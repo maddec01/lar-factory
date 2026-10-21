@@ -11,10 +11,22 @@ where `<mux-work>` is the folder holding this file's parent.
 1. Set **In progress**. Read the issue (brief, comments, linked prototype or
    research branches) and the repo's `AGENTS.md`. Run the repo's worktree setup
    if `AGENTS.md` asks for it.
-2. For a change that spans several modules, start an **Exploration subagent**
-   first. It reads the code the brief touches and writes notes (files, owners,
-   existing tests, traps) to `$TMPDIR/mux-<n>-notes.md`. Work from the notes,
-   not by reading everything yourself.
+2. Before implementation, use a quick file/path inspection to bound the relevant
+   reading scope. Count physical lines in the full existing hand-written files
+   needed to understand the change, including relevant tests and dependencies,
+   once each; exclude generated files, vendored files and lockfiles. Measure the
+   reading scope, not repository size or the eventual diff.
+
+   - **Read directly** when implementation stays in one repository and the scope
+     totals **2,000 lines or fewer**.
+   - **Start an Exploration subagent** when the scope exceeds 2,000 lines,
+     implementation spans repositories, or quick inspection cannot bound the
+     scope. If direct reading reveals required files that push the total above
+     2,000, switch to Exploration before implementation.
+
+   On the delegated path, the subagent writes notes (files, owners, existing
+   tests, traps) to `$TMPDIR/mux-<n>-notes.md`; work from those notes. On the
+   direct path, work from your own reading.
 3. Build test-first with the `tdd` skill, using `developer-profile` and, when a
    module's shape changes, `codebase-design`. Each commit is one reviewable step
    with a conventional message (`AGENTS.md` lists types and scopes).

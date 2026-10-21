@@ -1,7 +1,7 @@
 // Browser side: keeps the page live by fetching /api/board every 15 s (every
 // second during an update) and re-rendering with the same template the server used.
 
-import { DEFAULT_UI, listGroupId, renderApp } from './render.ts';
+import { DEFAULT_UI, abandonPrompt, listGroupId, renderApp } from './render.ts';
 import type { FlowTab, ItemAction, RenderOptions, UiState, UpdateView, View } from './render.ts';
 import { platformOf } from './model.ts';
 import type { BoardData } from './model.ts';
@@ -34,7 +34,7 @@ let updating: { session: string | undefined; awaySince: number | null } | null =
 const ui: UiState = {
   ...DEFAULT_UI,
   view: location.hash === '#flow' ? 'flow' : 'board',
-  open: [],
+  toggled: {},
 };
 
 function render(): void {
@@ -48,7 +48,7 @@ function render(): void {
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-add-item],[data-update],details[id] > summary').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update],details[id] > summary').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
@@ -57,6 +57,8 @@ function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.queue) return `queue-${el.dataset.queue}`;
   if (el.dataset.start) return `start-${el.dataset.start}`;
   if (el.hasAttribute('data-update')) return 'update';
+  // Keyed by project item id, since a draft has no number.
+  if (el.dataset.abandon) return `abandon-${el.dataset.abandon}`;
   return el.dataset.view ?? el.dataset.flowTab ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
 }
 
@@ -238,7 +240,7 @@ async function submitItem(): Promise<void> {
       mutationVersion++;
       data = result.board;
       notice = { verb: 'Added', item: result.item, to: 'List' };
-      ui.open = [...new Set([...ui.open, listGroupId(platformOf(result.item, data.repos))])];
+      ui.toggled[listGroupId(platformOf(result.item, data.repos))] = true;
       submission = { phase: 'complete' };
       revealList = true;
       setView('board');
@@ -273,13 +275,17 @@ async function postAction<T extends { error: string | null; board?: BoardData }>
   }
 }
 
+/** When this button's row leaves List, keep keyboard focus in the list: the same button on the next row, else its group. */
+function focusAfterLeaving(button: HTMLElement, attr: string): string {
+  const row = button.closest('li');
+  const neighbour = (row?.nextElementSibling ?? row?.previousElementSibling)?.querySelector<HTMLElement>(`[${attr}]`);
+  return neighbour ? focusKeyOf(neighbour) : `summary-${button.closest('details')?.id}`;
+}
+
 async function queueItem(button: HTMLElement): Promise<void> {
   const itemId = button.dataset.queue!;
   if (actions[itemId]?.phase === 'pending') return;
-  // When this row leaves List, keep keyboard focus in the list: the next row, else its group.
-  const row = button.closest('li');
-  const neighbour = (row?.nextElementSibling ?? row?.previousElementSibling)?.querySelector<HTMLElement>('[data-queue]');
-  const nextFocus = neighbour ? focusKeyOf(neighbour) : `summary-${button.closest('details')?.id}`;
+  const nextFocus = focusAfterLeaving(button, 'data-queue');
   actions[itemId] = { phase: 'pending' };
   render();
   const result = await postAction('/api/queue', { itemId });
@@ -324,8 +330,53 @@ async function startItem(itemId: string): Promise<void> {
   }
 }
 
+const abandonDialog = document.getElementById('abandon-dialog') as HTMLDialogElement;
+const abandonConfirm = abandonDialog.querySelector<HTMLButtonElement>('[data-abandon-confirm]')!;
+let abandonTarget: string | null = null;
+
+function askAbandon(itemId: string): void {
+  const item = data.items.find((i) => i.id === itemId);
+  if (!item || actions[itemId]?.phase === 'pending') return;
+  const prompt = abandonPrompt(item);
+  document.getElementById('abandon-heading')!.textContent = prompt.question;
+  document.getElementById('abandon-detail')!.textContent = prompt.detail;
+  abandonConfirm.textContent = prompt.confirm;
+  abandonTarget = itemId;
+  abandonDialog.returnValue = '';
+  abandonDialog.showModal();
+}
+
+abandonDialog.querySelector('[data-abandon-cancel]')!.addEventListener('click', () => abandonDialog.close());
+abandonConfirm.addEventListener('click', () => abandonDialog.close('confirm'));
+// Escape closes it too, as a cancel. A poll may have redrawn the button, so focus it by key.
+abandonDialog.addEventListener('close', () => {
+  const itemId = abandonTarget;
+  abandonTarget = null;
+  if (!itemId) return;
+  if (abandonDialog.returnValue === 'confirm') void abandonItem(itemId);
+  else focusByKey(`abandon-${itemId}`);
+});
+
+async function abandonItem(itemId: string): Promise<void> {
+  const button = app.querySelector<HTMLElement>(`[data-abandon="${CSS.escape(itemId)}"]`);
+  const item = data.items.find((i) => i.id === itemId);
+  if (!button || !item || actions[itemId]?.phase === 'pending') return;
+  const nextFocus = focusAfterLeaving(button, 'data-abandon');
+  actions[itemId] = { phase: 'pending', kind: 'abandon' };
+  render();
+  focusByKey(`abandon-${itemId}`);
+  const result = await postAction('/api/abandon', { session: data.capture?.session, itemId });
+  if (result.error) actions[itemId] = { phase: 'error', kind: 'abandon', message: result.error };
+  else {
+    delete actions[itemId];
+    notice = { verb: 'Abandoned', item };
+  }
+  render();
+  if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
+}
+
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-add-item],[data-update]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update]');
   if (!target) return;
   if (target.hasAttribute('data-add-item')) {
     if (submission.phase === 'complete') resetDraft();
@@ -339,6 +390,7 @@ app.addEventListener('click', (event) => {
   else if (target.dataset.queue) void queueItem(target);
   else if (target.dataset.start) void startItem(target.dataset.start);
   else if (target.hasAttribute('data-update')) void startUpdate();
+  else if (target.dataset.abandon) askAbandon(target.dataset.abandon);
 });
 
 // Arrow keys move between the Board and Flow tabs (WAI-ARIA tabs pattern).
@@ -355,8 +407,7 @@ app.addEventListener(
   (event) => {
     const el = event.target as HTMLDetailsElement;
     if (!el.id) return;
-    ui.open = ui.open.filter((id) => id !== el.id);
-    if (el.open) ui.open.push(el.id);
+    ui.toggled[el.id] = el.open;
   },
   true,
 );

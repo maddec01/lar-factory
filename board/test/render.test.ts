@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
-import { DEFAULT_UI, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
+import { DEFAULT_UI, abandonPrompt, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData } from '../src/model.ts';
 
@@ -104,11 +104,28 @@ test('an update shows its steps as they finish, then its result', () => {
   assert.match(refused, /role="alert"><strong>The update didn't start.<\/strong> A Start is running/);
 });
 
-test('board view, with List and Done expanded', () => {
-  matchesSaved(
-    'board.html',
-    renderBoardView(sample, { ...base, ui: { ...DEFAULT_UI, open: ['list-server', 'list-apple', 'list-draft', 'done-list'] } }),
-  );
+test('board view, with List open by default and Done expanded', () => {
+  matchesSaved('board.html', renderBoardView(sample, { ...base, ui: { ...DEFAULT_UI, toggled: { 'done-list': true } } }));
+});
+
+test('List groups open by default, Done stays closed, and a Hide closes one group', () => {
+  const opened = (html: string) => [...html.matchAll(/<details class="platform" id="([^"]+)" open>/g)].map((m) => m[1]);
+  assert.deepEqual(opened(renderBoardView(sample, base)), ['list-server', 'list-apple', 'list-draft']);
+  assert.deepEqual(opened(renderBoardView(sample, { ...base, ui: { ...DEFAULT_UI, toggled: { 'list-apple': false } } })),
+    ['list-server', 'list-draft']);
+});
+
+test('List and Done rows show one pill per label instead of the kind pill', () => {
+  const html = renderBoardView(sample, base);
+  const rowOf = (id: string) => {
+    const item = sample.items.find((i) => i.id === id)!;
+    return html.split('<li class="row-item">').find((r) => r.includes(`${item.title}</`))!;
+  };
+  const pills = (row: string) => [...row.matchAll(/<span class="label kind-[^"]*">([^<]*)<\/span>/g)].map((m) => m[1]);
+  assert.deepEqual(pills(rowOf('PVTI_sample03')), ['feature', 'app: music', 'os: ios', 'os: macos']);
+  assert.deepEqual(pills(rowOf('PVTI_sample19')), ['bug', 'os: watchos'], 'Done rows too');
+  assert.deepEqual(pills(rowOf('PVTI_sample04')), [], 'a draft has no labels');
+  for (const id of ['PVTI_sample03', 'PVTI_sample19']) assert.ok(!rowOf(id).includes('class="kind'), 'no separate kind pill');
 });
 
 test('flow view, all paths', () => {
@@ -156,6 +173,28 @@ test('Queue buttons appear only on List rows and show the action in flight or it
   assert.match(acting, /<span class="action-error" role="alert">Could not set Queued.<\/span><button[^>]*data-queue/);
 });
 
+test('Abandon appears only on List rows, next to Queue, and shows the delete in flight', () => {
+  const html = renderBoardView(sample, base);
+  assert.deepEqual(buttons(html, 'data-abandon').sort(), ids('List').sort());
+  assert.match(html, /data-queue="PVTI_sample01"[^>]*>Queue<\/button><button[^>]*data-abandon="PVTI_sample01"[^>]*aria-label="Abandon #61 [^"]*"[^>]*>Abandon<\/button>/);
+  const acting = renderBoardView(sample, { ...base, actions: {
+    PVTI_sample01: { phase: 'pending', kind: 'abandon' },
+    PVTI_sample02: { phase: 'error', kind: 'abandon', message: 'Could not delete #114. Must have admin rights.' } } });
+  assert.match(acting, /data-queue="PVTI_sample01"[^>]*aria-disabled="true"[^>]*>Queue<\/button>/);
+  assert.match(acting, /data-abandon="PVTI_sample01"[^>]*aria-disabled="true"[^>]*>Abandoning…<\/button>/);
+  assert.match(acting, /role="alert">Could not delete #114\. Must have admin rights\.<\/span><button[^>]*data-queue="PVTI_sample02"/);
+});
+
+test('Abandon names the item it will delete or remove, and announces it without a link', () => {
+  const issue = sample.items.find((i) => i.id === 'PVTI_sample01')!;
+  const draft = sample.items.find((i) => i.id === 'PVTI_sample04')!;
+  assert.equal(abandonPrompt(issue).question, `Delete #61 ${issue.title}?`);
+  assert.equal(abandonPrompt(draft).question, `Remove draft ${draft.title}?`);
+  const html = renderApp(sample, { ...base, notice: { verb: 'Abandoned', item: issue } });
+  assert.match(html, new RegExp(`role="status">Deleted #61 ${issue.title}\\.</div>`));
+  assert.match(renderPage(sample, base), /<dialog id="abandon-dialog"[^>]*>[\s\S]*data-abandon-cancel autofocus>Cancel<\/button>/);
+});
+
 test('a queued or added item is announced in the header', () => {
   const item = sample.items[0]!;
   assert.match(renderApp(sample, { ...base, notice: { verb: 'Moved', item, to: 'Queued' } }),
@@ -195,12 +234,14 @@ test('copy describes the Queue and Start buttons instead of dragging or typing /
   assert.match(html, /Nothing queued\. Press Queue on a List item/);
 });
 
-test('a thread another page started shows on every page, and sample mode disables both buttons', () => {
+test('a thread another page started shows on every page, and sample mode disables every write button', () => {
   const started = renderBoardView({ ...sample, started: { PVTI_sample05: { threadId: 'thread-9', title: 'Shape the playback queue' } } }, base);
   assert.match(started, /Started T3 thread <b>Shape the playback queue<\/b> <code class="thread-id">thread-9<\/code>/);
   assert.ok(!started.includes('data-start="PVTI_sample05"'));
   const off = renderBoardView({ ...sample, capture: { session: 's', enabled: false } }, base);
-  assert.ok([...off.matchAll(/<button[^>]*data-(?:queue|start)="[^"]*"[^>]*>/g)].every((m) => m[0].includes(' disabled')));
+  const writes = [...off.matchAll(/<button[^>]*data-(?:queue|start|abandon)="[^"]*"[^>]*>/g)];
+  assert.ok(writes.some((m) => m[0].includes('data-abandon')));
+  assert.ok(writes.every((m) => m[0].includes(' disabled')));
 });
 
 test("a linked PR shows its checks: running with counts and age, amber when slow, passed, failed, or nothing", () => {

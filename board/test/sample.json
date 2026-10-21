@@ -26,7 +26,9 @@
       "url": "https://github.com/maddec01/mux-server/issues/61",
       "repo": "maddec01/mux-server",
       "labels": [
-        "feature"
+        "feature",
+        "area: server",
+        "area: web"
       ],
       "state": "OPEN",
       "parent": null,
@@ -48,7 +50,8 @@
       "url": "https://github.com/maddec01/mux-server/issues/114",
       "repo": "maddec01/mux-server",
       "labels": [
-        "bug"
+        "bug",
+        "area: server"
       ],
       "state": "OPEN",
       "parent": null,
@@ -70,7 +73,10 @@
       "url": "https://github.com/maddec01/mux-apple/issues/12",
       "repo": "maddec01/mux-apple",
       "labels": [
-        "feature"
+        "feature",
+        "app: music",
+        "os: ios",
+        "os: macos"
       ],
       "state": "OPEN",
       "parent": null,
@@ -516,7 +522,8 @@
       "url": "https://github.com/maddec01/mux-apple/issues/5",
       "repo": "maddec01/mux-apple",
       "labels": [
-        "bug"
+        "bug",
+        "os: watchos"
       ],
       "state": "CLOSED",
       "parent": null,

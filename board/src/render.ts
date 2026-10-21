@@ -4,6 +4,7 @@
 import {
   AMBER_STATUSES,
   STATUSES,
+  canAbandon,
   checkState,
   countsOf,
   flowNodeOf,
@@ -26,8 +27,8 @@ export type FlowTab = 'all' | 'bug' | 'feat' | 'vis' | 'fog';
 export interface UiState {
   view: View;
   flowTab: FlowTab;
-  /** ids of <details> elements the user opened. */
-  open: string[];
+  /** Open or closed, by <details> id, for the ones the user toggled since the page loaded. */
+  toggled: Record<string, boolean>;
 }
 
 export interface RenderOptions {
@@ -37,8 +38,8 @@ export interface RenderOptions {
   ui: UiState;
   /** Set by the browser when it can't reach the board server. */
   clientError?: string | null;
-  /** The item this page just added or moved, announced in the header. */
-  notice?: { verb: 'Added' | 'Moved'; item: Item; to: Status } | null;
+  /** The item this page just added, moved or abandoned, announced in the header. */
+  notice?: { verb: 'Added' | 'Moved'; item: Item; to: Status } | { verb: 'Abandoned'; item: Item } | null;
   /** Per item id: what this page is doing for the item. */
   actions?: Record<string, ItemAction>;
   /** What this page knows about an update that the server can't report: its own request, or a board that didn't come back. */
@@ -64,11 +65,13 @@ const UPDATE_HINTS: Record<UpdateStep, string> = {
 /** An action this page started for an item: in flight, failed, or (for Start) done. */
 export interface ItemAction {
   phase: 'pending' | 'error' | 'uncertain' | 'started';
+  /** Set for Abandon; Queue and Start leave it unset. */
+  kind?: 'abandon';
   message?: string;
   thread?: StartedThread;
 }
 
-export const DEFAULT_UI: UiState = { view: 'board', flowTab: 'all', open: [] };
+export const DEFAULT_UI: UiState = { view: 'board', flowTab: 'all', toggled: {} };
 
 // ---------- small helpers ----------
 
@@ -130,8 +133,8 @@ export function listGroupId(platform: string): string {
   return `list-${slug(platform)}`;
 }
 
-function isOpen(ui: UiState, id: string): string {
-  return ui.open.includes(id) ? ' open' : '';
+function isOpen(ui: UiState, id: string, byDefault: boolean): string {
+  return ui.toggled[id] ?? byDefault ? ' open' : '';
 }
 
 // ---------- shared bits ----------
@@ -143,6 +146,11 @@ function platformBadge(item: Item, data: BoardData): string {
 
 function kindPill(item: Item): string {
   return `<span class="kind kind-${kindOf(item)}">${esc(kindLabel(item))}</span>`;
+}
+
+/** One pill per GitHub label, kind included; a kind label keeps its colour. Always rendered, so it pushes a row's buttons to the end. */
+function labelPills(item: Item): string {
+  return `<span class="labels">${item.labels.map((l) => `<span class="label kind-${esc(slug(l))}">${esc(l)}</span>`).join('')}</span>`;
 }
 
 function titleLink(item: Item, cls = 'title'): string {
@@ -220,8 +228,9 @@ function cards(items: Item[], data: BoardData, now: number, empty: string, extra
   return `<div class="cards">${items.map((i) => card(i, data, now, extra?.(i), action?.(i))).join('\n')}</div>`;
 }
 
-function row(item: Item, data: BoardData, trailing = '', withPlatform = true): string {
-  return `<li class="row-item">${withPlatform ? platformBadge(item, data) : ''}${titleLink(item, 'row-title')}${kindPill(item)}${trailing}</li>`;
+/** List and Done rows show every label; sub-issue rows keep the card's kind pill. */
+function row(item: Item, data: BoardData, trailing = '', withPlatform = true, pills: 'labels' | 'kind' = 'labels'): string {
+  return `<li class="row-item">${withPlatform ? platformBadge(item, data) : ''}${titleLink(item, 'row-title')}${pills === 'labels' ? labelPills(item) : kindPill(item)}${trailing}</li>`;
 }
 
 function actionError(action: ItemAction | undefined): string {
@@ -237,8 +246,14 @@ function writeState(data: BoardData, action: ItemAction | undefined): string {
 }
 
 function queueButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
-  const verb = action?.phase === 'pending' ? 'Queuing…' : 'Queue';
+  const verb = action?.phase === 'pending' && action.kind !== 'abandon' ? 'Queuing…' : 'Queue';
   return `${actionError(action)}<button type="button" class="copy row-action" data-queue="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
+}
+
+function abandonButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
+  if (!canAbandon(item)) return '';
+  const verb = action?.phase === 'pending' && action.kind === 'abandon' ? 'Abandoning…' : 'Abandon';
+  return `<button type="button" class="copy row-action abandon" data-abandon="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
 }
 
 /** Start's button for the card's top row, and the message under the card when there is one. */
@@ -316,7 +331,10 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
   if (update && (update.error || update.behind === null)) {
     banners.push(`<div class="banner" role="status"><strong>${update.error ? 'Board update check failed.' : 'Checking for board updates…'}</strong>${update.error ? ` ${esc(update.error)}` : ''}</div>`);
   }
-  if (opts.notice) {
+  if (opts.notice?.verb === 'Abandoned') {
+    // The issue is gone, so there is nothing to link to.
+    banners.push(`<div class="banner capture-success" role="status">${esc(abandonPrompt(opts.notice.item).done)}</div>`);
+  } else if (opts.notice) {
     const { verb, item, to } = opts.notice;
     banners.push(`<div class="banner capture-success" role="status">${verb} ${titleLink(item)} to ${esc(to)}.</div>`);
   }
@@ -348,6 +366,24 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
 </ul>
 ${banners.join('\n')}
 </header>`;
+}
+
+/** What Abandon asks before it deletes, and what it says after. */
+export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
+  return item.type === 'DraftIssue'
+    ? { question: `Remove draft ${item.title}?`, detail: "This removes the draft from the project. It can't be undone.",
+        confirm: 'Remove draft', done: `Removed draft ${item.title}.` }
+    : { question: `Delete ${ref(item)} ${item.title}?`, detail: `This permanently deletes the issue from ${item.repo} on GitHub. It can't be undone.`,
+        confirm: 'Delete issue', done: `Deleted ${ref(item)} ${item.title}.` };
+}
+
+/** Abandon's confirmation. The page fills in the item; it stays outside the polling render area. */
+export function renderAbandonDialog(): string {
+  return `<dialog id="abandon-dialog" aria-labelledby="abandon-heading" aria-describedby="abandon-detail">
+<div class="form-heading"><h2 id="abandon-heading"></h2></div>
+<p class="form-hint" id="abandon-detail"></p>
+<div class="form-actions"><button type="button" class="copy" data-abandon-cancel autofocus>Cancel</button><button type="button" class="copy abandon" data-abandon-confirm></button></div>
+</dialog>`;
 }
 
 /** A stable dialog outside the board's polling render area. */
@@ -400,7 +436,7 @@ function conceptBlock(concept: Item, data: BoardData, now: number): string {
       const amber = AMBER_STATUSES.includes(s) ? ' amber' : '';
       return `<li class="sub-group"><span class="sub-status${amber}">${esc(s)}</span><ul>${list
         .map((c) =>
-          row(c, data, c.blockedBy ? `<span class="blocked">blocked by ${c.blockedBy}</span>` : ''),
+          row(c, data, c.blockedBy ? `<span class="blocked">blocked by ${c.blockedBy}</span>` : '', true, 'kind'),
         )
         .join('')}</ul></li>`;
     })
@@ -444,13 +480,13 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       const mine = list.filter((i) => platformOf(i, data.repos) === p);
       const id = listGroupId(p);
       const body = mine.length
-        ? `<ul class="rows">${mine.map((i) => row(i, data, queueButton(i, data, opts.actions?.[i.id]), false)).join('')}</ul>`
+        ? `<ul class="rows">${mine.map((i) => row(i, data, queueButton(i, data, opts.actions?.[i.id]) + abandonButton(i, data, opts.actions?.[i.id]), false)).join('')}</ul>`
         : '<p class="empty">Nothing in List.</p>';
-      return `<details class="platform" id="${id}"${isOpen(ui, id)}><summary><span class="plat plat-${esc(slug(p))}">${esc(p)}</span> <b>${mine.length}</b> in List</summary>${body}</details>`;
+      return `<details class="platform" id="${id}"${isOpen(ui, id, true)}><summary><span class="plat plat-${esc(slug(p))}">${esc(p)}</span> <b>${mine.length}</b> in List</summary>${body}</details>`;
     })
     .join('')}</div>`;
 
-  const doneBody = `<details class="platform" id="done-list"${isOpen(ui, 'done-list')}><summary>Show ${plural(done.length, 'item')} closed in the last 7 days</summary>${
+  const doneBody = `<details class="platform" id="done-list"${isOpen(ui, 'done-list', false)}><summary>Show ${plural(done.length, 'item')} closed in the last 7 days</summary>${
     done.length
       ? `<ul class="rows">${done
           .map((i) =>

@@ -1,7 +1,7 @@
 // Reads the Mux project through the local `gh` CLI (`gh api graphql`).
 
 import { execFile } from 'node:child_process';
-import { STATUSES } from './model.ts';
+import { STATUSES, kindOf } from './model.ts';
 import type { Checks, ContentType, IssueLinks, IssueRef, Item, LinkedPr, Status } from './model.ts';
 import type { BoardConfig } from './config.ts';
 import type { CreationProgress, CreationResult } from './add-item.ts';
@@ -14,6 +14,8 @@ const MAX_PAGES = 20;
 const CHECK_SLICE = 20;
 /** Blocked-by and blocking links read per issue; the rest are counted. */
 const LINK_SLICE = 20;
+/** A build's slices read per build; more than this is a build to split. */
+const SLICE_LIMIT = 50;
 
 export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String) {
   user(login: $owner) {
@@ -37,6 +39,7 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               labels(first: 20) { nodes { name } }
               parent { number title url state repository { nameWithOwner } }
               subIssuesSummary { total completed }
+              subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state repository { nameWithOwner } } }
               issueDependenciesSummary { blockedBy }
               blockedBy(first: ${LINK_SLICE}) { ...links }
               blocking(first: ${LINK_SLICE}) { ...links }
@@ -106,6 +109,7 @@ interface RawContent {
   labels?: RawLabelConn;
   parent?: RawIssueRef | null;
   subIssuesSummary?: { total: number; completed: number };
+  subIssues?: { nodes: RawIssueRef[] };
   issueDependenciesSummary?: { blockedBy: number };
   blockedBy?: RawIssueLinks;
   blocking?: RawIssueLinks;
@@ -218,7 +222,7 @@ export function normalizeItem(raw: RawItem): Item | null {
   const c = raw.content;
   if (!c) return null;
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
-  return {
+  const item: Item = {
     id: raw.id,
     status: toStatus(raw.status?.name),
     type: c.__typename,
@@ -236,7 +240,10 @@ export function normalizeItem(raw: RawItem): Item | null {
     updatedAt: updated,
     closedAt: c.closedAt ?? null,
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
+    slices: [],
   };
+  // Only a build's sub-issues are slices; a concept's are items on the board.
+  return kindOf(item) === 'build' ? { ...item, slices: c.subIssues?.nodes.map(normalizeIssueRef) ?? [] } : item;
 }
 
 // ---------- gh ----------
@@ -390,7 +397,7 @@ export async function addProjectItem(
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'OPEN',
       parent: null, subIssues: { total: 0, completed: 0 }, blockedBy: 0,
       blockers: { total: 0, nodes: [] }, blocking: { total: 0, nodes: [] },
-      updatedAt: issue.updated_at, closedAt: null, linkedPrs: [],
+      updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],
     };
     return { item: progress.item, issueUrl: issue.html_url, error: null };
   } catch (err) {

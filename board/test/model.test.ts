@@ -24,6 +24,7 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
     updatedAt: '2026-10-21T09:00:00Z',
     closedAt: null,
     linkedPrs: [],
+    slices: [],
     ...extra,
   };
 }

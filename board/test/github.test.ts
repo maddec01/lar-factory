@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeItem } from '../src/github.ts';
+import { ITEMS_QUERY, normalizeItem } from '../src/github.ts';
 import type { RawItem, RawLinkedPr } from '../src/github.ts';
 
 test('normalizes an issue item from the GraphQL response', () => {
@@ -93,4 +93,23 @@ test("a linked PR's check rollup becomes counts over all checks and the earliest
   assert.equal(pr(null)?.checks, null, 'no checks, no rollup');
   assert.equal(pr({ contexts: { checkRunCountsByState: counts({ SUCCESS: 0 }), statusContextCountsByState: [], nodes: [] } })?.checks, null,
     'a rollup with nothing in it is no checks');
+});
+
+test("a build's slices come from the board query, open and closed; other kinds keep none", () => {
+  assert.match(ITEMS_QUERY, /subIssues\(first: \d+\) \{ nodes \{ number title url state repository \{ nameWithOwner \} \} \}/,
+    'the same query reads sub-issue nodes, so a refresh makes no extra request');
+  const subIssues = { nodes: [
+    { number: 46, title: 'First slice', url: 's46', state: 'CLOSED' as const, repository: { nameWithOwner: 'maddec01/mux-factory' } },
+    { number: 47, title: 'Second slice', url: 's47', state: 'OPEN' as const, repository: { nameWithOwner: 'maddec01/mux-factory' } },
+  ] };
+  const issue = (labels: string[]) => normalizeItem({
+    id: 'PVTI_5', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'In progress' },
+    content: { __typename: 'Issue', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
+      labels: { nodes: labels.map((name) => ({ name })) }, subIssues },
+  });
+  assert.deepEqual(issue(['build'])?.slices, [
+    { number: 46, title: 'First slice', url: 's46', repo: 'maddec01/mux-factory', state: 'CLOSED' },
+    { number: 47, title: 'Second slice', url: 's47', repo: 'maddec01/mux-factory', state: 'OPEN' },
+  ]);
+  assert.deepEqual(issue(['concept'])?.slices, [], "a concept's sub-issues are board items, not slices");
 });

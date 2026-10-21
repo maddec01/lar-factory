@@ -84,6 +84,8 @@ export interface Item {
   updatedAt: string;
   closedAt: string | null;
   linkedPrs: LinkedPr[];
+  /** A build's slices, open and closed: its sub-issues, which never join the project. Empty for other kinds. */
+  slices: IssueRef[];
 }
 
 /** A T3 Code thread the board started. */

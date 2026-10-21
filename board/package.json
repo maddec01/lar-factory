@@ -2,7 +2,7 @@
   "name": "mux-factory-board",
   "private": true,
   "version": "0.1.0",
-  "description": "Local board for the Mux factory: reads the Mux GitHub Project through gh and shows it as a board and a flow diagram.",
+  "description": "Local board for the Mux factory: reads the Mux GitHub Project through gh and shows it as a board and an outline of how items relate.",
   "type": "module",
   "engines": {
     "node": ">=22.18"

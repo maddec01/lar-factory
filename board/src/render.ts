@@ -7,7 +7,7 @@ import {
   canAbandon,
   checkState,
   countsOf,
-  flowNodeOf,
+  isOnBoard,
   isRecentlyDone,
   isSlow,
   isStale,
@@ -15,18 +15,15 @@ import {
   kindOf,
   platformOf,
   ref,
-  trackOf,
   workCommand,
 } from './model.ts';
-import type { BoardData, FlowNode, Item, LinkedPr, StartedThread, Status, Track, UpdateStep } from './model.ts';
+import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, StartedThread, Status, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
-export type FlowTab = 'all' | 'bug' | 'feat' | 'vis' | 'fog';
 
 export interface UiState {
   view: View;
-  flowTab: FlowTab;
   /** Open or closed, by <details> id, for the ones the user toggled since the page loaded. */
   toggled: Record<string, boolean>;
 }
@@ -74,7 +71,7 @@ export interface ItemAction {
 /** The Mux logo: viewBox and path copied unchanged from mux-server's BrandMark.tsx. */
 export const BRAND_MARK = '<svg class="brand-mark" role="img" aria-label="Mux" viewBox="0 0 56 32" fill="none"><path d="M5 3.5v25M5 3.5V12a8.5 8.5 0 0 0 17 0V3.5M22 12c0 4.5 2 7.5 5.5 7.5M36 3.5l14 17M50 3.5l-14 17" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-export const DEFAULT_UI: UiState = { view: 'board', flowTab: 'all', toggled: {} };
+export const DEFAULT_UI: UiState = { view: 'board', toggled: {} };
 
 // ---------- small helpers ----------
 
@@ -540,150 +537,88 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
 
 // ---------- flow view ----------
 
-const STORIES: Record<FlowTab, string> = {
-  all: 'Every item goes through the same columns. Only the shaping step differs. Pick an issue type to see its path.',
-  bug: "Bug: a subagent reproduces it and finds the cause, and you're only asked if the expected behaviour is unclear. Usually no prototype and no Verify step.",
-  feat: "Small feature: you're grilled in the shaping thread until there are no doubts. No prototype. It goes to Ready to merge unless it touches something risky.",
-  vis: 'Visual feature: grilling plus a prototype subagent that builds variants for you to pick from. It always ends in Verify, so you see it before merging.',
-  fog: 'Foggy concept: the issue becomes a map, with decision sub-issues worked one per thread. Build sub-issues appear as decisions close, and each one runs through build, review and merge on its own.',
-};
-
-const TAB_LABELS: Record<FlowTab, string> = {
-  all: 'All paths',
-  bug: 'Bug',
-  feat: 'Small feature',
-  vis: 'Visual feature',
-  fog: 'Foggy concept',
-};
-
-const TAB_TRACK: Record<FlowTab, Track | null> = {
-  all: null,
-  bug: 'bug',
-  feat: 'feat',
-  vis: 'feat',
-  fog: 'fog',
-};
-
-export function flowItems(data: BoardData, tab: FlowTab, now: number): Map<FlowNode, Item[]> {
-  const track = TAB_TRACK[tab];
-  const out = new Map<FlowNode, Item[]>();
-  for (const item of [...data.items].sort(byFlowOrder)) {
-    if (item.status === 'Done' && !isRecentlyDone(item, now)) continue;
-    if (track && trackOf(item) !== track) continue;
-    const node = flowNodeOf(item);
-    out.set(node, [...(out.get(node) ?? []), item]);
-  }
-  return out;
+function issueKey(repo: string | null, number: number | null): string | null {
+  return repo && number !== null ? `${repo}#${number}` : null;
 }
 
+function outlineOrder(a: Item, b: Item): number {
+  return STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || (a.number ?? 0) - (b.number ?? 0);
+}
+
+function statusChip(item: Item): string {
+  const tone = AMBER_STATUSES.includes(item.status) ? ' amber' : item.status === 'Done' ? ' done' : '';
+  return `<span class="o-status${tone}">${esc(item.status)}</span>`;
+}
+
+/** `#n` within the same repo, `repo#n` across repos. */
+function shortRef(r: IssueRef, from: string | null): string {
+  return r.repo === from ? `#${r.number}` : `${r.repo.split('/')[1]}#${r.number}`;
+}
+
+/** A Board item jumps to its own row; anything else is a dashed reference to GitHub with its state. */
+function issueRefLink(r: IssueRef, from: string | null, shown: Map<string, Item>): string {
+  const item = shown.get(issueKey(r.repo, r.number)!);
+  const label = `<b>${esc(shortRef(r, from))}</b> ${esc(r.title)}`;
+  if (item) return `<a class="o-ref" href="#flow" data-outline-jump="${esc(item.id)}">${label}</a> ${statusChip(item)}`;
+  return `<a class="o-ref off" href="${esc(r.url)}" target="_blank" rel="noopener">${label}</a> <span class="o-off">not on board · ${r.state === 'OPEN' ? 'open' : 'closed'}</span>`;
+}
+
+/** One row per link GitHub returned, then a count of the rest. */
+function linkRows(rel: 'blocked by' | 'blocks', links: IssueLinks, from: string | null, shown: Map<string, Item>): string {
+  const cls = rel === 'blocked by' ? 'blocked-by' : 'blocks';
+  const rows = links.nodes.map((r) => `<li class="o-link ${cls}"><span class="o-rel">${rel}</span> ${issueRefLink(r, from, shown)}</li>`);
+  const more = links.total - links.nodes.length;
+  if (more > 0) rows.push(`<li class="o-link ${cls} o-more"><span class="o-rel">${rel}</span> ${plural(more, 'more issue', 'more issues')}</li>`);
+  return rows.join('');
+}
+
+/**
+ * Parent/child and blocked-by links as an indented outline. Only links GitHub
+ * records are shown; issues that aren't on the Board appear as references.
+ */
 export function renderFlowView(data: BoardData, opts: RenderOptions): string {
-  const tab = opts.ui.flowTab;
-  const placed = flowItems(data, tab, opts.now);
-  const dim = (paths: string) => (tab !== 'all' && !paths.split(' ').includes(tab) ? ' dim' : '');
+  const items = data.items.filter((i) => isOnBoard(i, opts.now)).sort(outlineOrder);
+  const shown = new Map(items.flatMap((i) => {
+    const key = issueKey(i.repo, i.number);
+    return key ? [[key, i] as const] : [];
+  }));
+  const parentKey = (i: Item) => (i.parent ? issueKey(i.parent.repo, i.parent.number) : null);
+  const children = new Map<string, Item[]>();
+  for (const i of items) {
+    const key = parentKey(i);
+    if (key) children.set(key, [...(children.get(key) ?? []), i]);
+  }
 
-  const live = (node: FlowNode) => {
-    const list = placed.get(node) ?? [];
-    if (!list.length) return '';
-    return `<ul class="live" aria-label="Items here">${list
-      .map((i) => {
-        const amber = AMBER_STATUSES.includes(i.status);
-        const label = `${platformOf(i, data.repos)} ${ref(i)}: ${i.title}${amber ? ' (needs you)' : ''}`;
-        const inner = `<span class="ic-plat">${esc(platformOf(i, data.repos))}</span><b>${esc(ref(i))}</b> <span class="ic-title">${esc(i.title)}</span>${amber ? '<span class="ic-you">needs you</span>' : ''}`;
-        return `<li>${
-          i.url
-            ? `<a class="ichip${amber ? ' amber' : ''}" href="${esc(i.url)}" target="_blank" rel="noopener" title="${esc(label)}">${inner}</a>`
-            : `<span class="ichip${amber ? ' amber' : ''}" title="${esc(label)}">${inner}</span>`
-        }</li>`;
-      })
-      .join('')}</ul>`;
+  const node = (i: Item): string => {
+    const kids = children.get(issueKey(i.repo, i.number) ?? '') ?? [];
+    const missing = i.subIssues.total - kids.length;
+    const kidRows = kids.map(node).join('')
+      + (missing > 0 ? `<li class="o-missing">${plural(missing, 'more sub-issue')} not on the board</li>` : '');
+    const links = linkRows('blocked by', i.blockers, i.repo, shown) + linkRows('blocks', i.blocking, i.repo, shown);
+    const subs = i.subIssues.total ? `<span class="o-subs">${i.subIssues.completed}/${i.subIssues.total} sub-issues done</span>` : '';
+    return `<li class="o-node" id="o-${esc(i.id)}">
+<div class="o-row" data-anchor="o:${esc(i.id)}">${platformBadge(i, data)}${kindPill(i)}${titleLink(i, 'o-title')}${statusChip(i)}${subs}</div>
+${links ? `<ul class="o-links">${links}</ul>` : ''}${kidRows ? `<ul class="o-tree">${kidRows}</ul>` : ''}</li>`;
   };
-  const n = (node: FlowNode) => {
-    const c = placed.get(node)?.length ?? 0;
-    return `<span class="ncount${c ? ' has' : ''}" aria-label="${plural(c, 'item')}">${c}</span>`;
-  };
-  const who = (text: string) => `<span class="who">${text}</span>`;
-  const chips = (...names: string[]) =>
-    `<div class="chips">${names.map((c) => `<span class="chip">${esc(c)}</span>`).join('')}</div>`;
-  const arrow = '<div class="frow"><div></div><div class="arrow"></div></div>';
 
-  const tabs = (Object.keys(TAB_LABELS) as FlowTab[])
-    .map(
-      (t) =>
-        `<button type="button" class="tab" data-flow-tab="${t}" aria-pressed="${t === tab}">${TAB_LABELS[t]}</button>`,
-    )
-    .join('');
+  const related = (i: Item) => Boolean(i.parent || i.subIssues.total || i.blockers.total || i.blocking.total);
+  const roots: Item[] = [];
+  const offBoard = new Map<string, { parent: IssueRef; kids: Item[] }>();
+  for (const i of items.filter(related)) {
+    const key = parentKey(i);
+    if (!key) roots.push(i);
+    else if (!shown.has(key)) offBoard.set(key, { parent: i.parent!, kids: [...(offBoard.get(key)?.kids ?? []), i] });
+  }
+  const offRoots = [...offBoard.values()].map(({ parent, kids }) => `<li class="o-node o-offroot">
+<div class="o-row">${issueRefLink(parent, null, shown)}</div>
+<ul class="o-tree">${kids.map(node).join('')}</ul></li>`).join('');
+  const loose = items.filter((i) => !related(i));
+  const looseRows = loose.map((i) => `<li class="row-item" data-anchor="o:${esc(i.id)}">${platformBadge(i, data)}${titleLink(i, 'row-title')}${statusChip(i)}</li>`).join('');
 
-  return `<div class="flow">
-<div class="tabs" role="group" aria-label="Issue type">${tabs}</div>
-<p class="story">${esc(STORIES[tab])}</p>
-<div class="legend">
-<span><i class="dot" style="background:var(--you)"></i>You</span>
-<span><i class="dot" style="background:var(--thread)"></i>Your shaping thread (T3)</span>
-<span><i class="dot" style="background:var(--sub)"></i>Subagent, fresh context, returns a summary</span>
-<span><i class="dot" style="background:var(--build)"></i>Build thread (T3, own worktree)</span>
-<span><i class="ichip amber legend-chip"><b>#1</b><span class="ic-you">needs you</span></i>Live issue, waiting on you</span>
-</div>
-
-<div class="frow${dim('bug feat vis fog')}"><div class="col">List</div>
-<div class="box" style="--c:var(--you)" data-node="capture">${who('You')}<h3>Capture ${n('capture')}</h3><p>Add an issue to the server or Apple list, or a draft item in the Mux Project if you don't know the repo yet.</p>${live('capture')}</div></div>
-${arrow}
-<div class="frow${dim('bug feat vis fog')}"><div class="col">Queued</div>
-<div class="box" style="--c:var(--you)" data-node="queue">${who('You')}<h3>Queue and start ${n('queue')}</h3><p>Press Queue on a List item, then Start on its Queued card. Start opens a T3 thread that runs <code>/mux-work #123</code>. Nothing starts without this.</p>${live('queue')}</div></div>
-${arrow}
-<div class="frow${dim('bug feat vis fog')}"><div class="col">Shaping</div>
-<div class="box" style="--c:var(--thread)">${who('Agent')}<h3>Size up</h3><p>Reads the issue, glossary and ADRs. Proposes a route in two or three lines, and you confirm it.</p>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Explore subagent</h4><p>Reads the code involved and returns a short summary, so the shaping thread never holds whole files.</p></div></div>
-${chips('mux-work', 'domain-modeling')}</div></div>
-${arrow}
-<div class="frow${dim('bug feat vis fog')}"><div class="col">Shaping<br>Needs you</div>
-<div class="split">
-<div class="box${dim('bug')}" style="--c:var(--thread)" data-node="clear"><h3>Clear ${n('clear')}</h3><p>A bug it can reproduce, or a small, defined change.</p>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Diagnose subagent</h4><p>Reproduces the bug and finds the cause. Returns the cause and a failing test idea.</p></div></div>
-${chips('diagnosing-bugs')}${live('clear')}</div>
-<div class="box${dim('feat vis')}" style="--c:var(--thread)" data-node="decisions"><h3>Needs decisions ${n('decisions')}</h3><p>Fits one session. It grills you here, one question at a time, until no doubts are left.</p>
-<div class="nest"><div class="box${dim('vis')}" style="--c:var(--sub)"><h4>Prototype subagent</h4><p>Builds 2 or 3 variants that differ only on the open question. You try them in the browser preview or simulator and pick one.</p></div></div>
-${chips('grilling', 'domain-modeling', 'prototype')}${live('decisions')}</div>
-<div class="box${dim('fog')}" style="--c:var(--thread)" data-node="foggy"><h3>Foggy ${n('foggy')}</h3><p>The issue becomes the parent. Its body is the map.</p>
-<div class="map"><div>Destination</div><div>Decisions so far</div><div class="fog">Fog</div><div>Out of scope</div></div>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Research subagents</h4><p>Run in the background. Cited findings go on a <code>research/</code> branch, linked from the sub-issue.</p></div></div>
-${chips('grilling', 'research', 'domain-modeling')}${live('foggy')}</div>
-</div></div>
-
-<div class="frow${dim('fog')}"><div class="col">Concept</div>
-<div class="box" style="--c:var(--thread)" data-node="concept"><h3>Working the map, one decision per thread ${n('concept')}</h3><p>Each decision sub-issue is picked up like any item, in its own fresh shaping thread, so no thread holds the whole concept. When a decision closes, its answer goes on the map and the agent creates build sub-issues for what's now clear.</p>
-${live('concept')}
-<div class="loop">Each build sub-issue goes through the steps below on its own, as soon as nothing blocks it. The concept is done when the fog is gone and every build has merged.</div></div></div>
-${arrow}
-<div class="frow${dim('bug feat vis fog')}"><div class="col">Ready</div>
-<div class="box" style="--c:var(--thread)" data-node="gate">${who('Agent')}<h3>Gate, then brief ${n('gate')}</h3><p>Any unconfirmed assumption goes back to you. Then the brief is written into the issue: what to build, how to tell it's done, and the confirmed assumptions. The shaping thread ends here.</p>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Doubt subagent</h4><p>Reads only the brief, with no history, and tries to prove it wrong or ambiguous.</p></div></div>
-${chips('doubt-driven-development')}${live('gate')}</div></div>
-${arrow}
-<div class="frow${dim('bug feat vis fog')}"><div class="col">In progress</div>
-<div class="box" style="--c:var(--build)" data-node="build">${who('Agent')}<h3>Build ${n('build')}</h3><p>A new T3 thread in its own worktree. It starts from the brief alone, not from your conversation. Test-first, with clean conventional commits.</p>
-<div class="nest"><div class="box${dim('fog vis feat')}" style="--c:var(--sub)"><h4>Exploration subagent (big builds)</h4><p>Saves notes on the code involved, so the builder doesn't spend context exploring.</p></div></div>
-${chips('tdd', 'developer-profile', 'codebase-design')}${live('build')}</div></div>
-${arrow}
-<div class="frow${dim('bug feat vis fog')}"><div class="col">Review</div>
-<div class="box" style="--c:var(--build)" data-node="review"><h3>Four reviewers in parallel ${n('review')}</h3><p>Each subagent reads only the brief and the diff. If any asks for changes, the builder fixes them as fixup commits. Two rounds at most, then it goes to you.</p>
-<div class="nest two">
-<div class="box" style="--c:var(--sub)"><h4>Code</h4>${chips('code-review-and-quality', 'code-review')}</div>
-<div class="box" style="--c:var(--sub)"><h4>Security</h4>${chips('security-and-hardening')}</div>
-<div class="box" style="--c:var(--sub)"><h4>UX</h4><p>Does the flow match the brief?</p></div>
-<div class="box" style="--c:var(--sub)"><h4>UI</h4><p>Browser preview or simulator.</p>${chips('frontend-ui-engineering', 'browser-testing-with-devtools')}</div>
-</div>${live('review')}</div></div>
-${arrow}
-<div class="frow${dim('bug feat vis fog')}"><div class="col">Verify or<br>Ready to merge</div>
-<div class="box" style="--c:var(--build)"><h3>Approver</h3><p>Folds the fixups in, opens the PR with a conventional title, then decides where it goes. The item stays in Review until the required checks pass; a CI fixer subagent handles failures.</p>
-<div class="nest two">
-<div class="box${dim('vis fog')}" style="--c:var(--you)" data-node="verify">${who('You')}<h4>Verify ${n('verify')}</h4><p>It's visual, an agent couldn't check something, or it touches auth, migrations or deployment. You get test steps and links.</p>${live('verify')}</div>
-<div class="box${dim('bug feat fog')}" style="--c:var(--build)" data-node="ready-to-merge"><h4>Ready to merge ${n('ready-to-merge')}</h4><p>Not visual, and every reviewer was confident.</p>${live('ready-to-merge')}</div>
-</div>
-${chips('pr')}</div></div>
-${arrow}
-<div class="frow${dim('bug feat vis fog')}"><div class="col">Done</div>
-<div class="box" style="--c:var(--you)" data-node="merge">${who('You')}<h3>Merge ${n('merge')}</h3><p>You merge every PR. The issue closes and the board moves it to Done. Before the build thread closes, it suggests improvements to the skills and checks. You choose which to apply.</p>
-${chips('retro')}${live('merge')}</div></div>
+  return `<div class="outline">
+<ul class="o-legend" aria-label="Legend"><li><span class="o-rel">nested</span> sub-issue of the row above</li><li><span class="o-rel">blocked by</span> GitHub's blocked-by link</li><li><span class="o-rel">blocks</span> GitHub's blocking link</li><li><span class="o-ref off">dashed</span> not on the board, shown as a reference</li></ul>
+<ul class="o-tree o-root">${roots.map(node).join('')}${offRoots}</ul>
+<details class="platform o-loose" id="flow-loose"${isOpen(opts.ui, 'flow-loose', false)}><summary>${plural(loose.length, 'item')} with no recorded relationships</summary><ul class="rows">${looseRows}</ul></details>
 </div>`;
 }
 

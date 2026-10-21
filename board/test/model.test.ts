@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { checkState, countsOf, flowNodeOf, isRecentlyDone, isSlow, isStale, kindOf, trackOf, workCommand } from '../src/model.ts';
+import { checkState, countsOf, isRecentlyDone, isSlow, isStale, kindOf, workCommand } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
-import { esc, flowItems } from '../src/render.ts';
+import { esc } from '../src/render.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
   return {
@@ -28,52 +28,10 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
   };
 }
 
-test('fixed statuses map to one node each', () => {
-  const cases: [Status, string][] = [
-    ['List', 'capture'],
-    ['Queued', 'queue'],
-    ['Ready', 'gate'],
-    ['In progress', 'build'],
-    ['Review', 'review'],
-    ['Verify', 'verify'],
-    ['Ready to merge', 'ready-to-merge'],
-    ['Done', 'merge'],
-  ];
-  for (const [status, node] of cases) {
-    for (const labels of [[], ['bug'], ['concept'], ['decision: grill']]) {
-      assert.equal(flowNodeOf(item(status, labels)), node, `${status} ${labels}`);
-    }
-  }
-});
-
-test('Shaping and Needs you go to the route box for the kind', () => {
-  const cases: [string[], string][] = [
-    [['bug'], 'clear'],
-    [['feature'], 'decisions'],
-    [['improvement'], 'decisions'],
-    [[], 'decisions'],
-    [['build'], 'decisions'],
-    [['concept'], 'foggy'],
-    [['decision: grill'], 'concept'],
-    [['decision: prototype', 'feature'], 'concept'],
-    [['decision: research'], 'concept'],
-    [['decision: task'], 'concept'],
-  ];
-  for (const status of ['Shaping', 'Needs you'] as const) {
-    for (const [labels, node] of cases) {
-      assert.equal(flowNodeOf(item(status, labels)), node, `${status} ${labels}`);
-    }
-  }
-});
-
-test('kinds and tracks come from labels', () => {
+test('kinds come from labels', () => {
   assert.equal(kindOf(item('List', ['bug', 'concept'])), 'concept');
   assert.equal(kindOf(item('List', [], { type: 'DraftIssue' })), 'draft');
   assert.equal(kindOf(item('List', [])), 'issue');
-  assert.equal(trackOf(item('List', ['bug'])), 'bug');
-  assert.equal(trackOf(item('List', ['build'])), 'fog');
-  assert.equal(trackOf(item('List', ['decision: task'])), 'fog');
-  assert.equal(trackOf(item('List', ['improvement'])), 'feat');
 });
 
 test('Done counts for 7 days after closing', () => {
@@ -103,17 +61,6 @@ test('sample covers every status and both platforms', () => {
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/mux-server') && repos.has('maddec01/mux-apple'));
   assert.deepEqual(countsOf(sample), { total: 21, needsYou: 4, inFlight: 6, queued: 3, list: 4 });
-});
-
-test('flow tabs filter chips by issue type, and old Done items drop off', () => {
-  const now = Date.parse('2026-10-21T10:00:00Z');
-  const all = flowItems(sample, 'all', now);
-  assert.deepEqual(all.get('merge')?.map((i) => i.number), [5, 203]);
-  const fog = flowItems(sample, 'fog', now);
-  assert.deepEqual(fog.get('concept')?.map((i) => i.number), [201, 202]);
-  assert.equal(fog.get('capture'), undefined);
-  const bug = flowItems(sample, 'bug', now);
-  assert.ok([...bug.values()].flat().every((i) => i.labels.includes('bug')));
 });
 
 test('escapes HTML', () => {

@@ -195,76 +195,6 @@ export function kindLabel(item: Item): string {
   return kind;
 }
 
-/** The issue-type tabs of the flow diagram. */
-export type Track = 'bug' | 'feat' | 'fog';
-
-/**
- * Which flow-diagram path an item follows. Concepts, their decision and build
- * sub-issues follow the foggy path; bugs the bug path; everything else the
- * feature paths (small and visual can't be told apart from labels).
- */
-export function trackOf(item: Item): Track {
-  const kind = kindOf(item);
-  if (kind === 'concept' || kind === 'decision' || kind === 'build') return 'fog';
-  if (kind === 'bug') return 'bug';
-  return 'feat';
-}
-
-// ---------- flow nodes ----------
-
-export type FlowNode =
-  | 'capture'
-  | 'queue'
-  | 'clear'
-  | 'decisions'
-  | 'foggy'
-  | 'concept'
-  | 'gate'
-  | 'build'
-  | 'review'
-  | 'verify'
-  | 'ready-to-merge'
-  | 'merge';
-
-/** The route box an item is shaped in, by kind. */
-export function routeOf(item: Item): FlowNode {
-  switch (kindOf(item)) {
-    case 'bug':
-      return 'clear';
-    case 'concept':
-      return 'foggy';
-    case 'decision':
-      return 'concept';
-    default:
-      return 'decisions';
-  }
-}
-
-/** The flow node an item sits on, given its status. */
-export function flowNodeOf(item: Item): FlowNode {
-  switch (item.status) {
-    case 'List':
-      return 'capture';
-    case 'Queued':
-      return 'queue';
-    case 'Shaping':
-    case 'Needs you':
-      return routeOf(item);
-    case 'Ready':
-      return 'gate';
-    case 'In progress':
-      return 'build';
-    case 'Review':
-      return 'review';
-    case 'Verify':
-      return 'verify';
-    case 'Ready to merge':
-      return 'ready-to-merge';
-    case 'Done':
-      return 'merge';
-  }
-}
-
 // ---------- checks ----------
 
 /** Running while any check runs, then failed if any failed, else passed. */
@@ -287,6 +217,11 @@ export function isRecentlyDone(item: Item, now: number): boolean {
   if (item.status !== 'Done') return false;
   const at = Date.parse(item.closedAt ?? item.updatedAt);
   return Number.isFinite(at) && now - at <= DONE_WINDOW_MS;
+}
+
+/** Shown on the Board: anything not Done, and Done items closed in the last 7 days. */
+export function isOnBoard(item: Item, now: number): boolean {
+  return item.status !== 'Done' || isRecentlyDone(item, now);
 }
 
 export function platformOf(item: Item, repos: readonly RepoConfig[]): string {

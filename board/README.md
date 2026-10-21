@@ -21,8 +21,11 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
   runs, a double press, a retry or another tab starts no second thread. A
   queued draft needs an issue first; issues keep a copyable `/mux-work` command
   as a fallback.
-- **Flow** is the workflow diagram with each issue placed on the step it's at.
-  Pick an issue type to follow its path.
+- **Flow** is an outline of how items relate: sub-issues sit under their
+  parent, and each issue lists the issues it is blocked by and the ones it
+  blocks, as GitHub records them. A link to an item on the Board jumps to it;
+  issues that aren't on the Board (including Done items older than 7 days) show
+  as dashed references with their open or closed state. Nothing is inferred.
 - **Add item** creates an issue in a configured repository and adds it to List.
   Choose its kind and optional applicability labels. Empty applicability groups
   mean all apps, all operating systems, or both server areas. The form keeps

@@ -2,7 +2,7 @@
 // second during an update) and re-rendering with the same template the server used.
 
 import { DEFAULT_UI, abandonPrompt, listGroupId, renderApp } from './render.ts';
-import type { FlowTab, ItemAction, RenderOptions, UiState, UpdateView, View } from './render.ts';
+import type { ItemAction, RenderOptions, UiState, UpdateView, View } from './render.ts';
 import { platformOf } from './model.ts';
 import type { BoardData } from './model.ts';
 import { validateDraft } from './add-item.ts';
@@ -48,7 +48,7 @@ function render(): void {
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update],details[id] > summary').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update],details[id] > summary').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
@@ -59,7 +59,7 @@ function focusKeyOf(el: HTMLElement): string {
   if (el.hasAttribute('data-update')) return 'update';
   // Keyed by project item id, since a draft has no number.
   if (el.dataset.abandon) return `abandon-${el.dataset.abandon}`;
-  return el.dataset.view ?? el.dataset.flowTab ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
+  return el.dataset.view ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
 }
 
 function focusByKey(key: string): void {
@@ -119,6 +119,17 @@ function setView(view: View, focus = false): void {
   history.replaceState(null, '', view === 'flow' ? '#flow' : location.pathname);
   render();
   if (focus) app.querySelector<HTMLElement>(`[data-view="${view}"]`)?.focus();
+}
+
+/** Deliberate navigation: bring an element into view, flash it and move focus into it. */
+function jumpTo(el: HTMLElement | null): void {
+  if (!el) return;
+  el.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  el.classList.remove('anchor-flash');
+  void el.offsetWidth; // restart the animation
+  el.classList.add('anchor-flash');
+  // The title first: on a Queued card Start comes earlier in the page, and Enter must not start a thread.
+  el.querySelector<HTMLElement>('a.title, a.row-title, a.o-title, a, button')?.focus({ preventScroll: true });
 }
 
 async function copy(text: string, button: HTMLButtonElement): Promise<void> {
@@ -376,17 +387,18 @@ async function abandonItem(itemId: string): Promise<void> {
 }
 
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update],[data-outline-jump]');
   if (!target) return;
-  if (target.hasAttribute('data-add-item')) {
+  if (target.dataset.outlineJump) {
+    // An in-page link: keep it out of the hash, which picks the view.
+    event.preventDefault();
+    jumpTo(document.getElementById(`o-${target.dataset.outlineJump}`));
+  } else if (target.hasAttribute('data-add-item')) {
     if (submission.phase === 'complete') resetDraft();
     dialog.showModal();
     form.querySelector<HTMLElement>('[name="repo"]')?.focus();
   } else if (target.dataset.view) setView(target.dataset.view as View);
-  else if (target.dataset.flowTab) {
-    ui.flowTab = target.dataset.flowTab as FlowTab;
-    render();
-  } else if (target.dataset.copy) void copy(target.dataset.copy, target as HTMLButtonElement);
+  else if (target.dataset.copy) void copy(target.dataset.copy, target as HTMLButtonElement);
   else if (target.dataset.queue) void queueItem(target);
   else if (target.dataset.start) void startItem(target.dataset.start);
   else if (target.hasAttribute('data-update')) void startUpdate();

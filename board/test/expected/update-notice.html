@@ -257,63 +257,50 @@ details.platform summary::after { content: "Show"; margin-left: auto; color: var
 details.platform[open] summary::after { content: "Hide"; }
 details.platform summary b { font-size: 15px; font-variant-numeric: tabular-nums; }
 
-/* flow (from design/flow-reference.html) */
-.flow { max-width: 900px; }
-.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
-.tab { border: 1px solid var(--line); background: transparent; color: inherit; border-radius: 999px; padding: 5px 12px; font: inherit; cursor: pointer; }
-.tab[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: transparent; }
-.story { color: var(--muted); margin: 0 0 12px; min-height: 38px; }
-.legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 14px; color: var(--muted); font-size: 12px; }
-.legend span, .legend-chip { display: inline-flex; align-items: center; gap: 6px; }
-.legend-chip { font-style: normal; margin-right: 2px; }
-.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.frow { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: stretch; transition: opacity 0.2s; }
-.col { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding-top: 10px; text-align: right; }
-.box { border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: var(--r); padding: 9px 11px; background: color-mix(in srgb, var(--c) 7%, var(--bg)); min-width: 0; transition: opacity 0.2s; }
-.box h3, .box h4 { margin: 0 0 3px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
-.box p { margin: 0; color: var(--muted); }
-.who { float: right; font-size: 11px; color: var(--c); font-weight: 600; margin-left: 8px; }
-.box[style*="--you"] > .who { color: var(--you-text); }
-.chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
-.chip { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 1px 6px; border-radius: 5px; background: var(--soft); }
-.arrow { grid-column: 2; height: 16px; position: relative; }
-.arrow::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 0; border-left: 2px solid var(--line); }
-.split { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; min-width: 0; }
-.nest { margin-top: 7px; display: grid; gap: 5px; }
-.nest.two { grid-template-columns: 1fr 1fr; }
-.nest .box { padding: 6px 9px; border-left-width: 3px; }
-.dim { opacity: 0.18; }
-.loop { margin-top: 6px; font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 6px; }
-.map { margin-top: 7px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px; }
-.map div { border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
-.fog { border-style: dashed !important; color: var(--muted); }
-
-/* live issue chips on flow nodes */
-.ncount { font: 600 11px/1 ui-sans-serif, system-ui, sans-serif; min-width: 20px; text-align: center; padding: 3px 6px; border-radius: 999px; background: var(--soft); color: var(--muted); font-variant-numeric: tabular-nums; }
-.ncount.has { background: var(--fg); color: var(--bg); }
-.live { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 5px; }
-.live li { min-width: 0; max-width: 100%; }
-.ichip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; font-size: 12px; text-decoration: none; background: var(--surface); border: 1px solid var(--bd); border-radius: 6px; padding: 2px 7px; color: var(--fg); }
-a.ichip:hover { border-color: var(--fg); }
-.ichip b { font-variant-numeric: tabular-nums; flex: none; }
-.ic-plat { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); flex: none; }
-.ic-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; }
-.ichip.amber { border-color: var(--you); background: var(--you-soft); }
-.ic-you { flex: none; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--you-text); }
+/* flow: an outline of parent/child and blocked-by links */
+.outline { display: grid; gap: 12px; }
+.o-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; color: var(--muted); font-size: 12px; }
+.o-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.o-legend .o-ref.off { font-size: 11px; }
+.o-tree { list-style: none; margin: 0; padding: 0; }
+.o-root { display: grid; gap: 8px; }
+.o-root > .o-node { border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); padding: 4px; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
+.o-node .o-tree { margin-left: 15px; padding-left: 14px; border-left: 1px solid var(--line); }
+.o-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 32px; padding: 3px 8px; border-radius: var(--r-control); }
+.o-row:hover { background: var(--muted-bg); }
+.o-title { text-decoration: none; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+a.o-title:hover { text-decoration: underline; }
+.o-status { font-size: 11px; font-weight: 500; padding: 0 6px; min-height: 18px; display: inline-flex; align-items: center; border-radius: var(--r-sm); background: var(--accent); color: var(--muted); white-space: nowrap; }
+.o-status.amber { background: var(--you-soft); color: var(--you-text); }
+.o-status.done { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-fg); }
+.o-subs { font-size: 12px; color: var(--muted); }
+.o-links { list-style: none; margin: 0 0 2px; padding: 0 8px 0 30px; display: grid; gap: 2px; font-size: 12px; }
+.o-link { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 22px; }
+.o-more { color: var(--muted); }
+.o-rel { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.blocked-by .o-rel { color: var(--danger-text); }
+.o-ref { text-decoration: none; color: var(--fg); overflow-wrap: anywhere; }
+.o-ref:hover { text-decoration: underline; }
+.o-ref.off { border: 1px dashed var(--input); border-radius: var(--r-sm); padding: 0 6px; color: var(--muted); }
+.o-off { font-size: 11px; color: var(--muted); }
+.o-offroot > .o-row { color: var(--muted); }
+.o-missing { padding: 4px 8px; font-size: 12px; color: var(--muted); }
+.o-missing::before { content: "+ "; }
+.o-loose .rows { margin-top: 8px; }
+/* Where a jump landed. */
+.anchor-flash { animation: anchor-flash 1.6s ease-out; }
+@keyframes anchor-flash { from { box-shadow: 0 0 0 2px var(--primary); } to { box-shadow: 0 0 0 2px transparent; } }
 
 @media (max-width: 720px) {
-  .split { grid-template-columns: 1fr; }
   .cards.wide { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   #app { padding: 12px; }
-  .frow { grid-template-columns: 1fr; }
-  .col { text-align: left; padding: 4px 0 0; }
-  .arrow { grid-column: 1; }
-  .nest.two { grid-template-columns: 1fr; }
+  .o-links { padding-left: 12px; }
+  .o-node .o-tree { margin-left: 6px; padding-left: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .frow, .box { transition: none; }
+  .anchor-flash { animation: none; }
 }
 </style>
 </head>
@@ -425,77 +412,32 @@ a.ichip:hover { border-color: var(--fg); }
 </section>
 </div>
 <div class="panel" role="tabpanel" id="panel-flow" aria-labelledby="tab-flow" hidden>
-<div class="flow">
-<div class="tabs" role="group" aria-label="Issue type"><button type="button" class="tab" data-flow-tab="all" aria-pressed="true">All paths</button><button type="button" class="tab" data-flow-tab="bug" aria-pressed="false">Bug</button><button type="button" class="tab" data-flow-tab="feat" aria-pressed="false">Small feature</button><button type="button" class="tab" data-flow-tab="vis" aria-pressed="false">Visual feature</button><button type="button" class="tab" data-flow-tab="fog" aria-pressed="false">Foggy concept</button></div>
-<p class="story">Every item goes through the same columns. Only the shaping step differs. Pick an issue type to see its path.</p>
-<div class="legend">
-<span><i class="dot" style="background:var(--you)"></i>You</span>
-<span><i class="dot" style="background:var(--thread)"></i>Your shaping thread (T3)</span>
-<span><i class="dot" style="background:var(--sub)"></i>Subagent, fresh context, returns a summary</span>
-<span><i class="dot" style="background:var(--build)"></i>Build thread (T3, own worktree)</span>
-<span><i class="ichip amber legend-chip"><b>#1</b><span class="ic-you">needs you</span></i>Live issue, waiting on you</span>
-</div>
-
-<div class="frow"><div class="col">List</div>
-<div class="box" style="--c:var(--you)" data-node="capture"><span class="who">You</span><h3>Capture <span class="ncount has" aria-label="4 items">4</span></h3><p>Add an issue to the server or Apple list, or a draft item in the Mux Project if you don't know the repo yet.</p><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/114" target="_blank" rel="noopener" title="Server #114: Verify VideoToolbox 8-bit HEVC decoding during hardware detection"><span class="ic-plat">Server</span><b>#114</b> <span class="ic-title">Verify VideoToolbox 8-bit HEVC decoding during hardware detection</span></a></li><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/61" target="_blank" rel="noopener" title="Server #61: Arr instances, catalog bindings and content requests"><span class="ic-plat">Server</span><b>#61</b> <span class="ic-title">Arr instances, catalog bindings and content requests</span></a></li><li><a class="ichip" href="https://github.com/maddec01/mux-apple/issues/12" target="_blank" rel="noopener" title="Apple #12: Remember the last subtitle language per show"><span class="ic-plat">Apple</span><b>#12</b> <span class="ic-title">Remember the last subtitle language per show</span></a></li><li><span class="ichip" title="Draft draft: Shared playback history across devices"><span class="ic-plat">Draft</span><b>draft</b> <span class="ic-title">Shared playback history across devices</span></span></li></ul></div></div>
-<div class="frow"><div></div><div class="arrow"></div></div>
-<div class="frow"><div class="col">Queued</div>
-<div class="box" style="--c:var(--you)" data-node="queue"><span class="who">You</span><h3>Queue and start <span class="ncount has" aria-label="3 items">3</span></h3><p>Press Queue on a List item, then Start on its Queued card. Start opens a T3 thread that runs <code>/mux-work #123</code>. Nothing starts without this.</p><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/129" target="_blank" rel="noopener" title="Server #129: Run more than one 4K HDR to 1080p stream at a time"><span class="ic-plat">Server</span><b>#129</b> <span class="ic-title">Run more than one 4K HDR to 1080p stream at a time</span></a></li><li><a class="ichip" href="https://github.com/maddec01/mux-apple/issues/20" target="_blank" rel="noopener" title="Apple #20: Player controls stay visible after scrubbing &lt;on tvOS&gt;"><span class="ic-plat">Apple</span><b>#20</b> <span class="ic-title">Player controls stay visible after scrubbing &lt;on tvOS&gt;</span></a></li><li><span class="ichip" title="Draft draft: Offline downloads on watchOS"><span class="ic-plat">Draft</span><b>draft</b> <span class="ic-title">Offline downloads on watchOS</span></span></li></ul></div></div>
-<div class="frow"><div></div><div class="arrow"></div></div>
-<div class="frow"><div class="col">Shaping</div>
-<div class="box" style="--c:var(--thread)"><span class="who">Agent</span><h3>Size up</h3><p>Reads the issue, glossary and ADRs. Proposes a route in two or three lines, and you confirm it.</p>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Explore subagent</h4><p>Reads the code involved and returns a short summary, so the shaping thread never holds whole files.</p></div></div>
-<div class="chips"><span class="chip">mux-work</span><span class="chip">domain-modeling</span></div></div></div>
-<div class="frow"><div></div><div class="arrow"></div></div>
-<div class="frow"><div class="col">Shaping<br>Needs you</div>
-<div class="split">
-<div class="box" style="--c:var(--thread)" data-node="clear"><h3>Clear <span class="ncount has" aria-label="1 item">1</span></h3><p>A bug it can reproduce, or a small, defined change.</p>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Diagnose subagent</h4><p>Reproduces the bug and finds the cause. Returns the cause and a failing test idea.</p></div></div>
-<div class="chips"><span class="chip">diagnosing-bugs</span></div><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/130" target="_blank" rel="noopener" title="Server #130: Show cold bitmap subtitles within 3 s before preparation finishes"><span class="ic-plat">Server</span><b>#130</b> <span class="ic-title">Show cold bitmap subtitles within 3 s before preparation finishes</span></a></li></ul></div>
-<div class="box" style="--c:var(--thread)" data-node="decisions"><h3>Needs decisions <span class="ncount has" aria-label="2 items">2</span></h3><p>Fits one session. It grills you here, one question at a time, until no doubts are left.</p>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Prototype subagent</h4><p>Builds 2 or 3 variants that differ only on the open question. You try them in the browser preview or simulator and pick one.</p></div></div>
-<div class="chips"><span class="chip">grilling</span><span class="chip">domain-modeling</span><span class="chip">prototype</span></div><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-apple/issues/22" target="_blank" rel="noopener" title="Apple #22: Continue watching row on the home screen"><span class="ic-plat">Apple</span><b>#22</b> <span class="ic-title">Continue watching row on the home screen</span></a></li><li><a class="ichip amber" href="https://github.com/maddec01/mux-apple/issues/23" target="_blank" rel="noopener" title="Apple #23: Faster library sync on large collections (needs you)"><span class="ic-plat">Apple</span><b>#23</b> <span class="ic-title">Faster library sync on large collections</span><span class="ic-you">needs you</span></a></li></ul></div>
-<div class="box" style="--c:var(--thread)" data-node="foggy"><h3>Foggy <span class="ncount has" aria-label="1 item">1</span></h3><p>The issue becomes the parent. Its body is the map.</p>
-<div class="map"><div>Destination</div><div>Decisions so far</div><div class="fog">Fog</div><div>Out of scope</div></div>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Research subagents</h4><p>Run in the background. Cited findings go on a <code>research/</code> branch, linked from the sub-issue.</p></div></div>
-<div class="chips"><span class="chip">grilling</span><span class="chip">research</span><span class="chip">domain-modeling</span></div><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/200" target="_blank" rel="noopener" title="Server #200: Mux cloud: website sign-in and relay"><span class="ic-plat">Server</span><b>#200</b> <span class="ic-title">Mux cloud: website sign-in and relay</span></a></li></ul></div>
-</div></div>
-
-<div class="frow"><div class="col">Concept</div>
-<div class="box" style="--c:var(--thread)" data-node="concept"><h3>Working the map, one decision per thread <span class="ncount has" aria-label="2 items">2</span></h3><p>Each decision sub-issue is picked up like any item, in its own fresh shaping thread, so no thread holds the whole concept. When a decision closes, its answer goes on the map and the agent creates build sub-issues for what's now clear.</p>
-<ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/201" target="_blank" rel="noopener" title="Server #201: Relay: broker only or full TURN?"><span class="ic-plat">Server</span><b>#201</b> <span class="ic-title">Relay: broker only or full TURN?</span></a></li><li><a class="ichip amber" href="https://github.com/maddec01/mux-server/issues/202" target="_blank" rel="noopener" title="Server #202: Sign-in screen (needs you)"><span class="ic-plat">Server</span><b>#202</b> <span class="ic-title">Sign-in screen</span><span class="ic-you">needs you</span></a></li></ul>
-<div class="loop">Each build sub-issue goes through the steps below on its own, as soon as nothing blocks it. The concept is done when the fog is gone and every build has merged.</div></div></div>
-<div class="frow"><div></div><div class="arrow"></div></div>
-<div class="frow"><div class="col">Ready</div>
-<div class="box" style="--c:var(--thread)" data-node="gate"><span class="who">Agent</span><h3>Gate, then brief <span class="ncount has" aria-label="1 item">1</span></h3><p>Any unconfirmed assumption goes back to you. Then the brief is written into the issue: what to build, how to tell it's done, and the confirmed assumptions. The shaping thread ends here.</p>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Doubt subagent</h4><p>Reads only the brief, with no history, and tries to prove it wrong or ambiguous.</p></div></div>
-<div class="chips"><span class="chip">doubt-driven-development</span></div><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/140" target="_blank" rel="noopener" title="Server #140: Owner accounts"><span class="ic-plat">Server</span><b>#140</b> <span class="ic-title">Owner accounts</span></a></li></ul></div></div>
-<div class="frow"><div></div><div class="arrow"></div></div>
-<div class="frow"><div class="col">In progress</div>
-<div class="box" style="--c:var(--build)" data-node="build"><span class="who">Agent</span><h3>Build <span class="ncount has" aria-label="1 item">1</span></h3><p>A new T3 thread in its own worktree. It starts from the brief alone, not from your conversation. Test-first, with clean conventional commits.</p>
-<div class="nest"><div class="box" style="--c:var(--sub)"><h4>Exploration subagent (big builds)</h4><p>Saves notes on the code involved, so the builder doesn't spend context exploring.</p></div></div>
-<div class="chips"><span class="chip">tdd</span><span class="chip">developer-profile</span><span class="chip">codebase-design</span></div><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-apple/issues/30" target="_blank" rel="noopener" title="Apple #30: Chapter markers in the scrubber"><span class="ic-plat">Apple</span><b>#30</b> <span class="ic-title">Chapter markers in the scrubber</span></a></li></ul></div></div>
-<div class="frow"><div></div><div class="arrow"></div></div>
-<div class="frow"><div class="col">Review</div>
-<div class="box" style="--c:var(--build)" data-node="review"><h3>Four reviewers in parallel <span class="ncount has" aria-label="1 item">1</span></h3><p>Each subagent reads only the brief and the diff. If any asks for changes, the builder fixes them as fixup commits. Two rounds at most, then it goes to you.</p>
-<div class="nest two">
-<div class="box" style="--c:var(--sub)"><h4>Code</h4><div class="chips"><span class="chip">code-review-and-quality</span><span class="chip">code-review</span></div></div>
-<div class="box" style="--c:var(--sub)"><h4>Security</h4><div class="chips"><span class="chip">security-and-hardening</span></div></div>
-<div class="box" style="--c:var(--sub)"><h4>UX</h4><p>Does the flow match the brief?</p></div>
-<div class="box" style="--c:var(--sub)"><h4>UI</h4><p>Browser preview or simulator.</p><div class="chips"><span class="chip">frontend-ui-engineering</span><span class="chip">browser-testing-with-devtools</span></div></div>
-</div><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/141" target="_blank" rel="noopener" title="Server #141: Transcoder leaks a file handle on cancel"><span class="ic-plat">Server</span><b>#141</b> <span class="ic-title">Transcoder leaks a file handle on cancel</span></a></li></ul></div></div>
-<div class="frow"><div></div><div class="arrow"></div></div>
-<div class="frow"><div class="col">Verify or<br>Ready to merge</div>
-<div class="box" style="--c:var(--build)"><h3>Approver</h3><p>Folds the fixups in, opens the PR with a conventional title, then decides where it goes. The item stays in Review until the required checks pass; a CI fixer subagent handles failures.</p>
-<div class="nest two">
-<div class="box" style="--c:var(--you)" data-node="verify"><span class="who">You</span><h4>Verify <span class="ncount has" aria-label="1 item">1</span></h4><p>It's visual, an agent couldn't check something, or it touches auth, migrations or deployment. You get test steps and links.</p><ul class="live" aria-label="Items here"><li><a class="ichip amber" href="https://github.com/maddec01/mux-apple/issues/31" target="_blank" rel="noopener" title="Apple #31: New artwork grid layout (needs you)"><span class="ic-plat">Apple</span><b>#31</b> <span class="ic-title">New artwork grid layout</span><span class="ic-you">needs you</span></a></li></ul></div>
-<div class="box" style="--c:var(--build)" data-node="ready-to-merge"><h4>Ready to merge <span class="ncount has" aria-label="1 item">1</span></h4><p>Not visual, and every reviewer was confident.</p><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/142" target="_blank" rel="noopener" title="Server #142: Cache probe results between restarts"><span class="ic-plat">Server</span><b>#142</b> <span class="ic-title">Cache probe results between restarts</span></a></li></ul></div>
-</div>
-<div class="chips"><span class="chip">pr</span></div></div></div>
-<div class="frow"><div></div><div class="arrow"></div></div>
-<div class="frow"><div class="col">Done</div>
-<div class="box" style="--c:var(--you)" data-node="merge"><span class="who">You</span><h3>Merge <span class="ncount has" aria-label="2 items">2</span></h3><p>You merge every PR. The issue closes and the board moves it to Done. Before the build thread closes, it suggests improvements to the skills and checks. You choose which to apply.</p>
-<div class="chips"><span class="chip">retro</span></div><ul class="live" aria-label="Items here"><li><a class="ichip" href="https://github.com/maddec01/mux-apple/issues/5" target="_blank" rel="noopener" title="Apple #5: Crash when a server goes offline mid-playback"><span class="ic-plat">Apple</span><b>#5</b> <span class="ic-title">Crash when a server goes offline mid-playback</span></a></li><li><a class="ichip" href="https://github.com/maddec01/mux-server/issues/203" target="_blank" rel="noopener" title="Server #203: Hosting cost of the relay"><span class="ic-plat">Server</span><b>#203</b> <span class="ic-title">Hosting cost of the relay</span></a></li></ul></div></div>
+<div class="outline">
+<ul class="o-legend" aria-label="Legend"><li><span class="o-rel">nested</span> sub-issue of the row above</li><li><span class="o-rel">blocked by</span> GitHub's blocked-by link</li><li><span class="o-rel">blocks</span> GitHub's blocking link</li><li><span class="o-ref off">dashed</span> not on the board, shown as a reference</li></ul>
+<ul class="o-tree o-root"><li class="o-node" id="o-PVTI_sample05">
+<div class="o-row" data-anchor="o:PVTI_sample05"><span class="plat plat-server">Server</span><span class="kind kind-improvement">improvement</span><a class="o-title" href="https://github.com/maddec01/mux-server/issues/129" target="_blank" rel="noopener"><span class="ref">#129</span> Run more than one 4K HDR to 1080p stream at a time</a><span class="o-status">Queued</span></div>
+<ul class="o-links"><li class="o-link blocked-by"><span class="o-rel">blocked by</span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample13"><b>#140</b> Owner accounts</a> <span class="o-status">Ready</span></li></ul></li><li class="o-node" id="o-PVTI_sample09">
+<div class="o-row" data-anchor="o:PVTI_sample09"><span class="plat plat-server">Server</span><span class="kind kind-concept">concept</span><a class="o-title" href="https://github.com/maddec01/mux-server/issues/200" target="_blank" rel="noopener"><span class="ref">#200</span> Mux cloud: website sign-in and relay</a><span class="o-status">Shaping</span><span class="o-subs">2/6 sub-issues done</span></div>
+<ul class="o-tree"><li class="o-node" id="o-PVTI_sample10">
+<div class="o-row" data-anchor="o:PVTI_sample10"><span class="plat plat-server">Server</span><span class="kind kind-decision">decision: grill</span><a class="o-title" href="https://github.com/maddec01/mux-server/issues/201" target="_blank" rel="noopener"><span class="ref">#201</span> Relay: broker only or full TURN?</a><span class="o-status">Shaping</span></div>
+<ul class="o-links"><li class="o-link blocks"><span class="o-rel">blocks</span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample12"><b>#202</b> Sign-in screen</a> <span class="o-status amber">Needs you</span></li></ul></li><li class="o-node" id="o-PVTI_sample12">
+<div class="o-row" data-anchor="o:PVTI_sample12"><span class="plat plat-server">Server</span><span class="kind kind-decision">decision: prototype</span><a class="o-title" href="https://github.com/maddec01/mux-server/issues/202" target="_blank" rel="noopener"><span class="ref">#202</span> Sign-in screen</a><span class="o-status amber">Needs you</span></div>
+<ul class="o-links"><li class="o-link blocked-by"><span class="o-rel">blocked by</span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample10"><b>#201</b> Relay: broker only or full TURN?</a> <span class="o-status">Shaping</span></li></ul></li><li class="o-node" id="o-PVTI_sample13">
+<div class="o-row" data-anchor="o:PVTI_sample13"><span class="plat plat-server">Server</span><span class="kind kind-build">build</span><a class="o-title" href="https://github.com/maddec01/mux-server/issues/140" target="_blank" rel="noopener"><span class="ref">#140</span> Owner accounts</a><span class="o-status">Ready</span></div>
+<ul class="o-links"><li class="o-link blocked-by"><span class="o-rel">blocked by</span> <a class="o-ref off" href="https://github.com/maddec01/mux-server/issues/118" target="_blank" rel="noopener"><b>#118</b> Accounts table migration</a> <span class="o-off">not on board · open</span></li><li class="o-link blocks"><span class="o-rel">blocks</span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample05"><b>#129</b> Run more than one 4K HDR to 1080p stream at a time</a> <span class="o-status">Queued</span></li></ul></li><li class="o-node" id="o-PVTI_sample18">
+<div class="o-row" data-anchor="o:PVTI_sample18"><span class="plat plat-server">Server</span><span class="kind kind-decision">decision: research</span><a class="o-title" href="https://github.com/maddec01/mux-server/issues/203" target="_blank" rel="noopener"><span class="ref">#203</span> Hosting cost of the relay</a><span class="o-status done">Done</span></div>
+</li><li class="o-missing">2 more sub-issues not on the board</li></ul></li><li class="o-node" id="o-PVTI_sample15">
+<div class="o-row" data-anchor="o:PVTI_sample15"><span class="plat plat-server">Server</span><span class="kind kind-bug">bug</span><a class="o-title" href="https://github.com/maddec01/mux-server/issues/141" target="_blank" rel="noopener"><span class="ref">#141</span> Transcoder leaks a file handle on cancel</a><span class="o-status">Review</span></div>
+<ul class="o-links"><li class="o-link blocked-by"><span class="o-rel">blocked by</span> <a class="o-ref off" href="https://github.com/maddec01/mux-server/issues/100" target="_blank" rel="noopener"><b>#100</b> Old cleanup task</a> <span class="o-off">not on board · closed</span></li></ul></li><li class="o-node" id="o-PVTI_sample16">
+<div class="o-row" data-anchor="o:PVTI_sample16"><span class="plat plat-apple">Apple</span><span class="kind kind-feature">feature</span><a class="o-title" href="https://github.com/maddec01/mux-apple/issues/31" target="_blank" rel="noopener"><span class="ref">#31</span> New artwork grid layout</a><span class="o-status amber">Verify</span></div>
+<ul class="o-links"><li class="o-link blocked-by"><span class="o-rel">blocked by</span> <a class="o-ref off" href="https://github.com/maddec01/mux-apple/issues/27" target="_blank" rel="noopener"><b>#27</b> Artwork cache eviction</a> <span class="o-off">not on board · closed</span></li></ul></li><li class="o-node o-offroot">
+<div class="o-row"><a class="o-ref off" href="https://github.com/maddec01/mux-apple/issues/9" target="_blank" rel="noopener"><b>mux-apple#9</b> Home screen refresh</a> <span class="o-off">not on board · open</span></div>
+<ul class="o-tree"><li class="o-node" id="o-PVTI_sample08">
+<div class="o-row" data-anchor="o:PVTI_sample08"><span class="plat plat-apple">Apple</span><span class="kind kind-feature">feature</span><a class="o-title" href="https://github.com/maddec01/mux-apple/issues/22" target="_blank" rel="noopener"><span class="ref">#22</span> Continue watching row on the home screen</a><span class="o-status">Shaping</span></div>
+</li><li class="o-node" id="o-PVTI_sample11">
+<div class="o-row" data-anchor="o:PVTI_sample11"><span class="plat plat-apple">Apple</span><span class="kind kind-improvement">improvement</span><a class="o-title" href="https://github.com/maddec01/mux-apple/issues/23" target="_blank" rel="noopener"><span class="ref">#23</span> Faster library sync on large collections</a><span class="o-status amber">Needs you</span></div>
+</li></ul></li></ul>
+<details class="platform o-loose" id="flow-loose"><summary>10 items with no recorded relationships</summary><ul class="rows"><li class="row-item" data-anchor="o:PVTI_sample04"><span class="plat plat-draft">Draft</span><span class="row-title"><span class="ref">draft</span> Shared playback history across devices</span><span class="o-status">List</span></li><li class="row-item" data-anchor="o:PVTI_sample03"><span class="plat plat-apple">Apple</span><a class="row-title" href="https://github.com/maddec01/mux-apple/issues/12" target="_blank" rel="noopener"><span class="ref">#12</span> Remember the last subtitle language per show</a><span class="o-status">List</span></li><li class="row-item" data-anchor="o:PVTI_sample01"><span class="plat plat-server">Server</span><a class="row-title" href="https://github.com/maddec01/mux-server/issues/61" target="_blank" rel="noopener"><span class="ref">#61</span> Arr instances, catalog bindings and content requests</a><span class="o-status">List</span></li><li class="row-item" data-anchor="o:PVTI_sample02"><span class="plat plat-server">Server</span><a class="row-title" href="https://github.com/maddec01/mux-server/issues/114" target="_blank" rel="noopener"><span class="ref">#114</span> Verify VideoToolbox 8-bit HEVC decoding during hardware detection</a><span class="o-status">List</span></li><li class="row-item" data-anchor="o:PVTI_sample21"><span class="plat plat-draft">Draft</span><span class="row-title"><span class="ref">draft</span> Offline downloads on watchOS</span><span class="o-status">Queued</span></li><li class="row-item" data-anchor="o:PVTI_sample06"><span class="plat plat-apple">Apple</span><a class="row-title" href="https://github.com/maddec01/mux-apple/issues/20" target="_blank" rel="noopener"><span class="ref">#20</span> Player controls stay visible after scrubbing &lt;on tvOS&gt;</a><span class="o-status">Queued</span></li><li class="row-item" data-anchor="o:PVTI_sample07"><span class="plat plat-server">Server</span><a class="row-title" href="https://github.com/maddec01/mux-server/issues/130" target="_blank" rel="noopener"><span class="ref">#130</span> Show cold bitmap subtitles within 3 s before preparation finishes</a><span class="o-status">Shaping</span></li><li class="row-item" data-anchor="o:PVTI_sample14"><span class="plat plat-apple">Apple</span><a class="row-title" href="https://github.com/maddec01/mux-apple/issues/30" target="_blank" rel="noopener"><span class="ref">#30</span> Chapter markers in the scrubber</a><span class="o-status">In progress</span></li><li class="row-item" data-anchor="o:PVTI_sample17"><span class="plat plat-server">Server</span><a class="row-title" href="https://github.com/maddec01/mux-server/issues/142" target="_blank" rel="noopener"><span class="ref">#142</span> Cache probe results between restarts</a><span class="o-status">Ready to merge</span></li><li class="row-item" data-anchor="o:PVTI_sample19"><span class="plat plat-apple">Apple</span><a class="row-title" href="https://github.com/maddec01/mux-apple/issues/5" target="_blank" rel="noopener"><span class="ref">#5</span> Crash when a server goes offline mid-playback</a><span class="o-status done">Done</span></li></ul></details>
 </div>
 </div>
 </main>

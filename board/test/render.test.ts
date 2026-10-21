@@ -138,12 +138,71 @@ test('List and Done rows show one pill per label instead of the kind pill', () =
   for (const id of ['PVTI_sample03', 'PVTI_sample19']) assert.ok(!rowOf(id).includes('class="kind'), 'no separate kind pill');
 });
 
-test('flow view, all paths', () => {
+test('flow view: an outline of parent and blocked-by links', () => {
   matchesSaved('flow.html', renderFlowView(sample, { ...base, ui: { ...DEFAULT_UI, view: 'flow' } }));
 });
 
-test('flow view, foggy concept tab', () => {
-  matchesSaved('flow-fog.html', renderFlowView(sample, { ...base, ui: { ...DEFAULT_UI, view: 'flow', flowTab: 'fog' } }));
+/** One outline node's HTML, nested nodes included. */
+function flowNode(html: string, id: string): string {
+  const start = html.indexOf(`<li class="o-node" id="o-${id}"`);
+  assert.ok(start >= 0, `${id} is in the outline`);
+  let depth = 0;
+  for (const m of html.slice(start).matchAll(/<li\b|<\/li>/g)) {
+    depth += m[0] === '</li>' ? -1 : 1;
+    if (!depth) return html.slice(start, start + m.index + 5);
+  }
+  throw new Error(`${id} never closes`);
+}
+
+const hasNode = (html: string, id: string) => html.includes(`<li class="o-node" id="o-${id}"`);
+
+test('Flow nests sub-issues under their parent and counts the ones not on the Board', () => {
+  const concept = flowNode(renderFlowView(sample, base), 'PVTI_sample09');
+  for (const id of ['PVTI_sample10', 'PVTI_sample12', 'PVTI_sample13', 'PVTI_sample18']) assert.ok(hasNode(concept, id), `${id} nests under #200`);
+  assert.match(concept, /<li class="o-missing">2 more sub-issues not on the board<\/li>/, 'six sub-issues, four on the Board');
+});
+
+test('Flow shows blocked-by and blocks links from GitHub, jumping to Board items and referencing the rest', () => {
+  const html = renderFlowView(sample, base);
+  assert.match(flowNode(html, 'PVTI_sample12'), /<li class="o-link blocked-by"><span class="o-rel">blocked by<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample10"><b>#201<\/b> Relay: broker only or full TURN\?<\/a> <span class="o-status">Shaping<\/span><\/li>/);
+  assert.match(flowNode(html, 'PVTI_sample10'), /<li class="o-link blocks"><span class="o-rel">blocks<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample12"><b>#202<\/b> Sign-in screen<\/a>/);
+  const owner = flowNode(html, 'PVTI_sample13');
+  assert.match(owner, /blocked by<\/span> <a class="o-ref off" href="https:\/\/github\.com\/maddec01\/mux-server\/issues\/118" target="_blank" rel="noopener"><b>#118<\/b> Accounts table migration<\/a> <span class="o-off">not on board · open<\/span>/);
+  assert.match(owner, /blocks<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample05"><b>#129<\/b>/);
+  assert.match(flowNode(html, 'PVTI_sample16'), /blocked by<\/span> <a class="o-ref off" [^>]*><b>#27<\/b> Artwork cache eviction<\/a> <span class="o-off">not on board · closed<\/span>/, 'closed blockers are listed too');
+  assert.match(flowNode(html, 'PVTI_sample15'), /blocked by<\/span> <a class="o-ref off" [^>]*><b>#100<\/b> Old cleanup task<\/a> <span class="o-off">not on board · closed<\/span>/,
+    'a Done item older than 7 days is hidden, so it counts as not on the Board');
+  assert.ok(!hasNode(html, 'PVTI_sample20'), 'and gets no node of its own');
+});
+
+test('Flow groups items under a parent that is not on the Board, with its state', () => {
+  const html = renderFlowView(sample, base);
+  const root = html.slice(html.indexOf('<li class="o-node o-offroot">'));
+  assert.match(root, /^<li class="o-node o-offroot">\n<div class="o-row"><a class="o-ref off" href="https:\/\/github\.com\/maddec01\/mux-apple\/issues\/9" target="_blank" rel="noopener"><b>mux-apple#9<\/b> Home screen refresh<\/a> <span class="o-off">not on board · open<\/span><\/div>/);
+  assert.ok(hasNode(root, 'PVTI_sample08') && hasNode(root, 'PVTI_sample11'), 'both of its sub-issues sit under it');
+  const done = sample.items.find((i) => i.id === 'PVTI_sample20')!;
+  const orphan = { ...sample.items[0]!, parent: { number: 100, title: done.title, url: done.url!, repo: done.repo!, state: 'CLOSED' as const } };
+  assert.match(renderFlowView({ ...sample, items: [orphan, done] }, base), /<b>mux-server#100<\/b> Old cleanup task<\/a> <span class="o-off">not on board · closed<\/span>/,
+    'a hidden parent is a reference too');
+});
+
+test('Flow counts links beyond the first ones GitHub returned, and never infers a link', () => {
+  const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/mux-server/issues/${number}`, repo: 'maddec01/mux-server', state: 'OPEN' as const });
+  const blocked = { ...sample.items[0]!, blockers: { total: 23, nodes: [ref(1), ref(2)] }, blocking: { total: 4, nodes: [ref(3)] } };
+  const blocker = { ...sample.items[1]!, number: 1, title: 'Issue 1' };
+  const html = renderFlowView({ ...sample, items: [blocked, blocker] }, base);
+  const node = flowNode(html, blocked.id);
+  assert.match(node, /<li class="o-link blocked-by o-more"><span class="o-rel">blocked by<\/span> 21 more issues<\/li>/);
+  assert.match(node, /<li class="o-link blocks o-more"><span class="o-rel">blocks<\/span> 3 more issues<\/li>/);
+  assert.ok(!hasNode(html, blocker.id) || !flowNode(html, blocker.id).includes('o-link'), "the blocker's own blocking list is empty, so it shows no link back");
+});
+
+test('Flow replaces the old tabs, story text and diagram with the outline', () => {
+  const html = renderFlowView(sample, base);
+  assert.match(html, /<ul class="o-legend" aria-label="Legend">.*<li><span class="o-rel">blocks<\/span> GitHub's blocking link<\/li>/);
+  assert.ok(!/data-flow-tab|class="story"|class="frow"/.test(html));
+  assert.match(html, /<details class="platform o-loose" id="flow-loose"><summary>\d+ items with no recorded relationships<\/summary>/);
+  assert.match(renderFlowView(sample, { ...base, ui: { ...DEFAULT_UI, toggled: { 'flow-loose': true } } }), /id="flow-loose" open>/);
 });
 
 test('capture form uses configured repositories and explains empty applicability selections', () => {

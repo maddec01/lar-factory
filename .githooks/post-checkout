@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Sets up board/ in a new worktree. Git passes the null SHA as the previous HEAD
+# only when `git worktree add` (or a clone) creates the checkout, and runs the hook
+# from the new worktree's root.
+# Set core.hooksPath to main's absolute .githooks, so worktrees of older branches,
+# which have no setup script, still run main's.
+[[ "${1:-}" == 0000000000000000000000000000000000000000 ]] || exit 0
+setup="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/setup-worktree.sh"
+bash "$setup" "$PWD" \
+  || echo "warning: worktree setup failed; fix the error above, then run: bash \"$setup\" \"$PWD\"" >&2 \
+  || true

@@ -22,3 +22,17 @@ the flow and `docs/plan.md` for how it was set up.
   `GH_TOKEN=$(gh auth token) HOME=$(mktemp -d) bash scripts/install.sh`. The
   token keeps gh logged in under the new home.
 - A PR that no issue tracks goes on the Mux board too: `bash ~/.agents/skills/mux-work/scripts/status.sh <pr-url> "Ready to merge"`.
+
+## Worktree builds
+
+Every worktree gets its own `board/node_modules` from pnpm's shared store, so a
+new worktree installs in seconds and uses almost no disk.
+
+- One-time machine setup: `brew install pnpm`, then point git at main's hooks with
+  an absolute path, so worktrees of older branches run them too. From any checkout:
+  `git config core.hooksPath "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.githooks"`.
+- After that, `git worktree add` (the `post-checkout` hook) and T3 (`t3.json`)
+  both run `scripts/setup-worktree.sh` in the new worktree.
+- If `board/node_modules` is missing, run `bash scripts/setup-worktree.sh` from the
+  worktree (on a branch from before this setup, use main's copy of the script). It leaves a `node_modules` made by npm alone; delete it to switch.
+- Setup changes: run `bash scripts/setup-worktree.test.sh`.

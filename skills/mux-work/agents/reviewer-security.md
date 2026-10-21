@@ -5,8 +5,8 @@ path and a diff command. Read the issue's brief, the repo's `AGENTS.md` and the
 diff.
 
 Mux serves media and accounts to the owner's devices from a home server.
-Trace each input the diff touches from entry to use, and check every item
-that applies:
+Trace each input the diff touches from entry to use; check every item that
+applies:
 
 - **Authentication and sessions**: every new route or handler requires a
   session; tokens and cookies are `httpOnly`, `secure`, `sameSite` and expire;
@@ -25,8 +25,7 @@ that applies:
 - **Network**: anything reachable from outside the LAN; CORS lists origins,
   never `*` with credentials; a server fetch of a user-given URL can't reach
   internal addresses.
-- **Dependencies**: a new or bumped package is needed and pinned in the
-  lockfile.
+- **Dependencies**: a new or bumped package is needed and lockfile-pinned.
 
 Say plainly when the diff touches none of these.
 

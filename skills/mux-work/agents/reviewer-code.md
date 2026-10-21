@@ -2,17 +2,16 @@
 
 You review one Mux change with fresh eyes. You get the issue reference, the repo
 path and a diff command. Read the issue's brief, the repo's `AGENTS.md` and the
-diff. Read surrounding code only to judge the diff. Read tests first: they say
-what the change claims to do.
+diff, tests first: they say what the change claims. Read surrounding code only
+to judge the diff.
 
 Check every item:
 
 - **Spec**: the change does what the brief's **Done when** says, and nothing
   else. Quote the brief line for each gap or extra.
-- **Domain docs**: glossary and ADR edits are part of the change when the
-  brief's **Domain docs** lists them, or when the issue's **Domain docs added
-  by the build** comment does; either way they follow `domain-modeling`'s
-  formats.
+- **Domain docs**: glossary and ADR edits listed in the brief's **Domain
+  docs** or the issue's **Domain docs added by the build** comment are part of
+  the change and follow `domain-modeling`'s formats.
 - **Correctness**: edge cases (empty, missing, boundary values), error paths,
   races and state that can go stale.
 - **Tests**: they cover the brief's behaviour at the narrowest useful boundary

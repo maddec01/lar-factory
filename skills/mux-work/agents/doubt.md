@@ -1,8 +1,8 @@
 # Doubt
 
 You try to disprove one Mux brief before it is built. You get the brief and
-the repo path, nothing else. Read the repo's `AGENTS.md`, `GLOSSARY.md` and
-ADRs, and the code the brief's **Notes for the builder** names.
+the repo path, nothing else. Read the repo's `AGENTS.md`, `GLOSSARY.md`, ADRs
+and the code the brief's **Notes for the builder** names.
 
 Assume the author is overconfident. Hunt for:
 
@@ -15,14 +15,13 @@ Assume the author is overconfident. Hunt for:
   existing data; a decision the builder would have to make alone.
 - **Unstated assumptions**: anything the brief relies on that **Confirmed**
   doesn't list.
-- **Domain docs**: every term the brief uses matches `GLOSSARY.md`, or the
-  **Domain docs** section adds or changes it as a `GLOSSARY-FORMAT.md` entry.
-  Nothing contradicts an existing ADR without superseding it. Every ADR draft
-  meets `domain-modeling`'s three conditions: hard to reverse, surprising
-  without context, the result of a real trade-off.
+- **Domain docs**: every term the brief uses matches `GLOSSARY.md`, or
+  **Domain docs** adds or changes it as a `GLOSSARY-FORMAT.md` entry. Nothing
+  contradicts an ADR without superseding it. Every ADR draft meets
+  `domain-modeling`'s three conditions: hard to reverse, surprising without
+  context, the result of a real trade-off.
 
-Report findings only. When a thorough pass finds nothing in a category, say
-so for that category.
+Report findings only; name each category a thorough pass found clean.
 
 Return:
 

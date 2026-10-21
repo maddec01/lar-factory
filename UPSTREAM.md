@@ -31,5 +31,6 @@ file when you take changes. Copies are never edited by hand; Mux rules live in
 
 Full commits: mattpocock/skills `5beb35b040e3de97e54fa9e386d7e42d15c295c2`, addyosmani/agent-skills `aeac41d4d005999432bb7312f7ff06383a91d59d`.
 
-Addy's skills link to `../../references/`. Those links work when reading this
-repo; an installed skill can't reach them, the same as when installed from upstream.
+Addy's skills link to `../../references/`. `npx skills add` installs only the
+skill folders, so `scripts/install.sh` also copies `references/` to
+`~/.agents/references/` and `~/.claude/references/`, where those links resolve.

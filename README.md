@@ -62,27 +62,34 @@ which lives in its own repo.
 
 ### Install
 
-With the [`skills` CLI](https://github.com/vercel-labs/skills), globally, naming
-each skill and the agents you use:
+From a clone of `main`, run:
 
 ```sh
-npx skills add maddec01/mux-factory -g -a claude-code codex \
-  -s mux-work skill-sync grilling domain-modeling prototype research \
-     diagnosing-bugs tdd code-review codebase-design writing-for-agents pr \
-     retro handoff code-review-and-quality security-and-hardening \
-     doubt-driven-development frontend-ui-engineering browser-testing-with-devtools
+bash scripts/install.sh
 ```
 
-Always pass `-a`: `-y` without it installs into every agent the CLI knows.
+It installs every skill globally for Claude Code and Codex with the
+[`skills` CLI](https://github.com/vercel-labs/skills). Then it copies the shared
+checklists from `references/` on `main` to `~/.agents/references/` and
+`~/.claude/references/`, which is where the copied skills' `../../references/`
+links point. It ends by checking that those links resolve. It needs `npx` and a
+`gh` login.
+
+The skill list is `SKILLS` in the script. If you run `npx skills add` yourself,
+always pass `-a`: `-y` without it installs into every agent the CLI knows.
 
 ### Update
 
 The copies change only when a `skill-sync` PR merges here. Run `/skill-sync` to
-see what changed upstream and pick what to take; after merging, run:
+see what changed upstream and pick what to take; after merging, pull `main` and
+run the install again:
 
 ```sh
-npx skills update -g
+git pull && bash scripts/install.sh
 ```
+
+It updates the skills, adds newly listed ones, and replaces the checklists with
+the ones on `main`.
 
 ### Avoiding conflicts
 
@@ -109,6 +116,7 @@ reads GitHub through your local `gh` login and refreshes itself. See
 skills/            copies (original names), mux-work (with agents/), skill-sync
 board/             the local board app
 references/        checklists Addy's skills link to
+scripts/install.sh installs or updates the skills and checklists
 config.json        Mux repos, board port and refresh, pickup limits
 UPSTREAM.md        source and commit of every copy
 docs/plan.md       how this was set up

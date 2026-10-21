@@ -4,7 +4,6 @@
 import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { expandHome, loadConfig } from './config.ts';
@@ -16,15 +15,18 @@ import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts'
 import { renderPage } from './page.ts';
 import { DEFAULT_UI } from './render.ts';
 import { workCommand } from './model.ts';
+import { revisionCheck } from './revision.ts';
 import type { BoardData, Item } from './model.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
 const fixture = process.env.BOARD_DATA_FILE;
 const capture = { session: randomUUID(), enabled: !fixture };
+const code = revisionCheck();
 
 const state: BoardData = {
   capture,
+  codeUpdate: code.status,
   project: { title: config.title, url: null },
   repos: config.repos,
   refreshSeconds: config.refreshSeconds,
@@ -77,7 +79,8 @@ async function refresh(): Promise<void> {
 }
 
 // Browser modules: the shared template is served as JS by stripping its types.
-const ASSETS = new Set(['client.ts', 'render.ts', 'model.ts', 'add-item.ts']);
+const ASSETS = new Map(['client.ts', 'render.ts', 'model.ts', 'add-item.ts'].map((name) =>
+  [name, stripTypeScriptTypes(readFileSync(new URL(`./${name}`, import.meta.url), 'utf8'))]));
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -228,11 +231,12 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return send(res, 200, 'text/html; charset=utf-8', renderPage(state, { now: Date.now(), ui: DEFAULT_UI }));
   }
   if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(state));
-  if (path === '/healthz') return send(res, 200, 'text/plain; charset=utf-8', 'ok\n');
+  if (path === '/healthz') return json(res, 200, {
+    runningRevision: code.status.runningRevision, launchToken: process.env.BOARD_LAUNCH_TOKEN ?? null,
+  });
   const asset = path.startsWith('/assets/') ? path.slice('/assets/'.length) : '';
   if (ASSETS.has(asset)) {
-    const source = await readFile(new URL(`./${asset}`, import.meta.url), 'utf8');
-    return send(res, 200, 'text/javascript; charset=utf-8', stripTypeScriptTypes(source));
+    return send(res, 200, 'text/javascript; charset=utf-8', ASSETS.get(asset)!);
   }
   send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
 }
@@ -250,13 +254,18 @@ server.listen(config.port, HOST, () => {
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with test/sample.json).
+void code.refresh();
 if (fixture) {
   Object.assign(state, JSON.parse(readFileSync(fixture, 'utf8')) as BoardData);
   state.repos = config.repos;
   state.capture = capture;
+  state.codeUpdate = code.status;
   log(`serving ${fixture} instead of GitHub`);
 } else await refresh();
-const timer = setInterval(() => void (fixture || refresh()), config.refreshSeconds * 1000);
+const timer = setInterval(() => {
+  void code.refresh();
+  if (!fixture) void refresh();
+}, config.refreshSeconds * 1000);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {

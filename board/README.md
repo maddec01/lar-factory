@@ -43,5 +43,23 @@ To start it at login, run `board/scripts/install-launch-agent.sh` from the main
 checkout. It's safe to rerun and logs to `~/Library/Logs/mux-board.log`;
 `board/scripts/uninstall-launch-agent.sh` removes it.
 
+Update the installed board and global skills from the main factory checkout:
+
+```sh
+bash board/scripts/update.sh
+```
+
+See the [factory update instructions](../README.md#update) for requirements,
+refused histories, partial failures and extra Claude profiles. The updater
+refreshes the launch-agent configuration and confirms the new process is
+serving the expected revision before updating skills. It is safe to rerun.
+
+The board checks remote `main` every refresh cycle and shows **Board update
+available** with a copyable command when it contains commits absent from this
+process. Pulling the checkout does not clear the notice: restart the board to
+run that revision. A running process keeps its own browser modules and styling
+so a new browser load still works after checkout changes. Failed revision
+checks show their own warning, separate from stale GitHub project data.
+
 `npm test` renders the sample and compares it with the saved copies in
 `test/expected/`; `npm run test:update` rewrites them after a deliberate change.

@@ -247,6 +247,13 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
     ? `Refreshed <time datetime="${esc(data.fetchedAt)}">${clock(data.fetchedAt, opts.timeZone)}</time> <span class="age">(${ago(data.fetchedAt, opts.now)})</span>`
     : 'Not read yet';
   const banners: string[] = [];
+  const update = data.codeUpdate;
+  if (update && (update.behind ?? 0) > 0) {
+    banners.push(`<div class="banner code-update" role="status"><strong>Board update available.</strong> Run <code>${esc(update.command)}</code> <button type="button" class="copy" data-copy="${esc(update.command)}" aria-label="Copy board update command">Copy</button></div>`);
+  }
+  if (update && (update.error || update.behind === null)) {
+    banners.push(`<div class="banner" role="status"><strong>${update.error ? 'Board update check failed.' : 'Checking for board updates…'}</strong>${update.error ? ` ${esc(update.error)}` : ''}</div>`);
+  }
   if (opts.notice) {
     const { verb, item, to } = opts.notice;
     banners.push(`<div class="banner capture-success" role="status">${verb} ${titleLink(item)} to ${esc(to)}.</div>`);

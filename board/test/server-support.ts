@@ -21,7 +21,7 @@ export function rawIssue(number: number, status: string, repo = 'maddec01/mux-fa
   };
 }
 
-export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}) {
+export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}, directory?: string) {
   const dir = await mkdtemp(join(tmpdir(), 'mux-board-test-'));
   const stateFile = join(dir, 'github.json');
   await writeFile(stateFile, JSON.stringify(options));
@@ -35,8 +35,8 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const port = address.port;
   await new Promise<void>((resolve) => socket.close(() => resolve()));
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
-    ...(fastRefresh ? ['--import', './test/fast-refresh.ts'] : []), 'src/server.ts'], {
-    cwd: new URL('../', import.meta.url),
+    ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
+    cwd: directory ?? new URL('../', import.meta.url),
     env: { ...process.env, BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname,
       FAKE_GH_STATE: stateFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '', ...env },

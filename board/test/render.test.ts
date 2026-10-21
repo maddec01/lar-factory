@@ -31,6 +31,24 @@ test('page: header, stale banner and both views', () => {
   matchesSaved('page.html', renderPage(sample, base));
 });
 
+test('code updates have a copyable command and a warning independent of project staleness', () => {
+  const data: BoardData = { ...sample, fetchedAt: new Date(base.now).toISOString(), error: null, codeUpdate: {
+    runningRevision: 'a'.repeat(40), remoteRevision: 'b'.repeat(40), behind: 2, error: null,
+    command: "bash '/Users/pedro/Developer/Mux/mux-factory/board/scripts/update.sh'",
+  } };
+  const html = renderPage(data, base);
+  matchesSaved('update-notice.html', html);
+  assert.match(html, /Board update available/);
+  assert.match(html, /aria-label="Copy board update command"/);
+  assert.ok(!html.includes('<strong>Stale.</strong>'));
+  const failed = renderApp({ ...data, codeUpdate: { ...data.codeUpdate!, error: 'Network unavailable.' } }, base);
+  assert.match(failed, /Board update available/);
+  assert.match(failed, /Board update check failed/);
+  const unknown = renderApp({ ...data, codeUpdate: { ...data.codeUpdate!, behind: null } }, base);
+  assert.match(unknown, /Checking for board updates/);
+  assert.ok(!unknown.includes('Board update available'));
+});
+
 test('board view, with List and Done expanded', () => {
   matchesSaved(
     'board.html',

@@ -20,6 +20,7 @@ T3="$(command -v t3 || true)"
 "$NODE" -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=18)?0:1)' \
   || { echo "node $("$NODE" --version) is too old; the board needs 22.18 or newer" >&2; exit 1; }
 "$GH" auth status >/dev/null 2>&1 || echo "warning: gh is not logged in; the board will show a stale banner until it is" >&2
+LAUNCH_TOKEN="${BOARD_LAUNCH_TOKEN:-$("$NODE" -p 'crypto.randomUUID()')}"
 
 # launchd starts with a bare PATH; give it the directories of node and gh.
 AGENT_PATH="$(dirname "$NODE"):$(dirname "$GH"):/usr/bin:/bin:/usr/sbin:/sbin"
@@ -38,6 +39,7 @@ render() {
       -e "s|@PATH@|$(escape "$AGENT_PATH")|g" \
       -e "s|@HOME@|$(escape "$HOME")|g" \
       -e "s|@LOG@|$(escape "$LOG")|g" \
+      -e "s|@LAUNCH_TOKEN@|$(escape "$LAUNCH_TOKEN")|g" \
       "$TEMPLATE"
 }
 

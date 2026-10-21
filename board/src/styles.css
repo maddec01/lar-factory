@@ -55,6 +55,7 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
 .banner { margin-top: 10px; border: 1px solid var(--you); border-left-width: 4px; background: var(--you-soft); border-radius: var(--r); padding: 8px 12px; }
 .banner strong { color: var(--you-text); }
 .banner .err { white-space: pre-wrap; word-break: break-word; }
+.code-update code { overflow-wrap: anywhere; }
 
 /* view tabs */
 .vtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--bd); margin: 4px 0 16px; }

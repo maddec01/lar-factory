@@ -85,6 +85,8 @@ export interface RepoConfig {
 }
 
 export interface BoardData {
+  /** Running code, independent of the GitHub project data's freshness. */
+  codeUpdate?: CodeUpdate;
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
   project: { title: string; url: string | null };
@@ -97,6 +99,14 @@ export interface BoardData {
   items: Item[];
   /** Threads this board run started, by item id, so every page shows them. */
   started?: Record<string, StartedThread>;
+}
+
+export interface CodeUpdate {
+  runningRevision: string | null;
+  remoteRevision: string | null;
+  behind: number | null;
+  error: string | null;
+  command: string;
 }
 
 export interface Counts {

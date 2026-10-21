@@ -80,6 +80,20 @@ links point. It ends by checking that those links resolve. It needs `npx` and a
 The skill list is `SKILLS` in the script. If you run `npx skills add` yourself,
 always pass `-a`: `-y` without it installs into every agent the CLI knows.
 
+The CLI installs Claude's shared links in `~/.claude/skills`. If you also use
+extra Claude config directories such as `~/.claude-personal`, create those
+directories first, then synchronize their skills:
+
+```sh
+node board/scripts/sync-claude-skills.ts
+```
+
+This links only skills that `~/.claude/skills` already symlinks into
+`~/.agents/skills`, using relative links in each existing `~/.claude-*/skills`.
+It creates missing `skills` directories, preserves files and unrelated links,
+and lists conflicting destinations with a nonzero partial-update result.
+Resolve the conflicts yourself and rerun; other eligible links are still added.
+
 ### Update
 
 The copies change only when a `skill-sync` PR merges here. Run `/skill-sync` to
@@ -92,6 +106,32 @@ git pull && bash scripts/install.sh
 
 It updates the skills, adds newly listed ones, and replaces the checklists with
 the ones on `main`.
+
+To update the installed board and global skills together, run from the main
+factory checkout:
+
+```sh
+bash board/scripts/update.sh
+```
+
+The command requires macOS with a logged-in launchd GUI session, Node 22.18+
+and npm/npx, Git, and a logged-in `gh`. Install the T3 Code CLI for the board's
+Start button. It checks that the checkout is clean and on `main`, fetches
+`origin/main`, fast-forwards, runs `npm ci` in `board/`, reinstalls/restarts the
+launch agent, and waits up to 15 seconds for the expected running revision and
+new launch identity. Then it runs `npx skills update -g` and synchronizes extra
+Claude profiles as above. The launch-agent configuration is refreshed too.
+
+Dirty, detached, local-ahead or diverged checkouts stop before installation or
+restart; your commits are never reset, rebased or merged into a new commit.
+Failures name the step and return nonzero. Completed steps are kept, so an
+update can be partial; resolve the reported problem and rerun. A launchctl
+success alone is not success: a crash, bind failure or old process answering
+on the port fails readiness. Check `~/Library/Logs/mux-board.log` in that case.
+
+The board updater refreshes already installed skills. Use `scripts/install.sh`
+as above to add newly listed skills and refresh shared checklists, then run the
+synchronization command above for extra Claude profiles.
 
 ### Avoiding conflicts
 

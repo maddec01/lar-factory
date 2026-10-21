@@ -47,7 +47,8 @@ Read each file or skill a step names only when that step runs.
      blocked-by links, using **Slices** in `<mux-work>/issue-tracker.md`. Its
      body has What to build, Acceptance criteria and a short **Where to look**
      (the files or modules to start from), self-contained for an implementer
-     that has seen nothing else.
+     that has seen nothing else. A slice that edits skills, `AGENTS.md` or
+     `CLAUDE.md` says to load `writing-for-agents`.
    - Mux overrides `to-tickets`: skip its quiz, tracker setup and
      `ready-for-agent` label; Where to look replaces its no-file-paths rule;
      blocked-by lives only in the native links. Slices stay off the Mux Project
@@ -67,7 +68,8 @@ Read each file or skill a step names only when that step runs.
    `implement` at `~/.claude/skills/implement/SKILL.md` (Claude Code) or
    `~/.agents/skills/implement/SKILL.md` (Codex) and follow it for the slice,
    test-first with `tdd`, using `developer-profile` and, when a module's shape
-   changes, `codebase-design`. Skip its code review step. Each commit is one
+   changes, `codebase-design`; when the slice edits skills, `AGENTS.md` or
+   `CLAUDE.md`, `writing-for-agents`. Skip its code review step. Each commit is one
    reviewable step with a conventional message (`AGENTS.md` lists types and
    scopes), never a fixup. Run the checks `AGENTS.md` names for the layers
    changed, then rebase onto the build branch tip. It reports its absolute

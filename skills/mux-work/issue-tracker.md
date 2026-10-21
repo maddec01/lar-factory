@@ -142,6 +142,20 @@ query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){
     | "#\(.number) \(.title)"'
 ```
 
+## Parent closing
+
+Print the build's parent (or `no parent`), then the parent's open sub-issues
+other than the build (none printed: the build is the last):
+
+```sh
+parent_url=$(gh issue view "$build" --repo "$repo" --json parent --jq '.parent.url // empty')
+if [ -z "$parent_url" ]; then echo "no parent"; else
+  echo "parent: $parent_url"
+  gh api --paginate "repos/${parent_url#https://github.com/}/sub_issues" \
+    --jq ".[] | select(.state == \"open\" and .html_url != \"https://github.com/$repo/issues/$build\") | .html_url"
+fi
+```
+
 ## Capture-only Concepts
 
 Follow [Retro capture](retro-capture.md), including its persisted plan, stable

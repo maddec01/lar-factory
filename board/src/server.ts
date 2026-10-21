@@ -9,14 +9,14 @@ import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { expandHome, loadConfig } from './config.ts';
-import { addProjectItem, fetchProject, findProjectNumber, setItemStatus } from './github.ts';
+import { abandonItem, addProjectItem, fetchProject, findProjectNumber, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
 import { DEFAULT_UI } from './render.ts';
-import { workCommand } from './model.ts';
+import { canAbandon, workCommand } from './model.ts';
 import { revisionCheck } from './revision.ts';
 import { lockHolder, readProgress, updatePaths } from './update-state.ts';
 import type { BoardData, Item } from './model.ts';
@@ -54,6 +54,10 @@ const starts = new Map<string, Promise<StartResult>>();
 let runningStarts = 0;
 /** Set while the board waits for a new updater to take the lock. */
 let launchingUpdate = false;
+/** Deletes in flight by item id, so a second press waits for the first. */
+const abandoning = new Map<string, Promise<string | null>>();
+/** Item ids this board deleted. GitHub can still list them for a while, so reads drop them. */
+const abandoned = new Set<string>();
 const REQUEST_ID = /^[a-f0-9-]{36}$/;
 
 function log(message: string): void {
@@ -75,7 +79,7 @@ async function refresh(): Promise<void> {
       const reported = snapshot.items.some((i) => i.id === id && i.status === recent.item.status);
       if (reported || ++recent.unconfirmedReads >= 3) recentItems.delete(id);
     }
-    state.items = [...snapshot.items.filter((i) => !recentItems.has(i.id)), ...[...recentItems.values()].map((r) => r.item)];
+    state.items = [...snapshot.items.filter((i) => !recentItems.has(i.id) && !abandoned.has(i.id)), ...[...recentItems.values()].map((r) => r.item)];
     state.fetchedAt = new Date().toISOString();
     state.error = null;
     if (recovered) log(`read ${snapshot.items.length} items from ${snapshot.url}`);
@@ -141,6 +145,7 @@ async function readJson(req: IncomingMessage, res: ServerResponse, what: string)
 
 /** Shows a change at once and keeps it through refreshes until GitHub reports it. */
 function showChanged(item: Item): void {
+  if (abandoned.has(item.id)) return;
   recentItems.set(item.id, { item, revision: ++revision, unconfirmedReads: 0 });
   state.items = [...state.items.filter((i) => i.id !== item.id), item];
 }
@@ -271,6 +276,37 @@ async function updateBoard(res: ServerResponse): Promise<void> {
   } finally { launchingUpdate = false; }
 }
 
+async function abandonListItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!capture.enabled) return json(res, 403, { error: 'Abandoning is disabled in sample mode.' });
+  const input = await readJson(req, res, 'the item to abandon');
+  if (!input) return;
+  if (input.session !== capture.session) {
+    return json(res, 409, { error: 'The board restarted. Press Abandon again.', board: state });
+  }
+  const { itemId } = input;
+  if (typeof itemId !== 'string') return json(res, 400, { error: 'Name the item to abandon.' });
+  let pending = abandoning.get(itemId);
+  if (!pending) {
+    const item = state.items.find((i) => i.id === itemId);
+    // A second press after the delete finished has nothing left to do.
+    if (!item && abandoned.has(itemId)) return json(res, 200, { error: null, board: state });
+    if (!item) return json(res, 404, { error: 'That item is no longer on the board.', board: state });
+    if (!canAbandon(item)) return json(res, 409, { error: `Only List issues and drafts can be abandoned; this one is a ${item.type} in ${item.status}.` });
+    pending = abandonItem({ ...config, number: projectNumber }, item).then((error) => {
+      abandoning.delete(itemId);
+      if (!error) {
+        abandoned.add(itemId);
+        recentItems.delete(itemId);
+        state.items = state.items.filter((i) => i.id !== itemId);
+      }
+      return error;
+    });
+    abandoning.set(itemId, pending);
+  }
+  const error = await pending;
+  json(res, error ? 502 : 200, { error, board: state });
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
@@ -282,6 +318,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (req.method === 'POST' && path === '/api/queue') return queueItem(req, res);
   if (req.method === 'POST' && path === '/api/start') return startItem(req, res);
   if (req.method === 'POST' && path === '/api/update') return updateBoard(res);
+  if (req.method === 'POST' && path === '/api/abandon') return abandonListItem(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }

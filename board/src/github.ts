@@ -299,6 +299,24 @@ export async function setItemStatus(
   }
 }
 
+/** Deletes an issue for good, or removes a draft from the project; returns the error, or null when GitHub accepted it. */
+export async function abandonItem(
+  config: BoardConfig,
+  item: Item,
+  run: (args: string[]) => Promise<string> = gh,
+): Promise<string | null> {
+  try {
+    if (item.type === 'DraftIssue') {
+      const number = config.number ?? await findProjectNumber(config.owner, config.title);
+      await run(['project', 'item-delete', String(number), '--owner', config.owner, '--id', item.id]);
+    } else await run(['issue', 'delete', String(item.number), '-R', item.repo!, '--yes']);
+    return null;
+  } catch (err) {
+    const what = item.type === 'DraftIssue' ? `remove draft ${item.title}` : `delete #${item.number}`;
+    return `Could not ${what}. ${err instanceof Error ? err.message : 'GitHub request failed.'}`;
+  }
+}
+
 /** Creates an issue, adds it to the configured project and explicitly assigns List. */
 export async function addProjectItem(
   config: BoardConfig,

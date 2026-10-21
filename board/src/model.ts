@@ -285,6 +285,11 @@ export function ref(item: Item): string {
   return item.number === null ? 'draft' : `#${item.number}`;
 }
 
+/** Abandon deletes a List issue or removes a List draft. Pull requests stay. */
+export function canAbandon(item: Item): boolean {
+  return item.status === 'List' && (item.type === 'DraftIssue' || (item.type === 'Issue' && item.number !== null && item.repo !== null));
+}
+
 export function workCommand(item: Item): string | null {
   if (!item.repo || item.number === null) return null;
   return `/mux-work ${item.repo}#${item.number}`;

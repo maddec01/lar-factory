@@ -20,6 +20,14 @@ const main = async () => {
     process.exitCode = 1;
     return;
   }
+  if (options.fail === 'delete' && (args[1] === 'delete' || args[1] === 'item-delete')) {
+    process.stderr.write('HTTP 403: Must have admin rights to Repository.');
+    process.exitCode = 1;
+    return;
+  }
+  // Deletes leave options.items alone, like a GitHub read that still lags behind.
+  if (args[0] === 'issue' && args[1] === 'delete') return;
+  if (args[1] === 'item-delete') return output({});
   if (args[0] === 'api') {
     if (options.createDelay) await new Promise((r) => setTimeout(r, options.createDelay));
     const repo = args[3].slice('repos/'.length, -'/issues'.length);

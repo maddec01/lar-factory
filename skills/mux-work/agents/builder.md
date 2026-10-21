@@ -15,8 +15,8 @@ where `<mux-work>` is the folder holding this file's parent.
   or `"Explore"` for read-only work); `SendMessage` to its agent ID sends it more
   work. In Codex, `spawn_agent`, then `wait` for its report; `send_input` sends
   it more work.
-- **Report**: every prompt carries the report rule from `<mux-work>/SKILL.md`
-  (**Rules**: ≤300 words, no whole files, logs or screenshots); check runs
+- **Report**: every prompt carries the factory report rule: ≤300 words, no
+  whole files, logs or screenshots; check runs
   report pass/fail and only the failures that matter.
 - **Fixer**: makes changes on the build branch in this worktree as
   `git commit --fixup <sha>` commits, reruns the checks and reports.

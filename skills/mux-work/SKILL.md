@@ -42,21 +42,31 @@ Read the issue with comments, parent, sub-issues and blockers. Then:
 
 ## 2. Size up
 
-Propose a route in two or three lines, with the kind label (`bug`, `feature`,
-`improvement`, `concept`), and wait for Pedro to confirm:
+Decide the route yourself. Never ask Pedro to pick a route by name. Tell him,
+in a few lines:
 
-- **Clear**: a bug that can be reproduced, or a small, defined change.
-  For a bug, start a **Diagnose subagent** with the `diagnosing-bugs` skill. It
-  returns the cause, the evidence and a failing test to write. Ask Pedro only if
-  the expected behaviour is unclear.
-- **Needs decisions**: open questions that fit one session. Use `grilling` here
-  in this thread. When a question is about how something looks or feels, start
-  a **Prototype subagent** with the `prototype` skill in its own worktree on a
-  `prototype/<n>-<slug>` branch: two or three variants that differ only on that
-  question. Set Needs you, tell Pedro how to open them (T3 browser preview for
-  web, the repo's simulator run scripts in `t3.json` for Apple), and record his
-  pick and the branch on the issue.
-- **Foggy**: too big or unclear for one session. Go to **Concepts**.
+- what you understood the item to be;
+- the open questions you found, or "none";
+- what happens next, in plain words. For example: "I'll ask you three
+  questions, then write the brief", or "a subagent reproduces the bug first; I
+  only ask you if the expected behaviour is unclear", or "this is too big for
+  one session, so I'll turn it into a concept map".
+
+Add the kind label (`bug`, `feature`, `improvement`, `concept`). Pedro confirms
+or corrects; anything he adds is another open question. Then:
+
+- **Bug**: first start a **Diagnose subagent** with the `diagnosing-bugs` skill.
+  It returns the cause, the evidence and a failing test to write. Its open
+  questions join the list.
+- **Open questions**: settle every one with `grilling` here in this thread,
+  for bugs and features alike. When a question is about how something looks or
+  feels, start a **Prototype subagent** with the `prototype` skill in its own
+  worktree on a `prototype/<n>-<slug>` branch: two or three variants that differ
+  only on that question. Set Needs you, tell Pedro how to open them (T3 browser
+  preview for web, the run scripts in the repo's T3 project for Apple), and
+  record his pick and the branch on the issue.
+- **No open questions**: go straight to the brief.
+- **Too big or unclear for one session**: go to **Concepts**.
 
 ## 3. Brief
 

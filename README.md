@@ -36,7 +36,9 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
    security, UX and UI (browser preview or simulator). At most two rounds of fixes.
 7. **Verify or Ready to merge.** An approver opens the PR. Anything visible, risky
    (auth, migrations, deployment) or not fully checked goes to Verify with test
-   steps; the rest goes to Ready to merge.
+   steps; the rest goes to Ready to merge. The item stays in Review until the
+   PR's required checks pass; a CI fixer subagent handles failures, and after
+   two tries or a runner problem the item goes to Needs you.
 8. **Done.** You merge. The build thread ends with a retro: suggested fixes to
    the skills and checks, for you to pick from.
 
@@ -51,7 +53,7 @@ through a long conversation, and subagents return summaries instead of files.
 | Skill | What it does | Source |
 | ----- | ------------ | ------ |
 | `mux-work` | Runs one item: size up, shape, brief, gate, start the build | Mux |
-| `mux-work/agents/` | Builder, four reviewers, approver | Mux |
+| `mux-work/agents/` | Builder, four reviewers, approver, CI fixer | Mux |
 | `skill-sync` | Brings upstream changes into the copies, by your choice | Mux |
 | `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff` | Shaping, building and reviewing | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |
 | `code-review-and-quality`, `security-and-hardening`, `doubt-driven-development`, `frontend-ui-engineering`, `browser-testing-with-devtools` | Reviews and the gate | Copies of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |

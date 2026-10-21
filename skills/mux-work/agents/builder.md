@@ -43,11 +43,39 @@ left to the approver.
 
 Start the **Approver subagent** with `approver.md`, the issue reference, the
 repo path, every reviewer's final result and your rejected findings. It opens
-the PR and sets the status. Link the PR it returns to this thread
-(`link_pull_request`).
+the PR and returns the status it recommends; the item stays in Review. Link the
+PR to this thread (`link_pull_request`).
+
+## Checks
+
+Call `watch_pull_request` on the PR. T3 wakes you when checks finish, someone
+comments or the branch conflicts. Fast checks can finish before the watch
+starts, so handle the checks once right away, then on every wake: read the
+required checks with `gh pr checks <pr> --required`, then:
+
+- **Required checks green**: set the recommended status, send one push
+  notification (the PR title, link and status), then `unwatch_pull_request`.
+  Go to **Retro**.
+- **A required check failed, or the branch conflicts**: start a **CI fixer
+  subagent** with `ci-fixer.md`, the issue reference, the repo path, the PR URL
+  and the failing check (or "merge conflict"). The watch stays active; end your
+  turn when it returns.
+- **Anything else** (required checks still running, a comment, a review, a
+  non-required check failing, a run cancelled because a newer run on the same
+  head replaced it): end your turn.
+  Non-required checks never block the status or start a fix.
+
+Set **Needs you** when the CI fixer returns `infrastructure` or `not fixed`, or
+when a required check fails or the branch conflicts after two CI fixer runs
+(every run counts, merge conflicts included). Comment on the issue with the
+failing job's name and run link (or "merge conflict") and what the CI fixer
+reported, send one push notification, then `unwatch_pull_request` and go to
+**Retro**. When Pedro answers, set **Review**, do what he asks (rerun the job,
+or start a CI fixer), and continue from the top of **Checks**.
 
 ## Retro
 
-Before you finish, follow `~/.agents/skills/retro/SKILL.md` for this thread.
-End with the PR link, its status (Verify or Ready to merge), and the retro
-suggestions as a numbered list for Pedro to pick from. Don't apply them.
+Run this last, after the final status is set and the PR is unwatched. Follow
+`~/.agents/skills/retro/SKILL.md` for this thread. End with the PR link, its
+status (Verify, Ready to merge or Needs you), and the retro suggestions as a
+numbered list for Pedro to pick from. Don't apply them.

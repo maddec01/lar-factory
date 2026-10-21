@@ -12,7 +12,7 @@ the repo path, the reviewers' final results and the builder's rejected findings.
    written with the `pr` skill, screenshots from the UI reviewer, and
    `Closes <owner/repo#n>` at the end, followed by the attribution line the
    repo's agents use.
-3. Pick the status:
+3. Recommend the status the item gets once its required checks pass:
    - **Verify** when the change is visible on screen, the brief says Verify,
      it touches auth, permissions, migrations or deployment, a reviewer
      couldn't check something, or a finding is still open. Add a
@@ -20,7 +20,8 @@ the repo path, the reviewers' final results and the builder's rejected findings.
      links or run commands.
    - **Ready to merge** otherwise: not visible, every reviewer approved with
      high confidence, nothing left unchecked.
-4. Set the status with `bash <mux-work>/scripts/status.sh <owner/repo#n> "<Status>"`
-   and send one push notification: the PR title, link and status.
 
-Return the PR URL, the status and one line on why.
+The item stays in **Review**: the build thread sets your status when the
+required checks are green.
+
+Return the PR URL, the recommended status and one line on why.

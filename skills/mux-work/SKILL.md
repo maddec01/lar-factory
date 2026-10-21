@@ -59,6 +59,23 @@ verifies visible changes and merges every PR. Everything else is yours.
 - Never merge, never push to `main`. Commit and PR rules are in each repo's
   `AGENTS.md`.
 
+## Grilling with docs
+
+Wherever this skill grills (open questions in **2. Size up**, **Concepts**
+step 1, `decision: grill`), load `grilling` and `domain-modeling`, the pair
+upstream `grill-with-docs` loads. Challenge Pedro's terms against the repo's
+`GLOSSARY.md` and ADRs, and capture each resolved term and ADR-worthy decision
+the moment it settles, as `domain-modeling` says.
+
+Shaping, concept and decision threads run in the repo's main checkout, with no
+branch and no PR, so they write only to the issue and leave the checkout as
+they found it. Where `domain-modeling` says to update `GLOSSARY.md` inline or
+write an ADR, draft the entry instead: capture it as it settles, record it in
+the batch's answers comment, then put it in the **Domain docs** section of the
+brief (**3. Brief**) or the map (**Concepts**). Drafts follow `domain-modeling`'s `GLOSSARY-FORMAT.md`
+and `ADR-FORMAT.md`, and an ADR draft meets its three conditions. The builder
+writes them to the repo in the build PR.
+
 ## Screenshots
 
 Keep review screenshots outside the checkout, in `${TMPDIR:-/tmp}/mux-<n>-ui/`,
@@ -105,9 +122,9 @@ Then:
 - **Bug**: first start a **Diagnose subagent** with the `diagnosing-bugs` skill.
   It returns the cause, the evidence and a failing test to write. Its open
   questions join the list.
-- **Open questions**: settle every one with `grilling` here in this thread,
-  through the question UI, for bugs and features alike. When a question is
-  about how something looks or feels, start a **Prototype subagent** with the `prototype` skill in its own
+- **Open questions**: settle every one here in this thread by **Grilling
+  with docs**, through the question UI, for bugs and features alike. When a
+  question is about how something looks or feels, start a **Prototype subagent** with the `prototype` skill in its own
   worktree on a `prototype/<n>-<slug>` branch: two or three variants that differ
   only on that question. Tell Pedro how to open them (T3 browser preview for
   web, the run scripts in the repo's T3 project for Apple), ask for his pick
@@ -133,6 +150,10 @@ collapsed `<details>` block at the end.
 ## Notes for the builder
 <where the code is, the failing test to start from, prototype branch to follow>
 
+## Domain docs
+- Glossary: <each term to add or change, as a GLOSSARY-FORMAT.md entry>, or "none"
+- ADRs: <each ADR to write, as an ADR-FORMAT.md draft>, or "none"
+
 ## Verify
 <"yes" with why (visible, auth, migrations, deployment, hard to check), or "no">
 ```
@@ -141,7 +162,9 @@ collapsed `<details>` block at the end.
 
 1. Start a **Doubt subagent** with the `doubt-driven-development` skill. Give it
    only the brief and the repo path, no conversation. It tries to show the brief
-   is wrong, ambiguous or incomplete. Fix what it finds.
+   is wrong, ambiguous or incomplete, and that its **Domain docs** agree with
+   the repo's `GLOSSARY.md` and ADRs, with every ADR draft meeting
+   `domain-modeling`'s three conditions. Fix what it finds.
 2. Ask Pedro, in one batch, every assumption he hasn't confirmed and every
    Doubt finding you can't fix yourself.
 3. Set **Ready**.
@@ -178,12 +201,16 @@ The issue becomes the **map** and gets the `concept` label. Its body:
 ## Out of scope
 - <what this won't do>
 
+## Domain docs
+- <each glossary entry and ADR draft settled so far, with its decision (#n)>, or "none"
+
 ## Map
 <Mermaid flowchart of the sub-issues: decisions and builds, edges for
 blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
 ```
 
-1. Grill Pedro only on the destination and the out-of-scope list.
+1. Grill Pedro (**Grilling with docs**) only on the destination and the
+   out-of-scope list.
 2. Create a sub-issue for each decision you can phrase now, labelled
    `decision: grill`, `decision: prototype`, `decision: research` or
    `decision: task`, linked with blocked-by where one needs another
@@ -197,10 +224,12 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
 
 ### Decisions
 
-Work one decision sub-issue with the method its label names (grilling,
-prototype, research findings, or a small task). Then comment the answer, close
-it, add its gist to the map's Decisions so far, and redraw the map. Turn fog
-that became clear into new decision sub-issues. When a part of the destination
-is fully decided, create a `build` sub-issue for it with a brief (**3. Brief**),
-run the gate, set it Ready, and start its build (**5**). The map is done when
-the fog is gone and every build has merged.
+Work one decision sub-issue with the method its label names (**Grilling with
+docs**, prototype, research findings, or a small task). Then comment the answer
+with any Domain docs drafts it settled, close it, add its gist to the map's
+Decisions so far and its drafts to the map's Domain docs, and redraw the map.
+Turn fog that became clear into new decision sub-issues. When a part of the
+destination is fully decided, create a `build` sub-issue for it with a brief
+(**3. Brief**) whose Domain docs copies the map's entries that build needs, run
+the gate, set it Ready, and start its build (**5**). The map is done when the
+fog is gone and every build has merged.

@@ -1,8 +1,8 @@
-// Browser side: keeps the page live by fetching /api/board every 15 s and
-// re-rendering with the same template the server used.
+// Browser side: keeps the page live by fetching /api/board every 15 s (every
+// second during an update) and re-rendering with the same template the server used.
 
 import { DEFAULT_UI, listGroupId, renderApp } from './render.ts';
-import type { FlowTab, ItemAction, RenderOptions, UiState, View } from './render.ts';
+import type { FlowTab, ItemAction, RenderOptions, UiState, UpdateView, View } from './render.ts';
 import { platformOf } from './model.ts';
 import type { BoardData } from './model.ts';
 import { validateDraft } from './add-item.ts';
@@ -10,6 +10,9 @@ import type { CreationResult, ItemDraft } from './add-item.ts';
 import type { StartResult } from './t3.ts';
 
 const POLL_MS = 15_000;
+const UPDATE_POLL_MS = 1_000;
+/** How long the board may stay away during an update before the page says it didn't restart. */
+const RESTART_MS = 30_000;
 const app = document.getElementById('app')!;
 const bootstrap = document.getElementById('board-data');
 const dialog = document.getElementById('add-item-dialog') as HTMLDialogElement;
@@ -22,6 +25,12 @@ let notice: RenderOptions['notice'] = null;
 const actions: Record<string, ItemAction> = {};
 let mutationVersion = 0;
 let pollSequence = 0;
+let pollTimer: ReturnType<typeof setTimeout> | undefined;
+let updateView: UpdateView | null = null;
+let refusedAt = 0;
+let lastBoard = '';
+/** The update this page follows: the session it started in, and since when the board has been away. */
+let updating: { session: string | undefined; awaySince: number | null } | null = null;
 const ui: UiState = {
   ...DEFAULT_UI,
   view: location.hash === '#flow' ? 'flow' : 'board',
@@ -31,7 +40,7 @@ const ui: UiState = {
 function render(): void {
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
   const { scrollX, scrollY } = window;
-  app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions });
+  app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions, updateView });
   tagFocusable();
   window.scrollTo(scrollX, scrollY);
   if (focusKey) focusByKey(focusKey);
@@ -39,7 +48,7 @@ function render(): void {
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-add-item],details[id] > summary').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-add-item],[data-update],details[id] > summary').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
@@ -47,6 +56,7 @@ function tagFocusable(): void {
 function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.queue) return `queue-${el.dataset.queue}`;
   if (el.dataset.start) return `start-${el.dataset.start}`;
+  if (el.hasAttribute('data-update')) return 'update';
   return el.dataset.view ?? el.dataset.flowTab ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
 }
 
@@ -54,21 +64,52 @@ function focusByKey(key: string): void {
   app.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`)?.focus();
 }
 
+function schedulePoll(): void {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(() => void poll(), updating && updateView?.phase !== 'lost' ? UPDATE_POLL_MS : POLL_MS);
+}
+
 async function poll(): Promise<void> {
   const version = mutationVersion;
   const sequence = ++pollSequence;
   try {
-    const res = await fetch('/api/board', { cache: 'no-store' });
+    const res = await fetch('/api/board', { cache: 'no-store', signal: AbortSignal.timeout(5_000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const next = (await res.json()) as BoardData;
+    const text = await res.text();
     if (version !== mutationVersion || sequence !== pollSequence) return;
-    data = next;
+    // Polls each second during an update: redraw only on change, so the progress isn't announced again.
+    const unchanged = updating !== null && clientError === null && text === lastBoard;
+    lastBoard = text;
+    data = JSON.parse(text) as BoardData;
     clientError = null;
+    const view = updateView;
+    if (followUpdate() || (unchanged && view === updateView)) return;
   } catch (err) {
     if (version !== mutationVersion || sequence !== pollSequence) return;
-    clientError = err instanceof Error ? err.message : String(err);
+    if (updating) {
+      // The board is expected to go away while the update restarts it.
+      updating.awaySince ??= Date.now();
+      if (Date.now() - updating.awaySince > RESTART_MS) updateView = { phase: 'lost' };
+    } else clientError = err instanceof Error ? err.message : String(err);
+  } finally {
+    if (sequence === pollSequence) schedulePoll();
   }
   render();
+}
+
+/** Follows a running update from the latest data; true when the page reloads onto the restarted board. */
+function followUpdate(): boolean {
+  if (updateView?.phase === 'lost' || (updateView?.phase === 'refused' && Date.now() - refusedAt > 10_000)) updateView = null;
+  if (data.update?.state === 'running') {
+    updating ??= { session: data.capture?.session, awaySince: null };
+    updating.awaySince = null;
+    return false;
+  }
+  // A new session means the board restarted: reload to run its new revision.
+  const restarted = updating !== null && updating.session !== data.capture?.session;
+  updating = null;
+  if (restarted) location.reload();
+  return restarted;
 }
 
 function setView(view: View, focus = false): void {
@@ -252,6 +293,23 @@ async function queueItem(button: HTMLElement): Promise<void> {
   if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
 }
 
+async function startUpdate(): Promise<void> {
+  if (updateView?.phase === 'starting' || (data.update?.state === 'running' && updateView?.phase !== 'lost')) return;
+  updateView = { phase: 'starting' };
+  render();
+  const session = data.capture?.session;
+  const result = await postAction('/api/update', {});
+  if (result.error) {
+    updateView = { phase: 'refused', message: result.error };
+    refusedAt = Date.now();
+  } else {
+    updateView = null;
+    updating = { session, awaySince: null };
+  }
+  render();
+  schedulePoll();
+}
+
 async function startItem(itemId: string): Promise<void> {
   if (actions[itemId]?.phase === 'pending') return;
   actions[itemId] = { phase: 'pending' };
@@ -267,7 +325,7 @@ async function startItem(itemId: string): Promise<void> {
 }
 
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-add-item]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-add-item],[data-update]');
   if (!target) return;
   if (target.hasAttribute('data-add-item')) {
     if (submission.phase === 'complete') resetDraft();
@@ -280,6 +338,7 @@ app.addEventListener('click', (event) => {
   } else if (target.dataset.copy) void copy(target.dataset.copy, target as HTMLButtonElement);
   else if (target.dataset.queue) void queueItem(target);
   else if (target.dataset.start) void startItem(target.dataset.start);
+  else if (target.hasAttribute('data-update')) void startUpdate();
 });
 
 // Arrow keys move between the Board and Flow tabs (WAI-ARIA tabs pattern).
@@ -307,4 +366,5 @@ window.addEventListener('hashchange', () => setView(location.hash === '#flow' ? 
 if (ui.view !== DEFAULT_UI.view) render();
 else tagFocusable();
 resetDraft();
-setInterval(() => void poll(), POLL_MS);
+followUpdate();
+schedulePoll();

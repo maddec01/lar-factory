@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
-import { DEFAULT_UI, renderAddItemForm, renderApp, renderBoardView, renderFlowView } from '../src/render.ts';
+import { DEFAULT_UI, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData } from '../src/model.ts';
 
@@ -34,7 +34,8 @@ test('page: header, stale banner and both views', () => {
 test('code updates have a copyable command and a warning independent of project staleness', () => {
   const data: BoardData = { ...sample, fetchedAt: new Date(base.now).toISOString(), error: null, codeUpdate: {
     runningRevision: 'a'.repeat(40), remoteRevision: 'b'.repeat(40), behind: 2, error: null,
-    command: "bash '/Users/pedro/Developer/Mux/mux-factory/board/scripts/update.sh'",
+    command: "bash '/Users/pedro/Developer/Mux/mux-factory/board/scripts/update.sh'", updatable: false,
+    logs: { update: '/Users/pedro/Library/Logs/mux-board-update.log', board: '/Users/pedro/Library/Logs/mux-board.log' },
   } };
   const html = renderPage(data, base);
   matchesSaved('update-notice.html', html);
@@ -47,6 +48,60 @@ test('code updates have a copyable command and a warning independent of project 
   const unknown = renderApp({ ...data, codeUpdate: { ...data.codeUpdate!, behind: null } }, base);
   assert.match(unknown, /Checking for board updates/);
   assert.ok(!unknown.includes('Board update available'));
+});
+
+test('the launch-agent board offers Update: in the header, or on the banner when behind', () => {
+  const codeUpdate = { runningRevision: 'a'.repeat(40), remoteRevision: 'a'.repeat(40), behind: 0, error: null,
+    command: "bash '/Users/pedro/Developer/Mux/mux-factory/board/scripts/update.sh'", updatable: true,
+    logs: { update: '/Users/pedro/Library/Logs/mux-board-update.log', board: '/Users/pedro/Library/Logs/mux-board.log' } };
+  const data: BoardData = { ...sample, fetchedAt: new Date(base.now).toISOString(), error: null, codeUpdate };
+  const current = renderApp(data, base);
+  assert.equal(current.match(/data-update/g)?.length, 1);
+  assert.match(current, /class="title-row".*data-update/);
+  const behind = renderApp({ ...data, codeUpdate: { ...codeUpdate, remoteRevision: 'b'.repeat(40), behind: 2 } }, base);
+  assert.equal(behind.match(/data-update/g)?.length, 1);
+  assert.match(behind, /Board update available.<\/strong> <button[^>]*data-update/);
+  assert.ok(!behind.includes('aria-label="Copy board update command"'), 'Update replaces the copy button');
+  const dev = renderApp({ ...data, codeUpdate: { ...codeUpdate, updatable: false } }, base);
+  assert.ok(!dev.includes('data-update'));
+});
+
+test('an update shows its steps as they finish, then its result', () => {
+  const codeUpdate = { runningRevision: 'a'.repeat(40), remoteRevision: 'b'.repeat(40), behind: 1, error: null,
+    command: "bash '/Users/pedro/Developer/Mux/mux-factory/board/scripts/update.sh'", updatable: true,
+    logs: { update: '/Users/pedro/Library/Logs/mux-board-update.log', board: '/Users/pedro/Library/Logs/mux-board.log' } };
+  const progress = { state: 'running' as const, pid: 1, finished: ['check' as const, 'fetch' as const], current: 'install' as const,
+    startedAt: '2026-10-21T09:59:00Z', finishedAt: null, revision: 'b'.repeat(40), error: null, logTail: null };
+  const data: BoardData = { ...sample, fetchedAt: new Date(base.now).toISOString(), error: null, codeUpdate, update: progress };
+  const running = renderApp(data, base);
+  matchesSaved('update-running.html', renderHeader(data, base));
+  assert.match(running, /<li class="finished">check<\/li><li class="finished">fetch<\/li><li class="current" aria-current="step">install<\/li>/);
+  assert.match(running, /aria-disabled="true">Updating…/);
+  assert.ok(!running.includes('Board update available'), 'the progress replaces the notice while the update runs');
+  assert.equal(running.match(/data-update/g)?.length, 1);
+  const failed: BoardData = { ...data, update: { ...progress, state: 'failed', finishedAt: '2026-10-21T09:59:30Z',
+    error: 'npm exited with code 1.', logTail: 'npm ERR! missing lockfile\n<script>' } };
+  const failure = renderHeader(failed, base);
+  matchesSaved('update-failed.html', failure);
+  assert.match(failure, /Update failed at install/);
+  assert.match(failure, /npm ERR! missing lockfile\n&lt;script&gt;/);
+  assert.match(failure, /press Update/);
+  assert.match(failure, />Update<\/button>/, 'Update is available again to retry');
+  const done = renderHeader({ ...data, codeUpdate: { ...codeUpdate, behind: 0 }, update: { ...progress, state: 'done', current: null,
+    finished: ['check', 'fetch', 'install', 'restart', 'health', 'skills', 'profiles', 'done'], finishedAt: '2026-10-21T09:59:50Z' } }, base);
+  assert.match(done, /Update finished.<\/strong> The board now runs <code>bbbbbbb<\/code>/);
+  const skipped = renderHeader({ ...data, update: { ...progress, state: 'done', current: null,
+    finished: ['check', 'fetch', 'skills', 'profiles', 'done'], finishedAt: '2026-10-21T09:59:50Z' } }, base);
+  assert.match(skipped, /already current/);
+  const old = renderHeader({ ...failed, update: { ...failed.update!, finishedAt: '2026-10-21T09:00:00Z' } }, base);
+  assert.ok(!old.includes('Update failed'), 'an old result leaves the header');
+  const lost = renderHeader(data, { ...base, updateView: { phase: 'lost' } });
+  matchesSaved('update-lost.html', lost);
+  assert.match(lost, /The board didn't restart/);
+  assert.match(lost, /mux-board\.log/);
+  assert.match(lost, /board\/scripts\/update\.sh/);
+  const refused = renderHeader(data, { ...base, updateView: { phase: 'refused', message: 'A Start is running. Press Update when it finishes.' } });
+  assert.match(refused, /role="alert"><strong>The update didn't start.<\/strong> A Start is running/);
 });
 
 test('board view, with List and Done expanded', () => {

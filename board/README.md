@@ -43,7 +43,12 @@ To start it at login, run `board/scripts/install-launch-agent.sh` from the main
 checkout. It's safe to rerun and logs to `~/Library/Logs/mux-board.log`;
 `board/scripts/uninstall-launch-agent.sh` removes it.
 
-Update the installed board and global skills from the main factory checkout:
+The launch-agent board has an **Update** button in its header. It runs the
+updater for the checkout the board was started from, apart from the board so it
+survives the restart, and the page shows each step as it finishes, reloads onto
+the new revision, or names the failed step with the end of its log. Update is
+refused while a Start or another update runs, and Start waits for an update.
+From a terminal, run from the main factory checkout:
 
 ```sh
 bash board/scripts/update.sh
@@ -52,11 +57,12 @@ bash board/scripts/update.sh
 See the [factory update instructions](../README.md#update) for requirements,
 refused histories, partial failures and extra Claude profiles. The updater
 refreshes the launch-agent configuration and confirms the new process is
-serving the expected revision before updating skills. It is safe to rerun.
+serving the expected revision before installing skills. It is safe to rerun.
 
 The board checks remote `main` every refresh cycle and shows **Board update
-available** with a copyable command when it contains commits absent from this
-process. Pulling the checkout does not clear the notice: restart the board to
+available** when it contains commits absent from this process: with the Update
+button on the launch-agent board, and with a copyable command on dev, sample and
+other-port runs, which can't update themselves. Pulling the checkout does not clear the notice: restart the board to
 run that revision. A running process keeps its own browser modules and styling
 so a new browser load still works after checkout changes. Failed revision
 checks show their own warning, separate from stale GitHub project data.

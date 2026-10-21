@@ -7,7 +7,8 @@ import type { TestContext } from 'node:test';
 /** Real, isolated Git histories; no network or user Git configuration. */
 export async function factoryRepo(t: TestContext) {
   const dir = await mkdtemp(join(tmpdir(), 'mux update test '));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  // Runs before a board started later is killed, so its git fetch may still be writing: retry.
+  t.after(() => rm(dir, { recursive: true, force: true, maxRetries: 10 }));
   const repo = join(dir, 'factory');
   const origin = join(dir, 'origin.git');
   const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
@@ -19,6 +20,7 @@ export async function factoryRepo(t: TestContext) {
   for (const folder of ['src', 'scripts', 'launchd']) {
     await cp(new URL(`../${folder}`, import.meta.url), join(repo, 'board', folder), { recursive: true });
   }
+  await cp(new URL('../../scripts/install.sh', import.meta.url), join(repo, 'scripts/install.sh'));
   await cp(new URL('../../config.json', import.meta.url), join(repo, 'config.json'));
   await cp(new URL('./sample.json', import.meta.url), join(repo, 'sample.json'));
   await writeFile(join(repo, 'board/package.json'), '{"type":"module"}');

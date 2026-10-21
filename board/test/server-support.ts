@@ -21,19 +21,23 @@ export function rawIssue(number: number, status: string, repo = 'maddec01/mux-fa
   };
 }
 
+export async function freePort(): Promise<number> {
+  const socket = createServer();
+  socket.listen(0, '127.0.0.1');
+  await once(socket, 'listening');
+  const address = socket.address();
+  if (!address || typeof address === 'string') throw new Error('No test port');
+  await new Promise<void>((resolve) => socket.close(() => resolve()));
+  return address.port;
+}
+
 export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}, directory?: string) {
   const dir = await mkdtemp(join(tmpdir(), 'mux-board-test-'));
   const stateFile = join(dir, 'github.json');
   await writeFile(stateFile, JSON.stringify(options));
   await writeFile(stateFile + '.calls', '');
   await writeFile(stateFile + '.t3calls', '');
-  const socket = createServer();
-  socket.listen(0, '127.0.0.1');
-  await once(socket, 'listening');
-  const address = socket.address();
-  if (!address || typeof address === 'string') throw new Error('No test port');
-  const port = address.port;
-  await new Promise<void>((resolve) => socket.close(() => resolve()));
+  const port = env.BOARD_PORT ? Number(env.BOARD_PORT) : await freePort();
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),

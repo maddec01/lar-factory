@@ -10,6 +10,8 @@ export interface BoardConfig {
   number: number | null;
   repos: RepoConfig[];
   port: number;
+  /** The port config.json names; BOARD_PORT overrides it for other runs. */
+  configuredPort: number;
   refreshSeconds: number;
   /** T3 Code project that Start opens threads in, as written in config.json (may start with ~). */
   t3Project: string | null;
@@ -32,6 +34,7 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
     number: raw.project?.number ?? null,
     repos: raw.repos ?? [],
     port: Number(process.env.BOARD_PORT ?? raw.board?.port ?? 4317),
+    configuredPort: raw.board?.port ?? 4317,
     refreshSeconds: raw.board?.refreshSeconds ?? 45,
     t3Project: raw.board?.t3Project ?? null,
   };

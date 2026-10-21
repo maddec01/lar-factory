@@ -17,7 +17,7 @@ import {
   trackOf,
   workCommand,
 } from './model.ts';
-import type { BoardData, FlowNode, Item, LinkedPr, StartedThread, Status, Track } from './model.ts';
+import type { BoardData, FlowNode, Item, LinkedPr, StartedThread, Status, Track, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -41,7 +41,25 @@ export interface RenderOptions {
   notice?: { verb: 'Added' | 'Moved'; item: Item; to: Status } | null;
   /** Per item id: what this page is doing for the item. */
   actions?: Record<string, ItemAction>;
+  /** What this page knows about an update that the server can't report: its own request, or a board that didn't come back. */
+  updateView?: UpdateView | null;
 }
+
+export type UpdateView = { phase: 'starting' } | { phase: 'refused'; message: string } | { phase: 'lost' };
+
+/** How long a finished update's result stays in the header. */
+export const UPDATE_RESULT_MS = 15 * 60 * 1000;
+
+const UPDATE_HINTS: Record<UpdateStep, string> = {
+  check: 'Put the checkout back on a clean main, then press Update.',
+  fetch: 'Check GitHub access and reconcile local main with origin/main, then press Update.',
+  install: 'npm ci failed; fix what the log shows, then press Update.',
+  restart: 'The launch agent could not be reinstalled; fix what the log shows, then press Update.',
+  health: 'The new board did not answer in time; check the board log, then press Update.',
+  skills: 'The skills install failed; check the gh login and the log, then press Update.',
+  profiles: 'Resolve the conflicting skill links in the log, then press Update.',
+  done: 'Press Update to retry.',
+};
 
 /** An action this page started for an item: in flight, failed, or (for Start) done. */
 export interface ItemAction {
@@ -215,7 +233,7 @@ function actionError(action: ItemAction | undefined): string {
 /** Board writes are off in sample mode, so its buttons are too. */
 function writeState(data: BoardData, action: ItemAction | undefined): string {
   if (data.capture?.enabled === false) return ' disabled title="Disabled in sample mode"';
-  return action?.phase === 'pending' ? ' aria-disabled="true"' : '';
+  return action?.phase === 'pending' || data.update?.state === 'running' ? ' aria-disabled="true"' : '';
 }
 
 function queueButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
@@ -241,6 +259,42 @@ function startControl(item: Item, data: BoardData, action: ItemAction | undefine
 
 // ---------- header ----------
 
+function updateButton(data: BoardData, opts: RenderOptions): string {
+  const busy = opts.updateView?.phase === 'starting' || (data.update?.state === 'running' && opts.updateView?.phase !== 'lost');
+  return `<button type="button" class="copy" data-update aria-label="${busy ? 'Updating' : 'Update'} the board and skills"${busy ? ' aria-disabled="true"' : ''}>${busy ? 'Updating…' : 'Update'}</button>`;
+}
+
+/** The update this page or a terminal started: its steps as they finish, then its result. */
+function updateBanner(data: BoardData, opts: RenderOptions): string {
+  const view = opts.updateView;
+  const update = data.codeUpdate;
+  if (view?.phase === 'lost' && update) {
+    return `<div class="banner" role="alert"><strong>The board didn't restart.</strong> Check <code>${esc(update.logs.board)}</code> and <code>${esc(update.logs.update)}</code>, then run <code>${esc(update.command)}</code> in a terminal. <button type="button" class="copy" data-copy="${esc(update.command)}" aria-label="Copy board update command">Copy</button></div>`;
+  }
+  if (view?.phase === 'refused') return `<div class="banner" role="alert"><strong>The update didn't start.</strong> ${esc(view.message)}</div>`;
+  const progress = data.update;
+  if (!progress) return '';
+  const finishedAt = progress.finishedAt ? Date.parse(progress.finishedAt) : NaN;
+  if (progress.state !== 'running' && !(opts.now - finishedAt <= UPDATE_RESULT_MS)) return '';
+  const current = progress.current
+    ? `<li class="${progress.state === 'failed' ? 'failed' : 'current'}" aria-current="step">${esc(progress.current)}</li>`
+    : '';
+  const steps = `<ol class="update-steps" aria-label="Update steps">${progress.finished.map((step) => `<li class="finished">${esc(step)}</li>`).join('')}${current}</ol>`;
+  if (progress.state === 'running') {
+    return `<div class="banner update-progress" role="status"><strong>Updating the board and skills…</strong>${steps}</div>`;
+  }
+  if (progress.state === 'done') {
+    const result = progress.finished.includes('restart') && progress.revision
+      ? `The board now runs <code>${esc(progress.revision.slice(0, 7))}</code>, with the skills and checklists from main.`
+      : 'The board was already current; the skills and checklists are updated from main.';
+    return `<div class="banner update-progress capture-success" role="status"><strong>Update finished.</strong> ${result}${steps}</div>`;
+  }
+  const step = progress.current && progress.current in UPDATE_HINTS ? progress.current : 'done';
+  const tail = progress.logTail ? `<pre class="update-log">${esc(progress.logTail)}</pre>` : '';
+  const log = update ? ` Full log: <code>${esc(update.logs.update)}</code>` : '';
+  return `<div class="banner update-progress" role="alert"><strong>Update failed at ${esc(step)}.</strong> ${esc(progress.error ?? '')}${steps}${tail}<p class="update-hint">${esc(UPDATE_HINTS[step])}${log}</p></div>`;
+}
+
 export function renderHeader(data: BoardData, opts: RenderOptions): string {
   const counts = countsOf(data);
   const refreshed = data.fetchedAt
@@ -248,9 +302,17 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
     : 'Not read yet';
   const banners: string[] = [];
   const update = data.codeUpdate;
-  if (update && (update.behind ?? 0) > 0) {
-    banners.push(`<div class="banner code-update" role="status"><strong>Board update available.</strong> Run <code>${esc(update.command)}</code> <button type="button" class="copy" data-copy="${esc(update.command)}" aria-label="Copy board update command">Copy</button></div>`);
+  const behind = (update?.behind ?? 0) > 0;
+  // While an update runs, its progress replaces the notice and the control returns to the title row.
+  const running = data.update?.state === 'running' && opts.updateView?.phase !== 'lost';
+  const onBanner = Boolean(update?.updatable) && behind && !running;
+  if (update && behind && (onBanner || !update.updatable)) {
+    banners.push(update.updatable
+      ? `<div class="banner code-update" role="status"><strong>Board update available.</strong> ${updateButton(data, opts)}</div>`
+      : `<div class="banner code-update" role="status"><strong>Board update available.</strong> Run <code>${esc(update.command)}</code> <button type="button" class="copy" data-copy="${esc(update.command)}" aria-label="Copy board update command">Copy</button></div>`);
   }
+  const progress = updateBanner(data, opts);
+  if (progress) banners.push(progress);
   if (update && (update.error || update.behind === null)) {
     banners.push(`<div class="banner" role="status"><strong>${update.error ? 'Board update check failed.' : 'Checking for board updates…'}</strong>${update.error ? ` ${esc(update.error)}` : ''}</div>`);
   }
@@ -276,7 +338,7 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
     ? `<a href="${esc(data.project.url)}" target="_blank" rel="noopener">${esc(data.project.title)} project</a>`
     : esc(data.project.title);
   return `<header class="top">
-<div class="title-row"><h1>Mux factory board</h1><p class="refreshed">${refreshed} · ${project}</p><button type="button" class="copy add-item" data-add-item>Add item</button></div>
+<div class="title-row"><h1>Mux factory board</h1><p class="refreshed">${refreshed} · ${project}</p><span class="header-actions"><button type="button" class="copy add-item" data-add-item>Add item</button>${update?.updatable && !onBanner ? updateButton(data, opts) : ''}</span></div>
 <ul class="totals" aria-label="Counts">
 <li class="${counts.needsYou ? 'amber' : ''}"><b>${counts.needsYou}</b> need you</li>
 <li><b>${counts.inFlight}</b> in flight</li>

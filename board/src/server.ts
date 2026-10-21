@@ -1,11 +1,13 @@
 // The board server: refreshes the project through `gh` every refreshSeconds,
 // keeps the last good copy in memory and serves it on 127.0.0.1.
 
+import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { expandHome, loadConfig } from './config.ts';
 import { addProjectItem, fetchProject, findProjectNumber, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
@@ -16,13 +18,17 @@ import { renderPage } from './page.ts';
 import { DEFAULT_UI } from './render.ts';
 import { workCommand } from './model.ts';
 import { revisionCheck } from './revision.ts';
+import { lockHolder, readProgress, updatePaths } from './update-state.ts';
 import type { BoardData, Item } from './model.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
 const fixture = process.env.BOARD_DATA_FILE;
 const capture = { session: randomUUID(), enabled: !fixture };
-const code = revisionCheck();
+const updates = updatePaths();
+// Only the launch-agent board updates itself: launchd sets its token, and it runs on the configured port.
+const updatable = !fixture && Boolean(process.env.BOARD_LAUNCH_TOKEN) && config.port === config.configuredPort;
+const code = revisionCheck({ updatable, logs: { update: updates.log, board: updates.boardLog } });
 
 const state: BoardData = {
   capture,
@@ -45,6 +51,9 @@ const submissions = new Map<string, {
 }>();
 /** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
 const starts = new Map<string, Promise<StartResult>>();
+let runningStarts = 0;
+/** Set while the board waits for a new updater to take the lock. */
+let launchingUpdate = false;
 const REQUEST_ID = /^[a-f0-9-]{36}$/;
 
 function log(message: string): void {
@@ -193,6 +202,9 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
   const { itemId } = input;
   if (typeof itemId !== 'string') return json(res, 400, { error: 'Name the item to start.' });
   let pending = starts.get(itemId);
+  if (!pending && updating()) {
+    return json(res, 409, { error: 'The board is updating and will restart. Press Start when the update finishes.', board: state });
+  }
   if (!pending) {
     const item = state.items.find((i) => i.id === itemId);
     if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
@@ -204,26 +216,72 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
     try { project = expandHome(config.t3Project, process.env.HOME); }
     catch (err) { return json(res, 503, { error: (err as Error).message }); }
     // Only a failure t3 reported may run again; a started or unconfirmed thread is kept.
+    runningStarts++;
     pending = startThread(project, message).then((result) => {
       if (result.thread) state.started = { ...state.started, [itemId]: result.thread };
       else if (!result.uncertain) starts.delete(itemId);
       return result;
-    });
+    }).finally(() => { runningStarts--; });
     starts.set(itemId, pending);
   }
   const result = await pending;
   json(res, result.error ? 502 : 200, { ...result, board: state });
 }
 
+function updating(): boolean {
+  return updatable && (launchingUpdate || lockHolder(updates) !== null);
+}
+
+/**
+ * Starts scripts/update.ts in its own process group, so it outlives the board when
+ * launchd restarts it, and waits until it holds the lock or reports why it can't.
+ */
+function launchUpdater(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', fileURLToPath(new URL('../scripts/update.ts', import.meta.url))], {
+      cwd: fileURLToPath(new URL('../', import.meta.url)), detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      env: { ...process.env, BOARD_PORT: String(config.port) },
+    });
+    let settled = false;
+    const settle = (error: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (child.connected) child.disconnect();
+      child.unref();
+      resolve(error);
+    };
+    const timer = setTimeout(() => settle(`The updater didn't start. See ${updates.log}.`), 10_000);
+    child.on('message', (message: { started?: boolean; busy?: string }) => settle(message.busy ?? null));
+    child.on('exit', () => settle(`The updater stopped before it started. See ${updates.log}.`));
+    child.on('error', (err) => settle(`The updater couldn't start: ${err.message}`));
+  });
+}
+
+async function updateBoard(res: ServerResponse): Promise<void> {
+  if (!updatable) return json(res, 403, { error: `Only the launch-agent board updates itself. Run ${code.status.command} instead.` });
+  if (runningStarts) return json(res, 409, { error: 'A Start is running. Press Update when it finishes.', board: state });
+  if (updating()) return json(res, 409, { error: 'An update is already running. Wait for it to finish, then retry.', board: state });
+  launchingUpdate = true;
+  try {
+    const error = await launchUpdater();
+    state.update = readProgress(updates);
+    if (!error) log('update started');
+    json(res, error ? 409 : 202, { error, board: state });
+  } finally { launchingUpdate = false; }
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+  if (!path.startsWith('/assets/')) state.update = updatable ? readProgress(updates) : null;
   if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
     return json(res, 403, { error: 'Submit from this board page.' });
   }
   if (req.method === 'POST' && path === '/api/items') return captureItem(req, res);
   if (req.method === 'POST' && path === '/api/queue') return queueItem(req, res);
   if (req.method === 'POST' && path === '/api/start') return startItem(req, res);
+  if (req.method === 'POST' && path === '/api/update') return updateBoard(res);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }

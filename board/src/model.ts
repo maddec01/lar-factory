@@ -99,6 +99,8 @@ export interface BoardData {
   items: Item[];
   /** Threads this board run started, by item id, so every page shows them. */
   started?: Record<string, StartedThread>;
+  /** The latest update of this checkout, from the button or a terminal; null on boards that can't update. */
+  update?: UpdateProgress | null;
 }
 
 export interface CodeUpdate {
@@ -107,6 +109,31 @@ export interface CodeUpdate {
   behind: number | null;
   error: string | null;
   command: string;
+  /** Whether this board can update itself: only the launch-agent board can. */
+  updatable: boolean;
+  /** Where the updater and the board write their logs. */
+  logs: { update: string; board: string };
+}
+
+export const UPDATE_STEPS = ['check', 'fetch', 'install', 'restart', 'health', 'skills', 'profiles', 'done'] as const;
+export type UpdateStep = (typeof UPDATE_STEPS)[number];
+
+/** An update's progress, kept outside the board's memory because the update restarts the board. */
+export interface UpdateProgress {
+  state: 'running' | 'done' | 'failed';
+  /** The updater's process id, so a dead updater isn't shown as running. */
+  pid: number;
+  /** Steps that finished, in order. Skipped steps aren't listed. */
+  finished: UpdateStep[];
+  /** The step running now, or the one that failed. */
+  current: UpdateStep | null;
+  startedAt: string;
+  finishedAt: string | null;
+  /** The origin/main revision this update moves to, once fetched. */
+  revision: string | null;
+  error: string | null;
+  /** The last lines of the update log when the update failed. */
+  logTail: string | null;
 }
 
 export interface Counts {

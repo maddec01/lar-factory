@@ -125,7 +125,16 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
 .copy:hover { border-color: var(--fg); }
 
 /* Capture form: stays mounted while the board refreshes. */
-.add-item { margin-left: auto; }
+.header-actions { margin-left: auto; display: flex; gap: 8px; }
+.update-steps { display: flex; flex-wrap: wrap; gap: 2px 12px; list-style: none; padding: 0; margin: 6px 0 0; font-size: 12px; }
+.update-steps .finished::before { content: "✓ "; color: var(--build); }
+.update-steps .current { font-weight: 600; }
+.update-steps .current::after { content: "…"; }
+.update-steps .failed { color: var(--danger-text); font-weight: 600; }
+.update-steps .failed::before { content: "✕ "; }
+.update-log { margin: 6px 0 0; max-height: 14em; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.update-hint { margin: 6px 0 0; }
+.update-hint code { overflow-wrap: anywhere; }
 #add-item-dialog { width: min(520px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); color: var(--fg); overflow: auto; }
 #add-item-dialog::backdrop { background: rgb(0 0 0 / 40%); }
 .form-heading, .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

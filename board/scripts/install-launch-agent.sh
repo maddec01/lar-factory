@@ -12,8 +12,9 @@ LOG="$HOME/Library/Logs/mux-board.log"
 DOMAIN="gui/$(id -u)"
 
 NODE="$(command -v node || true)"
-GH="$(command -v gh || true)"
-T3="$(command -v t3 || true)"
+# Run from the board's Update button, PATH is launchd's short one: keep the board's paths.
+GH="$(command -v gh || printf '%s' "${GH_PATH:-}")"
+T3="$(command -v t3 || printf '%s' "${T3_PATH:-}")"
 [[ -n "$NODE" ]] || { echo "node not found on PATH" >&2; exit 1; }
 [[ -n "$GH" ]] || { echo "gh not found on PATH" >&2; exit 1; }
 [[ -n "$T3" ]] || echo "warning: t3 not found on PATH; Start will fail until the T3 Code CLI is installed and this is rerun" >&2

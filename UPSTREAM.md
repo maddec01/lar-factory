@@ -19,6 +19,8 @@ file when you take changes. Copies are never edited by hand; Mux rules live in
 | `pr` | mattpocock/skills | `skills/engineering/pr` | `5beb35b040e3` |
 | `retro` | mattpocock/skills | `skills/engineering/retro` | `5beb35b040e3` |
 | `handoff` | mattpocock/skills | `skills/productivity/handoff` | `5beb35b040e3` |
+| `to-tickets` | mattpocock/skills | `skills/engineering/to-tickets` | `5beb35b040e3` |
+| `implement` | mattpocock/skills | `skills/engineering/implement` | `5beb35b040e3` |
 | `code-review-and-quality` | addyosmani/agent-skills | `skills/code-review-and-quality` | `aeac41d4d005` |
 | `security-and-hardening` | addyosmani/agent-skills | `skills/security-and-hardening` | `aeac41d4d005` |
 | `doubt-driven-development` | addyosmani/agent-skills | `skills/doubt-driven-development` | `aeac41d4d005` |

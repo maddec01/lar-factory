@@ -74,5 +74,28 @@ else
   pass "fails when a skill is not installed"
 fi
 
+root="$(cd "$(dirname "$0")/.." && pwd)"
+
+missing=()
+for dir in "$root"/skills/*/; do
+  name=$(basename "$dir")
+  [[ " ${SKILLS[*]} " == *" $name "* ]] || missing+=("$name")
+done
+if ((${#missing[@]} == 0)); then
+  pass "SKILLS lists every folder under skills/"
+else
+  fail "SKILLS lists every folder under skills/; missing: ${missing[*]}"
+fi
+
+missing=()
+while read -r name; do
+  [[ -d "$root/skills/$name" ]] || missing+=("$name")
+done < <(awk -F'|' '$4 ~ /`skills\// { gsub(/[ `]/, "", $2); print $2 }' "$root/UPSTREAM.md")
+if ((${#missing[@]} == 0)); then
+  pass "every skill row in UPSTREAM.md has a folder under skills/"
+else
+  fail "every skill row in UPSTREAM.md has a folder under skills/; missing: ${missing[*]}"
+fi
+
 ((failures == 0)) || { printf '%d failed\n' "$failures"; exit 1; }
 printf 'all passed\n'

@@ -33,23 +33,8 @@ only when that step runs.
    `AGENTS.md`; run its worktree setup if it asks.
 2. **Plan.** If the build issue already has slices (a handoff), remove leftover
    slice worktrees and branches and **Implement** the ready slices fresh.
-   Otherwise start a **planner** subagent with the issue reference, repo path
-   and these instructions:
-   - Follow `to-tickets` (`~/.claude/skills/to-tickets/SKILL.md` in Claude
-     Code, `~/.agents/skills/to-tickets/SKILL.md` in Codex) on the build issue:
-     explore the code, then split the work into vertical slices, each sized for
-     one fresh context. Chain slices that touch the same file with blocked-by.
-   - Publish each slice as a native sub-issue of the build issue with native
-     blocked-by links (**Slices** in `<mux-work>/issue-tracker.md`). Its body,
-     self-contained for an implementer that has seen nothing else: What to
-     build, Acceptance criteria, and a short **Where to look** (files or
-     modules to start from). A slice editing skills, `AGENTS.md` or `CLAUDE.md`
-     says to load `writing-for-agents`.
-   - Mux overrides `to-tickets`: skip its quiz, tracker setup and
-     `ready-for-agent` label; Where to look replaces its no-file-paths rule;
-     blocked-by lives only in native links. Slices stay off the Mux Project
-     with no Status.
-   - Return only the slice list: number, title, blockers.
+   Otherwise start a **planner** subagent with `planner.md`, the issue
+   reference and the repo path; it returns the slice list.
 3. **Implement.** In parallel, start an **implementer** subagent for each ready
    slice (the ready-slices command in **Slices**) not already running (track
    the ones you started), each in its own worktree:
@@ -59,25 +44,14 @@ only when that step runs.
      `git worktree add ${TMPDIR:-/tmp}/mux-<n>-slice-<m> -b slice/<n>-<m>-<slug> <build-branch>`
      and pass that path (the post-checkout hook runs worktree setup).
 
-   Give it the slice reference, the build branch and these instructions:
-   follow `implement` (`~/.claude/skills/implement/SKILL.md` in Claude Code,
-   `~/.agents/skills/implement/SKILL.md` in Codex) for the slice, test-first
-   with `tdd`, using `developer-profile`, plus `codebase-design` when a
-   module's shape changes and `writing-for-agents` when it edits skills,
-   `AGENTS.md` or `CLAUDE.md`. Skip its code review step. Each commit is one
-   reviewable step with a conventional message (`AGENTS.md` lists types and
-   scopes), never a fixup. Run the checks `AGENTS.md` names for the layers
-   changed, then rebase onto the build branch tip. Report the absolute
-   worktree path and slice branch.
+   Give it `implementer.md`, the slice reference and the build branch.
 4. **Merge.** As each implementer reports, run
    `git merge --ff-only slice/<n>-<m>-<slug>` here; if it can't fast-forward,
    send the slice back to its implementer (or a fresh subagent) to rebase onto
    the build branch tip, then merge again. After each merge, remove the
    worktree and slice branch, close the slice sub-issue (**Slices** in
    `<mux-work>/issue-tracker.md`) and run **Implement** again. A slice reported
-   blocked (too big, checks won't pass) goes back to the planner to re-slice:
-   it publishes the new slices, moves dependents' blocked-by links to them and
-   closes the old slice as not planned (**Slices**). A wrong brief follows the
+   blocked goes back to the planner to re-slice. A wrong brief follows the
    stop rule below. Done when every slice is closed.
 5. A subagent writes the brief's **Domain docs** in its own commit,
    following `domain-modeling`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and

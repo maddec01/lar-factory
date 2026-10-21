@@ -198,7 +198,19 @@ button:disabled { opacity: 0.6; cursor: wait; }
 button:disabled[title] { cursor: not-allowed; }
 #item-result:not(:empty) { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--you); border-radius: 6px; background: var(--you-soft); overflow-wrap: anywhere; white-space: pre-line; }
 #item-result a { display: block; margin-top: 4px; }
-.capture-success { border-color: var(--build); border-left-width: 1px; background: var(--soft); }
+
+/* notices: a close button on every failure, and successes as toasts that clear themselves */
+.dismiss { float: right; margin: -3px -6px 0 8px; width: 24px; height: 24px; border: 0; border-radius: var(--r-control); background: none; color: var(--muted); font: 16px/1 var(--font-sans); cursor: pointer; }
+.dismiss:hover { background: var(--accent); color: var(--fg); }
+.action-error .dismiss { float: none; margin: -4px 0 -4px 2px; vertical-align: middle; font-weight: 400; }
+/* client.ts keeps --toast-top below the header while it's on screen. */
+.toasts { position: fixed; top: var(--toast-top, 12px); right: 12px; z-index: 60; display: grid; gap: 8px; width: min(400px, calc(100vw - 24px)); }
+.toast { margin: 0; background: var(--surface); border-color: var(--bd); box-shadow: var(--shadow), 0 1px 3px rgb(0 0 0 / 8%); animation: toast-in 0.18s cubic-bezier(0.32, 0.72, 0, 1); }
+.toast.seen { animation: none; }
+.toast::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 8px; }
+.toast strong { color: var(--fg); }
+.view-item { margin-left: 4px; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
 @media (max-width: 400px) {
   .form-pair { grid-template-columns: 1fr; gap: 0; }
   .add-item { margin-left: 0; }
@@ -233,7 +245,9 @@ button:disabled[title] { cursor: not-allowed; }
 .abandon:hover { border-color: var(--danger-text); }
 .copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .start { margin: 0; font-size: 12px; }
-[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
+p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
+.started-tag { margin-left: auto; display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-fg); font-weight: 500; }
+.started-tag.unsure { background: var(--you-soft); color: var(--you-text); }
 .start-item { margin-left: auto; background: var(--primary); color: var(--primary-fg); border-color: var(--primary); padding: 0 10px; }
 .start-item:hover { background: color-mix(in srgb, var(--primary) 90%, var(--bg)); }
 .thread-id { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
@@ -291,5 +305,5 @@ a.o-title:hover { text-decoration: underline; }
   .o-node .o-tree { margin-left: 6px; padding-left: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .anchor-flash { animation: none; }
+  .anchor-flash, .toast { animation: none; }
 }

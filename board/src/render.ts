@@ -35,17 +35,25 @@ export interface RenderOptions {
   ui: UiState;
   /** Set by the browser when it can't reach the board server. */
   clientError?: string | null;
-  /** The item this page just added, moved or abandoned, announced in the header. */
-  notice?: { verb: 'Added' | 'Moved'; item: Item; to: Status } | { verb: 'Abandoned'; item: Item } | null;
+  /** What this page just did, announced in a toast. `key` is new for every notice. */
+  notice?: Notice | null;
   /** Per item id: what this page is doing for the item. */
   actions?: Record<string, ItemAction>;
   /** What this page knows about an update that the server can't report: its own request, or a board that didn't come back. */
   updateView?: UpdateView | null;
+  /** Keys of the notices closed on this page. */
+  dismissed?: ReadonlySet<string>;
 }
+
+export type Notice = { key: string } & (
+  | { verb: 'Added' | 'Moved'; item: Item; to: Status }
+  | { verb: 'Abandoned'; item: Item }
+  | { verb: 'Started'; item: Item; thread: StartedThread }
+);
 
 export type UpdateView = { phase: 'starting' } | { phase: 'refused'; message: string } | { phase: 'lost' };
 
-/** How long a finished update's result stays in the header. */
+/** How long after it finished a successful update still shows its toast on a new page. */
 export const UPDATE_RESULT_MS = 15 * 60 * 1000;
 
 const UPDATE_HINTS: Record<UpdateStep, string> = {
@@ -209,7 +217,7 @@ function card(item: Item, data: BoardData, now: number, extra = '', action = '')
     )
     .join('');
   const foot = hint || prs ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}</p>` : '';
-  return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}">
+  return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}" data-anchor="${esc(item.id)}">
 <div class="meta">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}${action}</div>
 ${titleLink(item)}
 ${parent}${stepBar(item.status)}${foot}${extra}
@@ -230,12 +238,18 @@ function cards(items: Item[], data: BoardData, now: number, empty: string, extra
 
 /** List and Done rows show every label; sub-issue rows keep the card's kind pill. */
 function row(item: Item, data: BoardData, trailing = '', withPlatform = true, pills: 'labels' | 'kind' = 'labels'): string {
-  return `<li class="row-item">${withPlatform ? platformBadge(item, data) : ''}${titleLink(item, 'row-title')}${pills === 'labels' ? labelPills(item) : kindPill(item)}${trailing}</li>`;
+  return `<li class="row-item" data-anchor="${esc(item.id)}">${withPlatform ? platformBadge(item, data) : ''}${titleLink(item, 'row-title')}${pills === 'labels' ? labelPills(item) : kindPill(item)}${trailing}</li>`;
 }
 
-function actionError(action: ItemAction | undefined): string {
-  return action?.phase === 'error' || action?.phase === 'uncertain'
-    ? `<span class="action-error" role="alert">${esc(action.message)}</span>`
+/** A close button. The key names what it closes: a notice, or `action:<item id>` for a card's error; `what` names it for screen readers. */
+function dismissButton(key: string, what: string): string {
+  return `<button type="button" class="dismiss" data-dismiss="${esc(key)}" aria-label="Dismiss${esc(what)}">&#215;</button>`;
+}
+
+/** A closed error keeps its phase without its message, so a Start that may have run stays hidden. */
+function actionError(item: Item, action: ItemAction | undefined): string {
+  return (action?.phase === 'error' || action?.phase === 'uncertain') && action.message
+    ? `<span class="action-error"><span role="alert">${esc(action.message)}</span> ${dismissButton(`action:${item.id}`, ` error for ${ref(item)}`)}</span>`
     : '';
 }
 
@@ -247,7 +261,7 @@ function writeState(data: BoardData, action: ItemAction | undefined): string {
 
 function queueButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
   const verb = action?.phase === 'pending' && action.kind !== 'abandon' ? 'Queuing…' : 'Queue';
-  return `${actionError(action)}<button type="button" class="copy row-action" data-queue="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
+  return `<button type="button" class="copy row-action" data-queue="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
 }
 
 function abandonButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
@@ -259,16 +273,17 @@ function abandonButton(item: Item, data: BoardData, action: ItemAction | undefin
 /** Start's button for the card's top row, and the message under the card when there is one. */
 function startControl(item: Item, data: BoardData, action: ItemAction | undefined): { button: string; message: string } {
   const thread = data.started?.[item.id] ?? (action?.phase === 'started' ? action.thread : undefined);
-  if (thread) {
-    // T3 titles a thread after its first message; don't repeat the command shown below.
-    const title = thread.title === workCommand(item) ? '' : ` <b>${esc(thread.title)}</b>`;
-    return { button: '', message: `<p class="start started" role="status" tabindex="-1" data-start-result="${esc(item.id)}">Started T3 thread${title} <code class="thread-id">${esc(thread.threadId)}</code></p>` };
+  // The toast announces a start; the card only keeps Start from running twice.
+  if (thread) return { button: `<span class="started-tag" tabindex="-1" data-start-result="${esc(item.id)}" title="T3 thread ${esc(thread.threadId)}">Started</span>`, message: '' };
+  if (action?.phase === 'uncertain') {
+    // Once its message is closed, a tag still says why Start is gone.
+    if (!action.message) return { button: `<span class="started-tag unsure" tabindex="-1" data-start-result="${esc(item.id)}" title="Check T3 before starting it again">May have started</span>`, message: '' };
+    return { button: '', message: `<p class="start" tabindex="-1" data-start-result="${esc(item.id)}">${actionError(item, action)}</p>` };
   }
-  if (action?.phase === 'uncertain') return { button: '', message: `<p class="start" tabindex="-1" data-start-result="${esc(item.id)}">${actionError(action)}</p>` };
   const verb = action?.phase === 'pending' ? 'Starting…' : action?.phase === 'error' ? 'Retry start' : 'Start';
   return {
     button: `<button type="button" class="copy start-item" data-start="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`,
-    message: action?.phase === 'error' ? `<p class="start">${actionError(action)}</p>` : '',
+    message: action?.phase === 'error' ? `<p class="start">${actionError(item, action)}</p>` : '',
   };
 }
 
@@ -279,35 +294,63 @@ function updateButton(data: BoardData, opts: RenderOptions): string {
   return `<button type="button" class="copy" data-update aria-label="${busy ? 'Updating' : 'Update'} the board and skills"${busy ? ' aria-disabled="true"' : ''}>${busy ? 'Updating…' : 'Update'}</button>`;
 }
 
-/** The update this page or a terminal started: its steps as they finish, then its result. */
-function updateBanner(data: BoardData, opts: RenderOptions): string {
+/** A success that clears itself: the page closes it after a few seconds. */
+function toast(key: string, what: string, body: string): string {
+  return `<div class="banner toast" role="status" data-expires="${esc(key)}">${dismissButton(key, `: ${what}`)}${body}</div>`;
+}
+
+/** The update this page or a terminal started: its steps as they finish, then a toast or the failure. */
+function updateBanner(data: BoardData, opts: RenderOptions): { banner?: string; toast?: string } {
   const view = opts.updateView;
   const update = data.codeUpdate;
+  const shown = (key: string) => !opts.dismissed?.has(key);
   if (view?.phase === 'lost' && update) {
-    return `<div class="banner" role="alert"><strong>The board didn't restart.</strong> Check <code>${esc(update.logs.board)}</code> and <code>${esc(update.logs.update)}</code>, then run <code>${esc(update.command)}</code> in a terminal. <button type="button" class="copy" data-copy="${esc(update.command)}" aria-label="Copy board update command">Copy</button></div>`;
+    if (!shown('lost')) return {};
+    return { banner: `<div class="banner" role="alert">${dismissButton('lost', ": the board didn't restart")}<strong>The board didn't restart.</strong> Check <code>${esc(update.logs.board)}</code> and <code>${esc(update.logs.update)}</code>, then run <code>${esc(update.command)}</code> in a terminal. <button type="button" class="copy" data-copy="${esc(update.command)}" aria-label="Copy board update command">Copy</button></div>` };
   }
-  if (view?.phase === 'refused') return `<div class="banner" role="alert"><strong>The update didn't start.</strong> ${esc(view.message)}</div>`;
+  if (view?.phase === 'refused' && shown('refused')) {
+    return { banner: `<div class="banner" role="alert">${dismissButton('refused', ": the update didn't start")}<strong>The update didn't start.</strong> ${esc(view.message)}</div>` };
+  }
   const progress = data.update;
-  if (!progress) return '';
+  if (!progress) return {};
+  const key = `update-${progress.finishedAt}`;
+  if (progress.state !== 'running' && !shown(key)) return {};
+  // A failure stays until it is closed or the next update replaces it; a success clears.
   const finishedAt = progress.finishedAt ? Date.parse(progress.finishedAt) : NaN;
-  if (progress.state !== 'running' && !(opts.now - finishedAt <= UPDATE_RESULT_MS)) return '';
+  if (progress.state === 'done' && !(opts.now - finishedAt <= UPDATE_RESULT_MS)) return {};
   const current = progress.current
     ? `<li class="${progress.state === 'failed' ? 'failed' : 'current'}" aria-current="step">${esc(progress.current)}</li>`
     : '';
   const steps = `<ol class="update-steps" aria-label="Update steps">${progress.finished.map((step) => `<li class="finished">${esc(step)}</li>`).join('')}${current}</ol>`;
   if (progress.state === 'running') {
-    return `<div class="banner update-progress" role="status"><strong>Updating the board and skills…</strong>${steps}</div>`;
+    return { banner: `<div class="banner update-progress" role="status"><strong>Updating the board and skills…</strong>${steps}</div>` };
   }
   if (progress.state === 'done') {
     const result = progress.finished.includes('restart') && progress.revision
       ? `The board now runs <code>${esc(progress.revision.slice(0, 7))}</code>, with the skills and checklists from main.`
       : 'The board was already current; the skills and checklists are updated from main.';
-    return `<div class="banner update-progress capture-success" role="status"><strong>Update finished.</strong> ${result}${steps}</div>`;
+    return { toast: toast(key, 'update finished', `<strong>Update finished.</strong> ${result}`) };
   }
   const step = progress.current && progress.current in UPDATE_HINTS ? progress.current : 'done';
   const tail = progress.logTail ? `<pre class="update-log">${esc(progress.logTail)}</pre>` : '';
   const log = update ? ` Full log: <code>${esc(update.logs.update)}</code>` : '';
-  return `<div class="banner update-progress" role="alert"><strong>Update failed at ${esc(step)}.</strong> ${esc(progress.error ?? '')}${steps}${tail}<p class="update-hint">${esc(UPDATE_HINTS[step])}${log}</p></div>`;
+  return { banner: `<div class="banner update-progress" role="alert">${dismissButton(key, ': update failed')}<strong>Update failed at ${esc(step)}.</strong> ${esc(progress.error ?? '')}${steps}${tail}<p class="update-hint">${esc(UPDATE_HINTS[step])}${log}</p></div>` };
+}
+
+function noticeToast(notice: Notice): string {
+  const { key, item } = notice;
+  switch (notice.verb) {
+    // The issue is gone, so there is nothing to link to.
+    case 'Abandoned':
+      return toast(key, `${notice.verb} ${ref(item)}`, esc(abandonPrompt(item).done));
+    case 'Started': {
+      // T3 titles a thread after its first message; don't repeat the command.
+      const title = notice.thread.title === workCommand(item) ? '' : ` <b>${esc(notice.thread.title)}</b>`;
+      return toast(key, `started ${ref(item)}`, `Started T3 thread${title} <code class="thread-id">${esc(notice.thread.threadId)}</code> for ${titleLink(item)}.`);
+    }
+    default:
+      return toast(key, `${notice.verb} ${ref(item)}`, `${notice.verb} ${titleLink(item)} to ${esc(notice.to)}. <button type="button" class="copy view-item" data-view-item="${esc(item.id)}">View item</button>`);
+  }
 }
 
 export function renderHeader(data: BoardData, opts: RenderOptions): string {
@@ -327,20 +370,14 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
       : `<div class="banner code-update" role="status"><strong>Board update available.</strong> Run <code>${esc(update.command)}</code> <button type="button" class="copy" data-copy="${esc(update.command)}" aria-label="Copy board update command">Copy</button></div>`);
   }
   const progress = updateBanner(data, opts);
-  if (progress) banners.push(progress);
+  if (progress.banner) banners.push(progress.banner);
   if (update && (update.error || update.behind === null)) {
     banners.push(`<div class="banner" role="status"><strong>${update.error ? 'Board update check failed.' : 'Checking for board updates…'}</strong>${update.error ? ` ${esc(update.error)}` : ''}</div>`);
   }
-  if (opts.notice?.verb === 'Abandoned') {
-    // The issue is gone, so there is nothing to link to.
-    banners.push(`<div class="banner capture-success" role="status">${esc(abandonPrompt(opts.notice.item).done)}</div>`);
-  } else if (opts.notice) {
-    const { verb, item, to } = opts.notice;
-    banners.push(`<div class="banner capture-success" role="status">${verb} ${titleLink(item)} to ${esc(to)}.</div>`);
-  }
-  if (opts.clientError) {
+  const toasts = [progress.toast, opts.notice && noticeToast(opts.notice)].filter(Boolean);
+  if (opts.clientError && !opts.dismissed?.has('client-error')) {
     banners.push(
-      `<div class="banner" role="alert"><strong>Can't reach the board server.</strong> ${esc(opts.clientError)} Showing the last data this page received.</div>`,
+      `<div class="banner" role="alert">${dismissButton('client-error', ": can't reach the board server")}<strong>Can't reach the board server.</strong> ${esc(opts.clientError)} Showing the last data this page received.</div>`,
     );
   }
   if (isStale(data, opts.now)) {
@@ -365,6 +402,7 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
 <li><b>${counts.total}</b> items</li>
 </ul>
 ${banners.join('\n')}
+<div class="toasts">${toasts.map((t) => `\n${t}`).join('')}</div>
 </header>`;
 }
 
@@ -480,7 +518,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       const mine = list.filter((i) => platformOf(i, data.repos) === p);
       const id = listGroupId(p);
       const body = mine.length
-        ? `<ul class="rows">${mine.map((i) => row(i, data, queueButton(i, data, opts.actions?.[i.id]) + abandonButton(i, data, opts.actions?.[i.id]), false)).join('')}</ul>`
+        ? `<ul class="rows">${mine.map((i) => row(i, data, queueButton(i, data, opts.actions?.[i.id]) + abandonButton(i, data, opts.actions?.[i.id]) + actionError(i, opts.actions?.[i.id]), false)).join('')}</ul>`
         : '<p class="empty">Nothing in List.</p>';
       return `<details class="platform" id="${id}"${isOpen(ui, id, true)}><summary><span class="plat plat-${esc(slug(p))}">${esc(p)}</span> <b>${mine.length}</b> in List</summary>${body}</details>`;
     })

@@ -99,19 +99,30 @@ test('an update shows its steps as they finish, then its result', () => {
   assert.match(failure, />Update<\/button>/, 'Update is available again to retry');
   const done = renderHeader({ ...data, codeUpdate: { ...codeUpdate, behind: 0 }, update: { ...progress, state: 'done', current: null,
     finished: ['check', 'fetch', 'install', 'restart', 'health', 'skills', 'profiles', 'done'], finishedAt: '2026-10-21T09:59:50Z' } }, base);
-  assert.match(done, /Update finished.<\/strong> The board now runs <code>bbbbbbb<\/code>/);
+  assert.match(done, /<div class="toasts">[\s\S]*<div class="banner toast" role="status" data-expires="update-2026-10-21T09:59:50Z"><button type="button" class="dismiss" data-dismiss="update-2026-10-21T09:59:50Z" aria-label="Dismiss: update finished">&#215;<\/button><strong>Update finished.<\/strong> The board now runs <code>bbbbbbb<\/code>/,
+    'a finished update is a toast that clears itself');
   const skipped = renderHeader({ ...data, update: { ...progress, state: 'done', current: null,
     finished: ['check', 'fetch', 'skills', 'profiles', 'done'], finishedAt: '2026-10-21T09:59:50Z' } }, base);
   assert.match(skipped, /already current/);
+  assert.match(failure, /role="alert"><button type="button" class="dismiss" data-dismiss="update-2026-10-21T09:59:30Z" aria-label="Dismiss: update failed">&#215;<\/button><strong>Update failed at install/);
+  assert.ok(!failure.includes('data-expires'), 'a failure stays until it is dismissed');
   const old = renderHeader({ ...failed, update: { ...failed.update!, finishedAt: '2026-10-21T09:00:00Z' } }, base);
-  assert.ok(!old.includes('Update failed'), 'an old result leaves the header');
+  assert.match(old, /Update failed at install/, 'however old');
+  assert.ok(!renderHeader(failed, { ...base, dismissed: new Set(['update-2026-10-21T09:59:30Z']) }).includes('Update failed'), 'until it is dismissed');
+  const oldDone = renderHeader({ ...data, update: { ...progress, state: 'done', current: null, finished: ['done'], finishedAt: '2026-10-21T09:00:00Z' } }, base);
+  assert.ok(!oldDone.includes('Update finished'), 'an old success leaves the header');
   const lost = renderHeader(data, { ...base, updateView: { phase: 'lost' } });
   matchesSaved('update-lost.html', lost);
-  assert.match(lost, /The board didn't restart/);
+  assert.match(lost, /role="alert"><button type="button" class="dismiss" data-dismiss="lost" aria-label="Dismiss: the board didn&#39;t restart">&#215;<\/button><strong>The board didn't restart/);
+  assert.ok(!renderHeader(data, { ...base, updateView: { phase: 'lost' }, dismissed: new Set(['lost']) }).includes("didn't restart"));
   assert.match(lost, /mux-board\.log/);
   assert.match(lost, /board\/scripts\/update\.sh/);
   const refused = renderHeader(data, { ...base, updateView: { phase: 'refused', message: 'A Start is running. Press Update when it finishes.' } });
-  assert.match(refused, /role="alert"><strong>The update didn't start.<\/strong> A Start is running/);
+  assert.match(refused, /role="alert"><button type="button" class="dismiss" data-dismiss="refused" aria-label="Dismiss: the update didn&#39;t start">&#215;<\/button><strong>The update didn't start.<\/strong> A Start is running/);
+  assert.ok(!renderHeader(data, { ...base, updateView: { phase: 'refused', message: 'x' }, dismissed: new Set(['refused']) }).includes("didn't start"));
+  assert.ok(!running.includes('class="dismiss"'), 'progress shows while it runs and has nothing to dismiss');
+  assert.match(renderHeader(data, { ...base, updateView: { phase: 'refused', message: 'x' }, dismissed: new Set(['refused']) }), /Updating the board and skills…/,
+    'a closed refusal no longer hides the update someone else started');
 });
 
 test('board view, with List open by default and Done expanded', () => {
@@ -129,7 +140,7 @@ test('List and Done rows show one pill per label instead of the kind pill', () =
   const html = renderBoardView(sample, base);
   const rowOf = (id: string) => {
     const item = sample.items.find((i) => i.id === id)!;
-    return html.split('<li class="row-item">').find((r) => r.includes(`${item.title}</`))!;
+    return html.split('<li class="row-item"').find((r) => r.includes(`${item.title}</`))!;
   };
   const pills = (row: string) => [...row.matchAll(/<span class="label kind-[^"]*">([^<]*)<\/span>/g)].map((m) => m[1]);
   assert.deepEqual(pills(rowOf('PVTI_sample03')), ['feature', 'app: music', 'os: ios', 'os: macos']);
@@ -239,7 +250,8 @@ test('Queue buttons appear only on List rows and show the action in flight or it
   const acting = renderBoardView(sample, { ...base, actions: {
     [first]: { phase: 'pending' }, [second]: { phase: 'error', message: 'Could not set Queued.' } } });
   assert.match(acting, new RegExp(`data-queue="${first}"[^>]*aria-disabled="true"[^>]*>Queuing…</button>`));
-  assert.match(acting, /<span class="action-error" role="alert">Could not set Queued.<\/span><button[^>]*data-queue/);
+  assert.match(acting, new RegExp(`data-queue="${second}"[^>]*>Queue</button>.*?<span class="action-error"><span role="alert">Could not set Queued.</span> <button type="button" class="dismiss" data-dismiss="action:${second}" aria-label="Dismiss error for #114">&#215;</button></span></li>`),
+    'an error stays on its card with a close button');
 });
 
 test('Abandon appears only on List rows, next to Queue, and shows the delete in flight', () => {
@@ -251,7 +263,7 @@ test('Abandon appears only on List rows, next to Queue, and shows the delete in 
     PVTI_sample02: { phase: 'error', kind: 'abandon', message: 'Could not delete #114. Must have admin rights.' } } });
   assert.match(acting, /data-queue="PVTI_sample01"[^>]*aria-disabled="true"[^>]*>Queue<\/button>/);
   assert.match(acting, /data-abandon="PVTI_sample01"[^>]*aria-disabled="true"[^>]*>Abandoning…<\/button>/);
-  assert.match(acting, /role="alert">Could not delete #114\. Must have admin rights\.<\/span><button[^>]*data-queue="PVTI_sample02"/);
+  assert.match(acting, /data-queue="PVTI_sample02".*?<span class="action-error"><span role="alert">Could not delete #114\. Must have admin rights\.<\/span> <button[^>]*data-dismiss="action:PVTI_sample02"[^>]*>&#215;<\/button><\/span><\/li>/);
 });
 
 test('Abandon names the item it will delete or remove, and announces it without a link', () => {
@@ -259,15 +271,24 @@ test('Abandon names the item it will delete or remove, and announces it without 
   const draft = sample.items.find((i) => i.id === 'PVTI_sample04')!;
   assert.equal(abandonPrompt(issue).question, `Delete #61 ${issue.title}?`);
   assert.equal(abandonPrompt(draft).question, `Remove draft ${draft.title}?`);
-  const html = renderApp(sample, { ...base, notice: { verb: 'Abandoned', item: issue } });
-  assert.match(html, new RegExp(`role="status">Deleted #61 ${issue.title}\\.</div>`));
+  const html = renderApp(sample, { ...base, notice: { key: 'notice-1', verb: 'Abandoned', item: issue } });
+  assert.match(html, new RegExp(`<div class="banner toast" role="status" data-expires="notice-1"><button[^>]*data-dismiss="notice-1"[^>]*>&#215;</button>Deleted #61 ${issue.title}\\.</div>`));
   assert.match(renderPage(sample, base), /<dialog id="abandon-dialog"[^>]*>[\s\S]*data-abandon-cancel autofocus>Cancel<\/button>/);
 });
 
-test('a queued or added item is announced in the header', () => {
+test('a queued or added item is announced in a toast that offers View item', () => {
   const item = sample.items[0]!;
-  assert.match(renderApp(sample, { ...base, notice: { verb: 'Moved', item, to: 'Queued' } }),
-    /role="status">Moved <a[^>]*>.*<\/a> to Queued\.<\/div>/);
+  for (const verb of ['Moved', 'Added'] as const) {
+    const html = renderApp(sample, { ...base, notice: { key: 'notice-2', verb, item, to: 'Queued' } });
+    assert.match(html, new RegExp(`<div class="toasts">\\n<div class="banner toast" role="status" data-expires="notice-2"><button[^>]*data-dismiss="notice-2"[^>]*>&#215;</button>${verb} <a[^>]*>.*</a> to Queued\\. <button type="button" class="copy view-item" data-view-item="${item.id}">View item</button></div>`));
+  }
+});
+
+test('failures and the lost server have a close button; ongoing warnings do not', () => {
+  const html = renderHeader({ ...sample, error: 'gh: HTTP 502' }, { ...base, clientError: 'HTTP 500' });
+  assert.match(html, /role="alert"><button type="button" class="dismiss" data-dismiss="client-error" aria-label="Dismiss: can&#39;t reach the board server">&#215;<\/button><strong>Can't reach the board server/);
+  assert.match(html, /role="alert"><strong>Stale\.<\/strong>/, 'stale data stays while it lasts');
+  assert.ok(!renderHeader(sample, { ...base, clientError: 'HTTP 500', dismissed: new Set(['client-error']) }).includes("Can't reach"));
 });
 
 test('Start appears only on Queued issues; a queued draft asks for an issue first', () => {
@@ -285,15 +306,22 @@ test('Start shows its progress, the started thread, or the error', () => {
   const card = (actions: Record<string, ItemAction>, id: string) =>
     renderBoardView(sample, { ...base, actions }).split('<article').find((x) => x.includes(`href="${sample.items.find((i) => i.id === id)!.url}"`))!;
   assert.match(card({ [a]: { phase: 'pending' } }, a), /data-start="PVTI_sample05"[^>]*aria-disabled="true"[^>]*>Starting…</);
-  const started = card({ [b]: { phase: 'started', thread: { threadId: 'thread-1', title: '/mux-work maddec01/mux-apple#20' } } }, b);
-  assert.match(started, /role="status"[^>]*>Started T3 thread <code class="thread-id">thread-1<\/code>/, 'a title that is just the command is not repeated');
-  assert.match(started, /thread-1/);
-  assert.ok(!started.includes('data-start="'));
+  const thread = { threadId: 'thread-1', title: '/mux-work maddec01/mux-apple#20' };
+  const started = card({ [b]: { phase: 'started', thread } }, b);
+  assert.match(started, /<span class="started-tag" tabindex="-1" data-start-result="PVTI_sample06" title="T3 thread thread-1">Started<\/span>/, 'the card keeps only a quiet tag');
+  assert.ok(!started.includes('data-start="') && !started.includes('Started T3 thread'));
+  const item = sample.items.find((i) => i.id === b)!;
+  assert.match(renderHeader(sample, { ...base, notice: { key: 'notice-3', verb: 'Started', item, thread } }),
+    /<div class="banner toast" role="status" data-expires="notice-3"><button[^>]*>&#215;<\/button>Started T3 thread <code class="thread-id">thread-1<\/code> for <a[^>]*>.*Player controls stay visible after scrub[^<]*<\/a>\.<\/div>/,
+    'the toast says so, without repeating a title that is just the command');
   const failed = card({ [c]: { phase: 'error', message: 'T3 is down.' } }, c);
   assert.match(failed, /<div class="meta">.*<button[^>]*data-start[^>]*>Retry start<\/button><\/div>/, 'Start sits in the top row');
-  assert.match(failed, /role="alert">T3 is down.</);
+  assert.match(failed, /role="alert">T3 is down.<\/span> <button[^>]*data-dismiss="action:PVTI_sample05"/);
   const unsure = card({ [d]: { phase: 'uncertain', message: 'Check T3.' } }, d);
-  assert.match(unsure, /role="alert">Check T3.</);
+  assert.match(unsure, /role="alert">Check T3.<\/span> <button[^>]*data-dismiss="action:PVTI_sample06"/);
+  const closed = card({ [d]: { phase: 'uncertain' } }, d);
+  assert.ok(!closed.includes('Check T3.') && !closed.includes('data-start="'), 'closing an unconfirmed start hides the message and keeps Start hidden');
+  assert.match(closed, /<span class="started-tag unsure" tabindex="-1" data-start-result="PVTI_sample06" title="Check T3 before starting it again">May have started<\/span>/, 'and says why');
   assert.ok(!unsure.includes('data-start="'));
 });
 
@@ -305,7 +333,7 @@ test('copy describes the Queue and Start buttons instead of dragging or typing /
 
 test('a thread another page started shows on every page, and sample mode disables every write button', () => {
   const started = renderBoardView({ ...sample, started: { PVTI_sample05: { threadId: 'thread-9', title: 'Shape the playback queue' } } }, base);
-  assert.match(started, /Started T3 thread <b>Shape the playback queue<\/b> <code class="thread-id">thread-9<\/code>/);
+  assert.match(started, /data-start-result="PVTI_sample05" title="T3 thread thread-9">Started</);
   assert.ok(!started.includes('data-start="PVTI_sample05"'));
   const off = renderBoardView({ ...sample, capture: { session: 's', enabled: false } }, base);
   const writes = [...off.matchAll(/<button[^>]*data-(?:queue|start|abandon)="[^"]*"[^>]*>/g)];

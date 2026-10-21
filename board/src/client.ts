@@ -2,17 +2,21 @@
 // second during an update) and re-rendering with the same template the server used.
 
 import { DEFAULT_UI, abandonPrompt, listGroupId, renderApp } from './render.ts';
-import type { ItemAction, RenderOptions, UiState, UpdateView, View } from './render.ts';
+import type { ItemAction, Notice, UiState, UpdateView, View } from './render.ts';
 import { platformOf } from './model.ts';
 import type { BoardData } from './model.ts';
 import { validateDraft } from './add-item.ts';
 import type { CreationResult, ItemDraft } from './add-item.ts';
 import type { StartResult } from './t3.ts';
 
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 const POLL_MS = 15_000;
 const UPDATE_POLL_MS = 1_000;
 /** How long the board may stay away during an update before the page says it didn't restart. */
 const RESTART_MS = 30_000;
+/** How long a success toast stays. Failures stay until closed; warnings while their cause lasts. */
+const TOAST_MS = 5_000;
 const app = document.getElementById('app')!;
 const bootstrap = document.getElementById('board-data');
 const dialog = document.getElementById('add-item-dialog') as HTMLDialogElement;
@@ -21,13 +25,17 @@ const repoSelect = form.elements.namedItem('repo') as HTMLSelectElement;
 
 let data: BoardData = JSON.parse(bootstrap?.textContent ?? 'null');
 let clientError: string | null = null;
-let notice: RenderOptions['notice'] = null;
+let notice: Notice | null = null;
+let noticeCount = 0;
+/** Notices closed on this page. A reload shows again whatever still holds. */
+const dismissed = new Set<string>();
+/** Toasts whose clock is running, so a re-render neither restarts it nor replays their entrance. */
+const expiring = new Set<string>();
 const actions: Record<string, ItemAction> = {};
 let mutationVersion = 0;
 let pollSequence = 0;
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 let updateView: UpdateView | null = null;
-let refusedAt = 0;
 let lastBoard = '';
 /** The update this page follows: the session it started in, and since when the board has been away. */
 let updating: { session: string | undefined; awaySince: number | null } | null = null;
@@ -40,15 +48,69 @@ const ui: UiState = {
 function render(): void {
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
   const { scrollX, scrollY } = window;
-  app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions, updateView });
+  app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions, updateView, dismissed });
   tagFocusable();
   window.scrollTo(scrollX, scrollY);
   if (focusKey) focusByKey(focusKey);
+  startToastClocks();
+}
+
+function setNotice(next: DistributiveOmit<Notice, 'key'>): void {
+  notice = { ...next, key: `notice-${++noticeCount}` };
+}
+
+/** Closes a notice, or a card's error (`action:<item id>`), and keeps keyboard focus on the page if it was inside. */
+function dismiss(key: string): void {
+  const closing = app.querySelector(`[data-dismiss="${CSS.escape(key)}"]`)?.parentElement;
+  const hadFocus = Boolean(closing?.contains(document.activeElement));
+  let next = '[data-add-item]';
+  if (key === notice?.key) notice = null;
+  else if (key.startsWith('action:')) {
+    const itemId = key.slice('action:'.length);
+    const action = actions[itemId];
+    // An unconfirmed start keeps its phase, so Start stays hidden; only the message goes.
+    if (action?.phase === 'uncertain') actions[itemId] = { phase: 'uncertain' };
+    else if (action?.phase === 'error') delete actions[itemId];
+    const id = CSS.escape(itemId);
+    next = `${action?.kind === 'abandon' ? `[data-abandon="${id}"],` : ''}[data-queue="${id}"],[data-start="${id}"],[data-start-result="${id}"],[data-add-item]`;
+  } else dismissed.add(key);
+  render();
+  if (hadFocus && document.activeElement === document.body) {
+    // querySelector returns the first in page order; take the first selector that matches.
+    const target = next.split(',').map((sel) => app.querySelector<HTMLElement>(sel)).find(Boolean);
+    target?.focus({ preventScroll: true });
+  }
+}
+
+/** Toasts sit top right, below the header while it's on screen, so they never cover its buttons or banners. */
+function placeToasts(): void {
+  const bottom = app.querySelector('header.top')?.getBoundingClientRect().bottom ?? 0;
+  document.documentElement.style.setProperty('--toast-top', `${Math.max(12, Math.round(bottom) + 8)}px`);
+}
+
+function startToastClocks(): void {
+  placeToasts();
+  app.querySelectorAll<HTMLElement>('[data-expires]').forEach((el) => {
+    const key = el.dataset.expires!;
+    if (expiring.has(key)) {
+      el.classList.add('seen');
+      return;
+    }
+    expiring.add(key);
+    const expire = (paused = false) => {
+      const toast = app.querySelector<HTMLElement>(`[data-expires="${CSS.escape(key)}"]`);
+      if (!toast) expiring.delete(key); // gone for now: its clock starts again if it comes back
+      else if (toast.matches(':hover, :focus-within')) setTimeout(() => expire(true), 1_000); // being read or used
+      else if (paused) setTimeout(expire, TOAST_MS); // a full 5 s again once it's left
+      else dismiss(key);
+    };
+    setTimeout(expire, TOAST_MS);
+  });
 }
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update],details[id] > summary').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-dismiss],[data-view-item],details[id] > summary').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
@@ -56,7 +118,10 @@ function tagFocusable(): void {
 function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.queue) return `queue-${el.dataset.queue}`;
   if (el.dataset.start) return `start-${el.dataset.start}`;
+  if (el.dataset.startResult) return `result-${el.dataset.startResult}`;
   if (el.hasAttribute('data-update')) return 'update';
+  if (el.dataset.dismiss) return `dismiss-${el.dataset.dismiss}`;
+  if (el.dataset.viewItem) return `view-${el.dataset.viewItem}`;
   // Keyed by project item id, since a draft has no number.
   if (el.dataset.abandon) return `abandon-${el.dataset.abandon}`;
   return el.dataset.view ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
@@ -84,6 +149,7 @@ async function poll(): Promise<void> {
     lastBoard = text;
     data = JSON.parse(text) as BoardData;
     clientError = null;
+    dismissed.delete('client-error');
     const view = updateView;
     if (followUpdate() || (unchanged && view === updateView)) return;
   } catch (err) {
@@ -101,7 +167,8 @@ async function poll(): Promise<void> {
 
 /** Follows a running update from the latest data; true when the page reloads onto the restarted board. */
 function followUpdate(): boolean {
-  if (updateView?.phase === 'lost' || (updateView?.phase === 'refused' && Date.now() - refusedAt > 10_000)) updateView = null;
+  // Back, or an update someone else started is running: either way this page's failure no longer holds.
+  if (updateView?.phase === 'lost' || (updateView?.phase === 'refused' && data.update?.state === 'running')) updateView = null;
   if (data.update?.state === 'running') {
     updating ??= { session: data.capture?.session, awaySince: null };
     updating.awaySince = null;
@@ -119,6 +186,19 @@ function setView(view: View, focus = false): void {
   history.replaceState(null, '', view === 'flow' ? '#flow' : location.pathname);
   render();
   if (focus) app.querySelector<HTMLElement>(`[data-view="${view}"]`)?.focus();
+}
+
+/** Shows an item where it is after the latest poll: on the Board, with its List group open. Does nothing once it's gone. */
+function viewItem(itemId: string): void {
+  const item = data.items.find((i) => i.id === itemId);
+  if (!item) return;
+  if (ui.view !== 'board') setView('board');
+  const group = listGroupId(platformOf(item, data.repos));
+  if (item.status === 'List' && ui.toggled[group] === false) {
+    ui.toggled[group] = true;
+    render();
+  }
+  jumpTo(app.querySelector<HTMLElement>(`#panel-board [data-anchor="${CSS.escape(itemId)}"]`));
 }
 
 /** Deliberate navigation: bring an element into view, flash it and move focus into it. */
@@ -250,7 +330,7 @@ async function submitItem(): Promise<void> {
     if (result.item && result.board) {
       mutationVersion++;
       data = result.board;
-      notice = { verb: 'Added', item: result.item, to: 'List' };
+      setNotice({ verb: 'Added', item: result.item, to: 'List' });
       ui.toggled[listGroupId(platformOf(result.item, data.repos))] = true;
       submission = { phase: 'complete' };
       revealList = true;
@@ -304,7 +384,7 @@ async function queueItem(button: HTMLElement): Promise<void> {
   if (result.error || !item) actions[itemId] = { phase: 'error', message: result.error ?? 'The item left the board.' };
   else {
     delete actions[itemId];
-    notice = { verb: 'Moved', item, to: 'Queued' };
+    setNotice({ verb: 'Moved', item, to: 'Queued' });
   }
   render();
   if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
@@ -313,13 +393,13 @@ async function queueItem(button: HTMLElement): Promise<void> {
 async function startUpdate(): Promise<void> {
   if (updateView?.phase === 'starting' || (data.update?.state === 'running' && updateView?.phase !== 'lost')) return;
   updateView = { phase: 'starting' };
+  dismissed.delete('refused');
+  dismissed.delete('lost');
   render();
   const session = data.capture?.session;
   const result = await postAction('/api/update', {});
-  if (result.error) {
-    updateView = { phase: 'refused', message: result.error };
-    refusedAt = Date.now();
-  } else {
+  if (result.error) updateView = { phase: 'refused', message: result.error };
+  else {
     updateView = null;
     updating = { session, awaySince: null };
   }
@@ -334,10 +414,12 @@ async function startItem(itemId: string): Promise<void> {
   const result = await postAction<StartResult & { error: string | null }>('/api/start', { session: data.capture?.session, itemId });
   actions[itemId] = result.thread ? { phase: 'started', thread: result.thread }
     : { phase: result.uncertain ? 'uncertain' : 'error', message: result.error ?? 'The thread did not start.' };
+  const item = data.items.find((i) => i.id === itemId);
+  if (result.thread && item) setNotice({ verb: 'Started', item, thread: result.thread });
   render();
-  // The Start button is gone once a thread starts or may have started; move focus to the card's message.
+  // The Start button is gone once a thread starts or may have started; move focus to what replaced it.
   if (document.activeElement === document.body) {
-    app.querySelector<HTMLElement>(`[data-start-result="${CSS.escape(itemId)}"]`)?.focus();
+    app.querySelector<HTMLElement>(`[data-start-result="${CSS.escape(itemId)}"]`)?.focus({ preventScroll: true });
   }
 }
 
@@ -380,20 +462,22 @@ async function abandonItem(itemId: string): Promise<void> {
   if (result.error) actions[itemId] = { phase: 'error', kind: 'abandon', message: result.error };
   else {
     delete actions[itemId];
-    notice = { verb: 'Abandoned', item };
+    setNotice({ verb: 'Abandoned', item });
   }
   render();
   if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
 }
 
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update],[data-outline-jump]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update],[data-outline-jump],[data-dismiss],[data-view-item]');
   if (!target) return;
   if (target.dataset.outlineJump) {
     // An in-page link: keep it out of the hash, which picks the view.
     event.preventDefault();
     jumpTo(document.getElementById(`o-${target.dataset.outlineJump}`));
-  } else if (target.hasAttribute('data-add-item')) {
+  } else if (target.dataset.dismiss) dismiss(target.dataset.dismiss);
+  else if (target.dataset.viewItem) viewItem(target.dataset.viewItem);
+  else if (target.hasAttribute('data-add-item')) {
     if (submission.phase === 'complete') resetDraft();
     dialog.showModal();
     form.querySelector<HTMLElement>('[name="repo"]')?.focus();
@@ -426,8 +510,13 @@ app.addEventListener(
 
 window.addEventListener('hashchange', () => setView(location.hash === '#flow' ? 'flow' : 'board'));
 
+addEventListener('scroll', placeToasts, { passive: true });
+addEventListener('resize', placeToasts);
 if (ui.view !== DEFAULT_UI.view) render();
-else tagFocusable();
+else {
+  tagFocusable();
+  startToastClocks();
+}
 resetDraft();
 followUpdate();
 schedulePoll();

@@ -25,9 +25,10 @@ where `<mux-work>` is the folder holding this file's parent.
      scope. If direct reading reveals required files that push the total above
      2,000, switch to Exploration before implementation.
 
-   On the delegated path, the subagent writes notes (files, owners, existing
-   tests, traps) to `$TMPDIR/mux-<n>-notes.md`; work from those notes. On the
-   direct path, work from your own reading.
+   On the delegated path, ask the read-only Explore subagent to return notes
+   (files, owners, existing tests, traps) in its final report. The builder works
+   directly from that report; no notes file is required. On the direct path,
+   work from your own reading.
 3. Build test-first with the `tdd` skill, using `developer-profile` and, when a
    module's shape changes, `codebase-design`. Each commit is one reviewable step
    with a conventional message (`AGENTS.md` lists types and scopes).

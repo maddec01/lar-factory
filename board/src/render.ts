@@ -207,7 +207,7 @@ function card(item: Item, data: BoardData, now: number, extra = '', action = '')
     ? `<span class="blocked" title="Blocked by ${plural(item.blockedBy, 'issue')}">blocked by ${item.blockedBy}</span>`
     : '';
   const subs = item.subIssues.total
-    ? `<span class="subs">${item.subIssues.completed}/${item.subIssues.total} sub-issues</span>`
+    ? `<span class="subs">${item.subIssues.completed}/${item.subIssues.total} ${subsNoun(item)}</span>`
     : '';
   const hint = HINTS[item.status];
   const prs = item.linkedPrs
@@ -220,8 +220,21 @@ function card(item: Item, data: BoardData, now: number, extra = '', action = '')
   return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}" data-anchor="${esc(item.id)}">
 <div class="meta">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}${action}</div>
 ${titleLink(item)}
-${parent}${stepBar(item.status)}${foot}${extra}
+${parent}${stepBar(item.status)}${foot}${sliceList(item.slices)}${extra}
 </article>`;
+}
+
+/** A build's sub-issues are its slices. */
+const subsNoun = (item: Item) => (kindOf(item) === 'build' ? 'slices' : 'sub-issues');
+
+/** A build's slices, nested like a concept's sub-issues. They aren't board items, so they have no Status. */
+function sliceList(slices: IssueRef[]): string {
+  if (!slices.length) return '';
+  const rows = slices.map((s) => {
+    const closed = s.state === 'CLOSED';
+    return `<li class="row-item slice${closed ? ' done' : ''}"><a class="row-title" href="${esc(s.url)}" title="${esc(s.title)}" target="_blank" rel="noopener"><span class="ref">#${s.number}</span> ${esc(s.title)}${closed ? '<span class="sr-only"> (closed)</span>' : ''}</a></li>`;
+  }).join('');
+  return `<ul class="sub-groups slices" aria-label="Slices"><li class="sub-group"><span class="sub-status">Slices</span><ul>${rows}</ul></li></ul>`;
 }
 
 function section(id: string, title: string, count: number, body: string, note = ''): string {
@@ -629,11 +642,12 @@ export function renderFlowView(data: BoardData, opts: RenderOptions): string {
 
   const node = (i: Item): string => {
     const kids = children.get(issueKey(i.repo, i.number) ?? '') ?? [];
-    const missing = i.subIssues.total - kids.length;
+    // A build's slices never join the project, so they aren't missing from it.
+    const missing = kindOf(i) === 'build' ? 0 : i.subIssues.total - kids.length;
     const kidRows = kids.map(node).join('')
       + (missing > 0 ? `<li class="o-missing">${plural(missing, 'more sub-issue')} not on the board</li>` : '');
     const links = linkRows('blocked by', i.blockers, i.repo, shown) + linkRows('blocks', i.blocking, i.repo, shown);
-    const subs = i.subIssues.total ? `<span class="o-subs">${i.subIssues.completed}/${i.subIssues.total} sub-issues done</span>` : '';
+    const subs = i.subIssues.total ? `<span class="o-subs">${i.subIssues.completed}/${i.subIssues.total} ${subsNoun(i)} done</span>` : '';
     return `<li class="o-node" id="o-${esc(i.id)}">
 <div class="o-row" data-anchor="o:${esc(i.id)}">${platformBadge(i, data)}${kindPill(i)}${titleLink(i, 'o-title')}${statusChip(i)}${subs}</div>
 ${links ? `<ul class="o-links">${links}</ul>` : ''}${kidRows ? `<ul class="o-tree">${kidRows}</ul>` : ''}</li>`;

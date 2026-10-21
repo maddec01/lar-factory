@@ -173,6 +173,36 @@ test('Flow nests sub-issues under their parent and counts the ones not on the Bo
   assert.match(concept, /<li class="o-missing">2 more sub-issues not on the board<\/li>/, 'six sub-issues, four on the Board');
 });
 
+test("a build card nests its slices, open and closed, with no Status; Flow doesn't count them as missing", () => {
+  const html = renderBoardView(sample, base);
+  const build = html.split('<article').find((a) => a.includes('data-anchor="PVTI_sample13"'))!;
+  const slices = build.slice(build.indexOf('<ul class="sub-groups slices" aria-label="Slices">'));
+  assert.ok(slices.length < build.length, 'the slice list sits inside the build card');
+  const rows = [...slices.matchAll(/<li class="row-item slice([^"]*)"><a class="row-title" href="([^"]+)" title="([^"]+)"[^>]*><span class="ref">(#\d+)<\/span> ([^<]+)(.*?)<\/a><\/li>/g)]
+    .map((m) => [m[4], m[1], m[3] === m[5], m[6]]);
+  assert.deepEqual(rows, [
+    ['#144', ' done', true, '<span class="sr-only"> (closed)</span>'],
+    ['#145', '', true, ''],
+    ['#146', '', true, ''],
+  ], 'every slice, open and closed, titled in full, with the closed one styled done and named closed inside its link');
+  assert.ok(!/o-status|sub-status amber|data-anchor="PVTI_slice/.test(slices), 'slices are not board items and show no Status');
+  assert.ok(!flowNode(renderFlowView(sample, base), 'PVTI_sample13').includes('o-missing'), "a build's slices are never on the board, so none is missing");
+});
+
+test('a build counts slices, not sub-issues, on its card and in Flow', () => {
+  const build = renderBoardView(sample, base).split('<article').find((a) => a.includes('data-anchor="PVTI_sample13"'))!;
+  assert.match(build, /<span class="subs">1\/3 slices<\/span>/);
+  assert.match(flowNode(renderFlowView(sample, base), 'PVTI_sample13'), /<span class="o-subs">1\/3 slices done<\/span>/);
+});
+
+test('Flow counts none of a build\'s slices as missing, even past the 50 the board query reads', () => {
+  const big: BoardData = {
+    ...sample,
+    items: sample.items.map((i) => (i.id === 'PVTI_sample13' ? { ...i, subIssues: { ...i.subIssues, total: 60 } } : i)),
+  };
+  assert.ok(!flowNode(renderFlowView(big, base), 'PVTI_sample13').includes('o-missing'));
+});
+
 test('Flow shows blocked-by and blocks links from GitHub, jumping to Board items and referencing the rest', () => {
   const html = renderFlowView(sample, base);
   assert.match(flowNode(html, 'PVTI_sample12'), /<li class="o-link blocked-by"><span class="o-rel">blocked by<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample10"><b>#201<\/b> Relay: broker only or full TURN\?<\/a> <span class="o-status">Shaping<\/span><\/li>/);

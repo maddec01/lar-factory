@@ -15,9 +15,9 @@ verifies visible changes and merges every PR. Everything else is yours.
   List, Queued, Shaping, Needs you, Ready, In progress, Review, Verify,
   Ready to merge, Done.
 - Facts are yours to find, decisions are Pedro's. Read code, docs and history
-  in **subagents** that return a short summary, so this thread never holds whole
-  files. For builder exploration, follow [Build step 2](agents/builder.md#build)
-  instead. Ask Pedro only what a subagent can't answer.
+  in **subagents**, so no thread holds whole files. Every factory subagent
+  report is ≤300 words and never pastes whole files, logs or screenshots. Ask
+  Pedro only what a subagent can't answer.
 - Every question to Pedro goes through the question UI (`AskUserQuestion`), so
   T3 shows the thread as waiting: Size up, grilling rounds, the prototype pick,
   Gate assumptions, Doubt findings, Concepts, `decision: grill`, and the

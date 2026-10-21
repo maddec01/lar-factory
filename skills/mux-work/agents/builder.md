@@ -100,4 +100,7 @@ Follow `~/.agents/skills/retro/SKILL.md` for this thread. End with the PR link,
 its status (Verify, Ready to merge or Needs you), and the retro suggestions,
 then ask Pedro for his picks through the question UI. The final status stands,
 so don't change the status for these questions.
-Don't apply the picks.
+After Pedro answers, follow [Retro capture](../retro-capture.md) to create or
+reuse follow-up issues for his picks and report their links and any pending
+failures. Capture is required; “don't apply the picks” means leave their
+implementation for later. Keep the final status throughout capture and retries.

@@ -44,8 +44,16 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
    steps; the rest goes to Ready to merge. The item stays in Review until the
    PR's required checks pass; a CI fixer subagent handles failures, and after
    two tries or a runner problem the item goes to Needs you.
-8. **Done.** You merge. The build thread ends with a retro: suggested fixes to
-   the skills and checks, for you to pick from.
+8. **Retro and merge.** After the final review status is set and PR monitoring
+   stops, the build thread ends with suggested improvements for you to pick.
+   Picks become follow-up issues in the owning repos (or reuse matching open
+   issues); new issues enter List. Shared/global work goes to Factory, and one
+   suggestion spanning repos becomes one Factory concept for later shaping.
+   Capture leaves the source status unchanged and implements none of the picks.
+   Its source-issue record tracks links and unfinished steps; rerun
+   `/mux-work <source-owner/repo#n>` to resume capture only, even with a passing
+   brief. See [Retro capture](skills/mux-work/retro-capture.md) for routing,
+   recovery and privacy rules. You merge the original PR to reach **Done**.
 
 **Needs you** means it's waiting on you: a question, a prototype choice or a
 review.

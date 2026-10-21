@@ -23,7 +23,10 @@ verifies visible changes and merges every PR. Everything else is yours.
   Gate assumptions, Doubt findings, Concepts, `decision: grill`, and the
   builder's stops and retro picks. If the tool is deferred, load it with
   `ToolSearch`; if it isn't available, ask in the `grilling` chat format.
-  Run these steps once per batch of questions, however many calls it takes:
+  For retro picks and their clarifications, preserve the source issue's final
+  status throughout questions, capture, retries and failure reporting. Use
+  [Retro capture](retro-capture.md) as the answers record; skip steps 1–3 below.
+  For other questions, run these steps once per batch, however many calls it takes:
   1. Set **Needs you**, then make the question UI calls; each blocks.
   2. After the last call, comment the answers on the issue in one comment
      (summarise; never copy secrets, tokens or private hostnames).
@@ -69,6 +72,11 @@ follow the repo's rules; they are separate from review captures.
 
 Read the issue with comments, parent, sub-issues and blockers. Then:
 
+- **Unfinished retro capture record**: before any route below, including a
+  passing brief, follow [Retro capture](retro-capture.md) to finish only the
+  pending capture. Preserve the source status; do not rerun its build or retro,
+  start shaping, or launch another thread. Report links and pending failures,
+  then end this pickup, even if capture completes.
 - A `decision: *` sub-issue: go to **Decisions** below.
 - A `build` sub-issue, or any issue whose body already has a passing brief: go
   to **5. Start the build**.

@@ -74,10 +74,10 @@ through a long conversation, and subagents return summaries instead of files.
 | Skill | What it does | Source |
 | ----- | ------------ | ------ |
 | `mux-work` | Runs one item: size up, shape, brief, gate, start the build | Mux |
-| `mux-work/agents/` | Builder, four reviewers, approver, CI fixer | Mux |
+| `mux-work/agents/` | Builder, Doubt, four reviewers, approver, CI fixer | Mux |
 | `skill-sync` | Brings upstream changes into the copies, by your choice | Mux |
-| `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff`, `to-tickets`, `implement` | Shaping, building and reviewing | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |
-| `code-review-and-quality`, `security-and-hardening`, `doubt-driven-development`, `frontend-ui-engineering`, `browser-testing-with-devtools` | Reviews and the gate | Copies of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
+| `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff`, `to-tickets`, `implement` | Shaping and building; `code-review` is for reviewing by hand, and no `mux-work` file loads it | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |
+| `code-review-and-quality`, `security-and-hardening`, `doubt-driven-development`, `frontend-ui-engineering`, `browser-testing-with-devtools` | Source for the Doubt and reviewer checklists in `mux-work/agents/`; not loaded by them | Copies of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
 | `developer-profile` | Pedro's coding style, which the builder follows | Copy of [maddec01/developer-profile-skill](https://github.com/maddec01/developer-profile-skill) |
 
 `UPSTREAM.md` lists the upstream path and commit of every copy.

@@ -90,11 +90,21 @@ fi
 missing=()
 while read -r name; do
   [[ -d "$root/skills/$name" ]] || missing+=("$name")
-done < <(awk -F'|' '$4 ~ /`skills\// { gsub(/[ `]/, "", $2); print $2 }' "$root/UPSTREAM.md")
+done < <(awk -F'|' '/^\| `/ && $4 !~ /`references\// { gsub(/[ `]/, "", $2); print $2 }' "$root/UPSTREAM.md")
 if ((${#missing[@]} == 0)); then
   pass "every skill row in UPSTREAM.md has a folder under skills/"
 else
   fail "every skill row in UPSTREAM.md has a folder under skills/; missing: ${missing[*]}"
+fi
+
+missing=()
+while read -r source commit; do
+  grep -qE "^Full commits:.*$source \`$commit[0-9a-f]{28}\`" "$root/UPSTREAM.md" || missing+=("$source $commit")
+done < <(awk -F'|' '/^\| `/ { gsub(/[ `]/, "", $3); gsub(/[ `]/, "", $5); print $3, $5 }' "$root/UPSTREAM.md" | sort -u)
+if ((${#missing[@]} == 0)); then
+  pass "every source and commit in UPSTREAM.md has a full commit"
+else
+  fail "every source and commit in UPSTREAM.md has a full commit; missing: ${missing[*]}"
 fi
 
 ((failures == 0)) || { printf '%d failed\n' "$failures"; exit 1; }

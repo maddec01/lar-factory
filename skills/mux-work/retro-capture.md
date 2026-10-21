@@ -83,6 +83,10 @@ reconcile on resume rather than repeating a possibly successful mutation.
    as recorded. Preserve the issue's status; do not call `status.sh` for reuse.
 3. Otherwise create one issue with an actionable title, the selected improvement,
    useful context, safe provenance and the exact selection ID in its body.
+   First follow [label setup](issue-tracker.md#label-setup) for the **destination**
+   repository, including `mux-factory` for a cross-repository concept captured
+   from another Mux repository. Do this after persisting the source plan; if
+   setup fails, leave capture pending and retry setup before issue creation.
    Follow destination label conventions (`bug`, `feature`, `improvement` as
    appropriate); capture text is not a passing brief. For a cross-repository
    concept use the `concept` label and **Concepts**' sections: Destination

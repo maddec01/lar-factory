@@ -58,6 +58,11 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
 **Needs you** means it's waiting on you: a question, a prototype choice or a
 review.
 
+Before using the workflow in a destination repository, follow
+[issue-tracking setup](skills/mux-work/issue-tracker.md#label-setup) to create
+missing workflow labels while preserving existing ones. The same guide covers
+native parent/sub-issue and blocked-by commands. Status stays a Project field.
+
 Every thread starts small: steps hand over through the issue and the PR, never
 through a long conversation, and subagents return summaries instead of files.
 

@@ -98,7 +98,9 @@ confirm it (question UI, **Rules**), in a few lines:
   one session, so I'll turn it into a concept map".
 
 Add the kind label (`bug`, `feature`, `improvement`, `concept`). Pedro confirms
-or corrects; anything he adds is another open question. Then:
+or corrects; anything he adds is another open question. Before applying a missing
+label, run [label setup](issue-tracker.md#label-setup) in the issue's repository.
+Then:
 
 - **Bug**: first start a **Diagnose subagent** with the `diagnosing-bugs` skill.
   It returns the cause, the evidence and a failing test to write. Its open
@@ -157,6 +159,10 @@ Tell Pedro the build thread's link. This shaping thread is done.
 
 ## Concepts
 
+Run [label setup](issue-tracker.md#label-setup) for the map's repository before
+creating or labelling the map and its sub-issues. Use the guide's explicit
+destination selection for sub-issues that belong in another repository.
+
 The issue becomes the **map** and gets the `concept` label. Its body:
 
 ```markdown
@@ -181,8 +187,8 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
 2. Create a sub-issue for each decision you can phrase now, labelled
    `decision: grill`, `decision: prototype`, `decision: research` or
    `decision: task`, linked with blocked-by where one needs another
-   (`docs/agents/issue-tracker.md` in the repo shows the commands). Put them in
-   Queued. Leave the rest in Fog.
+   (see [native relationship commands](issue-tracker.md#native-relationships)).
+   Put them in Queued. Leave the rest in Fog.
 3. For `decision: research`, start the research now with the `research` skill in
    the background. Findings go on a `research/<n>-<slug>` branch; link it from
    the sub-issue.

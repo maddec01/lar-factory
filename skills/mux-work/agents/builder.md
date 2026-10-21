@@ -32,8 +32,18 @@ where `<mux-work>` is the folder holding this file's parent.
 3. Build test-first with the `tdd` skill, using `developer-profile` and, when a
    module's shape changes, `codebase-design`. Each commit is one reviewable step
    with a conventional message (`AGENTS.md` lists types and scopes).
-4. Run the checks `AGENTS.md` names for the layers you changed. All must pass.
-5. Push the branch. Don't open the PR yet.
+4. Write the brief's **Domain docs** into the repo in this build, following
+   `domain-modeling`: its glossary and ADR formats, the next ADR number, and
+   `GLOSSARY.md` or `docs/adr/` created only when the first entry needs it.
+   When the build itself settles a new term or an ADR-worthy decision (all
+   three conditions), add it the same way, keep going, and list it in one issue
+   comment headed **Domain docs added by the build**, edited whenever the list
+   changes (review fixes included), so reviewers and the approver see it. When you create `GLOSSARY.md` or `docs/adr/`, link it from
+   `AGENTS.md` as the repo's `docs/agents/domain.md` says. A repo without
+   `docs/agents/domain.md` gets a **Domain docs** section in `AGENTS.md`
+   pointing to both, modelled on mux-apple's `### Domain docs`.
+5. Run the checks `AGENTS.md` names for the layers you changed. All must pass.
+6. Push the branch. Don't open the PR yet.
 
 Every question to Pedro follows the question UI rule in `<mux-work>/SKILL.md`
 (**Rules**): Needs you, then `AskUserQuestion`, then

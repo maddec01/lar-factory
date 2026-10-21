@@ -129,7 +129,13 @@ left to the approver.
 
 ## Approve
 
+Work out the **parent to close**: the build issue's parent, when every other
+sub-issue of it is closed (**Parent closing** in `<mux-work>/issue-tracker.md`)
+and, for a concept map, its **Fog** is empty. Slices are sub-issues of the
+build, so they never count as the parent's sub-issues. Otherwise there is none.
+
 Start the **Approver subagent** with `approver.md`, the issue reference, the
+parent to close (if any), the
 repo path, every reviewer's final result and your rejected findings. It opens
 the PR and returns the status it recommends; the item stays in Review. Link the
 PR to this thread (`link_pull_request`).

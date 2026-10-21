@@ -94,9 +94,8 @@ where `<mux-work>` is the folder holding this file's parent.
    All must pass.
 7. Push the branch. Don't open the PR yet.
 
-Every question to Pedro follows the question UI rule in `<mux-work>/SKILL.md`
-(**Rules**): Needs you, then `AskUserQuestion`, then
-the answers on the issue and the status back.
+Every question to Pedro follows `<mux-work>/questions.md`: Needs you, then
+`AskUserQuestion`, then the answers on the issue and the status back.
 
 Past about 150k tokens, follow the handoff rule in `<mux-work>/SKILL.md`
 (**Rules**), relaunching in this worktree and branch. A relaunched builder

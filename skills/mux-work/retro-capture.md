@@ -9,9 +9,9 @@ clarification questions and failures. On resume, use the existing plan and IDs.
 
 1. Capture only Pedro's picks, including clear free text. Concrete selections
    take precedence over None. Clarify ambiguous free text through the question
-   UI before any capture mutation, following **Rules**' retro exception. With
-   no picks, post a one-line `Retro capture: complete — no picks` on the source
-   issue and finish. No suggestions means no selection question or follow-ups.
+   UI before any capture mutation, following the retro exception in
+   [Question UI](questions.md). With no picks, post a one-line
+   `Retro capture: complete — no picks` on the source issue and finish. No suggestions means no selection question or follow-ups.
 2. Route each selected suggestion to `maddec01/`:
    - Server work → `mux-server`; Apple work → `mux-apple`.
    - A repository's own `AGENTS.md`, CI or local tooling → that repository.

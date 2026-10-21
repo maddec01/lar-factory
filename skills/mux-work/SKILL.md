@@ -17,9 +17,37 @@ verifies visible changes and merges every PR. Everything else is yours.
 - Facts are yours to find, decisions are Pedro's. Read code, docs and history
   in **subagents** that return a short summary, so this thread never holds whole
   files. Ask Pedro only what a subagent can't answer.
-- Whenever the item waits on Pedro, set it to **Needs you** and send one push
-  notification (`PushNotification`) naming the issue and what you need. Set it
-  back to Shaping when he answers.
+- Every question to Pedro goes through the question UI (`AskUserQuestion`), so
+  T3 shows the thread as waiting: Size up, grilling rounds, the prototype pick,
+  Gate assumptions, Doubt findings, Concepts, `decision: grill`, and the
+  builder's stops and retro picks. If the tool is deferred, load it with
+  `ToolSearch`; if it isn't available, ask in the `grilling` chat format.
+  Run these steps once per batch of questions, however many calls it takes:
+  1. Set **Needs you** and send one push notification (`PushNotification`)
+     naming the issue and what you need. Then make the calls; each blocks.
+  2. After the last call, comment the answers on the issue in one comment
+     (summarise; never copy secrets, tokens or private hostnames).
+  3. Set the status back to the one the step was in: Shaping while shaping,
+     In progress or Review in a build.
+
+  Map the `grilling` format onto the call, and don't repeat it in chat:
+  - question: `Qn - <title>: <body>`, worded so "yes" accepts the
+    recommendation;
+  - first option: the recommended answer, its label ending `(Recommended)`,
+    the reasoning in its description. The other options are the real
+    alternatives; "Other" stays for free text. Mark nothing `(Recommended)`
+    when there's no honest recommendation (a prototype pick);
+  - at least 2 options. A confirmation like Size up gets "Confirm" and
+    "Correct it". If he picks "Correct it" without text, ask what to correct
+    in a follow-up call of the same batch;
+  - `header` at most 12 characters, option labels 1–5 words plus
+    `(Recommended)`;
+  - at most 4 questions per call. Split a longer batch (a grilling round, Gate
+    assumptions, Doubt findings) into consecutive calls and keep the numbering
+    going, so a round still asks the whole frontier;
+  - retro picks: `multiSelect` questions whose options are the suggestions,
+    none `(Recommended)`, at most 4 each, spread so each has at least 2; add
+    "None" when one is left alone. No suggestions, no question.
 - The issue is the only hand-over. Each step must be resumable from the issue
   alone: the brief, the map, decisions and links live in its body and comments.
 - If this thread passes about 150k tokens, write a handoff following
@@ -42,8 +70,8 @@ Read the issue with comments, parent, sub-issues and blockers. Then:
 
 ## 2. Size up
 
-Decide the route yourself. Never ask Pedro to pick a route by name. Tell him,
-in a few lines:
+Decide the route yourself. Never ask Pedro to pick a route by name. Ask him to
+confirm it (question UI, **Rules**), in a few lines:
 
 - what you understood the item to be;
 - the open questions you found, or "none";
@@ -59,12 +87,12 @@ or corrects; anything he adds is another open question. Then:
   It returns the cause, the evidence and a failing test to write. Its open
   questions join the list.
 - **Open questions**: settle every one with `grilling` here in this thread,
-  for bugs and features alike. When a question is about how something looks or
-  feels, start a **Prototype subagent** with the `prototype` skill in its own
+  through the question UI, for bugs and features alike. When a question is
+  about how something looks or feels, start a **Prototype subagent** with the `prototype` skill in its own
   worktree on a `prototype/<n>-<slug>` branch: two or three variants that differ
-  only on that question. Set Needs you, tell Pedro how to open them (T3 browser
-  preview for web, the run scripts in the repo's T3 project for Apple), and
-  record his pick and the branch on the issue.
+  only on that question. Tell Pedro how to open them (T3 browser preview for
+  web, the run scripts in the repo's T3 project for Apple), ask for his pick
+  through the question UI, and record it and the branch on the issue.
 - **No open questions**: go straight to the brief.
 - **Too big or unclear for one session**: go to **Concepts**.
 
@@ -92,10 +120,11 @@ collapsed `<details>` block at the end.
 
 ## 4. Gate
 
-1. Any assumption Pedro hasn't confirmed goes back to him (Needs you).
-2. Start a **Doubt subagent** with the `doubt-driven-development` skill. Give it
+1. Start a **Doubt subagent** with the `doubt-driven-development` skill. Give it
    only the brief and the repo path, no conversation. It tries to show the brief
-   is wrong, ambiguous or incomplete. Fix what it finds, or ask Pedro.
+   is wrong, ambiguous or incomplete. Fix what it finds.
+2. Ask Pedro, in one batch, every assumption he hasn't confirmed and every
+   Doubt finding you can't fix yourself.
 3. Set **Ready**.
 
 ## 5. Start the build

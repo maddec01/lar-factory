@@ -21,9 +21,13 @@ where `<mux-work>` is the folder holding this file's parent.
 4. Run the checks `AGENTS.md` names for the layers you changed. All must pass.
 5. Push the branch. Don't open the PR yet.
 
+Every question to Pedro follows the question UI rule in `<mux-work>/SKILL.md`
+(**Rules**): Needs you and a push notification, then `AskUserQuestion`, then
+the answers on the issue and the status back.
+
 If the brief turns out wrong or a decision is missing, stop: comment on the
-issue with what you found and your recommendation, set **Needs you**, and send
-one push notification. Continue when Pedro answers.
+issue with what you found and your recommendation, then ask Pedro. Set the
+status back and continue when he answers.
 
 ## Review
 
@@ -69,13 +73,16 @@ Set **Needs you** when the CI fixer returns `infrastructure` or `not fixed`, or
 when a required check fails or the branch conflicts after two CI fixer runs
 (every run counts, merge conflicts included). Comment on the issue with the
 failing job's name and run link (or "merge conflict") and what the CI fixer
-reported, send one push notification, then `unwatch_pull_request` and go to
-**Retro**. When Pedro answers, set **Review**, do what he asks (rerun the job,
-or start a CI fixer), and continue from the top of **Checks**.
+reported, `unwatch_pull_request`, and ask him how to go on (rerun the job,
+start a CI fixer, or stop). When he answers, set **Review**, do what he asks,
+`watch_pull_request` again and continue from the top of **Checks**. If he says
+stop, set **Needs you** and go to **Retro**.
 
 ## Retro
 
-Run this last, after the final status is set and the PR is unwatched. Follow
-`~/.agents/skills/retro/SKILL.md` for this thread. End with the PR link, its
-status (Verify, Ready to merge or Needs you), and the retro suggestions as a
-numbered list for Pedro to pick from. Don't apply them.
+Run this once, last, after the final status is set and the PR is unwatched.
+Follow `~/.agents/skills/retro/SKILL.md` for this thread. End with the PR link,
+its status (Verify, Ready to merge or Needs you), and the retro suggestions,
+then ask Pedro for his picks through the question UI. The final status and its
+push notification stand, so don't change the status for these questions.
+Don't apply the picks.

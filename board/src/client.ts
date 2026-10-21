@@ -6,6 +6,7 @@ import type { ItemAction, Notice, UiState, UpdateView, View } from './render.ts'
 import { platformOf } from './model.ts';
 import type { BoardData } from './model.ts';
 import { validateDraft } from './add-item.ts';
+import { anchorKeys, survivingAnchor } from './anchor.ts';
 import type { CreationResult, ItemDraft } from './add-item.ts';
 import type { StartResult } from './t3.ts';
 
@@ -48,11 +49,41 @@ const ui: UiState = {
 function render(): void {
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
   const { scrollX, scrollY } = window;
+  const anchor = captureAnchor();
   app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions, updateView, dismissed });
   tagFocusable();
   window.scrollTo(scrollX, scrollY);
+  restoreAnchor(anchor);
   if (focusKey) focusByKey(focusKey);
   startToastClocks();
+}
+
+type Anchor = { keys: string[]; index: number; tops: number[] };
+
+/** The items on screen in page order: hidden panels and closed groups have no boxes. */
+function anchorElements(): { keys: string[]; els: HTMLElement[] } {
+  const els = [...app.querySelectorAll<HTMLElement>('[data-anchor]')].filter((el) => el.getClientRects().length > 0);
+  return { keys: anchorKeys(els.map((el) => el.dataset.anchor!)), els };
+}
+
+/** The top-most item in the viewport and where it sits; null at the top of the page, which stays there. */
+function captureAnchor(): Anchor | null {
+  if (window.scrollY < 1) return null;
+  const { keys, els } = anchorElements();
+  const visible = (el: HTMLElement) => el.getBoundingClientRect().bottom > 0;
+  // Innermost: a concept card's sub-issue row rather than the card around it.
+  const index = els.findIndex((el, i) => visible(el) && !els.slice(i + 1).some((inner) => el.contains(inner) && visible(inner)));
+  return index < 0 ? null : { keys, index, tops: els.map((el) => el.getBoundingClientRect().top) };
+}
+
+/** Puts that item, or the nearest one that survived, back where it was, whatever changed above it. */
+function restoreAnchor(anchor: Anchor | null): void {
+  if (!anchor) return;
+  const { keys, els } = anchorElements();
+  const key = survivingAnchor(anchor.keys, anchor.index, new Set(keys));
+  if (!key) return;
+  // The survivor goes back to where it was itself, not where the vanished item was.
+  window.scrollBy(0, els[keys.indexOf(key)]!.getBoundingClientRect().top - anchor.tops[anchor.keys.indexOf(key)]!);
 }
 
 function setNotice(next: DistributiveOmit<Notice, 'key'>): void {
@@ -128,7 +159,8 @@ function focusKeyOf(el: HTMLElement): string {
 }
 
 function focusByKey(key: string): void {
-  app.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`)?.focus();
+  // Restoring focus is not navigation: an off-screen control must not pull the page to it.
+  app.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
 }
 
 function schedulePoll(): void {
@@ -192,13 +224,13 @@ function setView(view: View, focus = false): void {
 function viewItem(itemId: string): void {
   const item = data.items.find((i) => i.id === itemId);
   if (!item) return;
-  if (ui.view !== 'board') setView('board');
-  const group = listGroupId(platformOf(item, data.repos));
-  if (item.status === 'List' && ui.toggled[group] === false) {
-    ui.toggled[group] = true;
-    render();
-  }
-  jumpTo(app.querySelector<HTMLElement>(`#panel-board [data-anchor="${CSS.escape(itemId)}"]`));
+  // Its toast has done its job; closing it now keeps a later expiry from redrawing over the jump.
+  notice = null;
+  if (item.status === 'List') ui.toggled[listGroupId(platformOf(item, data.repos))] = true;
+  setView('board');
+  // Its own card or row, not the copy of it inside a concept card.
+  const copies = [...app.querySelectorAll<HTMLElement>(`#panel-board [data-anchor="${CSS.escape(itemId)}"]`)];
+  jumpTo(copies.find((el) => !el.closest('.sub-groups')) ?? copies[0] ?? null);
 }
 
 /** Deliberate navigation: bring an element into view, flash it and move focus into it. */
@@ -254,7 +286,6 @@ type Submission =
   | { phase: 'editing' | 'complete' }
   | { phase: 'pending' | 'retry' | 'uncertain'; attempt: Attempt };
 let submission: Submission = { phase: 'editing' };
-let revealList = false;
 
 function message(text: string, url?: string | null, label = 'View created issue'): void {
   resultBox.replaceChildren(document.createTextNode(text));
@@ -289,14 +320,8 @@ form.addEventListener('input', () => {
   if (submission.phase === 'editing') message('');
 });
 newItem.addEventListener('click', resetDraft);
-dialog.addEventListener('close', () => {
-  const target = revealList && notice
-    ? document.querySelector<HTMLElement>(`#${CSS.escape(listGroupId(platformOf(notice.item, data.repos)))} > summary`)
-    : app.querySelector<HTMLElement>('[data-add-item]');
-  revealList = false;
-  target?.focus();
-  target?.scrollIntoView({ block: 'nearest' });
-});
+// The page stays where it was; the Added toast's View item goes to the new item.
+dialog.addEventListener('close', () => app.querySelector<HTMLElement>('[data-add-item]')?.focus({ preventScroll: true }));
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -331,10 +356,8 @@ async function submitItem(): Promise<void> {
       mutationVersion++;
       data = result.board;
       setNotice({ verb: 'Added', item: result.item, to: 'List' });
-      ui.toggled[listGroupId(platformOf(result.item, data.repos))] = true;
       submission = { phase: 'complete' };
-      revealList = true;
-      setView('board');
+      render();
       dialog.close();
     } else {
       submission = result.uncertain ? { phase: 'uncertain', attempt }

@@ -137,11 +137,9 @@ collapsed `<details>` block at the end.
 
 ## 4. Gate
 
-1. Start a **Doubt subagent** with the `doubt-driven-development` skill. Give it
-   only the brief and the repo path, no conversation. It tries to show the brief
-   is wrong, ambiguous or incomplete, and that its **Domain docs** agree with
-   the repo's `GLOSSARY.md` and ADRs, with every ADR draft meeting
-   `domain-modeling`'s three conditions. Fix what it finds.
+1. Start a **Doubt subagent** with [`agents/doubt.md`](agents/doubt.md). Give
+   it only that file's path, the brief and the repo path, no conversation. Fix
+   what it finds.
 2. Ask Pedro, in one batch, every assumption he hasn't confirmed and every
    Doubt finding you can't fix yourself.
 3. Set **Ready**.

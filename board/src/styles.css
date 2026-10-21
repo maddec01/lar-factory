@@ -115,6 +115,34 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
 .copy { font: inherit; font-size: 12px; border: 1px solid var(--bd); background: var(--surface); color: var(--fg); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
 .copy:hover { border-color: var(--fg); }
 
+/* Capture form: stays mounted while the board refreshes. */
+.add-item { margin-left: auto; }
+#add-item-dialog { width: min(520px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); color: var(--fg); overflow: auto; }
+#add-item-dialog::backdrop { background: rgb(0 0 0 / 40%); }
+.form-heading, .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.form-heading h2 { margin: 0; font-size: 16px; }
+.form-hint { color: var(--muted); margin: 6px 0 12px; font-size: 12px; }
+.item-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-field { display: grid; gap: 4px; margin-bottom: 12px; }
+.form-field > label, .applicability legend { font-weight: 600; }
+.required-note { color: var(--muted); font-weight: 400; font-size: 12px; }
+.form-field input, .form-field select, .form-field textarea { width: 100%; min-width: 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--bd); border-radius: 6px; padding: 7px 8px; }
+.form-field textarea { resize: vertical; min-height: 80px; }
+.applicability { margin: 0 0 10px; padding: 8px 10px 0; border: 1px solid var(--bd); border-radius: 6px; min-width: 0; }
+.choices { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.choices label { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; }
+.choices input { accent-color: var(--focus); }
+.submit-item { background: var(--fg); color: var(--bg); border-color: var(--fg); padding: 7px 12px; }
+button:disabled { opacity: 0.6; cursor: wait; }
+#item-result:not(:empty) { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--you); border-radius: 6px; background: var(--you-soft); overflow-wrap: anywhere; white-space: pre-line; }
+#item-result a { display: block; margin-top: 4px; }
+.capture-success { border-color: var(--build); border-left-width: 1px; background: var(--soft); }
+@media (max-width: 400px) {
+  .form-pair { grid-template-columns: 1fr; gap: 0; }
+  .add-item { margin-left: 0; }
+}
+
 /* concepts */
 .progress { display: flex; align-items: center; gap: 8px; }
 .progress .bar { flex: 1; height: 8px; border-radius: 999px; background: var(--soft); overflow: hidden; max-width: 260px; }

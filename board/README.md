@@ -14,9 +14,20 @@ cd board && npm install && npm start   # npm run dev restarts on changes
   Every card has a step bar showing where it is in the flow.
 - **Flow** is the workflow diagram with each issue placed on the step it's at.
   Pick an issue type to follow its path.
+- **Add item** creates an issue in a configured repository and adds it to List.
+  Choose its kind and optional applicability labels. Empty applicability groups
+  mean all apps, all operating systems, or both server areas. The form keeps
+  your draft while the board refreshes. If project assignment fails after the
+  issue is created, its link and **Retry this submission** finish the same issue.
+
+Creation uses the same local `gh` login as reads and needs permission to create
+issues and edit the Mux project. If a response is lost, retry the current
+submission. An uncertain GitHub creation or a board restart asks you to check
+the repository issues before starting another item.
 
 If `gh` can't reach GitHub, the board keeps the last data it read and shows a
-stale warning. `npm run sample` serves `test/sample.json` instead of GitHub.
+stale warning. `npm run sample` serves `test/sample.json` instead of GitHub;
+adding items is disabled in sample mode.
 
 To start it at login, run `board/scripts/install-launch-agent.sh` from the main
 checkout. It's safe to rerun and logs to `~/Library/Logs/mux-board.log`;

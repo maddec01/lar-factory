@@ -16,6 +16,7 @@ import {
   workCommand,
 } from './model.ts';
 import type { BoardData, FlowNode, Item, Status, Track } from './model.ts';
+import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
 export type FlowTab = 'all' | 'bug' | 'feat' | 'vis' | 'fog';
@@ -34,6 +35,7 @@ export interface RenderOptions {
   ui: UiState;
   /** Set by the browser when it can't reach the board server. */
   clientError?: string | null;
+  createdItem?: Item | null;
 }
 
 export const DEFAULT_UI: UiState = { view: 'board', flowTab: 'all', open: [] };
@@ -86,6 +88,10 @@ function byFlowOrder(a: Item, b: Item): number {
 
 function slug(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+export function listGroupId(platform: string): string {
+  return `list-${slug(platform)}`;
 }
 
 function isOpen(ui: UiState, id: string): string {
@@ -176,6 +182,9 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
     ? `Refreshed <time datetime="${esc(data.fetchedAt)}">${clock(data.fetchedAt, opts.timeZone)}</time> <span class="age">(${ago(data.fetchedAt, opts.now)})</span>`
     : 'Not read yet';
   const banners: string[] = [];
+  if (opts.createdItem) {
+    banners.push(`<div class="banner capture-success" role="status">Added ${titleLink(opts.createdItem)} to List.</div>`);
+  }
   if (opts.clientError) {
     banners.push(
       `<div class="banner" role="alert"><strong>Can't reach the board server.</strong> ${esc(opts.clientError)} Showing the last data this page received.</div>`,
@@ -194,7 +203,7 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
     ? `<a href="${esc(data.project.url)}" target="_blank" rel="noopener">${esc(data.project.title)} project</a>`
     : esc(data.project.title);
   return `<header class="top">
-<div class="title-row"><h1>Mux factory board</h1><p class="refreshed">${refreshed} · ${project}</p></div>
+<div class="title-row"><h1>Mux factory board</h1><p class="refreshed">${refreshed} · ${project}</p><button type="button" class="copy add-item" data-add-item>Add item</button></div>
 <ul class="totals" aria-label="Counts">
 <li class="${counts.needsYou ? 'amber' : ''}"><b>${counts.needsYou}</b> need you</li>
 <li><b>${counts.inFlight}</b> in flight</li>
@@ -204,6 +213,33 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
 </ul>
 ${banners.join('\n')}
 </header>`;
+}
+
+/** A stable dialog outside the board's polling render area. */
+export function renderAddItemForm(data: BoardData): string {
+  const groups = data.repos.map((repo, index) => {
+    const choices = applicability(repo.platform);
+    if (!choices.length) return '';
+    return `<div data-applicability="${esc(repo.repo)}"${index ? ' hidden' : ''}>${choices.map((group, g) =>
+      `<fieldset class="applicability" aria-describedby="item-hint-${index}-${g}"><legend>${esc(group.title)}</legend>
+<div class="choices">${group.labels.map((label) => `<label><input type="checkbox" name="labels" value="${esc(label)}"${index ? ' disabled' : ''}> ${esc(label)}</label>`).join('')}</div>
+<p class="form-hint" id="item-hint-${index}-${g}">${esc(group.hint)}</p></fieldset>`).join('')}</div>`;
+  }).join('');
+  return `<dialog id="add-item-dialog" aria-labelledby="add-item-heading">
+<form id="add-item-form" novalidate>
+<div class="form-heading"><h2 id="add-item-heading">Add item</h2><button type="button" class="copy" data-close-item>Close</button></div>
+<p class="form-hint">Create an issue in ${esc(data.project.title)} and add it to List.</p>
+<fieldset id="item-fields" class="item-fields">
+<div class="form-pair"><div class="form-field"><label for="item-repo">Repository</label><select id="item-repo" name="repo" required>${data.repos.map((r) => `<option value="${esc(r.repo)}">${esc(r.platform)}</option>`).join('')}</select></div>
+<div class="form-field"><label for="item-kind">Kind</label><select id="item-kind" name="kind" required><option value="">Choose a kind</option>${ITEM_KINDS.map((kind) => `<option value="${kind}">${kind}</option>`).join('')}</select></div></div>
+${groups}
+<div class="form-field"><label for="item-title">Title <span class="required-note">(required)</span></label><input id="item-title" name="title" required maxlength="256" autocomplete="off"></div>
+<div class="form-field"><label for="item-description">Description <span class="required-note">(optional)</span></label><textarea id="item-description" name="description" rows="4" maxlength="65536"></textarea></div>
+</fieldset>
+<div id="item-result" role="status" aria-live="polite" aria-atomic="true"></div>
+<div class="form-actions"><button type="submit" class="copy submit-item" id="item-submit">Add to List</button><button type="button" class="copy" id="item-new" hidden>Start a new item</button></div>
+</form>
+</dialog>`;
 }
 
 // ---------- board view ----------
@@ -270,7 +306,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
   const listBody = `<div class="platforms">${platforms
     .map((p) => {
       const mine = list.filter((i) => platformOf(i, data.repos) === p);
-      const id = `list-${slug(p)}`;
+      const id = listGroupId(p);
       const body = mine.length
         ? `<ul class="rows">${mine.map((i) => row(i, data, '', false)).join('')}</ul>`
         : '<p class="empty">Nothing in List.</p>';

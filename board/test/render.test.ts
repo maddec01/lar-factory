@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
-import { DEFAULT_UI, renderBoardView, renderFlowView } from '../src/render.ts';
+import { DEFAULT_UI, renderAddItemForm, renderBoardView, renderFlowView } from '../src/render.ts';
 import type { RenderOptions } from '../src/render.ts';
 import type { BoardData } from '../src/model.ts';
 
@@ -44,4 +44,28 @@ test('flow view, all paths', () => {
 
 test('flow view, foggy concept tab', () => {
   matchesSaved('flow-fog.html', renderFlowView(sample, { ...base, ui: { ...DEFAULT_UI, view: 'flow', flowTab: 'fog' } }));
+});
+
+test('capture form uses configured repositories and explains empty applicability selections', () => {
+  const html = renderAddItemForm({ ...sample, repos: [
+    ...sample.repos, { repo: 'maddec01/mux-factory', platform: 'Factory' },
+  ] });
+  for (const text of ['Server', 'Apple', 'Factory', 'bug', 'feature', 'improvement', 'app: books', 'os: watchos',
+    'area: server', 'area: web', 'No apps selected means all apps.', 'No OSes selected means all OSes.',
+    'Selecting neither means both server and web.']) assert.ok(html.includes(text), text);
+  assert.match(html, /<label for="item-title">Title/);
+  assert.match(html, /id="item-title"[^>]*required/);
+  assert.match(html, /<label for="item-description">Description/);
+  assert.match(html, /role="status"/);
+  assert.ok(!html.includes('data-applicability="maddec01/mux-factory"'));
+});
+
+test('entered titles round-trip through bootstrap JSON without closing its script element', () => {
+  const title = 'Play <queue> & "mix" </script>';
+  const data = { ...sample, items: [{ ...sample.items[0]!, title }] };
+  const html = renderPage(data, base);
+  const embedded = html.match(/<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(embedded);
+  assert.equal((JSON.parse(embedded) as BoardData).items[0]?.title, title);
+  assert.ok(!embedded.includes('</script>'));
 });

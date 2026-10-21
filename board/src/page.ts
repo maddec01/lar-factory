@@ -1,7 +1,7 @@
 // The full HTML document the server sends on first load. Server-only.
 
 import { readFileSync } from 'node:fs';
-import { renderApp } from './render.ts';
+import { renderAddItemForm, renderApp } from './render.ts';
 import type { RenderOptions } from './render.ts';
 import type { BoardData } from './model.ts';
 
@@ -28,6 +28,7 @@ ${css}</style>
 <div id="app">
 ${renderApp(data, opts)}
 </div>
+${renderAddItemForm(data)}
 <script id="board-data" type="application/json">${scriptJson(data)}</script>
 <script type="module" src="/assets/client.ts"></script>
 </body>

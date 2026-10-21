@@ -6,11 +6,27 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import type { TestContext } from 'node:test';
 
-export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false) {
+async function readCalls(file: string): Promise<string[][]> {
+  return (await readFile(file, 'utf8')).trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
+}
+
+/** A raw GraphQL project item, as the fake gh returns it. */
+export function rawIssue(number: number, status: string, repo = 'maddec01/mux-factory') {
+  return {
+    id: `PVTI_${number}`, updatedAt: '2026-10-21T09:00:00Z', status: { name: status },
+    content: { __typename: 'Issue', number, title: `Issue ${number}`, url: `https://github.com/${repo}/issues/${number}`,
+      state: 'OPEN', closedAt: null, updatedAt: '2026-10-21T09:00:00Z', repository: { nameWithOwner: repo },
+      labels: { nodes: [] }, parent: null, subIssuesSummary: { total: 0, completed: 0 },
+      issueDependenciesSummary: { blockedBy: 0 }, closedByPullRequestsReferences: { nodes: [] } },
+  };
+}
+
+export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'mux-board-test-'));
   const stateFile = join(dir, 'github.json');
   await writeFile(stateFile, JSON.stringify(options));
   await writeFile(stateFile + '.calls', '');
+  await writeFile(stateFile + '.t3calls', '');
   const socket = createServer();
   socket.listen(0, '127.0.0.1');
   await once(socket, 'listening');
@@ -22,7 +38,8 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     ...(fastRefresh ? ['--import', './test/fast-refresh.ts'] : []), 'src/server.ts'], {
     cwd: new URL('../', import.meta.url),
     env: { ...process.env, BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
-      FAKE_GH_STATE: stateFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '' },
+      T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname,
+      FAKE_GH_STATE: stateFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '', ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';
@@ -42,9 +59,10 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
       if (response.ok) return {
         url,
         update: (value: object) => writeFile(stateFile, JSON.stringify(value)),
-        calls: async (): Promise<string[][]> => (await readFile(stateFile + '.calls', 'utf8')).trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]),
+        calls: () => readCalls(stateFile + '.calls'),
+        t3Calls: () => readCalls(stateFile + '.t3calls'),
         board: () => fetch(`${url}/api/board`).then((r) => r.json()),
-        post: (body: unknown, origin = url) => fetch(`${url}/api/items`, { method: 'POST',
+        post: (body: unknown, origin = url, path = '/api/items') => fetch(`${url}${path}`, { method: 'POST',
           headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
       };
     } catch { /* Wait for the subprocess to listen. */ }

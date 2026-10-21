@@ -15,7 +15,7 @@ import {
   trackOf,
   workCommand,
 } from './model.ts';
-import type { BoardData, FlowNode, Item, Status, Track } from './model.ts';
+import type { BoardData, FlowNode, Item, StartedThread, Status, Track } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -35,7 +35,17 @@ export interface RenderOptions {
   ui: UiState;
   /** Set by the browser when it can't reach the board server. */
   clientError?: string | null;
-  createdItem?: Item | null;
+  /** The item this page just added or moved, announced in the header. */
+  notice?: { verb: 'Added' | 'Moved'; item: Item; to: Status } | null;
+  /** Per item id: what this page is doing for the item. */
+  actions?: Record<string, ItemAction>;
+}
+
+/** An action this page started for an item: in flight, failed, or (for Start) done. */
+export interface ItemAction {
+  phase: 'pending' | 'error' | 'uncertain' | 'started';
+  message?: string;
+  thread?: StartedThread;
 }
 
 export const DEFAULT_UI: UiState = { view: 'board', flowTab: 'all', open: [] };
@@ -174,6 +184,17 @@ function row(item: Item, data: BoardData, trailing = '', withPlatform = true): s
   return `<li class="row-item">${withPlatform ? platformBadge(item, data) : ''}${titleLink(item, 'row-title')}${kindPill(item)}${trailing}</li>`;
 }
 
+function actionError(action: ItemAction | undefined): string {
+  return action?.phase === 'error' || action?.phase === 'uncertain'
+    ? `<span class="action-error" role="alert">${esc(action.message)}</span>`
+    : '';
+}
+
+function queueButton(item: Item, action: ItemAction | undefined): string {
+  const verb = action?.phase === 'pending' ? 'Queuing…' : 'Queue';
+  return `${actionError(action)}<button type="button" class="copy row-action" data-queue="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${action?.phase === 'pending' ? ' aria-disabled="true"' : ''}>${verb}</button>`;
+}
+
 // ---------- header ----------
 
 export function renderHeader(data: BoardData, opts: RenderOptions): string {
@@ -182,8 +203,9 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
     ? `Refreshed <time datetime="${esc(data.fetchedAt)}">${clock(data.fetchedAt, opts.timeZone)}</time> <span class="age">(${ago(data.fetchedAt, opts.now)})</span>`
     : 'Not read yet';
   const banners: string[] = [];
-  if (opts.createdItem) {
-    banners.push(`<div class="banner capture-success" role="status">Added ${titleLink(opts.createdItem)} to List.</div>`);
+  if (opts.notice) {
+    const { verb, item, to } = opts.notice;
+    banners.push(`<div class="banner capture-success" role="status">${verb} ${titleLink(item)} to ${esc(to)}.</div>`);
   }
   if (opts.clientError) {
     banners.push(
@@ -308,7 +330,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       const mine = list.filter((i) => platformOf(i, data.repos) === p);
       const id = listGroupId(p);
       const body = mine.length
-        ? `<ul class="rows">${mine.map((i) => row(i, data, '', false)).join('')}</ul>`
+        ? `<ul class="rows">${mine.map((i) => row(i, data, queueButton(i, opts.actions?.[i.id]), false)).join('')}</ul>`
         : '<p class="empty">Nothing in List.</p>';
       return `<details class="platform" id="${id}"${isOpen(ui, id)}><summary><span class="plat plat-${esc(slug(p))}">${esc(p)}</span> <b>${mine.length}</b> in List</summary>${body}</details>`;
     })

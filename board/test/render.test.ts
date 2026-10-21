@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
-import { DEFAULT_UI, renderAddItemForm, renderBoardView, renderFlowView } from '../src/render.ts';
+import { DEFAULT_UI, renderAddItemForm, renderApp, renderBoardView, renderFlowView } from '../src/render.ts';
 import type { RenderOptions } from '../src/render.ts';
 import type { BoardData } from '../src/model.ts';
 
@@ -68,4 +68,23 @@ test('entered titles round-trip through bootstrap JSON without closing its scrip
   assert.ok(embedded);
   assert.equal((JSON.parse(embedded) as BoardData).items[0]?.title, title);
   assert.ok(!embedded.includes('</script>'));
+});
+
+const buttons = (html: string, attr: string) => [...html.matchAll(new RegExp(`${attr}="([^"]+)"`, 'g'))].map((m) => m[1]);
+const ids = (status: string) => sample.items.filter((i) => i.status === status).map((i) => i.id);
+
+test('Queue buttons appear only on List rows and show the action in flight or its error', () => {
+  const html = renderBoardView(sample, base);
+  assert.deepEqual(buttons(html, 'data-queue').sort(), ids('List').sort());
+  const [first, second] = ids('List') as [string, string];
+  const acting = renderBoardView(sample, { ...base, actions: {
+    [first]: { phase: 'pending' }, [second]: { phase: 'error', message: 'Could not set Queued.' } } });
+  assert.match(acting, new RegExp(`data-queue="${first}"[^>]*aria-disabled="true"[^>]*>Queuing…</button>`));
+  assert.match(acting, /<span class="action-error" role="alert">Could not set Queued.<\/span><button[^>]*data-queue/);
+});
+
+test('a queued or added item is announced in the header', () => {
+  const item = sample.items[0]!;
+  assert.match(renderApp(sample, { ...base, notice: { verb: 'Moved', item, to: 'Queued' } }),
+    /role="status">Moved <a[^>]*>.*<\/a> to Queued\.<\/div>/);
 });

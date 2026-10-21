@@ -8,7 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { loadConfig } from './config.ts';
-import { addProjectItem, fetchProject, findProjectNumber } from './github.ts';
+import { addProjectItem, fetchProject, findProjectNumber, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
@@ -33,7 +33,8 @@ const state: BoardData = {
 let projectNumber = config.number;
 let refreshing = false;
 let revision = 0;
-const recentItems = new Map<string, { item: Item; revision: number; missingReads: number }>();
+/** Items this board just created or moved, shown as changed until GitHub reports the change. */
+const recentItems = new Map<string, { item: Item; revision: number; unconfirmedReads: number }>();
 const submissions = new Map<string, {
   draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
 }>();
@@ -53,8 +54,9 @@ async function refresh(): Promise<void> {
     state.project = { title: snapshot.title, url: snapshot.url };
     for (const [id, recent] of recentItems) {
       if (readRevision < recent.revision) continue;
-      // Give GitHub three successful reads to expose membership, then trust removals.
-      if (snapshot.items.some((i) => i.id === id) || ++recent.missingReads >= 3) recentItems.delete(id);
+      // Give GitHub three successful reads to expose the change, then trust what it reports.
+      const reported = snapshot.items.some((i) => i.id === id && i.status === recent.item.status);
+      if (reported || ++recent.unconfirmedReads >= 3) recentItems.delete(id);
     }
     state.items = [...snapshot.items.filter((i) => !recentItems.has(i.id)), ...[...recentItems.values()].map((r) => r.item)];
     state.fetchedAt = new Date().toISOString();
@@ -93,25 +95,42 @@ function json(res: ServerResponse, status: number, value: unknown): void {
   send(res, status, 'application/json; charset=utf-8', JSON.stringify(value));
 }
 
-async function captureItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!capture.enabled) return json(res, 403, { error: 'Adding items is disabled in sample mode.' });
+/** Reads a small JSON object body, or answers the request with the problem and returns null. */
+async function readJson(req: IncomingMessage, res: ServerResponse, what: string): Promise<Record<string, unknown> | null> {
   if (req.headers['content-type']?.split(';')[0]?.trim() !== 'application/json') {
-    return json(res, 415, { error: 'Send item details as JSON.' });
+    json(res, 415, { error: `Send ${what} as JSON.` });
+    return null;
   }
-  let input: { session?: unknown; requestId?: unknown; draft?: unknown };
   try {
     let size = 0;
     const chunks: Buffer[] = [];
     for await (const chunk of req) {
       size += (chunk as Buffer).length;
-      if (size > 100_000) return json(res, 413, { error: 'Item details are too large.' });
+      if (size > 100_000) {
+        json(res, 413, { error: `${what[0]!.toUpperCase()}${what.slice(1)} are too large.` });
+        return null;
+      }
       chunks.push(chunk as Buffer);
     }
-    input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as typeof input;
+    const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
     if (!input || typeof input !== 'object') throw new Error('Invalid JSON.');
+    return input as Record<string, unknown>;
   } catch {
-    return json(res, 400, { error: 'Send valid item details as JSON.' });
+    json(res, 400, { error: `Send valid ${what} as JSON.` });
+    return null;
   }
+}
+
+/** Shows a change at once and keeps it through refreshes until GitHub reports it. */
+function showChanged(item: Item): void {
+  recentItems.set(item.id, { item, revision: ++revision, unconfirmedReads: 0 });
+  state.items = [...state.items.filter((i) => i.id !== item.id), item];
+}
+
+async function captureItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!capture.enabled) return json(res, 403, { error: 'Adding items is disabled in sample mode.' });
+  const input = await readJson(req, res, 'item details');
+  if (!input) return;
   if (input.session !== capture.session) {
     return json(res, 409, { uncertain: true, error: 'The board restarted. Check the repository issues before starting a new item.' });
   }
@@ -134,20 +153,35 @@ async function captureItem(req: IncomingMessage, res: ServerResponse): Promise<v
   const result = await entry.pending;
   entry.pending = undefined;
   if (result.item && !entry.published) {
-    recentItems.set(result.item.id, { item: result.item, revision: ++revision, missingReads: 0 });
-    state.items = [...state.items.filter((i) => i.id !== result.item!.id), result.item];
+    showChanged(result.item);
     entry.published = true;
   }
   json(res, result.error ? 502 : 200, { ...result, board: state });
 }
 
+async function queueItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!capture.enabled) return json(res, 403, { error: 'Queuing is disabled in sample mode.' });
+  const input = await readJson(req, res, 'the item to queue');
+  if (!input) return;
+  if (typeof input.itemId !== 'string') return json(res, 400, { error: 'Name the item to queue.' });
+  const item = state.items.find((i) => i.id === input.itemId);
+  if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
+  if (item.status === 'Queued') return json(res, 200, { error: null, board: state });
+  if (item.status !== 'List') return json(res, 409, { error: `Only List items can be queued; this one is in ${item.status}.` });
+  const error = await setItemStatus({ ...config, number: projectNumber }, item.id, 'Queued');
+  if (error) return json(res, 502, { error, board: state });
+  showChanged({ ...item, status: 'Queued' });
+  json(res, 200, { error: null, board: state });
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-  if (req.method === 'POST' && path === '/api/items' && req.headers.origin !== `http://${req.headers.host}`) {
-    return send(res, 403, 'application/json; charset=utf-8', JSON.stringify({ error: 'Submit from this board page.' }));
+  if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
+    return json(res, 403, { error: 'Submit from this board page.' });
   }
   if (req.method === 'POST' && path === '/api/items') return captureItem(req, res);
+  if (req.method === 'POST' && path === '/api/queue') return queueItem(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }

@@ -159,6 +159,9 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .row-item .plat, .row-item .kind { flex: none; }
 .row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
 .row-title:hover { text-decoration: underline; }
+.row-action { flex: none; }
+.copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
+.action-error { flex: none; max-width: 40%; color: var(--you-text); font-weight: 600; overflow-wrap: anywhere; }
 .when { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 10px; align-items: start; }
 details.platform { background: var(--surface); border: 1px solid var(--bd); border-radius: var(--r); padding: 8px 12px; min-width: 0; }

@@ -5,15 +5,16 @@ const args = process.argv.slice(2);
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
 fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
 const output = (value) => process.stdout.write(JSON.stringify(value));
+const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued' }];
 const main = async () => {
   if (args[1] === 'graphql') {
     if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'Mux' }] } } } });
     if (options.readDelay) await new Promise((r) => setTimeout(r, options.readDelay));
     return output({ data: { user: { projectV2: { title: 'Mux', url: 'https://github.com/users/maddec01/projects/1',
-      items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } } });
+      items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: options.items ?? [] } } } } });
   }
   if (args[1] === 'view') return output({ id: 'PVT_1' });
-  if (args[1] === 'field-list') return output({ fields: [{ id: 'FIELD_1', name: 'Status', options: [{ id: 'LIST_1', name: 'List' }] }] });
+  if (args[1] === 'field-list') return output({ fields: [{ id: 'FIELD_1', name: 'Status', options: OPTIONS }] });
   if ((options.fail === 'membership' && args[1] === 'item-add') || (options.fail === 'status' && args[1] === 'item-edit')) {
     process.stderr.write('GitHub temporarily unavailable');
     process.exitCode = 1;
@@ -25,7 +26,15 @@ const main = async () => {
     return output({ number: 900001, html_url: `https://github.com/${repo}/issues/900001`, updated_at: '2026-10-21T10:00:00Z' });
   }
   if (args[1] === 'item-add') return output({ id: 'PVTI_900001' });
-  if (args[1] === 'item-edit') return output({});
+  if (args[1] === 'item-edit') {
+    // Later reads report the edit, like GitHub, unless the test says they lag.
+    const item = options.items?.find((i) => i.id === args[args.indexOf('--id') + 1]);
+    if (item && !options.ignoreEdits) {
+      item.status = { name: OPTIONS.find((o) => o.id === args[args.indexOf('--single-select-option-id') + 1]).name };
+      fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    }
+    return output({});
+  }
   throw new Error('Unexpected fake gh command');
 };
 main().catch((err) => { console.error(err); process.exitCode = 1; });

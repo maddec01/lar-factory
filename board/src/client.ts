@@ -2,9 +2,9 @@
 // re-rendering with the same template the server used.
 
 import { DEFAULT_UI, listGroupId, renderApp } from './render.ts';
-import type { FlowTab, UiState, View } from './render.ts';
+import type { FlowTab, ItemAction, RenderOptions, UiState, View } from './render.ts';
 import { platformOf } from './model.ts';
-import type { BoardData, Item } from './model.ts';
+import type { BoardData } from './model.ts';
 import { validateDraft } from './add-item.ts';
 import type { CreationResult, ItemDraft } from './add-item.ts';
 
@@ -17,7 +17,8 @@ const repoSelect = form.elements.namedItem('repo') as HTMLSelectElement;
 
 let data: BoardData = JSON.parse(bootstrap?.textContent ?? 'null');
 let clientError: string | null = null;
-let createdItem: Item | null = null;
+let notice: RenderOptions['notice'] = null;
+const actions: Record<string, ItemAction> = {};
 let mutationVersion = 0;
 let pollSequence = 0;
 const ui: UiState = {
@@ -29,18 +30,26 @@ const ui: UiState = {
 function render(): void {
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
   const { scrollX, scrollY } = window;
-  app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, createdItem });
+  app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions });
   tagFocusable();
   window.scrollTo(scrollX, scrollY);
-  if (focusKey) app.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(focusKey)}"]`)?.focus();
+  if (focusKey) focusByKey(focusKey);
 }
 
 function tagFocusable(): void {
-  // Give tabs, toggles and copy buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-add-item],details[id] > summary').forEach((el) => {
-    el.dataset.focusKey =
-      el.dataset.view ?? el.dataset.flowTab ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
+  // Give tabs, toggles and buttons stable keys so focus survives a re-render.
+  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-add-item],details[id] > summary').forEach((el) => {
+    el.dataset.focusKey = focusKeyOf(el);
   });
+}
+
+function focusKeyOf(el: HTMLElement): string {
+  if (el.dataset.queue) return `queue-${el.dataset.queue}`;
+  return el.dataset.view ?? el.dataset.flowTab ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
+}
+
+function focusByKey(key: string): void {
+  app.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(key)}"]`)?.focus();
 }
 
 async function poll(): Promise<void> {
@@ -145,8 +154,8 @@ form.addEventListener('input', () => {
 });
 newItem.addEventListener('click', resetDraft);
 dialog.addEventListener('close', () => {
-  const target = revealList && createdItem
-    ? document.querySelector<HTMLElement>(`#${CSS.escape(listGroupId(platformOf(createdItem, data.repos)))} > summary`)
+  const target = revealList && notice
+    ? document.querySelector<HTMLElement>(`#${CSS.escape(listGroupId(platformOf(notice.item, data.repos)))} > summary`)
     : app.querySelector<HTMLElement>('[data-add-item]');
   revealList = false;
   target?.focus();
@@ -185,7 +194,7 @@ async function submitItem(): Promise<void> {
     if (result.item && result.board) {
       mutationVersion++;
       data = result.board;
-      createdItem = result.item;
+      notice = { verb: 'Added', item: result.item, to: 'List' };
       ui.open = [...new Set([...ui.open, listGroupId(platformOf(result.item, data.repos))])];
       submission = { phase: 'complete' };
       revealList = true;
@@ -205,8 +214,44 @@ async function submitItem(): Promise<void> {
   }
 }
 
+/** Posts an item action and returns the server's answer, or a message when the server can't be reached. */
+async function postAction<T extends { error: string | null; board?: BoardData }>(path: string, body: object): Promise<T> {
+  mutationVersion++;
+  try {
+    const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const result = await response.json() as T;
+    if (result.board) {
+      mutationVersion++;
+      data = result.board;
+    }
+    return { ...result, error: result.error ?? (response.ok ? null : `Request failed (HTTP ${response.status}).`) };
+  } catch {
+    return { error: "Can't reach the board server. Try again." } as T;
+  }
+}
+
+async function queueItem(button: HTMLElement): Promise<void> {
+  const itemId = button.dataset.queue!;
+  if (actions[itemId]?.phase === 'pending') return;
+  // When this row leaves List, keep keyboard focus in the list: the next row, else its group.
+  const row = button.closest('li');
+  const neighbour = (row?.nextElementSibling ?? row?.previousElementSibling)?.querySelector<HTMLElement>('[data-queue]');
+  const nextFocus = neighbour ? focusKeyOf(neighbour) : `summary-${button.closest('details')?.id}`;
+  actions[itemId] = { phase: 'pending' };
+  render();
+  const result = await postAction('/api/queue', { itemId });
+  const item = data.items.find((i) => i.id === itemId);
+  if (result.error || !item) actions[itemId] = { phase: 'error', message: result.error ?? 'The item left the board.' };
+  else {
+    delete actions[itemId];
+    notice = { verb: 'Moved', item, to: 'Queued' };
+  }
+  render();
+  if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
+}
+
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-add-item]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-add-item]');
   if (!target) return;
   if (target.hasAttribute('data-add-item')) {
     if (submission.phase === 'complete') resetDraft();
@@ -217,6 +262,7 @@ app.addEventListener('click', (event) => {
     ui.flowTab = target.dataset.flowTab as FlowTab;
     render();
   } else if (target.dataset.copy) void copy(target.dataset.copy, target as HTMLButtonElement);
+  else if (target.dataset.queue) void queueItem(target);
 });
 
 // Arrow keys move between the Board and Flow tabs (WAI-ARIA tabs pattern).

@@ -193,6 +193,36 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
   throw new Error(`Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`);
 }
 
+/** Looks up the project's Status option once and returns a writer for it. */
+async function statusWriter(config: BoardConfig, name: Status, run: (args: string[]) => Promise<string>) {
+  const number = config.number ?? await findProjectNumber(config.owner, config.title);
+  const project = JSON.parse(await run(['project', 'view', String(number), '--owner', config.owner, '--format', 'json'])) as { id: string };
+  const fields = JSON.parse(await run(['project', 'field-list', String(number), '--owner', config.owner, '--format', 'json'])) as {
+    fields: { id: string; name: string; options?: { id: string; name: string }[] }[];
+  };
+  const status = fields.fields.find((f) => f.name === 'Status');
+  const option = status?.options?.find((o) => o.name === name);
+  if (!project.id || !status || !option) throw new Error(`The project has no ${name} status.`);
+  const setStatus = (itemId: string) => run(['project', 'item-edit', '--project-id', project.id, '--id', itemId,
+    '--field-id', status.id, '--single-select-option-id', option.id]);
+  return { number, setStatus };
+}
+
+/** Sets an existing project item's Status; returns the error, or null when GitHub accepted it. */
+export async function setItemStatus(
+  config: BoardConfig,
+  itemId: string,
+  name: Status,
+  run: (args: string[]) => Promise<string> = gh,
+): Promise<string | null> {
+  try {
+    await (await statusWriter(config, name, run)).setStatus(itemId);
+    return null;
+  } catch (err) {
+    return `Could not set ${name}. ${err instanceof Error ? err.message : 'GitHub request failed.'}`;
+  }
+}
+
 /** Creates an issue, adds it to the configured project and explicitly assigns List. */
 export async function addProjectItem(
   config: BoardConfig,
@@ -207,14 +237,7 @@ export async function addProjectItem(
   if (progress.creationUncertain) return uncertain();
   try {
     if (progress.item) return { item: progress.item, issueUrl: progress.item.url, error: null };
-    const number = config.number ?? await findProjectNumber(config.owner, config.title);
-    const project = JSON.parse(await run(['project', 'view', String(number), '--owner', config.owner, '--format', 'json'])) as { id: string };
-    const fields = JSON.parse(await run(['project', 'field-list', String(number), '--owner', config.owner, '--format', 'json'])) as {
-      fields: { id: string; name: string; options?: { id: string; name: string }[] }[];
-    };
-    const status = fields.fields.find((f) => f.name === 'Status');
-    const list = status?.options?.find((o) => o.name === 'List');
-    if (!project.id || !status || !list) throw new Error('The project has no List status.');
+    const { number, setStatus } = await statusWriter(config, 'List', run);
     const labels = [draft.kind, ...draft.labels];
     step = 'issue creation';
     if (!progress.issue) {
@@ -239,8 +262,7 @@ export async function addProjectItem(
       progress.itemId = member.id;
     }
     step = 'List status';
-    await run(['project', 'item-edit', '--project-id', project.id, '--id', progress.itemId,
-      '--field-id', status.id, '--single-select-option-id', list.id]);
+    await setStatus(progress.itemId);
     progress.item = {
       id: progress.itemId, status: 'List', type: 'Issue', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'OPEN',

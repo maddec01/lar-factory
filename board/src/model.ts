@@ -56,6 +56,12 @@ export interface Item {
   linkedPrs: LinkedPr[];
 }
 
+/** A T3 Code thread the board started. */
+export interface StartedThread {
+  threadId: string;
+  title: string;
+}
+
 export interface RepoConfig {
   repo: string;
   platform: string;

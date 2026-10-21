@@ -29,7 +29,9 @@ where `<mux-work>` is the folder holding this file's parent.
 1. Set **In progress**, unless a handoff resumes past **Build**. Read the issue (brief, comments, linked prototype or
    research branches) and the repo's `AGENTS.md`. Run the repo's worktree setup
    if `AGENTS.md` asks for it.
-2. **Plan.** Start a **planner** subagent with the issue reference, the repo
+2. **Plan.** If the build issue already has slices (a handoff), remove any
+   leftover slice worktrees and branches, then **Implement** the ready slices
+   fresh. Otherwise start a **planner** subagent with the issue reference, the repo
    path and these instructions:
    - Read `to-tickets` at `~/.claude/skills/to-tickets/SKILL.md` (Claude Code)
      or `~/.agents/skills/to-tickets/SKILL.md` (Codex) and follow it on the
@@ -95,6 +97,10 @@ where `<mux-work>` is the folder holding this file's parent.
 Every question to Pedro follows the question UI rule in `<mux-work>/SKILL.md`
 (**Rules**): Needs you, then `AskUserQuestion`, then
 the answers on the issue and the status back.
+
+Past about 150k tokens, follow the handoff rule in `<mux-work>/SKILL.md`
+(**Rules**), relaunching in this worktree and branch. A relaunched builder
+resumes at the step and review round its handoff names.
 
 If the brief turns out wrong or a decision is missing, stop: comment on the
 issue with what you found and your recommendation, then ask Pedro. Set the

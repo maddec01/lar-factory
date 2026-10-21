@@ -53,9 +53,20 @@ verifies visible changes and merges every PR. Everything else is yours.
     "None" when one is left alone. No suggestions, no question.
 - The issue is the only hand-over. Each step must be resumable from the issue
   alone: the brief, the map, decisions and links live in its body and comments.
-- If this thread passes about 150k tokens, write a handoff following
+- Past about 150k tokens, a thread hands off: write a handoff following
   `~/.agents/skills/handoff/SKILL.md`, post it as an issue comment, and continue
-  with `/mux-work <issue>` in a fresh thread (`t3_thread_launch`, root workspace).
+  in a fresh thread with `t3_thread_launch`.
+  - Shaping thread: `/mux-work <issue>`, root workspace.
+  - Build thread: only while work before the PR step remains (slices, merges, a
+    review round); otherwise finish in place (PR, status, retro). Past the
+    mark, start no new implementers; merge the running ones, then hand off.
+    Launch with
+    the message from **5. Start the build** and `workspaceStrategy`
+    `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
+    The handoff names the step and review round to resume at; the open slice
+    sub-issues carry the remaining state. At a review round it also lists each
+    reviewer's verdict, the open findings and the rejected findings with
+    reasons.
 - Never merge, never push to `main`. Commit and PR rules are in each repo's
   `AGENTS.md`.
 

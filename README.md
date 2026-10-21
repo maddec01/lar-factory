@@ -27,14 +27,17 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
 3. **Shaping.** `mux-work` reads the issue and the code through subagents, and
    proposes a route:
    - **clear**: a bug a subagent can reproduce and diagnose, or a small change;
-   - **needs decisions**: it grills you with questions and, for anything visual,
-     builds two or three prototypes for you to pick from;
+   - **needs decisions**: it grills you with docs: questions that check your
+     terms against the project's glossary and ADRs, and drafts any new terms
+     and decisions into the brief for the builder to write. For anything
+     visual, it builds two or three prototypes for you to pick from;
    - **foggy**: the issue becomes a **concept**. Its body is a map (destination,
-     decisions so far, fog, out of scope, a diagram), and each decision is its
-     own sub-issue, worked in its own thread. Build sub-issues appear as
-     decisions close.
+     decisions so far, fog, out of scope, domain docs drafts, a diagram), and
+     each decision is its own sub-issue, worked in its own thread. Build
+     sub-issues appear as decisions close.
 4. **Ready.** It writes a brief into the issue (what, how to tell it's done,
-   confirmed assumptions). A fresh-context subagent tries to find holes in it.
+   confirmed assumptions, domain docs drafts). A fresh-context subagent tries
+   to find holes in it.
 5. **In progress.** A new thread builds it in its own git worktree, test-first,
    from the brief alone.
 6. **Review.** Four reviewers run in parallel, each with fresh context: code,

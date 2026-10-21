@@ -9,8 +9,13 @@ Pedro merges. This vocabulary describes its work, roles and board statuses.
 
 **Brief**:
 The issue's build handover: what to change, how to tell it is done, confirmed
-assumptions, builder notes and whether Pedro needs to verify it.
+assumptions, builder notes, domain docs drafts and whether Pedro needs to
+verify it.
 _Avoid_: Specification (when referring to the factory's brief)
+
+**Domain docs**:
+A project's glossary and ADRs. Shaping drafts changes to them in the brief, and
+the builder writes them in the build PR.
 
 **Passing brief**:
 A brief that has passed the shaping gate and can be handed to a build thread.
@@ -25,7 +30,7 @@ decision and build sub-issues.
 
 **Map**:
 A concept's account of its destination, decisions so far, remaining fog,
-out-of-scope work and relationships between sub-issues.
+out-of-scope work, domain docs drafts and relationships between sub-issues.
 
 **Overlay**:
 The board's temporary view of successful item creations and status changes

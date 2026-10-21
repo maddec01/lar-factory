@@ -23,6 +23,11 @@ the flow and `docs/plan.md` for how it was set up.
   token keeps gh logged in under the new home.
 - A PR that no issue tracks goes on the Mux board too: `bash ~/.agents/skills/mux-work/scripts/status.sh <pr-url> "Ready to merge"`.
 
+## Domain docs
+
+Single-context: one root `GLOSSARY.md` and `docs/adr/`. Read both before
+shaping or building; a build PR writes the brief's **Domain docs** to them.
+
 ## Worktree builds
 
 Every worktree gets its own `board/node_modules` from pnpm's shared store, so a

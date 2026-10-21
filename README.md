@@ -78,10 +78,9 @@ through a long conversation, and subagents return summaries instead of files.
 | `skill-sync` | Brings upstream changes into the copies, by your choice | Mux |
 | `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff`, `to-tickets`, `implement` | Shaping, building and reviewing | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |
 | `code-review-and-quality`, `security-and-hardening`, `doubt-driven-development`, `frontend-ui-engineering`, `browser-testing-with-devtools` | Reviews and the gate | Copies of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
+| `developer-profile` | Pedro's coding style, which the builder follows | Copy of [maddec01/developer-profile-skill](https://github.com/maddec01/developer-profile-skill) |
 
-`UPSTREAM.md` lists the upstream path and commit of every copy. The builder also
-uses [`developer-profile`](https://github.com/maddec01/developer-profile-skill),
-which lives in its own repo.
+`UPSTREAM.md` lists the upstream path and commit of every copy.
 
 ### Install
 

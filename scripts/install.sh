@@ -12,6 +12,7 @@ SKILLS=(
   diagnosing-bugs tdd code-review codebase-design writing-for-agents pr
   retro handoff to-tickets implement code-review-and-quality security-and-hardening
   doubt-driven-development frontend-ui-engineering browser-testing-with-devtools
+  developer-profile
 )
 
 # Skills whose copies link to ../../references/.

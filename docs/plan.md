@@ -32,8 +32,7 @@ Owner tags: **Claude** means an agent does it. **You** means only you can do it.
 ## Before starting (You)
 
 1. Done 2026-10-20: `gh` has the `project` scope.
-2. Done 2026-10-20: T3 Remote Control is connected, so notifications reach
-   your phone.
+2. Done 2026-10-20: T3 Remote Control is connected.
 3. Export your current notes list (the ideas, bugs and findings) to a text or
    Markdown file, or paste it into a thread. Claude turns it into issues in
    phase 3.
@@ -201,9 +200,8 @@ No releases for mux-apple until TestFlight is set up.
       `research/<name>` branch. Build sub-issues appear as decisions close;
     - the gate: no unconfirmed assumptions, and a fresh-context check using
       `doubt-driven-development` before anything moves to Ready;
-    - move the issue's Status at every step, send one notification each time it
-      enters Needs you, and hand off to a fresh thread if the context passes
-      about 150k tokens.
+    - move the issue's Status at every step, and hand off to a fresh thread if
+      the context passes about 150k tokens.
 19. **Claude.** Write the build agent prompts in `mux-work/agents`:
     - builder: its own worktree, `tdd`, `developer-profile`, conventional
       commits, exploration notes for big builds;

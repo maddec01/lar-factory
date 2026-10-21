@@ -48,7 +48,7 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
    the skills and checks, for you to pick from.
 
 **Needs you** means it's waiting on you: a question, a prototype choice or a
-review. You get a push notification each time.
+review.
 
 Every thread starts small: steps hand over through the issue and the PR, never
 through a long conversation, and subagents return summaries instead of files.

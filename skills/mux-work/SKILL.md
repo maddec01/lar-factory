@@ -24,8 +24,7 @@ verifies visible changes and merges every PR. Everything else is yours.
   builder's stops and retro picks. If the tool is deferred, load it with
   `ToolSearch`; if it isn't available, ask in the `grilling` chat format.
   Run these steps once per batch of questions, however many calls it takes:
-  1. Set **Needs you** and send one push notification (`PushNotification`)
-     naming the issue and what you need. Then make the calls; each blocks.
+  1. Set **Needs you**, then make the question UI calls; each blocks.
   2. After the last call, comment the answers on the issue in one comment
      (summarise; never copy secrets, tokens or private hostnames).
   3. Set the status back to the one the step was in: Shaping while shaping,

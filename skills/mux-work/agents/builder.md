@@ -35,7 +35,7 @@ where `<mux-work>` is the folder holding this file's parent.
 5. Push the branch. Don't open the PR yet.
 
 Every question to Pedro follows the question UI rule in `<mux-work>/SKILL.md`
-(**Rules**): Needs you and a push notification, then `AskUserQuestion`, then
+(**Rules**): Needs you, then `AskUserQuestion`, then
 the answers on the issue and the status back.
 
 If the brief turns out wrong or a decision is missing, stop: comment on the
@@ -70,8 +70,7 @@ comments or the branch conflicts. Fast checks can finish before the watch
 starts, so handle the checks once right away, then on every wake: read the
 required checks with `gh pr checks <pr> --required`, then:
 
-- **Required checks green**: set the recommended status, send one push
-  notification (the PR title, link and status), then `unwatch_pull_request`.
+- **Required checks green**: set the recommended status, then `unwatch_pull_request`.
   Go to **Retro**.
 - **A required check failed, or the branch conflicts**: start a **CI fixer
   subagent** with `ci-fixer.md`, the issue reference, the repo path, the PR URL
@@ -99,6 +98,6 @@ and absolute file paths, so Pedro can inspect them alongside the PR link.
 Run this once, last, after the final status is set and the PR is unwatched.
 Follow `~/.agents/skills/retro/SKILL.md` for this thread. End with the PR link,
 its status (Verify, Ready to merge or Needs you), and the retro suggestions,
-then ask Pedro for his picks through the question UI. The final status and its
-push notification stand, so don't change the status for these questions.
+then ask Pedro for his picks through the question UI. The final status stands,
+so don't change the status for these questions.
 Don't apply the picks.

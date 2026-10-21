@@ -12,7 +12,7 @@ the change.
 2. Open the PR with `gh pr create`: a conventional title naming the change as
    Pedro would (it becomes the release note) and a body written with the `pr`
    skill. Include a text summary of the UI reviewer's checks
-   and results, following **Screenshots** in `../SKILL.md` (relative to this
+   and results, following `../screenshots.md` (relative to this
    file), a `## Domain docs added by the build` section copied from the issue's
    comment of that name, for Pedro to review before merge (omit it when there
    is none), and `Closes <owner/repo#n>` at the end, followed by the

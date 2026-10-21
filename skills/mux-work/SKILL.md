@@ -55,15 +55,6 @@ brief (**3. Brief**) or the map ([Concepts](concepts.md)). Drafts follow `domain
 and `ADR-FORMAT.md`, and an ADR draft meets its three conditions. The builder
 writes them to the repo in the build PR.
 
-## Screenshots
-
-Keep review screenshots outside the checkout, in `${TMPDIR:-/tmp}/mux-<n>-ui/`,
-and show them to Pedro in the build conversation with absolute file paths.
-Never commit review screenshots or add them to PR descriptions or comments.
-PR evidence is a text summary of the visual checks and their results, even when
-the `pr` skill suggests screenshots. Required test fixtures and product assets
-follow the repo's rules; they are separate from review captures.
-
 ## 1. Pick up
 
 Read the issue with comments, parent, sub-issues and blockers. Then:

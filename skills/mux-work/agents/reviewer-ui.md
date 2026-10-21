@@ -18,7 +18,7 @@ reference, the repo path and a diff command. Read the issue's brief and the diff
   data covers every status; the live board on 4317 belongs to Pedro), open it in
   T3's browser preview, and check both tabs in light and dark, narrow and wide.
 
-Follow **Screenshots** in `../SKILL.md` (relative to this file). Use its capture
+Follow `../screenshots.md` (relative to this file). Use its capture
 directory and return absolute paths with captions for the builder to show in
 the build conversation.
 

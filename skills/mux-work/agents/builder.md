@@ -21,7 +21,7 @@ where `<mux-work>` is the folder holding this file's parent.
 - **Fixer**: makes changes on the build branch in this worktree as
   `git commit --fixup <sha>` commits, reruns the checks and reports.
 - **UI-check**: runs the visible checks and Verify captures, following
-  **Screenshots** in `<mux-work>/SKILL.md`. It keeps screenshots in its own
+  `<mux-work>/screenshots.md`. It keeps screenshots in its own
   context and returns their absolute paths and a verdict.
 
 ## Build

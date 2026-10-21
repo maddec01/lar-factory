@@ -9,10 +9,9 @@ Owner tags: **Claude** means an agent does it. **You** means only you can do it.
 
 ## What we agreed
 
-- Every commit from a PR lands on `main` through a merge commit. The merge
-  commit's title is the PR title, so `git log --first-parent main` reads one
-  conventional line per PR. Every commit and every PR title follows
-  conventional commits.
+- Every commit from a PR lands on `main` by rebase merge, in a linear history.
+  Every commit and every PR title follows conventional commits; PR titles
+  become the release notes. (Changed 2026-10-21 from merge commits.)
 - Nobody pushes to `main`, including you and agents. Agents push as your
   GitHub account, so a bypass for you is a bypass for them.
 - You cut releases by hand. Release notes come from PR titles.
@@ -51,9 +50,8 @@ requires a PR and four checks, but you have an "always" bypass, which is how
 direct pushes still happen. "Main merge and push permissions" limits who can
 update `main`. Merge commits are titled "Merge pull request #n from …".
 
-1. **Claude, you approve.** Repo settings: merge commits only (turn off squash
-   and rebase), merge commit title set to the PR title, merge commit message
-   left blank. Keep "delete branch on merge" on.
+1. **Claude, you approve.** Repo settings: rebase merge only (turn off merge
+   commits and squash). Keep "delete branch on merge" on.
 2. **Claude.** PR `ci: check conventional commits`:
    - a workflow on the Unraid runner that checks the PR title and every commit
      in the PR against the conventional format, and rejects merge commits made
@@ -66,7 +64,7 @@ update `main`. Merge commits are titled "Merge pull request #n from …".
      labels with the Project's Status column and the new labels (phase 3).
 3. **You.** Merge that PR.
 4. **Claude, you approve.** Update the "Main verification" ruleset: allow only
-   the merge method `merge`, add the conventional-commit check to the required
+   the merge method `rebase`, add the conventional-commit check to the required
    checks, and remove your bypass.
 5. **Claude.** PR `ci: add manual release workflow`:
    - "Prepare release" (you run it, entering a version such as `0.2.0`) opens a
@@ -96,7 +94,7 @@ There is no CI and no protection on `main` today.
    runner), plus the same `AGENTS.md` and `docs/agents/` updates.
 10. **You.** Merge it.
 11. **Claude, you approve.** Create a ruleset on `main`: require a PR, require
-    the conventional-commit check, allow only merge commits, block force
+    the conventional-commit check, allow only rebase merge, block force
     pushes, no bypass.
 
 No releases for mux-apple until TestFlight is set up.

@@ -102,7 +102,8 @@ Then:
   with docs**, through the question UI, for bugs and features alike. When a
   question is about how something looks or feels, start a **Prototype subagent** with the `prototype` skill in its own
   worktree on a `prototype/<n>-<slug>` branch: two or three variants that differ
-  only on that question. Tell Pedro how to open them (T3 browser preview for
+  only on that question. It keeps its screenshots in its own context and
+  returns each variant's file paths and a short description. Tell Pedro how to open them (T3 browser preview for
   web, the run scripts in the repo's T3 project for Apple), ask for his pick
   through the question UI, and record it and the branch on the issue.
 - **No open questions**: go straight to the brief.

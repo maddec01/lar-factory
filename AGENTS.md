@@ -19,8 +19,9 @@ the flow and `docs/plan.md` for how it was set up.
   spare port (`BOARD_PORT=4318 pnpm run sample`); 4317 is the live board.
 - Install script changes: run `bash scripts/install.test.sh`. Run the script
   itself only against a throwaway home, never the real `~/.agents`:
-  `GH_TOKEN=$(gh auth token) HOME=$(mktemp -d) bash scripts/install.sh`. The
-  token keeps gh logged in under the new home.
+  `env -u CLAUDE_CONFIG_DIR GH_TOKEN=$(gh auth token) HOME=$(mktemp -d) bash scripts/install.sh`.
+  The token keeps gh logged in under the new home; unsetting `CLAUDE_CONFIG_DIR`
+  stops the skills CLI writing to the real Claude config.
 - A PR that no issue tracks goes on the Mux board too: `bash ~/.agents/skills/mux-work/scripts/status.sh <pr-url> "Ready to merge"`.
 
 ## Domain docs

@@ -18,6 +18,11 @@ verifies visible changes and merges every PR. Everything else is yours.
   in **subagents**, so no thread holds whole files. Every factory subagent
   report is ≤300 words and never pastes whole files, logs or screenshots. Ask
   Pedro only what a subagent can't answer.
+- **Tools**, called by name: `gh issue view <ref> --comments` and
+  `gh issue comment` for issues, `t3_thread_launch` for new threads,
+  `delegate_task` for a T3 child task, and `AskUserQuestion` for the
+  [question UI](questions.md). Call `orchestrator_capabilities` only when a
+  model must change; skip searching the tool catalogue.
 - Every question to Pedro follows the [question UI](questions.md).
 - The issue is the only hand-over. Each step must be resumable from the issue
   alone: the brief, the map, decisions and links live in its body and comments.

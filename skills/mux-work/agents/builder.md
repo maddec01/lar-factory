@@ -9,6 +9,10 @@ browser; you hold their reports, merge slices and run review.
 Status changes use `bash <mux-work>/scripts/status.sh <owner/repo#n> "<Status>"`,
 where `<mux-work>` is the folder holding this file's parent.
 
+Call the tools this file names by name, plus the **Tools** in
+`<mux-work>/SKILL.md` (**Rules**). Call `orchestrator_capabilities` only when a
+model must change; skip searching the tool catalogue.
+
 ## Subagents
 
 - **Spawn**: in Claude Code, the `Agent` tool (`subagent_type: "general-purpose"`,

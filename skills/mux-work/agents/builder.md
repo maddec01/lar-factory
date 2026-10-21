@@ -10,7 +10,8 @@ where `<mux-work>` is the folder holding this file's parent.
 
 1. Set **In progress**. Read the issue (brief, comments, linked prototype or
    research branches) and the repo's `AGENTS.md`. Run the repo's worktree setup
-   if `AGENTS.md` asks for it.
+   if `AGENTS.md` asks for it. Follow **Screenshots** in `<mux-work>/SKILL.md`
+   for every review capture, including screenshots taken while building.
 2. Before implementation, use a quick file/path inspection to bound the relevant
    reading scope. Count physical lines in the full existing hand-written files
    needed to understand the change, including relevant tests and dependencies,
@@ -91,6 +92,9 @@ start a CI fixer, or stop). When he answers, set **Review**, do what he asks,
 stop, set **Needs you** and go to **Retro**.
 
 ## Retro
+
+Show the UI reviewer's screenshots in this build conversation, with captions
+and absolute file paths, so Pedro can inspect them alongside the PR link.
 
 Run this once, last, after the final status is set and the PR is unwatched.
 Follow `~/.agents/skills/retro/SKILL.md` for this thread. End with the PR link,

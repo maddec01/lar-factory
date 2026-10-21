@@ -8,9 +8,10 @@ the repo path, the reviewers' final results and the builder's rejected findings.
    `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`), rerun the
    checks, and `git push --force-with-lease`.
 2. Open the PR with `gh pr create`: a conventional title naming the change as
-   Pedro would (it becomes the release note), a body
-   written with the `pr` skill, screenshots from the UI reviewer, and
-   `Closes <owner/repo#n>` at the end, followed by the attribution line the
+   Pedro would (it becomes the release note) and a body written with the `pr`
+   skill. Include a text summary of the UI reviewer's checks
+   and results, following **Screenshots** in `../SKILL.md` (relative to this
+   file), and `Closes <owner/repo#n>` at the end, followed by the attribution line the
    repo's agents use.
 3. Recommend the status the item gets once its required checks pass:
    - **Verify** when the change is visible on screen, the brief says Verify,

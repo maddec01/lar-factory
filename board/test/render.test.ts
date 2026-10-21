@@ -31,6 +31,16 @@ test('page: header, stale banner and both views', () => {
   matchesSaved('page.html', renderPage(sample, base));
 });
 
+test('the header and the tab show the Mux logo followed by "factory"', () => {
+  const page = renderPage(sample, base);
+  assert.match(page, /<title>µx factory<\/title>/);
+  assert.match(page, /<link rel="icon" href="data:image\/svg\+xml,[^"]*viewBox%3D%220%200%2056%2032%22/, 'the favicon is the logo');
+  const h1 = renderHeader(sample, base).match(/<h1>(.*?)<\/h1>/)?.[1] ?? '';
+  assert.match(h1, /^<svg class="brand-mark" role="img" aria-label="Mux" viewBox="0 0 56 32"[^>]*><path d="M5 3\.5v25M5 3\.5V12a8\.5 8\.5 0 0 0 17 0V3\.5M22 12c0 4\.5 2 7\.5 5\.5 7\.5M36 3\.5l14 17M50 3\.5l-14 17"/);
+  assert.match(h1, /<\/svg><span>factory<\/span>$/);
+  assert.ok(!page.includes('Mux factory board'));
+});
+
 test('code updates have a copyable command and a warning independent of project staleness', () => {
   const data: BoardData = { ...sample, fetchedAt: new Date(base.now).toISOString(), error: null, codeUpdate: {
     runningRevision: 'a'.repeat(40), remoteRevision: 'b'.repeat(40), behind: 2, error: null,

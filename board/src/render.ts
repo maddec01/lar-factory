@@ -71,6 +71,9 @@ export interface ItemAction {
   thread?: StartedThread;
 }
 
+/** The Mux logo: viewBox and path copied unchanged from mux-server's BrandMark.tsx. */
+export const BRAND_MARK = '<svg class="brand-mark" role="img" aria-label="Mux" viewBox="0 0 56 32" fill="none"><path d="M5 3.5v25M5 3.5V12a8.5 8.5 0 0 0 17 0V3.5M22 12c0 4.5 2 7.5 5.5 7.5M36 3.5l14 17M50 3.5l-14 17" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 export const DEFAULT_UI: UiState = { view: 'board', flowTab: 'all', toggled: {} };
 
 // ---------- small helpers ----------
@@ -356,7 +359,7 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
     ? `<a href="${esc(data.project.url)}" target="_blank" rel="noopener">${esc(data.project.title)} project</a>`
     : esc(data.project.title);
   return `<header class="top">
-<div class="title-row"><h1>Mux factory board</h1><p class="refreshed">${refreshed} · ${project}</p><span class="header-actions"><button type="button" class="copy add-item" data-add-item>Add item</button>${update?.updatable && !onBanner ? updateButton(data, opts) : ''}</span></div>
+<div class="title-row"><h1>${BRAND_MARK}<span>factory</span></h1><p class="refreshed">${refreshed} · ${project}</p><span class="header-actions"><button type="button" class="copy add-item" data-add-item>Add item</button>${update?.updatable && !onBanner ? updateButton(data, opts) : ''}</span></div>
 <ul class="totals" aria-label="Counts">
 <li class="${counts.needsYou ? 'amber' : ''}"><b>${counts.needsYou}</b> need you</li>
 <li><b>${counts.inFlight}</b> in flight</li>

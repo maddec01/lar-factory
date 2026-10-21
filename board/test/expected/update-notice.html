@@ -4,64 +4,103 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Mux factory board</title>
-<link rel="icon" href="data:,">
+<title>µx factory</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22brand-mark%22%20role%3D%22img%22%20aria-label%3D%22Mux%22%20viewBox%3D%220%200%2056%2032%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M5%203.5v25M5%203.5V12a8.5%208.5%200%200%200%2017%200V3.5M22%2012c0%204.5%202%207.5%205.5%207.5M36%203.5l14%2017M50%203.5l-14%2017%22%20stroke%3D%22%2371717b%22%20stroke-width%3D%225.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
 <style>
-/* Uses T3's theme variables when they exist, with light and dark fallbacks. */
+/* T3 Code's default theme, following the system's light or dark setting. Values from pingdotgg/t3code
+   apps/web/src/index.css (:root and its dark variant, @theme fonts, --text-2xs, --radius,
+   --control-radius) at 0bdf33a, with the Tailwind v4 colours those tokens name
+   (tailwindcss/packages/tailwindcss/theme.css). Badges and buttons follow
+   apps/web/src/components/ui/badge.tsx and button.tsx; grouped lists follow
+   components/settings/SettingsGroup.tsx. */
 :root {
   color-scheme: light dark;
-  --bg: var(--background, #ffffff);
-  --fg: var(--foreground, #18181b);
-  --muted: var(--muted-foreground, #5b5b66);
-  --bd: var(--border, #e4e4e7);
-  --surface: var(--card, #ffffff);
-  --r: var(--radius, 8px);
-  --you: #d97706;
-  --thread: #3b82f6;
-  --sub: #8b5cf6;
-  --build: #10b981;
-  --you-text: #a34a06;
-  --you-soft: color-mix(in srgb, #f59e0b 14%, transparent);
-  --danger-text: #b42318;
-  --line: color-mix(in srgb, var(--fg) 18%, transparent);
-  --soft: color-mix(in srgb, var(--fg) 6%, transparent);
-  --focus: #2563eb;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --bg: oklch(99.2% 0 0);                       /* --background: zinc-25 */
+  --fg: oklch(27.4% 0.006 286.033);             /* --foreground: zinc-800 */
+  --surface: #fff;                              /* --card, --popover */
+  --muted: oklch(55.2% 0.016 285.938);          /* --muted-foreground: zinc-500 */
+  --muted-bg: oklch(98.5% 0 0);                 /* --muted, --secondary: zinc-50 */
+  --accent: oklch(96.7% 0.001 286.375);         /* --accent: zinc-100 */
+  --bd: oklch(92% 0.004 286.32);                /* --border: zinc-200 */
+  --input: oklch(87.1% 0.006 286.286);          /* --input: zinc-300 */
+  --primary: oklch(0.488 0.217 264);
+  --primary-fg: #fff;
+  --warning: oklch(76.9% 0.188 70.08);          /* amber-500 */
+  --warning-fg: oklch(55.5% 0.163 48.998);      /* amber-700 */
+  --warning-surface: color-mix(in srgb, var(--warning) 8%, transparent);
+  --error: oklch(63.7% 0.237 25.331);           /* red-500 */
+  --error-fg: oklch(50.5% 0.213 27.518);        /* red-700 */
+  --error-surface: color-mix(in srgb, var(--error) 8%, transparent);
+  --success: oklch(69.6% 0.17 162.48);          /* emerald-500 */
+  --success-fg: oklch(50.8% 0.118 165.612);     /* emerald-700 */
+  --info-fg: oklch(48.8% 0.243 264.376);        /* blue-700 */
+  --r: 0.625rem;                                /* --radius */
+  --r-control: 0.5rem;                          /* --control-radius */
+  --r-sm: calc(var(--r) - 4px);                 /* --radius-sm, badges */
+  --shadow: 0 12px 28px -18px rgb(0 0 0 / 40%); /* --shadow-composer */
+  /* The board's own roles, mapped onto T3's. */
+  --you: var(--warning);
+  --you-text: var(--warning-fg);
+  --you-soft: var(--warning-surface);
+  --thread: var(--primary);
+  --sub: oklch(60.6% 0.25 292.717);             /* violet-500 */
+  --build: var(--success);
+  --danger-text: var(--error-fg);
+  --line: color-mix(in srgb, var(--fg) 14%, transparent);
+  --soft: color-mix(in srgb, var(--fg) 7%, transparent);
+  --focus: var(--primary);                      /* --ring */
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: var(--background, #0c0c0e);
-    --fg: var(--foreground, #e6e6e9);
-    --muted: var(--muted-foreground, #a3a3ad);
-    --bd: var(--border, #2a2a30);
-    --surface: var(--card, #141418);
-    --you-text: #fbbf24;
-    --you-soft: color-mix(in srgb, #f59e0b 16%, transparent);
-    --danger-text: #fca5a5;
-    --focus: #60a5fa;
+    --bg: oklch(14.5% 0 0);                     /* neutral-950 */
+    --fg: oklch(97% 0 0);                       /* neutral-100 */
+    --surface: color-mix(in srgb, var(--bg) 97%, #fff);
+    --muted: color-mix(in srgb, oklch(55.6% 0 0) 90%, #fff);
+    --muted-bg: rgb(255 255 255 / 3%);
+    --accent: rgb(255 255 255 / 4%);
+    --bd: rgb(255 255 255 / 6%);
+    --input: rgb(255 255 255 / 8%);
+    --primary: oklch(0.571 0.21 264);
+    --error: color-mix(in srgb, oklch(63.7% 0.237 25.331) 90%, #fff);
+    --error-fg: oklch(70.4% 0.191 22.216);      /* red-400 */
+    --error-surface: color-mix(in srgb, var(--error) 16%, transparent);
+    --warning-fg: oklch(82.8% 0.189 84.429);    /* amber-400 */
+    --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
+    --success-fg: oklch(76.5% 0.177 163.223);   /* emerald-400 */
+    --info-fg: oklch(70.7% 0.165 254.624);      /* blue-400 */
+    --shadow: 0 14px 32px -18px rgb(0 0 0 / 75%);
+    --sub: oklch(70.2% 0.183 293.541);          /* violet-400 */
   }
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
-body { font: 13px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif; }
-#app { max-width: 1180px; margin: 0 auto; padding: 16px 18px 48px; }
+body { font: 14px/1.43 var(--font-sans); -webkit-font-smoothing: antialiased; }
+/* Full browser width, with T3's workspace gutter. */
+#app { padding: 14px 20px 48px; }
 a { color: inherit; }
 a:hover { text-decoration-thickness: 2px; }
-code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+code { font: 12px var(--font-mono); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
 [hidden] { display: none !important; }
 
 /* header */
 .top { margin-bottom: 12px; }
 .title-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
-h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; display: inline-flex; align-items: baseline; gap: 8px; }
+/* Baseline alignment puts the logo's bottom edge on the text's baseline. The x's strokes end 8.75 of the
+   viewBox's 32 units above that edge, so drop the logo by that much: the x sits on the baseline and the
+   µ's tail hangs below like a descender. */
+.brand-mark { width: 28px; height: 16px; flex: none; position: relative; top: calc(16px * 8.75 / 32); }
 .refreshed { margin: 0; color: var(--muted); }
 .totals { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 10px 0 0; }
-.totals li { border: 1px solid var(--bd); border-radius: 999px; padding: 2px 10px; color: var(--muted); }
+.totals li { border: 1px solid var(--bd); background: var(--surface); border-radius: var(--r-control); padding: 1px 8px; color: var(--muted); font-size: 12px; }
 .totals b { color: var(--fg); }
-.totals li.amber { border-color: var(--you); background: var(--you-soft); color: var(--you-text); }
+.totals li.amber { border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: var(--you-soft); color: var(--you-text); }
 .totals li.amber b { color: var(--you-text); }
-.banner { margin-top: 10px; border: 1px solid var(--you); border-left-width: 4px; background: var(--you-soft); border-radius: var(--r); padding: 8px 12px; }
+.banner { margin-top: 10px; border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent); background: var(--warning-surface); border-radius: var(--r); padding: 8px 12px; font-size: 13px; }
 .banner strong { color: var(--you-text); }
 .banner .err { white-space: pre-wrap; word-break: break-word; }
 .code-update code { overflow-wrap: anywhere; }
@@ -69,23 +108,23 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
 /* view tabs */
 .vtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--bd); margin: 4px 0 16px; }
 .vtab { font: inherit; font-weight: 600; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; margin-bottom: -1px; cursor: pointer; }
-.vtab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+.vtab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--primary); }
 .vtab:hover { color: var(--fg); }
 
 /* sections */
 .section { margin: 0 0 22px; }
-.section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.section h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .section h2 .count { font-variant-numeric: tabular-nums; color: var(--muted); }
 .section h2 .note { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted); font-size: 12px; }
 #needs-you h2 { color: var(--you-text); }
-.empty { color: var(--muted); margin: 0; padding: 10px 12px; border: 1px dashed var(--bd); border-radius: var(--r); }
+.empty { color: var(--muted); margin: 0; padding: 10px 12px; border: 1px dashed var(--input); border-radius: var(--r); font-size: 13px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 10px; }
 .cards.wide { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
 
-.card { background: var(--surface); border: 1px solid var(--bd); border-radius: var(--r); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--bd); border-radius: var(--r); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .card.amber { border-color: color-mix(in srgb, var(--you) 55%, var(--bd)); box-shadow: inset 4px 0 0 var(--you); padding-left: 14px; }
 .meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; font-size: 11px; }
-.title { font-weight: 600; text-decoration: none; line-height: 1.35; }
+.title { font-weight: 500; text-decoration: none; line-height: 1.35; }
 .title:hover { text-decoration: underline; }
 .ref { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
 .parent, .foot { margin: 0; font-size: 12px; color: var(--muted); }
@@ -94,26 +133,26 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
 .pr { color: var(--fg); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .linked-pr { display: inline-flex; align-items: center; gap: 6px; }
-.checks { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--bd); white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.checks { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--r-sm); padding: 1px 6px; border: 1px solid var(--bd); white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .checks::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k); }
 .checks.running { --k: var(--muted); }
 .checks.passed { --k: var(--build); }
-.checks.failed { --k: #ef4444; color: var(--danger-text); border-color: color-mix(in srgb, #ef4444 45%, var(--bd)); }
-.checks.slow { --k: var(--you); color: var(--you-text); font-weight: 600; border-color: var(--you); background: var(--you-soft); }
+.checks.failed { --k: var(--error); color: var(--danger-text); border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); }
+.checks.slow { --k: var(--you); color: var(--you-text); font-weight: 600; border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: var(--you-soft); }
 
-.plat, .kind, .label, .blocked, .subs { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--bd); white-space: nowrap; font-size: 11px; }
+.plat, .kind, .label, .blocked, .subs { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--r-sm); padding: 0 6px; min-height: 18px; border: 1px solid var(--input); white-space: nowrap; font-size: 11px; font-weight: 500; }
 .plat { font-weight: 600; }
 .plat::before, .kind::before, .label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k, var(--muted)); }
-.plat-server { --k: #0ea5e9; }
-.plat-apple { --k: #ec4899; }
+.plat-server { --k: oklch(68.5% 0.169 237.323); }
+.plat-apple { --k: oklch(65.6% 0.241 354.308); }
 .plat-draft { --k: var(--muted); }
 .kind, .label { color: var(--muted); }
-.kind-bug { --k: #ef4444; }
+.kind-bug { --k: var(--error); }
 .kind-feature { --k: var(--thread); }
-.kind-improvement { --k: #14b8a6; }
+.kind-improvement { --k: oklch(70.4% 0.14 182.503); }
 .kind-concept, .kind-decision, [class*="kind-decision-"] { --k: var(--sub); }
 .kind-build { --k: var(--build); }
-.blocked { color: var(--danger-text); border-color: color-mix(in srgb, #ef4444 45%, var(--bd)); }
+.blocked { color: var(--danger-text); border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); }
 .subs { color: var(--muted); }
 
 /* step bar */
@@ -128,10 +167,10 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
 .step-label.amber { color: var(--you-text); font-weight: 600; }
 
 /* queued */
-.cmd { display: flex; align-items: center; gap: 6px; background: var(--soft); border-radius: 6px; padding: 4px 4px 4px 8px; min-width: 0; }
+.cmd { display: flex; align-items: center; gap: 6px; background: var(--muted-bg); border: 1px solid var(--bd); border-radius: var(--r-control); padding: 4px 4px 4px 8px; min-width: 0; }
 .cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.copy { font: inherit; font-size: 12px; border: 1px solid var(--bd); background: var(--surface); color: var(--fg); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
-.copy:hover { border-color: var(--fg); }
+.copy { font: inherit; font-size: 12px; font-weight: 500; min-height: 24px; border: 1px solid var(--input); background: var(--surface); color: var(--fg); border-radius: var(--r-control); padding: 0 7px; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+.copy:hover { background: var(--accent); }
 
 /* Capture form: stays mounted while the board refreshes. */
 .header-actions { margin-left: auto; display: flex; gap: 8px; }
@@ -157,13 +196,13 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
 .form-field { display: grid; gap: 4px; margin-bottom: 12px; }
 .form-field > label, .applicability legend { font-weight: 600; }
 .required-note { color: var(--muted); font-weight: 400; font-size: 12px; }
-.form-field input, .form-field select, .form-field textarea { width: 100%; min-width: 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--bd); border-radius: 6px; padding: 7px 8px; }
+.form-field input, .form-field select, .form-field textarea { width: 100%; min-width: 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--input); border-radius: var(--r-control); padding: 6px 8px; }
 .form-field textarea { resize: vertical; min-height: 80px; }
 .applicability { margin: 0 0 10px; padding: 8px 10px 0; border: 1px solid var(--bd); border-radius: 6px; min-width: 0; }
 .choices { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .choices label { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; }
 .choices input { accent-color: var(--focus); }
-.submit-item { background: var(--fg); color: var(--bg); border-color: var(--fg); padding: 7px 12px; }
+.submit-item { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); min-height: 32px; padding: 0 11px; }
 button:disabled { opacity: 0.6; cursor: wait; }
 button:disabled[title] { cursor: not-allowed; }
 #item-result:not(:empty) { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--you); border-radius: 6px; background: var(--you-soft); overflow-wrap: anywhere; white-space: pre-line; }
@@ -177,7 +216,7 @@ button:disabled[title] { cursor: not-allowed; }
 /* concepts */
 .progress { display: flex; align-items: center; gap: 8px; }
 .progress .bar { flex: 1; height: 8px; border-radius: 999px; background: var(--soft); overflow: hidden; max-width: 260px; }
-.progress .bar span { display: block; height: 100%; background: var(--sub); }
+.progress .bar span { display: block; height: 100%; background: var(--sub); border-radius: inherit; }
 .progress-label { font-size: 12px; color: var(--muted); }
 .sub-groups { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .sub-status { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
@@ -188,6 +227,11 @@ button:disabled[title] { cursor: not-allowed; }
 .rows { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 2px; }
 .row-item { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 0; font-size: 12px; }
 .row-item .plat, .row-item .kind { flex: none; }
+/* Rows light up under the pointer or keyboard focus, so it's clear which item Queue and Abandon act on.
+   The inset padding is cancelled by the margin, so text stays aligned with the rest of the box. */
+.rows .row-item { padding-inline: 6px; margin-inline: -6px; border-radius: var(--r-control); }
+.rows .row-item:hover, .rows .row-item:focus-within { background: var(--soft); }
+.sub-groups .row-item { flex-wrap: wrap; }
 /* One line: the title shortens first, down to a few words, then the label pills are clipped. */
 .row-title { flex: 0 1000 auto; min-width: min(14ch, 40%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
 .row-title:hover { text-decoration: underline; }
@@ -199,8 +243,8 @@ button:disabled[title] { cursor: not-allowed; }
 .copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .start { margin: 0; font-size: 12px; }
 [data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
-.start-item { margin-left: auto; background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; padding: 1px 12px; }
-.start-item:hover { border-color: var(--fg); opacity: 0.9; }
+.start-item { margin-left: auto; background: var(--primary); color: var(--primary-fg); border-color: var(--primary); padding: 0 10px; }
+.start-item:hover { background: color-mix(in srgb, var(--primary) 90%, var(--bg)); }
 .thread-id { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .row-item:has(.action-error) { flex-wrap: wrap; }
 .action-error { order: 1; flex: 1 1 100%; min-width: 0; color: var(--danger-text); font-weight: 600; overflow-wrap: anywhere; }
@@ -276,7 +320,7 @@ a.ichip:hover { border-color: var(--fg); }
 <body>
 <div id="app">
 <header class="top">
-<div class="title-row"><h1>Mux factory board</h1><p class="refreshed">Refreshed <time datetime="2026-10-21T10:00:00.000Z">10:00</time> <span class="age">(just now)</span> · <a href="https://github.com/users/maddec01/projects/1" target="_blank" rel="noopener">Mux project</a></p><span class="header-actions"><button type="button" class="copy add-item" data-add-item>Add item</button></span></div>
+<div class="title-row"><h1><svg class="brand-mark" role="img" aria-label="Mux" viewBox="0 0 56 32" fill="none"><path d="M5 3.5v25M5 3.5V12a8.5 8.5 0 0 0 17 0V3.5M22 12c0 4.5 2 7.5 5.5 7.5M36 3.5l14 17M50 3.5l-14 17" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>factory</span></h1><p class="refreshed">Refreshed <time datetime="2026-10-21T10:00:00.000Z">10:00</time> <span class="age">(just now)</span> · <a href="https://github.com/users/maddec01/projects/1" target="_blank" rel="noopener">Mux project</a></p><span class="header-actions"><button type="button" class="copy add-item" data-add-item>Add item</button></span></div>
 <ul class="totals" aria-label="Counts">
 <li class="amber"><b>4</b> need you</li>
 <li><b>6</b> in flight</li>

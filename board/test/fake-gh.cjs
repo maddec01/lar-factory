@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+// Test-only GitHub transport. Never contacts GitHub.
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
+fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
+const output = (value) => process.stdout.write(JSON.stringify(value));
+const main = async () => {
+  if (args[1] === 'graphql') {
+    if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'Mux' }] } } } });
+    if (options.readDelay) await new Promise((r) => setTimeout(r, options.readDelay));
+    return output({ data: { user: { projectV2: { title: 'Mux', url: 'https://github.com/users/maddec01/projects/1',
+      items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } } });
+  }
+  if (args[1] === 'view') return output({ id: 'PVT_1' });
+  if (args[1] === 'field-list') return output({ fields: [{ id: 'FIELD_1', name: 'Status', options: [{ id: 'LIST_1', name: 'List' }] }] });
+  if ((options.fail === 'membership' && args[1] === 'item-add') || (options.fail === 'status' && args[1] === 'item-edit')) {
+    process.stderr.write('GitHub temporarily unavailable');
+    process.exitCode = 1;
+    return;
+  }
+  if (args[0] === 'api') {
+    if (options.createDelay) await new Promise((r) => setTimeout(r, options.createDelay));
+    const repo = args[3].slice('repos/'.length, -'/issues'.length);
+    return output({ number: 900001, html_url: `https://github.com/${repo}/issues/900001`, updated_at: '2026-10-21T10:00:00Z' });
+  }
+  if (args[1] === 'item-add') return output({ id: 'PVTI_900001' });
+  if (args[1] === 'item-edit') return output({});
+  throw new Error('Unexpected fake gh command');
+};
+main().catch((err) => { console.error(err); process.exitCode = 1; });

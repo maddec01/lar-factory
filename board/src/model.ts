@@ -62,6 +62,8 @@ export interface RepoConfig {
 }
 
 export interface BoardData {
+  /** Local write session; changes on restart so an old retry cannot recreate an issue. */
+  capture?: { session: string; enabled: boolean };
   project: { title: string; url: string | null };
   repos: RepoConfig[];
   refreshSeconds: number;

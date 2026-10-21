@@ -3,6 +3,9 @@
 import { execFile } from 'node:child_process';
 import { STATUSES } from './model.ts';
 import type { ContentType, Item, Status } from './model.ts';
+import type { BoardConfig } from './config.ts';
+import type { CreationProgress, CreationResult } from './add-item.ts';
+import { validateDraft } from './add-item.ts';
 
 const GH = process.env.GH_PATH || 'gh';
 const PAGE_SIZE = 100;
@@ -188,4 +191,69 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
     after = project.items.pageInfo.endCursor;
   }
   throw new Error(`Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`);
+}
+
+/** Creates an issue, adds it to the configured project and explicitly assigns List. */
+export async function addProjectItem(
+  config: BoardConfig,
+  input: unknown,
+  progress: CreationProgress,
+  run: (args: string[]) => Promise<string> = gh,
+): Promise<CreationResult> {
+  const draft = validateDraft(input, config.repos);
+  let step = 'project setup';
+  const uncertain = (): CreationResult => ({ item: null, issueUrl: null, uncertain: true,
+    error: 'Issue creation could not be confirmed. Check the repository issues before starting a new item; this submission will not create another issue.' });
+  if (progress.creationUncertain) return uncertain();
+  try {
+    if (progress.item) return { item: progress.item, issueUrl: progress.item.url, error: null };
+    const number = config.number ?? await findProjectNumber(config.owner, config.title);
+    const project = JSON.parse(await run(['project', 'view', String(number), '--owner', config.owner, '--format', 'json'])) as { id: string };
+    const fields = JSON.parse(await run(['project', 'field-list', String(number), '--owner', config.owner, '--format', 'json'])) as {
+      fields: { id: string; name: string; options?: { id: string; name: string }[] }[];
+    };
+    const status = fields.fields.find((f) => f.name === 'Status');
+    const list = status?.options?.find((o) => o.name === 'List');
+    if (!project.id || !status || !list) throw new Error('The project has no List status.');
+    const labels = [draft.kind, ...draft.labels];
+    step = 'issue creation';
+    if (!progress.issue) {
+      // A CLI timeout can happen after GitHub accepted the issue. Never blindly recreate it.
+      progress.creationUncertain = true;
+      const issue = JSON.parse(await run(['api', '--method', 'POST', `repos/${draft.repo}/issues`,
+        '-f', `title=${draft.title}`, '-f', `body=${draft.description}`,
+        ...labels.flatMap((label) => ['-f', `labels[]=${label}`])])) as NonNullable<CreationProgress['issue']>;
+      if (!Number.isSafeInteger(issue.number) || issue.html_url !== `https://github.com/${draft.repo}/issues/${issue.number}`) {
+        throw new Error('GitHub did not return an issue identity.');
+      }
+      progress.issue = issue;
+      progress.creationUncertain = false;
+    }
+    const issue = progress.issue;
+    step = 'project membership';
+    if (!progress.itemId) {
+      // GitHub item-add reuses membership when the issue is already on this project.
+      const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', config.owner,
+        '--url', issue.html_url, '--format', 'json'])) as { id: string };
+      if (!member.id) throw new Error('GitHub did not return a project item.');
+      progress.itemId = member.id;
+    }
+    step = 'List status';
+    await run(['project', 'item-edit', '--project-id', project.id, '--id', progress.itemId,
+      '--field-id', status.id, '--single-select-option-id', list.id]);
+    progress.item = {
+      id: progress.itemId, status: 'List', type: 'Issue', number: issue.number,
+      title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'OPEN',
+      parent: null, subIssues: { total: 0, completed: 0 }, blockedBy: 0,
+      updatedAt: issue.updated_at, closedAt: null, linkedPrs: [],
+    };
+    return { item: progress.item, issueUrl: issue.html_url, error: null };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : 'GitHub request failed.';
+    // A definite client rejection did not create an issue and can be corrected/retried.
+    if (step === 'issue creation' && /HTTP (?:400|401|403|404|410|422)\b/.test(detail)) progress.creationUncertain = false;
+    if (progress.creationUncertain) return uncertain();
+    return { item: null, issueUrl: progress.issue?.html_url ?? null,
+      error: `Could not finish ${step}. ${detail}` };
+  }
 }

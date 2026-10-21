@@ -32,6 +32,11 @@ decision and build sub-issues.
 A concept's account of its destination, decisions so far, remaining fog,
 out-of-scope work, domain docs drafts and relationships between sub-issues.
 
+**Slice**:
+A small, independently testable piece of a build, recorded as a sub-issue of
+the build issue and implemented by one subagent.
+_Avoid_: ticket, chunk, task
+
 **Overlay**:
 The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.

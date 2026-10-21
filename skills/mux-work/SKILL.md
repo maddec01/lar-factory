@@ -24,6 +24,7 @@ verifies visible changes and merges every PR. Everything else is yours.
   [question UI](questions.md). Call `orchestrator_capabilities` only when a
   model must change; skip searching the tool catalogue.
 - Every question to Pedro follows the [question UI](questions.md).
+- Read each linked file or skill only when the step that links it runs.
 - The issue is the only hand-over. Each step must be resumable from the issue
   alone: the brief, the map, decisions and links live in its body and comments.
 - Past about 150k tokens, a thread hands off: write a handoff following

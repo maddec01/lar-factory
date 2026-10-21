@@ -12,6 +12,7 @@ where `<mux-work>` is the folder holding this file's parent.
 Call the tools this file names by name, plus the **Tools** in
 `<mux-work>/SKILL.md` (**Rules**). Call `orchestrator_capabilities` only when a
 model must change; skip searching the tool catalogue.
+Read each file or skill a step names only when that step runs.
 
 ## Subagents
 
@@ -75,7 +76,8 @@ model must change; skip searching the tool catalogue.
    `git merge --ff-only slice/<n>-<m>-<slug>` here. When it can't fast-forward,
    send the slice back to its implementer (or a fresh subagent) to rebase onto
    the build branch tip, then merge again. After each merge, remove the reported
-   worktree and slice branch, close the slice sub-issue (**Slices**) and run
+   worktree and slice branch, close the slice sub-issue (**Slices** in
+   `<mux-work>/issue-tracker.md`) and run
    **Implement** again. When an implementer reports its slice blocked (too
    big, checks won't pass), send it back to the planner to re-slice: it
    publishes the new slices, moves the dependents' blocked-by links to them and

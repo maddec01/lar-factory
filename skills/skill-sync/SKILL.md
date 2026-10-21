@@ -22,7 +22,8 @@ The copied skills in `maddec01/mux-factory` change only through this skill.
    next time; say so.
 5. Commit as `chore(skills): sync <names> from upstream`, push, and open a PR
    listing what was taken and skipped. Pedro merges it.
-6. Tell him to run `npx skills update -g` after merging.
+6. Tell him to pull `main` after merging and run `bash scripts/install.sh`. It
+   updates the skills and the checklists in `references/`.
 
 Never edit a copy for Mux reasons. Mux rules belong in `mux-work` or a repo's
 `AGENTS.md`.

@@ -20,6 +20,7 @@ export async function factoryRepo(t: TestContext) {
   for (const folder of ['src', 'scripts', 'launchd']) {
     await cp(new URL(`../${folder}`, import.meta.url), join(repo, 'board', folder), { recursive: true });
   }
+  await cp(new URL('../.gitignore', import.meta.url), join(repo, 'board/.gitignore'));
   await cp(new URL('../../scripts/install.sh', import.meta.url), join(repo, 'scripts/install.sh'));
   await cp(new URL('../../config.json', import.meta.url), join(repo, 'config.json'));
   await cp(new URL('./sample.json', import.meta.url), join(repo, 'sample.json'));

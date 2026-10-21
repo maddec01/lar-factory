@@ -5,7 +5,7 @@ every 45 seconds (`config.json`) and serves it on http://127.0.0.1:4317. Open it
 in a browser or in T3's browser preview.
 
 ```sh
-cd board && npm install && npm start   # npm run dev restarts on changes
+cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
 ```
 
 - **Board** shows what needs you first (Needs you, Verify, Ready to merge), then
@@ -36,7 +36,7 @@ submission. An uncertain GitHub creation or a board restart asks you to check
 the repository issues before starting another item.
 
 If `gh` can't reach GitHub, the board keeps the last data it read and shows a
-stale warning. `npm run sample` serves `test/sample.json` instead of GitHub;
+stale warning. `pnpm run sample` serves `test/sample.json` instead of GitHub;
 adding, queuing and starting are disabled in sample mode.
 
 To start it at login, run `board/scripts/install-launch-agent.sh` from the main
@@ -67,5 +67,5 @@ run that revision. A running process keeps its own browser modules and styling
 so a new browser load still works after checkout changes. Failed revision
 checks show their own warning, separate from stale GitHub project data.
 
-`npm test` renders the sample and compares it with the saved copies in
-`test/expected/`; `npm run test:update` rewrites them after a deliberate change.
+`pnpm test` renders the sample and compares it with the saved copies in
+`test/expected/`; `pnpm run test:update` rewrites them after a deliberate change.

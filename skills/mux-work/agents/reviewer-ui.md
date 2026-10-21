@@ -14,7 +14,7 @@ reference, the repo path and a diff command. Read the issue's brief and the diff
   used for styling and loading states follow `AGENTS.md`.
 
 - **Board (mux-factory `board/`)**: use `frontend-ui-engineering`. Run
-  `cd board && npm ci && BOARD_PORT=4318 npm run sample` from the worktree (sample
+  `cd board && pnpm install --frozen-lockfile && BOARD_PORT=4318 pnpm run sample` from the worktree (sample
   data covers every status; the live board on 4317 belongs to Pedro), open it in
   T3's browser preview, and check both tabs in light and dark, narrow and wide.
 

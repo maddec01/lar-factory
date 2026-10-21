@@ -1,10 +1,10 @@
-// Updates the checkout that holds this script: main, board dependencies, the
+// Updates the checkout that holds this script: main, board dependencies (pnpm), the
 // launch agent, then the skills through scripts/install.sh and extra Claude profiles.
 // The board's Update button starts it detached, because the restart step kills the board.
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createWriteStream, mkdirSync, readFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import { loadConfig } from '../src/config.ts';
@@ -54,7 +54,8 @@ function run(command: string, args: string[], options: { cwd: string; env?: Node
     for (const stream of [child.stdout, child.stderr]) {
       stream.on('data', (chunk: Buffer) => { log.write(chunk); process.stdout.write(chunk); });
     }
-    child.on('error', reject);
+    child.on('error', (error: NodeJS.ErrnoException) => reject(error.code === 'ENOENT' && error.path === command
+      ? new Error(`${command} not found on PATH.${command === 'pnpm' ? ' Install it with brew install pnpm.' : ''}`) : error));
     child.on('close', (code) => code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code}.`)));
   });
 }
@@ -91,7 +92,10 @@ try {
   // Already on origin/main: only the skills can be behind.
   if (local !== remote || (await health(port))?.runningRevision !== remote) {
     begin('install');
-    await run('npm', ['ci'], { cwd: board });
+    // npm made a node_modules without pnpm's marker: replace it rather than mix layouts.
+    const modules = join(board, 'node_modules');
+    if (existsSync(modules) && !existsSync(join(modules, '.modules.yaml'))) rmSync(modules, { recursive: true, force: true });
+    await run('pnpm', ['install', '--frozen-lockfile'], { cwd: board });
     begin('restart');
     const launchToken = randomUUID();
     await run('bash', [fileURLToPath(new URL('./install-launch-agent.sh', import.meta.url))], {

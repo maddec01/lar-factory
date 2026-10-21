@@ -120,15 +120,16 @@ bash board/scripts/update.sh
 ```
 
 The command requires macOS with a logged-in launchd GUI session, Node 22.18+
-and npm/npx, Git, and a logged-in `gh`. Install the T3 Code CLI for the board's
-Start button. It checks that the checkout is clean and on `main`, fetches
-`origin/main`, fast-forwards, runs `npm ci` in `board/`, reinstalls/restarts the
-launch agent, and waits up to 15 seconds for the expected running revision and
-new launch identity. Then it runs `scripts/install.sh`, which adds newly listed
-skills and replaces the checklists with the ones on `main`, and synchronizes
-extra Claude profiles as above. The launch-agent configuration is refreshed too.
+with npx, pnpm (`brew install pnpm`), Git, and a logged-in `gh`. Install the T3
+Code CLI for the board's Start button. It checks that the checkout is clean and
+on `main`, fetches `origin/main`, fast-forwards, runs
+`pnpm install --frozen-lockfile` in `board/` (replacing a `node_modules` that
+npm made), reinstalls/restarts the launch agent, and waits up to 15 seconds for
+the expected running revision and new launch identity. Then it runs
+`scripts/install.sh`, which adds newly listed skills and replaces the checklists
+with the ones on `main`, and synchronizes extra Claude profiles as above. The launch-agent configuration is refreshed too.
 When the checkout and the running board are already on `origin/main`, it skips
-`npm ci` and the restart and only updates the skills and profiles.
+the install and the restart and only updates the skills and profiles.
 
 Dirty, detached, local-ahead or diverged checkouts stop before installation or
 restart; your commits are never reset, rebased or merged into a new commit.

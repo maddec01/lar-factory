@@ -54,7 +54,7 @@ export const UPDATE_RESULT_MS = 15 * 60 * 1000;
 const UPDATE_HINTS: Record<UpdateStep, string> = {
   check: 'Put the checkout back on a clean main, then press Update.',
   fetch: 'Check GitHub access and reconcile local main with origin/main, then press Update.',
-  install: 'npm ci failed; fix what the log shows, then press Update.',
+  install: 'pnpm install failed; fix what the message or log shows, then press Update.',
   restart: 'The launch agent could not be reinstalled; fix what the log shows, then press Update.',
   health: 'The new board did not answer in time; check the board log, then press Update.',
   skills: 'The skills install failed; check the gh login and the log, then press Update.',

@@ -1,5 +1,5 @@
 // Saved-copy test: renders test/sample.json and compares it with test/expected/.
-// Run `npm run test:update` to rewrite the saved copies after a deliberate change.
+// Run `pnpm run test:update` to rewrite the saved copies after a deliberate change.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,7 +24,7 @@ function matchesSaved(name: string, actual: string): void {
     return;
   }
   const expected = readFileSync(file, 'utf8');
-  assert.equal(actual, expected, `${name} differs from the saved copy; run npm run test:update if intended`);
+  assert.equal(actual, expected, `${name} differs from the saved copy; run pnpm run test:update if intended`);
 }
 
 test('page: header, stale banner and both views', () => {
@@ -80,11 +80,11 @@ test('an update shows its steps as they finish, then its result', () => {
   assert.ok(!running.includes('Board update available'), 'the progress replaces the notice while the update runs');
   assert.equal(running.match(/data-update/g)?.length, 1);
   const failed: BoardData = { ...data, update: { ...progress, state: 'failed', finishedAt: '2026-10-21T09:59:30Z',
-    error: 'npm exited with code 1.', logTail: 'npm ERR! missing lockfile\n<script>' } };
+    error: 'pnpm exited with code 1.', logTail: 'ERR_PNPM_OUTDATED_LOCKFILE missing lockfile\n<script>' } };
   const failure = renderHeader(failed, base);
   matchesSaved('update-failed.html', failure);
   assert.match(failure, /Update failed at install/);
-  assert.match(failure, /npm ERR! missing lockfile\n&lt;script&gt;/);
+  assert.match(failure, /ERR_PNPM_OUTDATED_LOCKFILE missing lockfile\n&lt;script&gt;/);
   assert.match(failure, /press Update/);
   assert.match(failure, />Update<\/button>/, 'Update is available again to retry');
   const done = renderHeader({ ...data, codeUpdate: { ...codeUpdate, behind: 0 }, update: { ...progress, state: 'done', current: null,

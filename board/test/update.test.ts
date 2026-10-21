@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { chmod, mkdir, readFile, readdir, readlink, symlink, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { chmod, mkdir, readFile, readdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
@@ -45,6 +46,11 @@ if (command === 'gh' && args[0] === 'api') {
   const url = args.find((a) => a.startsWith('repos/'));
   process.stdout.write(url.includes('references/checklist.md') ? 'checklist from main\\n' : 'checklist.md\\n');
 }
+// pnpm install lays out node_modules with its .modules.yaml marker.
+if (command === 'pnpm' && args[0] === 'install') {
+  fs.mkdirSync('node_modules', { recursive: true });
+  fs.writeFileSync('node_modules/.modules.yaml', 'layoutVersion: 5\\n');
+}
 if (command === 'launchctl' && args[0] === 'print') process.exit(1);
 if (command === 'launchctl' && args[0] === 'bootstrap') {
   const plist = fs.readFileSync(args[2], 'utf8');
@@ -56,7 +62,7 @@ if (command === 'launchctl' && args[0] === 'bootstrap') {
 }
 `);
   await chmod(fake, 0o755);
-  for (const name of ['npm', 'npx', 'launchctl', 'plutil', 'gh']) await symlink(fake, join(bin, name));
+  for (const name of ['pnpm', 'npx', 'launchctl', 'plutil', 'gh']) await symlink(fake, join(bin, name));
   const server = createServer(async (_req, res) => {
     try { res.end(await readFile(health)); }
     catch { res.writeHead(503); res.end(); }
@@ -101,14 +107,14 @@ test('updater refuses a non-main branch before invoking any install commands', a
 });
 
 test('updater reports the failed step and stops before later changes', async (t) => {
-  for (const [command, message] of [['npm', /failed at install/], ['launchctl', /failed at restart/], ['npx', /failed at skills/]] as const) {
+  for (const [command, message] of [['pnpm', /failed at install/], ['launchctl', /failed at restart/], ['npx', /failed at skills/]] as const) {
     const f = await updateFixture(t);
     const result = await f.run({ FAIL_STEP: command });
     assert.notEqual(result.code, 0);
     assert.match(result.output, message);
     assert.doesNotMatch(result.output, /Update complete/);
     const calls = await f.calls();
-    if (command === 'npm') assert.ok(!calls.some((c) => c[0] === 'launchctl'));
+    if (command === 'pnpm') assert.ok(!calls.some((c) => c[0] === 'launchctl'));
     if (command !== 'npx') assert.ok(!calls.some((c) => c[0] === 'npx'));
   }
   const f = await updateFixture(t);
@@ -250,9 +256,46 @@ test('updater fast-forwards, reinstalls, waits for the new revision, installs sk
     ['check', 'fetch', 'skills', 'profiles', 'done'],
   ]);
   const calls = await f.calls();
-  assert.equal(calls.filter((c) => c[0] === 'npm' && c[1] === 'ci').length, 1);
+  assert.deepEqual(calls.filter((c) => c[0] === 'pnpm'), [['pnpm', 'install', '--frozen-lockfile']]);
   assert.equal(calls.filter((c) => c[0] === 'launchctl' && c[1] === 'bootstrap').length, 1);
   assert.equal(calls.filter((c) => c[0] === 'npx' && c[2] === 'skills' && c[3] === 'add').length, 2);
+});
+
+/** Puts origin/main one commit ahead, so the next run installs. */
+function behindMain(f: Awaited<ReturnType<typeof updateFixture>>) {
+  f.git('commit', '--allow-empty', '-m', 'feat(board): merged update');
+  f.git('push', 'origin', 'HEAD:main');
+  f.git('reset', '--hard', 'HEAD~1');
+}
+
+test('the install step replaces an npm-made node_modules and keeps a pnpm-made one', async (t) => {
+  for (const pnpmMade of [false, true]) {
+    const f = await updateFixture(t);
+    behindMain(f);
+    const modules = join(f.repo, 'board/node_modules');
+    await mkdir(modules);
+    await writeFile(join(modules, 'marker'), 'old');
+    if (pnpmMade) await writeFile(join(modules, '.modules.yaml'), 'layoutVersion: 5\n');
+    const result = await f.run();
+    assert.equal(result.code, 0, result.output);
+    assert.equal(existsSync(join(modules, 'marker')), pnpmMade);
+    assert.ok(existsSync(join(modules, '.modules.yaml')));
+  }
+});
+
+test('a missing pnpm fails the install step with the brew hint', async (t) => {
+  const f = await updateFixture(t);
+  behindMain(f);
+  const bin = join(f.dir, 'bin');
+  await rm(join(bin, 'pnpm'));
+  const nodeBin = join(f.dir, 'node-bin');
+  await mkdir(nodeBin);
+  await symlink(process.execPath, join(nodeBin, 'node'));
+  const result = await f.run({ PATH: `${bin}:${nodeBin}:/usr/bin:/bin` });
+  assert.notEqual(result.code, 0);
+  assert.match(result.output, /failed at install: pnpm not found on PATH/);
+  assert.match((await f.progress()).error!, /brew install pnpm/);
+  assert.ok(!(await f.calls()).some((c) => c[0] === 'launchctl'));
 });
 
 test('the skills step installs every listed skill and replaces the checklists with main\'s', async (t) => {
@@ -346,7 +389,7 @@ test('Update on the launch-agent board runs the updater apart from the board and
   assert.deepEqual(done.finished, ['check', 'fetch', 'skills', 'profiles', 'done'], 'a board already on origin/main only updates skills');
   const calls = await f.calls();
   assert.ok(calls.some((c) => c[0] === 'npx' && c[3] === 'add'));
-  assert.ok(!calls.some((c) => c[0] === 'npm' || c[0] === 'launchctl'));
+  assert.ok(!calls.some((c) => c[0] === 'pnpm' || c[0] === 'launchctl'));
   assert.equal(f.git('status', '--porcelain'), '', 'the update leaves the checkout clean');
 });
 

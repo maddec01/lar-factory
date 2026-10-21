@@ -14,3 +14,6 @@ the flow and `docs/plan.md` for how it was set up.
   enforces it. Update branches by rebase; fold review fixes in with
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   Pedro merges every PR.
+- Board changes: run `npm test` and `npm run typecheck` in `board/`. A deliberate
+  layout change updates the saved copies with `npm run test:update`. Run it on a
+  spare port (`BOARD_PORT=4318 npm run sample`); 4317 is the live board.

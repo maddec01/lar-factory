@@ -107,8 +107,8 @@ git pull && bash scripts/install.sh
 It updates the skills, adds newly listed ones, and replaces the checklists with
 the ones on `main`.
 
-To update the installed board and global skills together, run from the main
-factory checkout:
+To update the installed board and the skills together, press **Update** in the
+board's header, or run from the main factory checkout:
 
 ```sh
 bash board/scripts/update.sh
@@ -119,8 +119,11 @@ and npm/npx, Git, and a logged-in `gh`. Install the T3 Code CLI for the board's
 Start button. It checks that the checkout is clean and on `main`, fetches
 `origin/main`, fast-forwards, runs `npm ci` in `board/`, reinstalls/restarts the
 launch agent, and waits up to 15 seconds for the expected running revision and
-new launch identity. Then it runs `npx skills update -g` and synchronizes extra
-Claude profiles as above. The launch-agent configuration is refreshed too.
+new launch identity. Then it runs `scripts/install.sh`, which adds newly listed
+skills and replaces the checklists with the ones on `main`, and synchronizes
+extra Claude profiles as above. The launch-agent configuration is refreshed too.
+When the checkout and the running board are already on `origin/main`, it skips
+`npm ci` and the restart and only updates the skills and profiles.
 
 Dirty, detached, local-ahead or diverged checkouts stop before installation or
 restart; your commits are never reset, rebased or merged into a new commit.
@@ -129,9 +132,10 @@ update can be partial; resolve the reported problem and rerun. A launchctl
 success alone is not success: a crash, bind failure or old process answering
 on the port fails readiness. Check `~/Library/Logs/mux-board.log` in that case.
 
-The board updater refreshes already installed skills. Use `scripts/install.sh`
-as above to add newly listed skills and refresh shared checklists, then run the
-synchronization command above for extra Claude profiles.
+One update runs at a time, from the button or a terminal. Each run writes its
+output to `~/Library/Logs/mux-board-update.log` and its progress and lock to
+`~/Library/Application Support/mux-factory-board/`, outside the checkout; a lock
+left by a dead process is cleared on the next run.
 
 ### Avoiding conflicts
 

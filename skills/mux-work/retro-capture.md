@@ -89,8 +89,8 @@ reconcile on resume rather than repeating a possibly successful mutation.
    setup fails, leave capture pending and retry setup before issue creation.
    Follow destination label conventions (`bug`, `feature`, `improvement` as
    appropriate); capture text is not a passing brief. For a cross-repository
-   concept use the `concept` label and **Concepts**' sections: Destination
-   (including affected repositories), Decisions so far (only confirmed choices),
+   concept use the `concept` label and the sections in [Concepts](concepts.md):
+   Destination (including affected repositories), Decisions so far (only confirmed choices),
    Fog (unshaped decomposition), Out of scope, Map (no sub-issues yet). Capture
    creates neither decisions nor sub-issues and does not start shaping/building.
 4. For a **new** issue only, after retaining its URL, run

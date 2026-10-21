@@ -72,9 +72,9 @@ verifies visible changes and merges every PR. Everything else is yours.
 
 ## Grilling with docs
 
-Wherever this skill grills (open questions in **2. Size up**, **Concepts**
-step 1, `decision: grill`), load `grilling` and `domain-modeling`, the pair
-upstream `grill-with-docs` loads. Challenge Pedro's terms against the repo's
+Wherever this skill grills (open questions in **2. Size up**,
+[Concepts](concepts.md) step 1, `decision: grill`), load `grilling` and
+`domain-modeling`, the pair upstream `grill-with-docs` loads. Challenge Pedro's terms against the repo's
 `GLOSSARY.md` and ADRs, and capture each resolved term and ADR-worthy decision
 the moment it settles, as `domain-modeling` says.
 
@@ -83,7 +83,7 @@ branch and no PR, so they write only to the issue and leave the checkout as
 they found it. Where `domain-modeling` says to update `GLOSSARY.md` inline or
 write an ADR, draft the entry instead: capture it as it settles, record it in
 the batch's answers comment, then put it in the **Domain docs** section of the
-brief (**3. Brief**) or the map (**Concepts**). Drafts follow `domain-modeling`'s `GLOSSARY-FORMAT.md`
+brief (**3. Brief**) or the map ([Concepts](concepts.md)). Drafts follow `domain-modeling`'s `GLOSSARY-FORMAT.md`
 and `ADR-FORMAT.md`, and an ADR draft meets its three conditions. The builder
 writes them to the repo in the build PR.
 
@@ -105,7 +105,7 @@ Read the issue with comments, parent, sub-issues and blockers. Then:
   pending capture. Preserve the source status; do not rerun its build or retro,
   start shaping, or launch another thread. Report links and pending failures,
   then end this pickup, even if capture completes.
-- A `decision: *` sub-issue: go to **Decisions** below.
+- A `decision: *` sub-issue: go to [Decisions](concepts.md#decisions).
 - A `build` sub-issue, or any issue whose body already has a passing brief: go
   to **5. Start the build**.
 - Anything else: set Shaping and start an **Explore subagent**: read the repo's
@@ -141,7 +141,7 @@ Then:
   web, the run scripts in the repo's T3 project for Apple), ask for his pick
   through the question UI, and record it and the branch on the issue.
 - **No open questions**: go straight to the brief.
-- **Too big or unclear for one session**: go to **Concepts**.
+- **Too big or unclear for one session**: go to [Concepts](concepts.md).
 
 ## 3. Brief
 
@@ -190,57 +190,3 @@ Start a new T3 thread for the build with `t3_thread_launch`:
   with the absolute path of this skill.
 
 Tell Pedro the build thread's link. This shaping thread is done.
-
-## Concepts
-
-Run [label setup](issue-tracker.md#label-setup) for the map's repository before
-creating or labelling the map and its sub-issues. Use the guide's explicit
-destination selection for sub-issues that belong in another repository.
-
-The issue becomes the **map** and gets the `concept` label. Its body:
-
-```markdown
-## Destination
-<what is true when this is done>
-
-## Decisions so far
-- <gist> (#n)
-
-## Fog
-- <what we don't know yet, and can't phrase as a question yet>
-
-## Out of scope
-- <what this won't do>
-
-## Domain docs
-- <each glossary entry and ADR draft settled so far, with its decision (#n)>, or "none"
-
-## Map
-<Mermaid flowchart of the sub-issues: decisions and builds, edges for
-blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
-```
-
-1. Grill Pedro (**Grilling with docs**) only on the destination and the
-   out-of-scope list.
-2. Create a sub-issue for each decision you can phrase now, labelled
-   `decision: grill`, `decision: prototype`, `decision: research` or
-   `decision: task`, linked with blocked-by where one needs another
-   (see [native relationship commands](issue-tracker.md#native-relationships)).
-   Put them in Queued. Leave the rest in Fog.
-3. For `decision: research`, start the research now with the `research` skill in
-   the background. Findings go on a `research/<n>-<slug>` branch; link it from
-   the sub-issue.
-4. Set the map to Shaping while decisions are open. Each decision runs in its own
-   thread with `/mux-work <sub-issue>`.
-
-### Decisions
-
-Work one decision sub-issue with the method its label names (**Grilling with
-docs**, prototype, research findings, or a small task). Then comment the answer
-with any Domain docs drafts it settled, close it, add its gist to the map's
-Decisions so far and its drafts to the map's Domain docs, and redraw the map.
-Turn fog that became clear into new decision sub-issues. When a part of the
-destination is fully decided, create a `build` sub-issue for it with a brief
-(**3. Brief**) whose Domain docs copies the map's entries that build needs, run
-the gate, set it Ready, and start its build (**5**). The map is done when the
-fog is gone and every build has merged.

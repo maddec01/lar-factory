@@ -151,7 +151,7 @@ source issue and current checkout are in another Mux repository. Run label setup
 there after persisting the plan and before creating a missing concept.
 
 Create or reuse only the concept map in this path. Use the `concept` label and
-the sections in [Concepts](SKILL.md#concepts), listing affected repositories in
+the sections in [Concepts](concepts.md), listing affected repositories in
 Destination and leaving decomposition in Fog with no sub-issues yet. Retain the
 URL and put a new concept in List; preserve a reused concept's status and the
 source issue's final status. Decisions, native sub-issues and blocked-by edges

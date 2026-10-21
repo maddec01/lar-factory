@@ -100,7 +100,7 @@ test('sample covers every status and both platforms', () => {
   assert.equal(statuses.size, 10);
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/mux-server') && repos.has('maddec01/mux-apple'));
-  assert.deepEqual(countsOf(sample), { total: 20, needsYou: 4, inFlight: 6, queued: 2, list: 4 });
+  assert.deepEqual(countsOf(sample), { total: 21, needsYou: 4, inFlight: 6, queued: 3, list: 4 });
 });
 
 test('flow tabs filter chips by issue type, and old Done items drop off', () => {

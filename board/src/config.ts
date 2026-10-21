@@ -11,6 +11,8 @@ export interface BoardConfig {
   repos: RepoConfig[];
   port: number;
   refreshSeconds: number;
+  /** T3 Code project that Start opens threads in, as written in config.json (may start with ~). */
+  t3Project: string | null;
 }
 
 export const CONFIG_URL = new URL('../../config.json', import.meta.url);
@@ -19,7 +21,7 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
   const raw = JSON.parse(readFileSync(url, 'utf8')) as {
     project?: { owner?: string; title?: string; number?: number };
     repos?: RepoConfig[];
-    board?: { port?: number; refreshSeconds?: number };
+    board?: { port?: number; refreshSeconds?: number; t3Project?: string };
   };
   const owner = raw.project?.owner;
   const title = raw.project?.title;
@@ -31,5 +33,13 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
     repos: raw.repos ?? [],
     port: Number(process.env.BOARD_PORT ?? raw.board?.port ?? 4317),
     refreshSeconds: raw.board?.refreshSeconds ?? 45,
+    t3Project: raw.board?.t3Project ?? null,
   };
+}
+
+/** Expands a leading ~, which execFile leaves alone; config.json is public, so it can't name the home folder. */
+export function expandHome(path: string, home: string | undefined): string {
+  if (path !== '~' && !path.startsWith('~/')) return path;
+  if (!home) throw new Error(`HOME is not set, so ${path} can't be expanded.`);
+  return home + path.slice(1);
 }

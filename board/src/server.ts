@@ -7,12 +7,15 @@ import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
-import { loadConfig } from './config.ts';
+import { expandHome, loadConfig } from './config.ts';
 import { addProjectItem, fetchProject, findProjectNumber, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
+import { startThread } from './t3.ts';
+import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
 import { DEFAULT_UI } from './render.ts';
+import { workCommand } from './model.ts';
 import type { BoardData, Item } from './model.ts';
 
 const HOST = '127.0.0.1';
@@ -38,6 +41,9 @@ const recentItems = new Map<string, { item: Item; revision: number; unconfirmedR
 const submissions = new Map<string, {
   draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
 }>();
+/** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
+const starts = new Map<string, Promise<StartResult>>();
+const REQUEST_ID = /^[a-f0-9-]{36}$/;
 
 function log(message: string): void {
   console.log(`${new Date().toISOString()} ${message}`);
@@ -134,7 +140,7 @@ async function captureItem(req: IncomingMessage, res: ServerResponse): Promise<v
   if (input.session !== capture.session) {
     return json(res, 409, { uncertain: true, error: 'The board restarted. Check the repository issues before starting a new item.' });
   }
-  if (typeof input.requestId !== 'string' || !/^[a-f0-9-]{36}$/.test(input.requestId)) {
+  if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) {
     return json(res, 400, { error: 'The submission needs a valid request ID.' });
   }
   let draft: ItemDraft;
@@ -174,6 +180,38 @@ async function queueItem(req: IncomingMessage, res: ServerResponse): Promise<voi
   json(res, 200, { error: null, board: state });
 }
 
+async function startItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!capture.enabled) return json(res, 403, { error: 'Starting threads is disabled in sample mode.' });
+  const input = await readJson(req, res, 'the item to start');
+  if (!input) return;
+  if (input.session !== capture.session) {
+    return json(res, 409, { error: 'The board restarted. Press Start again.', board: state });
+  }
+  const { itemId } = input;
+  if (typeof itemId !== 'string') return json(res, 400, { error: 'Name the item to start.' });
+  let pending = starts.get(itemId);
+  if (!pending) {
+    const item = state.items.find((i) => i.id === itemId);
+    if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
+    if (item.status !== 'Queued') return json(res, 409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
+    const message = workCommand(item);
+    if (!message) return json(res, 409, { error: 'This item needs an issue before it can start.' });
+    if (!config.t3Project) return json(res, 503, { error: 'Set board.t3Project in config.json to start threads.' });
+    let project: string;
+    try { project = expandHome(config.t3Project, process.env.HOME); }
+    catch (err) { return json(res, 503, { error: (err as Error).message }); }
+    // Only a failure t3 reported may run again; a started or unconfirmed thread is kept.
+    pending = startThread(project, message).then((result) => {
+      if (result.thread) state.started = { ...state.started, [itemId]: result.thread };
+      else if (!result.uncertain) starts.delete(itemId);
+      return result;
+    });
+    starts.set(itemId, pending);
+  }
+  const result = await pending;
+  json(res, result.error ? 502 : 200, { ...result, board: state });
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
@@ -182,6 +220,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
   if (req.method === 'POST' && path === '/api/items') return captureItem(req, res);
   if (req.method === 'POST' && path === '/api/queue') return queueItem(req, res);
+  if (req.method === 'POST' && path === '/api/start') return startItem(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }

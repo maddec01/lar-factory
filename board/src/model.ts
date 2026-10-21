@@ -78,6 +78,8 @@ export interface BoardData {
   /** Error from the latest read if it failed; the items are then from fetchedAt. */
   error: string | null;
   items: Item[];
+  /** Threads this board run started, by item id, so every page shows them. */
+  started?: Record<string, StartedThread>;
 }
 
 export interface Counts {

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI, renderAddItemForm, renderApp, renderBoardView, renderFlowView } from '../src/render.ts';
-import type { RenderOptions } from '../src/render.ts';
+import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData } from '../src/model.ts';
 
 const sample = JSON.parse(readFileSync(new URL('./sample.json', import.meta.url), 'utf8')) as BoardData;
@@ -87,4 +87,45 @@ test('a queued or added item is announced in the header', () => {
   const item = sample.items[0]!;
   assert.match(renderApp(sample, { ...base, notice: { verb: 'Moved', item, to: 'Queued' } }),
     /role="status">Moved <a[^>]*>.*<\/a> to Queued\.<\/div>/);
+});
+
+test('Start appears only on Queued issues; a queued draft asks for an issue first', () => {
+  const html = renderBoardView(sample, base);
+  const issues = sample.items.filter((i) => i.status === 'Queued' && i.number !== null).map((i) => i.id);
+  assert.deepEqual(buttons(html, 'data-start').sort(), issues.sort());
+  const draftCard = html.split('<article').find((c) => c.includes('Offline downloads on watchOS'))!;
+  assert.match(draftCard, /needs an issue/);
+  assert.ok(!draftCard.includes('data-start') && !draftCard.includes('data-copy'));
+  assert.match(html.split('<article').find((c) => c.includes('data-start'))!, /data-copy="\/mux-work /, 'Copy stays as a fallback');
+});
+
+test('Start shows its progress, the started thread, or the error', () => {
+  const [a, b, c, d] = ['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample05', 'PVTI_sample06'];
+  const card = (actions: Record<string, ItemAction>, id: string) =>
+    renderBoardView(sample, { ...base, actions }).split('<article').find((x) => x.includes(`href="${sample.items.find((i) => i.id === id)!.url}"`))!;
+  assert.match(card({ [a]: { phase: 'pending' } }, a), /data-start="PVTI_sample05"[^>]*aria-disabled="true"[^>]*>Starting…</);
+  const started = card({ [b]: { phase: 'started', thread: { threadId: 'thread-1', title: '/mux-work maddec01/mux-apple#20' } } }, b);
+  assert.match(started, /role="status"[^>]*>Started T3 thread <code class="thread-id">thread-1<\/code>/, 'a title that is just the command is not repeated');
+  assert.match(started, /thread-1/);
+  assert.ok(!started.includes('data-start="'));
+  const failed = card({ [c]: { phase: 'error', message: 'T3 is down.' } }, c);
+  assert.match(failed, /<div class="meta">.*<button[^>]*data-start[^>]*>Retry start<\/button><\/div>/, 'Start sits in the top row');
+  assert.match(failed, /role="alert">T3 is down.</);
+  const unsure = card({ [d]: { phase: 'uncertain', message: 'Check T3.' } }, d);
+  assert.match(unsure, /role="alert">Check T3.</);
+  assert.ok(!unsure.includes('data-start="'));
+});
+
+test('copy describes the Queue and Start buttons instead of dragging or typing /mux-work', () => {
+  const html = renderBoardView({ ...sample, items: [] }, base) + renderFlowView(sample, base);
+  assert.ok(!/drag|in a new T3 thread/i.test(html));
+  assert.match(html, /Nothing queued\. Press Queue on a List item/);
+});
+
+test('a thread another page started shows on every page, and sample mode disables both buttons', () => {
+  const started = renderBoardView({ ...sample, started: { PVTI_sample05: { threadId: 'thread-9', title: 'Shape the playback queue' } } }, base);
+  assert.match(started, /Started T3 thread <b>Shape the playback queue<\/b> <code class="thread-id">thread-9<\/code>/);
+  assert.ok(!started.includes('data-start="PVTI_sample05"'));
+  const off = renderBoardView({ ...sample, capture: { session: 's', enabled: false } }, base);
+  assert.ok([...off.matchAll(/<button[^>]*data-(?:queue|start)="[^"]*"[^>]*>/g)].every((m) => m[0].includes(' disabled')));
 });

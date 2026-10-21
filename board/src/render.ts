@@ -143,7 +143,8 @@ const HINTS: Partial<Record<Status, string>> = {
   'Ready to merge': 'Merge the PR',
 };
 
-function card(item: Item, data: BoardData, extra = ''): string {
+/** `action` is a button for the card's top row, so it adds no height. */
+function card(item: Item, data: BoardData, extra = '', action = ''): string {
   const parent = item.parent
     ? `<p class="parent">Part of <a href="${esc(item.parent.url)}" target="_blank" rel="noopener">#${item.parent.number} ${esc(item.parent.title)}</a></p>`
     : '';
@@ -162,7 +163,7 @@ function card(item: Item, data: BoardData, extra = ''): string {
     .join('');
   const foot = hint || prs ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}</p>` : '';
   return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}">
-<div class="meta">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}</div>
+<div class="meta">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}${action}</div>
 ${titleLink(item)}
 ${parent}${stepBar(item.status)}${foot}${extra}
 </article>`;
@@ -175,9 +176,9 @@ ${body}
 </section>`;
 }
 
-function cards(items: Item[], data: BoardData, empty: string, extra?: (i: Item) => string): string {
+function cards(items: Item[], data: BoardData, empty: string, extra?: (i: Item) => string, action?: (i: Item) => string): string {
   if (!items.length) return `<p class="empty">${esc(empty)}</p>`;
-  return `<div class="cards">${items.map((i) => card(i, data, extra?.(i))).join('\n')}</div>`;
+  return `<div class="cards">${items.map((i) => card(i, data, extra?.(i), action?.(i))).join('\n')}</div>`;
 }
 
 function row(item: Item, data: BoardData, trailing = '', withPlatform = true): string {
@@ -190,9 +191,31 @@ function actionError(action: ItemAction | undefined): string {
     : '';
 }
 
-function queueButton(item: Item, action: ItemAction | undefined): string {
+/** Board writes are off in sample mode, so its buttons are too. */
+function writeState(data: BoardData, action: ItemAction | undefined): string {
+  if (data.capture?.enabled === false) return ' disabled title="Disabled in sample mode"';
+  return action?.phase === 'pending' ? ' aria-disabled="true"' : '';
+}
+
+function queueButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
   const verb = action?.phase === 'pending' ? 'Queuing…' : 'Queue';
-  return `${actionError(action)}<button type="button" class="copy row-action" data-queue="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${action?.phase === 'pending' ? ' aria-disabled="true"' : ''}>${verb}</button>`;
+  return `${actionError(action)}<button type="button" class="copy row-action" data-queue="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
+}
+
+/** Start's button for the card's top row, and the message under the card when there is one. */
+function startControl(item: Item, data: BoardData, action: ItemAction | undefined): { button: string; message: string } {
+  const thread = data.started?.[item.id] ?? (action?.phase === 'started' ? action.thread : undefined);
+  if (thread) {
+    // T3 titles a thread after its first message; don't repeat the command shown below.
+    const title = thread.title === workCommand(item) ? '' : ` <b>${esc(thread.title)}</b>`;
+    return { button: '', message: `<p class="start started" role="status" tabindex="-1" data-start-result="${esc(item.id)}">Started T3 thread${title} <code class="thread-id">${esc(thread.threadId)}</code></p>` };
+  }
+  if (action?.phase === 'uncertain') return { button: '', message: `<p class="start" tabindex="-1" data-start-result="${esc(item.id)}">${actionError(action)}</p>` };
+  const verb = action?.phase === 'pending' ? 'Starting…' : action?.phase === 'error' ? 'Retry start' : 'Start';
+  return {
+    button: `<button type="button" class="copy start-item" data-start="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`,
+    message: action?.phase === 'error' ? `<p class="start">${actionError(action)}</p>` : '',
+  };
 }
 
 // ---------- header ----------
@@ -316,9 +339,10 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
 
   const queuedExtra = (i: Item) => {
     const cmd = workCommand(i);
-    if (!cmd) return '<p class="foot"><span class="hint">Move it to a repo before starting.</span></p>';
-    return `<div class="cmd"><code>${esc(cmd)}</code><button type="button" class="copy" data-copy="${esc(cmd)}" aria-label="Copy ${esc(cmd)}">Copy</button></div>`;
+    if (!cmd) return '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>';
+    return `${startControl(i, data, opts.actions?.[i.id]).message}<div class="cmd"><code>${esc(cmd)}</code><button type="button" class="copy" data-copy="${esc(cmd)}" aria-label="Copy ${esc(cmd)}">Copy</button></div>`;
   };
+  const queuedAction = (i: Item) => (workCommand(i) ? startControl(i, data, opts.actions?.[i.id]).button : '');
 
   const platforms = [...data.repos.map((r) => r.platform)];
   for (const i of list) {
@@ -330,7 +354,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       const mine = list.filter((i) => platformOf(i, data.repos) === p);
       const id = listGroupId(p);
       const body = mine.length
-        ? `<ul class="rows">${mine.map((i) => row(i, data, queueButton(i, opts.actions?.[i.id]), false)).join('')}</ul>`
+        ? `<ul class="rows">${mine.map((i) => row(i, data, queueButton(i, data, opts.actions?.[i.id]), false)).join('')}</ul>`
         : '<p class="empty">Nothing in List.</p>';
       return `<details class="platform" id="${id}"${isOpen(ui, id)}><summary><span class="plat plat-${esc(slug(p))}">${esc(p)}</span> <b>${mine.length}</b> in List</summary>${body}</details>`;
     })
@@ -377,8 +401,8 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       'queued',
       'Queued',
       queued.length,
-      cards(queued, data, 'Nothing queued. Drag an item to Queued to start it.', queuedExtra),
-      'start one with /mux-work in a new T3 thread',
+      cards(queued, data, 'Nothing queued. Press Queue on a List item to queue it.', queuedExtra, queuedAction),
+      'Start opens a mux-work thread in T3 Code',
     ),
     section('list', 'List', list.length, listBody),
     section('done', 'Done', done.length, doneBody, 'last 7 days'),
@@ -475,7 +499,7 @@ export function renderFlowView(data: BoardData, opts: RenderOptions): string {
 <div class="box" style="--c:var(--you)" data-node="capture">${who('You')}<h3>Capture ${n('capture')}</h3><p>Add an issue to the server or Apple list, or a draft item in the Mux Project if you don't know the repo yet.</p>${live('capture')}</div></div>
 ${arrow}
 <div class="frow${dim('bug feat vis fog')}"><div class="col">Queued</div>
-<div class="box" style="--c:var(--you)" data-node="queue">${who('You')}<h3>Queue and start ${n('queue')}</h3><p>Drag it to Queued, then run <code>/mux-work #123</code> in a new T3 thread. Nothing starts without this.</p>${live('queue')}</div></div>
+<div class="box" style="--c:var(--you)" data-node="queue">${who('You')}<h3>Queue and start ${n('queue')}</h3><p>Press Queue on a List item, then Start on its Queued card. Start opens a T3 thread that runs <code>/mux-work #123</code>. Nothing starts without this.</p>${live('queue')}</div></div>
 ${arrow}
 <div class="frow${dim('bug feat vis fog')}"><div class="col">Shaping</div>
 <div class="box" style="--c:var(--thread)">${who('Agent')}<h3>Size up</h3><p>Reads the issue, glossary and ADRs. Proposes a route in two or three lines, and you confirm it.</p>

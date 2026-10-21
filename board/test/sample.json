@@ -148,6 +148,26 @@
       "linkedPrs": []
     },
     {
+      "id": "PVTI_sample21",
+      "status": "Queued",
+      "type": "DraftIssue",
+      "number": null,
+      "title": "Offline downloads on watchOS",
+      "url": null,
+      "repo": null,
+      "labels": [],
+      "state": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockedBy": 0,
+      "updatedAt": "2026-10-20T10:00:00Z",
+      "closedAt": null,
+      "linkedPrs": []
+    },
+    {
       "id": "PVTI_sample07",
       "status": "Shaping",
       "type": "Issue",

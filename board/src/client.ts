@@ -7,6 +7,7 @@ import { platformOf } from './model.ts';
 import type { BoardData } from './model.ts';
 import { validateDraft } from './add-item.ts';
 import type { CreationResult, ItemDraft } from './add-item.ts';
+import type { StartResult } from './t3.ts';
 
 const POLL_MS = 15_000;
 const app = document.getElementById('app')!;
@@ -38,13 +39,14 @@ function render(): void {
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-add-item],details[id] > summary').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-add-item],details[id] > summary').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
 
 function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.queue) return `queue-${el.dataset.queue}`;
+  if (el.dataset.start) return `start-${el.dataset.start}`;
   return el.dataset.view ?? el.dataset.flowTab ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
 }
 
@@ -250,8 +252,22 @@ async function queueItem(button: HTMLElement): Promise<void> {
   if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
 }
 
+async function startItem(itemId: string): Promise<void> {
+  if (actions[itemId]?.phase === 'pending') return;
+  actions[itemId] = { phase: 'pending' };
+  render();
+  const result = await postAction<StartResult & { error: string | null }>('/api/start', { session: data.capture?.session, itemId });
+  actions[itemId] = result.thread ? { phase: 'started', thread: result.thread }
+    : { phase: result.uncertain ? 'uncertain' : 'error', message: result.error ?? 'The thread did not start.' };
+  render();
+  // The Start button is gone once a thread starts or may have started; move focus to the card's message.
+  if (document.activeElement === document.body) {
+    app.querySelector<HTMLElement>(`[data-start-result="${CSS.escape(itemId)}"]`)?.focus();
+  }
+}
+
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-add-item]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-flow-tab],[data-copy],[data-queue],[data-start],[data-add-item]');
   if (!target) return;
   if (target.hasAttribute('data-add-item')) {
     if (submission.phase === 'complete') resetDraft();
@@ -263,6 +279,7 @@ app.addEventListener('click', (event) => {
     render();
   } else if (target.dataset.copy) void copy(target.dataset.copy, target as HTMLButtonElement);
   else if (target.dataset.queue) void queueItem(target);
+  else if (target.dataset.start) void startItem(target.dataset.start);
 });
 
 // Arrow keys move between the Board and Flow tabs (WAI-ARIA tabs pattern).

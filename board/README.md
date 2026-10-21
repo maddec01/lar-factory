@@ -9,9 +9,18 @@ cd board && npm install && npm start   # npm run dev restarts on changes
 ```
 
 - **Board** shows what needs you first (Needs you, Verify, Ready to merge), then
-  what's in flight, concepts with their sub-issues, Queued items with a copyable
-  `/mux-work` command, List counts per platform, and the last 7 days of Done.
-  Every card has a step bar showing where it is in the flow.
+  what's in flight, concepts with their sub-issues, Queued items, List counts per
+  platform, and the last 7 days of Done. Every card has a step bar showing where
+  it is in the flow.
+- **Queue** on a List row sets the item's Status to Queued. The board shows it
+  in Queued at once and keeps it there until GitHub reports the change.
+- **Start** on a Queued issue opens a T3 Code thread in the Mux project
+  (`board.t3Project` in `config.json`) whose first message is
+  `/mux-work owner/repo#n`. mux-work shapes or builds it and sets its Status.
+  Every board page then shows the new thread's title and id. While the board
+  runs, a double press, a retry or another tab starts no second thread. A
+  queued draft needs an issue first; issues keep a copyable `/mux-work` command
+  as a fallback.
 - **Flow** is the workflow diagram with each issue placed on the step it's at.
   Pick an issue type to follow its path.
 - **Add item** creates an issue in a configured repository and adds it to List.
@@ -20,14 +29,15 @@ cd board && npm install && npm start   # npm run dev restarts on changes
   your draft while the board refreshes. If project assignment fails after the
   issue is created, its link and **Retry this submission** finish the same issue.
 
-Creation uses the same local `gh` login as reads and needs permission to create
-issues and edit the Mux project. If a response is lost, retry the current
+Creation and Queue use the same local `gh` login as reads and need permission
+to create issues and edit the Mux project. Start runs the local `t3` CLI (or
+`T3_PATH`) and needs T3 Code running. If a response is lost, retry the current
 submission. An uncertain GitHub creation or a board restart asks you to check
 the repository issues before starting another item.
 
 If `gh` can't reach GitHub, the board keeps the last data it read and shows a
 stale warning. `npm run sample` serves `test/sample.json` instead of GitHub;
-adding items is disabled in sample mode.
+adding, queuing and starting are disabled in sample mode.
 
 To start it at login, run `board/scripts/install-launch-agent.sh` from the main
 checkout. It's safe to rerun and logs to `~/Library/Logs/mux-board.log`;

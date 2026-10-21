@@ -19,7 +19,8 @@
   ],
   "board": {
     "port": 4317,
-    "refreshSeconds": 45
+    "refreshSeconds": 45,
+    "t3Project": "~/Developer/Mux"
   },
   "limits": {
     "inFlight": 2,

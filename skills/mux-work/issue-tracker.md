@@ -120,6 +120,28 @@ validation and conflicting-parent errors instead of falling back to mentions.
 REST reference: GitHub's [sub-issues API](https://docs.github.com/en/rest/issues/sub-issues)
 and [issue dependencies API](https://docs.github.com/en/rest/issues/issue-dependencies).
 
+## Slices
+
+A slice is a native sub-issue of a build issue (`build`). Create it and its
+blocked-by links with the commands above (`--parent "$build"`, then
+`--add-blocked-by`). Close a merged slice, then list the build's ready slices
+(open, every blocker closed):
+
+```sh
+gh issue close "$slice" --repo "$repo" --reason completed
+
+# A re-sliced slice: repoint each dependent, then close the old slice.
+gh issue edit "$dependent" --repo "$repo" --add-blocked-by "$new" --remove-blocked-by "$slice"
+gh issue close "$slice" --repo "$repo" --reason "not planned"
+
+gh api graphql -F owner="${repo%/*}" -F name="${repo#*/}" -F n="$build" -f query='
+query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
+  subIssues(first:100){nodes{number title state blockedBy(first:50){nodes{state}}}}}}}' \
+  --jq '.data.repository.issue.subIssues.nodes[]
+    | select(.state == "OPEN" and all(.blockedBy.nodes[]; .state == "CLOSED"))
+    | "#\(.number) \(.title)"'
+```
+
 ## Capture-only Concepts
 
 Follow [Retro capture](retro-capture.md), including its persisted plan, stable

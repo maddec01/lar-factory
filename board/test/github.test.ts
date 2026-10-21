@@ -18,17 +18,35 @@ test('normalizes an issue item from the GraphQL response', () => {
       updatedAt: '2026-10-21T08:10:00Z',
       repository: { nameWithOwner: 'maddec01/mux-server' },
       labels: { nodes: [{ name: 'feature' }] },
-      parent: { number: 60, title: 'P', url: 'u', repository: { nameWithOwner: 'maddec01/mux-server' } },
+      parent: { number: 60, title: 'P', url: 'u', state: 'CLOSED', repository: { nameWithOwner: 'maddec01/mux-server' } },
       subIssuesSummary: { total: 3, completed: 1 },
       issueDependenciesSummary: { blockedBy: 2 },
+      blockedBy: { totalCount: 23, nodes: [
+        { number: 50, title: 'Open blocker', url: 'b50', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } },
+        { number: 4, title: 'Closed blocker', url: 'b4', state: 'CLOSED', repository: { nameWithOwner: 'maddec01/mux-apple' } },
+      ] },
+      blocking: { totalCount: 1, nodes: [
+        { number: 62, title: 'Blocked one', url: 'b62', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } },
+      ] },
       closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false }] },
     },
   };
   const item = normalizeItem(raw);
   assert.equal(item?.status, 'Needs you');
   assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
-  assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/mux-server' });
-  assert.equal(item?.blockedBy, 2);
+  assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/mux-server', state: 'CLOSED' });
+  assert.equal(item?.blockedBy, 2, 'the badge keeps the open count from the summary');
+  assert.deepEqual(item?.blockers, {
+    total: 23,
+    nodes: [
+      { number: 50, title: 'Open blocker', url: 'b50', repo: 'maddec01/mux-server', state: 'OPEN' },
+      { number: 4, title: 'Closed blocker', url: 'b4', repo: 'maddec01/mux-apple', state: 'CLOSED' },
+    ],
+  }, 'the list holds open and closed blockers, and its total comes from GitHub, not the summary');
+  assert.deepEqual(item?.blocking, {
+    total: 1,
+    nodes: [{ number: 62, title: 'Blocked one', url: 'b62', repo: 'maddec01/mux-server', state: 'OPEN' }],
+  });
   assert.equal(item?.linkedPrs.length, 1);
 });
 
@@ -42,6 +60,8 @@ test('drafts, unknown statuses and hidden content', () => {
   assert.equal(draft?.status, 'List');
   assert.equal(draft?.number, null);
   assert.equal(draft?.repo, null);
+  assert.deepEqual(draft?.blockers, { total: 0, nodes: [] }, 'drafts have no dependency links');
+  assert.deepEqual(draft?.blocking, { total: 0, nodes: [] });
   assert.equal(normalizeItem({ id: 'PVTI_3', updatedAt: '', status: null, content: null }), null);
 });
 

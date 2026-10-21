@@ -37,6 +37,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T08:09:14Z",
       "closedAt": null,
       "linkedPrs": []
@@ -60,6 +68,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T08:09:19Z",
       "closedAt": null,
       "linkedPrs": []
@@ -85,6 +101,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-20T15:00:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -105,6 +129,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-19T10:00:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -126,7 +158,23 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
+      "blockedBy": 1,
+      "blockers": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 140,
+            "title": "Owner accounts",
+            "url": "https://github.com/maddec01/mux-server/issues/140",
+            "repo": "maddec01/mux-server",
+            "state": "OPEN"
+          }
+        ]
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T07:30:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -149,6 +197,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T06:00:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -169,6 +225,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-20T10:00:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -191,6 +255,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T09:10:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -207,12 +279,26 @@
         "feature"
       ],
       "state": "OPEN",
-      "parent": null,
+      "parent": {
+        "number": 9,
+        "title": "Home screen refresh",
+        "url": "https://github.com/maddec01/mux-apple/issues/9",
+        "repo": "maddec01/mux-apple",
+        "state": "OPEN"
+      },
       "subIssues": {
         "total": 0,
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T09:00:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -235,6 +321,14 @@
         "completed": 2
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T08:00:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -255,13 +349,30 @@
         "number": 200,
         "title": "Mux cloud: website sign-in and relay",
         "url": "https://github.com/maddec01/mux-server/issues/200",
-        "repo": "maddec01/mux-server"
+        "repo": "maddec01/mux-server",
+        "state": "OPEN"
       },
       "subIssues": {
         "total": 0,
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 202,
+            "title": "Sign-in screen",
+            "url": "https://github.com/maddec01/mux-server/issues/202",
+            "repo": "maddec01/mux-server",
+            "state": "OPEN"
+          }
+        ]
+      },
       "updatedAt": "2026-10-21T09:20:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -278,12 +389,26 @@
         "improvement"
       ],
       "state": "OPEN",
-      "parent": null,
+      "parent": {
+        "number": 9,
+        "title": "Home screen refresh",
+        "url": "https://github.com/maddec01/mux-apple/issues/9",
+        "repo": "maddec01/mux-apple",
+        "state": "OPEN"
+      },
       "subIssues": {
         "total": 0,
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T09:30:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -304,13 +429,30 @@
         "number": 200,
         "title": "Mux cloud: website sign-in and relay",
         "url": "https://github.com/maddec01/mux-server/issues/200",
-        "repo": "maddec01/mux-server"
+        "repo": "maddec01/mux-server",
+        "state": "OPEN"
       },
       "subIssues": {
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
+      "blockedBy": 1,
+      "blockers": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 201,
+            "title": "Relay: broker only or full TURN?",
+            "url": "https://github.com/maddec01/mux-server/issues/201",
+            "repo": "maddec01/mux-server",
+            "state": "OPEN"
+          }
+        ]
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T09:25:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -331,13 +473,38 @@
         "number": 200,
         "title": "Mux cloud: website sign-in and relay",
         "url": "https://github.com/maddec01/mux-server/issues/200",
-        "repo": "maddec01/mux-server"
+        "repo": "maddec01/mux-server",
+        "state": "OPEN"
       },
       "subIssues": {
         "total": 0,
         "completed": 0
       },
       "blockedBy": 1,
+      "blockers": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 118,
+            "title": "Accounts table migration",
+            "url": "https://github.com/maddec01/mux-server/issues/118",
+            "repo": "maddec01/mux-server",
+            "state": "OPEN"
+          }
+        ]
+      },
+      "blocking": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 129,
+            "title": "Run more than one 4K HDR to 1080p stream at a time",
+            "url": "https://github.com/maddec01/mux-server/issues/129",
+            "repo": "maddec01/mux-server",
+            "state": "OPEN"
+          }
+        ]
+      },
       "updatedAt": "2026-10-21T08:30:00Z",
       "closedAt": null,
       "linkedPrs": []
@@ -360,6 +527,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T09:35:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -396,6 +571,22 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 100,
+            "title": "Old cleanup task",
+            "url": "https://github.com/maddec01/mux-server/issues/100",
+            "repo": "maddec01/mux-server",
+            "state": "CLOSED"
+          }
+        ]
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T09:05:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -432,6 +623,22 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 27,
+            "title": "Artwork cache eviction",
+            "url": "https://github.com/maddec01/mux-apple/issues/27",
+            "repo": "maddec01/mux-apple",
+            "state": "CLOSED"
+          }
+        ]
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T08:45:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -468,6 +675,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-21T08:50:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -502,13 +717,22 @@
         "number": 200,
         "title": "Mux cloud: website sign-in and relay",
         "url": "https://github.com/maddec01/mux-server/issues/200",
-        "repo": "maddec01/mux-server"
+        "repo": "maddec01/mux-server",
+        "state": "OPEN"
       },
       "subIssues": {
         "total": 0,
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-19T12:00:00Z",
       "closedAt": "2026-10-19T12:00:00Z",
       "linkedPrs": []
@@ -532,6 +756,14 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
       "updatedAt": "2026-10-20T16:00:00Z",
       "closedAt": "2026-10-20T16:00:00Z",
       "linkedPrs": [
@@ -568,6 +800,22 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 141,
+            "title": "Transcoder leaks a file handle on cancel",
+            "url": "https://github.com/maddec01/mux-server/issues/141",
+            "repo": "maddec01/mux-server",
+            "state": "OPEN"
+          }
+        ]
+      },
       "updatedAt": "2026-09-30T10:00:00Z",
       "closedAt": "2026-09-30T10:00:00Z",
       "linkedPrs": []

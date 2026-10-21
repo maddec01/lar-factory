@@ -45,11 +45,19 @@ export type CheckState = 'running' | 'passed' | 'failed';
 /** Running checks past this long are shown amber, so a stuck runner gets noticed. */
 export const SLOW_CHECKS_MS = 30 * 60 * 1000;
 
-export interface ParentRef {
+/** Another issue an item links to; it may or may not be on the board. */
+export interface IssueRef {
   number: number;
   title: string;
   url: string;
   repo: string;
+  state: 'OPEN' | 'CLOSED';
+}
+
+/** The first issues of a GitHub link list, and how many it holds in all. */
+export interface IssueLinks {
+  total: number;
+  nodes: IssueRef[];
 }
 
 export interface Item {
@@ -65,9 +73,14 @@ export interface Item {
   labels: string[];
   /** OPEN, CLOSED or MERGED; null for drafts. */
   state: string | null;
-  parent: ParentRef | null;
+  parent: IssueRef | null;
   subIssues: { total: number; completed: number };
+  /** Open blockers, for the card's badge. */
   blockedBy: number;
+  /** GitHub's blocked-by links, open and closed. */
+  blockers: IssueLinks;
+  /** GitHub's blocking links: the issues this one blocks. */
+  blocking: IssueLinks;
   updatedAt: string;
   closedAt: string | null;
   linkedPrs: LinkedPr[];

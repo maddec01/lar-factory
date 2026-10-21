@@ -4,9 +4,11 @@
 import {
   AMBER_STATUSES,
   STATUSES,
+  checkState,
   countsOf,
   flowNodeOf,
   isRecentlyDone,
+  isSlow,
   isStale,
   kindLabel,
   kindOf,
@@ -15,7 +17,7 @@ import {
   trackOf,
   workCommand,
 } from './model.ts';
-import type { BoardData, FlowNode, Item, StartedThread, Status, Track } from './model.ts';
+import type { BoardData, FlowNode, Item, LinkedPr, StartedThread, Status, Track } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -83,6 +85,12 @@ export function ago(iso: string, now: number): string {
   return `${Math.round(h / 24)} days ago`;
 }
 
+/** A running time in whole minutes: `12m`, `1h 5m`. */
+function elapsed(iso: string, now: number): string {
+  const m = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
 function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
@@ -137,14 +145,27 @@ export function stepBar(status: Status): string {
   return `<div class="stepbar"><ol class="steps" aria-hidden="true">${segments}</ol><span class="step-label ${tone}">${at + 1}/${STATUSES.length} · ${esc(status)}</span></div>`;
 }
 
+/** The badge after an open PR's link: running with counts and age, passed, failed, or nothing. */
+function checksBadge(pr: LinkedPr, now: number): string {
+  const checks = pr.checks;
+  const state = checkState(checks);
+  if (!checks || !state || pr.state !== 'OPEN') return '';
+  if (state === 'passed') return `<span class="checks passed" title="All ${plural(checks.total, 'check')} passed">checks passed</span>`;
+  if (state === 'failed') return `<span class="checks failed" title="${checks.failed} of ${plural(checks.total, 'check')} failed">checks failed</span>`;
+  const slow = isSlow(checks, now);
+  const title = `Checks running${slow ? ' for over 30 minutes' : ''}: ${checks.passed} of ${checks.total} passed, ${checks.running} running${checks.failed ? `, ${checks.failed} failed` : ''}`;
+  const age = checks.since ? ` · ${elapsed(checks.since, now)}` : '';
+  return `<span class="checks running${slow ? ' slow' : ''}" title="${esc(title)}">checks ${checks.passed}/${checks.total}${age}${slow ? '<span class="sr-only"> (running over 30 minutes)</span>' : ''}</span>`;
+}
+
 const HINTS: Partial<Record<Status, string>> = {
-  'Needs you': 'Answer in its shaping thread',
+  'Needs you': 'Answer in its T3 thread',
   Verify: 'Test it with the steps in the PR, then merge',
   'Ready to merge': 'Merge the PR',
 };
 
 /** `action` is a button for the card's top row, so it adds no height. */
-function card(item: Item, data: BoardData, extra = '', action = ''): string {
+function card(item: Item, data: BoardData, now: number, extra = '', action = ''): string {
   const parent = item.parent
     ? `<p class="parent">Part of <a href="${esc(item.parent.url)}" target="_blank" rel="noopener">#${item.parent.number} ${esc(item.parent.title)}</a></p>`
     : '';
@@ -158,7 +179,7 @@ function card(item: Item, data: BoardData, extra = '', action = ''): string {
   const prs = item.linkedPrs
     .map(
       (pr) =>
-        `<a class="pr" href="${esc(pr.url)}" target="_blank" rel="noopener">PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'OPEN' ? '' : ` (${esc(pr.state.toLowerCase())})`}</a>`,
+        `<span class="linked-pr"><a class="pr" href="${esc(pr.url)}" target="_blank" rel="noopener">PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'OPEN' ? '' : ` (${esc(pr.state.toLowerCase())})`}</a>${checksBadge(pr, now)}</span>`,
     )
     .join('');
   const foot = hint || prs ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}</p>` : '';
@@ -176,9 +197,9 @@ ${body}
 </section>`;
 }
 
-function cards(items: Item[], data: BoardData, empty: string, extra?: (i: Item) => string, action?: (i: Item) => string): string {
+function cards(items: Item[], data: BoardData, now: number, empty: string, extra?: (i: Item) => string, action?: (i: Item) => string): string {
   if (!items.length) return `<p class="empty">${esc(empty)}</p>`;
-  return `<div class="cards">${items.map((i) => card(i, data, extra?.(i), action?.(i))).join('\n')}</div>`;
+  return `<div class="cards">${items.map((i) => card(i, data, now, extra?.(i), action?.(i))).join('\n')}</div>`;
 }
 
 function row(item: Item, data: BoardData, trailing = '', withPlatform = true): string {
@@ -289,7 +310,7 @@ ${groups}
 
 // ---------- board view ----------
 
-function conceptBlock(concept: Item, data: BoardData): string {
+function conceptBlock(concept: Item, data: BoardData, now: number): string {
   const children = data.items
     .filter(
       (i) =>
@@ -318,7 +339,7 @@ function conceptBlock(concept: Item, data: BoardData): string {
   const open = children.length
     ? `<ul class="sub-groups" aria-label="Open sub-issues by status">${groups}</ul>`
     : '<p class="empty">No open sub-issues on the board.</p>';
-  return card(concept, data, `${progress}${open}`);
+  return card(concept, data, now, `${progress}${open}`);
 }
 
 export function renderBoardView(data: BoardData, opts: RenderOptions): string {
@@ -379,14 +400,14 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       'needs-you',
       'Needs you',
       needsYou.length,
-      cards(needsYou, data, 'Nothing needs you right now.'),
+      cards(needsYou, data, now, 'Nothing needs you right now.'),
       'Needs you, Verify and Ready to merge: only you can move these',
     ),
     section(
       'in-flight',
       'In flight',
       inFlight.length,
-      cards(inFlight, data, 'Nothing is being shaped, built or reviewed.'),
+      cards(inFlight, data, now, 'Nothing is being shaped, built or reviewed.'),
       'Shaping, Ready, In progress, Review',
     ),
     section(
@@ -394,14 +415,14 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       'Concepts',
       concepts.length,
       concepts.length
-        ? `<div class="cards wide">${concepts.map((c) => conceptBlock(c, data)).join('\n')}</div>`
+        ? `<div class="cards wide">${concepts.map((c) => conceptBlock(c, data, now)).join('\n')}</div>`
         : '<p class="empty">No open concepts.</p>',
     ),
     section(
       'queued',
       'Queued',
       queued.length,
-      cards(queued, data, 'Nothing queued. Press Queue on a List item to queue it.', queuedExtra, queuedAction),
+      cards(queued, data, now, 'Nothing queued. Press Queue on a List item to queue it.', queuedExtra, queuedAction),
       'Start opens a mux-work thread in T3 Code',
     ),
     section('list', 'List', list.length, listBody),
@@ -545,7 +566,7 @@ ${arrow}
 </div>${live('review')}</div></div>
 ${arrow}
 <div class="frow${dim('bug feat vis fog')}"><div class="col">Verify or<br>Ready to merge</div>
-<div class="box" style="--c:var(--build)"><h3>Approver</h3><p>Folds the fixups in, opens the PR with a conventional title, then decides where it goes.</p>
+<div class="box" style="--c:var(--build)"><h3>Approver</h3><p>Folds the fixups in, opens the PR with a conventional title, then decides where it goes. The item stays in Review until the required checks pass; a CI fixer subagent handles failures.</p>
 <div class="nest two">
 <div class="box${dim('vis fog')}" style="--c:var(--you)" data-node="verify">${who('You')}<h4>Verify ${n('verify')}</h4><p>It's visual, an agent couldn't check something, or it touches auth, migrations or deployment. You get test steps and links.</p>${live('verify')}</div>
 <div class="box${dim('bug feat fog')}" style="--c:var(--build)" data-node="ready-to-merge"><h4>Ready to merge ${n('ready-to-merge')}</h4><p>Not visual, and every reviewer was confident.</p>${live('ready-to-merge')}</div>

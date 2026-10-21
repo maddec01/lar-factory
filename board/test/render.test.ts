@@ -129,3 +129,22 @@ test('a thread another page started shows on every page, and sample mode disable
   const off = renderBoardView({ ...sample, capture: { session: 's', enabled: false } }, base);
   assert.ok([...off.matchAll(/<button[^>]*data-(?:queue|start)="[^"]*"[^>]*>/g)].every((m) => m[0].includes(' disabled')));
 });
+
+test("a linked PR shows its checks: running with counts and age, amber when slow, passed, failed, or nothing", () => {
+  const pr = { number: 9, url: 'https://github.com/maddec01/mux-server/pull/9', state: 'OPEN', isDraft: false };
+  const item = { ...sample.items[0]!, status: 'Review' as const, linkedPrs: [
+    { ...pr, checks: { passed: 3, failed: 0, running: 2, total: 5, since: '2026-10-21T09:48:00Z' } },
+    { ...pr, number: 10, checks: { passed: 1, failed: 0, running: 1, total: 2, since: '2026-10-21T09:00:00Z' } },
+    { ...pr, number: 11, checks: { passed: 5, failed: 0, running: 0, total: 5, since: '2026-10-21T09:00:00Z' } },
+    { ...pr, number: 12, checks: { passed: 4, failed: 1, running: 0, total: 5, since: '2026-10-21T09:00:00Z' } },
+    { ...pr, number: 13, checks: null },
+    { ...pr, number: 14, state: 'CLOSED', checks: { passed: 0, failed: 1, running: 0, total: 1, since: null } },
+  ] };
+  const html = renderBoardView({ ...sample, items: [item] }, base);
+  assert.match(html, /PR #9<\/a><span class="checks running" title="Checks running: 3 of 5 passed, 2 running">checks 3\/5 · 12m<\/span>/);
+  assert.match(html, /PR #10<\/a><span class="checks running slow" title="Checks running for over 30 minutes: 1 of 2 passed, 1 running">checks 1\/2 · 1h 0m<span class="sr-only"> \(running over 30 minutes\)<\/span><\/span>/);
+  assert.match(html, /PR #11<\/a><span class="checks passed" title="All 5 checks passed">checks passed<\/span>/);
+  assert.match(html, /PR #12<\/a><span class="checks failed" title="1 of 5 checks failed">checks failed<\/span>/);
+  assert.match(html, /PR #13<\/a>(?!<span class="checks)/);
+  assert.match(html, /PR #14 \(closed\)<\/a>(?!<span class="checks)/, 'only open PRs show checks');
+});

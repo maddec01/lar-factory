@@ -82,6 +82,14 @@ h1 { font-size: 18px; margin: 0; letter-spacing: -0.01em; }
 .foot { display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .hint { color: var(--you-text); font-weight: 600; }
 .pr { color: var(--fg); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.linked-pr { display: inline-flex; align-items: center; gap: 6px; }
+.checks { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--bd); white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.checks::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k); }
+.checks.running { --k: var(--muted); }
+.checks.passed { --k: var(--build); }
+.checks.failed { --k: #ef4444; color: var(--danger-text); border-color: color-mix(in srgb, #ef4444 45%, var(--bd)); }
+.checks.slow { --k: var(--you); color: var(--you-text); font-weight: 600; border-color: var(--you); background: var(--you-soft); }
 
 .plat, .kind, .blocked, .subs { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 1px 8px; border: 1px solid var(--bd); white-space: nowrap; font-size: 11px; }
 .plat { font-weight: 600; }

@@ -2,7 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import { STATUSES } from './model.ts';
-import type { ContentType, Item, Status } from './model.ts';
+import type { Checks, ContentType, Item, LinkedPr, Status } from './model.ts';
 import type { BoardConfig } from './config.ts';
 import type { CreationProgress, CreationResult } from './add-item.ts';
 import { validateDraft } from './add-item.ts';
@@ -10,6 +10,8 @@ import { validateDraft } from './add-item.ts';
 const GH = process.env.GH_PATH || 'gh';
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
+/** Checks read per PR for the start time; the counts always cover all of them. */
+const CHECK_SLICE = 20;
 
 export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String) {
   user(login: $owner) {
@@ -35,7 +37,16 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               subIssuesSummary { total completed }
               issueDependenciesSummary { blockedBy }
               closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
-                nodes { number url state isDraft }
+                nodes {
+                  number url state isDraft
+                  statusCheckRollup {
+                    contexts(first: ${CHECK_SLICE}) {
+                      checkRunCountsByState { state count }
+                      statusContextCountsByState { state count }
+                      nodes { ... on CheckRun { status startedAt checkSuite { createdAt } } ... on StatusContext { state createdAt } }
+                    }
+                  }
+                }
               }
             }
             ... on PullRequest {
@@ -74,9 +85,32 @@ interface RawContent {
   parent?: { number: number; title: string; url: string; repository: { nameWithOwner: string } } | null;
   subIssuesSummary?: { total: number; completed: number };
   issueDependenciesSummary?: { blockedBy: number };
-  closedByPullRequestsReferences?: {
-    nodes: { number: number; url: string; state: string; isDraft: boolean }[];
-  };
+  closedByPullRequestsReferences?: { nodes: RawLinkedPr[] };
+}
+
+interface RawStateCount {
+  state: string;
+  count: number;
+}
+
+export interface RawLinkedPr {
+  number: number;
+  url: string;
+  state: string;
+  isDraft: boolean;
+  statusCheckRollup?: {
+    contexts: {
+      checkRunCountsByState: RawStateCount[];
+      statusContextCountsByState: RawStateCount[];
+      nodes: {
+        status?: string;
+        startedAt?: string | null;
+        checkSuite?: { createdAt: string };
+        state?: string;
+        createdAt?: string;
+      }[];
+    };
+  } | null;
 }
 
 export interface RawItem {
@@ -99,6 +133,48 @@ export interface RawItemsPage {
 }
 
 // ---------- normalizing ----------
+
+type CheckOutcome = 'passed' | 'failed' | 'running';
+
+// Check run states (CheckStatusState and CheckConclusionState) and commit status states.
+const CHECK_RUN_OUTCOMES: Record<string, CheckOutcome> = {
+  SUCCESS: 'passed', NEUTRAL: 'passed', SKIPPED: 'passed', COMPLETED: 'passed',
+  FAILURE: 'failed', CANCELLED: 'failed', TIMED_OUT: 'failed', ACTION_REQUIRED: 'failed',
+  STARTUP_FAILURE: 'failed', STALE: 'failed',
+  IN_PROGRESS: 'running', QUEUED: 'running', PENDING: 'running', WAITING: 'running', REQUESTED: 'running',
+};
+const STATUS_CONTEXT_OUTCOMES: Record<string, CheckOutcome> = {
+  SUCCESS: 'passed', FAILURE: 'failed', ERROR: 'failed', PENDING: 'running', EXPECTED: 'running',
+};
+
+/** Counts a PR's checks by outcome; null when it has none. */
+export function normalizeChecks(rollup: RawLinkedPr['statusCheckRollup']): Checks | null {
+  if (!rollup) return null;
+  const checks: Checks = { passed: 0, failed: 0, running: 0, total: 0, since: null };
+  const tally = (counts: RawStateCount[], outcomes: Record<string, CheckOutcome>) => {
+    for (const { state, count } of counts) {
+      const outcome = outcomes[state];
+      if (!outcome) continue;
+      checks[outcome] += count;
+      checks.total += count;
+    }
+  };
+  tally(rollup.contexts.checkRunCountsByState, CHECK_RUN_OUTCOMES);
+  tally(rollup.contexts.statusContextCountsByState, STATUS_CONTEXT_OUTCOMES);
+  if (!checks.total) return null;
+  // A rerun on the same head keeps its finished checks, so time only the running ones.
+  // A queued check has no start yet; its suite's creation still times a stuck runner.
+  checks.since = rollup.contexts.nodes
+    .filter((n) => (n.status && CHECK_RUN_OUTCOMES[n.status] === 'running') || (n.state && STATUS_CONTEXT_OUTCOMES[n.state] === 'running'))
+    .map((n) => n.startedAt ?? n.checkSuite?.createdAt ?? n.createdAt)
+    .filter((at) => !!at)
+    .sort()[0] ?? null;
+  return checks;
+}
+
+function normalizeLinkedPr({ statusCheckRollup, ...pr }: RawLinkedPr): LinkedPr {
+  return { ...pr, checks: normalizeChecks(statusCheckRollup) };
+}
 
 function toStatus(name: string | undefined): Status {
   return (STATUSES as readonly string[]).includes(name ?? '') ? (name as Status) : 'List';
@@ -131,7 +207,7 @@ export function normalizeItem(raw: RawItem): Item | null {
     blockedBy: c.issueDependenciesSummary?.blockedBy ?? 0,
     updatedAt: updated,
     closedAt: c.closedAt ?? null,
-    linkedPrs: c.closedByPullRequestsReferences?.nodes ?? [],
+    linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
   };
 }
 

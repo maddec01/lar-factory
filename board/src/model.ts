@@ -26,7 +26,24 @@ export interface LinkedPr {
   url: string;
   state: string;
   isDraft: boolean;
+  /** The head commit's checks; null when it has none. */
+  checks: Checks | null;
 }
+
+/** Counts over all of a PR's checks, required or not. */
+export interface Checks {
+  passed: number;
+  failed: number;
+  running: number;
+  total: number;
+  /** When the earliest running check started, or null if none has. */
+  since: string | null;
+}
+
+export type CheckState = 'running' | 'passed' | 'failed';
+
+/** Running checks past this long are shown amber, so a stuck runner gets noticed. */
+export const SLOW_CHECKS_MS = 30 * 60 * 1000;
 
 export interface ParentRef {
   number: number;
@@ -196,6 +213,20 @@ export function flowNodeOf(item: Item): FlowNode {
     case 'Done':
       return 'merge';
   }
+}
+
+// ---------- checks ----------
+
+/** Running while any check runs, then failed if any failed, else passed. */
+export function checkState(checks: Checks | null): CheckState | null {
+  if (!checks) return null;
+  if (checks.running) return 'running';
+  return checks.failed ? 'failed' : 'passed';
+}
+
+export function isSlow(checks: Checks, now: number): boolean {
+  if (checkState(checks) !== 'running' || !checks.since) return false;
+  return now - Date.parse(checks.since) >= SLOW_CHECKS_MS;
 }
 
 // ---------- helpers ----------

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { countsOf, flowNodeOf, isRecentlyDone, isStale, kindOf, trackOf, workCommand } from '../src/model.ts';
-import type { BoardData, Item, Status } from '../src/model.ts';
+import { checkState, countsOf, flowNodeOf, isRecentlyDone, isSlow, isStale, kindOf, trackOf, workCommand } from '../src/model.ts';
+import type { BoardData, Checks, Item, Status } from '../src/model.ts';
 import { esc, flowItems } from '../src/render.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
@@ -116,4 +116,17 @@ test('flow tabs filter chips by issue type, and old Done items drop off', () => 
 
 test('escapes HTML', () => {
   assert.equal(esc(`<a href="x">'&'</a>`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
+});
+
+test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {
+  const now = Date.parse('2026-10-21T10:00:00Z');
+  const checks = (c: Partial<Checks>): Checks => ({ passed: 0, failed: 0, running: 0, total: 0, since: null, ...c });
+  assert.equal(checkState(checks({ passed: 1, running: 1, failed: 1, total: 3 })), 'running');
+  assert.equal(checkState(checks({ passed: 2, failed: 1, total: 3 })), 'failed');
+  assert.equal(checkState(checks({ passed: 3, total: 3 })), 'passed');
+  assert.equal(checkState(null), null);
+  assert.equal(isSlow(checks({ running: 1, total: 1, since: '2026-10-21T09:31:00Z' }), now), false);
+  assert.equal(isSlow(checks({ running: 1, total: 1, since: '2026-10-21T09:30:00Z' }), now), true);
+  assert.equal(isSlow(checks({ passed: 1, total: 1, since: '2026-10-21T08:00:00Z' }), now), false, 'only a running pipeline is slow');
+  assert.equal(isSlow(checks({ running: 1, total: 1 }), now), false);
 });

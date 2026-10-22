@@ -503,8 +503,10 @@ function reader(
       const parent = parentOf.get(thread);
       agentMs += length(parent ? minus(work(thread), work(parent)) : work(thread));
     }
+    // Wall time: the union of every thread's work, so parallel work counts once.
+    const wallMs = length(merged([...threads].flatMap(work)));
     const own = [...threads].flatMap((thread) => records.get(thread) ?? []);
     const costUsd = pricing ? apiCost(own, pricing) : null;
-    return { agentMs, tokens: totalTokens(own), ...(costUsd === null ? {} : { costUsd }) };
+    return { agentMs, wallMs, tokens: totalTokens(own), ...(costUsd === null ? {} : { costUsd }) };
   }, { priced: pricing !== null });
 }

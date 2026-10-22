@@ -108,7 +108,7 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
   const home = claudeHome(t, { 'session-1': { main: [assistant('m0', 1, 2, 3, 4)], subagents: { a1: [assistant('m1', 5, 0, 300, 9)] } } });
   const items = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done'), rawIssue(13, 'Review')] }, false, false,
     { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) }));
-  assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, tokens: 10 + 314 });
+  assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 10 + 314 });
   assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
   const [without] = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done')] }));
   assert.equal(without?.stats, undefined);
@@ -158,7 +158,7 @@ test('a merged item shows the figures in its merged PR\'s block, not live ones, 
   const items = await readItems(board);
   const frozen = { agentMs: 135 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true };
   assert.deepEqual(items.find((i) => i.number === 12)?.stats, frozen, 'the block wins over live stats');
-  assert.deepEqual(items.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, tokens: 0 }, 'no block: live stats');
+  assert.deepEqual(items.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 }, 'no block: live stats');
   assert.deepEqual(items.find((i) => i.number === 14)?.stats, frozen, 'no live stats at all');
   await new Promise((r) => setTimeout(r, 300));
   assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH'), [], 'merged PRs are never edited');
@@ -177,7 +177,7 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   ] } } }];
   const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
   const [item] = await readItems(board);
-  assert.deepEqual(item?.stats, { agentMs: 30 * 60_000, tokens: 0 });
+  assert.deepEqual(item?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
   const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
   for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
   const [edit] = await edits();

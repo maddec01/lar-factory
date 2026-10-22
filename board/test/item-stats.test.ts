@@ -41,7 +41,7 @@ test('an item\'s threads are the roots whose first user message names it, in any
     { id: 'other-repo', messages: [`$mux-work maddec01/mux-server#60`], turns: [turn('f')] },
   ];
   const stats = reader(statsDb(t, threads));
-  assert.deepEqual(stats(REPO, 60), { agentMs: 30 * MIN, tokens: 0 }, 'T3\'s own token counts are not read');
+  assert.deepEqual(stats(REPO, 60), { agentMs: 30 * MIN, wallMs: 10 * MIN, tokens: 0 }, 'T3\'s own token counts are not read');
   assert.equal(stats(REPO, 61), null, 'only the first user message counts');
   assert.equal(stats('maddec01/mux-server', 60)?.agentMs, 10 * MIN);
 });
@@ -121,6 +121,22 @@ test('a subagent under a child task has its time taken out of that child\'s work
     subagent('nested', 1, '09:30', '09:50', { parentThreadId: 'task' }),
   ]));
   assert.equal(stats(REPO, 1)?.agentMs, (10 + 20 + 10) * MIN);
+});
+
+test('wall time is the time any of the item\'s agents worked: overlap once, no waits on Pedro, no idle gaps', (t) => {
+  const stats = reader(statsDb(t, [
+    root(1), subagent('left', 1, '09:10', '09:25'), subagent('right', 1, '09:15', '09:30'),
+    { id: 'waits', messages: [`$mux-work ${REPO}#2`], turns: [
+      { id: 'w', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T10:00:00Z' },
+    ] },
+    root(3), { id: 'later', messages: [`$mux-work ${REPO}#3`], turns: [
+      { id: 'l', startedAt: '2026-10-20T11:00:00Z', completedAt: '2026-10-20T11:05:00Z' },
+    ] },
+  ], [{ turnId: 'w', createdAt: '2026-10-20T09:10:00Z', resolvedAt: '2026-10-20T09:40:00Z' }]));
+  assert.equal(stats(REPO, 1)?.agentMs, 40 * MIN);
+  assert.equal(stats(REPO, 1)?.wallMs, 30 * MIN, 'parallel subagents count their overlap once');
+  assert.equal(stats(REPO, 2)?.wallMs, 30 * MIN, 'waits on Pedro are left out');
+  assert.equal(stats(REPO, 3)?.wallMs, 15 * MIN, 'the gap between threads isn\'t counted');
 });
 
 test('agent time leaves out waits on Pedro inside a turn, and a running turn or wait counts up to now', (t) => {
@@ -206,9 +222,9 @@ test('tokens are T3\'s totals over each session\'s own and subagent transcripts,
     { id: 'other', messages: [`$mux-work ${REPO}#61`], sessions: ['session-other'] },
     { id: 'plain', messages: [`$mux-work ${REPO}#62`], sessions: ['session-none'], turns: [turn('t2')] },
   ]), { home });
-  assert.deepEqual(stats(REPO, 60), { agentMs: 10 * MIN, tokens: 6042 + 6101 + 15 + 101 });
+  assert.deepEqual(stats(REPO, 60), { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 6042 + 6101 + 15 + 101 });
   assert.equal(stats(REPO, 61)?.tokens, 198);
-  assert.deepEqual(stats(REPO, 62), { agentMs: 10 * MIN, tokens: 0 }, 'no transcripts, no tokens');
+  assert.deepEqual(stats(REPO, 62), { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 0 }, 'no transcripts, no tokens');
 });
 
 test('each thread reads the transcripts under its own provider instance\'s Claude home, from T3\'s settings', (t) => {
@@ -253,7 +269,7 @@ test('an item totals its Claude and Codex threads, each Codex thread from its ow
   ]);
   const settings = t3Settings(t, { codex_work: { driver: 'codex', homePath: elsewhere } });
   const stats = reader(db, { settings, home });
-  assert.deepEqual(stats(REPO, 60), { agentMs: 10 * MIN, tokens: 6042 + 1050 + 2070 + 309 });
+  assert.deepEqual(stats(REPO, 60), { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 6042 + 1050 + 2070 + 309 });
   assert.equal(stats(REPO, 61)?.tokens, 8);
 });
 
@@ -278,7 +294,7 @@ test('missing or garbled transcripts leave tokens out, and never break the stats
   claudeHome(t, { 'session-a': { main: ['{not json', '"a string"', 'null', JSON.stringify({ type: 'assistant', message: { id: 'm' } })] } },
     join(home, '.claude'));
   const db = statsDb(t, [{ id: 'build', messages: [`Build ${REPO}#60`], sessions: ['session-a', '../escape'], turns: [turn('t1')] }]);
-  const expected = { agentMs: 10 * MIN, tokens: 0 };
+  const expected = { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 0 };
   assert.deepEqual(reader(db)(REPO, 60), expected);
   assert.deepEqual(reader(db, { home })(REPO, 60), expected);
 });
@@ -315,9 +331,9 @@ test('API cost is T3\'s price for the item\'s records, with the aliases and over
   });
   const stats = reader(db, { home, settings, rates });
   close(stats(REPO, 60)?.costUsd, 0.105 + 0.03 + 0.0028 + 0.25);
-  assert.deepEqual(stats(REPO, 61), { agentMs: 0, tokens: 2000 }, 'nothing priced, no cost');
+  assert.deepEqual(stats(REPO, 61), { agentMs: 0, wallMs: 0, tokens: 2000 }, 'nothing priced, no cost');
   // Without T3's price table there is no cost, and the rest of the stats stand.
-  assert.deepEqual(reader(db, { home, settings })(REPO, 60), { agentMs: 0, tokens: 13500 + 3000 + 1100 + 9999 * 4 });
+  assert.deepEqual(reader(db, { home, settings })(REPO, 60), { agentMs: 0, wallMs: 0, tokens: 13500 + 3000 + 1100 + 9999 * 4 });
   assert.equal(stats.priced, true);
   assert.equal(reader(db, { home, settings }).priced, false, 'the server logs when pricing goes and comes back');
   assert.equal(reader(db, { home, settings, rates: usageRates(t, {}) }).priced, false, 'an empty table prices nothing');

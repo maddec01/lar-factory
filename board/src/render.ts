@@ -119,7 +119,7 @@ export function ago(iso: string, now: number): string {
 }
 
 /** A running time in whole minutes: `12m`, `1h 5m`. */
-function duration(ms: number): string {
+export function duration(ms: number): string {
   const m = Math.max(0, Math.floor(ms / 60_000));
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
@@ -241,7 +241,7 @@ const HINTS: Partial<Record<Status, string>> = {
 };
 
 /** `1.2M in (900k cached) / 40k out`. */
-function tokenFigure({ input, cached, output }: Tokens): string {
+export function tokenFigure({ input, cached, output }: Tokens): string {
   return `${tokenCount(input)} in (${tokenCount(cached)} cached) / ${tokenCount(output)} out`;
 }
 

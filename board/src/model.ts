@@ -26,6 +26,8 @@ export interface LinkedPr {
   url: string;
   state: string;
   isDraft: boolean;
+  /** The PR's description, for its item stats block; absent when not read (sample data). */
+  body?: string;
   /** The head commit's checks; null when it has none. */
   checks: Checks | null;
 }

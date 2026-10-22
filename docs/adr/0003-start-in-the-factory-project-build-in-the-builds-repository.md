@@ -1,7 +1,7 @@
-# Start in Mux; build in the issue repository
+# Start in the factory project; build in the build's repository
 
 [Issue #9's confirmed brief](https://github.com/maddec01/mux-factory/issues/9)
-places board Start in the shared Mux project: it launches a thread with
+places board Start in the factory's shared T3 project: it launches a thread with
 the issue's **work message** (`#n title`, then `$mux-work owner/repo#n`; first
 `/mux-work owner/repo#n` in
 [commit 3fef010](https://github.com/maddec01/mux-factory/commit/3fef0103641afe76bc954916e473cfeb5e215900),
@@ -10,9 +10,13 @@ as described in the [board instructions](../../board/README.md).
 The current [mux-work workflow](../../skills/mux-work/SKILL.md#1-pick-up)
 shapes an issue when needed, or proceeds directly from a passing brief to
 [launching a separate build](../../skills/mux-work/SKILL.md#5-start-the-build)
-in the issue repository's project and its own worktree; Start itself leaves
+in its build's repository's project and its own worktree; Start itself leaves
 status changes to mux-work.
-The agreement explicitly covers concepts spanning repositories through a map
-and one build sub-issue per repository; the benefit of shared planning context
+Each build belongs to exactly one repository and lands as one PR in that
+repository's T3 project, settled in
+[issue #94](https://github.com/maddec01/mux-factory/issues/94).
+Work in another repository becomes a build in that repository, under the issue
+that needs it and blocking it, so a request spanning repositories needs no
+concept map ([issue #86](https://github.com/maddec01/mux-factory/issues/86)); the benefit of shared planning context
 with separate build workspaces is an inference from that arrangement, not a
 recorded historical rationale or comparison of alternatives.

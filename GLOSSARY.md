@@ -26,19 +26,22 @@ with Pedro's answers to remaining assumptions or findings.
 
 **Concept**:
 Work too broad or unclear for a single brief, represented by a map issue with
-decision and build sub-issues.
+decision and build sub-issues. Spanning several repositories doesn't by itself
+make work a concept.
 
 **Map**:
 A concept's account of its destination, decisions so far, remaining fog,
 out-of-scope work, domain docs drafts and relationships between sub-issues.
 
 **Build**:
-An issue that becomes one PR, delivered through its slices.
+An issue in one repository that changes only that repository and becomes one
+PR there, delivered through its slices.
 _Avoid_: build issue
 
 **Slice**:
 A small, independently testable piece of a build, recorded as a sub-issue of
-the build issue and implemented by one implementer.
+its build and implemented by one implementer. A sub-issue labelled `build` is a
+build, never a slice.
 _Avoid_: ticket, chunk, task
 
 **Active slice**:
@@ -62,7 +65,8 @@ brief before handing off to a build thread.
 
 **Build thread**:
 The separate conversation that takes a passing brief through implementation,
-review and PR checks in the issue repository's own workspace.
+review and PR checks in its build's repository's T3 project, in its own
+worktree.
 
 **Child task**:
 Delegated work a thread owns and addresses only by its task ID; its backing thread is never used as a conversation.
@@ -135,7 +139,12 @@ _Avoid_: elapsed time, calendar time, active time
 
 **Item stats**:
 An item's agent time, wall time, total tokens and API cost, shown as four plain figures.
+They cover the threads whose first message names this item before any other issue, with those threads' child tasks and subagents.
 _Avoid_: usage, metrics
+
+**Item total**:
+An item's stats plus the item total of each of its sub-issues on the board.
+_Avoid_: report total, aggregate, rollup
 
 **API cost**:
 What an item's tokens would cost at API list prices, as T3 Code estimates it, rather than the subscription bill.

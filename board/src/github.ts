@@ -47,7 +47,7 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               blocking(first: ${LINK_SLICE}) { ...links }
               closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
                 nodes {
-                  number url state isDraft
+                  number url state isDraft body
                   statusCheckRollup {
                     contexts(first: ${CHECK_SLICE}) {
                       checkRunCountsByState { state count }
@@ -142,6 +142,7 @@ export interface RawLinkedPr {
   url: string;
   state: string;
   isDraft: boolean;
+  body?: string;
   statusCheckRollup?: {
     contexts: {
       checkRunCountsByState: RawStateCount[];
@@ -394,6 +395,25 @@ export async function setItemStatus(
   } catch (err) {
     return `Could not set ${name}. ${err instanceof Error ? err.message : 'GitHub request failed.'}`;
   }
+}
+
+/** A PR's REST path, `repos/<owner>/<repo>/pulls/<n>`, from its URL. */
+function pullPath(url: string): string {
+  const match = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/.exec(url);
+  if (!match) throw new Error(`Not a pull request URL: ${url}`);
+  return `repos/${match[1]}/pulls/${match[2]}`;
+}
+
+/** A PR's description as it is now, by the PR's URL; empty when it has none. */
+export async function readPrBody(url: string, run: (args: string[]) => Promise<string> = gh): Promise<string> {
+  const pr = JSON.parse(await run(['api', pullPath(url)])) as { body?: string | null };
+  return pr.body ?? '';
+}
+
+/** Replaces a PR's description, by the PR's URL. */
+export async function editPrBody(url: string, body: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  // -f sends the body as a string as is; -F would read a body starting with @ as a file.
+  await run(['api', '--method', 'PATCH', pullPath(url), '-f', `body=${body}`]);
 }
 
 /** Deletes an issue for good, or removes a draft from the project; returns the error, or null when GitHub accepted it. */

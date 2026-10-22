@@ -1,5 +1,6 @@
 // The item stats block the board keeps in the body of each open PR linked to an
-// item. Pure: the server reads the bodies with the board query and sends the edits.
+// item. Pure: the server reads the bodies with the board query, reads each PR to
+// edit again, and sends the edits.
 
 import type { Item, ItemStats } from './model.ts';
 import { duration, tokenFigure } from './render.ts';
@@ -46,8 +47,19 @@ export function withStatsBlock(body: string, block: string): string {
   return body ? `${body}\n\n${block}` : block;
 }
 
+/** The body with its block brought up to date, or null when the block is already current. */
+export function updatedBody(body: string, block: string): string | null {
+  const range = blockRange(body);
+  // GitHub can send a body back with CRLF line ends; that block is still current.
+  if (range && body.slice(...range).replaceAll('\r\n', '\n') === block) return null;
+  return withStatsBlock(body, block);
+}
+
 export interface PrBodyEdit {
   url: string;
+  /** The current block, to apply again to the PR's latest body before the edit is sent. */
+  block: string;
+  /** The new body, from the body the board read. */
   body: string;
 }
 
@@ -55,8 +67,10 @@ export interface PrBodyEdit {
  * The open linked PRs whose block is missing or out of date, with their new bodies.
  * Items without stats, and PRs whose body wasn't read, are left alone. A PR linked
  * to several items takes the first item's stats, so the items don't take turns.
+ * Only PRs in `repos`, the repos config.json lists, are edited: an issue can be
+ * closed by a PR in a repo the board doesn't manage.
  */
-export function prStatsEdits(items: readonly Item[]): PrBodyEdit[] {
+export function prStatsEdits(items: readonly Item[], repos: readonly string[]): PrBodyEdit[] {
   const seen = new Set<string>();
   const edits: PrBodyEdit[] = [];
   for (const item of items) {
@@ -64,12 +78,11 @@ export function prStatsEdits(items: readonly Item[]): PrBodyEdit[] {
     if (!stats || stats === 'unavailable') continue;
     for (const pr of item.linkedPrs) {
       if (pr.state !== 'OPEN' || pr.body === undefined || seen.has(pr.url)) continue;
+      if (!repos.some((repo) => pr.url.startsWith(`https://github.com/${repo}/pull/`))) continue;
       seen.add(pr.url);
       const block = statsBlock(stats);
-      const range = blockRange(pr.body);
-      // GitHub can send a body back with CRLF line ends; that block is still current.
-      if (range && pr.body.slice(...range).replaceAll('\r\n', '\n') === block) continue;
-      edits.push({ url: pr.url, body: withStatsBlock(pr.body, block) });
+      const body = updatedBody(pr.body, block);
+      if (body !== null) edits.push({ url: pr.url, block, body });
     }
   }
   return edits;

@@ -29,6 +29,29 @@ const main = async () => {
   // Deletes leave options.items alone, like a GitHub read that still lags behind.
   if (args[0] === 'issue' && args[1] === 'delete') return;
   if (args[1] === 'item-delete') return output({});
+  // A PR read: options.liveBodies holds bodies edited since the board's read.
+  if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+\/pulls\/\d+$/.test(args[1])) {
+    const url = `https://github.com/${args[1].slice('repos/'.length).replace('/pulls/', '/pull/')}`;
+    const read = (options.items ?? []).flatMap((item) => item.content?.closedByPullRequestsReferences?.nodes ?? []).find((pr) => pr.url === url);
+    return output({ url, body: options.liveBodies?.[url] ?? read?.body ?? null });
+  }
+  if (args[0] === 'api' && args[2] === 'PATCH') {
+    if (options.prEditDelay) await new Promise((r) => setTimeout(r, options.prEditDelay));
+    if (options.fail === 'pr-edit') {
+      process.stderr.write('HTTP 502: Bad Gateway');
+      process.exitCode = 1;
+      return;
+    }
+    // Later reads see the new body, like GitHub.
+    const url = `https://github.com/${args[3].slice('repos/'.length).replace('/pulls/', '/pull/')}`;
+    const body = args[args.indexOf('-f') + 1].slice('body='.length);
+    for (const item of options.items ?? []) {
+      for (const pr of item.content?.closedByPullRequestsReferences?.nodes ?? []) if (pr.url === url) pr.body = body;
+    }
+    if (options.liveBodies?.[url] !== undefined) options.liveBodies[url] = body;
+    fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    return output({});
+  }
   if (args[0] === 'api') {
     if (options.createDelay) await new Promise((r) => setTimeout(r, options.createDelay));
     const repo = args[3].slice('repos/'.length, -'/issues'.length);

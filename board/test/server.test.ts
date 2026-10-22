@@ -114,3 +114,87 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
   const [without] = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done')] }));
   assert.equal(without?.stats, undefined);
 });
+
+test('refreshes keep a stats block in open linked PRs, edit only when it changes, and never in sample mode', async (t) => {
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
+    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
+      usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
+  ] }]);
+  const pr = (number: number, state: string) => ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`,
+    state, isDraft: false, body: `PR ${number}` });
+  const withPrs = (number: number, prs: object[]) => {
+    const raw = rawIssue(number, 'Review');
+    return { ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: prs } } };
+  };
+  const items = [withPrs(12, [pr(40, 'OPEN'), pr(41, 'MERGED')]), withPrs(13, [pr(42, 'OPEN')])];
+  const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
+  const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
+  for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
+  await new Promise((r) => setTimeout(r, 400));
+  const made = await edits();
+  assert.equal(made.length, 1, 'later refreshes see the block is current and leave the PR alone');
+  assert.equal(made[0]![3], 'repos/maddec01/mux-factory/pulls/40', 'merged PRs and items without stats are left alone');
+  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · T3 tokens 500 in (400 cached) / 20 out\n<!-- /mux-stats -->');
+
+  const failing = await startBoard(t, { items, fail: 'pr-edit' }, false, false, { T3_STATE_DB: db });
+  assert.equal((await readItems(failing)).length, 2, 'a failed edit leaves the board working');
+
+  const sample = await startBoard(t, {}, true, true, { T3_STATE_DB: db });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.deepEqual((await sample.calls()).filter((args) => args[2] === 'PATCH'), []);
+});
+
+test('before an edit the board reads the PR again, keeps edits made since its read, and skips a block already current', async (t) => {
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
+    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
+      usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
+  ] }]);
+  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · T3 tokens 500 in (400 cached) / 20 out\n<!-- /mux-stats -->';
+  const url = (number: number) => `https://github.com/maddec01/mux-factory/pull/${number}`;
+  const pr = (number: number, body: string) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body });
+  const raw = rawIssue(12, 'Review');
+  const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
+    // Edits go in order, so once PR 40's lands, PR 43 was read and left alone.
+    pr(43, 'PR 43'), pr(44, `PR 44\n\n${block}`), pr(40, 'PR 40'),
+  ] } } }];
+  const liveBodies = { [url(40)]: 'PR 40, edited by Pedro', [url(43)]: `PR 43\n\n${block}` };
+  const board = await startBoard(t, { items, liveBodies }, false, false, { T3_STATE_DB: db });
+  const prCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && args[1] !== 'graphql');
+  for (let attempt = 0; attempt < 80 && !(await prCalls()).some((args) => args[2] === 'PATCH'); attempt++) {
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  const calls = await prCalls();
+  assert.deepEqual(calls.filter((args) => args[2] !== 'PATCH').map((args) => args[1]),
+    ['repos/maddec01/mux-factory/pulls/43', 'repos/maddec01/mux-factory/pulls/40'], 'only PRs the board thinks need an edit are read');
+  assert.deepEqual(calls.filter((args) => args[2] === 'PATCH').map((args) => [args[3], args[5]]),
+    [['repos/maddec01/mux-factory/pulls/40', `body=PR 40, edited by Pedro\n\n${block}`]]);
+});
+
+test('PR edits run beside the refreshes without holding them up, and never two syncs at once', async (t) => {
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
+    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
+      usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
+  ] }]);
+  const raw = rawIssue(12, 'Review');
+  const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
+    { number: 40, url: 'https://github.com/maddec01/mux-factory/pull/40', state: 'OPEN', isDraft: false, body: 'PR 40' },
+  ] } } }];
+  // Refreshes run every 100 ms; the edit takes 1.5 s.
+  const board = await startBoard(t, { items, prEditDelay: 1500 }, false, true, { T3_STATE_DB: db });
+  const prCalls = async () => (await board.calls()).filter((args) => args[1]?.startsWith('repos/') || args[2] === 'PATCH');
+  for (let attempt = 0; attempt < 80 && !(await prCalls()).some((args) => args[2] === 'PATCH'); attempt++) {
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  type Board = { fetchedAt: string; items: { linkedPrs: { body?: string }[] }[] };
+  const first = (await board.board()) as Board;
+  let later = first;
+  for (let attempt = 0; attempt < 40 && later.fetchedAt === first.fetchedAt; attempt++) {
+    await new Promise((r) => setTimeout(r, 25));
+    later = (await board.board()) as Board;
+  }
+  assert.notEqual(later.fetchedAt, first.fetchedAt, 'the board refreshed while the edit was under way');
+  assert.equal(later.items[0]?.linkedPrs[0]?.body, 'PR 40', 'the edit had not landed yet');
+  await new Promise((r) => setTimeout(r, 1700));
+  assert.deepEqual((await prCalls()).map((args) => args[2] === 'PATCH' ? 'PATCH' : 'read'), ['read', 'PATCH'],
+    'refreshes during the edit started no second sync');
+});

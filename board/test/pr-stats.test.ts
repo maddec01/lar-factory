@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prStatsEdits, statsBlock, withStatsBlock } from '../src/pr-stats.ts';
+import { prStatsEdits, statsBlock, updatedBody, withStatsBlock } from '../src/pr-stats.ts';
 import type { Item, ItemStats, LinkedPr } from '../src/model.ts';
 
 const stats: ItemStats = { agentMs: 65 * 60_000, tokens: { input: 1_234_567, cached: 900_000, output: 40_200, lowerBound: true },
@@ -17,7 +17,7 @@ test('the block rounds agent time to 5 minutes under an hour and to 15 from an h
   const time = (minutes: number) => /agent time ([^·]+) ·/.exec(statsBlock({ ...stats, agentMs: minutes * 60_000 }))?.[1];
   assert.deepEqual([0.4, 2.4, 2.6, 52, 57.4, 59.9].map(time), ['0m', '0m', '5m', '50m', '55m', '1h 0m']);
   assert.deepEqual([60, 67.4, 67.6, 128, 135].map(time), ['1h 0m', '1h 0m', '1h 15m', '2h 15m', '2h 15m']);
-  assert.equal(prStatsEdits([item([pr(1, 'OPEN', `Body\n\n${block}`)], { ...stats, agentMs: 66 * 60_000 })]).length, 0,
+  assert.equal(edits([item([pr(1, 'OPEN', `Body\n\n${block}`)], { ...stats, agentMs: 66 * 60_000 })]).length, 0,
     'a minute more agent time leaves the block alone');
 });
 
@@ -37,6 +37,8 @@ test('a body with a block gets only the block replaced', () => {
 
 const pr = (number: number, state: string, body: string | undefined): LinkedPr =>
   ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`, state, isDraft: false, checks: null, body });
+const REPOS = ['maddec01/mux-factory'];
+const edits = (items: Item[]) => prStatsEdits(items, REPOS);
 const item = (linkedPrs: LinkedPr[], itemStats: Item['stats'] | null = stats) => ({ linkedPrs, stats: itemStats ?? undefined }) as Item;
 
 test('markers count only alone on their own line, so a marker quoted in prose is left as it is', () => {
@@ -50,16 +52,29 @@ test('markers count only alone on their own line, so a marker quoted in prose is
 
 test('edits go to open linked PRs whose block is missing or out of date, never to closed or merged ones', () => {
   const current = `Body\n\n${block}`;
-  assert.deepEqual(prStatsEdits([item([pr(1, 'OPEN', 'Body'), pr(2, 'MERGED', 'Body'), pr(3, 'CLOSED', 'Body'), pr(4, 'OPEN', current)])]),
-    [{ url: pr(1, 'OPEN', '').url, body: current }]);
-  assert.deepEqual(prStatsEdits([item([pr(5, 'OPEN', current.replaceAll('\n', '\r\n'))])]), [],
+  assert.deepEqual(edits([item([pr(1, 'OPEN', 'Body'), pr(2, 'MERGED', 'Body'), pr(3, 'CLOSED', 'Body'), pr(4, 'OPEN', current)])]),
+    [{ url: pr(1, 'OPEN', '').url, block, body: current }]);
+  assert.deepEqual(edits([item([pr(5, 'OPEN', current.replaceAll('\n', '\r\n'))])]), [],
     'a block GitHub sent back with CRLF line ends is still current');
   const stale = `Body\n\n${statsBlock({ ...stats, agentMs: 0 })}`;
-  assert.deepEqual(prStatsEdits([item([pr(6, 'OPEN', stale)])]), [{ url: pr(6, 'OPEN', '').url, body: current }]);
+  assert.deepEqual(edits([item([pr(6, 'OPEN', stale)])]), [{ url: pr(6, 'OPEN', '').url, block, body: current }]);
+});
+
+test('an edit\'s block applies again to a newer body, and a body already current needs none', () => {
+  const edited = 'Body edited since the board read it';
+  assert.equal(updatedBody(edited, block), `${edited}\n\n${block}`);
+  assert.equal(updatedBody(`${edited}\n\n${statsBlock({ ...stats, agentMs: 0 })}`, block), `${edited}\n\n${block}`);
+  assert.equal(updatedBody(`${edited}\r\n\r\n${block.replaceAll('\n', '\r\n')}`, block), null);
+});
+
+test('PRs in a repo config.json doesn\'t list are left alone', () => {
+  const elsewhere = { ...pr(7, 'OPEN', 'Body'), url: 'https://github.com/someone/other/pull/7' };
+  const prefix = { ...pr(8, 'OPEN', 'Body'), url: 'https://github.com/maddec01/mux-factory-fork/pull/8' };
+  assert.deepEqual(edits([item([elsewhere, prefix, pr(9, 'OPEN', 'Body')])]).map((e) => e.url), [pr(9, 'OPEN', '').url]);
 });
 
 test('missing or unavailable stats, or an unread body, make no edit; a PR linked twice is edited once', () => {
-  assert.deepEqual(prStatsEdits([item([pr(1, 'OPEN', 'Body')], null), item([pr(2, 'OPEN', 'Body')], 'unavailable'),
+  assert.deepEqual(edits([item([pr(1, 'OPEN', 'Body')], null), item([pr(2, 'OPEN', 'Body')], 'unavailable'),
     item([pr(3, 'OPEN', undefined)])]), []);
-  assert.equal(prStatsEdits([item([pr(1, 'OPEN', 'Body')]), item([pr(1, 'OPEN', 'Body')], { ...stats, agentMs: 0 })]).length, 1);
+  assert.equal(edits([item([pr(1, 'OPEN', 'Body')]), item([pr(1, 'OPEN', 'Body')], { ...stats, agentMs: 0 })]).length, 1);
 });

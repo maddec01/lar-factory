@@ -9,11 +9,12 @@ import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { expandHome, loadConfig } from './config.ts';
-import { abandonItem, addProjectItem, fetchProject, findProjectNumber, setItemStatus } from './github.ts';
+import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
 import { loadItemStats, statsDbPath } from './item-stats.ts';
 import { claudeProjectsDir } from './subagent-tokens.ts';
+import { prStatsEdits, updatedBody } from './pr-stats.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
@@ -48,6 +49,7 @@ const transcriptsPath = claudeProjectsDir();
 let statsUnavailable = false;
 let projectNumber = config.number;
 let refreshing = false;
+let syncingPrStats = false;
 let revision = 0;
 /** Items this board just created or moved, shown as changed until GitHub reports the change. */
 const recentItems = new Map<string, { item: Item; revision: number; unconfirmedReads: number }>();
@@ -82,9 +84,39 @@ function withStats(items: Item[]): Item[] {
   });
 }
 
+/**
+ * Brings the stats block in each open linked PR in a configured repo up to date;
+ * a failed edit is logged and tried again next refresh. Runs beside the refreshes,
+ * never two at once: a refresh while one runs starts none.
+ */
+async function syncPrStats(items: Item[]): Promise<void> {
+  if (syncingPrStats) return;
+  syncingPrStats = true;
+  try {
+    await editPrStats(items);
+  } finally {
+    syncingPrStats = false;
+  }
+}
+
+async function editPrStats(items: Item[]): Promise<void> {
+  for (const edit of prStatsEdits(items, config.repos.map((r) => r.repo))) {
+    try {
+      // The board read the body a while ago; apply the block to the body as it is now, so no one's edit is lost.
+      const body = updatedBody(await readPrBody(edit.url), edit.block);
+      if (body === null) continue;
+      await editPrBody(edit.url, body);
+      log(`updated item stats in ${edit.url}`);
+    } catch (err) {
+      log(`could not update item stats in ${edit.url}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
+
 async function refresh(): Promise<void> {
   if (refreshing) return;
   refreshing = true;
+  let read = false;
   const readRevision = revision;
   try {
     projectNumber ??= await findProjectNumber(config.owner, config.title);
@@ -101,12 +133,15 @@ async function refresh(): Promise<void> {
     state.fetchedAt = new Date().toISOString();
     state.error = null;
     if (recovered) log(`read ${snapshot.items.length} items from ${snapshot.url}`);
+    read = true;
   } catch (err) {
     state.error = err instanceof Error ? err.message : String(err);
     log(`refresh failed, serving data from ${state.fetchedAt ?? 'never'}: ${state.error}`);
   } finally {
     refreshing = false;
   }
+  // PR edits take a gh call or two each; the board doesn't wait for them.
+  if (read) void syncPrStats(state.items);
 }
 
 // Browser modules: the shared template is served as JS by stripping its types.

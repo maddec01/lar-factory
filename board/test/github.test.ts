@@ -28,7 +28,7 @@ test('normalizes an issue item from the GraphQL response', () => {
       blocking: { totalCount: 1, nodes: [
         { number: 62, title: 'Blocked one', url: 'b62', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } },
       ] },
-      closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false }] },
+      closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false, body: 'PR body' }] },
     },
   };
   const item = normalizeItem(raw);
@@ -48,6 +48,8 @@ test('normalizes an issue item from the GraphQL response', () => {
     nodes: [{ number: 62, title: 'Blocked one', url: 'b62', repo: 'maddec01/mux-server', state: 'OPEN' }],
   });
   assert.equal(item?.linkedPrs.length, 1);
+  assert.equal(item?.linkedPrs[0]?.body, 'PR body', 'the stats block is kept from the body the board query reads');
+  assert.match(ITEMS_QUERY, /number url state isDraft body\n/, 'linked PR bodies come with the board query, not a call per item');
 });
 
 test('drafts, unknown statuses and hidden content', () => {

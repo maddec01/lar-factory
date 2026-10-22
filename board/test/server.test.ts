@@ -91,6 +91,8 @@ test('successful refreshes eventually remove a created item whose project member
 });
 
 /** The board's items once its first read lands. */
+const rawBuild = (number: number, status: string) => rawIssue(number, status, undefined, ['build']);
+
 async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise<{ number: number; stats?: unknown }[]> {
   for (let attempt = 0; attempt < 80; attempt++) {
     const { items } = await board.board();
@@ -121,7 +123,7 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   const pr = (number: number, state: string) => ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`,
     state, isDraft: false, body: `PR ${number}` });
   const withPrs = (number: number, prs: object[]) => {
-    const raw = rawIssue(number, 'Review');
+    const raw = rawBuild(number, 'Review');
     return { ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: prs } } };
   };
   const items = [withPrs(12, [pr(40, 'OPEN'), pr(41, 'MERGED')]), withPrs(13, [pr(42, 'OPEN')])];
@@ -148,7 +150,7 @@ test('a merged item shows the figures in its merged PR\'s block, not live ones, 
     { id: 'b', messages: ['Build maddec01/mux-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
   const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
   const merged = (number: number, prNumber: number, body: string) => {
-    const raw = rawIssue(number, 'Done');
+    const raw = rawBuild(number, 'Done');
     return { ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
       { number: prNumber, url: `https://github.com/maddec01/mux-factory/pull/${prNumber}`, state: 'MERGED', isDraft: false, body },
     ] } } };
@@ -170,7 +172,7 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   ] }]);
   const frozenBlock = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
   const url = (number: number) => `https://github.com/maddec01/mux-factory/pull/${number}`;
-  const raw = rawIssue(12, 'Review');
+  const raw = rawBuild(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
     { number: 40, url: url(40), state: 'MERGED', isDraft: false, body: `PR 40\n\n${frozenBlock}`, mergedAt: '2026-10-19T00:00:00Z' },
     { number: 41, url: url(41), state: 'OPEN', isDraft: false, body: 'PR 41', mergedAt: null },
@@ -185,6 +187,27 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   assert.equal(edit?.[5], 'body=PR 41\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
 });
 
+test('an issue that isn\'t a build shows live figures and writes no block, even linked to a build\'s PRs', async (t) => {
+  const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
+  const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/mux-factory#12'], turns },
+    { id: 'b', messages: ['/mux-work maddec01/mux-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
+  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
+  const prs = { nodes: [
+    { number: 40, url: 'https://github.com/maddec01/mux-factory/pull/40', state: 'MERGED', isDraft: false, body: `PR 40\n\n${block}` },
+    { number: 41, url: 'https://github.com/maddec01/mux-factory/pull/41', state: 'OPEN', isDraft: false, body: 'PR 41' },
+  ] };
+  const build = rawBuild(12, 'Done');
+  const parent = rawIssue(13, 'In progress');
+  const items = [{ ...parent, content: { ...parent.content, closedByPullRequestsReferences: prs } },
+    { ...build, content: { ...build.content, closedByPullRequestsReferences: { nodes: [prs.nodes[0]] } } }];
+  const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
+  const read = await readItems(board);
+  assert.deepEqual(read.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
+  assert.equal((read.find((i) => i.number === 12)?.stats as { frozen?: boolean } | undefined)?.frozen, true);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH'), []);
+});
+
 test('before an edit the board reads the PR again, keeps edits made since its read, and skips a block already current', async (t) => {
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
@@ -192,7 +215,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
   const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->';
   const url = (number: number) => `https://github.com/maddec01/mux-factory/pull/${number}`;
   const pr = (number: number, body: string) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body });
-  const raw = rawIssue(12, 'Review');
+  const raw = rawBuild(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
     // Edits go in order, so once PR 40's lands, PR 43 was read and left alone.
     pr(43, 'PR 43'), pr(44, `PR 44\n\n${block}`), pr(40, 'PR 40'),
@@ -214,7 +237,7 @@ test('PR edits run beside the refreshes without holding them up, and never two s
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const raw = rawIssue(12, 'Review');
+  const raw = rawBuild(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
     { number: 40, url: 'https://github.com/maddec01/mux-factory/pull/40', state: 'OPEN', isDraft: false, body: 'PR 40' },
   ] } } }];

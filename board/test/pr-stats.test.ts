@@ -46,9 +46,9 @@ test('a body with a block gets only the block replaced', () => {
 
 const pr = (number: number, state: string, body: string | undefined, mergedAt?: string): LinkedPr =>
   ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`, state, isDraft: false, checks: null, body, mergedAt });
-const REPOS = ['maddec01/mux-factory'];
-const edits = (items: Item[]) => prStatsEdits(items, REPOS);
-const item = (linkedPrs: LinkedPr[], itemStats: Item['stats'] | null = stats) => ({ linkedPrs, stats: itemStats ?? undefined }) as Item;
+const edits = (items: Item[]) => prStatsEdits(items);
+const item = (linkedPrs: LinkedPr[], itemStats: Item['stats'] | null = stats, labels = ['build'], repo = 'maddec01/mux-factory') =>
+  ({ linkedPrs, stats: itemStats ?? undefined, labels, repo }) as Item;
 
 test('markers count only alone on their own line, so a marker quoted in prose is left as it is', () => {
   const prose = 'The board writes `<!-- mux-stats -->` and <!-- /mux-stats --> markers.';
@@ -76,10 +76,27 @@ test('an edit\'s block applies again to a newer body, and a body already current
   assert.equal(updatedBody(`${edited}\r\n\r\n${block.replaceAll('\n', '\r\n')}`, block), null);
 });
 
-test('PRs in a repo config.json doesn\'t list are left alone', () => {
+test('PRs in a repo with no items on the project are left alone; any repo with items gets its blocks', () => {
   const elsewhere = { ...pr(7, 'OPEN', 'Body'), url: 'https://github.com/someone/other/pull/7' };
   const prefix = { ...pr(8, 'OPEN', 'Body'), url: 'https://github.com/maddec01/mux-factory-fork/pull/8' };
-  assert.deepEqual(edits([item([elsewhere, prefix, pr(9, 'OPEN', 'Body')])]).map((e) => e.url), [pr(9, 'OPEN', '').url]);
+  const app = { ...pr(10, 'OPEN', 'Body'), url: 'https://github.com/maddec01/mux-app/pull/10' };
+  assert.deepEqual(edits([item([elsewhere, prefix, pr(9, 'OPEN', 'Body')]), item([app], stats, ['build'], 'maddec01/mux-app')]).map((e) => e.url),
+    [pr(9, 'OPEN', '').url, app.url]);
+  assert.deepEqual(edits([item([app]), item([], null, [], 'maddec01/mux-app')]).map((e) => e.url), [app.url],
+    'an item without stats still puts its repo on the project');
+});
+
+test('only builds write a PR\'s block: a parent that isn\'t a build, linked to the same PR, writes nothing', () => {
+  const parent = item([pr(1, 'OPEN', 'Body')], { ...stats, agentMs: 0 }, ['feature']);
+  assert.deepEqual(edits([parent, item([pr(1, 'OPEN', 'Body')])]), [{ url: pr(1, 'OPEN', '').url, block, body: `Body\n\n${block}` }]);
+  assert.deepEqual(edits([parent]), []);
+  assert.deepEqual(edits([item([pr(2, 'OPEN', 'Body')], stats, ['build', 'concept'])]), [], 'a concept map is no build');
+});
+
+test('only builds freeze figures from a merged PR; an issue that isn\'t a build keeps live figures', () => {
+  const merged = [pr(1, 'MERGED', `Body\n\n${block}`)];
+  assert.equal(mergedStats(item(merged))?.costUsd, 41);
+  assert.equal(mergedStats(item(merged, stats, ['feature'])), null);
 });
 
 test('missing or unavailable stats, or an unread body, make no edit; a PR linked twice is edited once', () => {

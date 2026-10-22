@@ -96,7 +96,7 @@ function withStats(items: Item[]): Item[] {
 }
 
 /**
- * Brings the stats block in each open linked PR in a configured repo up to date;
+ * Brings the stats block in each open PR linked to a build up to date;
  * a failed edit is logged and tried again next refresh. Runs beside the refreshes,
  * never two at once: a refresh while one runs starts none.
  */
@@ -111,7 +111,7 @@ async function syncPrStats(items: Item[]): Promise<void> {
 }
 
 async function editPrStats(items: Item[]): Promise<void> {
-  for (const edit of prStatsEdits(items, config.repos.map((r) => r.repo))) {
+  for (const edit of prStatsEdits(items)) {
     try {
       // The board read the body a while ago; apply the block to the body as it is now, so no one's edit is lost.
       const body = updatedBody(await readPrBody(edit.url), edit.block);

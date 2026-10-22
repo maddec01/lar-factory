@@ -11,12 +11,12 @@ async function readCalls(file: string): Promise<string[][]> {
 }
 
 /** A raw GraphQL project item, as the fake gh returns it. */
-export function rawIssue(number: number, status: string, repo = 'maddec01/mux-factory') {
+export function rawIssue(number: number, status: string, repo = 'maddec01/mux-factory', labels: string[] = []) {
   return {
     id: `PVTI_${number}`, updatedAt: '2026-10-21T09:00:00Z', status: { name: status },
     content: { __typename: 'Issue', number, title: `Issue ${number}`, url: `https://github.com/${repo}/issues/${number}`,
       state: 'OPEN', closedAt: null, updatedAt: '2026-10-21T09:00:00Z', repository: { nameWithOwner: repo },
-      labels: { nodes: [] }, parent: null, subIssuesSummary: { total: 0, completed: 0 },
+      labels: { nodes: labels.map((name) => ({ name })) }, parent: null, subIssuesSummary: { total: 0, completed: 0 },
       issueDependenciesSummary: { blockedBy: 0 }, blockedBy: { totalCount: 0, nodes: [] }, blocking: { totalCount: 0, nodes: [] },
       closedByPullRequestsReferences: { nodes: [] } },
   };

@@ -2,7 +2,7 @@
 // item. Pure: the server reads the bodies with the board query, reads each PR to
 // edit again, and sends the edits.
 
-import type { Item, ItemStats } from './model.ts';
+import { isBuild, type Item, type ItemStats } from './model.ts';
 import { duration, formatTokens, wholeUsd } from './render.ts';
 
 const START = '<!-- mux-stats -->';
@@ -59,12 +59,13 @@ function blockStats(body: string): ItemStats | null {
 }
 
 /**
- * An item's figures frozen in its most recently merged linked PR with a readable
+ * A build's figures frozen in its most recently merged linked PR with a readable
  * block, so Claude's transcript deletion doesn't shrink done items; null to use
- * live stats, as when an open linked PR is still being worked on.
+ * live stats, as when an open linked PR is still being worked on, or for an item
+ * that isn't a build, whose linked PR carries a build's figures.
  */
 export function mergedStats(item: Item): ItemStats | null {
-  if (item.linkedPrs.some((pr) => pr.state === 'OPEN')) return null;
+  if (!isBuild(item) || item.linkedPrs.some((pr) => pr.state === 'OPEN')) return null;
   const merged = item.linkedPrs.filter((pr) => pr.state === 'MERGED')
     .sort((a, b) => (b.mergedAt ?? '').localeCompare(a.mergedAt ?? ''));
   for (const pr of merged) {
@@ -103,6 +104,9 @@ export function updatedBody(body: string, block: string): string | null {
   return withStatsBlock(body, block);
 }
 
+/** A PR URL's owner/repo, lower-cased; empty for a URL that isn't a GitHub PR. */
+const prRepo = (url: string) => /^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\//.exec(url)?.[1]?.toLowerCase() ?? '';
+
 export interface PrBodyEdit {
   url: string;
   /** The current block, to apply again to the PR's latest body before the edit is sent. */
@@ -112,21 +116,23 @@ export interface PrBodyEdit {
 }
 
 /**
- * The open linked PRs whose block is missing or out of date, with their new bodies.
- * Items without stats, and PRs whose body wasn't read, are left alone. A PR linked
- * to several items takes the first item's stats, so the items don't take turns.
- * Only PRs in `repos`, the repos config.json lists, are edited: an issue can be
- * closed by a PR in a repo the board doesn't manage.
+ * The open PRs linked to builds whose block is missing or out of date, with their
+ * new bodies. A build's PR carries the build's stats; other items linked to it, such
+ * as a parent the PR also closes, write nothing. Builds without stats, and PRs whose
+ * body wasn't read, are left alone; a PR is edited once even if two builds link it.
+ * Only PRs in a repo with items on the project are edited: an issue can be closed by
+ * a PR in a repo the board doesn't follow.
  */
-export function prStatsEdits(items: readonly Item[], repos: readonly string[]): PrBodyEdit[] {
+export function prStatsEdits(items: readonly Item[]): PrBodyEdit[] {
+  const repos = new Set(items.flatMap((item) => item.repo ? [item.repo.toLowerCase()] : []));
   const seen = new Set<string>();
   const edits: PrBodyEdit[] = [];
   for (const item of items) {
     const stats = item.stats;
-    if (!stats || stats === 'unavailable') continue;
+    if (!isBuild(item) || !stats || stats === 'unavailable') continue;
     for (const pr of item.linkedPrs) {
       if (pr.state !== 'OPEN' || pr.body === undefined || seen.has(pr.url)) continue;
-      if (!repos.some((repo) => pr.url.startsWith(`https://github.com/${repo}/pull/`))) continue;
+      if (!repos.has(prRepo(pr.url))) continue;
       seen.add(pr.url);
       const block = statsBlock(stats);
       const body = updatedBody(pr.body, block);

@@ -12,6 +12,7 @@ import { expandHome, loadConfig } from './config.ts';
 import { abandonItem, addProjectItem, fetchProject, findProjectNumber, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
+import { loadItemStats, statsDbPath } from './item-stats.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
@@ -41,6 +42,8 @@ const state: BoardData = {
   items: [],
 };
 
+const statsPath = statsDbPath();
+let statsUnavailable = false;
 let projectNumber = config.number;
 let refreshing = false;
 let revision = 0;
@@ -64,6 +67,19 @@ function log(message: string): void {
   console.log(`${new Date().toISOString()} ${message}`);
 }
 
+/** Attaches each issue's item stats, read afresh from T3 Code's database; the board keeps working without them. */
+function withStats(items: Item[]): Item[] {
+  const stats = loadItemStats(statsPath, Date.now());
+  if ((stats === 'unavailable') !== statsUnavailable) {
+    statsUnavailable = !statsUnavailable;
+    log(statsUnavailable ? `item stats unavailable: can't read ${statsPath}` : `item stats readable again from ${statsPath}`);
+  }
+  return items.map((item) => {
+    if (!item.repo || item.number === null || !stats) return { ...item, stats: undefined };
+    return { ...item, stats: stats === 'unavailable' ? stats : stats(item.repo, item.number) ?? undefined };
+  });
+}
+
 async function refresh(): Promise<void> {
   if (refreshing) return;
   refreshing = true;
@@ -79,7 +95,7 @@ async function refresh(): Promise<void> {
       const reported = snapshot.items.some((i) => i.id === id && i.status === recent.item.status);
       if (reported || ++recent.unconfirmedReads >= 3) recentItems.delete(id);
     }
-    state.items = [...snapshot.items.filter((i) => !recentItems.has(i.id) && !abandoned.has(i.id)), ...[...recentItems.values()].map((r) => r.item)];
+    state.items = withStats([...snapshot.items.filter((i) => !recentItems.has(i.id) && !abandoned.has(i.id)), ...[...recentItems.values()].map((r) => r.item)]);
     state.fetchedAt = new Date().toISOString();
     state.error = null;
     if (recovered) log(`read ${snapshot.items.length} items from ${snapshot.url}`);

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { startBoard } from './server-support.ts';
+import { rawIssue, startBoard } from './server-support.ts';
+import { statsDb } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
 
 const draft = { repo: 'maddec01/mux-factory', kind: 'feature', title: 'Capture an item', description: '', labels: [] };
@@ -87,4 +88,26 @@ test('successful refreshes eventually remove a created item whose project member
     await new Promise((r) => setTimeout(r, 50));
   }
   assert.equal((await board.board()).items.length, 0, 'a temporary overlay cannot outlive repeated authoritative reads');
+});
+
+/** The board's items once its first read lands. */
+async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise<{ number: number; stats?: unknown }[]> {
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const { items } = await board.board();
+    if (items.length) return items;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error('The board never read its items');
+}
+
+test('each refresh attaches item stats from T3 Code\'s database, and a missing database leaves them out', async (t) => {
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
+    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
+      usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
+  ] }]);
+  const items = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done'), rawIssue(13, 'Review')] }, false, false, { T3_STATE_DB: db }));
+  assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, tokens: { input: 500, cached: 400, output: 20, lowerBound: false } });
+  assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
+  const [without] = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done')] }));
+  assert.equal(without?.stats, undefined);
 });

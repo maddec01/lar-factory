@@ -119,9 +119,19 @@ export function ago(iso: string, now: number): string {
 }
 
 /** A running time in whole minutes: `12m`, `1h 5m`. */
-function elapsed(iso: string, now: number): string {
-  const m = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));
+function duration(ms: number): string {
+  const m = Math.max(0, Math.floor(ms / 60_000));
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function elapsed(iso: string, now: number): string {
+  return duration(now - Date.parse(iso));
+}
+
+/** 40200 → 40k, 1234567 → 1.2M. */
+function tokenCount(n: number): string {
+  if (n >= 999_500) return `${Number((n / 1e6).toFixed(1))}M`;
+  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -230,6 +240,15 @@ const HINTS: Partial<Record<Status, string>> = {
   'Ready to merge': 'Merge the PR',
 };
 
+/** Agent time and T3 tokens, for a card's footer or a Done row; nothing when no thread worked on the item. */
+function statsBadge(item: Item): string {
+  const stats = item.stats;
+  if (!stats) return '';
+  if (stats === 'unavailable') return '<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>';
+  const { input, cached, output, lowerBound } = stats.tokens;
+  return `<span class="stats" title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output">${duration(stats.agentMs)} · ${lowerBound ? '≥' : ''}${tokenCount(input)} in (${tokenCount(cached)} cached) / ${tokenCount(output)} out</span>`;
+}
+
 /** `action` is a button for the card's top row, so it adds no height. */
 function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', action = ''): string {
   const parent = item.parent
@@ -249,7 +268,8 @@ function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', acti
         `<span class="linked-pr"><a class="pr" href="${esc(pr.url)}" target="_blank" rel="noopener">PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'OPEN' ? '' : ` (${esc(pr.state.toLowerCase())})`}</a>${checksBadge(pr, opts.now)}</span>`,
     )
     .join('');
-  const foot = hint || prs ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}</p>` : '';
+  const stats = statsBadge(item);
+  const foot = hint || prs || stats ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}${stats}</p>` : '';
   return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}" data-anchor="${esc(item.id)}">
 <div class="meta"><span class="badges">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}</span>${action}</div>
 ${titleLink(item)}
@@ -588,7 +608,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
             row(
               i,
               data,
-              `<span class="when">${day(i.closedAt ?? i.updatedAt, opts.timeZone)}</span>`,
+              `${statsBadge(i)}<span class="when">${day(i.closedAt ?? i.updatedAt, opts.timeZone)}</span>`,
             ),
           )
           .join('')}</ul>`

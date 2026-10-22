@@ -44,7 +44,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     cwd: directory ?? new URL('../', import.meta.url),
     env: { ...process.env, BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname,
-      FAKE_GH_STATE: stateFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '', ...env },
+      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), BOARD_DATA_FILE: fixture ? 'test/sample.json' : '', ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';

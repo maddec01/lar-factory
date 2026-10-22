@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI, abandonPrompt, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
-import type { BoardData } from '../src/model.ts';
+import type { BoardData, Item } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
 import type { RawItem } from '../src/github.ts';
 
@@ -538,4 +538,20 @@ test("a linked PR shows its checks: running with counts and age, amber when slow
   assert.match(html, /PR #12<\/a><span class="checks failed" title="1 of 5 checks failed">checks failed<\/span>/);
   assert.match(html, /PR #13<\/a>(?!<span class="checks)/);
   assert.match(html, /PR #14 \(closed\)<\/a>(?!<span class="checks)/, 'only open PRs show checks');
+});
+
+test('cards and Done rows show item stats: agent time and T3 tokens, a lower bound marked ≥, or that they are unavailable', () => {
+  const stats = { agentMs: (2 * 60 + 14) * 60_000 + 59_000, tokens: { input: 1_234_567, cached: 900_400, output: 40_200, lowerBound: false } };
+  const statsOf = (item: Partial<Item>) => {
+    const html = renderBoardView({ ...sample, items: [{ ...sample.items[0]!, ...item }] }, base);
+    return html.match(/<span class="stats"[^>]*>[^<]*<\/span>/g);
+  };
+  const title = 'title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output"';
+  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>2h 14m · 1.2M in (900k cached) / 40k out</span>`]);
+  assert.deepEqual(statsOf({ status: 'In progress', stats: { agentMs: 45 * 60_000, tokens: { input: 980, cached: 0, output: 12, lowerBound: true } } }),
+    [`<span class="stats" ${title}>45m · ≥980 in (0 cached) / 12 out</span>`]);
+  assert.deepEqual(statsOf({ status: 'Shaping', stats: 'unavailable' }), ['<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>']);
+  assert.deepEqual(statsOf({ status: 'Done', closedAt: '2026-10-20T10:00:00Z', stats }),
+    [`<span class="stats" ${title}>2h 14m · 1.2M in (900k cached) / 40k out</span>`], 'Done rows keep their stats');
+  assert.equal(statsOf({ status: 'Ready' }), null, 'no stats without matched threads');
 });

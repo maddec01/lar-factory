@@ -310,7 +310,16 @@
       "updatedAt": "2026-10-21T09:00:00Z",
       "closedAt": null,
       "linkedPrs": [],
-      "slices": []
+      "slices": [],
+      "stats": {
+        "agentMs": 2280000,
+        "tokens": {
+          "input": 2480000,
+          "cached": 2310000,
+          "output": 21400,
+          "lowerBound": false
+        }
+      }
     },
     {
       "id": "PVTI_sample09",
@@ -423,7 +432,16 @@
       "updatedAt": "2026-10-21T09:30:00Z",
       "closedAt": null,
       "linkedPrs": [],
-      "slices": []
+      "slices": [],
+      "stats": {
+        "agentMs": 3120000,
+        "tokens": {
+          "input": 3120000,
+          "cached": 2950000,
+          "output": 30800,
+          "lowerBound": true
+        }
+      }
     },
     {
       "id": "PVTI_sample12",
@@ -736,7 +754,16 @@
           }
         }
       ],
-      "slices": []
+      "slices": [],
+      "stats": {
+        "agentMs": 8040000,
+        "tokens": {
+          "input": 12600000,
+          "cached": 11900000,
+          "output": 140200,
+          "lowerBound": false
+        }
+      }
     },
     {
       "id": "PVTI_sample15",
@@ -789,7 +816,16 @@
           }
         }
       ],
-      "slices": []
+      "slices": [],
+      "stats": {
+        "agentMs": 3900000,
+        "tokens": {
+          "input": 6430000,
+          "cached": 6020000,
+          "output": 61000,
+          "lowerBound": false
+        }
+      }
     },
     {
       "id": "PVTI_sample16",
@@ -887,7 +923,16 @@
           }
         }
       ],
-      "slices": []
+      "slices": [],
+      "stats": {
+        "agentMs": 2820000,
+        "tokens": {
+          "input": 4050000,
+          "cached": 3880000,
+          "output": 39500,
+          "lowerBound": false
+        }
+      }
     },
     {
       "id": "PVTI_sample18",
@@ -970,7 +1015,16 @@
           }
         }
       ],
-      "slices": []
+      "slices": [],
+      "stats": {
+        "agentMs": 13260000,
+        "tokens": {
+          "input": 21700000,
+          "cached": 20400000,
+          "output": 233000,
+          "lowerBound": true
+        }
+      }
     },
     {
       "id": "PVTI_sample20",

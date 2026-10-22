@@ -127,6 +127,7 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .hint { color: var(--you-text); font-weight: 600; }
 .pr { color: var(--fg); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.stats { flex: none; white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .linked-pr { display: inline-flex; align-items: center; gap: 6px; }
 .checks { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--r-sm); padding: 1px 6px; border: 1px solid var(--bd); white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .checks::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k); }
@@ -337,6 +338,11 @@ a.o-title:hover { text-decoration: underline; }
 }
 @media (max-width: 560px) {
   #app { padding: 12px; }
+  /* Item stats don't fit beside the title on a phone, so they and the labels wrap below it; the title keeps the first line. */
+  .rows .row-item:has(.stats) { flex-wrap: wrap; }
+  .rows .row-item:has(.stats) .row-title { flex: 1 1 0; }
+  .rows .row-item:has(.stats) .labels { flex: 1 0 100%; flex-wrap: wrap; mask-image: none; }
+  .rows .row-item:has(.stats) .labels:empty { display: none; }
   .o-links { padding-left: 12px; }
   .o-node .o-tree { margin-left: 6px; padding-left: 8px; }
 }

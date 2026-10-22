@@ -38,7 +38,7 @@ _Avoid_: build issue
 
 **Slice**:
 A small, independently testable piece of a build, recorded as a sub-issue of
-the build issue and implemented by one subagent.
+the build issue and implemented by one implementer.
 _Avoid_: ticket, chunk, task
 
 **Active slice**:
@@ -63,6 +63,10 @@ brief before handing off to a build thread.
 **Build thread**:
 The separate conversation that takes a passing brief through implementation,
 review and PR checks in the issue repository's own workspace.
+
+**Child task**:
+Delegated work a thread owns and addresses only by its task ID; its backing thread is never used as a conversation.
+_Avoid_: delegated thread, child thread
 
 **Reviewer**:
 A fresh-context agent assessing a change on one review axis: code, security,

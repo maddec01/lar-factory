@@ -1,0 +1,3 @@
+# Item stats come from T3 Code's local database
+
+[Issue #60](https://github.com/maddec01/mux-factory/issues/60) settled that the board computes item stats itself by reading T3 Code's internal SQLite database read-only, matching an item's threads by their first user message. It adds Claude subagent tokens from Claude Code transcripts and rewrites a marked stats block in the open PR. No T3 MCP tool exposes token usage, and having agents report their own usage would miss turns and spend tokens. The cost is coupling to an internal schema that may change between T3 releases, so the read lives in one module and fails soft.

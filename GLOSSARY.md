@@ -113,3 +113,13 @@ or hand checks, awaiting Pedro's merge.
 
 **Done**:
 Completed work, reached when its issue closes or its PR merges.
+
+### Item stats
+
+**Agent time**:
+The sum of an item's turn run times across all its threads, excluding time a turn spends waiting on Pedro.
+_Avoid_: duration, elapsed time, wall time
+
+**Item stats**:
+An item's agent time and tokens: T3-counted tokens across its threads, plus Claude subagent tokens from transcripts, shown apart.
+_Avoid_: usage, cost, metrics

@@ -125,7 +125,8 @@ and [issue dependencies API](https://docs.github.com/en/rest/issues/issue-depend
 
 ## Slices
 
-A slice is a native sub-issue of a `build` issue. Create it and its
+A slice is a native sub-issue of a `build` issue; a sub-issue labelled
+`build` is a build, never a slice. Create it and its
 blocked-by links with the commands above (`--parent "$build"`, then
 `--add-blocked-by`). An **active slice** carries the `active` label while
 an implementer works on it; the board reads it to show progress. Add it when
@@ -158,15 +159,20 @@ query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){
 
 ## Parent closing
 
-Print the build's parent (or `no parent`), then the parent's open sub-issues
-other than the build (none printed: the build is the last):
+A build closes its parent when the parent isn't a build and every other open
+sub-issue of it blocks this build. Print the build's parent (or `no parent`),
+whether it's a build, then the parent's other open sub-issues that don't block
+this build (none printed and not a build: this build's PR closes it):
 
 ```sh
 parent_url=$(gh issue view "$build" --repo "$repo" --json parent --jq '.parent.url // empty')
 if [ -z "$parent_url" ]; then echo "no parent"; else
   echo "parent: $parent_url"
+  gh issue view "$parent_url" --json labels --jq 'if any(.labels[]; .name == "build") then "parent is a build" else "parent is not a build" end'
+  blockers=$(gh api --paginate "repos/$repo/issues/$build/dependencies/blocked_by" --jq '.[].html_url')
   gh api --paginate "repos/${parent_url#https://github.com/}/sub_issues" \
-    --jq ".[] | select(.state == \"open\" and .html_url != \"https://github.com/$repo/issues/$build\") | .html_url"
+    --jq ".[] | select(.state == \"open\" and .html_url != \"https://github.com/$repo/issues/$build\") | .html_url" |
+    grep -Fxv -f <(printf '%s\n' "$blockers") || true
 fi
 ```
 

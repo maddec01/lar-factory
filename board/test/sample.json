@@ -527,21 +527,24 @@
           "title": "Owner table and sign-up",
           "url": "https://github.com/maddec01/mux-server/issues/144",
           "repo": "maddec01/mux-server",
-          "state": "CLOSED"
+          "state": "CLOSED",
+          "progress": "done"
         },
         {
           "number": 145,
           "title": "Sign-in sessions",
           "url": "https://github.com/maddec01/mux-server/issues/145",
           "repo": "maddec01/mux-server",
-          "state": "OPEN"
+          "state": "OPEN",
+          "progress": "active"
         },
         {
           "number": 146,
           "title": "Owner settings page",
           "url": "https://github.com/maddec01/mux-server/issues/146",
           "repo": "maddec01/mux-server",
-          "state": "OPEN"
+          "state": "OPEN",
+          "progress": "waiting"
         }
       ]
     },

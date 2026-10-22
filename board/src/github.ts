@@ -1,8 +1,8 @@
 // Reads the Mux project through the local `gh` CLI (`gh api graphql`).
 
 import { execFile } from 'node:child_process';
-import { STATUSES, isBuild } from './model.ts';
-import type { Checks, ContentType, IssueLinks, IssueRef, Item, LinkedPr, Status } from './model.ts';
+import { STATUSES, isBuild, sliceProgress } from './model.ts';
+import type { Checks, ContentType, IssueLinks, IssueRef, Item, LinkedPr, Slice, Status } from './model.ts';
 import type { BoardConfig } from './config.ts';
 import type { CreationProgress, CreationResult } from './add-item.ts';
 import { validateDraft } from './add-item.ts';
@@ -16,6 +16,8 @@ const CHECK_SLICE = 20;
 const LINK_SLICE = 20;
 /** A build's slices read per build; more than this is a build to split. */
 const SLICE_LIMIT = 50;
+/** Open issues with the `active` label read per refresh; far more than the builder runs at once. */
+const ACTIVE_LIMIT = 100;
 
 export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String) {
   user(login: $owner) {
@@ -39,7 +41,7 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               labels(first: 20) { nodes { name } }
               parent { number title url state repository { nameWithOwner } }
               subIssuesSummary { total completed }
-              subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state repository { nameWithOwner } } }
+              subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state stateReason repository { nameWithOwner } } }
               issueDependenciesSummary { blockedBy }
               blockedBy(first: ${LINK_SLICE}) { ...links }
               blocking(first: ${LINK_SLICE}) { ...links }
@@ -73,6 +75,14 @@ fragment links on IssueConnection {
   nodes { number title url state repository { nameWithOwner } }
 }`;
 
+/**
+ * The open issues labelled `active` in the repos of the builds' open slices. Labels
+ * on every sub-issue in ITEMS_QUERY cost 60 points a page; this search costs 1.
+ */
+export const ACTIVE_SLICES_QUERY = `query($q: String!) {
+  search(type: ISSUE, first: ${ACTIVE_LIMIT}, query: $q) { nodes { ... on Issue { number repository { nameWithOwner } } } }
+}`;
+
 const FIND_PROJECT_QUERY = `query($owner: String!, $title: String!) {
   user(login: $owner) { projectsV2(first: 50, query: $title) { nodes { number title } } }
 }`;
@@ -83,12 +93,18 @@ interface RawLabelConn {
   nodes: { name: string }[];
 }
 
-interface RawIssueRef {
+export interface RawIssueRef {
   number: number;
   title: string;
   url: string;
   state: 'OPEN' | 'CLOSED';
+  /** Read for sub-issues only. */
+  stateReason?: string | null;
   repository: { nameWithOwner: string };
+}
+
+export interface RawActiveSlices {
+  data: { search: { nodes: { number?: number; repository?: { nameWithOwner: string } }[] } };
 }
 
 interface RawIssueLinks {
@@ -217,12 +233,29 @@ function normalizeLinks(raw: RawIssueLinks | undefined): IssueLinks {
   return { total: raw?.totalCount ?? 0, nodes: raw?.nodes.map(normalizeIssueRef) ?? [] };
 }
 
+const rawLabels = (raw: RawItem): string[] => raw.content?.labels?.nodes.map((l) => l.name) ?? [];
+
+/** A build's sub-issues, including those closed as not planned; none for other items. A concept's sub-issues are items on the board. */
+function rawSlices(raw: RawItem): RawIssueRef[] {
+  return isBuild({ labels: rawLabels(raw) }) ? raw.content?.subIssues?.nodes ?? [] : [];
+}
+
+const refKey = (repo: string | null, number: number | null) => `${repo}#${number}`;
+
+/** Keeps GitHub's sub-issue order and hides slices closed as not planned. `active` holds the `repo#number` keys of open issues labelled `active`. */
+function normalizeSlices(raws: RawIssueRef[], active: ReadonlySet<string>): Slice[] {
+  return raws.flatMap((raw) => {
+    const progress = sliceProgress(raw.state, raw.stateReason ?? null, active.has(refKey(raw.repository.nameWithOwner, raw.number)));
+    return progress ? [{ ...normalizeIssueRef(raw), progress }] : [];
+  });
+}
+
 /** Turns one raw project item into the board's Item; null for items we can't see. */
-export function normalizeItem(raw: RawItem): Item | null {
+export function normalizeItem(raw: RawItem, active: ReadonlySet<string> = new Set()): Item | null {
   const c = raw.content;
   if (!c) return null;
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
-  const item: Item = {
+  return {
     id: raw.id,
     status: toStatus(raw.status?.name),
     type: c.__typename,
@@ -230,7 +263,7 @@ export function normalizeItem(raw: RawItem): Item | null {
     title: c.title,
     url: c.url ?? null,
     repo: c.repository?.nameWithOwner ?? null,
-    labels: c.labels?.nodes.map((l) => l.name) ?? [],
+    labels: rawLabels(raw),
     state: c.state ?? null,
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
     subIssues: c.subIssuesSummary ?? { total: 0, completed: 0 },
@@ -240,23 +273,33 @@ export function normalizeItem(raw: RawItem): Item | null {
     updatedAt: updated,
     closedAt: c.closedAt ?? null,
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
-    slices: [],
+    slices: normalizeSlices(rawSlices(raw), active),
   };
-  // Only a build's sub-issues are slices; a concept's are items on the board.
-  return isBuild(item) ? { ...item, slices: c.subIssues?.nodes.map(normalizeIssueRef) ?? [] } : item;
 }
-
-const refKey = (repo: string | null, number: number | null) => `${repo}#${number}`;
 
 /**
  * Normalizes a project's raw items into board items. A slice lives inside its
  * build's card, so it's dropped here even when the project's auto-add put it on
  * the project. Membership in some build's slices decides, since `parent` has no labels.
  */
-export function normalizeItems(raws: RawItem[]): Item[] {
-  const items = raws.map(normalizeItem).filter((i): i is Item => i !== null);
-  const slices = new Set(items.flatMap((i) => i.slices.map((s) => refKey(s.repo, s.number))));
+export function normalizeItems(raws: RawItem[], active: ReadonlySet<string> = new Set()): Item[] {
+  const items: Item[] = [];
+  const slices = new Set<string>();
+  for (const raw of raws) {
+    const item = normalizeItem(raw, active);
+    if (!item) continue;
+    items.push(item);
+    // A slice closed as not planned is hidden from its build, but it's still no board item.
+    for (const s of rawSlices(raw)) slices.add(refKey(s.repository.nameWithOwner, s.number));
+  }
   return items.filter((i) => i.type === 'DraftIssue' || !slices.has(refKey(i.repo, i.number)));
+}
+
+/** The ACTIVE_SLICES_QUERY search for the repos holding the builds' open slices; null when none is open. */
+export function activeSliceSearch(raws: RawItem[]): string | null {
+  const repos = new Set(raws.flatMap((raw) =>
+    rawSlices(raw).filter((s) => s.state === 'OPEN').map((s) => `repo:${s.repository.nameWithOwner}`)));
+  return repos.size ? ['is:issue is:open label:active', ...repos].join(' ') : null;
 }
 
 // ---------- gh ----------
@@ -290,6 +333,14 @@ export async function findProjectNumber(owner: string, title: string): Promise<n
   return match.number;
 }
 
+/** The `repo#number` keys of the builds' open slices labelled `active`. */
+async function fetchActiveSlices(raws: RawItem[]): Promise<Set<string>> {
+  const q = activeSliceSearch(raws);
+  if (!q) return new Set();
+  const res = await graphql<RawActiveSlices>(ACTIVE_SLICES_QUERY, { q });
+  return new Set(res.data.search.nodes.flatMap((n) => (n.repository && n.number ? [refKey(n.repository.nameWithOwner, n.number)] : [])));
+}
+
 export interface ProjectSnapshot {
   title: string;
   url: string;
@@ -309,7 +360,7 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
     url = project.url;
     raws.push(...project.items.nodes);
     // A slice and its build can sit on different pages, so slices are dropped once all are read.
-    if (!project.items.pageInfo.hasNextPage) return { title, url, items: normalizeItems(raws) };
+    if (!project.items.pageInfo.hasNextPage) return { title, url, items: normalizeItems(raws, await fetchActiveSlices(raws)) };
     after = project.items.pageInfo.endCursor;
   }
   throw new Error(`Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`);

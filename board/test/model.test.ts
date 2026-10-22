@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { checkState, countsOf, isBuild, isRecentlyDone, isSlow, isStale, kindOf, workMessage, workTitle } from '../src/model.ts';
+import { checkState, countsOf, isBuild, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
 import { esc } from '../src/render.ts';
 
@@ -28,6 +28,17 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
     ...extra,
   };
 }
+
+test('a slice is done once closed as completed, active while open with the active label, else waiting; not planned is hidden', () => {
+  assert.equal(sliceProgress('CLOSED', 'COMPLETED', false), 'done');
+  assert.equal(sliceProgress('CLOSED', 'COMPLETED', true), 'done', 'a closed slice is done even if it still has active');
+  assert.equal(sliceProgress('CLOSED', null, false), 'done', 'closed before GitHub kept a reason');
+  assert.equal(sliceProgress('OPEN', null, true), 'active');
+  assert.equal(sliceProgress('OPEN', 'REOPENED', false), 'waiting');
+  assert.equal(sliceProgress('CLOSED', 'NOT_PLANNED', false), null);
+  assert.equal(sliceProgress('CLOSED', 'NOT_PLANNED', true), null);
+  assert.equal(sliceProgress('CLOSED', 'DUPLICATE', false), null, 'a duplicate is closed as not planned too');
+});
 
 test('kinds come from labels', () => {
   assert.equal(kindOf(item('List', ['bug', 'concept'])), 'concept');

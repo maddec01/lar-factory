@@ -54,6 +54,24 @@ export interface IssueRef {
   state: 'OPEN' | 'CLOSED';
 }
 
+/** Where a build's slice stands; see `sliceProgress`. */
+export type SliceProgress = 'done' | 'active' | 'waiting';
+
+/** One of a build's slices. */
+export interface Slice extends IssueRef {
+  progress: SliceProgress;
+}
+
+/**
+ * Done once closed as completed, even if it still has the `active` label; active
+ * while open with that label; waiting otherwise. Null for a slice closed as not
+ * planned (or as a duplicate): it's hidden and not counted.
+ */
+export function sliceProgress(state: 'OPEN' | 'CLOSED', stateReason: string | null, active: boolean): SliceProgress | null {
+  if (state === 'CLOSED') return stateReason === 'NOT_PLANNED' || stateReason === 'DUPLICATE' ? null : 'done';
+  return active ? 'active' : 'waiting';
+}
+
 /** The first issues of a GitHub link list, and how many it holds in all. */
 export interface IssueLinks {
   total: number;
@@ -84,8 +102,8 @@ export interface Item {
   updatedAt: string;
   closedAt: string | null;
   linkedPrs: LinkedPr[];
-  /** A build's slices, open and closed: its sub-issues. The project may auto-add them, but they're never board items. Empty for other issues. */
-  slices: IssueRef[];
+  /** A build's slices, in GitHub's sub-issue order, less those closed as not planned. The project may auto-add them, but they're never board items. Empty for other issues. */
+  slices: Slice[];
 }
 
 /** A T3 Code thread the board started. */
@@ -192,7 +210,7 @@ export function kindOf(item: Item): Kind {
 
 /** An issue that becomes one PR, delivered through its slices: the `build` label decides it, whatever the kind,
  *  except on a concept, whose sub-issues are items on the board. */
-export function isBuild(item: Item): boolean {
+export function isBuild(item: Pick<Item, 'labels'>): boolean {
   return item.labels.includes('build') && !item.labels.includes('concept');
 }
 

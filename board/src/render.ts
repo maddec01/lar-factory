@@ -19,7 +19,7 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, Slice, StartedThread, Status, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -230,10 +230,10 @@ ${parent}${stepBar(item.status)}${foot}${sliceList(item.slices)}${extra}
 const subsNoun = (item: Item) => (isBuild(item) ? 'slices' : 'sub-issues');
 
 /** A build's slices, nested like a concept's sub-issues. They aren't board items, so they have no Status. */
-function sliceList(slices: IssueRef[]): string {
+function sliceList(slices: Slice[]): string {
   if (!slices.length) return '';
   const rows = slices.map((s) => {
-    const closed = s.state === 'CLOSED';
+    const closed = s.progress === 'done';
     return `<li class="row-item slice${closed ? ' done' : ''}"><a class="row-title" href="${esc(s.url)}" title="${esc(s.title)}" target="_blank" rel="noopener"><span class="ref">#${s.number}</span> ${esc(s.title)}${closed ? '<span class="sr-only"> (closed)</span>' : ''}</a></li>`;
   }).join('');
   return `<ul class="sub-groups slices" aria-label="Slices"><li class="sub-group"><span class="sub-status">Slices</span><ul>${rows}</ul></li></ul>`;

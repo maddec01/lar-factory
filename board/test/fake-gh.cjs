@@ -9,6 +9,7 @@ const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued
 const main = async () => {
   if (args[1] === 'graphql') {
     if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'Mux' }] } } } });
+    if (args.some((a) => a.includes('search(type: ISSUE'))) return output({ data: { search: { nodes: options.active ?? [] } } });
     if (options.readDelay) await new Promise((r) => setTimeout(r, options.readDelay));
     return output({ data: { user: { projectV2: { title: 'Mux', url: 'https://github.com/users/maddec01/projects/1',
       items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: options.items ?? [] } } } } });

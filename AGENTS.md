@@ -10,8 +10,8 @@ the flow and `docs/plan.md` for how it was set up.
 - `board/` is the local board app. Nothing secret goes in this public repo; the
   board reads GitHub through the local `gh` login and `config.json` only names repos.
 - Every commit and PR title uses conventional commits (`type(scope): description`;
-  scopes: `board`, `mux-work`, `skill-sync`, `skills`, `ci`). A required check
-  enforces it. Update branches by rebase; fold review fixes in with
+  scopes: `board`, `mux-work`, `skill-sync`, `skills`, `ci`). A required check and the
+  `commit-msg` hook enforce it. Update branches by rebase; fold review fixes in with
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   Pedro merges every PR.
 - Board changes: run `pnpm test` and `pnpm run typecheck` in `board/`. A deliberate

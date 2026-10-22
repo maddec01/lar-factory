@@ -29,6 +29,14 @@ function findProblems({ title, commits }) {
     return problems;
 }
 
+// For the commit-msg hook: fixups are fine locally; the PR check rejects any left unfolded.
+function commitMessageProblem(message) {
+    const header = message.split('\n').find((line) => !line.startsWith('#')) ?? '';
+    if (/^(fixup|squash|amend)! /.test(header)) return null;
+    const problem = headerProblem(header);
+    return problem && `"${header}": ${problem}`;
+}
+
 async function checkPullRequest({ github, context, core }) {
     const pull = context.payload.pull_request;
     const commits = await github.paginate(github.rest.pulls.listCommits, {
@@ -42,4 +50,12 @@ async function checkPullRequest({ github, context, core }) {
     if (problems.length) core.setFailed('Use conventional commits for the PR title and every commit. See AGENTS.md.');
 }
 
-module.exports = { TYPES, headerProblem, findProblems, checkPullRequest };
+module.exports = { TYPES, headerProblem, findProblems, commitMessageProblem, checkPullRequest };
+
+if (require.main === module) {
+    const problem = commitMessageProblem(require('node:fs').readFileSync(process.argv[2], 'utf8'));
+    if (problem) {
+        console.error(`commit-msg: ${problem}. Use conventional commits (see AGENTS.md).`);
+        process.exit(1);
+    }
+}

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Rejects a commit message that isn't a conventional commit, as the PR check would.
+command -v node >/dev/null || exit 0
+exec node "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.github/scripts/conventional-commits.cjs" "$1"

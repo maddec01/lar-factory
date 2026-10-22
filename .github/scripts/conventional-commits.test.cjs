@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { headerProblem, findProblems } = require('./conventional-commits.cjs');
+const { headerProblem, findProblems, commitMessageProblem } = require('./conventional-commits.cjs');
 
 test('accepts conventional headers', () => {
     for (const header of ['feat: add rails', 'fix(video): keep depth', 'refactor(mux-db)!: drop table', 'ci: check commits']) {
@@ -29,4 +29,11 @@ test('rejects merge, fixup and non-conventional commits and a bad title', () => 
     assert.match(problems[1], /^bbbbbbbb .*rebase/);
     assert.match(problems[2], /^cccccccc .*autosquash/);
     assert.match(problems[3], /^dddddddd /);
+});
+
+test('commit-msg hook accepts conventional and fixup messages, skipping comments', () => {
+    for (const message of ['# Please enter\nfix(video): retry titles\n\nbody', 'fixup! fix(video): retry titles', 'amend! fix(video): x\n\nfix(video): y']) {
+        assert.equal(commitMessageProblem(message), null, message);
+    }
+    assert.match(commitMessageProblem('Retry titles\n'), /^"Retry titles": /);
 });

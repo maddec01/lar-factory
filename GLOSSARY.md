@@ -37,6 +37,10 @@ A small, independently testable piece of a build, recorded as a sub-issue of
 the build issue and implemented by one subagent.
 _Avoid_: ticket, chunk, task
 
+**Work message**:
+The two-line text a Queued card copies and Start sends: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.
+_Avoid_: work command, `/mux-work` command
+
 **Overlay**:
 The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.

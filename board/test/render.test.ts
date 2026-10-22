@@ -547,11 +547,22 @@ test('cards and Done rows show item stats: agent time and T3 tokens, a lower bou
     return html.match(/<span class="stats"[^>]*>[^<]*<\/span>/g);
   };
   const title = 'title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output"';
-  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>2h 14m · 1.2M in (900k cached) / 40k out</span>`]);
+  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>agent 2h 14m · 1.2M in (900k cached) / 40k out</span>`]);
   assert.deepEqual(statsOf({ status: 'In progress', stats: { agentMs: 45 * 60_000, tokens: { input: 980, cached: 0, output: 12, lowerBound: true } } }),
-    [`<span class="stats" ${title}>45m · ≥980 in (0 cached) / 12 out</span>`]);
+    [`<span class="stats" ${title}>agent 45m · ≥980 in (0 cached) / 12 out</span>`]);
   assert.deepEqual(statsOf({ status: 'Shaping', stats: 'unavailable' }), ['<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>']);
   assert.deepEqual(statsOf({ status: 'Done', closedAt: '2026-10-20T10:00:00Z', stats }),
-    [`<span class="stats" ${title}>2h 14m · 1.2M in (900k cached) / 40k out</span>`], 'Done rows keep their stats');
+    [`<span class="stats" ${title}>agent 2h 14m · 1.2M in (900k cached) / 40k out</span>`], 'Done rows keep their stats');
   assert.equal(statsOf({ status: 'Ready' }), null, 'no stats without matched threads');
+});
+
+test('Claude subagent tokens show as their own figure next to the T3 tokens, on cards and Done rows', () => {
+  const stats = { agentMs: 45 * 60_000, tokens: { input: 980, cached: 0, output: 12, lowerBound: false },
+    subagentTokens: { input: 312_400, cached: 250_000, output: 4_100 } };
+  const html = (item: Partial<Item>) => renderBoardView({ ...sample, items: [{ ...sample.items[0]!, ...item }] }, base);
+  const figure = '<span class="stats" title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output">agent 45m · 980 in (0 cached) / 12 out</span>'
+    + '<span class="stats" title="Claude subagent tokens, which T3 doesn\'t count: input (of which cached) / output">+ subagents 312k in (250k cached) / 4k out</span>';
+  assert.ok(html({ status: 'Review', stats }).includes(figure));
+  assert.ok(html({ status: 'Done', closedAt: '2026-10-20T10:00:00Z', stats }).includes(figure), 'Done rows keep it');
+  assert.doesNotMatch(html({ status: 'Review', stats: { ...stats, subagentTokens: undefined } }), /subagents/);
 });

@@ -762,6 +762,11 @@
           "cached": 11900000,
           "output": 140200,
           "lowerBound": false
+        },
+        "subagentTokens": {
+          "input": 3840000,
+          "cached": 3510000,
+          "output": 52300
         }
       }
     },
@@ -824,6 +829,11 @@
           "cached": 6020000,
           "output": 61000,
           "lowerBound": false
+        },
+        "subagentTokens": {
+          "input": 912000,
+          "cached": 840000,
+          "output": 11800
         }
       }
     },
@@ -878,7 +888,8 @@
           }
         }
       ],
-      "slices": []
+      "slices": [],
+      "stats": "unavailable"
     },
     {
       "id": "PVTI_sample17",
@@ -1023,6 +1034,11 @@
           "cached": 20400000,
           "output": 233000,
           "lowerBound": true
+        },
+        "subagentTokens": {
+          "input": 5260000,
+          "cached": 4870000,
+          "output": 71400
         }
       }
     },

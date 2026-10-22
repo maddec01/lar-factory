@@ -19,7 +19,7 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, SliceProgress, StartedThread, Status, Tokens, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -240,13 +240,24 @@ const HINTS: Partial<Record<Status, string>> = {
   'Ready to merge': 'Merge the PR',
 };
 
-/** Agent time and T3 tokens, for a card's footer or a Done row; nothing when no thread worked on the item. */
+/** `1.2M in (900k cached) / 40k out`. */
+function tokenFigure({ input, cached, output }: Tokens): string {
+  return `${tokenCount(input)} in (${tokenCount(cached)} cached) / ${tokenCount(output)} out`;
+}
+
+/**
+ * Agent time and T3 tokens, then Claude subagent tokens as their own figure, for a
+ * card's footer or a Done row; nothing when no thread worked on the item. The time
+ * says `agent` so it doesn't read as how long ago.
+ */
 function statsBadge(item: Item): string {
   const stats = item.stats;
   if (!stats) return '';
   if (stats === 'unavailable') return '<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>';
-  const { input, cached, output, lowerBound } = stats.tokens;
-  return `<span class="stats" title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output">${duration(stats.agentMs)} · ${lowerBound ? '≥' : ''}${tokenCount(input)} in (${tokenCount(cached)} cached) / ${tokenCount(output)} out</span>`;
+  const subagents = stats.subagentTokens
+    ? `<span class="stats" title="Claude subagent tokens, which T3 doesn't count: input (of which cached) / output">+ subagents ${tokenFigure(stats.subagentTokens)}</span>`
+    : '';
+  return `<span class="stats" title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output">agent ${duration(stats.agentMs)} · ${stats.tokens.lowerBound ? '≥' : ''}${tokenFigure(stats.tokens)}</span>${subagents}`;
 }
 
 /** `action` is a button for the card's top row, so it adds no height. */

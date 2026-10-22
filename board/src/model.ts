@@ -78,6 +78,14 @@ export interface IssueLinks {
   nodes: IssueRef[];
 }
 
+/** An item's agent time and T3-counted tokens, summed over every thread that worked on it. */
+export interface ItemStats {
+  /** Agent time: turn run time, less time waiting on Pedro. */
+  agentMs: number;
+  /** Input includes cached input. A lower bound when any turn's usage was partial or missing. */
+  tokens: { input: number; cached: number; output: number; lowerBound: boolean };
+}
+
 export interface Item {
   /** Project item id. */
   id: string;
@@ -104,6 +112,8 @@ export interface Item {
   linkedPrs: LinkedPr[];
   /** A build's slices, in GitHub's sub-issue order, less those closed as not planned. The project may auto-add them, but they're never board items. Empty for other issues. */
   slices: Slice[];
+  /** Absent when no T3 thread worked on it or there's no T3 database; 'unavailable' when the database can't be read. */
+  stats?: ItemStats | 'unavailable';
 }
 
 /** A T3 Code thread the board started. */

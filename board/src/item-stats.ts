@@ -105,14 +105,19 @@ interface Turn {
 }
 
 // `$mux-work <ref>` or `/mux-work <ref>` on any line, or a message starting `Build <ref>`.
-const WORK_REF = /(?:^|\s)[$/]mux-work ([\w.-]+\/[\w.-]+)#(\d+)/g;
+const WORK_REF = /(?:^|\s)[$/]mux-work ([\w.-]+\/[\w.-]+)#(\d+)/;
 const BUILD_REF = /^Build ([\w.-]+\/[\w.-]+)#(\d+)/;
 
-/** The issues a thread's first user message names, as `owner/repo#n`. */
-function namedIssues(text: string): string[] {
-  const refs = [...text.matchAll(WORK_REF)].map((m) => `${m[1]}#${m[2]}`);
-  const build = BUILD_REF.exec(text);
-  return build ? [...refs, `${build[1]}#${build[2]}`] : refs;
+/** The issue a thread's first user message names first, as lowercase `owner/repo#n`. */
+function namedIssue(text: string): string | null {
+  // `Build <ref>` can only start the message, so it always comes first.
+  const ref = BUILD_REF.exec(text) ?? WORK_REF.exec(text);
+  return ref ? issueKey(ref[1]!, ref[2]!) : null;
+}
+
+/** GitHub owner and repo names ignore case. */
+function issueKey(repo: string, number: string | number): string {
+  return `${repo.toLowerCase()}#${number}`;
 }
 
 function add<V>(map: Map<string, V[]>, key: string, value: V): void {
@@ -418,12 +423,11 @@ function reader(
   pricing: Pricing | null,
   now: number,
 ): ItemStatsReader {
-  const rootsByIssue = new Map<string, Set<string>>();
+  const rootsByIssue = new Map<string, string[]>();
   for (const root of roots) {
     if (typeof root.text !== 'string') continue;
-    for (const issue of namedIssues(root.text)) {
-      rootsByIssue.set(issue, (rootsByIssue.get(issue) ?? new Set()).add(root.id));
-    }
+    const issue = namedIssue(root.text);
+    if (issue) add(rootsByIssue, issue, root.id);
   }
   const threadsByRoot = new Map<string, string[]>();
   const parentOf = new Map<string, string>();
@@ -494,9 +498,9 @@ function reader(
   };
 
   return Object.assign((repo: string, number: number): ItemStats | null => {
-    const matched = rootsByIssue.get(`${repo}#${number}`);
+    const matched = rootsByIssue.get(issueKey(repo, number));
     if (!matched) return null;
-    const threads = new Set([...matched].flatMap((root) => [root, ...(threadsByRoot.get(root) ?? [])]));
+    const threads = new Set(matched.flatMap((root) => [root, ...(threadsByRoot.get(root) ?? [])]));
     // A root adds all its work; a child only its work outside its direct parent's.
     let agentMs = 0;
     for (const thread of threads) {

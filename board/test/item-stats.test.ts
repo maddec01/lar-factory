@@ -46,6 +46,28 @@ test('an item\'s threads are the roots whose first user message names it, in any
   assert.equal(stats('maddec01/mux-server', 60)?.agentMs, 10 * MIN);
 });
 
+test('a first message naming several issues counts only toward the first one named, in any form', (t) => {
+  const stats = reader(statsDb(t, [
+    { id: 'two-work', messages: [`$mux-work ${REPO}#1\n/mux-work ${REPO}#2`], turns: [turn('a')] },
+    { id: 'build-first', messages: [`Build ${REPO}#3, then $mux-work ${REPO}#4`], turns: [turn('b')] },
+    { id: 'work-first', messages: [`/mux-work ${REPO}#5 before Build`], turns: [turn('c')] },
+  ]));
+  assert.equal(stats(REPO, 1)?.agentMs, 10 * MIN);
+  assert.equal(stats(REPO, 2), null);
+  assert.equal(stats(REPO, 3)?.agentMs, 10 * MIN);
+  assert.equal(stats(REPO, 4), null);
+  assert.equal(stats(REPO, 5)?.agentMs, 10 * MIN);
+});
+
+test('owner and repo match whatever their case', (t) => {
+  const stats = reader(statsDb(t, [
+    { id: 'upper', messages: [`$mux-work Maddec01/Mux-Factory#5`], turns: [turn('a')] },
+    { id: 'lower', messages: [`Build ${REPO}#5`], turns: [turn('b')] },
+  ]));
+  assert.equal(stats(REPO, 5)?.agentMs, 20 * MIN);
+  assert.equal(stats('MADDEC01/mux-factory', 5)?.agentMs, 20 * MIN);
+});
+
 test('the number must match exactly, and titles are never used', (t) => {
   const stats = reader(statsDb(t, [
     { id: 'build-59', title: 'slice #68', messages: [`Build ${REPO}#59`], turns: [turn('a')] },

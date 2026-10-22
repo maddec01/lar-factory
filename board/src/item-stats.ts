@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { ItemStats } from './model.ts';
-import { claudeSessionRecords, firstCopies, totalTokens } from './transcript-usage.ts';
+import { claudeSessionRecords, codexSessionRecords, firstCopies, totalTokens } from './transcript-usage.ts';
 import type { SessionRecordsReader, UsageRecord } from './transcript-usage.ts';
 
 /** An item's stats by repo and issue number, or null when no thread worked on it. */
@@ -64,7 +64,8 @@ SELECT provider_thread_id AS id FROM orchestration_v2_projection_provider_thread
 // record forked threads share counts for the thread that produced it first. Never
 // map through a turn's nativeTurnRef, which can hold a placeholder. Claude's
 // provider_native child threads have no provider threads: their records are in
-// their parent session's subagent transcripts.
+// their parent session's subagent transcripts. A Codex child thread has its own
+// provider thread and rollout, whose copy of its parent's history isn't counted.
 const SESSIONS = `
 SELECT thread_id AS thread, json_extract(payload_json, '$.driver') AS driver,
   json_extract(payload_json, '$.providerInstanceId') AS instance,
@@ -118,7 +119,12 @@ function activeProviderThreads(db: DatabaseSync): Set<string> {
   }
 }
 
-const CLAUDE_DRIVER = 'claudeAgent';
+// The transcript reader for each provider driver whose sessions count, and the
+// home its built-in instance and any instance without a `homePath` use.
+const DRIVERS: Record<string, { read: (home: string) => SessionRecordsReader; home: string }> = {
+  claudeAgent: { read: claudeSessionRecords, home: '.claude' },
+  codex: { read: codexSessionRecords, home: '.codex' },
+};
 
 /** `~` and `~/…` under `home`, as T3's expandHomePath reads a configured path. */
 function expandHome(path: string, home: string): string {
@@ -127,14 +133,21 @@ function expandHome(path: string, home: string): string {
   return isAbsolute(path) ? path : resolve(home, path);
 }
 
+/** A provider instance's transcripts: its driver and transcript home. */
+interface InstanceHome {
+  driver: string;
+  home: string;
+}
+
 /**
- * Each Claude provider instance's Claude home, as T3's claudeUsageReader resolves
- * it: the instance's `homePath`, else `~/.claude`. The built-in `claudeAgent`
- * instance is there even when the settings don't list it or can't be read.
+ * Each Claude and Codex provider instance's home, as T3's claudeUsageReader and
+ * codexUsageReader (with CodexHomeLayout's shared home) resolve it: the
+ * instance's `homePath`, else `~/.claude` or `~/.codex`. The built-in
+ * `claudeAgent` and `codex` instances are there even when the settings don't
+ * list them or can't be read.
  */
-function claudeHomes(settingsPath: string, home: string): Map<string, string> {
-  const fallback = join(home, '.claude');
-  const homes = new Map([[CLAUDE_DRIVER, fallback]]);
+function instanceHomes(settingsPath: string, home: string): Map<string, InstanceHome> {
+  const homes = new Map(Object.entries(DRIVERS).map(([driver, built]) => [driver, { driver, home: join(home, built.home) }]));
   let instances: unknown;
   try {
     instances = (JSON.parse(readFileSync(settingsPath, 'utf8')) as { providerInstances?: unknown }).providerInstances;
@@ -143,32 +156,34 @@ function claudeHomes(settingsPath: string, home: string): Map<string, string> {
   }
   if (!instances || typeof instances !== 'object') return homes;
   for (const [id, instance] of Object.entries(instances as Record<string, { driver?: unknown; config?: { homePath?: unknown } } | null>)) {
-    if (instance?.driver !== CLAUDE_DRIVER) continue;
-    const configured = typeof instance.config?.homePath === 'string' ? instance.config.homePath.trim() : '';
-    homes.set(id, configured ? expandHome(configured, home) : fallback);
+    const driver = instance?.driver;
+    if (typeof driver !== 'string' || !Object.hasOwn(DRIVERS, driver)) continue;
+    const configured = typeof instance?.config?.homePath === 'string' ? instance.config.homePath.trim() : '';
+    homes.set(id, { driver, home: configured ? expandHome(configured, home) : join(home, DRIVERS[driver]!.home) });
   }
   return homes;
 }
 
 /**
- * Each thread's usage records from its Claude sessions' transcripts, under the
- * home of the thread's own provider instance. A record counts once across all
- * threads, for the earliest provider thread that has it, as in T3's global dedupe.
+ * Each thread's usage records from its sessions' transcripts, under the home of
+ * the thread's own provider instance. A record counts once across all threads,
+ * for the earliest provider thread that has it, as in T3's global dedupe.
  */
-function recordsByThread(db: DatabaseSync, homes: Map<string, string>): Map<string, UsageRecord[]> {
+function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Map<string, UsageRecord[]> {
   const readers = new Map<string, SessionRecordsReader>();
   const keep = firstCopies();
   const read = new Set<string>();
   const records = new Map<string, UsageRecord[]>();
   for (const row of db.prepare(SESSIONS).all() as { thread: unknown; driver: unknown; instance: unknown; session: unknown }[]) {
     const { thread, driver, instance, session } = row;
-    if (typeof thread !== 'string' || typeof session !== 'string' || driver !== CLAUDE_DRIVER || typeof instance !== 'string') continue;
-    const home = homes.get(instance);
-    const key = `${home}\0${session}`;
-    if (!home || read.has(key)) continue;
-    read.add(key);
-    let reader = readers.get(home);
-    if (!reader) readers.set(home, (reader = claudeSessionRecords(home)));
+    if (typeof thread !== 'string' || typeof session !== 'string' || typeof instance !== 'string') continue;
+    const source = homes.get(instance);
+    if (!source || source.driver !== driver) continue;
+    const at = `${source.driver}\0${source.home}`;
+    if (read.has(`${at}\0${session}`)) continue;
+    read.add(`${at}\0${session}`);
+    let reader = readers.get(at);
+    if (!reader) readers.set(at, (reader = DRIVERS[source.driver]!.read(source.home)));
     for (const record of reader(session)) if (keep(record)) add(records, thread, record);
   }
   return records;
@@ -190,7 +205,7 @@ export function loadItemStats(sources: StatsSources, now: number): ItemStatsRead
     const waits = db.prepare(WAITS).all() as { turn: string; createdAt: string | null; resolvedAt: string | null }[];
     const lastMessages = db.prepare(LAST_MESSAGES).all() as { thread: string; at: string | null }[];
     const activity = { lastMessages, active: activeProviderThreads(db) };
-    const records = recordsByThread(db, claudeHomes(sources.settings, sources.home));
+    const records = recordsByThread(db, instanceHomes(sources.settings, sources.home));
     return reader(roots, lineage, turns, waits, activity, records, now);
   } catch {
     return 'unavailable';

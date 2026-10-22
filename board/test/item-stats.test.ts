@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadItemStats } from '../src/item-stats.ts';
 import type { ItemStatsReader, StatsSources } from '../src/item-stats.ts';
-import { assistant, claudeHome, statsDb, t3Settings, tempDir } from './stats-db.ts';
+import { assistant, claudeHome, codexHome, codexSession, codexTokens, statsDb, t3Settings, tempDir } from './stats-db.ts';
 import type { FixtureThread } from './stats-db.ts';
 
 /** A home folder and settings that don't exist, so tests never read real transcripts. */
@@ -169,6 +169,32 @@ test('each thread reads the transcripts under its own provider instance\'s Claud
   assert.deepEqual([1, 2, 3, 4, 5].map((n) => stats(REPO, n)?.tokens), [1000, 20, 3, 0, 0]);
   // Without readable settings only the built-in instance, at ~/.claude, is known.
   assert.deepEqual([1, 2].map((n) => reader(db, { home })(REPO, n)?.tokens), [1000, 0]);
+});
+
+test('an item totals its Claude and Codex threads, each Codex thread from its own instance\'s Codex home', (t) => {
+  const home = tempDir(t, 'mux-home-');
+  const build = '01a13627-9790-70d0-8342-58f71022e222';
+  const child = '01a13628-c84a-7f33-9a04-c55eb4c75845';
+  const other = '01a13628-ffd8-70c1-a4a8-67217b17f950';
+  claudeHome(t, { 'session-claude': { main: [assistant('msg-1', 2, 1000, 5000, 40)] } }, join(home, '.claude'));
+  codexHome(t, {
+    [build]: [...codexSession(build), codexTokens('2026-10-20T09:01:00.000Z', 1000, 400, 50, [1000, 400, 50]),
+      codexTokens('2026-10-20T09:02:00.000Z', 2000, 1500, 70, [3000, 1900, 120])],
+    // A child thread's rollout opens with a copy of its parent's history, counted for the parent only.
+    [child]: [...codexSession(child, 'gpt-5.6-sol', build), codexTokens('2026-10-20T09:00:00.000Z', 1000, 400, 50, [1000, 400, 50]),
+      codexTokens('2026-10-20T09:05:00.000Z', 300, 0, 9, [1300, 400, 59])],
+  }, join(home, '.codex'));
+  const elsewhere = codexHome(t, { [other]: [...codexSession(other), codexTokens('2026-10-20T09:01:00.000Z', 7, 0, 1)] });
+  const db = statsDb(t, [
+    { id: 'build', messages: [`Build ${REPO}#60`], turns: [turn('t1')],
+      sessions: ['session-claude', { session: build, instance: 'codex', driver: 'codex' }] },
+    { id: 'child', rootThreadId: 'build', sessions: [{ session: child, instance: 'codex', driver: 'codex' }] },
+    { id: 'other', messages: [`$mux-work ${REPO}#61`], sessions: [{ session: other, instance: 'codex_work', driver: 'codex' }] },
+  ]);
+  const settings = t3Settings(t, { codex_work: { driver: 'codex', homePath: elsewhere } });
+  const stats = reader(db, { settings, home });
+  assert.deepEqual(stats(REPO, 60), { agentMs: 10 * MIN, tokens: 6042 + 1050 + 2070 + 309 });
+  assert.equal(stats(REPO, 61)?.tokens, 8);
 });
 
 test('a record forked threads share counts once, for the item whose thread produced it first', (t) => {

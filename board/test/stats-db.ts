@@ -17,7 +17,7 @@ export interface FixtureTurn {
   providerThread?: string;
 }
 
-/** A provider thread on a native session: a Claude session ID, on instance `claudeAgent` unless named. */
+/** A provider thread on a native session: a Claude or Codex session ID, on instance `claudeAgent` unless named. */
 export interface FixtureSession {
   session: string;
   instance?: string;
@@ -142,11 +142,45 @@ export function claudeHome(t: TestContext, sessions: Record<string, FixtureTrans
   return home;
 }
 
-/** Writes T3's settings with Claude provider instances by their `homePath`, and returns its path. */
-export function t3Settings(t: TestContext, homes: Record<string, string>): string {
+/**
+ * Writes a Codex home (its `sessions` folder) and returns it: each session's
+ * rollout under the day folder Codex files it in, at `home` or in a temporary
+ * folder removed after the test. A string line is written as is.
+ */
+export function codexHome(t: TestContext, sessions: Record<string, (object | string)[]>, home = tempDir(t, 'mux-codex-home-')): string {
+  const day = join(home, 'sessions', '2026', '10', '20');
+  mkdirSync(day, { recursive: true });
+  for (const [session, records] of Object.entries(sessions)) {
+    writeFileSync(join(day, `rollout-2026-10-20T09-00-00-${session}.jsonl`),
+      records.map((r) => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') + '\n');
+  }
+  return home;
+}
+
+/** A Codex rollout's opening lines: its session meta, and a turn context naming `model`. */
+export function codexSession(id: string, model = 'gpt-5.6-sol', forkedFrom?: string): object[] {
+  const timestamp = '2026-10-20T09:00:00.000Z';
+  return [
+    { type: 'session_meta', timestamp, payload: { type: 'session_meta', id, ...(forkedFrom ? { forked_from_id: forkedFrom } : {}) } },
+    { type: 'turn_context', timestamp, payload: { type: 'turn_context', model } },
+  ];
+}
+
+/** A Codex `token_count` event for one request, with the session's running total when given. */
+export function codexTokens(at: string, input: number, cached: number, output: number, total?: [number, number, number]): object {
+  const usage = (i: number, c: number, o: number) =>
+    ({ input_tokens: i, cached_input_tokens: c, cache_write_input_tokens: 0, output_tokens: o, reasoning_output_tokens: 0, total_tokens: i + o });
+  return { type: 'event_msg', timestamp: at, payload: { type: 'token_count', info: {
+    last_token_usage: usage(input, cached, output), ...(total ? { total_token_usage: usage(...total) } : {}) } } };
+}
+
+/** Writes T3's settings with provider instances by their `homePath`, Claude unless a driver is named, and returns its path. */
+export function t3Settings(t: TestContext, homes: Record<string, string | { driver: string; homePath: string }>): string {
   const path = join(tempDir(t, 'mux-t3-settings-'), 'settings.json');
-  const providerInstances = Object.fromEntries(Object.entries(homes).map(([id, homePath]) =>
-    [id, { driver: 'claudeAgent', displayName: id, enabled: true, config: { homePath } }]));
+  const providerInstances = Object.fromEntries(Object.entries(homes).map(([id, entry]) => {
+    const { driver, homePath } = typeof entry === 'string' ? { driver: 'claudeAgent', homePath: entry } : entry;
+    return [id, { driver, displayName: id, enabled: true, config: { homePath } }];
+  }));
   writeFileSync(path, JSON.stringify({ providerInstances, usageModelAliases: null, usagePriceOverrides: null }));
   return path;
 }

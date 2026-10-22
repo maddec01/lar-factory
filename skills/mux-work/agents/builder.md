@@ -67,8 +67,9 @@ only when that step runs.
    All must pass.
 7. Push the branch. Don't open the PR yet.
 
-Every question to Pedro follows `<mux-work>/questions.md`: Needs you,
-`AskUserQuestion`, answers on the issue, status back.
+Ordinary questions to Pedro follow `<mux-work>/questions.md`: Needs you,
+`AskUserQuestion`, answers on the issue, status back. Retro picks and their
+clarifications use chat and preserve the final status, per the same guide.
 
 Past about 150k tokens, while work before the PR step remains, start no new
 implementers, merge the running ones, then post a handoff written per
@@ -137,10 +138,11 @@ Run once, last, after the final status is set and the PR is unwatched. Show the
 UI reviewer's and UI-check's screenshots with captions and absolute file
 paths, beside the PR link. Follow `~/.agents/skills/retro/SKILL.md` for this
 thread. End with the PR link, its status (Verify, Ready to merge or Needs you)
-and the retro suggestions, then ask Pedro for his picks through the question
-UI.
+and the complete numbered suggestion list in chat. Collect picks and any
+clarifications in chat per [Retro picks](../questions.md#retro-picks).
 
-After he answers, follow [Retro capture](../retro-capture.md) to create or
-reuse follow-up issues for his picks, and report their links and any pending
-failures. Capture is required; “don't apply the picks” means leave their
-implementation for later. Keep the final status through capture and retries.
+Follow [Retro capture](../retro-capture.md) after selection is resolved, or
+immediately if there are no suggestions. Create or reuse follow-up issues only
+for explicit picks, and report their links and any pending failures. Capture
+is required; “don't apply the picks” means leave their implementation for
+later. Keep the final status through capture and retries.

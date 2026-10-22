@@ -7,12 +7,14 @@ clarification questions and failures. On resume, reuse the existing plan and IDs
 
 ## Select and route
 
-1. Capture only Pedro's picks, including clear free text; concrete selections
-   beat None. Clarify ambiguous free text through the question UI before any
-   capture mutation, following the retro exception in
-   [Question UI](questions.md). With no picks, post a one-line
-   `Retro capture: complete — no picks` on the source issue and finish. No
-   suggestions means no selection question or follow-ups.
+1. Resolve replies against the numbered list per [Retro picks](questions.md#retro-picks).
+   Capture only Pedro's explicit picks; “all” selects the whole list. Clarify
+   ambiguous, conflicting or partly unclear replies in chat before creating
+   or updating any destination issue, even when other picks are clear. Wait
+   for clarification; uncertainty or silence never means “none”. An explicit
+   “none”, or no suggestions, completes the no-picks path: post a one-line
+   `Retro capture: complete — no picks` on the source issue and finish without
+   follow-ups. With no suggestions, ask no selection question.
 2. Route each selected suggestion to `maddec01/`:
    - Server work → `mux-server`; Apple work → `mux-apple`.
    - A repository's own `AGENTS.md`, CI or local tooling → that repository.

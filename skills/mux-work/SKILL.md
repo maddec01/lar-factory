@@ -19,9 +19,10 @@ verifies visible changes and merges every PR; the rest is yours.
   files, logs or screenshots. Ask Pedro only what a subagent can't answer.
 - **Tools**: `gh issue view <ref> --comments` and `gh issue comment` for
   issues; `t3_thread_launch` for threads; `delegate_task` for a T3 child task;
-  `AskUserQuestion` for every question to Pedro, following the
-  [question UI](questions.md). Call `orchestrator_capabilities` only to change
-  a model; never search the tool catalogue.
+  `AskUserQuestion` for ordinary questions to Pedro, following the
+  [question guide](questions.md). Retro picks and their clarifications stay
+  in chat. Call `orchestrator_capabilities` only to change a model; never
+  search the tool catalogue.
 - Read each linked file or skill only when its step runs.
 - The issue is the only hand-over: brief, map, decisions and links live in its
   body and comments, so every step resumes from the issue alone.

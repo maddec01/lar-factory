@@ -105,8 +105,8 @@ label. Anything Pedro adds or corrects is another open question. Then:
   with its own brief and gate. This issue is a build only if its own repository
   changes.
 - **No open questions**: write the brief.
-- **Too big or unclear for one session**: [Concepts](concepts.md). Repository
-  count never makes an issue a concept.
+- **Too big or unclear for one session**: [Concepts](concepts.md), which has
+  its own launch check. Repository count never makes an issue a concept.
 
 ## 3. Brief
 

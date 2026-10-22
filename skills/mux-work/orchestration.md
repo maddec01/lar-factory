@@ -25,7 +25,7 @@ options against the request; report a capability mismatch, never downgrade.
 - Its worktree starts from this thread's local commit, without uncommitted
   edits: commit before delegating.
 - Top-level threads (`t3_thread_launch`) are a different thing, only for
-  shaping and build threads and handoffs.
+  shaping, decision and build threads and handoffs.
 - Every prompt carries the factory report rule: ≤300 words, no whole files,
   logs or screenshots.
 

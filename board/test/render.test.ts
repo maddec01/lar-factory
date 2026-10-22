@@ -328,7 +328,7 @@ test('Start appears only on Queued issues; a queued draft asks for an issue firs
   const draftCard = html.split('<article').find((c) => c.includes('Offline downloads on watchOS'))!;
   assert.match(draftCard, /needs an issue/);
   assert.ok(!draftCard.includes('data-start') && !draftCard.includes('data-copy'));
-  assert.match(html.split('<article').find((c) => c.includes('data-start'))!, /data-copy="\/mux-work /, 'Copy stays as a fallback');
+  assert.match(html.split('<article').find((c) => c.includes('data-start'))!, /data-copy="#\d+ [^"]*\n\$mux-work maddec01\//, 'Copy stays as a fallback');
 });
 
 test('Start shows its progress, the started thread, or the error', () => {
@@ -336,14 +336,16 @@ test('Start shows its progress, the started thread, or the error', () => {
   const card = (actions: Record<string, ItemAction>, id: string) =>
     renderBoardView(sample, { ...base, actions }).split('<article').find((x) => x.includes(`href="${sample.items.find((i) => i.id === id)!.url}"`))!;
   assert.match(card({ [a]: { phase: 'pending' } }, a), /data-start="PVTI_sample05"[^>]*aria-disabled="true"[^>]*>Starting…</);
-  const thread = { threadId: 'thread-1', title: '/mux-work maddec01/mux-apple#20' };
+  const thread = { threadId: 'thread-1', title: '#20 Player controls stay visible after scrubbing <on tvOS>' };
   const started = card({ [b]: { phase: 'started', thread } }, b);
   assert.match(started, /<span class="started-tag" tabindex="-1" data-start-result="PVTI_sample06" title="T3 thread thread-1">Started<\/span>/, 'the card keeps only a quiet tag');
   assert.ok(!started.includes('data-start="') && !started.includes('Started T3 thread'));
   const item = sample.items.find((i) => i.id === b)!;
   assert.match(renderHeader(sample, { ...base, notice: { key: 'notice-3', verb: 'Started', item, thread } }),
     /<div class="banner toast" role="status" data-expires="notice-3"><button[^>]*>&#215;<\/button>Started T3 thread <code class="thread-id">thread-1<\/code> for <a[^>]*>.*Player controls stay visible after scrub[^<]*<\/a>\.<\/div>/,
-    'the toast says so, without repeating a title that is just the command');
+    'the toast says so, without repeating a title that is just the work message title');
+  assert.match(renderHeader(sample, { ...base, notice: { key: 'notice-3', verb: 'Started', item, thread: { ...thread, title: 'Renamed' } } }),
+    /Started T3 thread <b>Renamed<\/b> <code class="thread-id">thread-1<\/code>/, 'a title T3 chose differently is shown');
   const failed = card({ [c]: { phase: 'error', message: 'T3 is down.' } }, c);
   assert.match(failed, /<div class="meta">.*<button[^>]*data-start[^>]*>Retry start<\/button><\/div>/, 'Start sits in the top row');
   assert.match(failed, /role="alert">T3 is down.<\/span> <button[^>]*data-dismiss="action:PVTI_sample05"/);

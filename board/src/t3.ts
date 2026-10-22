@@ -30,7 +30,9 @@ export function startThread(project: string, message: string): Promise<StartResu
       try {
         const launched = JSON.parse(stdout) as { threadId?: unknown; title?: unknown };
         if (typeof launched.threadId !== 'string' || !launched.threadId) throw new Error('No thread id.');
-        resolve({ thread: { threadId: launched.threadId, title: typeof launched.title === 'string' ? launched.title : message }, error: null });
+        // T3 titles a thread from the first line of its first message.
+        const title = typeof launched.title === 'string' ? launched.title : message.split('\n')[0] ?? message;
+        resolve({ thread: { threadId: launched.threadId, title }, error: null });
       } catch {
         resolve(UNCERTAIN);
       }

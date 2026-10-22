@@ -11,6 +11,7 @@ const main = async () => {
     process.exitCode = 1;
   } else if (options.fail === 'killed') process.kill(process.pid, 'SIGKILL');
   else if (options.fail === 'garbage') process.stdout.write('not json');
-  else process.stdout.write(JSON.stringify({ threadId: 'thread-1', runId: 'run-1', title: args[3] }));
+  // Like T3, title the thread from the first line of its first message.
+  else process.stdout.write(JSON.stringify({ threadId: 'thread-1', runId: 'run-1', title: options.untitled ? undefined : args[3].split('\n')[0] }));
 };
 main();

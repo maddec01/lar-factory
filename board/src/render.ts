@@ -15,7 +15,8 @@ import {
   kindOf,
   platformOf,
   ref,
-  workCommand,
+  workMessage,
+  workTitle,
 } from './model.ts';
 import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, StartedThread, Status, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
@@ -357,8 +358,8 @@ function noticeToast(notice: Notice): string {
     case 'Abandoned':
       return toast(key, `${notice.verb} ${ref(item)}`, esc(abandonPrompt(item).done));
     case 'Started': {
-      // T3 titles a thread after its first message; don't repeat the command.
-      const title = notice.thread.title === workCommand(item) ? '' : ` <b>${esc(notice.thread.title)}</b>`;
+      // T3 titles a thread after line 1 of the work message; don't repeat the issue.
+      const title = notice.thread.title === workTitle(item) ? '' : ` <b>${esc(notice.thread.title)}</b>`;
       return toast(key, `started ${ref(item)}`, `Started T3 thread${title} <code class="thread-id">${esc(notice.thread.threadId)}</code> for ${titleLink(item)}.`);
     }
     default:
@@ -515,11 +516,11 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
     .sort((a, b) => (b.closedAt ?? b.updatedAt).localeCompare(a.closedAt ?? a.updatedAt));
 
   const queuedExtra = (i: Item) => {
-    const cmd = workCommand(i);
+    const cmd = workMessage(i);
     if (!cmd) return '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>';
     return `${startControl(i, data, opts.actions?.[i.id]).message}<div class="cmd"><code>${esc(cmd)}</code><button type="button" class="copy" data-copy="${esc(cmd)}" aria-label="Copy ${esc(cmd)}">Copy</button></div>`;
   };
-  const queuedAction = (i: Item) => (workCommand(i) ? startControl(i, data, opts.actions?.[i.id]).button : '');
+  const queuedAction = (i: Item) => (workMessage(i) ?startControl(i, data, opts.actions?.[i.id]).button : '');
 
   const platforms = [...data.repos.map((r) => r.platform)];
   for (const i of list) {

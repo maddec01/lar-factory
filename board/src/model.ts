@@ -240,9 +240,16 @@ export function canAbandon(item: Item): boolean {
   return item.status === 'List' && (item.type === 'DraftIssue' || (item.type === 'Issue' && item.number !== null && item.repo !== null));
 }
 
-export function workCommand(item: Item): string | null {
+/** Line 1 of the work message, which T3 titles the thread from. Null for a draft. */
+export function workTitle(item: Item): string | null {
   if (!item.repo || item.number === null) return null;
-  return `/mux-work ${item.repo}#${item.number}`;
+  return `#${item.number} ${item.title}`;
+}
+
+/** The work message: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`. Null for a draft. */
+export function workMessage(item: Item): string | null {
+  const title = workTitle(item);
+  return title && `${title}\n$mux-work ${item.repo}#${item.number}`;
 }
 
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. */

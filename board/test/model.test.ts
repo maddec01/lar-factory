@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { checkState, countsOf, isRecentlyDone, isSlow, isStale, kindOf, workCommand } from '../src/model.ts';
+import { checkState, countsOf, isRecentlyDone, isSlow, isStale, kindOf, workMessage, workTitle } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
 import { esc } from '../src/render.ts';
 
@@ -42,9 +42,18 @@ test('Done counts for 7 days after closing', () => {
   assert.equal(isRecentlyDone(item('Review', [], { closedAt: '2026-10-21T09:00:00Z' }), now), false);
 });
 
-test('work command needs a repo and number', () => {
-  assert.equal(workCommand(item('Queued')), '/mux-work maddec01/mux-server#7');
-  assert.equal(workCommand(item('Queued', [], { type: 'DraftIssue', repo: null, number: null })), null);
+test('the work message titles the thread, then runs mux-work on the issue', () => {
+  assert.equal(workMessage(item('Queued')), '#7 t\n$mux-work maddec01/mux-server#7');
+  assert.equal(workTitle(item('Queued')), '#7 t');
+  const draft = item('Queued', [], { type: 'DraftIssue', repo: null, number: null });
+  assert.equal(workMessage(draft), null);
+  assert.equal(workTitle(draft), null);
+});
+
+test('a $word in the title is kept and $mux-work still opens line 2', () => {
+  const message = workMessage(item('Queued', [], { title: 'Fix $foo parsing' }))!;
+  assert.equal(message, '#7 Fix $foo parsing\n$mux-work maddec01/mux-server#7');
+  assert.equal(message.split('\n')[1], '$mux-work maddec01/mux-server#7');
 });
 
 const sample = JSON.parse(readFileSync(new URL('./sample.json', import.meta.url), 'utf8')) as BoardData;

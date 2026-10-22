@@ -16,7 +16,7 @@ import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
 import { DEFAULT_UI } from './render.ts';
-import { canAbandon, workCommand } from './model.ts';
+import { canAbandon, workMessage } from './model.ts';
 import { revisionCheck } from './revision.ts';
 import { lockHolder, readProgress, updatePaths } from './update-state.ts';
 import type { BoardData, Item } from './model.ts';
@@ -214,7 +214,7 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
     const item = state.items.find((i) => i.id === itemId);
     if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
     if (item.status !== 'Queued') return json(res, 409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
-    const message = workCommand(item);
+    const message = workMessage(item);
     if (!message) return json(res, 409, { error: 'This item needs an issue before it can start.' });
     if (!config.t3Project) return json(res, 503, { error: 'Set board.t3Project in config.json to start threads.' });
     let project: string;

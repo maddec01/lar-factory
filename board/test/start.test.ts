@@ -36,10 +36,17 @@ test('Start begins one mux-work thread in the Mux project and leaves the Status 
   await ready(board, 1);
   const response = await start(board, 'PVTI_12');
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '/mux-work maddec01/mux-factory#12' });
+  assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
   assert.deepEqual(await board.t3Calls(), [['thread', 'start', `${process.env.HOME}/Developer/Mux`,
-    '/mux-work maddec01/mux-factory#12', '--json']]);
+    '#12 Issue 12\n$mux-work maddec01/mux-factory#12', '--json']]);
   assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
+});
+
+test('a thread T3 returns untitled takes the first line of the work message as its title', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], t3: { untitled: true } });
+  await ready(board, 1);
+  const response = await start(board, 'PVTI_12');
+  assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
 });
 
 test('a double press, a retry or another page starts no second thread for the item', async (t) => {
@@ -48,7 +55,7 @@ test('a double press, a retry or another page starts no second thread for the it
   const responses = await Promise.all([start(board, 'PVTI_12'), start(board, 'PVTI_12')]);
   assert.deepEqual(responses.map((r) => r.status), [200, 200]);
   assert.equal((await start(board, 'PVTI_12')).status, 200);
-  const thread = { threadId: 'thread-1', title: '/mux-work maddec01/mux-factory#12' };
+  const thread = { threadId: 'thread-1', title: '#12 Issue 12' };
   assert.deepEqual((await board.board() as BoardData).started, { PVTI_12: thread }, 'a reloaded page sees the thread');
   assert.equal((await start(board, 'PVTI_13')).status, 200, 'another item starts its own thread');
   assert.equal((await board.t3Calls()).length, 2);

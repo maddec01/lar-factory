@@ -17,7 +17,8 @@ the flow and `docs/plan.md` for how it was set up.
 - Board changes: run `pnpm test` and `pnpm run typecheck` in `board/`. A deliberate
   layout change updates the saved copies with `pnpm run test:update`; a rebase
   conflict in them resolves the same way, then `git add`. Run it on a
-  spare port (`BOARD_PORT=4318 pnpm run sample`); 4317 is the live board.
+  spare port (`BOARD_PORT=4318 pnpm run sample`); 4317 is the live board, so
+  stop only the process you started.
 - Install script changes: run `bash scripts/install.test.sh`. Run the script
   itself only against a throwaway home, never the real `~/.agents`:
   `env -u CLAUDE_CONFIG_DIR GH_TOKEN=$(gh auth token) HOME=$(mktemp -d) bash scripts/install.sh`.

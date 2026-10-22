@@ -19,7 +19,7 @@ test('remote commits stay visible after checkout advancement, with startup asset
   const running = f.git('rev-parse', 'HEAD');
   const board = await startBoard(t, {}, true, true, { BOARD_DATA_FILE: join(f.repo, 'sample.json'), BOARD_LAUNCH_TOKEN: 'launch-7' }, join(f.repo, 'board'));
   await eventually(async () => (await board.board()).codeUpdate?.behind === 0);
-  const assets = await Promise.all(['client.ts', 'render.ts', 'model.ts', 'add-item.ts', 'anchor.ts'].map(async (name) => {
+  const assets = await Promise.all(['client.ts', 'render.ts', 'model.ts', 'add-item.ts', 'anchor.ts', 'slice-popover.ts'].map(async (name) => {
     return [name, await fetch(`${board.url}/assets/${name}`).then((r) => r.text())] as const;
   }));
   f.git('switch', '-c', 'merged');

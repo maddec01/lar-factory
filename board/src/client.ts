@@ -7,6 +7,8 @@ import { platformOf } from './model.ts';
 import type { BoardData } from './model.ts';
 import { validateDraft } from './add-item.ts';
 import { anchorKeys, survivingAnchor } from './anchor.ts';
+import { NO_POPOVER, nextPopover, openPopover } from './slice-popover.ts';
+import type { PopoverEvent } from './slice-popover.ts';
 import type { CreationResult, ItemDraft } from './add-item.ts';
 import type { StartResult } from './t3.ts';
 
@@ -55,6 +57,7 @@ function render(): void {
   window.scrollTo(scrollX, scrollY);
   restoreAnchor(anchor);
   if (focusKey) focusByKey(focusKey);
+  placePopover();
   startToastClocks();
 }
 
@@ -141,7 +144,7 @@ function startToastClocks(): void {
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-dismiss],[data-view-item],details[id] > summary').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-dismiss],[data-view-item],.slices-trigger,.slices-pop a,details[id] > summary').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
@@ -155,6 +158,8 @@ function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.viewItem) return `view-${el.dataset.viewItem}`;
   // Keyed by project item id, since a draft has no number.
   if (el.dataset.abandon) return `abandon-${el.dataset.abandon}`;
+  if (el.matches('.slices-trigger')) return `slices-${slicesOf(el)}`;
+  if (el.closest('.slices-pop')) return `slice-${slicesOf(el)}-${el.getAttribute('href')}`;
   return el.dataset.view ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
 }
 
@@ -539,6 +544,76 @@ app.addEventListener('keydown', (event) => {
   if (!target.dataset.view || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
   event.preventDefault();
   setView(ui.view === 'board' ? 'flow' : 'board', true);
+});
+
+// A build's slice popover (disclosure pattern): it opens on hover, focus or tap, a second click
+// or tap closes it, Enter or Space toggles it, and Escape closes it and returns focus to its trigger.
+let popover = NO_POPOVER;
+const slicesOf = (el: EventTarget | null): string | null =>
+  el instanceof Element ? (el.closest<HTMLElement>('[data-slices]')?.dataset.slices ?? null) : null;
+
+function popoverEvent(event: PopoverEvent): void {
+  popover = nextPopover(popover, event);
+  const id = openPopover(popover) ?? undefined;
+  if (id === ui.slicesOpen) return;
+  // Kept in `ui`, like open <details>, so a re-render keeps it open; shown here without one.
+  ui.slicesOpen = id;
+  app.querySelectorAll<HTMLElement>('[data-slices]').forEach((el) => {
+    const open = el.dataset.slices === id;
+    el.classList.toggle('open', open);
+    el.querySelector('.slices-trigger')?.setAttribute('aria-expanded', String(open));
+  });
+  placePopover();
+}
+
+/** Opens the popover upward when it would run past the window's bottom and there's more room above,
+ *  and lines it up with the card's right edge when it would run past the window's right. */
+function placePopover(): void {
+  const el = app.querySelector<HTMLElement>('.slices.open');
+  if (!el) return;
+  el.classList.remove('up', 'end');
+  const block = el.getBoundingClientRect();
+  const pop = el.querySelector('.slices-pop')!.getBoundingClientRect();
+  if (pop.bottom > innerHeight && block.top > innerHeight - block.bottom) el.classList.add('up');
+  if (pop.right > document.documentElement.clientWidth) el.classList.add('end');
+}
+
+// An open popover can stay open while the page scrolls or the window resizes, so place it again.
+addEventListener('scroll', placePopover, { passive: true, capture: true });
+addEventListener('resize', placePopover);
+
+document.addEventListener('pointermove', (event) => {
+  if (event.pointerType === 'touch') return;
+  const id = slicesOf(event.target);
+  if (id !== popover.hovered) popoverEvent({ type: 'hover', id });
+});
+document.documentElement.addEventListener('pointerleave', () => popoverEvent({ type: 'hover', id: null }));
+document.addEventListener('pointerdown', (event) => {
+  if (!slicesOf(event.target)) popoverEvent({ type: 'outside' });
+});
+// After the event, so focus has landed (or a re-render has put it back).
+const trackFocus = () => setTimeout(() => popoverEvent({ type: 'focus', id: slicesOf(document.activeElement) }));
+app.addEventListener('focusin', trackFocus);
+app.addEventListener('focusout', trackFocus);
+app.addEventListener('click', (event) => {
+  const trigger = (event.target as Element).closest('.slices-trigger');
+  if (trigger) popoverEvent({ type: 'tap', id: slicesOf(trigger)! });
+});
+// Escape anywhere closes it, such as one pinned by a click while focus is elsewhere, but not
+// while a dialog has the key; focus returns to the trigger only when it was in the popover.
+document.addEventListener('keydown', (event) => {
+  const open = openPopover(popover);
+  if (event.key !== 'Escape' || !open || (event.target as Element).closest('dialog')) return;
+  event.preventDefault();
+  popoverEvent({ type: 'escape' });
+  if (slicesOf(event.target) === open) focusByKey(`slices-${open}`);
+});
+app.addEventListener('keydown', (event) => {
+  const id = slicesOf(event.target);
+  if (id && (event.key === 'Enter' || event.key === ' ') && (event.target as Element).matches('.slices-trigger')) {
+    event.preventDefault();
+    popoverEvent({ type: 'toggle', id });
+  }
 });
 
 // Remember which <details> are open so a re-render keeps them that way.

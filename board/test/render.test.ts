@@ -248,7 +248,50 @@ test('a build card shows its slices as a bar under the status bar, with captions
   assert.match(card, /<div class="bars"><ol class="segbar steps" aria-hidden="true">.*?<\/ol><span class="bar-label step-label now">6\/10 · In progress<\/span><ol class="segbar slice-bar"/,
     'status bar and slice bar share one grid, captions in its right-hand column');
   assert.ok(!card.includes('class="subs"'), 'the caption replaces the meta row counter');
-  assert.ok(!card.includes('row-item'), 'no slice rows on the card');
+  assert.ok(!card.replace(/<div class="slices-pop".*?<\/div>/s, '').includes('row-item'), 'no slice rows on the card outside the popover');
+});
+
+/** A build card's popover: the trigger's opening tag, the popover's id, and each row's state, number and link in order. */
+function slicePopover(card: string) {
+  const trigger = /<div class="slices-trigger"[^>]*>/.exec(card)?.[0];
+  const pop = /<div class="slices-pop" id="([^"]+)">(.*?)<\/div>/s.exec(card);
+  assert.ok(trigger && pop, 'the card has a slice popover and its trigger');
+  const rows = [...pop[2]!.matchAll(/<li class="row-item slice-row ([a-z]+)">.*?<a [^>]*href="([^"]+)"[^>]*><span class="ref">#(\d+)<\/span>/g)];
+  return { trigger, id: pop[1], rows: rows.map((m) => [m[1], Number(m[3]), m[2]]) };
+}
+
+test("a build card's popover lists every slice, active then waiting then done, behind a disclosure trigger", () => {
+  const raw = rawIssue('PVTI_build', 59, 'In progress', ['improvement', 'build'], {
+    subIssuesSummary: { total: 3, completed: 1 },
+    subIssues: { nodes: [sliceRef(65, 'OPEN'), sliceRef(66, 'CLOSED'), sliceRef(67, 'OPEN')] },
+  });
+  const card = buildCard([raw], [67]);
+  const pop = slicePopover(card);
+  const url = (n: number) => `https://github.com/maddec01/mux-factory/issues/${n}`;
+  assert.deepEqual(pop.rows, [['active', 67, url(67)], ['waiting', 65, url(65)], ['done', 66, url(66)]]);
+  assert.match(pop.trigger, /role="button"/);
+  assert.match(pop.trigger, /tabindex="0"/);
+  assert.match(pop.trigger, /aria-expanded="false"/);
+  assert.match(pop.trigger, new RegExp(`aria-controls="${pop.id}"`));
+  assert.ok(!card.includes('role="tooltip"'), 'a disclosure, not a tooltip');
+});
+
+test("a build's popover stays open across a re-render", () => {
+  const data = boardOf([builtIssue]);
+  const card = (slicesOpen?: string) => renderBoardView(data, { ...base, ui: { ...DEFAULT_UI, slicesOpen } })
+    .split('<article').find((a) => a.includes('data-anchor="PVTI_build"'))!;
+  assert.match(slicePopover(card('PVTI_build')).trigger, /aria-expanded="true"/);
+  assert.match(card('PVTI_build'), /<div class="slices open" data-slices="PVTI_build">/);
+  assert.match(slicePopover(card('PVTI_other')).trigger, /aria-expanded="false"/);
+  assert.match(card(), /<div class="slices" data-slices="PVTI_build">/);
+});
+
+test("Flow counts only a build's visible slices, not GitHub's sub-issue totals", () => {
+  const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
+    subIssuesSummary: { total: 4, completed: 2 },
+    subIssues: { nodes: [sliceRef(65, 'CLOSED'), { ...sliceRef(66, 'CLOSED'), stateReason: 'NOT_PLANNED' }, sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
+  });
+  assert.match(flowNode(renderFlowView(boardOf([raw]), base), 'PVTI_build'), /<span class="o-subs">1\/3 slices done<\/span>/);
 });
 
 test("a build's slice caption counts only visible slices, and the active line collapses when none is active", () => {
@@ -264,8 +307,9 @@ test('a 3-slice and a 14-slice build render the same card structure', () => {
     subIssuesSummary: { total: count, completed: 1 },
     subIssues: { nodes: Array.from({ length: count }, (_, i) => sliceRef(100 + i, i ? 'OPEN' : 'CLOSED')) },
   });
-  // Tags only, with the slice bar's segments dropped.
-  const shape = (card: string) => card.replace(/(<ol class="segbar slice-bar"[^>]*>).*?<\/ol>/, '$1</ol>').match(/<[^>]+>/g)?.join('');
+  // Tags only, with the slice bar's segments and the popover's rows dropped: the popover floats.
+  const shape = (card: string) => card.replace(/(<ol class="segbar slice-bar"[^>]*>).*?<\/ol>/, '$1</ol>')
+    .replace(/(<ul class="slice-rows"[^>]*>).*?<\/ul>/, '$1</ul>').match(/<[^>]+>/g)?.join('');
   assert.equal(shape(buildCard([build(14)], [101, 102])), shape(buildCard([build(3)], [101, 102])));
 });
 

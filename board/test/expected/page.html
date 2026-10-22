@@ -178,6 +178,26 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .slices-active { color: var(--thread); font-weight: 600; margin-right: 2px; }
 .slices-now .sep { color: var(--muted); }
 
+/* a build's slice popover: the bars are its trigger; it floats over the board, so the card's height never changes */
+.slices { position: relative; }
+.slices-trigger { display: grid; gap: 4px; border-radius: var(--r-control); padding: 3px 4px; margin: -3px -4px; cursor: default; }
+.slices-trigger:hover, .slices.open .slices-trigger { background: var(--soft); }
+.slices-pop { display: none; position: absolute; top: 100%; left: 0; z-index: 50; width: max(100%, 300px); max-height: 280px; overflow-y: auto; margin-top: 2px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--bd); border-radius: var(--r); box-shadow: var(--shadow), 0 1px 3px rgb(0 0 0 / 8%); }
+/* client.ts sets .open on hover, focus or tap, and .up when there's no room below. */
+.slices.open .slices-pop { display: block; }
+.slices.up .slices-pop { top: auto; bottom: 100%; margin: 0 0 2px; }
+.slices.end .slices-pop { left: auto; right: 0; }
+/* Bridges the gap so the pointer can cross from the trigger into the popover. */
+.slices-pop::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.slices.up .slices-pop::before { top: auto; bottom: -8px; }
+.slice-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 1px; }
+.slice-rows .row-item { padding: 1px 0; }
+.slice-mark { flex: none; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); box-sizing: border-box; }
+.slice-row.done .slice-mark { background: var(--build); border-color: var(--build); }
+.slice-row.active .slice-mark { background: var(--thread); border-color: var(--thread); box-shadow: 0 0 0 3px color-mix(in srgb, var(--thread) 20%, transparent); }
+.slice-row.done .row-title { color: var(--muted); text-decoration: line-through; }
+.slice-row.active .row-title { font-weight: 600; }
+
 /* queued */
 .copy { font: inherit; font-size: 12px; font-weight: 500; min-height: 24px; border: 1px solid var(--input); background: var(--surface); color: var(--fg); border-radius: var(--r-control); padding: 0 7px; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .copy:hover { background: var(--accent); }
@@ -395,7 +415,8 @@ check your internet connection or https://githubstatus.com</code></div>
 <article class="card" data-anchor="PVTI_sample13">
 <div class="meta"><span class="badges"><span class="plat plat-server">Server</span><span class="kind kind-build">build</span><span class="blocked" title="Blocked by 1 issue">blocked by 1</span></span></div>
 <a class="title" href="https://github.com/maddec01/mux-server/issues/140" target="_blank" rel="noopener"><span class="ref">#140</span> Owner accounts</a>
-<p class="parent">Part of <a href="https://github.com/maddec01/mux-server/issues/200" target="_blank" rel="noopener">#200 Mux cloud: website sign-in and relay</a></p><div class="bars"><ol class="segbar steps" aria-hidden="true"><li class="past" title="List"></li><li class="past" title="Queued"></li><li class="past" title="Shaping"></li><li class="past" title="Needs you"></li><li class="cur now" title="Ready"></li><li class="next" title="In progress"></li><li class="next" title="Review"></li><li class="next" title="Verify"></li><li class="next" title="Ready to merge"></li><li class="next" title="Done"></li></ol><span class="bar-label step-label now">5/10 · Ready</span><ol class="segbar slice-bar" aria-hidden="true"><li class="done"></li><li class="active"></li><li class="waiting"></li></ol><span class="bar-label">1/3 · Slices done</span></div><p class="slices-now"><span class="slices-active">1 active</span> <span class="ref">#145</span> Sign-in sessions</p>
+<p class="parent">Part of <a href="https://github.com/maddec01/mux-server/issues/200" target="_blank" rel="noopener">#200 Mux cloud: website sign-in and relay</a></p><div class="slices" data-slices="PVTI_sample13"><div class="slices-trigger" role="button" tabindex="0" aria-expanded="false" aria-controls="slices-PVTI_sample13"><div class="bars"><ol class="segbar steps" aria-hidden="true"><li class="past" title="List"></li><li class="past" title="Queued"></li><li class="past" title="Shaping"></li><li class="past" title="Needs you"></li><li class="cur now" title="Ready"></li><li class="next" title="In progress"></li><li class="next" title="Review"></li><li class="next" title="Verify"></li><li class="next" title="Ready to merge"></li><li class="next" title="Done"></li></ol><span class="bar-label step-label now">5/10 · Ready</span><ol class="segbar slice-bar" aria-hidden="true"><li class="done"></li><li class="active"></li><li class="waiting"></li></ol><span class="bar-label">1/3 · Slices done</span></div><p class="slices-now"><span class="slices-active">1 active</span> <span class="ref">#145</span> Sign-in sessions</p></div>
+<div class="slices-pop" id="slices-PVTI_sample13"><ul class="slice-rows" aria-label="Slices"><li class="row-item slice-row active"><span class="slice-mark" aria-hidden="true"></span><a class="row-title" href="https://github.com/maddec01/mux-server/issues/145" title="Sign-in sessions" target="_blank" rel="noopener"><span class="ref">#145</span> Sign-in sessions<span class="sr-only"> (active)</span></a></li><li class="row-item slice-row waiting"><span class="slice-mark" aria-hidden="true"></span><a class="row-title" href="https://github.com/maddec01/mux-server/issues/146" title="Owner settings page" target="_blank" rel="noopener"><span class="ref">#146</span> Owner settings page<span class="sr-only"> (waiting)</span></a></li><li class="row-item slice-row done"><span class="slice-mark" aria-hidden="true"></span><a class="row-title" href="https://github.com/maddec01/mux-server/issues/144" title="Owner table and sign-up" target="_blank" rel="noopener"><span class="ref">#144</span> Owner table and sign-up<span class="sr-only"> (done)</span></a></li></ul></div></div>
 </article>
 <article class="card" data-anchor="PVTI_sample14">
 <div class="meta"><span class="badges"><span class="plat plat-apple">Apple</span><span class="kind kind-feature">feature</span></span></div>

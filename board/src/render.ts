@@ -19,7 +19,7 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -28,6 +28,8 @@ export interface UiState {
   view: View;
   /** Open or closed, by <details> id, for the ones the user toggled since the page loaded. */
   toggled: Record<string, boolean>;
+  /** The item id of the build whose slice popover is open, if any. */
+  slicesOpen?: string;
 }
 
 export interface RenderOptions {
@@ -181,12 +183,17 @@ function stepCells(status: Status): string {
   return `<ol class="segbar steps" aria-hidden="true">${segments}</ol><span class="bar-label step-label ${tone}">${at + 1}/${STATUSES.length} · ${esc(status)}</span>`;
 }
 
+/** The popover lists active slices first, then waiting, then done. */
+const SLICE_GROUPS: SliceProgress[] = ['active', 'waiting', 'done'];
+
 /**
  * The status bar, and on a build with slices its slice bar under it: one segment per
  * slice, the captions sharing a column, and one line naming the active slices. Its
- * height doesn't grow with the number of slices.
+ * height doesn't grow with the number of slices: they're listed in a popover that
+ * floats over the board. The block is the popover's disclosure trigger; `open` is
+ * kept in `UiState.slicesOpen` so a re-render keeps it open.
  */
-function bars(item: Item): string {
+function bars(item: Item, open: boolean): string {
   const slices = item.slices;
   if (!slices.length) return `<div class="bars">${stepCells(item.status)}</div>`;
   const done = slices.filter((s) => s.progress === 'done').length;
@@ -195,7 +202,13 @@ function bars(item: Item): string {
   const now = active.length
     ? `<p class="slices-now"><span class="slices-active">${active.length} active</span> ${active.map((s) => `<span class="ref">#${s.number}</span> ${esc(s.title)}`).join('<span class="sep"> · </span>')}</p>`
     : '';
-  return `<div class="bars">${stepCells(item.status)}<ol class="segbar slice-bar" aria-hidden="true">${segments}</ol><span class="bar-label">${done}/${slices.length} · Slices done</span></div>${now}`;
+  // Within each group, slices keep GitHub's sub-issue order.
+  const rows = SLICE_GROUPS.flatMap((g) => slices.filter((s) => s.progress === g)).map(
+    (s) => `<li class="row-item slice-row ${s.progress}"><span class="slice-mark" aria-hidden="true"></span><a class="row-title" href="${esc(s.url)}" title="${esc(s.title)}" target="_blank" rel="noopener"><span class="ref">#${s.number}</span> ${esc(s.title)}<span class="sr-only"> (${s.progress})</span></a></li>`,
+  ).join('');
+  const popId = `slices-${esc(item.id)}`;
+  return `<div class="slices${open ? ' open' : ''}" data-slices="${esc(item.id)}"><div class="slices-trigger" role="button" tabindex="0" aria-expanded="${open}" aria-controls="${popId}"><div class="bars">${stepCells(item.status)}<ol class="segbar slice-bar" aria-hidden="true">${segments}</ol><span class="bar-label">${done}/${slices.length} · Slices done</span></div>${now}</div>
+<div class="slices-pop" id="${popId}"><ul class="slice-rows" aria-label="Slices">${rows}</ul></div></div>`;
 }
 
 /** The badge after an open PR's link: running with counts and age, passed, failed, or nothing. */
@@ -218,7 +231,7 @@ const HINTS: Partial<Record<Status, string>> = {
 };
 
 /** `action` is a button for the card's top row, so it adds no height. */
-function card(item: Item, data: BoardData, now: number, extra = '', action = ''): string {
+function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', action = ''): string {
   const parent = item.parent
     ? `<p class="parent">Part of <a href="${esc(item.parent.url)}" target="_blank" rel="noopener">#${item.parent.number} ${esc(item.parent.title)}</a></p>`
     : '';
@@ -233,19 +246,27 @@ function card(item: Item, data: BoardData, now: number, extra = '', action = '')
   const prs = item.linkedPrs
     .map(
       (pr) =>
-        `<span class="linked-pr"><a class="pr" href="${esc(pr.url)}" target="_blank" rel="noopener">PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'OPEN' ? '' : ` (${esc(pr.state.toLowerCase())})`}</a>${checksBadge(pr, now)}</span>`,
+        `<span class="linked-pr"><a class="pr" href="${esc(pr.url)}" target="_blank" rel="noopener">PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'OPEN' ? '' : ` (${esc(pr.state.toLowerCase())})`}</a>${checksBadge(pr, opts.now)}</span>`,
     )
     .join('');
   const foot = hint || prs ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}</p>` : '';
   return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}" data-anchor="${esc(item.id)}">
 <div class="meta"><span class="badges">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}</span>${action}</div>
 ${titleLink(item)}
-${parent}${bars(item)}${foot}${extra}
+${parent}${bars(item, opts.ui.slicesOpen === item.id)}${foot}${extra}
 </article>`;
 }
 
-/** A build's sub-issues are its slices. */
-const subsNoun = (item: Item) => (isBuild(item) ? 'slices' : 'sub-issues');
+/**
+ * "done/total noun done" for Flow, or '' with nothing to count. A build counts its
+ * visible slices, not GitHub's sub-issue totals, which include those closed as not planned.
+ */
+function subsDone(item: Item): string {
+  const [done, total, noun] = isBuild(item)
+    ? [item.slices.filter((s) => s.progress === 'done').length, item.slices.length, 'slices']
+    : [item.subIssues.completed, item.subIssues.total, 'sub-issues'];
+  return total ? `${done}/${total} ${noun} done` : '';
+}
 
 function section(id: string, title: string, count: number, body: string, note = ''): string {
   return `<section class="section" id="${id}" aria-labelledby="${id}-h">
@@ -254,9 +275,9 @@ ${body}
 </section>`;
 }
 
-function cards(items: Item[], data: BoardData, now: number, empty: string, extra?: (i: Item) => string, action?: (i: Item) => string): string {
+function cards(items: Item[], data: BoardData, opts: RenderOptions, empty: string, extra?: (i: Item) => string, action?: (i: Item) => string): string {
   if (!items.length) return `<p class="empty">${esc(empty)}</p>`;
-  return `<div class="cards">${items.map((i) => card(i, data, now, extra?.(i), action?.(i))).join('\n')}</div>`;
+  return `<div class="cards">${items.map((i) => card(i, data, opts, extra?.(i), action?.(i))).join('\n')}</div>`;
 }
 
 /** List and Done rows show every label; sub-issue rows keep the card's kind pill. */
@@ -486,7 +507,7 @@ ${groups}
 
 // ---------- board view ----------
 
-function conceptBlock(concept: Item, data: BoardData, now: number): string {
+function conceptBlock(concept: Item, data: BoardData, opts: RenderOptions): string {
   const children = data.items
     .filter(
       (i) =>
@@ -515,7 +536,7 @@ function conceptBlock(concept: Item, data: BoardData, now: number): string {
   const open = children.length
     ? `<ul class="sub-groups" aria-label="Open sub-issues by status">${groups}</ul>`
     : '<p class="empty">No open sub-issues on the board.</p>';
-  return card(concept, data, now, `${progress}${open}`);
+  return card(concept, data, opts, `${progress}${open}`);
 }
 
 export function renderBoardView(data: BoardData, opts: RenderOptions): string {
@@ -579,14 +600,14 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       'needs-you',
       'Needs you',
       needsYou.length,
-      cards(needsYou, data, now, 'Nothing needs you right now.'),
+      cards(needsYou, data, opts, 'Nothing needs you right now.'),
       'Needs you, Verify and Ready to merge: only you can move these',
     ),
     section(
       'in-flight',
       'In flight',
       inFlight.length,
-      cards(inFlight, data, now, 'Nothing is being shaped, built or reviewed.'),
+      cards(inFlight, data, opts, 'Nothing is being shaped, built or reviewed.'),
       'Shaping, Ready, In progress, Review',
     ),
     section(
@@ -594,14 +615,14 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       'Concepts',
       concepts.length,
       concepts.length
-        ? `<div class="cards wide">${concepts.map((c) => conceptBlock(c, data, now)).join('\n')}</div>`
+        ? `<div class="cards wide">${concepts.map((c) => conceptBlock(c, data, opts)).join('\n')}</div>`
         : '<p class="empty">No open concepts.</p>',
     ),
     section(
       'queued',
       'Queued',
       queued.length,
-      cards(queued, data, now, 'Nothing queued. Press Queue on a List item to queue it.', queuedExtra, queuedAction),
+      cards(queued, data, opts, 'Nothing queued. Press Queue on a List item to queue it.', queuedExtra, queuedAction),
       'Start opens a mux-work thread in T3 Code',
     ),
     section('list', 'List', list.length, listBody),
@@ -670,7 +691,8 @@ export function renderFlowView(data: BoardData, opts: RenderOptions): string {
     const kidRows = kids.map(node).join('')
       + (missing > 0 ? `<li class="o-missing">${plural(missing, 'more sub-issue')} not on the board</li>` : '');
     const links = linkRows('blocked by', i.blockers, i.repo, shown) + linkRows('blocks', i.blocking, i.repo, shown);
-    const subs = i.subIssues.total ? `<span class="o-subs">${i.subIssues.completed}/${i.subIssues.total} ${subsNoun(i)} done</span>` : '';
+    const count = subsDone(i);
+    const subs = count ? `<span class="o-subs">${count}</span>` : '';
     return `<li class="o-node" id="o-${esc(i.id)}">
 <div class="o-row" data-anchor="o:${esc(i.id)}">${platformBadge(i, data)}${kindPill(i)}${titleLink(i, 'o-title')}${statusChip(i)}${subs}</div>
 ${links ? `<ul class="o-links">${links}</ul>` : ''}${kidRows ? `<ul class="o-tree">${kidRows}</ul>` : ''}</li>`;

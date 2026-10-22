@@ -169,6 +169,26 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .slices-active { color: var(--thread); font-weight: 600; margin-right: 2px; }
 .slices-now .sep { color: var(--muted); }
 
+/* a build's slice popover: the bars are its trigger; it floats over the board, so the card's height never changes */
+.slices { position: relative; }
+.slices-trigger { display: grid; gap: 4px; border-radius: var(--r-control); padding: 3px 4px; margin: -3px -4px; cursor: default; }
+.slices-trigger:hover, .slices.open .slices-trigger { background: var(--soft); }
+.slices-pop { display: none; position: absolute; top: 100%; left: 0; z-index: 50; width: max(100%, 300px); max-height: 280px; overflow-y: auto; margin-top: 2px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--bd); border-radius: var(--r); box-shadow: var(--shadow), 0 1px 3px rgb(0 0 0 / 8%); }
+/* client.ts sets .open on hover, focus or tap, and .up when there's no room below. */
+.slices.open .slices-pop { display: block; }
+.slices.up .slices-pop { top: auto; bottom: 100%; margin: 0 0 2px; }
+.slices.end .slices-pop { left: auto; right: 0; }
+/* Bridges the gap so the pointer can cross from the trigger into the popover. */
+.slices-pop::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.slices.up .slices-pop::before { top: auto; bottom: -8px; }
+.slice-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 1px; }
+.slice-rows .row-item { padding: 1px 0; }
+.slice-mark { flex: none; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); box-sizing: border-box; }
+.slice-row.done .slice-mark { background: var(--build); border-color: var(--build); }
+.slice-row.active .slice-mark { background: var(--thread); border-color: var(--thread); box-shadow: 0 0 0 3px color-mix(in srgb, var(--thread) 20%, transparent); }
+.slice-row.done .row-title { color: var(--muted); text-decoration: line-through; }
+.slice-row.active .row-title { font-weight: 600; }
+
 /* queued */
 .copy { font: inherit; font-size: 12px; font-weight: 500; min-height: 24px; border: 1px solid var(--input); background: var(--surface); color: var(--fg); border-radius: var(--r-control); padding: 0 7px; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .copy:hover { background: var(--accent); }

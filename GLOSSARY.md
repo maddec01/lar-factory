@@ -129,8 +129,12 @@ Completed work, reached when its issue closes or its PR merges.
 The sum of the work every agent did on an item, with parallel agents added up but a parent's wait on its own subagent counted once, excluding time waiting on Pedro.
 _Avoid_: duration, elapsed time
 
+**Wall time**:
+The time during which at least one of an item's agents was working, with parallel work counted once, excluding time waiting on Pedro.
+_Avoid_: elapsed time, calendar time, active time
+
 **Item stats**:
-An item's agent time, total tokens and API cost, shown as three plain figures.
+An item's agent time, wall time, total tokens and API cost, shown as four plain figures.
 _Avoid_: usage, metrics
 
 **API cost**:

@@ -540,30 +540,37 @@ test("a linked PR shows its checks: running with counts and age, amber when slow
   assert.match(html, /PR #14 \(closed\)<\/a>(?!<span class="checks)/, 'only open PRs show checks');
 });
 
-test('cards and Done rows show item stats, agent time, total tokens and API cost, or that they are unavailable', () => {
-  const stats = { agentMs: (3 * 60 + 20) * 60_000 + 59_000, tokens: 12_436_000, costUsd: 41.197 };
+test('cards and Done rows show item stats, agent time, wall time, total tokens and API cost, or that they are unavailable', () => {
+  const stats = { agentMs: (3 * 60 + 20) * 60_000 + 59_000, wallMs: 70 * 60_000, tokens: 12_436_000, costUsd: 41.197 };
   const statsOf = (item: Partial<Item>) => {
     const html = renderBoardView({ ...sample, items: [{ ...sample.items[0]!, ...item }] }, base);
-    return html.match(/<span class="stats"[^>]*>[^<]*<\/span>/g);
+    return html.match(/<span class="stats"[^>]*>(?:[^<]|<span[^>]*>[^<]*<\/span>)*<\/span>/g);
   };
-  const title = 'title="Agent time, less waits on you, and total tokens as T3 Code\'s usage page counts them. ' +
-    'The cost is an API estimate at list prices, not the subscription bill."';
-  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>3h 20m · 12.4M tokens · $41.20</span>`]);
-  const unpricedTitle = 'title="Agent time, less waits on you, and total tokens as T3 Code\'s usage page counts them."';
-  assert.deepEqual(statsOf({ status: 'In progress', stats: { agentMs: 45 * 60_000, tokens: 980 } }), [`<span class="stats" ${unpricedTitle}>45m · 980 tokens</span>`],
-    'nothing priced, no cost and no cost sentence');
+  // Σ shows; screen readers hear "agent time" instead.
+  const Σ = '<span aria-hidden="true">Σ</span><span class="sr-only">agent time</span>';
+  const sigma = 'title="Σ is agent time: all agents\' work, parallel work added up, less waits on you.';
+  const wall = ' Wall is the time any agent was working, less waits on you.';
+  const tokens = ' Tokens are counted as T3 Code\'s usage page counts them.';
+  const priced = ' The cost is an API estimate at list prices, not the subscription bill.';
+  const title = `${sigma}${wall}${tokens}${priced}"`;
+  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>${Σ} 3h 20m · wall 1h 10m · 12.4M · $41.20</span>`]);
+  assert.deepEqual(statsOf({ status: 'In progress', stats: { agentMs: 45 * 60_000, wallMs: 30 * 60_000, tokens: 980 } }),
+    [`<span class="stats" ${sigma}${wall}${tokens}">${Σ} 45m · wall 30m · 980</span>`], 'nothing priced, no cost and no cost sentence');
   assert.deepEqual(statsOf({ status: 'Shaping', stats: 'unavailable' }), ['<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>']);
   assert.deepEqual(statsOf({ status: 'Done', closedAt: '2026-10-20T10:00:00Z', stats }),
-    [`<span class="stats" ${title}>3h 20m · 12.4M tokens · $41.20</span>`], 'Done rows keep their stats');
+    [`<span class="stats" ${title}>${Σ} 3h 20m · wall 1h 10m · 12.4M · $41.20</span>`], 'Done rows keep their stats');
   assert.equal(statsOf({ status: 'Ready' }), null, 'no stats without matched threads');
-  const frozenTitle = title.replace(/"$/, ' Frozen when the PR merged, cost to the nearest dollar."');
   const done = { status: 'Done', closedAt: '2026-10-20T10:00:00Z' } as const;
+  assert.deepEqual(statsOf({ ...done, stats: { agentMs: 200 * 60_000, wallMs: 75 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true } }),
+    [`<span class="stats" ${sigma}${wall}${tokens}${priced} Frozen when the PR merged, times rounded, cost to the nearest dollar.">${Σ} 3h 20m · wall 1h 15m · 12.4M · $41</span>`],
+    'frozen figures show the whole-dollar cost the PR holds');
+  const frozenTitle = `${sigma}${tokens}${priced} Frozen when the PR merged, times rounded, cost to the nearest dollar."`;
   assert.deepEqual(statsOf({ ...done, stats: { agentMs: 200 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true } }),
-    [`<span class="stats" ${frozenTitle}>3h 20m · 12.4M tokens · $41</span>`], 'frozen figures show the whole-dollar cost the PR holds');
+    [`<span class="stats" ${frozenTitle}>${Σ} 3h 20m · 12.4M · $41</span>`], 'figures frozen before wall time leave it out');
   assert.deepEqual(statsOf({ ...done, stats: { agentMs: 0, tokens: 980, costUsd: 0, frozen: true } }),
-    [`<span class="stats" ${frozenTitle}>0m · 980 tokens · &lt;$1</span>`]);
+    [`<span class="stats" ${frozenTitle}>${Σ} 0m · 980 · &lt;$1</span>`]);
   assert.deepEqual(statsOf({ ...done, stats: { agentMs: 0, tokens: 980, frozen: true } }),
-    [`<span class="stats" ${unpricedTitle.replace(/"$/, ' Frozen when the PR merged."')}>0m · 980 tokens</span>`], 'frozen without a cost');
+    [`<span class="stats" ${sigma}${tokens} Frozen when the PR merged, times rounded.">${Σ} 0m · 980</span>`], 'frozen without a cost');
 });
 
 test('token counts are compact as on T3 Code\'s usage page', () => {

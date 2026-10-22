@@ -271,20 +271,24 @@ const HINTS: Partial<Record<Status, string>> = {
 };
 
 /**
- * Agent time, total tokens and API cost, `3h 20m · 12.4M tokens · $41.20`, for a
- * card's footer or a Done row; nothing when no thread worked on the item, and no
- * cost when none of its tokens could be priced.
+ * Agent time, wall time, total tokens and API cost, `Σ 3h 20m · wall 1h 10m · 12.4M · $41.20`,
+ * for a card's footer or a Done row; nothing when no thread worked on the item, no
+ * wall time in figures frozen before it existed, and no cost when none of its
+ * tokens could be priced. Screen readers hear "agent time" for Σ.
  */
 function statsBadge(item: Item): string {
   const stats = item.stats;
   if (!stats) return '';
   if (stats === 'unavailable') return '<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>';
+  const wall = stats.wallMs === undefined ? '' : ` · wall ${duration(stats.wallMs)}`;
   const cost = stats.costUsd === undefined ? '' : ` · ${esc(stats.frozen ? wholeUsd(stats.costUsd) : formatUsd(stats.costUsd))}`;
   const priced = stats.costUsd !== undefined;
-  const title = "Agent time, less waits on you, and total tokens as T3 Code's usage page counts them." +
+  const title = "Σ is agent time: all agents' work, parallel work added up, less waits on you." +
+    (wall ? ' Wall is the time any agent was working, less waits on you.' : '') +
+    " Tokens are counted as T3 Code's usage page counts them." +
     (priced ? ' The cost is an API estimate at list prices, not the subscription bill.' : '') +
-    (stats.frozen ? ` Frozen when the PR merged${priced ? ', cost to the nearest dollar' : ''}.` : '');
-  return `<span class="stats" title="${title}">${duration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens${cost}</span>`;
+    (stats.frozen ? ` Frozen when the PR merged, times rounded${priced ? ', cost to the nearest dollar' : ''}.` : '');
+  return `<span class="stats" title="${title}"><span aria-hidden="true">Σ</span><span class="sr-only">agent time</span> ${duration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}</span>`;
 }
 
 /** `action` is a button for the card's top row, so it adds no height. */

@@ -60,11 +60,67 @@ test('the number must match exactly, and titles are never used', (t) => {
 test('child threads count through their lineage root, even when their own first message names another issue', (t) => {
   const stats = reader(statsDb(t, [
     { id: 'root', messages: [`Build ${REPO}#60`], turns: [turn('a')] },
-    { id: 'child', rootThreadId: 'root', messages: [`$mux-work ${REPO}#72`], turns: [turn('b')] },
+    { id: 'child', rootThreadId: 'root', messages: [`$mux-work ${REPO}#72`],
+      turns: [{ id: 'b', startedAt: '2026-10-20T09:20:00Z', completedAt: '2026-10-20T09:30:00Z' }] },
     { id: 'stranger', rootThreadId: 'elsewhere', turns: [turn('c')] },
   ]));
   assert.equal(stats(REPO, 60)?.agentMs, 20 * MIN);
   assert.equal(stats(REPO, 72), null, 'a child is not a root of its own');
+});
+
+/** A ten-minute root turn naming issue `n`, from 09:00. */
+function root(n: number): FixtureThread {
+  return { id: `root-${n}`, messages: [`Build ${REPO}#${n}`], turns: [turn(`root-${n}`)] };
+}
+
+/** A turn-less subagent child of `root(n)` running from `start` to `end` (HH:MM on the test day). */
+function subagent(id: string, n: number, start: string, end: string | null, extra: Partial<FixtureThread> = {}): FixtureThread {
+  const at = (hm: string) => `2026-10-20T${hm}:00Z`;
+  return { id, rootThreadId: `root-${n}`, subagent: { startedAt: at(start), completedAt: end && at(end) }, ...extra };
+}
+
+test('a subagent adds the part of its run outside its parent\'s turns, and parallel siblings add up', (t) => {
+  const stats = reader(statsDb(t, [
+    root(1), subagent('background', 1, '09:10', '09:25'),
+    root(2), subagent('foreground', 2, '09:02', '09:08'),
+    // A Codex-style child: its own turns count, not its run, which T3 repeats.
+    root(3), { id: 'codex', rootThreadId: 'root-3', subagent: [
+      { startedAt: '2026-10-20T09:01:00Z', completedAt: '2026-10-20T09:30:00Z' },
+      { startedAt: '2026-10-20T09:01:00Z', completedAt: '2026-10-20T09:30:00Z' },
+    ], turns: [
+      { id: 'c1', startedAt: '2026-10-20T09:01:00Z', completedAt: '2026-10-20T09:04:00Z' },
+      { id: 'c2', startedAt: '2026-10-20T09:05:00Z', completedAt: '2026-10-20T09:09:00Z' },
+    ] },
+    root(4), subagent('left', 4, '09:10', '09:25'), subagent('right', 4, '09:10', '09:25'),
+    // One child's repeated runs are merged before counting.
+    root(5), { id: 'repeated', rootThreadId: 'root-5', subagent: [
+      { startedAt: '2026-10-20T09:10:00Z', completedAt: '2026-10-20T09:20:00Z' },
+      { startedAt: '2026-10-20T09:15:00Z', completedAt: '2026-10-20T09:25:00Z' },
+    ] },
+  ]));
+  assert.equal(stats(REPO, 1)?.agentMs, 25 * MIN);
+  assert.equal(stats(REPO, 2)?.agentMs, 10 * MIN, 'a parent waiting on its subagent counts once');
+  assert.equal(stats(REPO, 3)?.agentMs, 10 * MIN, 'a child working inside its parent\'s turn adds nothing');
+  assert.equal(stats(REPO, 4)?.agentMs, 40 * MIN);
+  assert.equal(stats(REPO, 5)?.agentMs, 25 * MIN);
+});
+
+test('a running subagent counts up to its latest message, never its updated time, and 0 before its first', (t) => {
+  const stats = reader(statsDb(t, [
+    root(1), subagent('replied', 1, '09:10', null, { repliedAt: '2026-10-20T09:18:00Z' }),
+    root(2), subagent('silent', 2, '09:10', null),
+  ]));
+  assert.equal(stats(REPO, 1)?.agentMs, 18 * MIN);
+  assert.equal(stats(REPO, 2)?.agentMs, 10 * MIN);
+});
+
+test('a subagent under a child task has its time taken out of that child\'s work, not the root\'s', (t) => {
+  const stats = reader(statsDb(t, [
+    root(1),
+    { id: 'task', rootThreadId: 'root-1', turns: [{ id: 'task', startedAt: '2026-10-20T09:20:00Z', completedAt: '2026-10-20T09:40:00Z' }] },
+    subagent('nested', 1, '09:30', '09:50', { parentThreadId: 'task' }),
+  ]));
+  assert.equal(stats(REPO, 1)?.agentMs, (10 + 20 + 10) * MIN);
 });
 
 test('agent time leaves out waits on Pedro inside a turn, and a running turn or wait counts up to now', (t) => {

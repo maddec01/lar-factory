@@ -54,8 +54,16 @@ FROM orchestration_v2_projection_threads t
 WHERE json_extract(t.payload_json, '$.lineage.relationshipToParent') IS NULL`;
 
 const LINEAGE = `
-SELECT thread_id AS id, json_extract(payload_json, '$.lineage.rootThreadId') AS root
+SELECT thread_id AS id, json_extract(payload_json, '$.lineage.rootThreadId') AS root,
+  json_extract(payload_json, '$.lineage.parentThreadId') AS parent
 FROM orchestration_v2_projection_threads`;
+
+// Each child thread's subagent runs. Claude's native subagents have no turns, so
+// their run is their work; a child can have several rows (Codex app_owned).
+// Never read updated_at, which T3 bulk-updates.
+const RUNS = `
+SELECT child_thread_id AS thread, started_at AS startedAt, completed_at AS completedAt
+FROM orchestration_v2_projection_subagents WHERE child_thread_id IS NOT NULL`;
 
 const TURNS = `
 SELECT provider_turn_id AS id, thread_id AS thread, provider_thread_id AS providerThread,
@@ -113,17 +121,37 @@ function add<V>(map: Map<string, V[]>, key: string, value: V): void {
   else map.set(key, [value]);
 }
 
-/** Total length of the intervals, overlaps counted once. */
-function covered(intervals: [number, number][]): number {
-  let total = 0;
-  let reach = -Infinity;
-  for (const [start, end] of intervals.sort((a, b) => a[0] - b[0])) {
-    const from = Math.max(start, reach);
-    if (end > from) total += end - from;
-    reach = Math.max(reach, end);
+type Interval = [number, number];
+
+/** The intervals merged into disjoint ones, earliest first, dropping empty ones. */
+function merged(intervals: Interval[]): Interval[] {
+  const out: Interval[] = [];
+  for (const [start, end] of [...intervals].sort((a, b) => a[0] - b[0])) {
+    if (!(end > start)) continue;
+    const last = out.at(-1);
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end);
+    else out.push([start, end]);
   }
-  return total;
+  return out;
 }
+
+/** The parts of each interval that no interval in `cut` covers. */
+function minus(intervals: Interval[], cut: Interval[]): Interval[] {
+  const holes = merged(cut);
+  return intervals.flatMap(([start, end]) => {
+    const parts: Interval[] = [];
+    let from = start;
+    for (const [holeStart, holeEnd] of holes) {
+      if (holeEnd <= from || holeStart >= end) continue;
+      if (holeStart > from) parts.push([from, holeStart]);
+      from = Math.max(from, holeEnd);
+    }
+    if (end > from) parts.push([from, end]);
+    return parts;
+  });
+}
+
+const length = (intervals: Interval[]): number => intervals.reduce((total, [start, end]) => total + end - start, 0);
 
 /** The provider threads running a turn now; none when T3 doesn't say, so open turns are capped. */
 function activeProviderThreads(db: DatabaseSync): Set<string> {
@@ -363,14 +391,15 @@ export function loadItemStats(sources: StatsSources, now: number): ItemStatsRead
   try {
     const open = (db = new DatabaseSync(sources.db, { readOnly: true }));
     const roots = db.prepare(ROOTS).all() as { id: string; text: unknown }[];
-    const lineage = db.prepare(LINEAGE).all() as { id: string; root: unknown }[];
+    const lineage = db.prepare(LINEAGE).all() as { id: string; root: unknown; parent: unknown }[];
     const turns = db.prepare(TURNS).all() as unknown as Turn[];
+    const runs = db.prepare(RUNS).all() as { thread: string; startedAt: string | null; completedAt: string | null }[];
     const waits = db.prepare(WAITS).all() as { turn: string; createdAt: string | null; resolvedAt: string | null }[];
     const lastMessages = db.prepare(LAST_MESSAGES).all() as { thread: string; at: string | null }[];
     const activity = { lastMessages, active: activeProviderThreads(db) };
     const settings = readSettings(sources.settings);
     const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(open, instanceHomes(settings, sources.home))));
-    return reader(roots, lineage, turns, waits, activity, records, loadPricing(sources.rates, settings), now);
+    return reader(roots, lineage, turns, runs, waits, activity, records, loadPricing(sources.rates, settings), now);
   } catch {
     return 'unavailable';
   } finally {
@@ -380,8 +409,9 @@ export function loadItemStats(sources: StatsSources, now: number): ItemStatsRead
 
 function reader(
   roots: { id: string; text: unknown }[],
-  lineage: { id: string; root: unknown }[],
+  lineage: { id: string; root: unknown; parent: unknown }[],
   turns: Turn[],
+  runs: { thread: string; startedAt: string | null; completedAt: string | null }[],
   waits: { turn: string; createdAt: string | null; resolvedAt: string | null }[],
   activity: { lastMessages: { thread: string; at: string | null }[]; active: Set<string> },
   records: Map<string, UsageRecord[]>,
@@ -396,7 +426,11 @@ function reader(
     }
   }
   const threadsByRoot = new Map<string, string[]>();
-  for (const { id, root } of lineage) add(threadsByRoot, typeof root === 'string' ? root : id, id);
+  const parentOf = new Map<string, string>();
+  for (const { id, root, parent } of lineage) {
+    add(threadsByRoot, typeof root === 'string' ? root : id, id);
+    if (typeof parent === 'string') parentOf.set(id, parent);
+  }
   const turnsByThread = new Map<string, Turn[]>();
   for (const turn of turns) add(turnsByThread, turn.thread, turn);
   const threadOfTurn = new Map(turns.map((turn) => [turn.id, turn.thread]));
@@ -406,7 +440,12 @@ function reader(
     const ms = Date.parse(at ?? '');
     if (thread && Number.isFinite(ms) && ms > (lastActivity.get(thread) ?? -Infinity)) lastActivity.set(thread, ms);
   };
-  for (const { thread, at } of activity.lastMessages) seen(thread, at);
+  const lastMessage = new Map<string, number>();
+  for (const { thread, at } of activity.lastMessages) {
+    seen(thread, at);
+    const ms = Date.parse(at ?? '');
+    if (Number.isFinite(ms)) lastMessage.set(thread, ms);
+  }
   for (const turn of turns) [turn.startedAt, turn.completedAt].forEach((at) => seen(turn.thread, at));
   const waitsByTurn = new Map<string, [number, number][]>();
   for (const wait of waits) {
@@ -437,19 +476,32 @@ function reader(
     return activity.active.has(turn.providerThread) ? now : (lastActivity.get(turn.thread) ?? -Infinity);
   };
 
+  // A running subagent counts up to its latest message, or not at all before one.
+  const runsByThread = new Map<string, Interval[]>();
+  for (const run of runs) {
+    const start = Date.parse(run.startedAt ?? '');
+    const end = run.completedAt ? Date.parse(run.completedAt) : (lastMessage.get(run.thread) ?? start);
+    if (Number.isFinite(start) && Number.isFinite(end)) add(runsByThread, run.thread, [start, end]);
+  }
+  // A thread's work: its turns less waits on Pedro, or, with no turns, its subagent runs.
+  const work = (thread: string): Interval[] => {
+    const own = turnsByThread.get(thread);
+    if (!own) return merged(runsByThread.get(thread) ?? []);
+    return own.flatMap((turn): Interval[] => {
+      const start = Date.parse(turn.startedAt ?? '');
+      return Number.isFinite(start) ? minus([[start, turnEnd(turn)]], waitsByTurn.get(turn.id) ?? []) : [];
+    });
+  };
+
   return Object.assign((repo: string, number: number): ItemStats | null => {
     const matched = rootsByIssue.get(`${repo}#${number}`);
     if (!matched) return null;
     const threads = new Set([...matched].flatMap((root) => [root, ...(threadsByRoot.get(root) ?? [])]));
+    // A root adds all its work; a child only its work outside its direct parent's.
     let agentMs = 0;
-    for (const turn of [...threads].flatMap((thread) => turnsByThread.get(thread) ?? [])) {
-      const start = Date.parse(turn.startedAt ?? '');
-      const end = turnEnd(turn);
-      if (Number.isFinite(start) && end > start) {
-        const inside = (waitsByTurn.get(turn.id) ?? [])
-          .map(([from, to]): [number, number] => [Math.max(from, start), Math.min(to, end)]);
-        agentMs += end - start - covered(inside);
-      }
+    for (const thread of threads) {
+      const parent = parentOf.get(thread);
+      agentMs += length(parent ? minus(work(thread), work(parent)) : work(thread));
     }
     const own = [...threads].flatMap((thread) => records.get(thread) ?? []);
     const costUsd = pricing ? apiCost(own, pricing) : null;

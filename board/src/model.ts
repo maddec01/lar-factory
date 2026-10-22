@@ -84,7 +84,7 @@ export interface IssueLinks {
 
 /** An item's agent time, tokens and API cost, summed over every thread that worked on it. */
 export interface ItemStats {
-  /** Agent time: turn run time, less time waiting on Pedro. */
+  /** Agent time: every agent's work, a child's only outside its direct parent's work, less waits on Pedro. */
   agentMs: number;
   /** Total tokens from the threads' transcripts, counted as T3 Code's usage page counts them. */
   tokens: number;

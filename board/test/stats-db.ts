@@ -35,9 +35,21 @@ export interface FixtureThread {
   title?: string;
   /** The root thread's id for a child thread; omitted for a root. */
   rootThreadId?: string;
+  /** The direct parent of a child thread nested under another child; the root by default. */
+  parentThreadId?: string;
+  /** The child thread's subagent run, or its repeated runs, as T3's subagent projection holds them. */
+  subagent?: FixtureRun | FixtureRun[];
+  /** When the thread's latest message (an assistant reply) was sent. */
+  repliedAt?: string;
   turns?: FixtureTurn[];
   /** The thread's provider threads by native session. */
   sessions?: (string | FixtureSession)[];
+}
+
+/** A subagent run; a running one has no completion time. */
+export interface FixtureRun {
+  startedAt: string;
+  completedAt?: string | null;
 }
 
 export interface FixtureRequest {
@@ -53,6 +65,7 @@ CREATE TABLE orchestration_v2_projection_provider_turns (provider_turn_id TEXT P
 CREATE TABLE orchestration_v2_projection_runtime_requests (runtime_request_id TEXT PRIMARY KEY, thread_id TEXT, provider_turn_id TEXT, created_at TEXT, resolved_at TEXT);
 CREATE TABLE orchestration_v2_projection_provider_threads (provider_thread_id TEXT PRIMARY KEY, thread_id TEXT, provider TEXT, status TEXT, payload_json TEXT);
 CREATE TABLE orchestration_v2_projection_run_attempts (attempt_id TEXT PRIMARY KEY, thread_id TEXT, run_id TEXT, provider_thread_id TEXT, payload_json TEXT);
+CREATE TABLE orchestration_v2_projection_subagents (subagent_id TEXT PRIMARY KEY, thread_id TEXT, child_thread_id TEXT, origin TEXT, status TEXT, started_at TEXT, completed_at TEXT, updated_at TEXT);
 CREATE TABLE orchestration_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, aggregate_kind TEXT, stream_id TEXT, event_type TEXT, application_event_version INTEGER, payload_json TEXT);
 `;
 
@@ -72,9 +85,10 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
     VALUES ('thread', ?, 'run.updated', 2, ?)`);
   const request = db.prepare('INSERT INTO orchestration_v2_projection_runtime_requests VALUES (?, ?, ?, ?, ?)');
   const provider = db.prepare('INSERT INTO orchestration_v2_projection_provider_threads VALUES (?, ?, ?, ?, ?)');
+  const subagent = db.prepare('INSERT INTO orchestration_v2_projection_subagents VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
   for (const th of threads) {
     const lineage = th.rootThreadId
-      ? { parentThreadId: th.rootThreadId, relationshipToParent: 'subagent', rootThreadId: th.rootThreadId }
+      ? { parentThreadId: th.parentThreadId ?? th.rootThreadId, relationshipToParent: 'subagent', rootThreadId: th.rootThreadId }
       : { parentThreadId: null, relationshipToParent: null, rootThreadId: th.id };
     thread.run(th.id, th.title ?? th.id, JSON.stringify({ id: th.id, title: th.title ?? th.id, lineage }));
     // Inserted latest first, so the reader has to order by time.
@@ -83,6 +97,10 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
       message.run(`${th.id}:m${i}`, th.id, 'user', at, JSON.stringify({ role: 'user', text }));
     });
     message.run(`${th.id}:assistant`, th.id, 'assistant', '2026-10-20T07:00:00.000Z', JSON.stringify({ role: 'assistant', text: 'Build x/y#1' }));
+    if (th.repliedAt) message.run(`${th.id}:reply`, th.id, 'assistant', th.repliedAt, JSON.stringify({ role: 'assistant', text: 'Done.' }));
+    // updated_at is bulk-updated by T3, so it is set to a time item stats must never use.
+    [th.subagent ?? []].flat().forEach((run, i) => subagent.run(`${th.id}:subagent-${i}`, th.parentThreadId ?? th.rootThreadId ?? null,
+      th.id, 'provider_native', run.completedAt ? 'completed' : 'running', run.startedAt, run.completedAt ?? null, '2026-10-20T23:00:00.000Z'));
     for (const entry of th.sessions ?? []) {
       const { session, instance = 'claudeAgent', driver = 'claudeAgent', createdAt = '2026-10-20T08:00:00.000Z' } =
         typeof entry === 'string' ? { session: entry } : entry;

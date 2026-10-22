@@ -10,6 +10,8 @@ Assume the author is overconfident. Hunt for:
   the repo contradicts. Check each against the files.
 - **Ambiguous**: a **Done when** line two builders could read differently, or
   a reviewer couldn't check by looking at the result.
+- **Inconsistent**: two **Done when** lines that contradict each other, or a
+  step that sets a status, comments or asks on an issue already closed by then.
 - **Incomplete**: the error, empty, slow, cancelled and permission cases; every
   platform the change reaches (web, Apple, server); migrations, deployment and
   existing data; a decision the builder would have to make alone.
@@ -29,7 +31,7 @@ Return:
 
 ```
 findings:
-- [wrong|ambiguous|incomplete|assumption|repository|domain-docs] brief section: problem. Evidence: <path:line or quote>. Fix: <suggestion>
+- [wrong|ambiguous|inconsistent|incomplete|assumption|repository|domain-docs] brief section: problem. Evidence: <path:line or quote>. Fix: <suggestion>
 clean:
 - <categories with no findings>
 not checked:

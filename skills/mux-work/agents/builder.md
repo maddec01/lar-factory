@@ -9,14 +9,13 @@ slices.
 `bash <mux-work>/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
 name: the ones named here, plus `gh issue view <ref> --comments` and
 `gh issue comment`. Call `orchestrator_capabilities` only when a model must
-change; skip searching the tool catalogue. Read each file or skill a step names
-only when that step runs.
+change or to read `inheritedOptions` before delegating; skip searching the tool
+catalogue. Read each file or skill a step names only when that step runs.
 
 ## Subagents
 
-- **Spawn**: in Claude Code, `Agent` (`subagent_type: "general-purpose"`, or
-  `"Explore"` for read-only work), then `SendMessage` to its agent ID for more
-  work. In Codex, `spawn_agent`, `wait`, then `send_input`.
+- **Spawn**: a native subagent or a child task, per
+  `<mux-work>/orchestration.md`. Keep each running child task's `taskId`.
 - **Report**: every prompt carries the factory report rule: ≤300 words, no
   whole files, logs or screenshots; check runs report pass/fail and only the
   failures that matter.
@@ -31,31 +30,39 @@ only when that step runs.
 1. Set **In progress**, unless a handoff resumes past **Build**. Read the issue
    (brief, comments, linked prototype or research branches) and the repo's
    `AGENTS.md`; run its worktree setup if it asks.
-2. **Plan.** If the build issue already has slices (a handoff), remove leftover
-   slice worktrees and branches, clear `active` from every open slice (the
-   resume command in **Slices**) and **Implement** the ready slices fresh.
+2. **Plan.** If the build issue already has slices (a handoff), clear the
+   leftovers: run `git worktree prune`; give the **forced cleanup** (in
+   **Merge**) to each `t3-<id>` worktree in `git worktree list` on a
+   `slice/<n>-*` branch; then `git branch -D` each branch left in
+   `git branch --list 'slice/<n>-*'`, and `git branch -d` each `t3/*` branch
+   no worktree uses (`-d` keeps any not merged here; other threads own
+   `t3-*` worktrees too, so touch none off a `slice/<n>-*` branch). Clear
+   `active` from every open slice (the resume command in **Slices**) and
+   **Implement** the ready slices fresh.
    Otherwise start a **planner** subagent with `planner.md`, the issue
    reference and the repo path; it returns the slice list.
-3. **Implement.** In parallel, start an **implementer** subagent for each ready
-   slice (the ready-slices command in **Slices**) not already running (track
-   the ones you started), each in its own worktree:
-   - Claude Code: `isolation: "worktree"`; the implementer first runs
-     `git switch -c slice/<n>-<m>-<slug> <build-branch>`.
-   - Codex: run
-     `git worktree add ${TMPDIR:-/tmp}/mux-<n>-slice-<m> -b slice/<n>-<m>-<slug> <build-branch>`
-     and pass that path (the post-checkout hook runs worktree setup).
-
-   Give it `implementer.md`, the slice reference and the build branch, and
-   add `active` to the slice (**Slices** in `<mux-work>/issue-tracker.md`).
+3. **Implement.** In parallel, start an **implementer** child task for each
+   ready slice (the ready-slices command in **Slices**) not already running,
+   per **Implementer** in `<mux-work>/orchestration.md`, and track it by its
+   `taskId`. Give it `implementer.md`, the slice reference and the build
+   branch, and add `active` to the slice (**Slices** in
+   `<mux-work>/issue-tracker.md`).
 4. **Merge.** As each implementer reports, run
    `git merge --ff-only slice/<n>-<m>-<slug>` here; if it can't fast-forward,
-   send the slice back to its implementer (or a fresh subagent) to rebase onto
-   the build branch tip, then merge again. After each merge, remove the
-   worktree and slice branch, remove `active` and close the slice sub-issue
-   (**Slices** in `<mux-work>/issue-tracker.md`), and run **Implement** again.
-   A slice reported blocked loses `active` and goes back to the planner to
-   re-slice; a slice closed any other way loses `active` too. A wrong brief
-   follows the stop rule below. Done when every slice is closed.
+   send a subagent to the implementer's reported worktree path to rebase onto
+   the build branch tip, then merge again. A finished child task leaves its
+   worktree behind, so after each merge run the **cleanup**, remove `active`
+   and close the slice sub-issue (**Slices** in
+   `<mux-work>/issue-tracker.md`), and run **Implement** again. A slice
+   reported blocked gets the **forced cleanup**, loses `active` and goes back
+   to the planner to re-slice; a slice closed any other way loses `active`
+   too. The **cleanup**, for the reported worktree path `.../t3-<id>`:
+   `git worktree remove <path>`, `git branch -d slice/<n>-<m>-<slug>` and
+   `git branch -d t3/<id>` (the T3 branch is always `t3/<id>`, named from the
+   worktree dir). The **forced cleanup**, for an unmerged slice, uses
+   `--force` and `-D` and skips any worktree or branch that doesn't exist (a
+   slice can block before `slice/...` exists). A wrong brief follows the stop
+   rule below. Done when every slice is closed.
 5. A subagent writes the brief's **Domain docs** in its own commit,
    following `domain-modeling`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
    links them from `AGENTS.md` as the repo's `docs/agents/domain.md` says
@@ -75,8 +82,10 @@ Ordinary questions to Pedro follow `<mux-work>/questions.md`: Needs you,
 clarifications use chat and preserve the final status, per the same guide.
 
 Past about 150k tokens, while work before the PR step remains, start no new
-implementers, merge the running ones, then post a handoff written per
-`~/.agents/skills/handoff/SKILL.md` as an issue comment and relaunch with
+implementers, and merge or `task_cancel` every running child task: task IDs
+work only in the thread that created them, so the handoff carries none. Then
+post a handoff written per `~/.agents/skills/handoff/SKILL.md` as an issue
+comment and relaunch with
 `t3_thread_launch`: message `Build <owner/repo#n>. Read <mux-work>/agents/builder.md and follow it.`,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
 The handoff names the step and review round to resume at; at a review round,

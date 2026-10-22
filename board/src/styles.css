@@ -150,16 +150,24 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .blocked { color: var(--danger-text); border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); }
 .subs { color: var(--muted); }
 
-/* step bar */
-.stepbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
-.steps { list-style: none; display: flex; gap: 2px; margin: 0; padding: 0; flex: none; width: 140px; }
-.steps li { flex: 1; height: 6px; border-radius: 2px; background: var(--soft); }
+/* segmented bars: every card's status bar, and a build's slice bar under it.
+   One grid, so both bars span the same width and their captions share a column. */
+.bars { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 10px; }
+.segbar { list-style: none; display: flex; gap: 2px; margin: 0; padding: 0; min-width: 0; }
+.segbar li { flex: 1; height: 6px; border-radius: 2px; background: var(--soft); }
+.bar-label { font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The current step is marked by colour alone. */
 .steps li.past { background: color-mix(in srgb, var(--fg) 30%, transparent); }
-.steps li.cur { height: 10px; margin-top: -2px; background: var(--thread); }
+.steps li.cur { background: var(--thread); }
 .steps li.cur.amber { background: var(--you); }
 .steps li.cur.done { background: var(--build); }
-.step-label { font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .step-label.amber { color: var(--you-text); font-weight: 600; }
+.slice-bar li.done { background: var(--build); }
+.slice-bar li.active { background: var(--thread); animation: slice-pulse 1.6s ease-in-out infinite; }
+@keyframes slice-pulse { 50% { opacity: 0.45; } }
+.slices-now { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slices-active { color: var(--thread); font-weight: 600; margin-right: 2px; }
+.slices-now .sep { color: var(--muted); }
 
 /* queued */
 .copy { font: inherit; font-size: 12px; font-weight: 500; min-height: 24px; border: 1px solid var(--input); background: var(--surface); color: var(--fg); border-radius: var(--r-control); padding: 0 7px; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
@@ -227,8 +235,6 @@ button:disabled[title] { cursor: not-allowed; }
 .sub-status { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .sub-status.amber { color: var(--you-text); font-weight: 600; }
 .sub-groups ul { list-style: none; padding: 0; margin: 2px 0 0; display: grid; gap: 3px; }
-.slices { margin-top: 8px; }
-.slice.done .row-title { color: var(--muted); text-decoration: line-through; }
 
 /* rows (lists) */
 .rows { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 2px; }
@@ -315,5 +321,5 @@ a.o-title:hover { text-decoration: underline; }
   .o-node .o-tree { margin-left: 6px; padding-left: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .anchor-flash, .toast { animation: none; }
+  .anchor-flash, .toast, .slice-bar li.active { animation: none; }
 }

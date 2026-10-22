@@ -19,7 +19,7 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, Slice, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, StartedThread, Status, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -170,15 +170,32 @@ function titleLink(item: Item, cls = 'title'): string {
     : `<span class="${cls}">${text}</span>`;
 }
 
-/** Ten segments, one per status, with the item's current status highlighted. */
-export function stepBar(status: Status): string {
+/** Ten segments, one per status, with the item's current status coloured, then its caption: two cells of a `.bars` grid. */
+function stepCells(status: Status): string {
   const at = STATUSES.indexOf(status);
   const tone = AMBER_STATUSES.includes(status) ? 'amber' : status === 'Done' ? 'done' : 'now';
   const segments = STATUSES.map((s, i) => {
     const state = i < at ? 'past' : i === at ? `cur ${tone}` : 'next';
     return `<li class="${state}" title="${esc(s)}"></li>`;
   }).join('');
-  return `<div class="stepbar"><ol class="steps" aria-hidden="true">${segments}</ol><span class="step-label ${tone}">${at + 1}/${STATUSES.length} · ${esc(status)}</span></div>`;
+  return `<ol class="segbar steps" aria-hidden="true">${segments}</ol><span class="bar-label step-label ${tone}">${at + 1}/${STATUSES.length} · ${esc(status)}</span>`;
+}
+
+/**
+ * The status bar, and on a build with slices its slice bar under it: one segment per
+ * slice, the captions sharing a column, and one line naming the active slices. Its
+ * height doesn't grow with the number of slices.
+ */
+function bars(item: Item): string {
+  const slices = item.slices;
+  if (!slices.length) return `<div class="bars">${stepCells(item.status)}</div>`;
+  const done = slices.filter((s) => s.progress === 'done').length;
+  const active = slices.filter((s) => s.progress === 'active');
+  const segments = slices.map((s) => `<li class="${s.progress}"></li>`).join('');
+  const now = active.length
+    ? `<p class="slices-now"><span class="slices-active">${active.length} active</span> ${active.map((s) => `<span class="ref">#${s.number}</span> ${esc(s.title)}`).join('<span class="sep"> · </span>')}</p>`
+    : '';
+  return `<div class="bars">${stepCells(item.status)}<ol class="segbar slice-bar" aria-hidden="true">${segments}</ol><span class="bar-label">${done}/${slices.length} · Slices done</span></div>${now}`;
 }
 
 /** The badge after an open PR's link: running with counts and age, passed, failed, or nothing. */
@@ -208,8 +225,9 @@ function card(item: Item, data: BoardData, now: number, extra = '', action = '')
   const blocked = item.blockedBy
     ? `<span class="blocked" title="Blocked by ${plural(item.blockedBy, 'issue')}">blocked by ${item.blockedBy}</span>`
     : '';
-  const subs = item.subIssues.total
-    ? `<span class="subs">${item.subIssues.completed}/${item.subIssues.total} ${subsNoun(item)}</span>`
+  // A build's slice caption replaces the counter.
+  const subs = item.subIssues.total && !isBuild(item)
+    ? `<span class="subs">${item.subIssues.completed}/${item.subIssues.total} sub-issues</span>`
     : '';
   const hint = HINTS[item.status];
   const prs = item.linkedPrs
@@ -222,22 +240,12 @@ function card(item: Item, data: BoardData, now: number, extra = '', action = '')
   return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}" data-anchor="${esc(item.id)}">
 <div class="meta"><span class="badges">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}</span>${action}</div>
 ${titleLink(item)}
-${parent}${stepBar(item.status)}${foot}${sliceList(item.slices)}${extra}
+${parent}${bars(item)}${foot}${extra}
 </article>`;
 }
 
 /** A build's sub-issues are its slices. */
 const subsNoun = (item: Item) => (isBuild(item) ? 'slices' : 'sub-issues');
-
-/** A build's slices, nested like a concept's sub-issues. They aren't board items, so they have no Status. */
-function sliceList(slices: Slice[]): string {
-  if (!slices.length) return '';
-  const rows = slices.map((s) => {
-    const closed = s.progress === 'done';
-    return `<li class="row-item slice${closed ? ' done' : ''}"><a class="row-title" href="${esc(s.url)}" title="${esc(s.title)}" target="_blank" rel="noopener"><span class="ref">#${s.number}</span> ${esc(s.title)}${closed ? '<span class="sr-only"> (closed)</span>' : ''}</a></li>`;
-  }).join('');
-  return `<ul class="sub-groups slices" aria-label="Slices"><li class="sub-group"><span class="sub-status">Slices</span><ul>${rows}</ul></li></ul>`;
-}
 
 function section(id: string, title: string, count: number, body: string, note = ''): string {
   return `<section class="section" id="${id}" aria-labelledby="${id}-h">

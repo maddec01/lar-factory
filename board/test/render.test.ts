@@ -175,25 +175,13 @@ test('Flow nests sub-issues under their parent and counts the ones not on the Bo
   assert.match(concept, /<li class="o-missing">2 more sub-issues not on the board<\/li>/, 'six sub-issues, four on the Board');
 });
 
-test("a build card nests its slices, open and closed, with no Status; Flow doesn't count them as missing", () => {
-  const html = renderBoardView(sample, base);
-  const build = html.split('<article').find((a) => a.includes('data-anchor="PVTI_sample13"'))!;
-  const slices = build.slice(build.indexOf('<ul class="sub-groups slices" aria-label="Slices">'));
-  assert.ok(slices.length < build.length, 'the slice list sits inside the build card');
-  const rows = [...slices.matchAll(/<li class="row-item slice([^"]*)"><a class="row-title" href="([^"]+)" title="([^"]+)"[^>]*><span class="ref">(#\d+)<\/span> ([^<]+)(.*?)<\/a><\/li>/g)]
-    .map((m) => [m[4], m[1], m[3] === m[5], m[6]]);
-  assert.deepEqual(rows, [
-    ['#144', ' done', true, '<span class="sr-only"> (closed)</span>'],
-    ['#145', '', true, ''],
-    ['#146', '', true, ''],
-  ], 'every slice, open and closed, titled in full, with the closed one styled done and named closed inside its link');
-  assert.ok(!/o-status|sub-status amber|data-anchor="PVTI_slice/.test(slices), 'slices are not board items and show no Status');
+test("a build's slices show no Status of their own, and Flow doesn't count them as missing", () => {
+  const build = renderBoardView(sample, base).split('<article').find((a) => a.includes('data-anchor="PVTI_sample13"'))!;
+  assert.ok(!/o-status|sub-status|data-anchor="PVTI_slice/.test(build), 'slices are not board items and show no Status');
   assert.ok(!flowNode(renderFlowView(sample, base), 'PVTI_sample13').includes('o-missing'), "a build's slices are never on the board, so none is missing");
 });
 
-test('a build counts slices, not sub-issues, on its card and in Flow', () => {
-  const build = renderBoardView(sample, base).split('<article').find((a) => a.includes('data-anchor="PVTI_sample13"'))!;
-  assert.match(build, /<span class="subs">1\/3 slices<\/span>/);
+test('a build counts slices, not sub-issues, in Flow', () => {
   assert.match(flowNode(renderFlowView(sample, base), 'PVTI_sample13'), /<span class="o-subs">1\/3 slices done<\/span>/);
 });
 
@@ -231,7 +219,54 @@ test('an improvement labelled build keeps its improvement pill and still carries
   assert.deepEqual(item?.slices.map((s) => [s.number, s.state]), [[65, 'CLOSED'], [66, 'OPEN'], [67, 'OPEN']]);
   const card = renderBoardView(boardOf([builtIssue]), base).split('<article').find((a) => a.includes('data-anchor="PVTI_build"'))!;
   assert.match(card, /<span class="kind kind-improvement">improvement<\/span>/);
-  assert.match(card, /<span class="subs">1\/3 slices<\/span>/);
+});
+
+/** A build card's slice bar segments, its caption, and its active line ('' when it's collapsed). */
+function sliceBar(card: string) {
+  const bar = /<ol class="segbar slice-bar" aria-hidden="true">(.*?)<\/ol><span class="bar-label">([^<]+)<\/span>/.exec(card);
+  assert.ok(bar, 'the card has a slice bar with a caption');
+  return {
+    segments: [...bar[1]!.matchAll(/<li class="([^"]+)"><\/li>/g)].map((m) => m[1]),
+    caption: bar[2],
+    active: /<p class="slices-now">(.*?)<\/p>/.exec(card)?.[1] ?? '',
+  };
+}
+
+const buildCard = (raws: RawItem[], active: number[] = []) => {
+  const keys = new Set(active.map((n) => `maddec01/mux-factory#${n}`));
+  const data: BoardData = { ...sample, error: null, items: normalizeItems(raws, keys) };
+  return renderBoardView(data, base).split('<article').find((a) => a.includes('data-anchor="PVTI_build"'))!;
+};
+
+test('a build card shows its slices as a bar under the status bar, with captions and the active slices named', () => {
+  const card = buildCard([builtIssue], [66]);
+  assert.deepEqual(sliceBar(card), {
+    segments: ['done', 'active', 'waiting'],
+    caption: '1/3 · Slices done',
+    active: '<span class="slices-active">1 active</span> <span class="ref">#66</span> Issue 66',
+  });
+  assert.match(card, /<div class="bars"><ol class="segbar steps" aria-hidden="true">.*?<\/ol><span class="bar-label step-label now">6\/10 · In progress<\/span><ol class="segbar slice-bar"/,
+    'status bar and slice bar share one grid, captions in its right-hand column');
+  assert.ok(!card.includes('class="subs"'), 'the caption replaces the meta row counter');
+  assert.ok(!card.includes('row-item'), 'no slice rows on the card');
+});
+
+test("a build's slice caption counts only visible slices, and the active line collapses when none is active", () => {
+  const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
+    subIssuesSummary: { total: 4, completed: 2 },
+    subIssues: { nodes: [sliceRef(65, 'CLOSED'), { ...sliceRef(66, 'CLOSED'), stateReason: 'NOT_PLANNED' }, sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
+  });
+  assert.deepEqual(sliceBar(buildCard([raw])), { segments: ['done', 'waiting', 'waiting'], caption: '1/3 · Slices done', active: '' });
+});
+
+test('a 3-slice and a 14-slice build render the same card structure', () => {
+  const build = (count: number) => rawIssue('PVTI_build', 59, 'In progress', ['build'], {
+    subIssuesSummary: { total: count, completed: 1 },
+    subIssues: { nodes: Array.from({ length: count }, (_, i) => sliceRef(100 + i, i ? 'OPEN' : 'CLOSED')) },
+  });
+  // Tags only, with the slice bar's segments dropped.
+  const shape = (card: string) => card.replace(/(<ol class="segbar slice-bar"[^>]*>).*?<\/ol>/, '$1</ol>').match(/<[^>]+>/g)?.join('');
+  assert.equal(shape(buildCard([build(14)], [101, 102])), shape(buildCard([build(3)], [101, 102])));
 });
 
 test('a card with sub-issues but no build or concept label shows only its counter', () => {

@@ -735,8 +735,8 @@
       "closedAt": null,
       "linkedPrs": [
         {
-          "number": 31,
-          "url": "https://github.com/maddec01/mux-apple/pull/31",
+          "number": 33,
+          "url": "https://github.com/maddec01/mux-apple/pull/33",
           "state": "OPEN",
           "isDraft": true,
           "checks": {
@@ -861,8 +861,8 @@
       "closedAt": null,
       "linkedPrs": [
         {
-          "number": 150,
-          "url": "https://github.com/maddec01/mux-server/pull/150",
+          "number": 190,
+          "url": "https://github.com/maddec01/mux-server/pull/190",
           "state": "OPEN",
           "isDraft": false,
           "checks": {

@@ -84,7 +84,7 @@ export interface Item {
   updatedAt: string;
   closedAt: string | null;
   linkedPrs: LinkedPr[];
-  /** A build's slices, open and closed: its sub-issues, which never join the project. Empty for other kinds. */
+  /** A build's slices, open and closed: its sub-issues. The project may auto-add them, but they're never board items. Empty for other issues. */
   slices: IssueRef[];
 }
 
@@ -181,13 +181,19 @@ export function kindOf(item: Item): Kind {
   const has = (l: string) => item.labels.includes(l);
   if (has('concept')) return 'concept';
   if (decisionType(item)) return 'decision';
-  if (has('build')) return 'build';
   if (has('bug')) return 'bug';
   if (has('feature')) return 'feature';
   if (has('improvement')) return 'improvement';
+  if (has('build')) return 'build';
   if (item.type === 'DraftIssue') return 'draft';
   if (item.type === 'PullRequest') return 'pr';
   return 'issue';
+}
+
+/** An issue that becomes one PR, delivered through its slices: the `build` label decides it, whatever the kind,
+ *  except on a concept, whose sub-issues are items on the board. */
+export function isBuild(item: Item): boolean {
+  return item.labels.includes('build') && !item.labels.includes('concept');
 }
 
 export function kindLabel(item: Item): string {

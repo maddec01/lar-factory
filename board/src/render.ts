@@ -7,6 +7,7 @@ import {
   canAbandon,
   checkState,
   countsOf,
+  isBuild,
   isOnBoard,
   isRecentlyDone,
   isSlow,
@@ -226,7 +227,7 @@ ${parent}${stepBar(item.status)}${foot}${sliceList(item.slices)}${extra}
 }
 
 /** A build's sub-issues are its slices. */
-const subsNoun = (item: Item) => (kindOf(item) === 'build' ? 'slices' : 'sub-issues');
+const subsNoun = (item: Item) => (isBuild(item) ? 'slices' : 'sub-issues');
 
 /** A build's slices, nested like a concept's sub-issues. They aren't board items, so they have no Status. */
 function sliceList(slices: IssueRef[]): string {
@@ -656,8 +657,8 @@ export function renderFlowView(data: BoardData, opts: RenderOptions): string {
 
   const node = (i: Item): string => {
     const kids = children.get(issueKey(i.repo, i.number) ?? '') ?? [];
-    // A build's slices never join the project, so they aren't missing from it.
-    const missing = kindOf(i) === 'build' ? 0 : i.subIssues.total - kids.length;
+    // A build's slices are never board items, even when auto-added to the project, so none is missing.
+    const missing = isBuild(i) ? 0 : i.subIssues.total - kids.length;
     const kidRows = kids.map(node).join('')
       + (missing > 0 ? `<li class="o-missing">${plural(missing, 'more sub-issue')} not on the board</li>` : '');
     const links = linkRows('blocked by', i.blockers, i.repo, shown) + linkRows('blocks', i.blocking, i.repo, shown);

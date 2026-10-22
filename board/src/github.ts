@@ -1,7 +1,7 @@
 // Reads the Mux project through the local `gh` CLI (`gh api graphql`).
 
 import { execFile } from 'node:child_process';
-import { STATUSES, kindOf } from './model.ts';
+import { STATUSES, isBuild } from './model.ts';
 import type { Checks, ContentType, IssueLinks, IssueRef, Item, LinkedPr, Status } from './model.ts';
 import type { BoardConfig } from './config.ts';
 import type { CreationProgress, CreationResult } from './add-item.ts';
@@ -243,7 +243,20 @@ export function normalizeItem(raw: RawItem): Item | null {
     slices: [],
   };
   // Only a build's sub-issues are slices; a concept's are items on the board.
-  return kindOf(item) === 'build' ? { ...item, slices: c.subIssues?.nodes.map(normalizeIssueRef) ?? [] } : item;
+  return isBuild(item) ? { ...item, slices: c.subIssues?.nodes.map(normalizeIssueRef) ?? [] } : item;
+}
+
+const refKey = (repo: string | null, number: number | null) => `${repo}#${number}`;
+
+/**
+ * Normalizes a project's raw items into board items. A slice lives inside its
+ * build's card, so it's dropped here even when the project's auto-add put it on
+ * the project. Membership in some build's slices decides, since `parent` has no labels.
+ */
+export function normalizeItems(raws: RawItem[]): Item[] {
+  const items = raws.map(normalizeItem).filter((i): i is Item => i !== null);
+  const slices = new Set(items.flatMap((i) => i.slices.map((s) => refKey(s.repo, s.number))));
+  return items.filter((i) => i.type === 'DraftIssue' || !slices.has(refKey(i.repo, i.number)));
 }
 
 // ---------- gh ----------
@@ -284,7 +297,7 @@ export interface ProjectSnapshot {
 }
 
 export async function fetchProject(owner: string, number: number): Promise<ProjectSnapshot> {
-  const items: Item[] = [];
+  const raws: RawItem[] = [];
   let after: string | null = null;
   let title = '';
   let url = '';
@@ -294,11 +307,9 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
     if (!project) throw new Error(`Project ${owner}/${number} not found`);
     title = project.title;
     url = project.url;
-    for (const raw of project.items.nodes) {
-      const item = normalizeItem(raw);
-      if (item) items.push(item);
-    }
-    if (!project.items.pageInfo.hasNextPage) return { title, url, items };
+    raws.push(...project.items.nodes);
+    // A slice and its build can sit on different pages, so slices are dropped once all are read.
+    if (!project.items.pageInfo.hasNextPage) return { title, url, items: normalizeItems(raws) };
     after = project.items.pageInfo.endCursor;
   }
   throw new Error(`Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`);

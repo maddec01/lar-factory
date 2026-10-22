@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { checkState, countsOf, isRecentlyDone, isSlow, isStale, kindOf, workMessage, workTitle } from '../src/model.ts';
+import { checkState, countsOf, isBuild, isRecentlyDone, isSlow, isStale, kindOf, workMessage, workTitle } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
 import { esc } from '../src/render.ts';
 
@@ -33,6 +33,18 @@ test('kinds come from labels', () => {
   assert.equal(kindOf(item('List', ['bug', 'concept'])), 'concept');
   assert.equal(kindOf(item('List', [], { type: 'DraftIssue' })), 'draft');
   assert.equal(kindOf(item('List', [])), 'issue');
+  assert.equal(kindOf(item('List', ['improvement', 'build'])), 'improvement', 'build only switches on slices');
+  assert.equal(kindOf(item('List', ['build', 'bug'])), 'bug');
+  assert.equal(kindOf(item('List', ['build', 'feature'])), 'feature');
+  assert.equal(kindOf(item('List', ['build'])), 'build', 'with no other kind it reads as a build');
+  assert.equal(kindOf(item('List', ['build', 'decision: research'])), 'decision');
+});
+
+test('the build label makes a build whatever the kind, except on a concept', () => {
+  assert.equal(isBuild(item('List', ['build'])), true);
+  assert.equal(isBuild(item('List', ['build', 'feature'])), true);
+  assert.equal(isBuild(item('List', ['feature'])), false);
+  assert.equal(isBuild(item('List', ['build', 'concept'])), false, "a concept's sub-issues are board items, not slices");
 });
 
 test('Done counts for 7 days after closing', () => {

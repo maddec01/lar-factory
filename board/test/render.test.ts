@@ -8,6 +8,8 @@ import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI, abandonPrompt, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData } from '../src/model.ts';
+import { normalizeItems } from '../src/github.ts';
+import type { RawItem } from '../src/github.ts';
 
 const sample = JSON.parse(readFileSync(new URL('./sample.json', import.meta.url), 'utf8')) as BoardData;
 const expectedDir = new URL('./expected/', import.meta.url);
@@ -193,6 +195,54 @@ test('a build counts slices, not sub-issues, on its card and in Flow', () => {
   const build = renderBoardView(sample, base).split('<article').find((a) => a.includes('data-anchor="PVTI_sample13"'))!;
   assert.match(build, /<span class="subs">1\/3 slices<\/span>/);
   assert.match(flowNode(renderFlowView(sample, base), 'PVTI_sample13'), /<span class="o-subs">1\/3 slices done<\/span>/);
+});
+
+// Raw project items as GitHub returns them, so the step that attaches slices runs.
+const rawIssue = (id: string, number: number, status: string, labels: string[], extra: Partial<NonNullable<RawItem['content']>> = {}): RawItem => ({
+  id, updatedAt: '2026-10-21T08:00:00Z', status: { name: status },
+  content: { __typename: 'Issue', number, title: `Issue ${number}`, url: `https://github.com/maddec01/mux-factory/issues/${number}`,
+    state: 'OPEN', updatedAt: '2026-10-21T08:00:00Z', repository: { nameWithOwner: 'maddec01/mux-factory' },
+    labels: { nodes: labels.map((name) => ({ name })) }, ...extra },
+});
+const sliceRef = (number: number, state: 'OPEN' | 'CLOSED') => ({ number, title: `Issue ${number}`,
+  url: `https://github.com/maddec01/mux-factory/issues/${number}`, state, repository: { nameWithOwner: 'maddec01/mux-factory' } });
+const builtIssue = rawIssue('PVTI_build', 59, 'In progress', ['improvement', 'build'], {
+  subIssuesSummary: { total: 3, completed: 1 },
+  subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
+});
+const boardOf = (raws: RawItem[]): BoardData => ({ ...sample, error: null, items: normalizeItems(raws) });
+
+test('an open slice that the project auto-added is dropped from the board items, header counts and Flow', () => {
+  const slice = rawIssue('PVTI_slice66', 66, 'In progress', ['improvement'], {
+    parent: { number: 59, title: 'Issue 59', url: 'https://github.com/maddec01/mux-factory/issues/59', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-factory' } },
+  });
+  const other = rawIssue('PVTI_other', 70, 'In progress', ['bug']);
+  const data = boardOf([slice, builtIssue, other]);
+  assert.deepEqual(data.items.map((i) => i.id), ['PVTI_build', 'PVTI_other'], 'the slice is not a board item, wherever it sits in the project');
+  const header = renderHeader(data, base);
+  assert.match(header, /<li><b>2<\/b> in flight<\/li>/);
+  assert.match(header, /<li><b>2<\/b> items<\/li>/);
+  assert.ok(!renderBoardView(data, base).includes('data-anchor="PVTI_slice66"'), 'no card of its own');
+  assert.ok(!renderFlowView(data, base).includes('id="o-PVTI_slice66"'), 'no Flow node of its own');
+});
+
+test('an improvement labelled build keeps its improvement pill and still carries its slices', () => {
+  const [item] = normalizeItems([builtIssue]);
+  assert.deepEqual(item?.slices.map((s) => [s.number, s.state]), [[65, 'CLOSED'], [66, 'OPEN'], [67, 'OPEN']]);
+  const card = renderBoardView(boardOf([builtIssue]), base).split('<article').find((a) => a.includes('data-anchor="PVTI_build"'))!;
+  assert.match(card, /<span class="kind kind-improvement">improvement<\/span>/);
+  assert.match(card, /<span class="subs">1\/3 slices<\/span>/);
+});
+
+test('a card with sub-issues but no build or concept label shows only its counter', () => {
+  const plain = rawIssue('PVTI_plain', 80, 'In progress', ['feature'], {
+    subIssuesSummary: { total: 2, completed: 0 }, subIssues: { nodes: [sliceRef(81, 'OPEN'), sliceRef(82, 'OPEN')] },
+  });
+  const data = boardOf([plain]);
+  assert.deepEqual(data.items[0]?.slices, []);
+  const card = renderBoardView(data, base).split('<article').find((a) => a.includes('data-anchor="PVTI_plain"'))!;
+  assert.match(card, /<span class="subs">0\/2 sub-issues<\/span>/);
+  assert.ok(!card.includes('aria-label="Slices"'), 'no fallback list');
 });
 
 test('Flow counts none of a build\'s slices as missing, even past the 50 the board query reads', () => {

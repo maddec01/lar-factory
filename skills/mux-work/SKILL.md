@@ -67,7 +67,8 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
   source status. Rerun no build or retro; start no shaping or thread. Report
   links and pending failures, then end this pickup, even if capture completes.
 - A `decision: *` sub-issue: [Decisions](concepts.md#decisions).
-- A `build` sub-issue, or a passing brief in the body: **5. Start the build**.
+- A `build` sub-issue, or a passing brief in the body: **5. Start the build**,
+  launch check included, also when resuming a shaping handoff.
 - Anything else: set Shaping. An **Explore subagent** reads the repo's
   `AGENTS.md`, `GLOSSARY.md`, relevant ADRs and the code this issue touches,
   and returns ≤300 words in `domain-modeling` vocabulary: what exists, where,
@@ -144,22 +145,36 @@ collapsed `<details>` block at the end.
 
 ## 5. Start the build
 
-Every build starts at once; blocked-by orders merges, not work. For each Ready
-build (this issue if it's a build, and each `build` sub-issue):
+Every build starts at once; blocked-by orders merges, not work. The builds:
+this issue if it's a build, each `build` sub-issue, and other-repo builds found
+while shaping, all Ready.
 
-1. Find its repository's T3 project with `t3_project_list`. If none and Pedro
-   can push to it (`gh repo view <owner/repo> --json viewerPermission` is ADMIN,
-   MAINTAIN or WRITE), clone and register it (`t3_project_clone`, then
-   `t3_project_create`) and run [label setup](issue-tracker.md#label-setup)
-   there; otherwise ask him first.
-2. Add the `build` label
-   (`gh issue edit <n> --repo <owner/repo> --add-label build`), so the board
-   shows its sub-issues as slices.
-3. Launch its build thread with `t3_thread_launch` in that project:
-   - `workspaceStrategy`: `{"type":"worktree","baseRef":"main","branch":"<kind>/<n>-<slug>","startFromOrigin":true}`,
-     where `<kind>` is `fix`, `feat` or `chore`;
-   - `message`: `Build <owner/repo#n>. Read <this skill>/agents/builder.md and follow it.`
-     with this skill's absolute path.
+1. **Launch check.** Before any `t3_thread_launch`, list each build and wait
+   for Go:
+   - `owner/repo#n`, title and a one-line What;
+   - its T3 project (`t3_project_list`). With none, "clone needed" if Pedro
+     can push (`gh repo view <owner/repo> --json viewerPermission` is ADMIN,
+     MAINTAIN or WRITE), else "no push access, needs your OK";
+   - branch `<kind>/<n>-<slug>` (`fix`, `feat` or `chore`) from `main`;
+   - the merge order, when one build blocks another.
+
+   Ask it as an ordinary [question](questions.md) ("Go (Recommended)" /
+   "Adjust") on the issue whose thread launches, then set it back to Ready
+   (Shaping for a map or decision). The list goes in the question, or in chat
+   just before it if too long. On Adjust, update the briefs, rerun the
+   **4. Gate** Doubt where What or Done when changed, and ask again. Only
+   shaping and decision threads run the check, and never for a handoff thread.
+2. After Go, for each build:
+   1. With no T3 project, clone and register its repo (`t3_project_clone`,
+      then `t3_project_create`) and run
+      [label setup](issue-tracker.md#label-setup) there.
+   2. Add the `build` label
+      (`gh issue edit <n> --repo <owner/repo> --add-label build`), so the
+      board shows its sub-issues as slices.
+   3. Launch its build thread with `t3_thread_launch` in that project:
+      - `workspaceStrategy`: `{"type":"worktree","baseRef":"main","branch":"<kind>/<n>-<slug>","startFromOrigin":true}`;
+      - `message`: `Build <owner/repo#n>. Read <this skill>/agents/builder.md and follow it.`
+        with this skill's absolute path.
 
 Set a parent that isn't a build to In progress; it stays there until a
 build's PR closes it ([Parent closing](issue-tracker.md#parent-closing)). Give Pedro each build

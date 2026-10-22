@@ -2,8 +2,9 @@
 
 Ask Pedro ordinary questions with the question UI (`AskUserQuestion`), so T3
 shows the thread as waiting: Size up, grilling rounds, the prototype pick,
-Gate assumptions, Doubt findings, Concepts, `decision: grill`, and the
-builder's stops. Retro picks and their clarifications use [chat](#retro-picks).
+Gate assumptions, Doubt findings, the launch check, Concepts,
+`decision: grill`, and the builder's stops. Retro picks and their
+clarifications use [chat](#retro-picks).
 If the tool is deferred, load it with `ToolSearch`; if it isn't available, ask
 in the `grilling` chat format.
 

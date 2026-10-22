@@ -68,7 +68,7 @@ catalogue. Read each file or skill a step names only when that step runs.
    following `domain-modeling`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
    links them from `AGENTS.md` as the repo's `docs/agents/domain.md` says
    (without that file, it adds a **Domain docs** section to `AGENTS.md`
-   pointing to both, modelled on mux-apple's `### Domain docs`).
+   pointing to both).
    A new term or ADR-worthy decision (all three conditions) settled during the
    build is added the same way (by the fixer during review) without stopping;
    list each in one issue comment headed **Domain docs added by the build**,

@@ -21,6 +21,7 @@ repo path. `<mux-work>` is the folder holding this file's parent.
   blocked-by links to them and close the old slice as not planned
   (**Slices**).
 - Work for another repository is never a slice: return it as
-  `needs <owner/repo>: <the work>`.
+  `needs <owner/repo>: <the work>`. The brief's **Domain docs** aren't a slice
+  either; the builder writes them.
 
 Return only the slice list: number, title, blockers; then any `needs` lines.

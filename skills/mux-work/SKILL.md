@@ -18,11 +18,12 @@ verifies visible changes and merges every PR; the rest is yours.
   in **subagents**. Every factory subagent reports in ≤300 words, never whole
   files, logs or screenshots. Ask Pedro only what a subagent can't answer.
 - **Tools**: `gh issue view <ref> --comments` and `gh issue comment` for
-  issues; `t3_thread_launch` for threads; `delegate_task` for a T3 child task;
-  `AskUserQuestion` for ordinary questions to Pedro, following the
-  [question guide](questions.md). Retro picks and their clarifications stay
-  in chat. Call `orchestrator_capabilities` only to change a model; never
-  search the tool catalogue.
+  issues; `t3_thread_launch` for threads; a native subagent or a
+  `delegate_task` child task per [Orchestration](orchestration.md) for
+  delegated work; `AskUserQuestion` for ordinary questions to Pedro, following
+  the [question guide](questions.md). Retro picks and their clarifications
+  stay in chat. Call `orchestrator_capabilities` only to change a model or to
+  read `inheritedOptions` before delegating; never search the tool catalogue.
 - Read each linked file or skill only when its step runs.
 - The issue is the only hand-over: brief, map, decisions and links live in its
   body and comments, so every step resumes from the issue alone.
@@ -91,9 +92,9 @@ label. Anything Pedro adds or corrects is another open question. Then:
   list.
 - **Open questions**: settle every one here by **Grilling with docs**, for bugs
   and features alike. A question of how something looks or feels gets a
-  **Prototype subagent** with `prototype`, in its own worktree on a
-  `prototype/<n>-<slug>` branch: two or three variants differing only on that
-  question. It keeps its screenshots in its own context and returns each
+  **Prototype** child task with `prototype`, started per
+  [Orchestration](orchestration.md): two or three variants differing only on
+  that question. It keeps its screenshots in its own context and returns each
   variant's file paths and a short description. Tell Pedro how to open them
   (T3 browser preview for web; the run scripts in the repo's T3 project for
   Apple), ask for his pick, and record it and the branch on the issue.

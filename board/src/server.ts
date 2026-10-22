@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +13,7 @@ import { expandHome, loadConfig } from './config.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
-import { loadItemStats, statsDbPath, t3SettingsPath } from './item-stats.ts';
+import { loadItemStats, statsDbPath, t3SettingsPath, usageRatesPath } from './item-stats.ts';
 import type { StatsSources } from './item-stats.ts';
 import { prStatsEdits, updatedBody } from './pr-stats.ts';
 import type { StartResult } from './t3.ts';
@@ -44,8 +45,9 @@ const state: BoardData = {
   items: [],
 };
 
-const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), home: process.env.HOME ?? '' };
+const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
 let statsUnavailable = false;
+let pricingUnavailable = false;
 let projectNumber = config.number;
 let refreshing = false;
 let syncingPrStats = false;
@@ -76,6 +78,10 @@ function withStats(items: Item[]): Item[] {
   if ((stats === 'unavailable') !== statsUnavailable) {
     statsUnavailable = !statsUnavailable;
     log(statsUnavailable ? `item stats unavailable: can't read ${statsSources.db}` : `item stats readable again from ${statsSources.db}`);
+  }
+  if (typeof stats === 'function' && !stats.priced !== pricingUnavailable) {
+    pricingUnavailable = !pricingUnavailable;
+    log(pricingUnavailable ? `API cost unavailable: can't read rates from ${statsSources.rates}` : `API cost readable again from ${statsSources.rates}`);
   }
   return items.map((item) => {
     if (!item.repo || item.number === null || !stats) return { ...item, stats: undefined };

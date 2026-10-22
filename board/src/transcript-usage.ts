@@ -361,8 +361,26 @@ export function firstCopies(): (record: UsageRecord) => boolean {
   };
 }
 
-// Each transcript's records, kept until the file changes.
+// Each transcript's records, kept until the file changes or a scan no longer reads it.
 const cache = new Map<string, { mtimeMs: number; size: number; records: UsageRecord[] }>();
+// The transcripts the running scan has read.
+let scanned: Set<string> | undefined;
+
+/**
+ * Runs `read`, a scan over every thread's transcripts, then drops the cached records
+ * of files it didn't read, as deleted transcripts, so the cache doesn't grow forever.
+ */
+export function scanTranscripts<T>(read: () => T): T {
+  const seen = new Set<string>();
+  scanned = seen;
+  try {
+    const result = read();
+    for (const path of cache.keys()) if (!seen.has(path)) cache.delete(path);
+    return result;
+  } finally {
+    scanned = undefined;
+  }
+}
 
 function list(dir: string): string[] {
   try {
@@ -375,6 +393,7 @@ function list(dir: string): string[] {
 function fileRecords(path: string, parse: (lines: string[]) => UsageRecord[]): UsageRecord[] {
   try {
     const { mtimeMs, size } = statSync(path);
+    scanned?.add(path);
     const hit = cache.get(path);
     if (hit && hit.mtimeMs === mtimeMs && hit.size === size) return hit.records;
     const records = parse(readFileSync(path, 'utf8').split('\n'));

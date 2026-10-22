@@ -80,12 +80,14 @@ export interface IssueLinks {
   nodes: IssueRef[];
 }
 
-/** An item's agent time and tokens, summed over every thread that worked on it. */
+/** An item's agent time, tokens and API cost, summed over every thread that worked on it. */
 export interface ItemStats {
   /** Agent time: turn run time, less time waiting on Pedro. */
   agentMs: number;
   /** Total tokens from the threads' transcripts, counted as T3 Code's usage page counts them. */
   tokens: number;
+  /** API cost in dollars, as T3 Code's usage page prices the tokens; absent when nothing could be priced. */
+  costUsd?: number;
 }
 
 export interface Item {

@@ -5,11 +5,15 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadItemStats } from '../src/item-stats.ts';
 import type { ItemStatsReader, StatsSources } from '../src/item-stats.ts';
-import { assistant, claudeHome, codexHome, codexSession, codexTokens, statsDb, t3Settings, tempDir } from './stats-db.ts';
+import { assistant, claudeHome, codexHome, codexSession, codexTokens, statsDb, t3Settings, tempDir, usageRates } from './stats-db.ts';
 import type { FixtureThread } from './stats-db.ts';
 
-/** A home folder and settings that don't exist, so tests never read real transcripts. */
-const NOWHERE = { settings: join(tmpdir(), 'no-such-dir', 'settings.json'), home: join(tmpdir(), 'no-such-dir', 'home') };
+/** A home folder, settings and price table that don't exist, so tests never read real transcripts. */
+const NOWHERE = {
+  settings: join(tmpdir(), 'no-such-dir', 'settings.json'),
+  rates: join(tmpdir(), 'no-such-dir', 'usage-model-rates.json'),
+  home: join(tmpdir(), 'no-such-dir', 'home'),
+};
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const REPO = 'maddec01/mux-factory';
@@ -221,4 +225,72 @@ test('missing or garbled transcripts leave tokens out, and never break the stats
   const expected = { agentMs: 10 * MIN, tokens: 0 };
   assert.deepEqual(reader(db)(REPO, 60), expected);
   assert.deepEqual(reader(db, { home })(REPO, 60), expected);
+});
+
+const close = (actual: number | undefined, expected: number) =>
+  assert.ok(actual !== undefined && Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
+
+test('API cost is T3\'s price for the item\'s records, with the aliases and overrides in T3\'s settings', (t) => {
+  const home = tempDir(t, 'mux-home-');
+  claudeHome(t, {
+    'session-a': { main: [
+      assistant('m1', 1000, 2000, 10000, 500, 'claude-opus-4-1'),
+      // No cache rates in the table: cached tokens cost the input rate.
+      assistant('m2', 1000, 1000, 1000, 0, 'claude-fable-5-1[1m]'),
+      // Aliased to a model only the user's override prices.
+      assistant('m3', 1000, 0, 0, 100, 'internal-model'),
+      // The provider's own cost goes ahead of the table.
+      { ...assistant('m4', 9999, 0, 0, 9999, 'claude-opus-4-1'), costUSD: 0.25 },
+      assistant('m5', 9999, 0, 0, 9999, 'mystery-model'),
+    ] },
+    'session-b': { main: [assistant('m6', 1000, 0, 0, 0, 'mystery-model'), assistant('m7', 1000, 0, 0, 0, 'opus')] },
+  }, join(home, '.claude'));
+  const db = statsDb(t, [
+    { id: 'priced', messages: [`$mux-work ${REPO}#60`], sessions: ['session-a'] },
+    { id: 'unpriced', messages: [`$mux-work ${REPO}#61`], sessions: ['session-b'] },
+  ]);
+  const settings = t3Settings(t, {}, {
+    usageModelAliases: { 'internal-model': 'my-proxy' },
+    usagePriceOverrides: { 'my-proxy': { inputCostPerMillionTokens: 2, outputCostPerMillionTokens: 8 }, broken: { inputCostPerMillionTokens: -1 } },
+  });
+  const rates = usageRates(t, {
+    'claude-opus-4-1': { input_cost_per_token: 1.5e-5, output_cost_per_token: 7.5e-5, cache_read_input_token_cost: 1.5e-6, cache_creation_input_token_cost: 1.875e-5 },
+    'claude-fable-5-1': { input_cost_per_token: 1e-5, output_cost_per_token: 5e-5 },
+  });
+  const stats = reader(db, { home, settings, rates });
+  close(stats(REPO, 60)?.costUsd, 0.105 + 0.03 + 0.0028 + 0.25);
+  assert.deepEqual(stats(REPO, 61), { agentMs: 0, tokens: 2000 }, 'nothing priced, no cost');
+  // Without T3's price table there is no cost, and the rest of the stats stand.
+  assert.deepEqual(reader(db, { home, settings })(REPO, 60), { agentMs: 0, tokens: 13500 + 3000 + 1100 + 9999 * 4 });
+  assert.equal(stats.priced, true);
+  assert.equal(reader(db, { home, settings }).priced, false, 'the server logs when pricing goes and comes back');
+  assert.equal(reader(db, { home, settings, rates: usageRates(t, {}) }).priced, false, 'an empty table prices nothing');
+});
+
+test('a Codex record whose rollout has no speed tier takes the one its turn started with in T3\'s history', (t) => {
+  const home = tempDir(t, 'mux-home-');
+  const sessions = ['01a13627-9790-70d0-8342-58f71022e001', '01a13627-9790-70d0-8342-58f71022e002', '01a13627-9790-70d0-8342-58f71022e003'];
+  const rollout = (id: string, turnId: string) => [
+    { type: 'session_meta', timestamp: '2026-10-20T09:00:00.000Z', payload: { type: 'session_meta', id, model_provider: 'openai' } },
+    { type: 'turn_context', timestamp: '2026-10-20T09:00:00.000Z', payload: { type: 'turn_context', model: 'gpt-6-astra', turn_id: turnId } },
+    codexTokens('2026-10-20T09:01:00.000Z', 1000, 0, 100, [1000, 0, 100]),
+  ];
+  codexHome(t, Object.fromEntries(sessions.map((id, i) => [id, rollout(id, `turn-${i}`)])), join(home, '.codex'));
+  const selection = (model: string, options: object[]) => ({ instanceId: 'codex', model, options });
+  const db = statsDb(t, [
+    [selection('gpt-6-astra', [{ id: 'serviceTier', value: 'priority' }])],
+    [selection('gpt-6-astra', [{ id: 'fastMode', value: true }])],
+    // A selection for another model can't tell this record's tier.
+    [selection('gpt-6-sol', [{ id: 'serviceTier', value: 'priority' }])],
+  ].map(([sel], i) => ({
+    id: `codex-${i}`, messages: [`$mux-work ${REPO}#${70 + i}`], sessions: [{ session: sessions[i]!, instance: 'codex', driver: 'codex' }],
+    turns: [{ ...turn(`t${i}`), codex: { session: sessions[i]!, nativeTurn: `turn-${i}`, selection: sel! } }],
+  })));
+  const rates = usageRates(t, { 'gpt-6-astra': {
+    input_cost_per_token: 1e-5, output_cost_per_token: 5e-5, input_cost_per_token_priority: 2e-5, output_cost_per_token_priority: 1e-4,
+  } });
+  const stats = reader(db, { home, rates });
+  close(stats(REPO, 70)?.costUsd, 0.03);
+  close(stats(REPO, 71)?.costUsd, 0.03);
+  close(stats(REPO, 72)?.costUsd, 0.015);
 });

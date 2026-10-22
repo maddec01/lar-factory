@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { renameSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  claudeSessionRecords, codexSessionRecords, firstCopies, initialCodexScanState, parseClaudeLine, parseCodexLine, totalTokens,
+  claudeSessionRecords, codexSessionRecords, firstCopies, initialCodexScanState, parseClaudeLine, parseCodexLine, scanTranscripts, totalTokens,
 } from '../src/transcript-usage.ts';
 import type { UsageRecord } from '../src/transcript-usage.ts';
 import { assistant, claudeHome, codexHome, codexSession, codexTokens } from './stats-db.ts';
@@ -99,6 +99,23 @@ test('a session\'s records come from its own transcript and its subagents\' tran
   assert.deepEqual(read('session-none'), []);
   assert.deepEqual(read('../escape'), []);
   assert.deepEqual(claudeSessionRecords(`${home}/missing`)('session-a'), []);
+});
+
+test('a scan drops the cached records of transcripts it no longer reads, so the cache doesn\'t keep deleted files', (t) => {
+  const home = claudeHome(t, { 'session-a': { main: [assistant('msg-1', 1, 0, 0, 1)] } });
+  const path = join(home, 'projects', '-Users-pedro--t3-worktrees-mux-factory-feat-60', 'session-a.jsonl');
+  const ids = () => scanTranscripts(() => claudeSessionRecords(home)('session-a')).map((r) => r.dedupeKey);
+  const at = 1_760_000_000;
+  utimesSync(path, at, at);
+  assert.deepEqual(ids(), ['msg-1:req-msg-1']);
+  const { size } = statSync(path);
+  renameSync(path, `${path}.gone`);
+  assert.deepEqual(ids(), []);
+  // The same name, time and size again, but other records: only a dropped entry reads them.
+  writeFileSync(path, JSON.stringify(assistant('msg-2', 1, 0, 0, 1)) + '\n');
+  utimesSync(path, at, at);
+  assert.equal(statSync(path).size, size);
+  assert.deepEqual(ids(), ['msg-2:req-msg-2']);
 });
 
 // Ported from T3 Code's apps/server/src/provider/Drivers/codexUsage.test.ts

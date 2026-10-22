@@ -15,6 +15,8 @@ export interface FixtureTurn {
   abandoned?: boolean;
   /** A provider thread shared with the thread's other turns that name it; by default the turn's own. */
   providerThread?: string;
+  /** A Codex turn: its rollout's session and turn ID, and the model selection its run started with. */
+  codex?: { session: string; nativeTurn: string; selection: object | null };
 }
 
 /** A provider thread on a native session: a Claude or Codex session ID, on instance `claudeAgent` unless named. */
@@ -47,9 +49,11 @@ export interface FixtureRequest {
 const SCHEMA = `
 CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, title TEXT, payload_json TEXT);
 CREATE TABLE orchestration_v2_projection_messages (message_id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, created_at TEXT, payload_json TEXT);
-CREATE TABLE orchestration_v2_projection_provider_turns (provider_turn_id TEXT PRIMARY KEY, thread_id TEXT, provider_thread_id TEXT, status TEXT, started_at TEXT, completed_at TEXT, payload_json TEXT);
+CREATE TABLE orchestration_v2_projection_provider_turns (provider_turn_id TEXT PRIMARY KEY, thread_id TEXT, provider_thread_id TEXT, run_attempt_id TEXT, status TEXT, started_at TEXT, completed_at TEXT, payload_json TEXT);
 CREATE TABLE orchestration_v2_projection_runtime_requests (runtime_request_id TEXT PRIMARY KEY, thread_id TEXT, provider_turn_id TEXT, created_at TEXT, resolved_at TEXT);
 CREATE TABLE orchestration_v2_projection_provider_threads (provider_thread_id TEXT PRIMARY KEY, thread_id TEXT, provider TEXT, status TEXT, payload_json TEXT);
+CREATE TABLE orchestration_v2_projection_run_attempts (attempt_id TEXT PRIMARY KEY, thread_id TEXT, run_id TEXT, provider_thread_id TEXT, payload_json TEXT);
+CREATE TABLE orchestration_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, aggregate_kind TEXT, stream_id TEXT, event_type TEXT, application_event_version INTEGER, payload_json TEXT);
 `;
 
 /** Writes the database to a temporary folder removed after the test, and returns its path. */
@@ -61,7 +65,11 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
   db.exec(SCHEMA);
   const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?)');
   const message = db.prepare('INSERT INTO orchestration_v2_projection_messages VALUES (?, ?, ?, ?, ?)');
-  const turn = db.prepare('INSERT INTO orchestration_v2_projection_provider_turns VALUES (?, ?, ?, ?, ?, ?, ?)');
+  const turn = db.prepare(`INSERT INTO orchestration_v2_projection_provider_turns
+    (provider_turn_id, thread_id, provider_thread_id, run_attempt_id, status, started_at, completed_at, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+  const attempt = db.prepare('INSERT INTO orchestration_v2_projection_run_attempts VALUES (?, ?, ?, ?, ?)');
+  const event = db.prepare(`INSERT INTO orchestration_events (aggregate_kind, stream_id, event_type, application_event_version, payload_json)
+    VALUES ('thread', ?, 'run.updated', 2, ?)`);
   const request = db.prepare('INSERT INTO orchestration_v2_projection_runtime_requests VALUES (?, ?, ?, ?, ?)');
   const provider = db.prepare('INSERT INTO orchestration_v2_projection_provider_threads VALUES (?, ?, ?, ?, ?)');
   for (const th of threads) {
@@ -87,9 +95,20 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
       const completedAt = tu.completedAt ?? null;
       const providerThread = `${th.id}:${tu.providerThread ?? tu.id}`;
       providerThreads.set(providerThread, (providerThreads.get(providerThread) ?? false) || !(completedAt || tu.abandoned));
+      const codex = tu.codex;
+      const attemptId = codex ? `${tu.id}:attempt` : null;
       // T3's own token counts, which item stats no longer read.
-      turn.run(tu.id, th.id, providerThread, completedAt ? 'completed' : 'running', tu.startedAt, completedAt,
-        JSON.stringify({ id: tu.id, turnTokenUsage: { inputTokens: 999, cachedInputTokens: 0, outputTokens: 9, usageStatus: 'complete' } }));
+      turn.run(tu.id, th.id, providerThread, attemptId, completedAt ? 'completed' : 'running', tu.startedAt, completedAt,
+        JSON.stringify({ id: tu.id, turnTokenUsage: { inputTokens: 999, cachedInputTokens: 0, outputTokens: 9, usageStatus: 'complete' },
+          ...(codex ? { nativeTurnRef: { driver: 'codex', nativeId: codex.nativeTurn } } : {}) }));
+      if (codex && attemptId) {
+        const run = `${tu.id}:run`;
+        attempt.run(attemptId, th.id, run, providerThread, JSON.stringify({ nativeThreadId: codex.session }));
+        // A later steer's selection, which doesn't change the tier the turn started with.
+        for (const modelSelection of [codex.selection, { instanceId: 'codex', model: 'steered' }]) {
+          event.run(th.id, JSON.stringify({ id: run, activeAttemptId: attemptId, status: 'running', modelSelection }));
+        }
+      }
     }
     for (const [providerThread, active] of providerThreads) {
       provider.run(providerThread, th.id, 'claudeAgent', active ? 'active' : 'idle', JSON.stringify({ appThreadId: th.id }));
@@ -175,12 +194,22 @@ export function codexTokens(at: string, input: number, cached: number, output: n
 }
 
 /** Writes T3's settings with provider instances by their `homePath`, Claude unless a driver is named, and returns its path. */
-export function t3Settings(t: TestContext, homes: Record<string, string | { driver: string; homePath: string }>): string {
+export function t3Settings(t: TestContext, homes: Record<string, string | { driver: string; homePath: string }>, usage: {
+  usageModelAliases?: unknown;
+  usagePriceOverrides?: unknown;
+} = {}): string {
   const path = join(tempDir(t, 'mux-t3-settings-'), 'settings.json');
   const providerInstances = Object.fromEntries(Object.entries(homes).map(([id, entry]) => {
     const { driver, homePath } = typeof entry === 'string' ? { driver: 'claudeAgent', homePath: entry } : entry;
     return [id, { driver, displayName: id, enabled: true, config: { homePath } }];
   }));
-  writeFileSync(path, JSON.stringify({ providerInstances, usageModelAliases: null, usagePriceOverrides: null }));
+  writeFileSync(path, JSON.stringify({ providerInstances, usageModelAliases: null, usagePriceOverrides: null, ...usage }));
+  return path;
+}
+
+/** Writes T3's cached price table, `usage-model-rates.json`, around a LiteLLM document, and returns its path. */
+export function usageRates(t: TestContext, document: Record<string, object>): string {
+  const path = join(tempDir(t, 'mux-t3-rates-'), 'usage-model-rates.json');
+  writeFileSync(path, JSON.stringify({ fetchedAtMs: Date.parse('2026-10-20T00:00:00Z'), document }));
   return path;
 }

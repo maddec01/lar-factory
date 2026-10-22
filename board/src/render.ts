@@ -12,6 +12,7 @@ import {
   isRecentlyDone,
   isSlow,
   isStale,
+  itemTotal,
   kindLabel,
   kindOf,
   platformOf,
@@ -19,7 +20,7 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, IssueLinks, IssueRef, Item, ItemStats, LinkedPr, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -279,16 +280,42 @@ const HINTS: Partial<Record<Status, string>> = {
 function statsBadge(item: Item): string {
   const stats = item.stats;
   if (!stats) return '';
-  if (stats === 'unavailable') return '<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>';
+  if (stats === 'unavailable') return `<span class="stats" title="${UNREADABLE}">stats unavailable</span>`;
+  const title = "Σ is agent time: all agents' work, parallel work added up, less waits on you." +
+    (stats.wallMs === undefined ? '' : ' Wall is the time any agent was working, less waits on you.') +
+    " Tokens are counted as T3 Code's usage page counts them." +
+    (stats.costUsd !== undefined ? ' The cost is an API estimate at list prices, not the subscription bill.' : '') + frozenNote(stats);
+  return `<span class="stats" title="${title}"><span aria-hidden="true">Σ</span><span class="sr-only">agent time</span> ${figures(stats)}</span>`;
+}
+
+/**
+ * The item total, `total 4h 10m · wall 2h 0m · 14.4M · $63.20`, beside the item stats
+ * when sub-issues on the board add figures to them; never Σ, which means agent time.
+ */
+function totalBadge(item: Item, data: BoardData): string {
+  // The stats badge already says the item's own stats are unavailable.
+  if (item.stats === 'unavailable') return '';
+  const total = itemTotal(item, data.items);
+  if (!total) return '';
+  if (total === 'unavailable') return `<span class="stats total" title="${UNREADABLE}">total unavailable</span>`;
+  const title = 'The total adds the item stats of this item and of its sub-issues on the board, each once: ' +
+    'agent time first, then wall time, tokens and API cost, as in the item stats. ' +
+    'Times are added up across sub-issues, wall time too, so builds that ran side by side count in full.' + frozenNote(total);
+  return `<span class="stats total" title="${title}">total ${figures(total)}</span>`;
+}
+
+const UNREADABLE = 'The T3 Code database could not be read';
+
+/** The tooltip sentence for figures read back from merged PRs; '' for live ones. */
+function frozenNote(stats: ItemStats): string {
+  return stats.frozen ? ` Frozen when the PR merged, times rounded${stats.costUsd !== undefined ? ', cost to the nearest dollar' : ''}.` : '';
+}
+
+/** Agent time, wall time when known, tokens and cost when priced; a frozen cost in whole dollars. */
+function figures(stats: ItemStats): string {
   const wall = stats.wallMs === undefined ? '' : ` · wall ${duration(stats.wallMs)}`;
   const cost = stats.costUsd === undefined ? '' : ` · ${esc(stats.frozen ? wholeUsd(stats.costUsd) : formatUsd(stats.costUsd))}`;
-  const priced = stats.costUsd !== undefined;
-  const title = "Σ is agent time: all agents' work, parallel work added up, less waits on you." +
-    (wall ? ' Wall is the time any agent was working, less waits on you.' : '') +
-    " Tokens are counted as T3 Code's usage page counts them." +
-    (priced ? ' The cost is an API estimate at list prices, not the subscription bill.' : '') +
-    (stats.frozen ? ` Frozen when the PR merged, times rounded${priced ? ', cost to the nearest dollar' : ''}.` : '');
-  return `<span class="stats" title="${title}"><span aria-hidden="true">Σ</span><span class="sr-only">agent time</span> ${duration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}</span>`;
+  return `${duration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}`;
 }
 
 /** `action` is a button for the card's top row, so it adds no height. */
@@ -310,7 +337,7 @@ function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', acti
         `<span class="linked-pr"><a class="pr" href="${esc(pr.url)}" target="_blank" rel="noopener">PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'OPEN' ? '' : ` (${esc(pr.state.toLowerCase())})`}</a>${checksBadge(pr, opts.now)}</span>`,
     )
     .join('');
-  const stats = statsBadge(item);
+  const stats = statsBadge(item) + totalBadge(item, data);
   const foot = hint || prs || stats ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}${stats}</p>` : '';
   return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}" data-anchor="${esc(item.id)}">
 <div class="meta"><span class="badges">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}</span>${action}</div>
@@ -650,7 +677,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
             row(
               i,
               data,
-              `${statsBadge(i)}<span class="when">${day(i.closedAt ?? i.updatedAt, opts.timeZone)}</span>`,
+              `${statsBadge(i)}${totalBadge(i, data)}<span class="when">${day(i.closedAt ?? i.updatedAt, opts.timeZone)}</span>`,
             ),
           )
           .join('')}</ul>`

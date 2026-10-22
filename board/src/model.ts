@@ -96,6 +96,46 @@ export interface ItemStats {
   frozen?: true;
 }
 
+/**
+ * An item's stats plus the item total of each of its sub-issues among `items`, each
+ * item counted once. Wall time only when every figure has it; frozen only when all
+ * are. Null when the sub-issues add nothing, so the total equals the item stats;
+ * 'unavailable' when a figure couldn't be read.
+ */
+export function itemTotal(item: Item, items: readonly Item[]): ItemStats | 'unavailable' | null {
+  const seen = new Set<string>([item.id]);
+  const figures: (ItemStats | 'unavailable')[] = [];
+  const add = (parent: Item) => {
+    for (const child of items) {
+      if (seen.has(child.id) || !isSubIssueOf(child, parent)) continue;
+      seen.add(child.id);
+      if (child.stats) figures.push(child.stats);
+      add(child);
+    }
+  };
+  add(item);
+  if (!figures.length) return null;
+  if (item.stats) figures.push(item.stats);
+  if (figures.includes('unavailable')) return 'unavailable';
+  const all = figures as ItemStats[];
+  const own = item.stats as ItemStats | undefined;
+  if (all.every((s) => s === own || (!s.agentMs && !s.wallMs && !s.tokens && !s.costUsd))) return null;
+  const total: ItemStats = { agentMs: sum(all, (s) => s.agentMs), tokens: sum(all, (s) => s.tokens) };
+  if (all.every((s) => s.wallMs !== undefined)) total.wallMs = sum(all, (s) => s.wallMs!);
+  if (all.some((s) => s.costUsd !== undefined)) total.costUsd = sum(all, (s) => s.costUsd ?? 0);
+  if (all.every((s) => s.frozen)) total.frozen = true;
+  return total;
+}
+
+function isSubIssueOf(child: Item, parent: Item): boolean {
+  return child.parent !== null && parent.repo !== null && child.parent.number === parent.number &&
+    child.parent.repo.toLowerCase() === parent.repo.toLowerCase();
+}
+
+function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): number {
+  return stats.reduce((n, s) => n + figure(s), 0);
+}
+
 export interface Item {
   /** Project item id. */
   id: string;

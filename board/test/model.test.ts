@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { checkState, countsOf, isBuild, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
+import { checkState, countsOf, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
 import { esc } from '../src/render.ts';
 
@@ -77,6 +77,32 @@ test('a $word in the title is kept and $mux-work still opens line 2', () => {
   const message = workMessage(item('Queued', [], { title: 'Fix $foo parsing' }))!;
   assert.equal(message, '#7 Fix $foo parsing\n$mux-work maddec01/mux-server#7');
   assert.equal(message.split('\n')[1], '$mux-work maddec01/mux-server#7');
+});
+
+test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {
+  const repo = 'maddec01/mux-server';
+  const under = (n: number) => ({ number: n, title: 't', url: `https://github.com/${repo}/issues/${n}`, repo: 'Maddec01/Mux-Server', state: 'OPEN' as const });
+  const parent = item('In progress', [], { id: 'p', number: 7, stats: { agentMs: 10, wallMs: 1, tokens: 100, costUsd: 0.5 } });
+  const build = item('Done', ['build'], { id: 'b', number: 8, parent: under(7), stats: { agentMs: 20, wallMs: 2, tokens: 200, costUsd: 3, frozen: true } });
+  const nested = item('Done', ['build'], { id: 'n', number: 9, parent: under(8), stats: { agentMs: 40, tokens: 400, costUsd: 5, frozen: true } });
+  const quiet = item('Ready', [], { id: 'q', number: 10, parent: under(7) });
+  const other = item('Done', [], { id: 'o', number: 11, repo: 'maddec01/mux-apple', parent: under(7), stats: { agentMs: 1, tokens: 1 } });
+  const items = [parent, build, nested, quiet, other];
+  assert.deepEqual(itemTotal(parent, items), { agentMs: 71, tokens: 701, costUsd: 8.5 },
+    'parent repos match in any case; wall only when every figure has it, frozen only when all are');
+  assert.deepEqual(itemTotal(build, items), { agentMs: 60, tokens: 600, costUsd: 8, frozen: true });
+  assert.equal(itemTotal(nested, items), null, 'no sub-issues: the total equals the item stats');
+  assert.equal(itemTotal(quiet, items), null);
+  assert.equal(itemTotal(parent, [parent, quiet]), null, 'sub-issues without figures add nothing');
+  assert.equal(itemTotal(parent, [parent, { ...quiet, stats: { agentMs: 0, wallMs: 0, tokens: 0, costUsd: 0 } }, { ...other, stats: { agentMs: 0, tokens: 0 } }]), null,
+    'sub-issues with all-zero figures leave the total equal to the item stats');
+  assert.deepEqual(itemTotal(item('Queued', [], { id: 'p', number: 7 }), [build]),
+    { agentMs: 20, wallMs: 2, tokens: 200, costUsd: 3, frozen: true }, 'a parent without its own figures totals its sub-issues');
+  const looped = { ...parent, parent: under(8) };
+  assert.deepEqual(itemTotal(looped, [looped, build, build]), { agentMs: 30, wallMs: 3, tokens: 300, costUsd: 3.5 },
+    'each item counts once, even listed twice or in a loop');
+  assert.equal(itemTotal(parent, [parent, { ...build, stats: 'unavailable' }]), 'unavailable', 'an unreadable figure leaves the total unknown');
+  assert.equal(itemTotal({ ...parent, stats: 'unavailable' }, [build]), 'unavailable');
 });
 
 const sample = JSON.parse(readFileSync(new URL('./sample.json', import.meta.url), 'utf8')) as BoardData;

@@ -582,6 +582,36 @@ test('cards and Done rows show item stats, agent time, wall time, total tokens a
     [`<span class="stats" ${sigma}${tokens} Frozen when the PR merged, times rounded.">${Σ} 0m · 980</span>`], 'frozen without a cost');
 });
 
+test('cards and Done rows show a "total" badge beside the item stats when sub-issues add figures', () => {
+  const [first] = sample.items;
+  const parentRef = { number: 70, title: 'Parent', url: 'https://github.com/maddec01/mux-server/issues/70', repo: 'maddec01/mux-server', state: 'OPEN' as const };
+  const parent: Item = { ...first!, id: 'p', number: 70, repo: 'maddec01/mux-server', labels: [], status: 'In progress', parent: null,
+    stats: { agentMs: 30 * 60_000, wallMs: 20 * 60_000, tokens: 1_000, costUsd: 2 } };
+  const build = (id: string, number: number, closedAt: string): Item => ({ ...first!, id, number, repo: 'maddec01/mux-server', labels: ['build'],
+    status: 'Done', closedAt, parent: parentRef, stats: { agentMs: 60 * 60_000, wallMs: 40 * 60_000, tokens: 2_000_000, costUsd: 10, frozen: true } });
+  const html = renderBoardView({ ...sample, items: [parent, build('b1', 71, '2026-10-19T10:00:00Z'), build('b2', 72, '2026-10-20T10:00:00Z')] },
+    { ...base, ui: { ...DEFAULT_UI, toggled: { 'done-list': true } } });
+  const totals = html.match(/<span class="stats total"[^>]*>[^<]*<\/span>/g);
+  const added = 'The total adds the item stats of this item and of its sub-issues on the board, each once: agent time first, then wall time, '
+    + 'tokens and API cost, as in the item stats. Times are added up across sub-issues, wall time too, so builds that ran side by side count in full.';
+  assert.deepEqual(totals, [`<span class="stats total" title="${added}">total 2h 30m · wall 1h 40m · 4M · $22.00</span>`],
+    'the parent shows its total; each build is a Done row with its own frozen figures and no total');
+  assert.equal(html.match(/<span class="stats"[^>]*>/g)?.length, 3, 'item stats on the parent card and on each Done row');
+  assert.doesNotMatch(totals![0]!, /Σ/, 'Σ means agent time, not total');
+  const doneParent = { ...parent, status: 'Done' as const, closedAt: '2026-10-20T11:00:00Z' };
+  const doneHtml = renderBoardView({ ...sample, items: [doneParent, build('b1', 71, '2026-10-19T10:00:00Z')] },
+    { ...base, ui: { ...DEFAULT_UI, toggled: { 'done-list': true } } });
+  assert.match(doneHtml, /<li[^>]*>(?:(?!<\/li>).)*total 1h 30m · wall 1h 0m · 2M · \$12.00(?:(?!<\/li>).)*<\/li>/s, 'a Done row shows its total too');
+  const totalOf = (items: Item[]) => renderBoardView({ ...sample, items }, base).match(/<span class="stats total"[^>]*>[^<]*<\/span>/g);
+  assert.deepEqual(totalOf([{ ...parent, stats: undefined }, build('b1', 71, '2026-10-19T10:00:00Z'), build('b2', 72, '2026-10-20T10:00:00Z')]),
+    [`<span class="stats total" title="${added} Frozen when the PR merged, times rounded, cost to the nearest dollar.">total 2h 0m · wall 1h 20m · 4M · $20</span>`],
+    'a total of frozen figures only says so, like the item stats');
+  assert.deepEqual(totalOf([parent, { ...build('b1', 71, '2026-10-19T10:00:00Z'), stats: 'unavailable' }]),
+    ['<span class="stats total" title="The T3 Code database could not be read">total unavailable</span>']);
+  assert.equal(totalOf([{ ...parent, stats: 'unavailable' }, build('b1', 71, '2026-10-19T10:00:00Z')]), null,
+    'an item whose own stats are unavailable says so once, in its stats badge');
+});
+
 test('token counts are compact as on T3 Code\'s usage page', () => {
   assert.deepEqual([0, 980, 1_000, 1_234, 40_200, 312_400, 999_999, 1_200_000, 12_436_000, 2.5e9, 3e12].map(formatTokens),
     ['0', '980', '1K', '1.23K', '40.2K', '312K', '1000K', '1.20M', '12.4M', '2.50B', '3T']);

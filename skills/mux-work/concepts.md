@@ -51,5 +51,9 @@ decision sub-issues. When part of the destination is fully decided, create a
 `build` sub-issue for it with a brief ([3. Brief](SKILL.md#3-brief)) whose
 Domain docs copies the map entries that build needs, run the
 [gate](SKILL.md#4-gate), set it Ready, and start its build
-([5. Start the build](SKILL.md#5-start-the-build)). The map is done when the
-fog is gone and every build has merged.
+([5. Start the build](SKILL.md#5-start-the-build)). Map builds follow the
+build rules: each changes one repository, and work in another becomes a build
+there blocking it ([2. Size up](SKILL.md#2-size-up)); all start at once, and
+once the Fog is gone the last to merge closes the map
+([Parent closing](issue-tracker.md#parent-closing)). The decision that clears
+the last Fog closes the map itself if every build has merged.

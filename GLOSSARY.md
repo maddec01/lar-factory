@@ -68,6 +68,11 @@ review and PR checks in the issue repository's own workspace.
 Delegated work a thread owns and addresses only by its task ID; its backing thread is never used as a conversation.
 _Avoid_: delegated thread, child thread
 
+**Subagent**:
+An agent a thread's provider starts natively to do part of the thread's work, running in its own thread beneath it.
+T3 stores child tasks the same way and tells them apart only by who started them.
+_Avoid_: child task (for native subagents), helper
+
 **Reviewer**:
 A fresh-context agent assessing a change on one review axis: code, security,
 UX or UI.
@@ -121,8 +126,8 @@ Completed work, reached when its issue closes or its PR merges.
 ### Item stats
 
 **Agent time**:
-The sum of an item's turn run times across all its threads, excluding time a turn spends waiting on Pedro.
-_Avoid_: duration, elapsed time, wall time
+The sum of the work every agent did on an item, with parallel agents added up but a parent's wait on its own subagent counted once, excluding time waiting on Pedro.
+_Avoid_: duration, elapsed time
 
 **Item stats**:
 An item's agent time, total tokens and API cost, shown as three plain figures.

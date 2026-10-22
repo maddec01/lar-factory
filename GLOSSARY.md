@@ -125,5 +125,9 @@ The sum of an item's turn run times across all its threads, excluding time a tur
 _Avoid_: duration, elapsed time, wall time
 
 **Item stats**:
-An item's agent time and tokens: T3-counted tokens across its threads, plus Claude subagent tokens from transcripts, shown apart.
-_Avoid_: usage, cost, metrics
+An item's agent time, total tokens and API cost, shown as three plain figures.
+_Avoid_: usage, metrics
+
+**API cost**:
+What an item's tokens would cost at API list prices, as T3 Code estimates it, rather than the subscription bill.
+_Avoid_: cost, spend, price

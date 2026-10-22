@@ -3,14 +3,13 @@ import assert from 'node:assert/strict';
 import { prStatsEdits, statsBlock, updatedBody, withStatsBlock } from '../src/pr-stats.ts';
 import type { Item, ItemStats, LinkedPr } from '../src/model.ts';
 
-const stats: ItemStats = { agentMs: 65 * 60_000, tokens: { input: 1_234_567, cached: 900_000, output: 40_200, lowerBound: true },
-  subagentTokens: { input: 305, cached: 300, output: 9 } };
+const stats: ItemStats = { agentMs: 65 * 60_000, tokens: 12_436_000 };
 const block = statsBlock(stats);
 
-test('the block shows agent time, T3 tokens marked as a lower bound, and subagent tokens, between markers', () => {
-  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · T3 tokens ≥1.2M in (900k cached) / 40k out · Claude subagents 305 in (300 cached) / 9 out\n<!-- /mux-stats -->');
-  assert.equal(statsBlock({ ...stats, tokens: { ...stats.tokens, lowerBound: false }, subagentTokens: undefined }),
-    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · T3 tokens 1.2M in (900k cached) / 40k out\n<!-- /mux-stats -->');
+test('the block shows agent time and total tokens, between markers', () => {
+  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · 12.4M tokens\n<!-- /mux-stats -->');
+  assert.equal(statsBlock({ ...stats, tokens: 980 }),
+    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · 980 tokens\n<!-- /mux-stats -->');
 });
 
 test('the block rounds agent time to 5 minutes under an hour and to 15 from an hour, so a running turn rarely rewrites it', () => {

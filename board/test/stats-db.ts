@@ -1,5 +1,5 @@
-// Builds a small T3 Code state database and Claude Code transcripts folder for tests:
-// only the tables, columns and records item stats read.
+// Builds a small T3 Code state database, T3 settings and Claude Code homes for tests:
+// only the tables, columns, settings and records item stats read.
 
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -11,11 +11,19 @@ export interface FixtureTurn {
   id: string;
   startedAt: string;
   completedAt?: string | null;
-  usage?: { inputTokens: number; cachedInputTokens: number; outputTokens: number; usageStatus: string } | null;
   /** An open turn whose run T3 gave up on: its provider thread is idle, not active. */
   abandoned?: boolean;
   /** A provider thread shared with the thread's other turns that name it; by default the turn's own. */
   providerThread?: string;
+}
+
+/** A provider thread on a native session: a Claude session ID, on instance `claudeAgent` unless named. */
+export interface FixtureSession {
+  session: string;
+  instance?: string;
+  driver?: string;
+  /** When T3 created the provider thread; the earliest thread owns a record forks share. */
+  createdAt?: string;
 }
 
 export interface FixtureThread {
@@ -26,8 +34,8 @@ export interface FixtureThread {
   /** The root thread's id for a child thread; omitted for a root. */
   rootThreadId?: string;
   turns?: FixtureTurn[];
-  /** Claude session IDs of the thread's provider threads. */
-  sessions?: string[];
+  /** The thread's provider threads by native session. */
+  sessions?: (string | FixtureSession)[];
 }
 
 export interface FixtureRequest {
@@ -67,9 +75,11 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
       message.run(`${th.id}:m${i}`, th.id, 'user', at, JSON.stringify({ role: 'user', text }));
     });
     message.run(`${th.id}:assistant`, th.id, 'assistant', '2026-10-20T07:00:00.000Z', JSON.stringify({ role: 'assistant', text: 'Build x/y#1' }));
-    for (const session of th.sessions ?? []) {
-      provider.run(`${th.id}:${session}`, th.id, 'claudeAgent', 'idle',
-        JSON.stringify({ appThreadId: th.id, nativeThreadRef: { driver: 'claudeAgent', nativeId: session, strength: 'strong' } }));
+    for (const entry of th.sessions ?? []) {
+      const { session, instance = 'claudeAgent', driver = 'claudeAgent', createdAt = '2026-10-20T08:00:00.000Z' } =
+        typeof entry === 'string' ? { session: entry } : entry;
+      provider.run(`${th.id}:${session}`, th.id, instance, 'idle', JSON.stringify({ appThreadId: th.id, driver,
+        providerInstanceId: instance, nativeThreadRef: { driver, nativeId: session, strength: 'strong' }, createdAt }));
     }
     // A provider thread is active while any of its turns is open and not abandoned.
     const providerThreads = new Map<string, boolean>();
@@ -77,8 +87,9 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
       const completedAt = tu.completedAt ?? null;
       const providerThread = `${th.id}:${tu.providerThread ?? tu.id}`;
       providerThreads.set(providerThread, (providerThreads.get(providerThread) ?? false) || !(completedAt || tu.abandoned));
+      // T3's own token counts, which item stats no longer read.
       turn.run(tu.id, th.id, providerThread, completedAt ? 'completed' : 'running', tu.startedAt, completedAt,
-        JSON.stringify({ id: tu.id, ...(tu.usage ? { turnTokenUsage: tu.usage } : {}) }));
+        JSON.stringify({ id: tu.id, turnTokenUsage: { inputTokens: 999, cachedInputTokens: 0, outputTokens: 9, usageStatus: 'complete' } }));
     }
     for (const [providerThread, active] of providerThreads) {
       provider.run(providerThread, th.id, 'claudeAgent', active ? 'active' : 'idle', JSON.stringify({ appThreadId: th.id }));
@@ -89,33 +100,53 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
   return path;
 }
 
-/** An assistant record for message `id`, shaped like a Claude Code transcript's. */
-export function assistant(id: string, input: number, cacheCreation: number, cacheRead: number, output: number): object {
-  return { type: 'assistant', isSidechain: true, message: { id, role: 'assistant', usage: {
-    input_tokens: input, cache_creation_input_tokens: cacheCreation, cache_read_input_tokens: cacheRead, output_tokens: output,
-  } } };
+/** An assistant record for message `id`, shaped like a Claude Code transcript's, with request `req-<id>`. */
+export function assistant(id: string, input: number, cacheCreation: number, cacheRead: number, output: number, model = 'claude-opus-4-1'): object {
+  return { type: 'assistant', isSidechain: true, timestamp: '2026-10-20T09:05:00.000Z', requestId: `req-${id}`, sessionId: 'unused',
+    message: { id, role: 'assistant', model, usage: {
+      input_tokens: input, cache_creation_input_tokens: cacheCreation, cache_read_input_tokens: cacheRead, output_tokens: output,
+    } } };
+}
+
+/** A Claude session's transcripts: its own lines, and its subagents' by agent ID; a string is written as is. */
+export interface FixtureTranscripts {
+  main?: (object | string)[];
+  subagents?: Record<string, (object | string)[]>;
+}
+
+/** A temporary folder removed after the test. */
+export function tempDir(t: TestContext, prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  return dir;
 }
 
 /**
- * Writes a Claude Code projects folder to a temporary root removed after the test, and returns the root.
- * `subagents` maps a session ID to its subagents' transcript lines by agent ID (a string is written as is);
- * `main` maps a session ID to its own transcript.
+ * Writes a Claude Code home (its `projects` folder) and returns it: at `home`, or
+ * in a temporary folder removed after the test.
  */
-export function transcriptsDir(t: TestContext, subagents: Record<string, Record<string, (object | string)[]>>,
-  main: Record<string, object[]> = {}): string {
-  const root = mkdtempSync(join(tmpdir(), 'mux-transcripts-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const project = join(root, '-Users-pedro--t3-worktrees-mux-factory-feat-60');
-  mkdirSync(project);
+export function claudeHome(t: TestContext, sessions: Record<string, FixtureTranscripts>, home = tempDir(t, 'mux-claude-home-')): string {
+  const project = join(home, 'projects', '-Users-pedro--t3-worktrees-mux-factory-feat-60');
+  mkdirSync(project, { recursive: true });
   const lines = (records: (object | string)[]) => records.map((r) => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') + '\n';
-  for (const [session, records] of Object.entries(main)) writeFileSync(join(project, `${session}.jsonl`), lines(records));
-  for (const [session, agents] of Object.entries(subagents)) {
+  for (const [session, { main, subagents }] of Object.entries(sessions)) {
+    if (main) writeFileSync(join(project, `${session}.jsonl`), lines(main));
+    if (!subagents) continue;
     const dir = join(project, session, 'subagents');
     mkdirSync(dir, { recursive: true });
-    for (const [agent, records] of Object.entries(agents)) {
+    for (const [agent, records] of Object.entries(subagents)) {
       writeFileSync(join(dir, `agent-${agent}.meta.json`), JSON.stringify({ agentType: 'general-purpose' }));
       writeFileSync(join(dir, `agent-${agent}.jsonl`), lines(records));
     }
   }
-  return root;
+  return home;
+}
+
+/** Writes T3's settings with Claude provider instances by their `homePath`, and returns its path. */
+export function t3Settings(t: TestContext, homes: Record<string, string>): string {
+  const path = join(tempDir(t, 'mux-t3-settings-'), 'settings.json');
+  const providerInstances = Object.fromEntries(Object.entries(homes).map(([id, homePath]) =>
+    [id, { driver: 'claudeAgent', displayName: id, enabled: true, config: { homePath } }]));
+  writeFileSync(path, JSON.stringify({ providerInstances, usageModelAliases: null, usagePriceOverrides: null }));
+  return path;
 }

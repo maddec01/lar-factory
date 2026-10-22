@@ -12,8 +12,8 @@ import { expandHome, loadConfig } from './config.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
-import { loadItemStats, statsDbPath } from './item-stats.ts';
-import { claudeProjectsDir } from './subagent-tokens.ts';
+import { loadItemStats, statsDbPath, t3SettingsPath } from './item-stats.ts';
+import type { StatsSources } from './item-stats.ts';
 import { prStatsEdits, updatedBody } from './pr-stats.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
@@ -44,8 +44,7 @@ const state: BoardData = {
   items: [],
 };
 
-const statsPath = statsDbPath();
-const transcriptsPath = claudeProjectsDir();
+const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), home: process.env.HOME ?? '' };
 let statsUnavailable = false;
 let projectNumber = config.number;
 let refreshing = false;
@@ -71,12 +70,12 @@ function log(message: string): void {
   console.log(`${new Date().toISOString()} ${message}`);
 }
 
-/** Attaches each issue's item stats, read afresh from T3 Code's database; the board keeps working without them. */
+/** Attaches each issue's item stats, read afresh from T3 Code's database and transcripts; the board keeps working without them. */
 function withStats(items: Item[]): Item[] {
-  const stats = loadItemStats(statsPath, transcriptsPath, Date.now());
+  const stats = loadItemStats(statsSources, Date.now());
   if ((stats === 'unavailable') !== statsUnavailable) {
     statsUnavailable = !statsUnavailable;
-    log(statsUnavailable ? `item stats unavailable: can't read ${statsPath}` : `item stats readable again from ${statsPath}`);
+    log(statsUnavailable ? `item stats unavailable: can't read ${statsSources.db}` : `item stats readable again from ${statsSources.db}`);
   }
   return items.map((item) => {
     if (!item.repo || item.number === null || !stats) return { ...item, stats: undefined };

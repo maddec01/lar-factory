@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { rawIssue, startBoard } from './server-support.ts';
-import { assistant, statsDb, transcriptsDir } from './stats-db.ts';
+import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
 
 const draft = { repo: 'maddec01/mux-factory', kind: 'feature', title: 'Capture an item', description: '', labels: [] };
@@ -101,15 +101,14 @@ async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise
 }
 
 test('each refresh attaches item stats from T3 Code\'s database and Claude transcripts, and a missing database leaves them out', async (t) => {
-  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], sessions: ['session-1'], turns: [
-    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
-      usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
-  ] }]);
-  const transcripts = transcriptsDir(t, { 'session-1': { a1: [assistant('m1', 5, 0, 300, 9)] } });
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'],
+    sessions: [{ session: 'session-1', instance: 'claudeAgent_personal' }], turns: [
+      { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
+    ] }]);
+  const home = claudeHome(t, { 'session-1': { main: [assistant('m0', 1, 2, 3, 4)], subagents: { a1: [assistant('m1', 5, 0, 300, 9)] } } });
   const items = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done'), rawIssue(13, 'Review')] }, false, false,
-    { T3_STATE_DB: db, CLAUDE_PROJECTS_DIR: transcripts }));
-  assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000,
-    tokens: { input: 500, cached: 400, output: 20, lowerBound: false }, subagentTokens: { input: 305, cached: 300, output: 9 } });
+    { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) }));
+  assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, tokens: 10 + 314 });
   assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
   const [without] = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done')] }));
   assert.equal(without?.stats, undefined);
@@ -117,8 +116,7 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
 
 test('refreshes keep a stats block in open linked PRs, edit only when it changes, and never in sample mode', async (t) => {
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
-    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
-      usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
+    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
   const pr = (number: number, state: string) => ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`,
     state, isDraft: false, body: `PR ${number}` });
@@ -134,7 +132,7 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   const made = await edits();
   assert.equal(made.length, 1, 'later refreshes see the block is current and leave the PR alone');
   assert.equal(made[0]![3], 'repos/maddec01/mux-factory/pulls/40', 'merged PRs and items without stats are left alone');
-  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · T3 tokens 500 in (400 cached) / 20 out\n<!-- /mux-stats -->');
+  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · 0 tokens\n<!-- /mux-stats -->');
 
   const failing = await startBoard(t, { items, fail: 'pr-edit' }, false, false, { T3_STATE_DB: db });
   assert.equal((await readItems(failing)).length, 2, 'a failed edit leaves the board working');
@@ -146,10 +144,9 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
 
 test('before an edit the board reads the PR again, keeps edits made since its read, and skips a block already current', async (t) => {
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
-    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
-      usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
+    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · T3 tokens 500 in (400 cached) / 20 out\n<!-- /mux-stats -->';
+  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · 0 tokens\n<!-- /mux-stats -->';
   const url = (number: number) => `https://github.com/maddec01/mux-factory/pull/${number}`;
   const pr = (number: number, body: string) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body });
   const raw = rawIssue(12, 'Review');
@@ -172,8 +169,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
 
 test('PR edits run beside the refreshes without holding them up, and never two syncs at once', async (t) => {
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
-    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
-      usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
+    { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
   const raw = rawIssue(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [

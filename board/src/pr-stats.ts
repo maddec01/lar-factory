@@ -3,7 +3,7 @@
 // edit again, and sends the edits.
 
 import type { Item, ItemStats } from './model.ts';
-import { duration, tokenFigure } from './render.ts';
+import { duration, formatTokens } from './render.ts';
 
 const START = '<!-- mux-stats -->';
 const END = '<!-- /mux-stats -->';
@@ -19,11 +19,9 @@ function roughDuration(ms: number): string {
   return duration(Math.round(ms / step) * step);
 }
 
-/** The marked block: agent time, T3 tokens (`≥` when a lower bound), then Claude subagent tokens. */
+/** The marked block: agent time, then total tokens. */
 export function statsBlock(stats: ItemStats): string {
-  const t3 = `${stats.tokens.lowerBound ? '≥' : ''}${tokenFigure(stats.tokens)}`;
-  const subagents = stats.subagentTokens ? ` · Claude subagents ${tokenFigure(stats.subagentTokens)}` : '';
-  return `${START}\n**Item stats** (kept current by the Mux board): agent time ${roughDuration(stats.agentMs)} · T3 tokens ${t3}${subagents}\n${END}`;
+  return `${START}\n**Item stats** (kept current by the Mux board): agent time ${roughDuration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens\n${END}`;
 }
 
 // A marker counts only alone on its own line, so one quoted in prose isn't the block.

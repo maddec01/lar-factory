@@ -38,13 +38,16 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   await writeFile(stateFile, JSON.stringify(options));
   await writeFile(stateFile + '.calls', '');
   await writeFile(stateFile + '.t3calls', '');
+  // T3 settings whose built-in Claude instance has no transcripts, so tests never read real ones.
+  const settingsFile = join(dir, 't3-settings.json');
+  await writeFile(settingsFile, JSON.stringify({ providerInstances: { claudeAgent: { driver: 'claudeAgent', config: { homePath: join(dir, 'no-claude') } } } }));
   const port = env.BOARD_PORT ? Number(env.BOARD_PORT) : await freePort();
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),
     env: { ...process.env, BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname,
-      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), CLAUDE_PROJECTS_DIR: join(dir, 'no-claude-projects'), BOARD_DATA_FILE: fixture ? 'test/sample.json' : '', ...env },
+      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '', ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';

@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
-import { DEFAULT_UI, abandonPrompt, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
+import { DEFAULT_UI, abandonPrompt, formatTokens, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData, Item } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
@@ -540,29 +540,22 @@ test("a linked PR shows its checks: running with counts and age, amber when slow
   assert.match(html, /PR #14 \(closed\)<\/a>(?!<span class="checks)/, 'only open PRs show checks');
 });
 
-test('cards and Done rows show item stats: agent time and T3 tokens, a lower bound marked ≥, or that they are unavailable', () => {
-  const stats = { agentMs: (2 * 60 + 14) * 60_000 + 59_000, tokens: { input: 1_234_567, cached: 900_400, output: 40_200, lowerBound: false } };
+test('cards and Done rows show item stats, agent time and total tokens, or that they are unavailable', () => {
+  const stats = { agentMs: (3 * 60 + 20) * 60_000 + 59_000, tokens: 12_436_000 };
   const statsOf = (item: Partial<Item>) => {
     const html = renderBoardView({ ...sample, items: [{ ...sample.items[0]!, ...item }] }, base);
     return html.match(/<span class="stats"[^>]*>[^<]*<\/span>/g);
   };
-  const title = 'title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output"';
-  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>agent 2h 14m · 1.2M in (900k cached) / 40k out</span>`]);
-  assert.deepEqual(statsOf({ status: 'In progress', stats: { agentMs: 45 * 60_000, tokens: { input: 980, cached: 0, output: 12, lowerBound: true } } }),
-    [`<span class="stats" ${title}>agent 45m · ≥980 in (0 cached) / 12 out</span>`]);
+  const title = 'title="Agent time, less waits on you, and total tokens as T3 Code\'s usage page counts them"';
+  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>3h 20m · 12.4M tokens</span>`]);
+  assert.deepEqual(statsOf({ status: 'In progress', stats: { agentMs: 45 * 60_000, tokens: 980 } }), [`<span class="stats" ${title}>45m · 980 tokens</span>`]);
   assert.deepEqual(statsOf({ status: 'Shaping', stats: 'unavailable' }), ['<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>']);
   assert.deepEqual(statsOf({ status: 'Done', closedAt: '2026-10-20T10:00:00Z', stats }),
-    [`<span class="stats" ${title}>agent 2h 14m · 1.2M in (900k cached) / 40k out</span>`], 'Done rows keep their stats');
+    [`<span class="stats" ${title}>3h 20m · 12.4M tokens</span>`], 'Done rows keep their stats');
   assert.equal(statsOf({ status: 'Ready' }), null, 'no stats without matched threads');
 });
 
-test('Claude subagent tokens show as their own figure next to the T3 tokens, on cards and Done rows', () => {
-  const stats = { agentMs: 45 * 60_000, tokens: { input: 980, cached: 0, output: 12, lowerBound: false },
-    subagentTokens: { input: 312_400, cached: 250_000, output: 4_100 } };
-  const html = (item: Partial<Item>) => renderBoardView({ ...sample, items: [{ ...sample.items[0]!, ...item }] }, base);
-  const figure = '<span class="stats" title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output">agent 45m · 980 in (0 cached) / 12 out</span>'
-    + '<span class="stats" title="Claude subagent tokens, which T3 doesn\'t count: input (of which cached) / output">+ subagents 312k in (250k cached) / 4k out</span>';
-  assert.ok(html({ status: 'Review', stats }).includes(figure));
-  assert.ok(html({ status: 'Done', closedAt: '2026-10-20T10:00:00Z', stats }).includes(figure), 'Done rows keep it');
-  assert.doesNotMatch(html({ status: 'Review', stats: { ...stats, subagentTokens: undefined } }), /subagents/);
+test('token counts are compact as on T3 Code\'s usage page', () => {
+  assert.deepEqual([0, 980, 1_000, 1_234, 40_200, 312_400, 999_999, 1_200_000, 12_436_000, 2.5e9, 3e12].map(formatTokens),
+    ['0', '980', '1K', '1.23K', '40.2K', '312K', '1000K', '1.20M', '12.4M', '2.50B', '3T']);
 });

@@ -19,7 +19,7 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, SliceProgress, StartedThread, Status, Tokens, UpdateStep } from './model.ts';
+import type { BoardData, IssueLinks, IssueRef, Item, LinkedPr, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
 export type View = 'board' | 'flow';
@@ -128,10 +128,26 @@ function elapsed(iso: string, now: number): string {
   return duration(now - Date.parse(iso));
 }
 
-/** 40200 → 40k, 1234567 → 1.2M. */
-function tokenCount(n: number): string {
-  if (n >= 999_500) return `${Number((n / 1e6).toFixed(1))}M`;
-  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
+const INTEGER = new Intl.NumberFormat('en-US');
+
+/**
+ * A compact token count as T3 Code's usage page shows it: 980, 40.2K, 12.4M.
+ * Ported from `formatTokens` in pingdotgg/t3code packages/shared/src/usageFormat.ts
+ * (main at f054d1b8018721bd997d99cbb918a7b17bf098a4).
+ */
+export function formatTokens(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1e12) return `${trimDigits(value / 1e12)}T`;
+  if (abs >= 1e9) return `${trimDigits(value / 1e9)}B`;
+  if (abs >= 1e6) return `${trimDigits(value / 1e6)}M`;
+  if (abs >= 1e3) return `${trimDigits(value / 1e3)}K`;
+  return INTEGER.format(Math.round(value));
+}
+
+function trimDigits(value: number): string {
+  const abs = Math.abs(value);
+  const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
+  return value.toFixed(digits).replace(/\.0+$/, '');
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
@@ -240,24 +256,15 @@ const HINTS: Partial<Record<Status, string>> = {
   'Ready to merge': 'Merge the PR',
 };
 
-/** `1.2M in (900k cached) / 40k out`. */
-export function tokenFigure({ input, cached, output }: Tokens): string {
-  return `${tokenCount(input)} in (${tokenCount(cached)} cached) / ${tokenCount(output)} out`;
-}
-
 /**
- * Agent time and T3 tokens, then Claude subagent tokens as their own figure, for a
- * card's footer or a Done row; nothing when no thread worked on the item. The time
- * says `agent` so it doesn't read as how long ago.
+ * Agent time and total tokens, `3h 20m · 12.4M tokens`, for a card's footer or a
+ * Done row; nothing when no thread worked on the item.
  */
 function statsBadge(item: Item): string {
   const stats = item.stats;
   if (!stats) return '';
   if (stats === 'unavailable') return '<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>';
-  const subagents = stats.subagentTokens
-    ? `<span class="stats" title="Claude subagent tokens, which T3 doesn't count: input (of which cached) / output">+ subagents ${tokenFigure(stats.subagentTokens)}</span>`
-    : '';
-  return `<span class="stats" title="Agent time, less waits on you, and T3-counted tokens: input (of which cached) / output">agent ${duration(stats.agentMs)} · ${stats.tokens.lowerBound ? '≥' : ''}${tokenFigure(stats.tokens)}</span>${subagents}`;
+  return `<span class="stats" title="Agent time, less waits on you, and total tokens as T3 Code's usage page counts them">${duration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens</span>`;
 }
 
 /** `action` is a button for the card's top row, so it adds no height. */

@@ -1,11 +1,13 @@
-// Item stats from T3 Code's local database, read-only (docs/adr/0005). Every
-// read of T3's internal schema lives here, so a schema change touches one file.
+// Item stats from T3 Code's local database and settings, read-only (docs/adr/0005,
+// 0006), with tokens from the provider transcripts of each item's threads. Every
+// read of T3's internal schema and settings lives here, so a change touches one file.
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { isAbsolute, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { ItemStats } from './model.ts';
-import { count, subagentTokens } from './subagent-tokens.ts';
-import type { SubagentTokensReader } from './subagent-tokens.ts';
+import { claudeSessionRecords, firstCopies, totalTokens } from './transcript-usage.ts';
+import type { SessionRecordsReader, UsageRecord } from './transcript-usage.ts';
 
 /** An item's stats by repo and issue number, or null when no thread worked on it. */
 export type ItemStatsReader = (repo: string, number: number) => ItemStats | null;
@@ -13,6 +15,18 @@ export type ItemStatsReader = (repo: string, number: number) => ItemStats | null
 /** T3's database: `T3_STATE_DB`, or its usual place under the home folder. */
 export function statsDbPath(env: NodeJS.ProcessEnv = process.env): string {
   return env.T3_STATE_DB || `${env.HOME ?? ''}/.t3/userdata/statev2.sqlite`;
+}
+
+/** T3's settings: `T3_SETTINGS`, or their usual place under the home folder. */
+export function t3SettingsPath(env: NodeJS.ProcessEnv = process.env): string {
+  return env.T3_SETTINGS || `${env.HOME ?? ''}/.t3/userdata/settings.json`;
+}
+
+/** Where item stats read from: T3's database and settings, and the home folder `~` stands for. */
+export interface StatsSources {
+  db: string;
+  settings: string;
+  home: string;
 }
 
 // A root thread with its first user message.
@@ -30,11 +44,7 @@ FROM orchestration_v2_projection_threads`;
 
 const TURNS = `
 SELECT provider_turn_id AS id, thread_id AS thread, provider_thread_id AS providerThread,
-  started_at AS startedAt, completed_at AS completedAt,
-  json_extract(payload_json, '$.turnTokenUsage.inputTokens') AS input,
-  json_extract(payload_json, '$.turnTokenUsage.cachedInputTokens') AS cached,
-  json_extract(payload_json, '$.turnTokenUsage.outputTokens') AS output,
-  json_extract(payload_json, '$.turnTokenUsage.usageStatus') AS usageStatus
+  started_at AS startedAt, completed_at AS completedAt
 FROM orchestration_v2_projection_provider_turns`;
 
 const WAITS = `
@@ -50,12 +60,17 @@ SELECT thread_id AS thread, max(created_at) AS at FROM orchestration_v2_projecti
 const ACTIVE = `
 SELECT provider_thread_id AS id FROM orchestration_v2_projection_provider_threads WHERE status = 'active'`;
 
-// Each thread's Claude session IDs, one per provider thread. Claude's provider_native
-// child threads have no turns or provider threads: their tokens are only in the
-// sessions' subagent transcripts. App-owned and Codex children count through turns.
+// Each provider thread's native session and provider instance, earliest first: a
+// record forked threads share counts for the thread that produced it first. Never
+// map through a turn's nativeTurnRef, which can hold a placeholder. Claude's
+// provider_native child threads have no provider threads: their records are in
+// their parent session's subagent transcripts.
 const SESSIONS = `
-SELECT thread_id AS thread, json_extract(payload_json, '$.nativeThreadRef.nativeId') AS session
-FROM orchestration_v2_projection_provider_threads`;
+SELECT thread_id AS thread, json_extract(payload_json, '$.driver') AS driver,
+  json_extract(payload_json, '$.providerInstanceId') AS instance,
+  json_extract(payload_json, '$.nativeThreadRef.nativeId') AS session
+FROM orchestration_v2_projection_provider_threads
+ORDER BY json_extract(payload_json, '$.createdAt'), rowid`;
 
 interface Turn {
   id: string;
@@ -63,10 +78,6 @@ interface Turn {
   providerThread: string;
   startedAt: string | null;
   completedAt: string | null;
-  input: unknown;
-  cached: unknown;
-  output: unknown;
-  usageStatus: unknown;
 }
 
 // `$mux-work <ref>` or `/mux-work <ref>` on any line, or a message starting `Build <ref>`.
@@ -107,37 +118,80 @@ function activeProviderThreads(db: DatabaseSync): Set<string> {
   }
 }
 
-/** Each thread's Claude session IDs; none when T3's provider threads can't be read. */
-function sessionsByThread(db: DatabaseSync): Map<string, string[]> {
-  const sessions = new Map<string, string[]>();
-  try {
-    for (const { thread, session } of db.prepare(SESSIONS).all() as { thread: unknown; session: unknown }[]) {
-      if (typeof thread === 'string' && typeof session === 'string') add(sessions, thread, session);
-    }
-  } catch {
-    // Subagent tokens are extra; T3's own stats still stand.
-  }
-  return sessions;
+const CLAUDE_DRIVER = 'claudeAgent';
+
+/** `~` and `~/…` under `home`, as T3's expandHomePath reads a configured path. */
+function expandHome(path: string, home: string): string {
+  if (path === '~') return home;
+  if (path.startsWith('~/')) return join(home, path.slice(2));
+  return isAbsolute(path) ? path : resolve(home, path);
 }
 
 /**
- * Reads the database once and returns a lookup over it, adding Claude subagent
- * tokens from the transcripts under `transcripts`. Null when there is no
- * database; 'unavailable' when it can't be read, e.g. T3 changed its schema.
+ * Each Claude provider instance's Claude home, as T3's claudeUsageReader resolves
+ * it: the instance's `homePath`, else `~/.claude`. The built-in `claudeAgent`
+ * instance is there even when the settings don't list it or can't be read.
  */
-export function loadItemStats(path: string, transcripts: string, now: number): ItemStatsReader | 'unavailable' | null {
-  if (!existsSync(path)) return null;
+function claudeHomes(settingsPath: string, home: string): Map<string, string> {
+  const fallback = join(home, '.claude');
+  const homes = new Map([[CLAUDE_DRIVER, fallback]]);
+  let instances: unknown;
+  try {
+    instances = (JSON.parse(readFileSync(settingsPath, 'utf8')) as { providerInstances?: unknown }).providerInstances;
+  } catch {
+    return homes;
+  }
+  if (!instances || typeof instances !== 'object') return homes;
+  for (const [id, instance] of Object.entries(instances as Record<string, { driver?: unknown; config?: { homePath?: unknown } } | null>)) {
+    if (instance?.driver !== CLAUDE_DRIVER) continue;
+    const configured = typeof instance.config?.homePath === 'string' ? instance.config.homePath.trim() : '';
+    homes.set(id, configured ? expandHome(configured, home) : fallback);
+  }
+  return homes;
+}
+
+/**
+ * Each thread's usage records from its Claude sessions' transcripts, under the
+ * home of the thread's own provider instance. A record counts once across all
+ * threads, for the earliest provider thread that has it, as in T3's global dedupe.
+ */
+function recordsByThread(db: DatabaseSync, homes: Map<string, string>): Map<string, UsageRecord[]> {
+  const readers = new Map<string, SessionRecordsReader>();
+  const keep = firstCopies();
+  const read = new Set<string>();
+  const records = new Map<string, UsageRecord[]>();
+  for (const row of db.prepare(SESSIONS).all() as { thread: unknown; driver: unknown; instance: unknown; session: unknown }[]) {
+    const { thread, driver, instance, session } = row;
+    if (typeof thread !== 'string' || typeof session !== 'string' || driver !== CLAUDE_DRIVER || typeof instance !== 'string') continue;
+    const home = homes.get(instance);
+    const key = `${home}\0${session}`;
+    if (!home || read.has(key)) continue;
+    read.add(key);
+    let reader = readers.get(home);
+    if (!reader) readers.set(home, (reader = claudeSessionRecords(home)));
+    for (const record of reader(session)) if (keep(record)) add(records, thread, record);
+  }
+  return records;
+}
+
+/**
+ * Reads the database once and returns a lookup over it, with each item's tokens
+ * from its threads' transcripts. Null when there is no database; 'unavailable'
+ * when it can't be read, e.g. T3 changed its schema.
+ */
+export function loadItemStats(sources: StatsSources, now: number): ItemStatsReader | 'unavailable' | null {
+  if (!existsSync(sources.db)) return null;
   let db: DatabaseSync | undefined;
   try {
-    db = new DatabaseSync(path, { readOnly: true });
+    db = new DatabaseSync(sources.db, { readOnly: true });
     const roots = db.prepare(ROOTS).all() as { id: string; text: unknown }[];
     const lineage = db.prepare(LINEAGE).all() as { id: string; root: unknown }[];
     const turns = db.prepare(TURNS).all() as unknown as Turn[];
     const waits = db.prepare(WAITS).all() as { turn: string; createdAt: string | null; resolvedAt: string | null }[];
     const lastMessages = db.prepare(LAST_MESSAGES).all() as { thread: string; at: string | null }[];
     const activity = { lastMessages, active: activeProviderThreads(db) };
-    const subagents = { sessions: sessionsByThread(db), tokens: subagentTokens(transcripts) };
-    return reader(roots, lineage, turns, waits, activity, subagents, now);
+    const records = recordsByThread(db, claudeHomes(sources.settings, sources.home));
+    return reader(roots, lineage, turns, waits, activity, records, now);
   } catch {
     return 'unavailable';
   } finally {
@@ -151,7 +205,7 @@ function reader(
   turns: Turn[],
   waits: { turn: string; createdAt: string | null; resolvedAt: string | null }[],
   activity: { lastMessages: { thread: string; at: string | null }[]; active: Set<string> },
-  subagents: { sessions: Map<string, string[]>; tokens: SubagentTokensReader },
+  records: Map<string, UsageRecord[]>,
   now: number,
 ): ItemStatsReader {
   const rootsByIssue = new Map<string, Set<string>>();
@@ -207,21 +261,16 @@ function reader(
     const matched = rootsByIssue.get(`${repo}#${number}`);
     if (!matched) return null;
     const threads = new Set([...matched].flatMap((root) => [root, ...(threadsByRoot.get(root) ?? [])]));
-    const stats: ItemStats = { agentMs: 0, tokens: { input: 0, cached: 0, output: 0, lowerBound: false } };
+    let agentMs = 0;
     for (const turn of [...threads].flatMap((thread) => turnsByThread.get(thread) ?? [])) {
       const start = Date.parse(turn.startedAt ?? '');
       const end = turnEnd(turn);
       if (Number.isFinite(start) && end > start) {
         const inside = (waitsByTurn.get(turn.id) ?? [])
           .map(([from, to]): [number, number] => [Math.max(from, start), Math.min(to, end)]);
-        stats.agentMs += end - start - covered(inside);
+        agentMs += end - start - covered(inside);
       }
-      stats.tokens.input += count(turn.input);
-      stats.tokens.cached += count(turn.cached);
-      stats.tokens.output += count(turn.output);
-      if (turn.usageStatus !== 'complete') stats.tokens.lowerBound = true;
     }
-    const subagentTokens = subagents.tokens([...threads].flatMap((thread) => subagents.sessions.get(thread) ?? []));
-    return subagentTokens ? { ...stats, subagentTokens } : stats;
+    return { agentMs, tokens: totalTokens([...threads].flatMap((thread) => records.get(thread) ?? [])) };
   };
 }

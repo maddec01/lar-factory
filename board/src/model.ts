@@ -80,21 +80,12 @@ export interface IssueLinks {
   nodes: IssueRef[];
 }
 
-/** Token counts; input includes cached input. */
-export interface Tokens {
-  input: number;
-  cached: number;
-  output: number;
-}
-
 /** An item's agent time and tokens, summed over every thread that worked on it. */
 export interface ItemStats {
   /** Agent time: turn run time, less time waiting on Pedro. */
   agentMs: number;
-  /** T3-counted tokens. A lower bound when any turn's usage was partial or missing. */
-  tokens: Tokens & { lowerBound: boolean };
-  /** Claude in-thread subagents' tokens, which T3 doesn't count; absent when the threads have no subagent transcripts. */
-  subagentTokens?: Tokens;
+  /** Total tokens from the threads' transcripts, counted as T3 Code's usage page counts them. */
+  tokens: number;
 }
 
 export interface Item {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { rawIssue, startBoard } from './server-support.ts';
-import { statsDb } from './stats-db.ts';
+import { assistant, statsDb, transcriptsDir } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
 
 const draft = { repo: 'maddec01/mux-factory', kind: 'feature', title: 'Capture an item', description: '', labels: [] };
@@ -100,13 +100,16 @@ async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise
   throw new Error('The board never read its items');
 }
 
-test('each refresh attaches item stats from T3 Code\'s database, and a missing database leaves them out', async (t) => {
-  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
+test('each refresh attaches item stats from T3 Code\'s database and Claude transcripts, and a missing database leaves them out', async (t) => {
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], sessions: ['session-1'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z',
       usage: { inputTokens: 500, cachedInputTokens: 400, outputTokens: 20, usageStatus: 'complete' } },
   ] }]);
-  const items = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done'), rawIssue(13, 'Review')] }, false, false, { T3_STATE_DB: db }));
-  assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, tokens: { input: 500, cached: 400, output: 20, lowerBound: false } });
+  const transcripts = transcriptsDir(t, { 'session-1': { a1: [assistant('m1', 5, 0, 300, 9)] } });
+  const items = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done'), rawIssue(13, 'Review')] }, false, false,
+    { T3_STATE_DB: db, CLAUDE_PROJECTS_DIR: transcripts }));
+  assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000,
+    tokens: { input: 500, cached: 400, output: 20, lowerBound: false }, subagentTokens: { input: 305, cached: 300, output: 9 } });
   assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
   const [without] = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done')] }));
   assert.equal(without?.stats, undefined);

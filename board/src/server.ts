@@ -13,6 +13,7 @@ import { abandonItem, addProjectItem, fetchProject, findProjectNumber, setItemSt
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
 import { loadItemStats, statsDbPath } from './item-stats.ts';
+import { claudeProjectsDir } from './subagent-tokens.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
@@ -43,6 +44,7 @@ const state: BoardData = {
 };
 
 const statsPath = statsDbPath();
+const transcriptsPath = claudeProjectsDir();
 let statsUnavailable = false;
 let projectNumber = config.number;
 let refreshing = false;
@@ -69,7 +71,7 @@ function log(message: string): void {
 
 /** Attaches each issue's item stats, read afresh from T3 Code's database; the board keeps working without them. */
 function withStats(items: Item[]): Item[] {
-  const stats = loadItemStats(statsPath, Date.now());
+  const stats = loadItemStats(statsPath, transcriptsPath, Date.now());
   if ((stats === 'unavailable') !== statsUnavailable) {
     statsUnavailable = !statsUnavailable;
     log(statsUnavailable ? `item stats unavailable: can't read ${statsPath}` : `item stats readable again from ${statsPath}`);

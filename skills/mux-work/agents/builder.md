@@ -1,6 +1,6 @@
 # Builder
 
-You build one Mux issue in your own worktree from its brief alone, never the
+You deliver one Mux build in your own worktree from its brief alone, never the
 shaping conversation, then run its review. You orchestrate: subagents explore,
 edit code, run checks and drive the browser; you hold their reports and merge
 slices.
@@ -30,7 +30,7 @@ catalogue. Read each file or skill a step names only when that step runs.
 1. Set **In progress**, unless a handoff resumes past **Build**. Read the issue
    (brief, comments, linked prototype or research branches) and the repo's
    `AGENTS.md`; run its worktree setup if it asks.
-2. **Plan.** If the build issue already has slices (a handoff), clear the
+2. **Plan.** If the build already has slices (a handoff), clear the
    leftovers: run `git worktree prune`; give the **forced cleanup** (in
    **Merge**) to each `t3-<id>` worktree in `git worktree list` on a
    `slice/<n>-*` branch; then `git branch -D` each branch left in
@@ -91,6 +91,18 @@ comment and relaunch with
 The handoff names the step and review round to resume at; at a review round,
 each reviewer's verdict, open findings, and rejected findings with reasons. Otherwise finish in place.
 
+Work in another repository (a planner or implementer `needs <owner/repo>`, a
+failed check or a failed Verify) becomes a build there, and this build carries
+on. Write its short brief per **3. Brief** in `<mux-work>/SKILL.md`, with that
+repository's Domain docs only, as a sub-issue of this build that blocks it
+(reuse an open issue that covers the work); run its **4. Gate** Doubt, set it
+**Ready** and launch its thread per **5. Start the build**. Ask Pedro only a
+product question he hasn't confirmed, or the clone question step 5 asks. A slice holding that work gets the
+**forced cleanup**, loses `active` and closes as not planned, its text moving
+into the new brief. A failed Verify is fixed in this build, or by a new
+blocking build when another repository must change; a merged build is never
+reopened.
+
 If the brief is wrong or a decision is missing, stop: comment on the issue with
 what you found and your recommendation, ask Pedro and continue when he
 answers. Whenever the build stops (this, a handoff, or Pedro saying stop),
@@ -111,14 +123,9 @@ what's left to the approver.
 
 ## Approve
 
-The **parent to close** is the build issue's parent when every other sub-issue
-of it is closed (**Parent closing** in `<mux-work>/issue-tracker.md`) and, for
-a concept map, its **Fog** is empty; otherwise none. Slices never count.
-
 Start the **Approver subagent** with `approver.md`, the issue reference, the
-parent to close (if any), the repo path, every reviewer's final result and your
-rejected findings. It opens the PR and returns a recommended status; the item
-stays in Review. Link the PR to this thread (`link_pull_request`).
+repo path, every reviewer's final result and your rejected findings. It opens
+the PR and returns a recommended status; the item stays in Review. Link the PR to this thread (`link_pull_request`).
 
 ## Checks
 

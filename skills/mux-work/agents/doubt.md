@@ -15,6 +15,8 @@ Assume the author is overconfident. Hunt for:
   existing data; a decision the builder would have to make alone.
 - **Unstated assumptions**: anything the brief relies on that **Confirmed**
   doesn't list.
+- **Repository**: anything the brief changes outside the repo path; that work
+  becomes a build in its own repository.
 - **Domain docs**: every term the brief uses matches `GLOSSARY.md`, or
   **Domain docs** adds or changes it as a `GLOSSARY-FORMAT.md` entry. Nothing
   contradicts an ADR without superseding it. Every ADR draft meets
@@ -27,7 +29,7 @@ Return:
 
 ```
 findings:
-- [wrong|ambiguous|incomplete|assumption|domain-docs] brief section: problem. Evidence: <path:line or quote>. Fix: <suggestion>
+- [wrong|ambiguous|incomplete|assumption|repository|domain-docs] brief section: problem. Evidence: <path:line or quote>. Fix: <suggestion>
 clean:
 - <categories with no findings>
 not checked:

@@ -28,6 +28,8 @@ export interface LinkedPr {
   isDraft: boolean;
   /** The PR's description, for its item stats block; absent when not read (sample data). */
   body?: string;
+  /** When the PR merged, to pick the latest merged PR's block; absent or null when not merged or not read. */
+  mergedAt?: string | null;
   /** The head commit's checks; null when it has none. */
   checks: Checks | null;
 }
@@ -88,6 +90,8 @@ export interface ItemStats {
   tokens: number;
   /** API cost in dollars, as T3 Code's usage page prices the tokens; absent when nothing could be priced. */
   costUsd?: number;
+  /** Read back from a merged PR's stats block: the figures as they stood at merge, cost in whole dollars (0 for under a dollar). */
+  frozen?: true;
 }
 
 export interface Item {

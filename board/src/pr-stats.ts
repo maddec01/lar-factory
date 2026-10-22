@@ -3,7 +3,7 @@
 // edit again, and sends the edits.
 
 import type { Item, ItemStats } from './model.ts';
-import { duration, formatTokens } from './render.ts';
+import { duration, formatTokens, wholeUsd } from './render.ts';
 
 const START = '<!-- mux-stats -->';
 const END = '<!-- /mux-stats -->';
@@ -19,17 +19,48 @@ function roughDuration(ms: number): string {
   return duration(Math.round(ms / step) * step);
 }
 
-const WHOLE_DOLLARS = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-
-/** API cost to the nearest whole dollar, `<$1` below a dollar, so cents don't rewrite the PR body. */
-function roughUsd(usd: number): string {
-  return usd < 1 ? '<$1' : WHOLE_DOLLARS.format(Math.round(usd));
+/**
+ * The marked block: agent time, total tokens, then API cost when any of the tokens
+ * could be priced, in whole dollars so cents don't rewrite the PR body.
+ */
+export function statsBlock(stats: ItemStats): string {
+  const cost = stats.costUsd === undefined ? '' : ` · ${wholeUsd(stats.costUsd)}`;
+  return `${START}\n**Item stats** (kept current by the Mux board): agent time ${roughDuration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens${cost}\n${END}`;
 }
 
-/** The marked block: agent time, total tokens, then API cost when any of the tokens could be priced. */
-export function statsBlock(stats: ItemStats): string {
-  const cost = stats.costUsd === undefined ? '' : ` · ${roughUsd(stats.costUsd)}`;
-  return `${START}\n**Item stats** (kept current by the Mux board): agent time ${roughDuration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens${cost}\n${END}`;
+// The figures line statsBlock writes: agent time, tokens with a K/M/B/T suffix, then the cost if any.
+const FIGURES = /agent time (?:(\d+)h )?(\d+)m · ([\d,.]+)([KMBT]?) tokens(?: · (<\$1|\$[\d,]+))?\r?\n/;
+const SUFFIX = { '': 1, K: 1e3, M: 1e6, B: 1e9, T: 1e12 } as const;
+
+/** The figures a body's block holds, as statsBlock wrote them, or null when it has no block or one that doesn't parse. */
+function blockStats(body: string): ItemStats | null {
+  const range = blockRange(body);
+  const m = range && FIGURES.exec(body.slice(...range));
+  if (!m) return null;
+  const [, hours = '0', minutes, count, suffix, cost] = m;
+  const tokens = Math.round(Number(count!.replaceAll(',', '')) * SUFFIX[suffix as keyof typeof SUFFIX]);
+  if (!Number.isFinite(tokens)) return null;
+  const stats: ItemStats = { agentMs: (Number(hours) * 60 + Number(minutes)) * 60_000, tokens };
+  // Under a dollar reads back as 0, which writes `<$1` again.
+  if (cost) stats.costUsd = cost === '<$1' ? 0 : Number(cost.slice(1).replaceAll(',', ''));
+  stats.frozen = true;
+  return stats;
+}
+
+/**
+ * An item's figures frozen in its most recently merged linked PR with a readable
+ * block, so Claude's transcript deletion doesn't shrink done items; null to use
+ * live stats, as when an open linked PR is still being worked on.
+ */
+export function mergedStats(item: Item): ItemStats | null {
+  if (item.linkedPrs.some((pr) => pr.state === 'OPEN')) return null;
+  const merged = item.linkedPrs.filter((pr) => pr.state === 'MERGED')
+    .sort((a, b) => (b.mergedAt ?? '').localeCompare(a.mergedAt ?? ''));
+  for (const pr of merged) {
+    const stats = pr.body === undefined ? null : blockStats(pr.body);
+    if (stats) return stats;
+  }
+  return null;
 }
 
 // A marker counts only alone on its own line, so one quoted in prose isn't the block.

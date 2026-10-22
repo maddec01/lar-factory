@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { prStatsEdits, statsBlock, updatedBody, withStatsBlock } from '../src/pr-stats.ts';
+import { mergedStats, prStatsEdits, statsBlock, updatedBody, withStatsBlock } from '../src/pr-stats.ts';
 import type { Item, ItemStats, LinkedPr } from '../src/model.ts';
 
 const stats: ItemStats = { agentMs: 65 * 60_000, tokens: 12_436_000, costUsd: 41.2 };
@@ -40,8 +40,8 @@ test('a body with a block gets only the block replaced', () => {
   assert.equal(withStatsBlock(withStatsBlock(body, block), block), `${before}${block}${after}`, 'the same stats leave the body as it is');
 });
 
-const pr = (number: number, state: string, body: string | undefined): LinkedPr =>
-  ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`, state, isDraft: false, checks: null, body });
+const pr = (number: number, state: string, body: string | undefined, mergedAt?: string): LinkedPr =>
+  ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`, state, isDraft: false, checks: null, body, mergedAt });
 const REPOS = ['maddec01/mux-factory'];
 const edits = (items: Item[]) => prStatsEdits(items, REPOS);
 const item = (linkedPrs: LinkedPr[], itemStats: Item['stats'] | null = stats) => ({ linkedPrs, stats: itemStats ?? undefined }) as Item;
@@ -82,4 +82,42 @@ test('missing or unavailable stats, or an unread body, make no edit; a PR linked
   assert.deepEqual(edits([item([pr(1, 'OPEN', 'Body')], null), item([pr(2, 'OPEN', 'Body')], 'unavailable'),
     item([pr(3, 'OPEN', undefined)])]), []);
   assert.equal(edits([item([pr(1, 'OPEN', 'Body')]), item([pr(1, 'OPEN', 'Body')], { ...stats, agentMs: 0 })]).length, 1);
+});
+
+test('a merged PR\'s block is never edited, even when it is out of date', () => {
+  const stale = `Body\n\n${statsBlock({ ...stats, agentMs: 0 })}`;
+  assert.deepEqual(edits([item([pr(1, 'MERGED', stale), pr(2, 'MERGED', 'Body')])]), []);
+});
+
+test('a merged item takes the figures its merged PR\'s block holds, frozen, as the block wrote them', () => {
+  const frozen = (s: ItemStats) => mergedStats(item([pr(1, 'MERGED', `Body\n\n${statsBlock(s)}\n\nMore`)], null));
+  assert.deepEqual(frozen(stats), { agentMs: 60 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true });
+  assert.deepEqual(frozen({ agentMs: 7 * 60_000, tokens: 980 }), { agentMs: 5 * 60_000, tokens: 980, frozen: true }, 'nothing priced, no cost');
+  assert.deepEqual(frozen({ agentMs: 3 * 3600_000 + 17 * 60_000, tokens: 1_234_567_000_000, costUsd: 1234.5 }),
+    { agentMs: (3 * 60 + 15) * 60_000, tokens: 1_230_000_000_000, costUsd: 1235, frozen: true });
+  assert.equal(frozen({ ...stats, costUsd: 0.3 })?.costUsd, 0, 'below a dollar parses to 0, which writes <$1 again');
+  for (const s of [stats, { agentMs: 0, tokens: 0 }, { agentMs: 90 * 60_000, tokens: 40_200, costUsd: 0.4 }]) {
+    assert.equal(statsBlock(frozen(s)!), statsBlock(s), 'the parsed figures write the same block back');
+  }
+  const crlf = mergedStats(item([pr(1, 'MERGED', `Body\r\n\r\n${statsBlock(stats).replaceAll('\n', '\r\n')}`)], null));
+  assert.equal(crlf?.costUsd, 41, 'a block GitHub sent back with CRLF line ends still parses');
+});
+
+test('a merged item falls back to live stats when no merged PR has a readable block', () => {
+  const garbled = '<!-- mux-stats -->\n**Item stats**: agent time soon · lots of tokens\n<!-- /mux-stats -->';
+  assert.equal(mergedStats(item([pr(1, 'MERGED', 'Body without a block')])), null);
+  assert.equal(mergedStats(item([pr(1, 'MERGED', garbled)])), null);
+  assert.equal(mergedStats(item([pr(1, 'MERGED', undefined)])), null, 'an unread body');
+  assert.equal(mergedStats(item([pr(1, 'OPEN', `Body\n\n${block}`), pr(2, 'CLOSED', `Body\n\n${block}`)])), null, 'only merged PRs freeze');
+  assert.equal(mergedStats(item([pr(1, 'MERGED', garbled), pr(2, 'MERGED', `Body\n\n${block}`)]))?.costUsd, 41,
+    'a merged PR with a readable block counts');
+});
+
+test('a merged item reads its most recently merged PR\'s block, and an open linked PR keeps it live', () => {
+  const older = `Body\n\n${statsBlock({ ...stats, costUsd: 10 })}`;
+  const newer = `Body\n\n${statsBlock({ ...stats, costUsd: 41 })}`;
+  assert.equal(mergedStats(item([pr(1, 'MERGED', older, '2026-10-01T00:00:00Z'), pr(2, 'MERGED', newer, '2026-10-20T00:00:00Z')]))?.costUsd, 41);
+  assert.equal(mergedStats(item([pr(2, 'MERGED', newer, '2026-10-20T00:00:00Z'), pr(1, 'MERGED', older, '2026-10-01T00:00:00Z')]))?.costUsd, 41,
+    'whatever order GitHub lists them in');
+  assert.equal(mergedStats(item([pr(1, 'MERGED', newer, '2026-10-20T00:00:00Z'), pr(2, 'OPEN', 'Body')])), null, 'an open PR: live stats');
 });

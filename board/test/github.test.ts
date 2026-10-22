@@ -49,7 +49,7 @@ test('normalizes an issue item from the GraphQL response', () => {
   });
   assert.equal(item?.linkedPrs.length, 1);
   assert.equal(item?.linkedPrs[0]?.body, 'PR body', 'the stats block is kept from the body the board query reads');
-  assert.match(ITEMS_QUERY, /number url state isDraft body\n/, 'linked PR bodies come with the board query, not a call per item');
+  assert.match(ITEMS_QUERY, /number url state isDraft body mergedAt\n/, 'linked PR bodies come with the board query, not a call per item');
 });
 
 test('drafts, unknown statuses and hidden content', () => {

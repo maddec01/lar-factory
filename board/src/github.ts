@@ -47,7 +47,7 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               blocking(first: ${LINK_SLICE}) { ...links }
               closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
                 nodes {
-                  number url state isDraft body
+                  number url state isDraft body mergedAt
                   statusCheckRollup {
                     contexts(first: ${CHECK_SLICE}) {
                       checkRunCountsByState { state count }
@@ -143,6 +143,7 @@ export interface RawLinkedPr {
   state: string;
   isDraft: boolean;
   body?: string;
+  mergedAt?: string | null;
   statusCheckRollup?: {
     contexts: {
       checkRunCountsByState: RawStateCount[];

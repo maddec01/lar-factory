@@ -15,7 +15,7 @@ import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
 import { loadItemStats, statsDbPath, t3SettingsPath, usageRatesPath } from './item-stats.ts';
 import type { StatsSources } from './item-stats.ts';
-import { prStatsEdits, updatedBody } from './pr-stats.ts';
+import { mergedStats, prStatsEdits, updatedBody } from './pr-stats.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
@@ -72,7 +72,11 @@ function log(message: string): void {
   console.log(`${new Date().toISOString()} ${message}`);
 }
 
-/** Attaches each issue's item stats, read afresh from T3 Code's database and transcripts; the board keeps working without them. */
+/**
+ * Attaches each item's stats: those frozen in its latest merged linked PR's block once
+ * no linked PR is open, else read afresh from T3 Code's database and transcripts; the
+ * board keeps working without them.
+ */
 function withStats(items: Item[]): Item[] {
   const stats = loadItemStats(statsSources, Date.now());
   if ((stats === 'unavailable') !== statsUnavailable) {
@@ -84,6 +88,8 @@ function withStats(items: Item[]): Item[] {
     log(pricingUnavailable ? `API cost unavailable: can't read rates from ${statsSources.rates}` : `API cost readable again from ${statsSources.rates}`);
   }
   return items.map((item) => {
+    const frozen = mergedStats(item);
+    if (frozen) return { ...item, stats: frozen };
     if (!item.repo || item.number === null || !stats) return { ...item, stats: undefined };
     return { ...item, stats: stats === 'unavailable' ? stats : stats(item.repo, item.number) ?? undefined };
   });

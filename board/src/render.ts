@@ -151,6 +151,13 @@ export function formatUsd(value: number): string {
   return CURRENCY.format(value);
 }
 
+const WHOLE_DOLLARS = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+/** A cost to the nearest whole dollar, `<$1` below a dollar: $41, $1,235. */
+export function wholeUsd(value: number): string {
+  return value < 1 ? '<$1' : WHOLE_DOLLARS.format(Math.round(value));
+}
+
 function trimDigits(value: number): string {
   const abs = Math.abs(value);
   const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
@@ -272,9 +279,11 @@ function statsBadge(item: Item): string {
   const stats = item.stats;
   if (!stats) return '';
   if (stats === 'unavailable') return '<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>';
-  const cost = stats.costUsd === undefined ? '' : ` · ${formatUsd(stats.costUsd)}`;
-  const title = "Agent time, less waits on you, and total tokens as T3 Code's usage page counts them. " +
-    'The cost is an API estimate at list prices, not the subscription bill.';
+  const cost = stats.costUsd === undefined ? '' : ` · ${esc(stats.frozen ? wholeUsd(stats.costUsd) : formatUsd(stats.costUsd))}`;
+  const priced = stats.costUsd !== undefined;
+  const title = "Agent time, less waits on you, and total tokens as T3 Code's usage page counts them." +
+    (priced ? ' The cost is an API estimate at list prices, not the subscription bill.' : '') +
+    (stats.frozen ? ` Frozen when the PR merged${priced ? ', cost to the nearest dollar' : ''}.` : '');
   return `<span class="stats" title="${title}">${duration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens${cost}</span>`;
 }
 

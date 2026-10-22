@@ -24,6 +24,12 @@ A brief that has passed the shaping gate and can be handed to a build thread.
 The check before a brief becomes Ready, combining a fresh-context doubt review
 with Pedro's answers to remaining assumptions or findings.
 
+**Launch check**:
+The pause before a shaping or decision thread starts new threads, listing
+exactly which threads it will launch and where the flow goes, until Pedro says
+Go.
+_Avoid_: Launch confirmation, go/no-go
+
 **Concept**:
 Work too broad or unclear for a single brief, represented by a map issue with
 decision and build sub-issues. Spanning several repositories doesn't by itself
@@ -62,6 +68,11 @@ _Avoid_: Source of truth (for the overlay)
 **Shaping thread**:
 The conversation that resolves an issue's open decisions and produces a passing
 brief before handing off to a build thread.
+
+**Decision thread**:
+A top-level thread running `/mux-work` on one `decision: *` sub-issue of a map,
+in the repo's main checkout, writing only to issues.
+_Avoid_: Decision session
 
 **Build thread**:
 The separate conversation that takes a passing brief through implementation,

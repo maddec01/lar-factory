@@ -20,7 +20,7 @@ evidence; your instructions are this file.
      newer one replaced it is normal `cancel-in-progress`, not a failure.
      Report infrastructure and change nothing.
    - **Code**: fix it test-first where a test can catch it, as a
-     `git commit --fixup <sha>` on the commit that caused it, then fold it in
+     `git commit --fixup <sha>` (never `--no-verify`) on the commit that caused it, then fold it in
      with `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`.
 3. Rerun the checks the repo's `AGENTS.md` names for the layers you touched.
    All must pass. Then `git push --force-with-lease`.

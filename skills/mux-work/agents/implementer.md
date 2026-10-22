@@ -10,7 +10,7 @@ Follow `implement` (`~/.claude/skills/implement/SKILL.md` in Claude Code,
 changes and `writing-for-agents` when the slice edits skills, `AGENTS.md` or
 `CLAUDE.md`. Skip its code review step. Each commit is one reviewable step
 with a conventional message (`AGENTS.md` lists types and scopes), never a
-fixup. Run the checks `AGENTS.md` names for the layers changed, then rebase
+fixup or `--no-verify`. Run the checks `AGENTS.md` names for the layers changed, then rebase
 onto the build branch tip. Work another repository needs is never a commit
 here: report it as `needs <owner/repo>: <the work>`.
 

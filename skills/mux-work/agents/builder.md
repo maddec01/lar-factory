@@ -20,8 +20,8 @@ catalogue. Read each file or skill a step names only when that step runs.
   whole files, logs or screenshots; check runs report pass/fail and only the
   failures that matter.
 - **Fixer**: commits on the build branch here as `git commit --fixup <sha>`
-  (`--fixup=amend:<sha>` when the fix makes that commit's message wrong) and
-  reruns the checks.
+  (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
+  never `--no-verify`, and reruns the checks.
 - **UI-check**: runs the visible checks and Verify captures per
   `<mux-work>/screenshots.md`, keeps screenshots in its own context, and
   returns their absolute paths and a verdict.

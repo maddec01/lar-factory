@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
 import type { TestContext } from 'node:test';
+import { testEnv } from './repo-support.ts';
 
 async function readCalls(file: string): Promise<string[][]> {
   return (await readFile(file, 'utf8')).trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
@@ -45,7 +46,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),
-    env: { ...process.env, BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
+    env: { ...testEnv(), BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname,
       FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '', ...env },
     stdio: ['ignore', 'pipe', 'pipe'],

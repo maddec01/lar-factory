@@ -219,7 +219,7 @@ function card(item: Item, data: BoardData, now: number, extra = '', action = '')
     .join('');
   const foot = hint || prs ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}</p>` : '';
   return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}" data-anchor="${esc(item.id)}">
-<div class="meta">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}${action}</div>
+<div class="meta"><span class="badges">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}</span>${action}</div>
 ${titleLink(item)}
 ${parent}${stepBar(item.status)}${foot}${sliceList(item.slices)}${extra}
 </article>`;
@@ -282,6 +282,16 @@ function abandonButton(item: Item, data: BoardData, action: ItemAction | undefin
   if (!canAbandon(item)) return '';
   const verb = action?.phase === 'pending' && action.kind === 'abandon' ? 'Abandoning…' : 'Abandon';
   return `<button type="button" class="copy row-action abandon" data-abandon="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
+}
+
+/** Icons for the copy button: the client shows the check while it reports "Copied". */
+const COPY_ICON = '<svg class="icon icon-copy" aria-hidden="true" viewBox="0 0 16 16" fill="none"><rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 3.5V3A1.5 1.5 0 0 0 9 1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const COPIED_ICON = '<svg class="icon icon-copied" aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.25 3.25L13 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/** The icon button left of Start that copies a Queued issue's work message. */
+function copyWorkMessage(item: Item, message: string): string {
+  const label = `Copy work message for ${esc(ref(item))}`;
+  return `<button type="button" class="copy copy-icon" data-copy="${esc(message)}" data-label="${label}" aria-label="${label}" title="${label}">${COPY_ICON}${COPIED_ICON}</button>`;
 }
 
 /** Start's button for the card's top row, and the message under the card when there is one. */
@@ -515,12 +525,15 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
     .filter((i) => isRecentlyDone(i, now))
     .sort((a, b) => (b.closedAt ?? b.updatedAt).localeCompare(a.closedAt ?? a.updatedAt));
 
-  const queuedExtra = (i: Item) => {
-    const cmd = workMessage(i);
-    if (!cmd) return '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>';
-    return `${startControl(i, data, opts.actions?.[i.id]).message}<div class="cmd"><code>${esc(cmd)}</code><button type="button" class="copy" data-copy="${esc(cmd)}" aria-label="Copy ${esc(cmd)}">Copy</button></div>`;
+  const queuedExtra = (i: Item) =>
+    workMessage(i)
+      ? startControl(i, data, opts.actions?.[i.id]).message
+      : '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>';
+  // One group, so the icon and Start stay together in the card's top-right corner.
+  const queuedAction = (i: Item) => {
+    const message = workMessage(i);
+    return message ? `<span class="start-group">${copyWorkMessage(i, message)}${startControl(i, data, opts.actions?.[i.id]).button}</span>` : '';
   };
-  const queuedAction = (i: Item) => (workMessage(i) ?startControl(i, data, opts.actions?.[i.id]).button : '');
 
   const platforms = [...data.repos.map((r) => r.platform)];
   for (const i of list) {

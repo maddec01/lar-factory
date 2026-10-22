@@ -114,7 +114,11 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 
 .card { background: var(--surface); border: 1px solid var(--bd); border-radius: var(--r); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .card.amber { border-color: color-mix(in srgb, var(--you) 55%, var(--bd)); box-shadow: inset 4px 0 0 var(--you); padding-left: 14px; }
-.meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; font-size: 11px; }
+.meta { display: flex; gap: 5px; align-items: flex-start; font-size: 11px; }
+/* The badges wrap onto more lines; the action group keeps the top-right corner. */
+.meta .badges { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+/* 3px centres the first line of 18px badges on the 24px Start buttons. */
+.meta:has(.start-group) .badges { padding-block: 3px; }
 .title { font-weight: 500; text-decoration: none; line-height: 1.35; }
 .title:hover { text-decoration: underline; }
 .ref { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
@@ -158,8 +162,6 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .step-label.amber { color: var(--you-text); font-weight: 600; }
 
 /* queued */
-.cmd { display: flex; align-items: center; gap: 6px; background: var(--muted-bg); border: 1px solid var(--bd); border-radius: var(--r-control); padding: 4px 4px 4px 8px; min-width: 0; }
-.cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .copy { font: inherit; font-size: 12px; font-weight: 500; min-height: 24px; border: 1px solid var(--input); background: var(--surface); color: var(--fg); border-radius: var(--r-control); padding: 0 7px; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
 .copy:hover { background: var(--accent); }
 
@@ -248,10 +250,16 @@ button:disabled[title] { cursor: not-allowed; }
 .copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .start { margin: 0; font-size: 12px; }
 p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
-.started-tag { margin-left: auto; display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-fg); font-weight: 500; }
+.started-tag { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-fg); font-weight: 500; }
 .started-tag.unsure { background: var(--you-soft); color: var(--you-text); }
-.start-item { margin-left: auto; background: var(--primary); color: var(--primary-fg); border-color: var(--primary); padding: 0 10px; }
+.start-item { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); padding: 0 10px; }
 .start-item:hover { background: color-mix(in srgb, var(--primary) 90%, var(--bg)); }
+.copy-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; padding: 0; color: var(--muted); }
+.copy-icon:hover { color: var(--fg); }
+.start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
+.copy-icon .icon { width: 14px; height: 14px; }
+.copy-icon .icon-copied, .copy-icon[data-copied] .icon-copy { display: none; }
+.copy-icon[data-copied] .icon-copied { display: block; color: var(--success-fg); }
 .thread-id { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .row-item:has(.action-error) { flex-wrap: wrap; }
 .action-error { order: 1; flex: 1 1 100%; min-width: 0; color: var(--danger-text); font-weight: 600; overflow-wrap: anywhere; }

@@ -32,6 +32,7 @@ ${renderApp(data, opts)}
 </div>
 ${renderAddItemForm(data)}
 ${renderAbandonDialog()}
+<div id="copy-status" class="sr-only" role="status" aria-live="polite"></div>
 <script id="board-data" type="application/json">${scriptJson(data)}</script>
 <script type="module" src="/assets/client.ts"></script>
 </body>

@@ -328,7 +328,26 @@ test('Start appears only on Queued issues; a queued draft asks for an issue firs
   const draftCard = html.split('<article').find((c) => c.includes('Offline downloads on watchOS'))!;
   assert.match(draftCard, /needs an issue/);
   assert.ok(!draftCard.includes('data-start') && !draftCard.includes('data-copy'));
-  assert.match(html.split('<article').find((c) => c.includes('data-start'))!, /data-copy="#\d+ [^"]*\n\$mux-work maddec01\//, 'Copy stays as a fallback');
+});
+
+test('a Queued issue copies its work message from an icon left of Start, with no command box under the card', () => {
+  const card = renderBoardView(sample, base).split('<article').find((c) => c.includes('data-start="PVTI_sample05"'))!;
+  assert.ok(!card.includes('class="cmd"'), 'no command box under the card');
+  const meta = card.match(/<div class="meta">.*?<\/div>/s)![0];
+  assert.match(
+    meta,
+    /<button type="button" class="copy copy-icon" data-copy="#129 Run more than one 4K HDR to 1080p stream at a time\n\$mux-work maddec01\/[^"]+#129" data-label="Copy work message for #129" aria-label="Copy work message for #129" title="Copy work message for #129"><svg [^>]*aria-hidden="true"[^>]*>.*<\/svg><\/button><button type="button" class="copy start-item"[^>]*>Start<\/button><\/span>/s,
+    'the icon sits immediately left of Start',
+  );
+  assert.match(meta, /<span class="start-group"><button type="button" class="copy copy-icon"/, 'the icon and Start wrap together as one group');
+  const started = renderBoardView(sample, { ...base, actions: { PVTI_sample05: { phase: 'started', thread: { threadId: 't', title: 'x' } } } })
+    .split('<article')
+    .find((c) => c.includes('data-start-result="PVTI_sample05"'))!;
+  assert.match(started, /class="copy copy-icon"[^>]*>.*<\/button><span class="started-tag"/s, 'the icon stays once Start is done');
+  const error = renderBoardView(sample, { ...base, actions: { PVTI_sample05: { phase: 'error', message: 'T3 is not running' } } })
+    .split('<article')
+    .find((c) => c.includes('data-start="PVTI_sample05"'))!;
+  assert.match(error, /<p class="start">.*T3 is not running/s, 'the Start error still shows under the card');
 });
 
 test('Start shows its progress, the started thread, or the error', () => {
@@ -347,7 +366,7 @@ test('Start shows its progress, the started thread, or the error', () => {
   assert.match(renderHeader(sample, { ...base, notice: { key: 'notice-3', verb: 'Started', item, thread: { ...thread, title: 'Renamed' } } }),
     /Started T3 thread <b>Renamed<\/b> <code class="thread-id">thread-1<\/code>/, 'a title T3 chose differently is shown');
   const failed = card({ [c]: { phase: 'error', message: 'T3 is down.' } }, c);
-  assert.match(failed, /<div class="meta">.*<button[^>]*data-start[^>]*>Retry start<\/button><\/div>/, 'Start sits in the top row');
+  assert.match(failed, /<div class="meta">.*<button[^>]*data-start[^>]*>Retry start<\/button><\/span><\/div>/s, 'Start sits in the top row');
   assert.match(failed, /role="alert">T3 is down.<\/span> <button[^>]*data-dismiss="action:PVTI_sample05"/);
   const unsure = card({ [d]: { phase: 'uncertain', message: 'Check T3.' } }, d);
   assert.match(unsure, /role="alert">Check T3.<\/span> <button[^>]*data-dismiss="action:PVTI_sample06"/);

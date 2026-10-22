@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { rawIssue, startBoard } from './server-support.ts';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
+import { itemTotal } from '../src/model.ts';
+import type { Item } from '../src/model.ts';
 
 const draft = { repo: 'maddec01/mux-factory', kind: 'feature', title: 'Capture an item', description: '', labels: [] };
 
@@ -93,7 +95,7 @@ test('successful refreshes eventually remove a created item whose project member
 /** The board's items once its first read lands. */
 const rawBuild = (number: number, status: string) => rawIssue(number, status, undefined, ['build']);
 
-async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise<{ number: number; stats?: unknown }[]> {
+async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise<Item[]> {
   for (let attempt = 0; attempt < 80; attempt++) {
     const { items } = await board.board();
     if (items.length) return items;
@@ -111,7 +113,7 @@ test("a refresh finds build sub-issues and active slices with issue searches, no
   const board = await startBoard(t, { items, builds: [{ number: 12, repository }], active: [{ number: 15, repository }] });
   const read = await readItems(board);
   assert.deepEqual(read.map((i) => i.number), [13, 12], 'the build sub-issue stays a board item; the slice does not');
-  const [built] = read as unknown as { subIssues: unknown; slices: { number: number; progress: string }[] }[];
+  const [built] = read;
   assert.deepEqual(built?.subIssues, { total: 1, completed: 0 });
   assert.deepEqual(built?.slices.map((s) => [s.number, s.progress]), [[15, 'active']]);
 });
@@ -230,6 +232,41 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
   assert.equal((read.find((i) => i.number === 12)?.stats as { frozen?: boolean } | undefined)?.frozen, true);
   await new Promise((r) => setTimeout(r, 300));
   assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH'), []);
+});
+
+test('a parent with two builds merged at different times: each build keeps its own frozen figures, the parent writes no block, its total counts all once', async (t) => {
+  const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
+  // The parent's own thread is live; the builds' threads are gone from T3 Code, as after transcript deletion.
+  const db = statsDb(t, [{ id: 'p', messages: ['$mux-work maddec01/mux-factory#13'], turns }]);
+  const block = (figures: string) => `<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): ${figures}\n<!-- /mux-stats -->`;
+  const pr = (number: number, mergedAt: string, body: string) => ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`,
+    state: 'MERGED', isDraft: false, body, mergedAt });
+  const first = pr(40, '2026-10-18T10:00:00Z', `PR 40\n\n${block('Σ 1h 0m · wall 40m · 2M · $10')}`);
+  const last = pr(41, '2026-10-20T10:00:00Z', `PR 41\n\n${block('Σ 2h 0m · wall 1h 0m · 3M · $20')}`);
+  const parentRef = { number: 13, title: 'Issue 13', url: 'https://github.com/maddec01/mux-factory/issues/13', state: 'OPEN',
+    repository: { nameWithOwner: 'maddec01/mux-factory' } };
+  const build = (number: number, linked: object) => {
+    const raw = rawBuild(number, 'Done');
+    return { ...raw, content: { ...raw.content, state: 'CLOSED', closedAt: '2026-10-20T10:00:00Z', parent: parentRef,
+      closedByPullRequestsReferences: { nodes: [linked] } } };
+  };
+  const parent = rawIssue(13, 'In progress');
+  // The last build's PR also closes the parent.
+  const items = [{ ...parent, content: { ...parent.content, subIssuesSummary: { total: 2, completed: 2 },
+    closedByPullRequestsReferences: { nodes: [last] } } }, build(12, first), build(14, last)];
+  const check = async (board: Awaited<ReturnType<typeof startBoard>>) => {
+    const read = await readItems(board);
+    const of = (number: number) => read.find((i) => i.number === number)!;
+    assert.deepEqual(of(12).stats, { agentMs: 60 * 60_000, wallMs: 40 * 60_000, tokens: 2_000_000, costUsd: 10, frozen: true });
+    assert.deepEqual(of(14).stats, { agentMs: 120 * 60_000, wallMs: 60 * 60_000, tokens: 3_000_000, costUsd: 20, frozen: true });
+    assert.deepEqual(of(13).stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 }, 'the parent keeps live own figures');
+    assert.deepEqual(itemTotal(of(13), read), { agentMs: 210 * 60_000, wallMs: 130 * 60_000, tokens: 5_000_000, costUsd: 30 });
+  };
+  const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
+  await check(board);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH'), [], 'merged PRs are never edited, and the parent writes no block');
+  await check(await startBoard(t, { items }, false, false, { T3_STATE_DB: db }));
 });
 
 test('before an edit the board reads the PR again, keeps edits made since its read, and skips a block already current', async (t) => {

@@ -757,6 +757,73 @@
       }
     },
     {
+      "id": "PVTI_sample23",
+      "status": "In progress",
+      "type": "Issue",
+      "number": 180,
+      "title": "Resume playback across devices",
+      "url": "https://github.com/maddec01/mux-server/issues/180",
+      "repo": "maddec01/mux-server",
+      "labels": [
+        "feature"
+      ],
+      "state": "OPEN",
+      "parent": null,
+      "subIssues": {
+        "total": 2,
+        "completed": 2
+      },
+      "blockedBy": 0,
+      "blockers": {
+        "total": 2,
+        "nodes": [
+          {
+            "number": 181,
+            "title": "Store the playback position per device",
+            "url": "https://github.com/maddec01/mux-server/issues/181",
+            "repo": "maddec01/mux-server",
+            "state": "CLOSED"
+          },
+          {
+            "number": 40,
+            "title": "Resume from the stored position",
+            "url": "https://github.com/maddec01/mux-apple/issues/40",
+            "repo": "maddec01/mux-apple",
+            "state": "CLOSED"
+          }
+        ]
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
+      "updatedAt": "2026-10-20T14:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 41,
+          "url": "https://github.com/maddec01/mux-apple/pull/41",
+          "state": "MERGED",
+          "isDraft": false,
+          "mergedAt": "2026-10-20T14:00:00Z",
+          "checks": {
+            "passed": 2,
+            "failed": 0,
+            "running": 0,
+            "total": 2,
+            "since": "2026-10-20T13:00:00Z"
+          }
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 2700000,
+        "wallMs": 1800000,
+        "tokens": 3120000,
+        "costUsd": 6.4
+      }
+    },
+    {
       "id": "PVTI_sample15",
       "status": "Review",
       "type": "Issue",
@@ -1005,6 +1072,140 @@
         "agentMs": 13260000,
         "tokens": 27264400,
         "costUsd": 41.2
+      }
+    },
+    {
+      "id": "PVTI_sample24",
+      "status": "Done",
+      "type": "Issue",
+      "number": 181,
+      "title": "Store the playback position per device",
+      "url": "https://github.com/maddec01/mux-server/issues/181",
+      "repo": "maddec01/mux-server",
+      "labels": [
+        "build"
+      ],
+      "state": "CLOSED",
+      "parent": {
+        "number": 180,
+        "title": "Resume playback across devices",
+        "url": "https://github.com/maddec01/mux-server/issues/180",
+        "repo": "maddec01/mux-server",
+        "state": "OPEN"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 180,
+            "title": "Resume playback across devices",
+            "url": "https://github.com/maddec01/mux-server/issues/180",
+            "repo": "maddec01/mux-server",
+            "state": "OPEN"
+          }
+        ]
+      },
+      "updatedAt": "2026-10-18T11:00:00Z",
+      "closedAt": "2026-10-18T11:00:00Z",
+      "linkedPrs": [
+        {
+          "number": 182,
+          "url": "https://github.com/maddec01/mux-server/pull/182",
+          "state": "MERGED",
+          "isDraft": false,
+          "mergedAt": "2026-10-18T11:00:00Z",
+          "checks": {
+            "passed": 2,
+            "failed": 0,
+            "running": 0,
+            "total": 2,
+            "since": "2026-10-18T10:00:00Z"
+          }
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 7200000,
+        "wallMs": 3600000,
+        "tokens": 9800000,
+        "costUsd": 18,
+        "frozen": true
+      }
+    },
+    {
+      "id": "PVTI_sample25",
+      "status": "Done",
+      "type": "Issue",
+      "number": 40,
+      "title": "Resume from the stored position",
+      "url": "https://github.com/maddec01/mux-apple/issues/40",
+      "repo": "maddec01/mux-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "CLOSED",
+      "parent": {
+        "number": 180,
+        "title": "Resume playback across devices",
+        "url": "https://github.com/maddec01/mux-server/issues/180",
+        "repo": "maddec01/mux-server",
+        "state": "OPEN"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 1,
+        "nodes": [
+          {
+            "number": 180,
+            "title": "Resume playback across devices",
+            "url": "https://github.com/maddec01/mux-server/issues/180",
+            "repo": "maddec01/mux-server",
+            "state": "OPEN"
+          }
+        ]
+      },
+      "updatedAt": "2026-10-20T14:00:00Z",
+      "closedAt": "2026-10-20T14:00:00Z",
+      "linkedPrs": [
+        {
+          "number": 41,
+          "url": "https://github.com/maddec01/mux-apple/pull/41",
+          "state": "MERGED",
+          "isDraft": false,
+          "mergedAt": "2026-10-20T14:00:00Z",
+          "checks": {
+            "passed": 2,
+            "failed": 0,
+            "running": 0,
+            "total": 2,
+            "since": "2026-10-20T13:00:00Z"
+          }
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 10800000,
+        "wallMs": 5400000,
+        "tokens": 14200000,
+        "costUsd": 27,
+        "frozen": true
       }
     },
     {

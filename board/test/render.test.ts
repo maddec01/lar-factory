@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
-import { DEFAULT_UI, abandonPrompt, formatTokens, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
+import { DEFAULT_UI, abandonPrompt, formatTokens, formatUsd, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData, Item } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
@@ -540,22 +540,28 @@ test("a linked PR shows its checks: running with counts and age, amber when slow
   assert.match(html, /PR #14 \(closed\)<\/a>(?!<span class="checks)/, 'only open PRs show checks');
 });
 
-test('cards and Done rows show item stats, agent time and total tokens, or that they are unavailable', () => {
-  const stats = { agentMs: (3 * 60 + 20) * 60_000 + 59_000, tokens: 12_436_000 };
+test('cards and Done rows show item stats, agent time, total tokens and API cost, or that they are unavailable', () => {
+  const stats = { agentMs: (3 * 60 + 20) * 60_000 + 59_000, tokens: 12_436_000, costUsd: 41.197 };
   const statsOf = (item: Partial<Item>) => {
     const html = renderBoardView({ ...sample, items: [{ ...sample.items[0]!, ...item }] }, base);
     return html.match(/<span class="stats"[^>]*>[^<]*<\/span>/g);
   };
-  const title = 'title="Agent time, less waits on you, and total tokens as T3 Code\'s usage page counts them"';
-  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>3h 20m · 12.4M tokens</span>`]);
-  assert.deepEqual(statsOf({ status: 'In progress', stats: { agentMs: 45 * 60_000, tokens: 980 } }), [`<span class="stats" ${title}>45m · 980 tokens</span>`]);
+  const title = 'title="Agent time, less waits on you, and total tokens as T3 Code\'s usage page counts them. ' +
+    'The cost is an API estimate at list prices, not the subscription bill."';
+  assert.deepEqual(statsOf({ status: 'Review', stats }), [`<span class="stats" ${title}>3h 20m · 12.4M tokens · $41.20</span>`]);
+  assert.deepEqual(statsOf({ status: 'In progress', stats: { agentMs: 45 * 60_000, tokens: 980 } }), [`<span class="stats" ${title}>45m · 980 tokens</span>`],
+    'nothing priced, no cost');
   assert.deepEqual(statsOf({ status: 'Shaping', stats: 'unavailable' }), ['<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>']);
   assert.deepEqual(statsOf({ status: 'Done', closedAt: '2026-10-20T10:00:00Z', stats }),
-    [`<span class="stats" ${title}>3h 20m · 12.4M tokens</span>`], 'Done rows keep their stats');
+    [`<span class="stats" ${title}>3h 20m · 12.4M tokens · $41.20</span>`], 'Done rows keep their stats');
   assert.equal(statsOf({ status: 'Ready' }), null, 'no stats without matched threads');
 });
 
 test('token counts are compact as on T3 Code\'s usage page', () => {
   assert.deepEqual([0, 980, 1_000, 1_234, 40_200, 312_400, 999_999, 1_200_000, 12_436_000, 2.5e9, 3e12].map(formatTokens),
     ['0', '980', '1K', '1.23K', '40.2K', '312K', '1000K', '1.20M', '12.4M', '2.50B', '3T']);
+});
+
+test('costs are shown as on T3 Code\'s usage page', () => {
+  assert.deepEqual([0.004, 41.2, 1234.567].map(formatUsd), ['$0.00', '$41.20', '$1,234.57']);
 });

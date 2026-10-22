@@ -3,13 +3,19 @@ import assert from 'node:assert/strict';
 import { prStatsEdits, statsBlock, updatedBody, withStatsBlock } from '../src/pr-stats.ts';
 import type { Item, ItemStats, LinkedPr } from '../src/model.ts';
 
-const stats: ItemStats = { agentMs: 65 * 60_000, tokens: 12_436_000 };
+const stats: ItemStats = { agentMs: 65 * 60_000, tokens: 12_436_000, costUsd: 41.2 };
 const block = statsBlock(stats);
 
-test('the block shows agent time and total tokens, between markers', () => {
-  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · 12.4M tokens\n<!-- /mux-stats -->');
-  assert.equal(statsBlock({ ...stats, tokens: 980 }),
-    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · 980 tokens\n<!-- /mux-stats -->');
+test('the block shows agent time, total tokens and API cost, between markers', () => {
+  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · 12.4M tokens · $41\n<!-- /mux-stats -->');
+  assert.equal(statsBlock({ agentMs: stats.agentMs, tokens: 980 }),
+    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · 980 tokens\n<!-- /mux-stats -->', 'nothing priced, no cost');
+});
+
+test('the block\'s cost is in whole dollars, to the nearest, and <$1 below a dollar, so cents don\'t rewrite it', () => {
+  const cost = (costUsd: number) => / · ([^ ·]+)\n/.exec(statsBlock({ ...stats, costUsd }))?.[1];
+  assert.deepEqual([0, 0.004, 0.99, 1, 1.49, 1.5, 41.2, 1234.5].map(cost), ['<$1', '<$1', '<$1', '$1', '$1', '$2', '$41', '$1,235']);
+  assert.equal(edits([item([pr(1, 'OPEN', `Body\n\n${block}`)], { ...stats, costUsd: 41.4 })]).length, 0, 'a few cents more leave the block alone');
 });
 
 test('the block rounds agent time to 5 minutes under an hour and to 15 from an hour, so a running turn rarely rewrites it', () => {

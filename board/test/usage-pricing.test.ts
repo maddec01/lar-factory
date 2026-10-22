@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apiCost, createOverrideRateTable, formatUsd, lookupRate, parseRateTable, priceUsage, resolveModelAliases } from '../src/usage-pricing.ts';
+import { apiCost, createOverrideRateTable, lookupRate, parseRateTable, priceUsage, resolveModelAliases } from '../src/usage-pricing.ts';
 import type { Pricing } from '../src/usage-pricing.ts';
 import type { UsageRecord, UsageSpeed } from '../src/transcript-usage.ts';
 
@@ -143,10 +143,4 @@ test('an item where nothing could be priced has no API cost', () => {
   assert.equal(apiCost([usage('mystery-model', 1000), usage('opus', 1000)], pricing), null);
   assert.equal(apiCost([], pricing), null);
   assert.equal(apiCost([usage('mystery-model', 1000, { reportedCostUsd: 0 })], pricing), 0, 'a reported cost is priced, even at zero');
-});
-
-test('costs are shown as T3 shows them', () => {
-  assert.equal(formatUsd(41.2), '$41.20');
-  assert.equal(formatUsd(1234.567), '$1,234.57');
-  assert.equal(formatUsd(0.004), '$0.00');
 });

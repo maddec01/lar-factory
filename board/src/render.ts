@@ -144,6 +144,13 @@ export function formatTokens(value: number): string {
   return INTEGER.format(Math.round(value));
 }
 
+const CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** A cost as T3 Code's usage page shows it: $41.20. Ported from `formatUsd` in the same file and commit. */
+export function formatUsd(value: number): string {
+  return CURRENCY.format(value);
+}
+
 function trimDigits(value: number): string {
   const abs = Math.abs(value);
   const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
@@ -257,14 +264,18 @@ const HINTS: Partial<Record<Status, string>> = {
 };
 
 /**
- * Agent time and total tokens, `3h 20m · 12.4M tokens`, for a card's footer or a
- * Done row; nothing when no thread worked on the item.
+ * Agent time, total tokens and API cost, `3h 20m · 12.4M tokens · $41.20`, for a
+ * card's footer or a Done row; nothing when no thread worked on the item, and no
+ * cost when none of its tokens could be priced.
  */
 function statsBadge(item: Item): string {
   const stats = item.stats;
   if (!stats) return '';
   if (stats === 'unavailable') return '<span class="stats" title="The T3 Code database could not be read">stats unavailable</span>';
-  return `<span class="stats" title="Agent time, less waits on you, and total tokens as T3 Code's usage page counts them">${duration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens</span>`;
+  const cost = stats.costUsd === undefined ? '' : ` · ${formatUsd(stats.costUsd)}`;
+  const title = "Agent time, less waits on you, and total tokens as T3 Code's usage page counts them. " +
+    'The cost is an API estimate at list prices, not the subscription bill.';
+  return `<span class="stats" title="${title}">${duration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens${cost}</span>`;
 }
 
 /** `action` is a button for the card's top row, so it adds no height. */

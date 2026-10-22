@@ -313,7 +313,8 @@
       "slices": [],
       "stats": {
         "agentMs": 2280000,
-        "tokens": 2501400
+        "tokens": 2501400,
+        "costUsd": 3.87
       }
     },
     {
@@ -430,7 +431,8 @@
       "slices": [],
       "stats": {
         "agentMs": 3120000,
-        "tokens": 3150800
+        "tokens": 3150800,
+        "costUsd": 0.62
       }
     },
     {
@@ -747,7 +749,8 @@
       "slices": [],
       "stats": {
         "agentMs": 8040000,
-        "tokens": 16632500
+        "tokens": 16632500,
+        "costUsd": 24.18
       }
     },
     {
@@ -804,7 +807,8 @@
       "slices": [],
       "stats": {
         "agentMs": 3900000,
-        "tokens": 7414800
+        "tokens": 7414800,
+        "costUsd": 11.05
       }
     },
     {
@@ -994,7 +998,8 @@
       "slices": [],
       "stats": {
         "agentMs": 13260000,
-        "tokens": 27264400
+        "tokens": 27264400,
+        "costUsd": 41.2
       }
     },
     {

@@ -19,9 +19,17 @@ function roughDuration(ms: number): string {
   return duration(Math.round(ms / step) * step);
 }
 
-/** The marked block: agent time, then total tokens. */
+const WHOLE_DOLLARS = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+/** API cost to the nearest whole dollar, `<$1` below a dollar, so cents don't rewrite the PR body. */
+function roughUsd(usd: number): string {
+  return usd < 1 ? '<$1' : WHOLE_DOLLARS.format(Math.round(usd));
+}
+
+/** The marked block: agent time, total tokens, then API cost when any of the tokens could be priced. */
 export function statsBlock(stats: ItemStats): string {
-  return `${START}\n**Item stats** (kept current by the Mux board): agent time ${roughDuration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens\n${END}`;
+  const cost = stats.costUsd === undefined ? '' : ` · ${roughUsd(stats.costUsd)}`;
+  return `${START}\n**Item stats** (kept current by the Mux board): agent time ${roughDuration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens${cost}\n${END}`;
 }
 
 // A marker counts only alone on its own line, so one quoted in prose isn't the block.

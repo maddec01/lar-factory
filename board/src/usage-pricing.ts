@@ -4,8 +4,7 @@
 //   cache-rate fallbacks, speed tiers, overrides and provider-reported costs
 //   (`parseRateTable`, `createOverrideRateTable`, `lookupRate`, `priceUsage`);
 // - apps/server/src/usage/usageAggregation.ts: model aliases (`resolveModelAliases`,
-//   `#mapModel`), applied before a record is priced;
-// - packages/shared/src/usageFormat.ts: `formatUsd`.
+//   `#mapModel`), applied before a record is priced.
 // Pure: item-stats.ts reads the rate table and T3's settings.
 
 import type { UsageRecord, UsageSpeed, UsageTokenTotals } from './transcript-usage.ts';
@@ -226,11 +225,4 @@ export function apiCost(records: Iterable<UsageRecord>, pricing: Pricing): numbe
     if (costSource !== 'unpriced') priced = true;
   }
   return priced ? total : null;
-}
-
-const CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-/** `$41.20`, as T3's usage page shows a cost. */
-export function formatUsd(value: number): string {
-  return CURRENCY.format(value);
 }

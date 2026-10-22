@@ -41,13 +41,16 @@ decision: grill|D4C5F9|Concept decision settled by questions
 decision: prototype|D4C5F9|Concept decision settled by a prototype
 decision: research|D4C5F9|Concept decision settled by research
 decision: task|D4C5F9|Concept decision settled by a small task
-build|0E8A16|Concept sub-issue that becomes one PR
+build|0E8A16|Issue that becomes one PR
+active|FBCA04|Slice an implementer is working on now
 LABELS
 )
 ```
 
 On failure, fix the reported access/network/API problem and rerun the whole
-block for the same destination; it skips completed creations. Never add
+block for the same destination; it skips completed creations. It never updates
+an existing label: a changed description (such as `build`'s) is a one-off
+`gh label edit "$name" --repo "$repo" --description "<new>"`. Never add
 `--force`, delete existing labels or suppress errors to make setup pass. Confirm
 the result:
 
@@ -55,7 +58,7 @@ the result:
 gh api --paginate "repos/$repo/labels" --jq '.[].name'
 ```
 
-All nine names above must be present. List, Queued, Shaping, Needs you, Ready,
+All ten names above must be present. List, Queued, Shaping, Needs you, Ready,
 In progress, Review, Verify, Ready to merge and Done are **Project Status
 values**, not labels: move them with `bash <mux-work>/scripts/status.sh
 <issue-url> "<Status>"` as the workflow directs.
@@ -124,10 +127,21 @@ and [issue dependencies API](https://docs.github.com/en/rest/issues/issue-depend
 
 A slice is a native sub-issue of a `build` issue. Create it and its
 blocked-by links with the commands above (`--parent "$build"`, then
-`--add-blocked-by`). Close a merged slice, then list the build's ready slices
-(open, every blocker closed):
+`--add-blocked-by`). An **active slice** carries the `active` label while
+an implementer works on it; the board reads it to show progress. Add it when
+the implementer starts and remove it when the slice merges or closes, when its
+implementer reports it blocked, and when the build stops. Close a merged slice,
+then list the build's ready slices (open, every blocker closed):
 
 ```sh
+gh issue edit "$slice" --repo "$repo" --add-label active
+gh issue edit "$slice" --repo "$repo" --remove-label active
+
+# On resume: clear active from every open slice.
+gh issue list --repo "$repo" --label active --state open --json number,parent \
+  --jq ".[] | select(.parent.number == $build) | .number" |
+  xargs -I{} gh issue edit {} --repo "$repo" --remove-label active
+
 gh issue close "$slice" --repo "$repo" --reason completed
 
 # A re-sliced slice: repoint each dependent, then close the old slice.

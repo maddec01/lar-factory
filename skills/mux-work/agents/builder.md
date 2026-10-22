@@ -32,7 +32,8 @@ only when that step runs.
    (brief, comments, linked prototype or research branches) and the repo's
    `AGENTS.md`; run its worktree setup if it asks.
 2. **Plan.** If the build issue already has slices (a handoff), remove leftover
-   slice worktrees and branches and **Implement** the ready slices fresh.
+   slice worktrees and branches, clear `active` from every open slice (the
+   resume command in **Slices**) and **Implement** the ready slices fresh.
    Otherwise start a **planner** subagent with `planner.md`, the issue
    reference and the repo path; it returns the slice list.
 3. **Implement.** In parallel, start an **implementer** subagent for each ready
@@ -44,15 +45,17 @@ only when that step runs.
      `git worktree add ${TMPDIR:-/tmp}/mux-<n>-slice-<m> -b slice/<n>-<m>-<slug> <build-branch>`
      and pass that path (the post-checkout hook runs worktree setup).
 
-   Give it `implementer.md`, the slice reference and the build branch.
+   Give it `implementer.md`, the slice reference and the build branch, and
+   add `active` to the slice (**Slices** in `<mux-work>/issue-tracker.md`).
 4. **Merge.** As each implementer reports, run
    `git merge --ff-only slice/<n>-<m>-<slug>` here; if it can't fast-forward,
    send the slice back to its implementer (or a fresh subagent) to rebase onto
    the build branch tip, then merge again. After each merge, remove the
-   worktree and slice branch, close the slice sub-issue (**Slices** in
-   `<mux-work>/issue-tracker.md`) and run **Implement** again. A slice reported
-   blocked goes back to the planner to re-slice. A wrong brief follows the
-   stop rule below. Done when every slice is closed.
+   worktree and slice branch, remove `active` and close the slice sub-issue
+   (**Slices** in `<mux-work>/issue-tracker.md`), and run **Implement** again.
+   A slice reported blocked loses `active` and goes back to the planner to
+   re-slice; a slice closed any other way loses `active` too. A wrong brief
+   follows the stop rule below. Done when every slice is closed.
 5. A subagent writes the brief's **Domain docs** in its own commit,
    following `domain-modeling`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
    links them from `AGENTS.md` as the repo's `docs/agents/domain.md` says
@@ -81,7 +84,8 @@ each reviewer's verdict, open findings, and rejected findings with reasons. Othe
 
 If the brief is wrong or a decision is missing, stop: comment on the issue with
 what you found and your recommendation, ask Pedro and continue when he
-answers.
+answers. Whenever the build stops (this, a handoff, or Pedro saying stop),
+remove `active` from every slice still carrying it.
 
 ## Review
 

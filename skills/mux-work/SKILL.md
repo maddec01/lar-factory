@@ -137,7 +137,10 @@ collapsed `<details>` block at the end.
 
 ## 5. Start the build
 
-Launch the build thread with `t3_thread_launch` in the issue's repo project:
+Add the `build` label to the issue
+(`gh issue edit <n> --repo <owner/repo> --add-label build`), so the board shows
+its sub-issues as slices. Then launch the build thread with `t3_thread_launch`
+in the issue's repo project:
 
 - `workspaceStrategy`: `{"type":"worktree","baseRef":"main","branch":"<kind>/<n>-<slug>","startFromOrigin":true}`,
   where `<kind>` is `fix`, `feat` or `chore`;

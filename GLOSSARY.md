@@ -32,10 +32,18 @@ decision and build sub-issues.
 A concept's account of its destination, decisions so far, remaining fog,
 out-of-scope work, domain docs drafts and relationships between sub-issues.
 
+**Build**:
+An issue that becomes one PR, delivered through its slices.
+_Avoid_: build issue
+
 **Slice**:
 A small, independently testable piece of a build, recorded as a sub-issue of
 the build issue and implemented by one subagent.
 _Avoid_: ticket, chunk, task
+
+**Active slice**:
+A slice an implementer is working on right now.
+_Avoid_: in-progress slice, current slice
 
 **Work message**:
 The two-line text a Queued card copies and Start sends: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.

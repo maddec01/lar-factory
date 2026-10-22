@@ -549,6 +549,151 @@
       ]
     },
     {
+      "id": "PVTI_sample22",
+      "status": "In progress",
+      "type": "Issue",
+      "number": 150,
+      "title": "Relay for streaming away from home",
+      "url": "https://github.com/maddec01/mux-server/issues/150",
+      "repo": "maddec01/mux-server",
+      "labels": [
+        "feature",
+        "build"
+      ],
+      "state": "OPEN",
+      "parent": null,
+      "subIssues": {
+        "total": 15,
+        "completed": 6
+      },
+      "blockedBy": 0,
+      "blockers": {
+        "total": 0,
+        "nodes": []
+      },
+      "blocking": {
+        "total": 0,
+        "nodes": []
+      },
+      "updatedAt": "2026-10-21T09:40:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 160,
+          "title": "Relay protocol framing",
+          "url": "https://github.com/maddec01/mux-server/issues/160",
+          "repo": "maddec01/mux-server",
+          "state": "CLOSED",
+          "progress": "done"
+        },
+        {
+          "number": 161,
+          "title": "Relay auth handshake",
+          "url": "https://github.com/maddec01/mux-server/issues/161",
+          "repo": "maddec01/mux-server",
+          "state": "CLOSED",
+          "progress": "done"
+        },
+        {
+          "number": 162,
+          "title": "Session keys rotation",
+          "url": "https://github.com/maddec01/mux-server/issues/162",
+          "repo": "maddec01/mux-server",
+          "state": "CLOSED",
+          "progress": "done"
+        },
+        {
+          "number": 163,
+          "title": "Device pairing codes",
+          "url": "https://github.com/maddec01/mux-server/issues/163",
+          "repo": "maddec01/mux-server",
+          "state": "CLOSED",
+          "progress": "done"
+        },
+        {
+          "number": 164,
+          "title": "Pairing screen on Apple TV",
+          "url": "https://github.com/maddec01/mux-server/issues/164",
+          "repo": "maddec01/mux-server",
+          "state": "CLOSED",
+          "progress": "done"
+        },
+        {
+          "number": 165,
+          "title": "Relay health endpoint",
+          "url": "https://github.com/maddec01/mux-server/issues/165",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "active"
+        },
+        {
+          "number": 166,
+          "title": "Reconnect with backoff",
+          "url": "https://github.com/maddec01/mux-server/issues/166",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "active"
+        },
+        {
+          "number": 167,
+          "title": "Bandwidth probe before streaming",
+          "url": "https://github.com/maddec01/mux-server/issues/167",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "waiting"
+        },
+        {
+          "number": 168,
+          "title": "Fallback to direct connection",
+          "url": "https://github.com/maddec01/mux-server/issues/168",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "waiting"
+        },
+        {
+          "number": 169,
+          "title": "Relay metrics dashboard",
+          "url": "https://github.com/maddec01/mux-server/issues/169",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "waiting"
+        },
+        {
+          "number": 170,
+          "title": "Rate limits per owner",
+          "url": "https://github.com/maddec01/mux-server/issues/170",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "waiting"
+        },
+        {
+          "number": 171,
+          "title": "Abuse report endpoint",
+          "url": "https://github.com/maddec01/mux-server/issues/171",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "waiting"
+        },
+        {
+          "number": 172,
+          "title": "Relay load test",
+          "url": "https://github.com/maddec01/mux-server/issues/172",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "waiting"
+        },
+        {
+          "number": 173,
+          "title": "Docs for self-hosting the relay",
+          "url": "https://github.com/maddec01/mux-server/issues/173",
+          "repo": "maddec01/mux-server",
+          "state": "OPEN",
+          "progress": "waiting"
+        }
+      ]
+    },
+    {
       "id": "PVTI_sample14",
       "status": "In progress",
       "type": "Issue",

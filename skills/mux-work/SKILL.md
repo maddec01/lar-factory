@@ -77,7 +77,8 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
 
 Pick the route yourself; never ask Pedro to pick one by name. Ask him to
 confirm it ([question UI](questions.md)) in a few lines: what you understood
-the item to be; the open questions, or "none"; and what happens next in plain
+the item to be; the repositories that change; the open questions, or "none";
+and what happens next in plain
 words ("I'll ask you three questions, then write the brief"; "a subagent
 reproduces the bug first; I only ask you if the expected behaviour is
 unclear"; "this is too big for one session, so I'll turn it into a concept
@@ -98,8 +99,13 @@ label. Anything Pedro adds or corrects is another open question. Then:
   variant's file paths and a short description. Tell Pedro how to open them
   (T3 browser preview for web; the run scripts in the repo's T3 project for
   Apple), ask for his pick, and record it and the branch on the issue.
+- **Another repository changes**: that work becomes a build there, a
+  sub-issue of this issue that blocks it (reuse an open issue that covers it),
+  with its own brief and gate. This issue is a build only if its own repository
+  changes.
 - **No open questions**: write the brief.
-- **Too big or unclear for one session**: [Concepts](concepts.md).
+- **Too big or unclear for one session**: [Concepts](concepts.md). Repository
+  count never makes an issue a concept.
 
 ## 3. Brief
 
@@ -138,14 +144,23 @@ collapsed `<details>` block at the end.
 
 ## 5. Start the build
 
-Add the `build` label to the issue
-(`gh issue edit <n> --repo <owner/repo> --add-label build`), so the board shows
-its sub-issues as slices. Then launch the build thread with `t3_thread_launch`
-in the issue's repo project:
+Every build starts at once; blocked-by orders merges, not work. For each Ready
+build (this issue if it's a build, and each `build` sub-issue):
 
-- `workspaceStrategy`: `{"type":"worktree","baseRef":"main","branch":"<kind>/<n>-<slug>","startFromOrigin":true}`,
-  where `<kind>` is `fix`, `feat` or `chore`;
-- `message`: `Build <owner/repo#n>. Read <this skill>/agents/builder.md and follow it.`
-  with this skill's absolute path.
+1. Find its repository's T3 project with `t3_project_list`. If none and Pedro
+   can push to it (`gh repo view <owner/repo> --json viewerPermission` is ADMIN,
+   MAINTAIN or WRITE), clone and register it (`t3_project_clone`, then
+   `t3_project_create`) and run [label setup](issue-tracker.md#label-setup)
+   there; otherwise ask him first.
+2. Add the `build` label
+   (`gh issue edit <n> --repo <owner/repo> --add-label build`), so the board
+   shows its sub-issues as slices.
+3. Launch its build thread with `t3_thread_launch` in that project:
+   - `workspaceStrategy`: `{"type":"worktree","baseRef":"main","branch":"<kind>/<n>-<slug>","startFromOrigin":true}`,
+     where `<kind>` is `fix`, `feat` or `chore`;
+   - `message`: `Build <owner/repo#n>. Read <this skill>/agents/builder.md and follow it.`
+     with this skill's absolute path.
 
-Give Pedro the build thread's link. This shaping thread is done.
+Set a parent that isn't a build to In progress; it stays there until a
+build's PR closes it ([Parent closing](issue-tracker.md#parent-closing)). Give Pedro each build
+thread's link. This shaping thread is done.

@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { mergedStats, prStatsEdits, statsBlock, updatedBody, withStatsBlock } from '../src/pr-stats.ts';
 import type { Item, ItemStats, LinkedPr } from '../src/model.ts';
 
-const stats: ItemStats = { agentMs: 65 * 60_000, tokens: 12_436_000, costUsd: 41.2 };
+const stats: ItemStats = { agentMs: 65 * 60_000, wallMs: 47 * 60_000, tokens: 12_436_000, costUsd: 41.2 };
 const block = statsBlock(stats);
 
-test('the block shows agent time, total tokens and API cost, between markers', () => {
-  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · 12.4M tokens · $41\n<!-- /mux-stats -->');
+test('the block shows agent time, wall time, total tokens and API cost, between markers', () => {
+  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 1h 0m · wall 45m · 12.4M · $41\n<!-- /mux-stats -->');
+  assert.equal(statsBlock({ agentMs: 195 * 60_000, wallMs: 75 * 60_000, tokens: 980 }),
+    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 3h 15m · wall 1h 15m · 980\n<!-- /mux-stats -->', 'nothing priced, no cost');
   assert.equal(statsBlock({ agentMs: stats.agentMs, tokens: 980 }),
-    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 1h 0m · 980 tokens\n<!-- /mux-stats -->', 'nothing priced, no cost');
+    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 1h 0m · 980\n<!-- /mux-stats -->', 'no wall time, no wall part');
 });
 
 test('the block\'s cost is in whole dollars, to the nearest, and <$1 below a dollar, so cents don\'t rewrite it', () => {
@@ -18,12 +20,14 @@ test('the block\'s cost is in whole dollars, to the nearest, and <$1 below a dol
   assert.equal(edits([item([pr(1, 'OPEN', `Body\n\n${block}`)], { ...stats, costUsd: 41.4 })]).length, 0, 'a few cents more leave the block alone');
 });
 
-test('the block rounds agent time to 5 minutes under an hour and to 15 from an hour, so a running turn rarely rewrites it', () => {
-  const time = (minutes: number) => /agent time ([^·]+) ·/.exec(statsBlock({ ...stats, agentMs: minutes * 60_000 }))?.[1];
+test('the block rounds agent and wall time to 5 minutes under an hour and to 15 from an hour, so a running turn rarely rewrites it', () => {
+  const time = (minutes: number) => /Σ ([^·]+) ·/.exec(statsBlock({ ...stats, agentMs: minutes * 60_000 }))?.[1];
   assert.deepEqual([0.4, 2.4, 2.6, 52, 57.4, 59.9].map(time), ['0m', '0m', '5m', '50m', '55m', '1h 0m']);
   assert.deepEqual([60, 67.4, 67.6, 128, 135].map(time), ['1h 0m', '1h 0m', '1h 15m', '2h 15m', '2h 15m']);
-  assert.equal(edits([item([pr(1, 'OPEN', `Body\n\n${block}`)], { ...stats, agentMs: 66 * 60_000 })]).length, 0,
-    'a minute more agent time leaves the block alone');
+  const wall = (minutes: number) => /wall ([^·]+) ·/.exec(statsBlock({ ...stats, wallMs: minutes * 60_000 }))?.[1];
+  assert.deepEqual([2.4, 2.6, 59.9, 67.4, 67.6].map(wall), ['0m', '5m', '1h 0m', '1h 0m', '1h 15m']);
+  assert.equal(edits([item([pr(1, 'OPEN', `Body\n\n${block}`)], { ...stats, agentMs: 66 * 60_000, wallMs: 46 * 60_000 })]).length, 0,
+    'a minute more agent and wall time leaves the block alone');
 });
 
 test('a body without a block gets one appended; the text before it is kept byte for byte', () => {
@@ -91,16 +95,24 @@ test('a merged PR\'s block is never edited, even when it is out of date', () => 
 
 test('a merged item takes the figures its merged PR\'s block holds, frozen, as the block wrote them', () => {
   const frozen = (s: ItemStats) => mergedStats(item([pr(1, 'MERGED', `Body\n\n${statsBlock(s)}\n\nMore`)], null));
-  assert.deepEqual(frozen(stats), { agentMs: 60 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true });
+  assert.deepEqual(frozen(stats), { agentMs: 60 * 60_000, wallMs: 45 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true });
   assert.deepEqual(frozen({ agentMs: 7 * 60_000, tokens: 980 }), { agentMs: 5 * 60_000, tokens: 980, frozen: true }, 'nothing priced, no cost');
   assert.deepEqual(frozen({ agentMs: 3 * 3600_000 + 17 * 60_000, tokens: 1_234_567_000_000, costUsd: 1234.5 }),
     { agentMs: (3 * 60 + 15) * 60_000, tokens: 1_230_000_000_000, costUsd: 1235, frozen: true });
   assert.equal(frozen({ ...stats, costUsd: 0.3 })?.costUsd, 0, 'below a dollar parses to 0, which writes <$1 again');
-  for (const s of [stats, { agentMs: 0, tokens: 0 }, { agentMs: 90 * 60_000, tokens: 40_200, costUsd: 0.4 }]) {
+  assert.deepEqual(frozen({ agentMs: 195 * 60_000, wallMs: 75 * 60_000, tokens: 980 }),
+    { agentMs: 195 * 60_000, wallMs: 75 * 60_000, tokens: 980, frozen: true }, 'wall time over an hour');
+  for (const s of [stats, { agentMs: 0, tokens: 0 }, { agentMs: 90 * 60_000, wallMs: 0, tokens: 40_200, costUsd: 0.4 }]) {
     assert.equal(statsBlock(frozen(s)!), statsBlock(s), 'the parsed figures write the same block back');
   }
   const crlf = mergedStats(item([pr(1, 'MERGED', `Body\r\n\r\n${statsBlock(stats).replaceAll('\n', '\r\n')}`)], null));
   assert.equal(crlf?.costUsd, 41, 'a block GitHub sent back with CRLF line ends still parses');
+});
+
+test('a merged item reads a block in the old format, from before wall time, with no wall time', () => {
+  const old = (figures: string) => mergedStats(item([pr(1, 'MERGED', `Body\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): ${figures}\n<!-- /mux-stats -->`)], null));
+  assert.deepEqual(old('agent time 3h 15m · 12.4M tokens · $41'), { agentMs: 195 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true });
+  assert.deepEqual(old('agent time 5m · 980 tokens'), { agentMs: 5 * 60_000, tokens: 980, frozen: true }, 'nothing priced, no cost');
 });
 
 test('a merged item falls back to live stats when no merged PR has a readable block', () => {

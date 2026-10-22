@@ -11,8 +11,8 @@ const END = '<!-- /mux-stats -->';
 const MIN = 60_000;
 
 /**
- * Agent time rounded coarser than on cards, so a running turn doesn't rewrite the
- * PR body every refresh: to 5 minutes under an hour, to 15 from an hour.
+ * Agent or wall time rounded coarser than on cards, so a running turn doesn't rewrite
+ * the PR body every refresh: to 5 minutes under an hour, to 15 from an hour.
  */
 function roughDuration(ms: number): string {
   const step = ms < 60 * MIN ? 5 * MIN : 15 * MIN;
@@ -20,27 +20,38 @@ function roughDuration(ms: number): string {
 }
 
 /**
- * The marked block: agent time, total tokens, then API cost when any of the tokens
- * could be priced, in whole dollars so cents don't rewrite the PR body.
+ * The marked block, figures as on cards: agent time, wall time when measured, total
+ * tokens, then API cost when any of the tokens could be priced, in whole dollars so
+ * cents don't rewrite the PR body.
  */
 export function statsBlock(stats: ItemStats): string {
+  const wall = stats.wallMs === undefined ? '' : ` · wall ${roughDuration(stats.wallMs)}`;
   const cost = stats.costUsd === undefined ? '' : ` · ${wholeUsd(stats.costUsd)}`;
-  return `${START}\n**Item stats** (kept current by the Mux board): agent time ${roughDuration(stats.agentMs)} · ${formatTokens(stats.tokens)} tokens${cost}\n${END}`;
+  return `${START}\n**Item stats** (kept current by the Mux board): Σ ${roughDuration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}\n${END}`;
 }
 
-// The figures line statsBlock writes: agent time, tokens with a K/M/B/T suffix, then the cost if any.
-const FIGURES = /agent time (?:(\d+)h )?(\d+)m · ([\d,.]+)([KMBT]?) tokens(?: · (<\$1|\$[\d,]+))?\r?\n/;
+// A duration as roughDuration writes it, hours then minutes.
+const DURATION = String.raw`(?:(\d+)h )?(\d+)m`;
+// The figures line statsBlock writes: agent time, wall time if any, tokens with a
+// K/M/B/T suffix, then the cost if any. Blocks from before wall time read
+// `agent time 1h 0m · 12.4M tokens`.
+const FIGURES = new RegExp(
+  String.raw`(?:Σ|agent time) ${DURATION}(?: · wall ${DURATION})? · ([\d,.]+)([KMBT]?)(?: tokens)?(?: · (<\$1|\$[\d,]+))?\r?\n`,
+);
 const SUFFIX = { '': 1, K: 1e3, M: 1e6, B: 1e9, T: 1e12 } as const;
+
+const minutes = (hours = '0', mins: string) => (Number(hours) * 60 + Number(mins)) * MIN;
 
 /** The figures a body's block holds, as statsBlock wrote them, or null when it has no block or one that doesn't parse. */
 function blockStats(body: string): ItemStats | null {
   const range = blockRange(body);
   const m = range && FIGURES.exec(body.slice(...range));
   if (!m) return null;
-  const [, hours = '0', minutes, count, suffix, cost] = m;
+  const [, hours, mins, wallHours, wallMins, count, suffix, cost] = m;
   const tokens = Math.round(Number(count!.replaceAll(',', '')) * SUFFIX[suffix as keyof typeof SUFFIX]);
   if (!Number.isFinite(tokens)) return null;
-  const stats: ItemStats = { agentMs: (Number(hours) * 60 + Number(minutes)) * 60_000, tokens };
+  const stats: ItemStats = { agentMs: minutes(hours, mins!), tokens };
+  if (wallMins) stats.wallMs = minutes(wallHours, wallMins);
   // Under a dollar reads back as 0, which writes `<$1` again.
   if (cost) stats.costUsd = cost === '<$1' ? 0 : Number(cost.slice(1).replaceAll(',', ''));
   stats.frozen = true;

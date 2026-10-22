@@ -132,7 +132,7 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   const made = await edits();
   assert.equal(made.length, 1, 'later refreshes see the block is current and leave the PR alone');
   assert.equal(made[0]![3], 'repos/maddec01/mux-factory/pulls/40', 'merged PRs and items without stats are left alone');
-  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · 0 tokens\n<!-- /mux-stats -->');
+  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
 
   const failing = await startBoard(t, { items, fail: 'pr-edit' }, false, false, { T3_STATE_DB: db });
   assert.equal((await readItems(failing)).length, 2, 'a failed edit leaves the board working');
@@ -182,14 +182,14 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
   const [edit] = await edits();
   assert.equal(edit?.[3], 'repos/maddec01/mux-factory/pulls/41');
-  assert.equal(edit?.[5], 'body=PR 41\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · 0 tokens\n<!-- /mux-stats -->');
+  assert.equal(edit?.[5], 'body=PR 41\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
 });
 
 test('before an edit the board reads the PR again, keeps edits made since its read, and skips a block already current', async (t) => {
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 30m · 0 tokens\n<!-- /mux-stats -->';
+  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->';
   const url = (number: number) => `https://github.com/maddec01/mux-factory/pull/${number}`;
   const pr = (number: number, body: string) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body });
   const raw = rawIssue(12, 'Review');

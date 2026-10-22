@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIVE_SLICES_QUERY, ITEMS_QUERY, activeSliceSearch, normalizeItem, normalizeItems } from '../src/github.ts';
+import { ISSUE_SEARCH_QUERY, ITEMS_QUERY, activeSliceSearch, buildSubIssueSearch, normalizeItem, normalizeItems } from '../src/github.ts';
 import type { RawIssueRef, RawItem, RawLinkedPr } from '../src/github.ts';
 
 test('normalizes an issue item from the GraphQL response', () => {
@@ -99,7 +99,7 @@ test("a linked PR's check rollup becomes counts over all checks and the earliest
 
 test("a build's slices come from the board query, open and closed, in GitHub's order; other kinds keep none", () => {
   assert.match(ITEMS_QUERY, /subIssues\(first: \d+\) \{ nodes \{ number title url state stateReason repository \{ nameWithOwner \} \} \}/,
-    'the board query reads each slice\'s state reason; labels would cost 60 points there');
+    'the board query reads each slice\'s state reason; labels there would cost 60 points a page, not 10');
   const ref = (number: number, state: 'OPEN' | 'CLOSED', stateReason: string | null) =>
     ({ number, title: `Slice ${number}`, url: `s${number}`, state, stateReason, repository: { nameWithOwner: 'maddec01/mux-factory' } });
   const subIssues = { nodes: [ref(48, 'OPEN', null), ref(46, 'CLOSED', 'COMPLETED'), ref(45, 'CLOSED', 'NOT_PLANNED'), ref(47, 'OPEN', 'REOPENED')] };
@@ -107,7 +107,7 @@ test("a build's slices come from the board query, open and closed, in GitHub's o
     id: 'PVTI_5', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'In progress' },
     content: { __typename: 'Issue', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
       labels: { nodes: labels.map((name) => ({ name })) }, subIssues },
-  }, new Set(['maddec01/mux-factory#47']));
+  }, { active: new Set(['maddec01/mux-factory#47']) });
   assert.deepEqual(issue(['build'])?.slices, [
     { number: 48, title: 'Slice 48', url: 's48', repo: 'maddec01/mux-factory', state: 'OPEN', progress: 'waiting' },
     { number: 46, title: 'Slice 46', url: 's46', repo: 'maddec01/mux-factory', state: 'CLOSED', progress: 'done' },
@@ -128,6 +128,29 @@ test('a slice closed as not planned is still no board item', () => {
   assert.deepEqual(items[0]?.slices, []);
 });
 
+test('a build sub-issue the `build` search found is a board item and counts as a sub-issue, not a slice', () => {
+  const ref = (number: number, state: 'OPEN' | 'CLOSED' = 'OPEN'): RawIssueRef => ({ number, title: `Issue ${number}`, url: `u${number}`,
+    state, stateReason: null, repository: { nameWithOwner: 'maddec01/mux-factory' } });
+  const builds = new Set(['maddec01/mux-factory#102']);
+  const raw = (id: string, number: number, labels: string[], subIssues: RawIssueRef[] = []): RawItem => ({
+    id, updatedAt: '2026-10-21T08:00:00Z', status: { name: 'In progress' },
+    content: { __typename: 'Issue', number, title: `Issue ${number}`, url: `u${number}`, state: 'OPEN', updatedAt: '2026-10-21T08:00:00Z',
+      repository: { nameWithOwner: 'maddec01/mux-factory' }, labels: { nodes: labels.map((name) => ({ name })) },
+      subIssuesSummary: { total: subIssues.length, completed: 0 }, subIssues: { nodes: subIssues } },
+  });
+  const items = normalizeItems([
+    raw('PVTI_parent', 100, ['build'], [ref(101), ref(102)]),
+    raw('PVTI_101', 101, ['improvement']),
+    raw('PVTI_102', 102, ['build', 'improvement']),
+  ], { builds });
+  assert.deepEqual(items.map((i) => i.id), ['PVTI_parent', 'PVTI_102'], 'the slice is dropped, the build sub-issue stays');
+  assert.deepEqual(items[0]?.slices.map((s) => s.number), [101]);
+  assert.deepEqual(items[0]?.subIssues, { total: 1, completed: 0 }, "a build's sub-issue counter counts only its build sub-issues");
+  assert.deepEqual(normalizeItems([raw('PVTI_p', 100, ['build'], [ref(102, 'CLOSED')])], { builds })[0]?.subIssues, { total: 1, completed: 1 });
+  assert.deepEqual(normalizeItems([raw('PVTI_c', 100, ['concept'], [ref(102)])], { builds })[0]?.subIssues, { total: 1, completed: 0 },
+    'other kinds keep GitHub\'s counts');
+});
+
 test('active slices come from one search over the repos of open slices, so the cost stays flat', () => {
   const ref = (repo: string, number: number, state: 'OPEN' | 'CLOSED'): RawIssueRef =>
     ({ number, title: 'S', url: 'u', state, stateReason: null, repository: { nameWithOwner: repo } });
@@ -142,5 +165,23 @@ test('active slices come from one search over the repos of open slices, so the c
     raw(['concept', 'build'], [ref('maddec01/mux-apple', 6, 'OPEN')]),
   ]), 'is:issue is:open label:active repo:maddec01/mux-server repo:maddec01/mux-factory');
   assert.equal(activeSliceSearch([raw(['build'], [ref('maddec01/mux-apple', 3, 'CLOSED')])]), null, 'no open slice, no search');
-  assert.match(ACTIVE_SLICES_QUERY, /search\(type: ISSUE, first: \d+, query: \$q\) \{ nodes \{ \.\.\. on Issue \{ number repository \{ nameWithOwner \} \} \} \}/);
+  assert.match(ISSUE_SEARCH_QUERY, /search\(type: ISSUE, first: \d+, after: \$after, query: \$q\) \{ pageInfo \{ hasNextPage endCursor \} nodes \{ \.\.\. on Issue \{ number repository \{ nameWithOwner \} \} \} \}/);
+});
+
+test("build sub-issues come from one search over the repos of the builds' sub-issues, open and closed", () => {
+  const ref = (repo: string, number: number, state: 'OPEN' | 'CLOSED'): RawIssueRef =>
+    ({ number, title: 'S', url: 'u', state, stateReason: null, repository: { nameWithOwner: repo } });
+  const raw = (labels: string[], subIssues: RawIssueRef[]): RawItem => ({
+    id: 'PVTI_x', updatedAt: '', status: null,
+    content: { __typename: 'Issue', title: 'T', updatedAt: '', labels: { nodes: labels.map((name) => ({ name })) }, subIssues: { nodes: subIssues } },
+  });
+  assert.equal(buildSubIssueSearch([
+    raw(['build'], [ref('maddec01/mux-server', 1, 'OPEN'), ref('maddec01/mux-apple', 3, 'CLOSED')]),
+    raw(['build'], [ref('maddec01/mux-server', 4, 'OPEN')]),
+    raw(['concept'], [ref('maddec01/mux-factory', 5, 'OPEN')]),
+  ]), 'is:issue label:build repo:maddec01/mux-server repo:maddec01/mux-apple');
+  assert.equal(buildSubIssueSearch([raw(['build'], [])]), null, 'no sub-issue, no search');
+  const onProject: RawItem = { ...raw(['build'], []), content: { ...raw(['build'], []).content!, number: 1, repository: { nameWithOwner: 'maddec01/mux-server' } } };
+  assert.equal(buildSubIssueSearch([raw(['build'], [ref('maddec01/mux-server', 1, 'OPEN')]), onProject]), null,
+    'a sub-issue on the project is judged by its own labels, so it needs no search');
 });

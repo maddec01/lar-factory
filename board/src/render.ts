@@ -299,8 +299,8 @@ function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', acti
   const blocked = item.blockedBy
     ? `<span class="blocked" title="Blocked by ${plural(item.blockedBy, 'issue')}">blocked by ${item.blockedBy}</span>`
     : '';
-  // A build's slice caption replaces the counter.
-  const subs = item.subIssues.total && !isBuild(item)
+  // A build's slices aren't counted here: its slice bar shows them.
+  const subs = item.subIssues.total
     ? `<span class="subs">${item.subIssues.completed}/${item.subIssues.total} sub-issues</span>`
     : '';
   const hint = HINTS[item.status];
@@ -321,7 +321,7 @@ ${parent}${bars(item, opts.ui.slicesOpen === item.id)}${foot}${extra}
 
 /**
  * "done/total noun done" for Flow, or '' with nothing to count. A build counts its
- * visible slices, not GitHub's sub-issue totals, which include those closed as not planned.
+ * visible slices, which leave out those closed as not planned.
  */
 function subsDone(item: Item): string {
   const [done, total, noun] = isBuild(item)
@@ -748,8 +748,8 @@ export function renderFlowView(data: BoardData, opts: RenderOptions): string {
 
   const node = (i: Item): string => {
     const kids = children.get(issueKey(i.repo, i.number) ?? '') ?? [];
-    // A build's slices are never board items, even when auto-added to the project, so none is missing.
-    const missing = isBuild(i) ? 0 : i.subIssues.total - kids.length;
+    // A build's slices are never board items and aren't in its sub-issue counts, so none is missing.
+    const missing = i.subIssues.total - kids.length;
     const kidRows = kids.map(node).join('')
       + (missing > 0 ? `<li class="o-missing">${plural(missing, 'more sub-issue')} not on the board</li>` : '');
     const links = linkRows('blocked by', i.blockers, i.repo, shown) + linkRows('blocks', i.blocking, i.repo, shown);
@@ -760,7 +760,7 @@ export function renderFlowView(data: BoardData, opts: RenderOptions): string {
 ${links ? `<ul class="o-links">${links}</ul>` : ''}${kidRows ? `<ul class="o-tree">${kidRows}</ul>` : ''}</li>`;
   };
 
-  const related = (i: Item) => Boolean(i.parent || i.subIssues.total || i.blockers.total || i.blocking.total);
+  const related = (i: Item) => Boolean(i.parent || i.subIssues.total || i.slices.length || i.blockers.total || i.blocking.total);
   const roots: Item[] = [];
   const offBoard = new Map<string, { parent: IssueRef; kids: Item[] }>();
   for (const i of items.filter(related)) {

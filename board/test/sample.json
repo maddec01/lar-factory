@@ -502,8 +502,8 @@
         "state": "OPEN"
       },
       "subIssues": {
-        "total": 3,
-        "completed": 1
+        "total": 0,
+        "completed": 0
       },
       "blockedBy": 1,
       "blockers": {
@@ -575,8 +575,8 @@
       "state": "OPEN",
       "parent": null,
       "subIssues": {
-        "total": 15,
-        "completed": 6
+        "total": 0,
+        "completed": 0
       },
       "blockedBy": 0,
       "blockers": {

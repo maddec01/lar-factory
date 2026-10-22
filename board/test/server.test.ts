@@ -102,6 +102,30 @@ async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise
   throw new Error('The board never read its items');
 }
 
+test("a refresh finds build sub-issues and active slices with issue searches, not the board query's labels", async (t) => {
+  const repository = { nameWithOwner: 'maddec01/mux-factory' };
+  const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/mux-factory/issues/${number}`,
+    state: 'OPEN', stateReason: null, repository });
+  const parent = rawBuild(13, 'In progress');
+  const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref(12), ref(15)] } } }, rawBuild(12, 'In progress'), rawIssue(15, 'In progress')];
+  const board = await startBoard(t, { items, builds: [{ number: 12, repository }], active: [{ number: 15, repository }] });
+  const read = await readItems(board);
+  assert.deepEqual(read.map((i) => i.number), [13, 12], 'the build sub-issue stays a board item; the slice does not');
+  const [built] = read as unknown as { subIssues: unknown; slices: { number: number; progress: string }[] }[];
+  assert.deepEqual(built?.subIssues, { total: 1, completed: 0 });
+  assert.deepEqual(built?.slices.map((s) => [s.number, s.progress]), [[15, 'active']]);
+});
+
+test('a build sub-issue on the project stays a board item while the issue search still misses its new label', async (t) => {
+  const repository = { nameWithOwner: 'maddec01/mux-factory' };
+  const ref = { number: 12, title: 'Issue 12', url: 'https://github.com/maddec01/mux-factory/issues/12', state: 'OPEN', stateReason: null, repository };
+  const parent = rawBuild(13, 'In progress');
+  const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref] } } }, rawBuild(12, 'In progress')];
+  const read = await readItems(await startBoard(t, { items, builds: [] }));
+  assert.deepEqual(read.map((i) => i.number), [13, 12]);
+  assert.deepEqual(read[0]?.subIssues, { total: 1, completed: 0 });
+});
+
 test('each refresh attaches item stats from T3 Code\'s database and Claude transcripts, and a missing database leaves them out', async (t) => {
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'],
     sessions: [{ session: 'session-1', instance: 'claudeAgent_personal' }], turns: [

@@ -198,7 +198,7 @@ const builtIssue = rawIssue('PVTI_build', 59, 'In progress', ['improvement', 'bu
   subIssuesSummary: { total: 3, completed: 1 },
   subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
 });
-const boardOf = (raws: RawItem[]): BoardData => ({ ...sample, error: null, items: normalizeItems(raws) });
+const boardOf = (raws: RawItem[], builds = new Set<string>()): BoardData => ({ ...sample, error: null, items: normalizeItems(raws, { builds }) });
 
 test('an open slice that the project auto-added is dropped from the board items, header counts and Flow', () => {
   const slice = rawIssue('PVTI_slice66', 66, 'In progress', ['improvement'], {
@@ -234,7 +234,7 @@ function sliceBar(card: string) {
 
 const buildCard = (raws: RawItem[], active: number[] = []) => {
   const keys = new Set(active.map((n) => `maddec01/mux-factory#${n}`));
-  const data: BoardData = { ...sample, error: null, items: normalizeItems(raws, keys) };
+  const data: BoardData = { ...sample, error: null, items: normalizeItems(raws, { active: keys }) };
   return renderBoardView(data, base).split('<article').find((a) => a.includes('data-anchor="PVTI_build"'))!;
 };
 
@@ -324,12 +324,21 @@ test('a card with sub-issues but no build or concept label shows only its counte
   assert.ok(!card.includes('aria-label="Slices"'), 'no fallback list');
 });
 
-test('Flow counts none of a build\'s slices as missing, even past the 50 the board query reads', () => {
-  const big: BoardData = {
-    ...sample,
-    items: sample.items.map((i) => (i.id === 'PVTI_sample13' ? { ...i, subIssues: { ...i.subIssues, total: 60 } } : i)),
-  };
-  assert.ok(!flowNode(renderFlowView(big, base), 'PVTI_sample13').includes('o-missing'));
+test('a build shows its `build` sub-issues like any parent: a counter, and Flow counts the ones not on the board', () => {
+  const parent = rawIssue('PVTI_parent', 100, 'In progress', ['build'], {
+    subIssuesSummary: { total: 3, completed: 0 },
+    subIssues: { nodes: [sliceRef(101, 'OPEN'), sliceRef(102, 'OPEN'), sliceRef(103, 'OPEN')] },
+  });
+  const child = rawIssue('PVTI_102', 102, 'In progress', ['build'], {
+    parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/mux-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-factory' } },
+  });
+  const data = boardOf([parent, child], new Set(['maddec01/mux-factory#102', 'maddec01/mux-factory#103']));
+  const card = renderBoardView(data, base).split('<article').find((a) => a.includes('data-anchor="PVTI_parent"'))!;
+  assert.match(card, /<span class="subs">0\/2 sub-issues<\/span>/, 'the counter counts the build sub-issues, not the slice');
+  assert.ok(card.includes('aria-label="Slices"') || card.includes('slice-bar'), 'its slice stays a slice');
+  const node = flowNode(renderFlowView(data, base), 'PVTI_parent');
+  assert.ok(hasNode(node, 'PVTI_102'), 'the build sub-issue nests under it');
+  assert.match(node, /<li class="o-missing">1 more sub-issue not on the board<\/li>/, 'the slice is never missing; the other build is');
 });
 
 test('Flow shows blocked-by and blocks links from GitHub, jumping to Board items and referencing the rest', () => {

@@ -110,6 +110,7 @@ export interface Item {
   /** OPEN, CLOSED or MERGED; null for drafts. */
   state: string | null;
   parent: IssueRef | null;
+  /** GitHub's sub-issue counts; a build counts only its `build` sub-issues, not its slices. */
   subIssues: { total: number; completed: number };
   /** Open blockers, for the card's badge. */
   blockedBy: number;

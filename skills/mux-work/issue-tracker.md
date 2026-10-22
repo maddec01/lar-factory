@@ -1,8 +1,10 @@
 # Issue tracking
 
-Use the local `gh` login. Read the destination's `AGENTS.md` and issue
-conventions before writing. Choose the destination explicitly, even when the
-checkout belongs to another repository:
+Use the local `gh` login. The **factory repository**, home of the workflow,
+the board and cross-repository work, is `maddec01/mux-factory`. Read the
+destination's `AGENTS.md` and issue conventions before writing. Choose
+the destination explicitly, even when the checkout belongs to another
+repository:
 
 ```sh
 repo=maddec01/mux-factory
@@ -180,8 +182,8 @@ fi
 
 Follow [Retro capture](retro-capture.md), with its persisted plan, stable
 selection IDs, reconciliation and visibility rules. A selected suggestion
-spanning repositories goes to `maddec01/mux-factory`, even when the source issue
-and checkout are in another Mux repository. Run label setup there after
+spanning repositories goes to the factory repository, even when the source
+issue and checkout are in another repository. Run label setup there after
 persisting the plan and before creating a missing concept.
 
 This path creates or reuses only the concept map: the `concept` label and the

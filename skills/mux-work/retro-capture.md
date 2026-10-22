@@ -15,17 +15,15 @@ clarification questions and failures. On resume, reuse the existing plan and IDs
    “none”, or no suggestions, completes the no-picks path: post a one-line
    `Retro capture: complete — no picks` on the source issue and finish without
    follow-ups. With no suggestions, ask no selection question.
-2. Route each selected suggestion to `maddec01/`:
-   - Server work → `mux-server`; Apple work → `mux-apple`.
-   - A repository's own `AGENTS.md`, CI or local tooling → that repository.
-   - Factory workflow/board, shared/global skills and instructions → `mux-factory`.
-   - Global environment, machine-wide tooling/configuration and information
-     access without a clear repository owner → `mux-factory`.
-   - One suggestion needing changes across repositories → one `mux-factory`
-     concept listing the affected repositories; prefer a matching open concept.
+2. Route each selected suggestion to the repository that owns the change: its
+   product code, `AGENTS.md`, CI or local tooling → that repository; the
+   factory workflow or board, shared skills and instructions, and machine-wide
+   setup without a clear owner → the factory repository. One suggestion
+   needing changes across repositories → one factory concept listing them;
+   prefer a matching open concept.
 3. Before drafting titles, bodies, context comments or the source record, read
    the destination's issue conventions and visibility/redaction rules.
-   `mux-factory` is public; `mux-server` and `mux-apple` are private. Every
+   Read each destination's visibility (`gh repo view --json visibility`). Every
    public surface, a Factory source record included, stays public-safe: no
    private logs, credentials, private hostnames, or sensitive paths or details.
    Source links, and destinations/URLs that expose private work, appear only
@@ -85,8 +83,8 @@ than repeat a possibly successful mutation.
 3. Otherwise create one issue with an actionable title, the selected
    improvement, useful context, safe provenance and the exact selection ID in
    its body. First follow [label setup](issue-tracker.md#label-setup) for the
-   **destination** repository, including `mux-factory` for a cross-repository
-   concept captured from another Mux repository. Do this after persisting the
+   **destination** repository, including the factory repository for a
+   cross-repository concept captured from another repository. Do this after persisting the
    source plan; if setup fails, leave capture pending and retry setup before
    creating the issue. Follow destination label conventions (`bug`, `feature`,
    `improvement` as fits); capture text is not a passing brief. A

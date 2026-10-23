@@ -37,7 +37,7 @@ const GUARDED_WRITES = new Set(['/api/items', '/api/queue', '/api/back-to-list',
 
 const state: BoardData = {
   capture,
-  project: { title: config.title, url: null },
+  project: { title: config.title },
   repos: config.repos,
   refreshSeconds: config.refreshSeconds,
   fetchedAt: null,
@@ -210,7 +210,7 @@ async function refresh(): Promise<void> {
     projectNumber ??= await findProjectNumber(config.owner, config.title);
     const snapshot = await fetchProject(config.owner, projectNumber);
     const recovered = state.error !== null || state.fetchedAt === null;
-    state.project = { title: snapshot.title, url: snapshot.url };
+    state.project = { title: snapshot.title };
     for (const [id, recent] of recentItems) {
       if (readRevision < recent.revision) continue;
       // Give GitHub three successful reads to expose the change, then trust what it reports.
@@ -220,7 +220,7 @@ async function refresh(): Promise<void> {
     state.items = withStats([...snapshot.items.filter((i) => !recentItems.has(i.id) && !abandoned.has(i.id)), ...[...recentItems.values()].map((r) => r.item)]);
     state.fetchedAt = new Date().toISOString();
     state.error = null;
-    if (recovered) log(`read ${snapshot.items.length} items from ${snapshot.url}`);
+    if (recovered) log(`read ${snapshot.items.length} items from the ${snapshot.title} project`);
     read = true;
   } catch (err) {
     // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale.

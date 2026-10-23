@@ -22,7 +22,6 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
   user(login: $owner) {
     projectV2(number: $number) {
       title
-      url
       items(first: ${PAGE_SIZE}, after: $after) {
         pageInfo { hasNextPage endCursor }
         nodes {
@@ -164,7 +163,6 @@ export interface RawItemsPage {
     user: {
       projectV2: {
         title: string;
-        url: string;
         items: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: RawItem[] };
       } | null;
     } | null;
@@ -377,7 +375,6 @@ async function searchLabels(raws: RawItem[]): Promise<Searched> {
 
 export interface ProjectSnapshot {
   title: string;
-  url: string;
   items: Item[];
 }
 
@@ -385,16 +382,14 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
   const raws: RawItem[] = [];
   let after: string | null = null;
   let title = '';
-  let url = '';
   for (let page = 0; page < MAX_PAGES; page++) {
     const res: RawItemsPage = await graphql<RawItemsPage>(ITEMS_QUERY, { owner, number, after });
     const project = res.data.user?.projectV2;
     if (!project) throw new Error(`Project ${owner}/${number} not found`);
     title = project.title;
-    url = project.url;
     raws.push(...project.items.nodes);
     // A slice and its build can sit on different pages, so slices are dropped once all are read.
-    if (!project.items.pageInfo.hasNextPage) return { title, url, items: normalizeItems(raws, await searchLabels(raws)) };
+    if (!project.items.pageInfo.hasNextPage) return { title, items: normalizeItems(raws, await searchLabels(raws)) };
     after = project.items.pageInfo.endCursor;
   }
   throw new Error(`Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`);

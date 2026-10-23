@@ -34,7 +34,7 @@ const main = async () => {
       await new Promise((r) => setTimeout(r, options.readDelay));
       fs.rmSync(lock, { force: true });
     }
-    return output({ data: { user: { projectV2: { title: 'Mux', url: 'https://github.com/users/maddec01/projects/1',
+    return output({ data: { user: { projectV2: { title: 'Mux',
       items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: options.items ?? [] } } } } });
   }
   if (args[1] === 'view') return output({ id: 'PVT_1' });

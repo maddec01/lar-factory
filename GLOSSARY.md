@@ -17,6 +17,12 @@ _Avoid_: Specification (when referring to the factory's brief)
 A project's glossary and ADRs. Shaping drafts changes to them in the brief, and
 the builder writes them in the build PR.
 
+**Prototype**:
+A throwaway variant built by a Prototype child task to answer one design
+question. The thread that asked for it shows it to Pedro inside T3, in the
+integrated browser or the Device panel, so he can pick one.
+_Avoid_: Mockup, draft
+
 **Passing brief**:
 A brief that has passed the shaping gate and can be handed to a build thread.
 

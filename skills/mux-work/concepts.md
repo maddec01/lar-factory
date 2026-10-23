@@ -61,13 +61,14 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
 ## Decisions
 
 Work a decision sub-issue by the method its label names (**Grilling with
-docs** in [SKILL.md](SKILL.md#grilling-with-docs), prototype, research findings,
-or a small task). Then comment the answer with any Domain docs drafts it
-settled, add its gist to the map's Decisions so far and its drafts to the map's
-Domain docs, and turn fog that cleared into new decision sub-issues. When part
-of the destination is fully decided, create a `build` sub-issue for it with a
-brief ([3. Brief](SKILL.md#3-brief)) whose Domain docs copies the map entries
-that build needs, run the [gate](SKILL.md#4-gate) and set it Ready. If this
+docs** in [SKILL.md](SKILL.md#grilling-with-docs), prototype per
+[SKILL.md 2. Size up](SKILL.md#2-size-up), research findings, or a small
+task). Then comment the answer with any Domain docs drafts it settled, add its
+gist to the map's Decisions so far and its drafts to the map's Domain docs, and
+turn fog that cleared into new decision sub-issues. When part of the
+destination is fully decided, create a `build` sub-issue for it with a brief
+([3. Brief](SKILL.md#3-brief)) whose Domain docs copies the map entries that
+build needs, run the [gate](SKILL.md#4-gate) and set it Ready. If this
 unblocked or created any decisions or builds, run one launch check on this
 sub-issue for them; on Go, launch the decisions as in step 4 and the builds by
 step 2 of [5. Start the build](SKILL.md#5-start-the-build). Then close it and

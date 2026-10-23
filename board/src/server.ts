@@ -9,10 +9,12 @@ import { homedir } from 'node:os';
 import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { expandHome, loadConfig } from './config.ts';
+import { loadConfig } from './config.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
+import { repositoryProject } from './repository-project.ts';
+import type { RepositoryProject } from './repository-project.ts';
 import { loadItemStats, statsDbPath, t3SettingsPath, usageRatesPath } from './item-stats.ts';
 import type { StatsSources } from './item-stats.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './pr-stats.ts';
@@ -57,8 +59,10 @@ const recentItems = new Map<string, { item: Item; revision: number; unconfirmedR
 const submissions = new Map<string, {
   draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
 }>();
+/** A refused Start ran no t3: one of the repository project's checks failed. */
+type Start = StartResult & { refused?: true };
 /** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
-const starts = new Map<string, Promise<StartResult>>();
+const starts = new Map<string, Promise<Start>>();
 let runningStarts = 0;
 /** Set while the board waits for a new updater to take the lock. */
 let launchingUpdate = false;
@@ -279,22 +283,28 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
     if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
     if (item.status !== 'Queued') return json(res, 409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
     const message = workMessage(item);
-    if (!message) return json(res, 409, { error: 'This item needs an issue before it can start.' });
-    if (!config.t3Project) return json(res, 503, { error: 'Set board.t3Project in config.json to start threads.' });
-    let project: string;
-    try { project = expandHome(config.t3Project, process.env.HOME); }
-    catch (err) { return json(res, 503, { error: (err as Error).message }); }
-    // Only a failure t3 reported may run again; a started or unconfirmed thread is kept.
+    if (!message || !item.repo) return json(res, 409, { error: 'This item needs an issue before it can start.' });
+    // Only a refusal or a failure t3 reported may run again; a started or unconfirmed thread is kept.
     runningStarts++;
-    pending = startThread(project, message).then((result) => {
+    pending = currentRepositoryProject(item.repo).then((project): Promise<Start> | Start =>
+      project.error === undefined ? startThread(project.projectId, message) : { thread: null, error: project.error, refused: true },
+    ).then((result) => {
       if (result.thread) state.started = { ...state.started, [itemId]: result.thread };
       else if (!result.uncertain) starts.delete(itemId);
       return result;
     }).finally(() => { runningStarts--; });
     starts.set(itemId, pending);
   }
-  const result = await pending;
-  json(res, result.error ? 502 : 200, { ...result, board: state });
+  const { refused, ...result } = await pending;
+  json(res, refused ? 409 : result.error ? 502 : 200, { ...result, board: state });
+}
+
+/** The repository project from config.json as it is now, so a path fixed after a refusal works on the next Start. */
+async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
+  let repos;
+  try { repos = loadConfig().repos; }
+  catch (err) { return { error: `Can't read config.json: ${(err as Error).message}` }; }
+  return repositoryProject(repo, repos);
 }
 
 function updating(): boolean {

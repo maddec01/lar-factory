@@ -6,7 +6,8 @@ import { chmod, mkdir, readFile, readdir, readlink, rm, symlink, writeFile } fro
 import { dirname, join } from 'node:path';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { factoryRepo } from './repo-support.ts';
+import { checkouts, factoryRepo } from './repo-support.ts';
+import { projectsDb } from './stats-db.ts';
 import { freePort, rawIssue, startBoard } from './server-support.ts';
 import type { TestContext } from 'node:test';
 import type { BoardData, UpdateProgress } from '../src/model.ts';
@@ -412,7 +413,9 @@ test('Update is refused while another update runs, and Start waits for it', asyn
 });
 
 test('Update is refused while a Start runs', async (t) => {
-  const f = await launchAgentBoard(t, { items: [rawIssue(12, 'Queued')], t3: { delay: 1000 } });
+  const f = await launchAgentBoard(t, { items: [rawIssue(12, 'Queued')], t3: { delay: 1000 } },
+    { T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: '~/Developer/Mux/mux-factory' }]) });
+  checkouts(f.home, { 'mux-factory': 'https://github.com/maddec01/mux-factory.git' });
   const { capture } = await f.board.board() as BoardData;
   const start = f.board.post({ session: capture!.session, itemId: 'PVTI_12' }, f.board.url, '/api/start');
   await new Promise((resolve) => setTimeout(resolve, 200));

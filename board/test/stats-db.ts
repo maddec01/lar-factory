@@ -231,3 +231,24 @@ export function usageRates(t: TestContext, document: Record<string, object>): st
   writeFileSync(path, JSON.stringify({ fetchedAtMs: Date.parse('2026-10-20T00:00:00Z'), document }));
   return path;
 }
+
+/** A T3 project: its id and folder, and when T3 deleted it, if it did. */
+export interface FixtureProject {
+  id: string;
+  root: string;
+  deletedAt?: string;
+}
+
+/** Writes a database holding only T3's projects to a temporary folder removed after the test, and returns its path. */
+export function projectsDb(t: TestContext, projects: FixtureProject[]): string {
+  const dir = mkdtempSync(join(tmpdir(), 'mux-projects-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const path = join(dir, 'statev2.sqlite');
+  const db = new DatabaseSync(path);
+  db.exec(`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, title TEXT NOT NULL,
+    workspace_root TEXT NOT NULL, deleted_at TEXT)`);
+  const project = db.prepare('INSERT INTO projection_projects VALUES (?, ?, ?, ?)');
+  for (const p of projects) project.run(p.id, p.id, p.root, p.deletedAt ?? null);
+  db.close();
+  return path;
+}

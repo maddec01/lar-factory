@@ -13,9 +13,9 @@ export interface StartResult {
 }
 
 const UNCERTAIN: StartResult = { thread: null, uncertain: true,
-  error: "The thread's start could not be confirmed. Check the Mux project in T3 Code before starting it again." };
+  error: "The thread's start could not be confirmed. Check the repository's project in T3 Code before starting it again." };
 
-/** Runs `t3 thread start <project> <message> --json`. */
+/** Runs `t3 thread start <project id> <message> --json`. */
 export function startThread(project: string, message: string): Promise<StartResult> {
   return new Promise((resolve) => {
     execFile(T3, ['thread', 'start', project, message, '--json'], { timeout: 60_000 }, (err, stdout, stderr) => {

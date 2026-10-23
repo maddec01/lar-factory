@@ -58,6 +58,10 @@ _Avoid_: in-progress slice, current slice
 The two-line text Start sends to a new thread: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.
 _Avoid_: work command, `/mux-work` command
 
+**Model choice**:
+The provider instance and model a new thread runs on, picked at Start; "T3 default" leaves it to T3.
+_Avoid_: model selection, provider setup
+
 **Repository project**:
 The T3 project whose folder is a repository's main checkout; an issue's threads run in its repository's project.
 _Avoid_: Mux project, factory project (for where threads run)

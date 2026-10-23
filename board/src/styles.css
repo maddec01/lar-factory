@@ -4,9 +4,10 @@
    (tailwindcss/packages/tailwindcss/theme.css). Badges and buttons follow
    apps/web/src/components/ui/badge.tsx and button.tsx; grouped lists follow
    components/settings/SettingsGroup.tsx. */
-/* No source scanning yet: the page's own class names (such as "outline") would
-   otherwise turn on Tailwind utilities of the same name. Add @source with the first utility. */
+/* Tailwind scans only the files listed here: the page's own class names (such as "outline") would
+   otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @import "tailwindcss" source(none);
+@source "./app/TitleBar.tsx";
 
 :root {
   color-scheme: light dark;
@@ -228,6 +229,9 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 /* The Add item and Abandon dialogs are Base UI's: a fixed popup over a backdrop element, not a native <dialog>. */
 #add-item-dialog, #abandon-dialog { position: fixed; inset: 0; z-index: 50; height: fit-content; }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 40%); }
+/* In the Mac app the dialogs open below its 52 px title bar, and neither they nor the backdrop drag the window. */
+:root:has(.title-bar) :is(#add-item-dialog, #abandon-dialog) { top: 52px; max-height: calc(100dvh - 52px - 32px); }
+#add-item-dialog, #abandon-dialog, .dialog-backdrop { -webkit-app-region: no-drag; }
 #abandon-dialog { width: min(420px, calc(100% - 34px)); }
 #abandon-heading { overflow-wrap: anywhere; }
 #abandon-dialog .form-actions { justify-content: flex-end; }
@@ -256,8 +260,10 @@ button:disabled[title] { cursor: not-allowed; }
 .dismiss { float: right; margin: -3px -6px 0 8px; width: 24px; height: 24px; border: 0; border-radius: var(--r-control); background: none; color: var(--muted); font: 16px/1 var(--font-sans); cursor: pointer; }
 .dismiss:hover { background: var(--accent); color: var(--fg); }
 .action-error .dismiss { float: none; margin: -4px 0 -4px 2px; vertical-align: middle; font-weight: 400; }
-/* app/Toasts.tsx keeps --toast-top below the header while it's on screen. */
+/* app/Toasts.tsx keeps --toast-top below the header while it's on screen and below the app's title bar. */
 .toasts { position: fixed; top: var(--toast-top, 12px); right: 12px; z-index: 60; display: grid; gap: 8px; width: min(400px, calc(100vw - 24px)); }
+/* A toast never drags the app's window, even where it overlaps the title bar. */
+.toasts { -webkit-app-region: no-drag; }
 .toast { margin: 0; background: var(--surface); border-color: var(--bd); box-shadow: var(--shadow), 0 1px 3px rgb(0 0 0 / 8%); animation: toast-in 0.18s cubic-bezier(0.32, 0.72, 0, 1); }
 .toast.seen { animation: none; }
 .toast::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 8px; }

@@ -6,6 +6,7 @@ import type { BoardData } from '../model.ts';
 import { ago, clock } from '../format.ts';
 import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../brand-mark.ts';
 import { AddItem } from './AddItem.tsx';
+import { inMacApp } from './board-app.ts';
 import { useBoardStore } from './board-store.ts';
 import { ClosableBanner } from './ClosableBanner.tsx';
 import { CLIENT_ERROR } from './live-data.ts';
@@ -50,7 +51,8 @@ export function Header() {
   return (
     <header className="top">
       <div className="title-row">
-        <h1><BrandMark /><span>factory</span></h1>
+        {/* In the Mac app the title bar shows the logo, so the heading stays for screen readers only. */}
+        <h1 className={inMacApp() ? 'sr-only' : undefined}><BrandMark /><span>factory</span></h1>
         <Refreshed data={data} now={now} />
         <span className="header-actions"><AddItem /><HeaderUpdateButton /></span>
       </div>

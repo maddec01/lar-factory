@@ -66,6 +66,8 @@ const starts = new Map<string, Promise<Start>>();
 let runningStarts = 0;
 /** Set while the board waits for a new updater to take the lock. */
 let launchingUpdate = false;
+/** Status changes in flight by item id; Start and Abandon wait out a move, and a move waits out Abandon. */
+const moving = new Set<string>();
 /** Deletes in flight by item id, so a second press waits for the first. */
 const abandoning = new Map<string, Promise<string | null>>();
 /** Item ids this board deleted. GitHub can still list them for a while, so reads drop them. */
@@ -258,6 +260,8 @@ interface Move {
   what: string;
   unnamed: string;
   refused: (status: Status) => string;
+  /** The refusal for an item Start holds, when the move would pull it from under a T3 thread. */
+  started?: string;
 }
 
 const QUEUE: Move = {
@@ -268,7 +272,13 @@ const QUEUE: Move = {
 const BACK_TO_LIST: Move = {
   from: 'Queued', to: 'List', disabled: 'Moving items back to List is disabled in sample mode.', what: 'the item to move back to List',
   unnamed: 'Name the item to move back to List.', refused: (status) => `Only Queued items can be moved back to List; this one is in ${status}.`,
+  started: 'Start is running or has run for this item. Check its T3 thread before moving it back to List.',
 };
+
+/** Whether a Start for the item is in flight, uncertain or done this board run. */
+function startHolds(itemId: string): boolean {
+  return starts.has(itemId) || !!state.started?.[itemId];
+}
 
 async function moveItem(req: IncomingMessage, res: ServerResponse, move: Move): Promise<void> {
   if (!capture.enabled) return json(res, 403, { error: move.disabled });
@@ -279,7 +289,10 @@ async function moveItem(req: IncomingMessage, res: ServerResponse, move: Move): 
   if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
   if (item.status === move.to) return json(res, 200, { error: null, board: state });
   if (item.status !== move.from) return json(res, 409, { error: move.refused(item.status) });
-  const error = await setItemStatus({ ...config, number: projectNumber }, item.id, move.to);
+  if (move.started && startHolds(item.id)) return json(res, 409, { error: move.started, board: state });
+  if (abandoning.has(item.id)) return json(res, 409, { error: 'This item is being abandoned, so it can\'t move.', board: state });
+  moving.add(item.id);
+  const error = await setItemStatus({ ...config, number: projectNumber }, item.id, move.to).finally(() => moving.delete(item.id));
   if (error) return json(res, 502, { error, board: state });
   showChanged({ ...item, status: move.to });
   json(res, 200, { error: null, board: state });
@@ -302,6 +315,8 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
     const item = state.items.find((i) => i.id === itemId);
     if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
     if (item.status !== 'Queued') return json(res, 409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
+    if (moving.has(itemId)) return json(res, 409, { error: 'This item is moving back to List, so it can\'t start.', board: state });
+    if (abandoning.has(itemId)) return json(res, 409, { error: 'This item is being abandoned, so it can\'t start.', board: state });
     const message = workMessage(item);
     if (!message || !item.repo) return json(res, 409, { error: 'This item needs an issue before it can start.' });
     // Only a refusal or a failure t3 reported may run again; a started or unconfirmed thread is kept.
@@ -388,6 +403,8 @@ async function abandonItemRequest(req: IncomingMessage, res: ServerResponse): Pr
     if (!item && abandoned.has(itemId)) return json(res, 200, { error: null, board: state });
     if (!item) return json(res, 404, { error: 'That item is no longer on the board.', board: state });
     if (!canAbandon(item)) return json(res, 409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${A_TYPE[item.type]} in ${item.status}.` });
+    if (startHolds(itemId)) return json(res, 409, { error: 'Start is running or has run for this item. Check its T3 thread before abandoning it.', board: state });
+    if (moving.has(itemId)) return json(res, 409, { error: 'This item is being moved, so it can\'t be abandoned.', board: state });
     pending = abandonItem({ ...config, number: projectNumber }, item).then((error) => {
       abandoning.delete(itemId);
       if (!error) {

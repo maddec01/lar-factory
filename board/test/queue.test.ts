@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rawIssue, startBoard } from './server-support.ts';
+import { rawIssue, startableEnv, startBoard } from './server-support.ts';
 import type { BoardData } from '../src/model.ts';
 
 type Board = Awaited<ReturnType<typeof startBoard>>;
@@ -124,4 +124,48 @@ test('Back to List rejects requests from other pages and sample mode', async (t)
   assert.equal(response.status, 403);
   assert.equal((await response.json()).error, 'Moving items back to List is disabled in sample mode.');
   assert.equal((await sample.calls()).length, 0);
+});
+
+async function startItem(board: Board, itemId: string) {
+  const { capture } = await board.board() as BoardData;
+  return board.post({ session: capture!.session, itemId }, board.url, '/api/start');
+}
+
+test('Back to List is refused while a Start is in flight, uncertain or done for the item', async (t) => {
+  const refused = 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], t3: { delay: 300 } }, false, false, startableEnv(t));
+  await until(board, (d) => d.items.length === 1);
+  const starting = startItem(board, 'PVTI_12');
+  await new Promise((r) => setTimeout(r, 100));
+  const inFlight = await backToList(board, 'PVTI_12');
+  assert.equal(inFlight.status, 409);
+  assert.equal((await inFlight.json()).error, refused);
+  assert.equal((await starting).status, 200);
+  assert.equal((await backToList(board, 'PVTI_12')).status, 409, 'done');
+  const unsure = await startBoard(t, { items: [rawIssue(12, 'Queued')], t3: { fail: 'killed' } }, false, false, startableEnv(t));
+  await until(unsure, (d) => d.items.length === 1);
+  assert.equal((await startItem(unsure, 'PVTI_12')).status, 502);
+  assert.equal((await backToList(unsure, 'PVTI_12')).status, 409, 'uncertain');
+  const edits = [...await board.calls(), ...await unsure.calls()].filter((args) => args[1] === 'item-edit');
+  assert.deepEqual(edits, []);
+});
+
+test('Back to List works again once a failed Start is over', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], t3: { fail: 'down' } }, false, false, startableEnv(t));
+  await until(board, (d) => d.items.length === 1);
+  assert.equal((await startItem(board, 'PVTI_12')).status, 502);
+  assert.equal((await backToList(board, 'PVTI_12')).status, 200);
+});
+
+test('Back to List is refused while Abandon is pending for the item', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], writeDelay: 300 });
+  await until(board, (d) => d.items.length === 1);
+  const { capture } = await board.board() as BoardData;
+  const abandoning = board.post({ session: capture!.session, itemId: 'PVTI_12' }, board.url, '/api/abandon');
+  await new Promise((r) => setTimeout(r, 100));
+  const refused = await backToList(board, 'PVTI_12');
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, 'This item is being abandoned, so it can\'t move.');
+  assert.equal((await abandoning).status, 200);
+  assert.deepEqual((await board.calls()).filter((args) => args[1] === 'item-edit'), []);
 });

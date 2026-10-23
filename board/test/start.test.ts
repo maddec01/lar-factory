@@ -232,3 +232,20 @@ test('Start only runs for Queued issues from this board page and session', async
   assert.equal((await start(sample, 'PVTI_sample05')).status, 403);
   assert.deepEqual([...await board.t3Calls(), ...await sample.t3Calls()], []);
 });
+
+test('Start is refused while Back to List or Abandon is pending for the item', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued'), rawIssue(13, 'Queued')], writeDelay: 300 });
+  await ready(board, 2);
+  const { capture } = await board.board() as BoardData;
+  const moving = board.post({ itemId: 'PVTI_12' }, board.url, '/api/back-to-list');
+  const abandoning = board.post({ session: capture!.session, itemId: 'PVTI_13' }, board.url, '/api/abandon');
+  await new Promise((r) => setTimeout(r, 100));
+  const refusedMove = await start(board, 'PVTI_12');
+  assert.equal(refusedMove.status, 409);
+  assert.equal((await refusedMove.json()).error, 'This item is moving back to List, so it can\'t start.');
+  const refusedAbandon = await start(board, 'PVTI_13');
+  assert.equal(refusedAbandon.status, 409);
+  assert.equal((await refusedAbandon.json()).error, 'This item is being abandoned, so it can\'t start.');
+  assert.deepEqual((await Promise.all([moving, abandoning])).map((r) => r.status), [200, 200]);
+  assert.deepEqual(await board.t3Calls(), []);
+});

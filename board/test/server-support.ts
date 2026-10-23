@@ -55,7 +55,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),
     env: { ...testEnv(), BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
-      T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname,
+      T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname, SHELL: new URL('./fake-shell.sh', import.meta.url).pathname,
       FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '',
       ...(fixture ? SAMPLE_MODELS : {}), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],

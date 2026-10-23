@@ -217,6 +217,38 @@ home:
 MUX_FACTORY_INSTALL_ROOT="$(mktemp -d)" pnpm run dev --install-skills
 ```
 
+### Release secrets
+
+The Release workflow signs and notarizes the board app with Pedro's Developer ID, and
+it fails without the signing secrets. Run the wizard once before the first Release,
+and again when the certificate or the API key changes:
+
+```bash
+bash scripts/release-secrets.sh
+```
+
+It walks the Apple Developer and App Store Connect pages, then creates the `release`
+environment (main only) and stores the secrets in it with `gh`. It stops unless `gh`
+is logged in as an admin of the repo. Add `--dry-run` to see the `gh` commands
+without running them.
+
+### Releasing
+
+Each green merge to main publishes a Nightly, a prerelease tagged like
+`v0.1.0-nightly.20261023.57`. Its version comes from `app/package.json` at the
+merged commit.
+
+For a Stable Release, bump `version` in `app/package.json` and merge it. Once that
+merge's Nightly is out, open Actions > Release > Run workflow. The run rebuilds the
+latest Nightly's commit as `v<version>` and marks it the latest Release. It fails if
+that tag exists or main doesn't contain the commit. Tick `dry_run` to build, sign and
+notarize without publishing.
+
+One Release run goes at a time. A Stable Release started while a Nightly is running
+waits for it. While it waits, the Nightly of a later merge can replace it, because
+GitHub keeps only the newest waiting run. If that happens, the Stable Release shows
+as canceled; run it again.
+
 ## Repo layout
 
 ```
@@ -226,6 +258,7 @@ app/               the board app: the board in a Mac window (Electron)
 references/        checklists Addy's skills link to
 scripts/install.sh installs or updates the skills and checklists
 scripts/setup-worktree.sh installs board/ in a new worktree (.githooks, t3.json)
+scripts/release-secrets.sh stores the Release signing secrets on GitHub
 config.json        Mux repos (platform, role), board refresh, pickup limits
 UPSTREAM.md        source and commit of every copy
 docs/plan.md       how this was set up

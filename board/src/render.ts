@@ -332,8 +332,8 @@ function figures(stats: ItemStats): string {
   return `${duration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}`;
 }
 
-/** `action` is a button for the card's top row, so it adds no height. */
-function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', action = ''): string {
+/** `action` is a button for the card's top row, so it adds no height. `after` is a row below the item stats, as the Queued card's actions. */
+function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', action = '', after = ''): string {
   const parent = item.parent
     ? `<p class="parent">Part of <a href="${esc(item.parent.url)}" target="_blank" rel="noopener">#${item.parent.number} ${esc(item.parent.title)}</a></p>`
     : '';
@@ -352,11 +352,12 @@ function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', acti
     )
     .join('');
   const stats = statsBadge(item) + totalBadge(item, data);
-  const foot = hint || prs || stats ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}${stats}</p>` : '';
+  const foot = hint || prs ? `<p class="foot">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}${prs}</p>` : '';
+  const statsRow = stats ? `<p class="card-stats">${stats}</p>` : '';
   return `<article class="card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}" data-anchor="${esc(item.id)}">
 <div class="meta"><span class="badges">${platformBadge(item, data)}${kindPill(item)}${blocked}${subs}</span>${action}</div>
 ${titleLink(item)}
-${parent}${bars(item, opts.ui.slicesOpen === item.id)}${foot}${extra}
+${parent}${bars(item, opts.ui.slicesOpen === item.id)}${foot}${extra}${statsRow}${after}
 </article>`;
 }
 
@@ -378,9 +379,9 @@ ${body}
 </section>`;
 }
 
-function cards(items: Item[], data: BoardData, opts: RenderOptions, empty: string, extra?: (i: Item) => string, action?: (i: Item) => string): string {
+function cards(items: Item[], data: BoardData, opts: RenderOptions, empty: string, extra?: (i: Item) => string, action?: (i: Item) => string, after?: (i: Item) => string): string {
   if (!items.length) return `<p class="empty">${esc(empty)}</p>`;
-  return `<div class="cards">${items.map((i) => card(i, data, opts, extra?.(i), action?.(i))).join('\n')}</div>`;
+  return `<div class="cards">${items.map((i) => card(i, data, opts, extra?.(i), action?.(i), after?.(i))).join('\n')}</div>`;
 }
 
 /** List and Done rows show every label; sub-issue rows keep the card's kind pill. */
@@ -693,7 +694,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
   const queuedExtra = (i: Item) =>
     (workMessage(i)
       ? startControl(i, data, opts.actions?.[i.id], ui).message
-      : '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>') + footer(i);
+      : '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>');
   // A group, so Start sits in the card's top-right corner.
   const queuedAction = (i: Item) =>
     workMessage(i) ? `<span class="start-group">${startControl(i, data, opts.actions?.[i.id], ui).button}</span>` : '';
@@ -755,7 +756,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
       'queued',
       'Queued',
       queued.length,
-      cards(queued, data, opts, 'Nothing queued. Press Queue on a List item to queue it.', queuedExtra, queuedAction),
+      cards(queued, data, opts, 'Nothing queued. Press Queue on a List item to queue it.', queuedExtra, queuedAction, footer),
       'Start opens a mux-work thread in T3 Code',
     ),
     section('list', 'List', list.length, listBody),

@@ -5,6 +5,7 @@ import { countsOf, isStale } from '../model.ts';
 import type { BoardData } from '../model.ts';
 import { ago, clock } from '../format.ts';
 import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../brand-mark.ts';
+import { AddItem } from './AddItem.tsx';
 import { useBoardStore } from './board-store.ts';
 
 function BrandMark() {
@@ -47,7 +48,7 @@ export function Header() {
       <div className="title-row">
         <h1><BrandMark /><span>factory</span></h1>
         <Refreshed data={data} now={now} />
-        <span className="header-actions"><button type="button" className="copy add-item">Add item</button></span>
+        <span className="header-actions"><AddItem /></span>
       </div>
       <ul className="totals" aria-label="Counts">
         <li className={counts.needsYou ? 'amber' : ''}><b>{counts.needsYou}</b> need you</li>

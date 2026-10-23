@@ -1,0 +1,190 @@
+// The Add item dialog: the form, its repo-dependent fields, and each phase of a submission.
+
+import { expect, test, vi } from 'vite-plus/test';
+import { $, $$, fetchMock, mountPage, sample, settle } from './support.ts';
+import type { BoardData } from '../../src/model.ts';
+
+const withFactory: BoardData = { ...sample, repos: [
+  ...sample.repos, { repo: 'maddec01/mux-factory', platform: 'Factory', role: 'The factory' },
+] };
+const addButton = () => $<HTMLButtonElement>('.add-item')!;
+const dialog = () => $('#add-item-dialog');
+const field = <T extends HTMLElement = HTMLInputElement>(id: string) => $<T>(`#${id}`)!;
+const submit = () => field<HTMLButtonElement>('item-submit');
+const result = () => field('item-result');
+const labels = () => $$<HTMLInputElement>('input[name="labels"]').map((input) => input.value);
+
+async function open(data: BoardData = withFactory): Promise<void> {
+  await mountPage(data);
+  await settle(() => addButton().click());
+  // Base UI moves focus on the next frame.
+  await settle(() => vi.advanceTimersByTime(50));
+}
+
+/** Sets a field's value the way typing or picking does, so React hears it. */
+async function enter(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): Promise<void> {
+  const proto = Object.getPrototypeOf(el) as object;
+  Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value);
+  await settle(() => el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true })));
+}
+
+async function fillDraft(): Promise<void> {
+  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await enter(field('item-title'), 'Playback stalls');
+  await enter(field<HTMLTextAreaElement>('item-description'), 'After a seek.');
+}
+
+const respond = (body: object, status = 200) => fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify(body), { status }));
+const created = { number: 501, html_url: 'https://github.com/maddec01/mux-server/issues/501' };
+const posted = () => JSON.parse(String((fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>;
+
+test('Add item opens a dialog with the configured repositories, kinds, and the selected repo\'s applicability', async () => {
+  await open();
+  const popup = dialog()!;
+  expect(popup.getAttribute('role')).toBe('dialog');
+  expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Add item');
+  expect(document.activeElement, 'focus starts on the repo select').toBe(field('item-repo'));
+  expect($$<HTMLOptionElement>('#item-repo option').map((o) => [o.value, o.textContent])).toEqual([
+    ['maddec01/mux-server', 'Server'], ['maddec01/mux-apple', 'Apple'], ['maddec01/mux-factory', 'Factory']]);
+  expect($$<HTMLOptionElement>('#item-kind option').map((o) => o.value)).toEqual(['', 'bug', 'feature', 'improvement']);
+  expect($('label[for="item-title"]')!.textContent).toBe('Title (required)');
+  expect(field('item-title').required).toBe(true);
+  expect($('label[for="item-description"]')!.textContent).toBe('Description (optional)');
+  expect(result().getAttribute('role')).toBe('status');
+  expect(popup.textContent).toContain('Create an issue in Mux and add it to List.');
+
+  expect(labels()).toEqual(['area: server', 'area: web']);
+  expect(popup.textContent).toContain('Selecting neither means both server and web.');
+  const hint = $('.applicability')!.getAttribute('aria-describedby')!;
+  expect(document.getElementById(hint)!.textContent).toBe('Selecting neither means both server and web.');
+});
+
+test('changing the repo shows its applicability, unchecked, and a repo with none shows no group', async () => {
+  await open();
+  await settle(() => $<HTMLInputElement>('input[value="area: web"]')!.click());
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-apple');
+  expect(labels()).toEqual(['app: music', 'app: video', 'app: photos', 'app: books', 'os: ios', 'os: macos', 'os: tvos', 'os: watchos']);
+  expect(dialog()!.textContent).toContain('No apps selected means all apps.');
+  expect(dialog()!.textContent).toContain('No OSes selected means all OSes.');
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-factory');
+  expect($('.applicability')).toBeNull();
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-server');
+  expect($$<HTMLInputElement>('input[name="labels"]').some((input) => input.checked), 'a repo shown again starts unchecked').toBe(false);
+});
+
+test('a draft without a kind is not sent and says why', async () => {
+  await open();
+  await enter(field('item-title'), 'Playback stalls');
+  await settle(() => submit().click());
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(result().textContent).toBe('Choose bug, feature or improvement.');
+  await enter(field('item-title'), 'Playback stalls on seek');
+  expect(result().textContent, 'editing clears the message').toBe('');
+});
+
+test('submitting posts the draft, shows it sending, then the created issue, and New item starts over', async () => {
+  await open();
+  await settle(() => $<HTMLInputElement>('input[value="area: web"]')!.click());
+  await fillDraft();
+  let finish!: (response: Response) => void;
+  fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (finish = resolve)));
+  await settle(() => submit().click());
+
+  expect(fetchMock.mock.calls.at(-1)![0]).toBe('/api/items');
+  const body = posted();
+  expect(body.draft).toEqual({ repo: 'maddec01/mux-server', kind: 'bug', title: 'Playback stalls', description: 'After a seek.', labels: ['area: web'] });
+  expect(typeof body.requestId).toBe('string');
+  expect(submit().textContent).toBe('Adding…');
+  expect(submit().disabled).toBe(true);
+  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
+  expect($('#add-item-form')!.getAttribute('aria-busy')).toBe('true');
+  expect(result().textContent).toBe('Creating the issue and adding it to List…');
+
+  const item = { ...sample.items[0]!, title: 'Playback stalls', number: 501 };
+  const board = { ...sample, items: [...sample.items, item] };
+  await settle(() => finish(new Response(JSON.stringify({ item, issueUrl: created.html_url, error: null, board }))));
+  expect(result().textContent).toBe('Added #501 Playback stalls to List.View created issue');
+  expect(result().querySelector('a')!.href).toBe(created.html_url);
+  expect($('.totals')!.textContent, 'the board shows the new data').toContain(`${sample.items.length + 1} items`);
+  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
+
+  await settle(() => field<HTMLButtonElement>('item-new').click());
+  expect(field('item-title').value).toBe('');
+  expect(field<HTMLSelectElement>('item-kind').value).toBe('');
+  expect(result().textContent).toBe('');
+  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(false);
+  expect(submit().textContent).toBe('Add to List');
+});
+
+test('a created issue the server could not add offers a retry of the same request', async () => {
+  await open();
+  await fillDraft();
+  respond({ item: null, issueUrl: created.html_url, error: 'Could not add it to List.' }, 502);
+  await settle(() => submit().click());
+  const first = posted();
+  expect(result().textContent).toBe('Issue created. Could not add it to List. Retry to finish this issue.View created issue');
+  expect(submit().textContent).toBe('Retry this submission');
+  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
+
+  respond({ item: null, issueUrl: null, error: 'Still failing.' }, 502);
+  await settle(() => submit().click());
+  expect(posted().requestId, 'the retry repeats the same request').toBe(first.requestId);
+});
+
+test('an error before any issue exists keeps the draft for editing', async () => {
+  await open();
+  await fillDraft();
+  respond({ item: null, issueUrl: null, error: null }, 500);
+  await settle(() => submit().click());
+  expect(result().textContent).toBe('Request failed (HTTP 500).');
+  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(false);
+  expect(field('item-title').value).toBe('Playback stalls');
+});
+
+test('an uncertain creation points at the repo\'s issues and only New item goes on', async () => {
+  await open();
+  await fillDraft();
+  respond({ item: null, issueUrl: null, error: 'GitHub did not answer.', uncertain: true });
+  await settle(() => submit().click());
+  expect(result().querySelector('a')!.href).toBe('https://github.com/maddec01/mux-server/issues');
+  expect(result().querySelector('a')!.textContent).toBe('Check repository issues');
+  expect(submit().disabled).toBe(true);
+  expect(field<HTMLButtonElement>('item-new').hidden).toBe(false);
+});
+
+test('a lost response offers a retry', async () => {
+  await open();
+  await fillDraft();
+  fetchMock.mockImplementationOnce(async () => { throw new TypeError('Failed to fetch'); });
+  await settle(() => submit().click());
+  expect(result().textContent).toBe('The submission response was lost. Retry this submission to recover its result without creating another issue.');
+  expect(submit().textContent).toBe('Retry this submission');
+});
+
+test('sample mode disables adding and says so', async () => {
+  await open({ ...withFactory, capture: { session: 's', enabled: false } });
+  expect(submit().disabled).toBe(true);
+  expect(result().textContent).toBe('Adding items is disabled in sample mode.');
+});
+
+test('Close returns focus to Add item, and reopening keeps a draft but not a finished item', async () => {
+  await open();
+  await enter(field('item-title'), 'Half written');
+  await settle(() => $<HTMLButtonElement>('[data-close-item]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(dialog()!.hidden).toBe(true);
+  expect(document.activeElement).toBe(addButton());
+
+  await settle(() => addButton().click());
+  expect(dialog()!.hidden).toBe(false);
+  expect(field('item-title').value).toBe('Half written');
+
+  await fillDraft();
+  const item = { ...sample.items[0]!, title: 'Playback stalls', number: 501 };
+  respond({ item, issueUrl: created.html_url, error: null, board: withFactory });
+  await settle(() => submit().click());
+  await settle(() => $<HTMLButtonElement>('[data-close-item]')!.click());
+  await settle(() => addButton().click());
+  expect(field('item-title').value).toBe('');
+  expect(result().textContent).toBe('');
+});

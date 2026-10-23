@@ -1,12 +1,13 @@
 // A Board card: badges, title, parent, the status bar (and a build's slice bar), PR links with
-// their checks, and the item stats. Its buttons render in place; later slices wire them.
+// their checks, and the item stats.
 
 import { Fragment } from 'react';
 import type { ReactNode } from 'react';
-import { AMBER_STATUSES, STATUSES, canAbandon, ref } from '../model.ts';
+import { AMBER_STATUSES, STATUSES } from '../model.ts';
 import type { BoardData, Item, LinkedPr, Slice, Status } from '../model.ts';
 import { HINTS, checksBadge, namedSlices, popoverOrder, prLabel, statusTone } from '../board-view.ts';
 import { plural } from '../format.ts';
+import type { ItemAction } from './action-store.ts';
 import { useBoardStore } from './board-store.ts';
 import { KindPill, PlatformBadge, TitleLink } from './item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
@@ -79,16 +80,10 @@ function ChecksBadge({ pr }: { pr: LinkedPr }) {
   return <span className={badge.className} title={badge.title}>{badge.text}{badge.slow && <span className="sr-only"> (running over 30 minutes)</span>}</span>;
 }
 
-/** Board writes are off in sample mode, so its buttons are too; a running update holds them. */
-export function writeState(data: BoardData): { disabled?: true; title?: string; 'aria-disabled'?: true } {
+/** Board writes are off in sample mode, so its buttons are too; an action in flight or a running update holds them. */
+export function writeState(data: BoardData, action?: ItemAction): { disabled?: true; title?: string; 'aria-disabled'?: true } {
   if (data.capture?.enabled === false) return { disabled: true, title: 'Disabled in sample mode' };
-  return data.update?.state === 'running' ? { 'aria-disabled': true } : {};
-}
-
-/** Abandon styled as a List row's button, or as a Queued card footer's link. */
-export function AbandonButton({ item, data, className = 'copy row-action abandon' }: { item: Item; data: BoardData; className?: string }) {
-  if (!canAbandon(item)) return null;
-  return <button type="button" className={className} data-abandon={item.id} aria-label={`Abandon ${ref(item)} ${item.title}`} {...writeState(data)}>Abandon</button>;
+  return action?.phase === 'pending' || data.update?.state === 'running' ? { 'aria-disabled': true } : {};
 }
 
 /** `action` sits in the card's top row, so it adds no height; `after` is a row below the item stats. */

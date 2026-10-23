@@ -7,13 +7,12 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI } from '../src/ui-state.ts';
 import { formatTokens, formatUsd } from '../src/format.ts';
-import { answeredRecheck, recheckAnswer, renderAbandonDialog, renderApp, renderBoardView, renderHeader } from '../src/render.ts';
+import { answeredRecheck, recheckAnswer, renderApp, renderBoardView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData, ModelGroup } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
 import type { RawItem } from '../src/github.ts';
 import { rawIssue, sliceRef } from './raw-items.ts';
-import { abandonPrompt } from '../src/board-view.ts';
 
 // The source index.html stands in for the built one, whose asset names change with every build.
 const template = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -170,42 +169,6 @@ test('entered titles round-trip through bootstrap JSON without closing its scrip
 
 const ids = (status: string) => sample.items.filter((i) => i.status === status).map((i) => i.id);
 
-test('Queue shows the action in flight or its error', () => {
-  const [first, second] = ids('List') as [string, string];
-  const acting = renderBoardView(sample, { ...base, actions: {
-    [first]: { phase: 'pending' }, [second]: { phase: 'error', message: 'Could not set Queued.' } } });
-  assert.match(acting, new RegExp(`data-queue="${first}"[^>]*aria-disabled="true"[^>]*>Queuing…</button>`));
-  assert.match(acting, new RegExp(`data-queue="${second}"[^>]*>Queue</button>.*?<span class="action-error"><span role="alert">Could not set Queued.</span> <button type="button" class="dismiss" data-dismiss="action:${second}" aria-label="Dismiss error for #114">&#215;</button></span></li>`),
-    'an error stays on its card with a close button');
-});
-
-test('Abandon shows the delete in flight', () => {
-  const acting = renderBoardView(sample, { ...base, actions: {
-    PVTI_sample01: { phase: 'pending', kind: 'abandon' },
-    PVTI_sample02: { phase: 'error', kind: 'abandon', message: 'Could not delete #114. Must have admin rights.' } } });
-  assert.match(acting, /data-queue="PVTI_sample01"[^>]*aria-disabled="true"[^>]*>Queue<\/button>/);
-  assert.match(acting, /data-abandon="PVTI_sample01"[^>]*aria-disabled="true"[^>]*>Abandoning…<\/button>/);
-  assert.match(acting, /data-queue="PVTI_sample02".*?<span class="action-error"><span role="alert">Could not delete #114\. Must have admin rights\.<\/span> <button[^>]*data-dismiss="action:PVTI_sample02"[^>]*>&#215;<\/button><\/span><\/li>/);
-});
-
-test('Abandon names the item it will delete or remove, and announces it without a link', () => {
-  const issue = sample.items.find((i) => i.id === 'PVTI_sample01')!;
-  const draft = sample.items.find((i) => i.id === 'PVTI_sample04')!;
-  assert.equal(abandonPrompt(issue).question, `Delete #61 ${issue.title}?`);
-  assert.equal(abandonPrompt(draft).question, `Remove draft ${draft.title}?`);
-  const html = renderApp(sample, { ...base, notice: { key: 'notice-1', verb: 'Abandoned', item: issue } });
-  assert.match(html, new RegExp(`<div class="banner toast" role="status" data-expires="notice-1"><button[^>]*data-dismiss="notice-1"[^>]*>&#215;</button>Deleted #61 ${issue.title}\\.</div>`));
-  assert.match(renderAbandonDialog(), /<dialog id="abandon-dialog"[^>]*>[\s\S]*data-abandon-cancel autofocus>Cancel<\/button>/);
-});
-
-test('a queued or added item is announced in a toast that offers View item', () => {
-  const item = sample.items[0]!;
-  for (const verb of ['Moved', 'Added'] as const) {
-    const html = renderApp(sample, { ...base, notice: { key: 'notice-2', verb, item, to: 'Queued' } });
-    assert.match(html, new RegExp(`<div class="toasts">\\n<div class="banner toast" role="status" data-expires="notice-2"><button[^>]*data-dismiss="notice-2"[^>]*>&#215;</button>${verb} <a[^>]*>.*</a> to Queued\\. <button type="button" class="copy view-item" data-view-item="${item.id}">View item</button></div>`));
-  }
-});
-
 test('failures and the lost server have a close button; ongoing warnings do not', () => {
   const html = renderHeader({ ...sample, error: 'gh: HTTP 502' }, { ...base, clientError: 'HTTP 500' });
   assert.match(html, /role="alert"><button type="button" class="dismiss" data-dismiss="client-error" aria-label="Dismiss: can&#39;t reach the board server">&#215;<\/button><strong>Can't reach the board server/);
@@ -226,19 +189,15 @@ test('Started replaces Start in its group, and a Start error shows under the car
 
 const cardOf = (html: string, id: string) => html.split('<article').find((c) => c.includes(`data-anchor="${id}"`))!;
 
-test('Back to List, Abandon and Start each show only their own pending state', () => {
+test('Start shows only its own pending state', () => {
   const card = (action: ItemAction) => cardOf(renderBoardView(sample, { ...base, actions: { PVTI_sample05: action } }), 'PVTI_sample05');
-  const moving = card({ phase: 'pending', kind: 'back-to-list' });
-  assert.match(moving, /data-back-to-list="PVTI_sample05" aria-label="Moving #129 [^"]*" aria-disabled="true">\u2190 Moving to List…<\/button>/);
-  assert.match(moving, /data-start="PVTI_sample05"[^>]*>Start \u25be<\/button>/, 'Start is not relabelled');
   assert.match(card({ phase: 'pending' }), />Starting…<\/button>/);
-  const abandoning = card({ phase: 'pending', kind: 'abandon' });
-  assert.match(abandoning, /data-back-to-list="PVTI_sample05" aria-label="Back to List #129 [^"]*" aria-disabled="true">\u2190 Back to List<\/button><button[^>]*data-abandon="PVTI_sample05" aria-label="Abandoning… #129 [^"]*" aria-disabled="true">Abandoning…<\/button>/);
-  assert.match(abandoning, /data-start="PVTI_sample05"[^>]*>Start \u25be<\/button>/, 'Start is not relabelled');
-  assert.match(moving, /data-abandon="PVTI_sample05"[^>]*>Abandon<\/button>/, 'Abandon is not relabelled by Back to List');
+  for (const kind of ['back-to-list', 'abandon'] as const) {
+    assert.match(card({ phase: 'pending', kind }), /data-start="PVTI_sample05"[^>]*>Start \u25be<\/button>/, 'Start is not relabelled');
+  }
   const otherError = card({ phase: 'error', kind: 'abandon', message: 'Could not delete #129.' });
   assert.match(otherError, /data-start="PVTI_sample05"[^>]*>Start \u25be<\/button>/, 'another action\'s error is not a Start error');
-  assert.ok(!otherError.includes('<p class="start">') && !otherError.includes('action-error'), 'a card shows no inline error');
+  assert.ok(!otherError.includes('<p class="start">'), 'nor shows under the card');
 });
 
 test('a Queued card whose Start is pending, uncertain or done shows no footer actions', () => {
@@ -253,14 +212,6 @@ test('a Queued card whose Start is pending, uncertain or done shows no footer ac
     ['started on another page', card({ ...sample, started: { PVTI_sample05: thread } })],
   ] as const) assert.ok(!html.includes('card-actions'), `no footer while Start is ${why}`);
   assert.match(card(sample, { phase: 'error', message: 'T3 is down.' }), /<div class="card-actions">/, 'a failed Start brings the footer back');
-});
-
-test('a failed card action shows as a toast naming the item, which stays until closed', () => {
-  const item = sample.items.find((i) => i.id === 'PVTI_sample05')!;
-  const html = renderApp(sample, { ...base, notice: { key: 'notice-3', verb: 'Failed', item, to: 'List', message: 'Could not set List. GitHub is down.' } });
-  assert.match(html, /<div class="banner toast" role="alert"><button[^>]*data-dismiss="notice-3"[^>]*>&#215;<\/button>Couldn't move <a[^>]*>.*<\/a> to List\. Could not set List\. GitHub is down\.<\/div>/);
-  const abandon = renderApp(sample, { ...base, notice: { key: 'notice-4', verb: 'Failed', item, message: 'Could not delete #129.' } });
-  assert.match(abandon, /<div class="banner toast" role="alert"><button[^>]*data-dismiss="notice-4"[^>]*>&#215;<\/button>Couldn't abandon <a[^>]*>.*<\/a>\. Could not delete #129\.<\/div>/);
 });
 
 const MODEL_CHOICES: ModelGroup[] = [

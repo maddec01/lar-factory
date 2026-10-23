@@ -1,14 +1,19 @@
 // The Board view: a section per group of statuses, with cards, concept blocks, List groups by
-// platform and the Done list. Read-only for now; later slices wire its buttons.
+// platform and the Done list. View item jumps to an item here.
 
+import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
 import { AMBER_STATUSES, STATUSES, ref, workMessage } from '../model.ts';
 import type { BoardData, Item } from '../model.ts';
 import { boardSections, conceptChildren } from '../board-view.ts';
 import { day, plural, slug } from '../format.ts';
 import { useBoardStore } from './board-store.ts';
-import { AbandonButton, Card, writeState } from './Card.tsx';
+import { Card, writeState } from './Card.tsx';
 import { Disclosure } from './Disclosure.tsx';
+import { AbandonButton, ActionError, BackToListButton, QueueButton } from './ItemActions.tsx';
+import { jumpTo } from './jump.ts';
+import { useJumpStore } from './jump-store.ts';
+import { useSetView, useView } from './router.tsx';
 import { KindPill, LabelPills, PlatformBadge, TitleLink } from './item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
 
@@ -99,7 +104,7 @@ function QueuedCard({ item, data }: { item: Item; data: BoardData }) {
   // Issues and drafts get a footer row; nothing queues a pull request, and a started thread takes the row away.
   const footer = item.type !== 'PullRequest' && !data.started?.[item.id] && (
     <div className="card-actions">
-      <button type="button" className="link-action" data-back-to-list={item.id} aria-label={`Back to List ${ref(item)} ${item.title}`} {...writeState(data)}>{'←'} Back to List</button>
+      <BackToListButton item={item} data={data} />
       <AbandonButton item={item} data={data} className="link-action danger" />
     </div>
   );
@@ -111,8 +116,23 @@ function QueuedCard({ item, data }: { item: Item; data: BoardData }) {
   );
 }
 
+/** Brings the item View item asked for into view on the Board: its own card or row, not the copy inside a concept card. */
+function useJump(): void {
+  const view = useView();
+  const setView = useSetView();
+  const target = useJumpStore((state) => state.target);
+  useLayoutEffect(() => {
+    if (!target) return;
+    if (view !== 'board') return setView('board');
+    useJumpStore.getState().done();
+    const copies = [...document.querySelectorAll<HTMLElement>(`#panel-board [data-anchor="${CSS.escape(target)}"]`)];
+    jumpTo(copies.find((el) => !el.closest('.sub-groups')) ?? copies[0] ?? null);
+  }, [target, view, setView]);
+}
+
 export function BoardView() {
   const { data, now } = useBoardStore();
+  useJump();
   const { needsYou, inFlight, concepts, queued, list, listGroups, done } = boardSections(data, now);
   return (
     <>
@@ -140,8 +160,9 @@ export function BoardView() {
                 <ul className="rows">
                   {items.map((i) => (
                     <Row item={i} data={data} withPlatform={false} key={i.id} trailing={<>
-                      <button type="button" className="copy row-action" data-queue={i.id} aria-label={`Queue ${ref(i)} ${i.title}`} {...writeState(data)}>Queue</button>
+                      <QueueButton item={i} data={data} />
                       <AbandonButton item={i} data={data} />
+                      <ActionError item={i} />
                     </>} />
                   ))}
                 </ul>

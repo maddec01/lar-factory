@@ -7,11 +7,12 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI } from '../src/ui-state.ts';
 import { formatTokens, formatUsd } from '../src/format.ts';
-import { abandonPrompt, answeredRecheck, recheckAnswer, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
+import { abandonPrompt, answeredRecheck, recheckAnswer, renderAbandonDialog, renderAddItemForm, renderApp, renderBoardView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData, Item, ModelGroup } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
 import type { RawItem } from '../src/github.ts';
+import { rawIssue, sliceRef } from './raw-items.ts';
 
 // The source index.html stands in for the built one, whose asset names change with every build.
 const template = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -33,12 +34,12 @@ function matchesSaved(name: string, actual: string): void {
   assert.equal(actual, expected, `${name} differs from the saved copy; run pnpm run test:update if intended`);
 }
 
-test('page: header, stale banner and both views', () => {
-  matchesSaved('page.html', renderPage(template, sample, base));
+test('page: the app root and the board data for its first paint', () => {
+  matchesSaved('page.html', renderPage(template, sample));
 });
 
 test('the header and the tab show the Mux logo followed by "factory"', () => {
-  const page = renderPage(template, sample, base);
+  const page = renderPage(template, sample);
   assert.match(page, /<title>µx factory<\/title>/);
   assert.match(page, /<link rel="icon" href="data:image\/svg\+xml,[^"]*viewBox%3D%220%200%2056%2032%22/, 'the favicon is the logo');
   const h1 = renderHeader(sample, base).match(/<h1>(.*?)<\/h1>/)?.[1] ?? '';
@@ -53,7 +54,7 @@ test('code updates have a copyable command and a warning independent of project 
     command: "bash '/Users/pedro/Developer/Mux/mux-factory/board/scripts/update.sh'", updatable: false,
     logs: { update: '/Users/pedro/Library/Logs/mux-board-update.log', board: '/Users/pedro/Library/Logs/mux-board.log' },
   } };
-  const html = renderPage(template, data, base);
+  const html = renderApp(data, base);
   matchesSaved('update-notice.html', html);
   assert.match(html, /Board update available/);
   assert.match(html, /aria-label="Copy board update command"/);
@@ -155,56 +156,18 @@ test('List and Done rows show one pill per label instead of the kind pill', () =
   for (const id of ['PVTI_sample03', 'PVTI_sample19']) assert.ok(!rowOf(id).includes('class="kind'), 'no separate kind pill');
 });
 
-test('flow view: an outline of parent and blocked-by links', () => {
-  matchesSaved('flow.html', renderFlowView(sample, { ...base, ui: { ...DEFAULT_UI, view: 'flow' } }));
-});
-
-/** One outline node's HTML, nested nodes included. */
-function flowNode(html: string, id: string): string {
-  const start = html.indexOf(`<li class="o-node" id="o-${id}"`);
-  assert.ok(start >= 0, `${id} is in the outline`);
-  let depth = 0;
-  for (const m of html.slice(start).matchAll(/<li\b|<\/li>/g)) {
-    depth += m[0] === '</li>' ? -1 : 1;
-    if (!depth) return html.slice(start, start + m.index + 5);
-  }
-  throw new Error(`${id} never closes`);
-}
-
-const hasNode = (html: string, id: string) => html.includes(`<li class="o-node" id="o-${id}"`);
-
-test('Flow nests sub-issues under their parent and counts the ones not on the Board', () => {
-  const concept = flowNode(renderFlowView(sample, base), 'PVTI_sample09');
-  for (const id of ['PVTI_sample10', 'PVTI_sample12', 'PVTI_sample13', 'PVTI_sample18']) assert.ok(hasNode(concept, id), `${id} nests under #200`);
-  assert.match(concept, /<li class="o-missing">2 more sub-issues not on the board<\/li>/, 'six sub-issues, four on the Board');
-});
-
-test("a build's slices show no Status of their own, and Flow doesn't count them as missing", () => {
+test("a build's slices show no Status of their own", () => {
   const build = renderBoardView(sample, base).split('<article').find((a) => a.includes('data-anchor="PVTI_sample13"'))!;
   assert.ok(!/o-status|sub-status|data-anchor="PVTI_slice/.test(build), 'slices are not board items and show no Status');
-  assert.ok(!flowNode(renderFlowView(sample, base), 'PVTI_sample13').includes('o-missing'), "a build's slices are never on the board, so none is missing");
 });
 
-test('a build counts slices, not sub-issues, in Flow', () => {
-  assert.match(flowNode(renderFlowView(sample, base), 'PVTI_sample13'), /<span class="o-subs">1\/3 slices done<\/span>/);
-});
-
-// Raw project items as GitHub returns them, so the step that attaches slices runs.
-const rawIssue = (id: string, number: number, status: string, labels: string[], extra: Partial<NonNullable<RawItem['content']>> = {}): RawItem => ({
-  id, updatedAt: '2026-10-21T08:00:00Z', status: { name: status },
-  content: { __typename: 'Issue', number, title: `Issue ${number}`, url: `https://github.com/maddec01/mux-factory/issues/${number}`,
-    state: 'OPEN', updatedAt: '2026-10-21T08:00:00Z', repository: { nameWithOwner: 'maddec01/mux-factory' },
-    labels: { nodes: labels.map((name) => ({ name })) }, ...extra },
-});
-const sliceRef = (number: number, state: 'OPEN' | 'CLOSED') => ({ number, title: `Issue ${number}`,
-  url: `https://github.com/maddec01/mux-factory/issues/${number}`, state, repository: { nameWithOwner: 'maddec01/mux-factory' } });
 const builtIssue = rawIssue('PVTI_build', 59, 'In progress', ['improvement', 'build'], {
   subIssuesSummary: { total: 3, completed: 1 },
   subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
 });
 const boardOf = (raws: RawItem[], builds = new Set<string>()): BoardData => ({ ...sample, error: null, items: normalizeItems(raws, { builds }) });
 
-test('an open slice that the project auto-added is dropped from the board items, header counts and Flow', () => {
+test('an open slice that the project auto-added is dropped from the board items and header counts', () => {
   const slice = rawIssue('PVTI_slice66', 66, 'In progress', ['improvement'], {
     parent: { number: 59, title: 'Issue 59', url: 'https://github.com/maddec01/mux-factory/issues/59', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-factory' } },
   });
@@ -215,7 +178,6 @@ test('an open slice that the project auto-added is dropped from the board items,
   assert.match(header, /<li><b>2<\/b> in flight<\/li>/);
   assert.match(header, /<li><b>2<\/b> items<\/li>/);
   assert.ok(!renderBoardView(data, base).includes('data-anchor="PVTI_slice66"'), 'no card of its own');
-  assert.ok(!renderFlowView(data, base).includes('id="o-PVTI_slice66"'), 'no Flow node of its own');
 });
 
 test('an improvement labelled build keeps its improvement pill and still carries its slices', () => {
@@ -303,14 +265,6 @@ test("a build's popover stays open across a re-render", () => {
   assert.match(card(), /<div class="slices" data-slices="PVTI_build">/);
 });
 
-test("Flow counts only a build's visible slices, not GitHub's sub-issue totals", () => {
-  const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
-    subIssuesSummary: { total: 4, completed: 2 },
-    subIssues: { nodes: [sliceRef(65, 'CLOSED'), { ...sliceRef(66, 'CLOSED'), stateReason: 'NOT_PLANNED' }, sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
-  });
-  assert.match(flowNode(renderFlowView(boardOf([raw]), base), 'PVTI_build'), /<span class="o-subs">1\/3 slices done<\/span>/);
-});
-
 test("a build's slice caption counts only visible slices, and the active line collapses when none is active", () => {
   const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
     subIssuesSummary: { total: 4, completed: 2 },
@@ -341,7 +295,7 @@ test('a card with sub-issues but no build or concept label shows only its counte
   assert.ok(!card.includes('aria-label="Slices"'), 'no fallback list');
 });
 
-test('a build shows its `build` sub-issues like any parent: a counter, and Flow counts the ones not on the board', () => {
+test('a build shows its `build` sub-issues like any parent, with a counter', () => {
   const parent = rawIssue('PVTI_parent', 100, 'In progress', ['build'], {
     subIssuesSummary: { total: 3, completed: 0 },
     subIssues: { nodes: [sliceRef(101, 'OPEN'), sliceRef(102, 'OPEN'), sliceRef(103, 'OPEN')] },
@@ -353,52 +307,6 @@ test('a build shows its `build` sub-issues like any parent: a counter, and Flow 
   const card = renderBoardView(data, base).split('<article').find((a) => a.includes('data-anchor="PVTI_parent"'))!;
   assert.match(card, /<span class="subs">0\/2 sub-issues<\/span>/, 'the counter counts the build sub-issues, not the slice');
   assert.ok(card.includes('aria-label="Slices"') || card.includes('slice-bar'), 'its slice stays a slice');
-  const node = flowNode(renderFlowView(data, base), 'PVTI_parent');
-  assert.ok(hasNode(node, 'PVTI_102'), 'the build sub-issue nests under it');
-  assert.match(node, /<li class="o-missing">1 more sub-issue not on the board<\/li>/, 'the slice is never missing; the other build is');
-});
-
-test('Flow shows blocked-by and blocks links from GitHub, jumping to Board items and referencing the rest', () => {
-  const html = renderFlowView(sample, base);
-  assert.match(flowNode(html, 'PVTI_sample12'), /<li class="o-link o-blocked-by"><span class="o-rel">blocked by<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample10"><b>#201<\/b> Relay: broker only or full TURN\?<\/a> <span class="o-status">Shaping<\/span><\/li>/);
-  assert.match(flowNode(html, 'PVTI_sample10'), /<li class="o-link o-blocks"><span class="o-rel">blocks<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample12"><b>#202<\/b> Sign-in screen<\/a>/);
-  const owner = flowNode(html, 'PVTI_sample13');
-  assert.match(owner, /blocked by<\/span> <a class="o-ref off" href="https:\/\/github\.com\/maddec01\/mux-server\/issues\/118" target="_blank" rel="noopener"><b>#118<\/b> Accounts table migration<\/a> <span class="o-off">not on board · open<\/span>/);
-  assert.match(owner, /blocks<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample05"><b>#129<\/b>/);
-  assert.match(flowNode(html, 'PVTI_sample16'), /blocked by<\/span> <a class="o-ref off" [^>]*><b>#27<\/b> Artwork cache eviction<\/a> <span class="o-off">not on board · closed<\/span>/, 'closed blockers are listed too');
-  assert.match(flowNode(html, 'PVTI_sample15'), /blocked by<\/span> <a class="o-ref off" [^>]*><b>#100<\/b> Old cleanup task<\/a> <span class="o-off">not on board · closed<\/span>/,
-    'a Done item older than 7 days is hidden, so it counts as not on the Board');
-  assert.ok(!hasNode(html, 'PVTI_sample20'), 'and gets no node of its own');
-});
-
-test('Flow groups items under a parent that is not on the Board, with its state', () => {
-  const html = renderFlowView(sample, base);
-  const root = html.slice(html.indexOf('<li class="o-node o-offroot">'));
-  assert.match(root, /^<li class="o-node o-offroot">\n<div class="o-row"><a class="o-ref off" href="https:\/\/github\.com\/maddec01\/mux-apple\/issues\/9" target="_blank" rel="noopener"><b>mux-apple#9<\/b> Home screen refresh<\/a> <span class="o-off">not on board · open<\/span><\/div>/);
-  assert.ok(hasNode(root, 'PVTI_sample08') && hasNode(root, 'PVTI_sample11'), 'both of its sub-issues sit under it');
-  const done = sample.items.find((i) => i.id === 'PVTI_sample20')!;
-  const orphan = { ...sample.items[0]!, parent: { number: 100, title: done.title, url: done.url!, repo: done.repo!, state: 'CLOSED' as const } };
-  assert.match(renderFlowView({ ...sample, items: [orphan, done] }, base), /<b>mux-server#100<\/b> Old cleanup task<\/a> <span class="o-off">not on board · closed<\/span>/,
-    'a hidden parent is a reference too');
-});
-
-test('Flow counts links beyond the first ones GitHub returned, and never infers a link', () => {
-  const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/mux-server/issues/${number}`, repo: 'maddec01/mux-server', state: 'OPEN' as const });
-  const blocked = { ...sample.items[0]!, blockers: { total: 23, nodes: [ref(1), ref(2)] }, blocking: { total: 4, nodes: [ref(3)] } };
-  const blocker = { ...sample.items[1]!, number: 1, title: 'Issue 1' };
-  const html = renderFlowView({ ...sample, items: [blocked, blocker] }, base);
-  const node = flowNode(html, blocked.id);
-  assert.match(node, /<li class="o-link o-blocked-by o-more"><span class="o-rel">blocked by<\/span> 21 more issues<\/li>/);
-  assert.match(node, /<li class="o-link o-blocks o-more"><span class="o-rel">blocks<\/span> 3 more issues<\/li>/);
-  assert.ok(!hasNode(html, blocker.id) || !flowNode(html, blocker.id).includes('o-link'), "the blocker's own blocking list is empty, so it shows no link back");
-});
-
-test('Flow replaces the old tabs, story text and diagram with the outline', () => {
-  const html = renderFlowView(sample, base);
-  assert.match(html, /<ul class="o-legend" aria-label="Legend">.*<li><span class="o-rel">blocks<\/span> GitHub's blocking link<\/li>/);
-  assert.ok(!/data-flow-tab|class="story"|class="frow"/.test(html));
-  assert.match(html, /<details class="platform o-loose" id="flow-loose"><summary>\d+ items with no recorded relationships<\/summary>/);
-  assert.match(renderFlowView(sample, { ...base, ui: { ...DEFAULT_UI, toggled: { 'flow-loose': true } } }), /id="flow-loose" open>/);
 });
 
 test('capture form uses configured repositories and explains empty applicability selections', () => {
@@ -418,7 +326,7 @@ test('capture form uses configured repositories and explains empty applicability
 test('entered titles round-trip through bootstrap JSON without closing its script element', () => {
   const title = 'Play <queue> & "mix" </script>';
   const data = { ...sample, items: [{ ...sample.items[0]!, title }] };
-  const html = renderPage(template, data, base);
+  const html = renderPage(template, data);
   const embedded = html.match(/<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/)?.[1];
   assert.ok(embedded);
   assert.equal((JSON.parse(embedded) as BoardData).items[0]?.title, title);
@@ -458,7 +366,7 @@ test('Abandon names the item it will delete or remove, and announces it without 
   assert.equal(abandonPrompt(draft).question, `Remove draft ${draft.title}?`);
   const html = renderApp(sample, { ...base, notice: { key: 'notice-1', verb: 'Abandoned', item: issue } });
   assert.match(html, new RegExp(`<div class="banner toast" role="status" data-expires="notice-1"><button[^>]*data-dismiss="notice-1"[^>]*>&#215;</button>Deleted #61 ${issue.title}\\.</div>`));
-  assert.match(renderPage(template, sample, base), /<dialog id="abandon-dialog"[^>]*>[\s\S]*data-abandon-cancel autofocus>Cancel<\/button>/);
+  assert.match(renderAbandonDialog(), /<dialog id="abandon-dialog"[^>]*>[\s\S]*data-abandon-cancel autofocus>Cancel<\/button>/);
 });
 
 test('a queued or added item is announced in a toast that offers View item', () => {
@@ -644,7 +552,7 @@ test('Start shows its progress, the started thread, or the error', () => {
 });
 
 test('copy describes the Queue and Start buttons instead of dragging or typing /mux-work', () => {
-  const html = renderBoardView({ ...sample, items: [] }, base) + renderFlowView(sample, base);
+  const html = renderBoardView({ ...sample, items: [] }, base);
   assert.ok(!/drag|in a new T3 thread/i.test(html));
   assert.match(html, /Nothing queued\. Press Queue on a List item/);
 });
@@ -756,7 +664,7 @@ test('costs are shown as on T3 Code\'s usage page', () => {
 });
 
 test('a missing t3 replaces the board with a notice and Recheck', () => {
-  const page = renderPage(template, { ...sample, tools: { t3: { problem: 'missing' } } }, base);
+  const page = renderApp({ ...sample, tools: { t3: { problem: 'missing' } } }, base);
   matchesSaved('t3-missing.html', page);
   assert.match(page, /T3 Code not found/);
   assert.match(page, /data-recheck/);

@@ -79,6 +79,16 @@ test('HTTP validation rejects malformed, oversized and mismatched drafts without
   assert.equal((await board.calls()).filter((args) => args[0] === 'api' && args[1] === '--method').length, 0);
 });
 
+test('the page holds its first paint for its one script, served from the board, so it never shows empty', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const response = await fetch(`${board.url}/`);
+  assert.match(response.headers.get('content-security-policy') ?? '', /script-src 'self';/);
+  const scripts = [...(await response.text()).matchAll(/<script\b[^>]*>/g)].map(([tag]) => tag);
+  assert.equal(scripts.length, 2);
+  assert.match(scripts[0]!, /^<script type="module" blocking="render" crossorigin src="\/assets\/index-[\w-]+\.js">$/);
+  assert.equal(scripts[1], '<script id="board-data" type="application/json">');
+});
+
 test('sample mode never writes through the local GitHub login', async (t) => {
   const board = await startBoard(t, {}, true);
   assert.equal((await board.post({})).status, 403);

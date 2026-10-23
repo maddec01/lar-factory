@@ -14,6 +14,12 @@ async function eventually(read: () => Promise<boolean>): Promise<void> {
   assert.fail('Expected revision status did not arrive');
 }
 
+/** The board data the page at / paints first. */
+async function pageData(url: string): Promise<BoardData> {
+  const html = await fetch(url).then((r) => r.text());
+  return JSON.parse(html.match(/<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/)![1]!) as BoardData;
+}
+
 test('remote commits stay visible after checkout advancement, with startup assets and health identity preserved', async (t) => {
   const f = await factoryRepo(t);
   const running = f.git('rev-parse', 'HEAD');
@@ -43,9 +49,10 @@ test('remote commits stay visible after checkout advancement, with startup asset
     return data.codeUpdate?.runningRevision === running && data.codeUpdate?.remoteRevision === remote && data.codeUpdate?.behind === 1;
   });
   const html = await fetch(board.url).then((r) => r.text());
-  assert.match(html, /Board update available/);
-  assert.match(html, /board\/scripts\/update.sh/);
-  assert.ok(!html.includes('body { display: none; }'));
+  const { codeUpdate } = await pageData(board.url);
+  assert.equal(codeUpdate?.behind, 1, 'the page starts with the update available');
+  assert.match(codeUpdate?.command ?? '', /board\/scripts\/update.sh/);
+  assert.ok(!html.includes('display: none'), 'the board keeps serving the page it started with');
   for (const [name, content] of assets) assert.equal(await fetch(`${board.url}/assets/${name}`).then((r) => r.text()), content);
   const health = await fetch(`${board.url}/healthz`).then((r) => r.json());
   assert.equal(health.runningRevision, running);
@@ -64,14 +71,14 @@ test('failed revision checks remain distinct from fresh project data and recover
   assert.equal(data.codeUpdate?.behind, null);
   assert.equal(data.error, null);
   assert.ok(data.fetchedAt);
-  assert.match(await fetch(board.url).then((r) => r.text()), /Board update check failed/);
+  assert.ok((await pageData(board.url)).codeUpdate?.error, 'the page starts with the failed check');
   f.git('remote', 'set-url', 'origin', f.origin);
   await eventually(async () => (await board.board()).codeUpdate?.behind === 0);
   f.git('remote', 'set-url', 'origin', join(f.dir, 'missing-again'));
   await eventually(async () => Boolean((await board.board()).codeUpdate?.error));
   data = await board.board() as BoardData;
   assert.equal(data.codeUpdate?.behind, 0, 'last known result is kept alongside the failed-check warning');
-  assert.match(await fetch(board.url).then((r) => r.text()), /Board update check failed/);
+  assert.ok((await pageData(board.url)).codeUpdate?.error, 'the page starts with the failed check');
 });
 
 test('a local-ahead running revision needs no update until remote contains absent commits', async (t) => {
@@ -80,7 +87,7 @@ test('a local-ahead running revision needs no update until remote contains absen
   f.git('commit', '--allow-empty', '-m', 'chore(board): local commit');
   const board = await startBoard(t, {}, true, true, { BOARD_DATA_FILE: join(f.repo, 'sample.json') }, join(f.repo, 'board'));
   await eventually(async () => (await board.board()).codeUpdate?.behind === 0);
-  assert.doesNotMatch(await fetch(board.url).then((r) => r.text()), /Board update available/);
+  assert.equal((await pageData(board.url)).codeUpdate?.behind, 0, 'the page starts with no update available');
   f.git('switch', '-c', 'remote-work', base);
   f.git('commit', '--allow-empty', '-m', 'feat(board): different remote commit');
   f.git('push', 'origin', 'HEAD:main');

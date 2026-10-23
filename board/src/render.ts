@@ -1,5 +1,5 @@
-// The board's fixed template. Pure functions from data to HTML strings, shared
-// by the server (initial page, tests) and the browser (re-render every 15 s).
+// The board's text-built template, which the React page in app/ is replacing view by view.
+// Pure functions from data to HTML strings; the Flow view has moved to app/FlowView.tsx.
 
 import {
   AMBER_STATUSES,
@@ -7,8 +7,6 @@ import {
   canAbandon,
   checkState,
   countsOf,
-  isBuild,
-  isOnBoard,
   isRecentlyDone,
   isSlow,
   isStale,
@@ -20,7 +18,7 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, ToolMissing, ToolProblem, IssueLinks, IssueRef, Item, ItemStats, LinkedPr, ModelChoice, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, ToolMissing, ToolProblem, Item, ItemStats, LinkedPr, ModelChoice, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
 import { highlightedChoice } from './start-menu.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 import { ago, clock, day, duration, elapsed, esc, formatTokens, formatUsd, plural, slug, wholeUsd } from './format.ts';
@@ -262,17 +260,6 @@ function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', acti
 ${titleLink(item)}
 ${parent}${bars(item, opts.ui.slicesOpen === item.id)}${foot}${extra}${statsRow}${after}
 </article>`;
-}
-
-/**
- * "done/total noun done" for Flow, or '' with nothing to count. A build counts its
- * visible slices, which leave out those closed as not planned.
- */
-function subsDone(item: Item): string {
-  const [done, total, noun] = isBuild(item)
-    ? [item.slices.filter((s) => s.progress === 'done').length, item.slices.length, 'slices']
-    : [item.subIssues.completed, item.subIssues.total, 'sub-issues'];
-  return total ? `${done}/${total} ${noun} done` : '';
 }
 
 function section(id: string, title: string, count: number, body: string, note = ''): string {
@@ -733,95 +720,6 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
   ].join('\n');
 }
 
-// ---------- flow view ----------
-
-function issueKey(repo: string | null, number: number | null): string | null {
-  return repo && number !== null ? `${repo}#${number}` : null;
-}
-
-function outlineOrder(a: Item, b: Item): number {
-  return STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || (a.number ?? 0) - (b.number ?? 0);
-}
-
-function statusChip(item: Item): string {
-  const tone = AMBER_STATUSES.includes(item.status) ? ' amber' : item.status === 'Done' ? ' done' : '';
-  return `<span class="o-status${tone}">${esc(item.status)}</span>`;
-}
-
-/** `#n` within the same repo, `repo#n` across repos. */
-function shortRef(r: IssueRef, from: string | null): string {
-  return r.repo === from ? `#${r.number}` : `${r.repo.split('/')[1]}#${r.number}`;
-}
-
-/** A Board item jumps to its own row; anything else is a dashed reference to GitHub with its state. */
-function issueRefLink(r: IssueRef, from: string | null, shown: Map<string, Item>): string {
-  const item = shown.get(issueKey(r.repo, r.number)!);
-  const label = `<b>${esc(shortRef(r, from))}</b> ${esc(r.title)}`;
-  if (item) return `<a class="o-ref" href="#flow" data-outline-jump="${esc(item.id)}">${label}</a> ${statusChip(item)}`;
-  return `<a class="o-ref off" href="${esc(r.url)}" target="_blank" rel="noopener">${label}</a> <span class="o-off">not on board · ${r.state === 'OPEN' ? 'open' : 'closed'}</span>`;
-}
-
-/** One row per link GitHub returned, then a count of the rest. */
-function linkRows(rel: 'blocked by' | 'blocks', links: IssueLinks, from: string | null, shown: Map<string, Item>): string {
-  const cls = rel === 'blocked by' ? 'o-blocked-by' : 'o-blocks';
-  const rows = links.nodes.map((r) => `<li class="o-link ${cls}"><span class="o-rel">${rel}</span> ${issueRefLink(r, from, shown)}</li>`);
-  const more = links.total - links.nodes.length;
-  if (more > 0) rows.push(`<li class="o-link ${cls} o-more"><span class="o-rel">${rel}</span> ${plural(more, 'more issue', 'more issues')}</li>`);
-  return rows.join('');
-}
-
-/**
- * Parent/child and blocked-by links as an indented outline. Only links GitHub
- * records are shown; issues that aren't on the Board appear as references.
- */
-export function renderFlowView(data: BoardData, opts: RenderOptions): string {
-  const items = data.items.filter((i) => isOnBoard(i, opts.now)).sort(outlineOrder);
-  const shown = new Map(items.flatMap((i) => {
-    const key = issueKey(i.repo, i.number);
-    return key ? [[key, i] as const] : [];
-  }));
-  const parentKey = (i: Item) => (i.parent ? issueKey(i.parent.repo, i.parent.number) : null);
-  const children = new Map<string, Item[]>();
-  for (const i of items) {
-    const key = parentKey(i);
-    if (key) children.set(key, [...(children.get(key) ?? []), i]);
-  }
-
-  const node = (i: Item): string => {
-    const kids = children.get(issueKey(i.repo, i.number) ?? '') ?? [];
-    // A build's slices are never board items and aren't in its sub-issue counts, so none is missing.
-    const missing = i.subIssues.total - kids.length;
-    const kidRows = kids.map(node).join('')
-      + (missing > 0 ? `<li class="o-missing">${plural(missing, 'more sub-issue')} not on the board</li>` : '');
-    const links = linkRows('blocked by', i.blockers, i.repo, shown) + linkRows('blocks', i.blocking, i.repo, shown);
-    const count = subsDone(i);
-    const subs = count ? `<span class="o-subs">${count}</span>` : '';
-    return `<li class="o-node" id="o-${esc(i.id)}">
-<div class="o-row" data-anchor="o:${esc(i.id)}">${platformBadge(i, data)}${kindPill(i)}${titleLink(i, 'o-title')}${statusChip(i)}${subs}</div>
-${links ? `<ul class="o-links">${links}</ul>` : ''}${kidRows ? `<ul class="o-tree">${kidRows}</ul>` : ''}</li>`;
-  };
-
-  const related = (i: Item) => Boolean(i.parent || i.subIssues.total || i.slices.length || i.blockers.total || i.blocking.total);
-  const roots: Item[] = [];
-  const offBoard = new Map<string, { parent: IssueRef; kids: Item[] }>();
-  for (const i of items.filter(related)) {
-    const key = parentKey(i);
-    if (!key) roots.push(i);
-    else if (!shown.has(key)) offBoard.set(key, { parent: i.parent!, kids: [...(offBoard.get(key)?.kids ?? []), i] });
-  }
-  const offRoots = [...offBoard.values()].map(({ parent, kids }) => `<li class="o-node o-offroot">
-<div class="o-row">${issueRefLink(parent, null, shown)}</div>
-<ul class="o-tree">${kids.map(node).join('')}</ul></li>`).join('');
-  const loose = items.filter((i) => !related(i));
-  const looseRows = loose.map((i) => `<li class="row-item" data-anchor="o:${esc(i.id)}">${platformBadge(i, data)}${titleLink(i, 'row-title')}${statusChip(i)}</li>`).join('');
-
-  return `<div class="outline">
-<ul class="o-legend" aria-label="Legend"><li><span class="o-rel">nested</span> sub-issue of the row above</li><li><span class="o-rel">blocked by</span> GitHub's blocked-by link</li><li><span class="o-rel">blocks</span> GitHub's blocking link</li><li><span class="o-ref off">dashed</span> not on the board, shown as a reference</li></ul>
-<ul class="o-tree o-root">${roots.map(node).join('')}${offRoots}</ul>
-<details class="platform o-loose" id="flow-loose"${isOpen(opts.ui, 'flow-loose', false)}><summary>${plural(loose.length, 'item')} with no recorded relationships</summary><ul class="rows">${looseRows}</ul></details>
-</div>`;
-}
-
 // ---------- the whole app ----------
 
 export function renderApp(data: BoardData, opts: RenderOptions): string {
@@ -834,9 +732,6 @@ export function renderApp(data: BoardData, opts: RenderOptions): string {
 <main>
 <div class="panel" role="tabpanel" id="panel-board" aria-labelledby="tab-board"${view === 'board' ? '' : ' hidden'}>
 ${renderBoardView(data, opts)}
-</div>
-<div class="panel" role="tabpanel" id="panel-flow" aria-labelledby="tab-flow"${view === 'flow' ? '' : ' hidden'}>
-${renderFlowView(data, opts)}
 </div>
 </main>`;
 }

@@ -57,7 +57,7 @@ test('install-launch-agent.sh builds the page, then replaces the running board',
 
 test('a failing build stops install-launch-agent.sh before it stops the running board', async (t) => {
   const f = await launchFixture(t);
-  await writeFile(join(f.board, 'src/main.ts'), "import './missing.ts';\n");
+  await writeFile(join(f.board, 'src/main.tsx'), "import './missing.ts';\n");
   const { code, output } = await f.run();
   assert.notEqual(code, 0);
   assert.match(output, /the board page did not build; the running board was left as it was/);

@@ -5,10 +5,7 @@ import {
   AMBER_STATUSES,
   STATUSES,
   canAbandon,
-  checkState,
   countsOf,
-  isRecentlyDone,
-  isSlow,
   isStale,
   itemTotal,
   kindLabel,
@@ -18,12 +15,13 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, ToolMissing, ToolProblem, Item, ItemStats, LinkedPr, ModelChoice, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, ToolMissing, ToolProblem, Item, LinkedPr, ModelChoice, StartedThread, Status, UpdateStep } from './model.ts';
 import { highlightedChoice } from './start-menu.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
-import { ago, clock, day, duration, elapsed, esc, formatTokens, formatUsd, plural, slug, wholeUsd } from './format.ts';
+import { ago, clock, day, esc, plural, slug } from './format.ts';
 import type { UiState, View } from './ui-state.ts';
 import { BRAND_MARK } from './brand-mark.ts';
+import { HINTS, UNREADABLE, boardSections, checksBadge, conceptChildren, figures, namedSlices, popoverOrder, prLabel, statsTitle, statusTone, totalTitle } from './board-view.ts';
 
 export interface RenderOptions {
   now: number;
@@ -81,19 +79,6 @@ export interface ItemAction {
 
 // ---------- small helpers ----------
 
-function byFlowOrder(a: Item, b: Item): number {
-  return (
-    STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) ||
-    b.updatedAt.localeCompare(a.updatedAt) ||
-    (a.repo ?? '').localeCompare(b.repo ?? '') ||
-    (a.number ?? 0) - (b.number ?? 0)
-  );
-}
-
-export function listGroupId(platform: string): string {
-  return `list-${slug(platform)}`;
-}
-
 function isOpen(ui: UiState, id: string, byDefault: boolean): string {
   return ui.toggled[id] ?? byDefault ? ' open' : '';
 }
@@ -124,19 +109,13 @@ function titleLink(item: Item, cls = 'title'): string {
 /** Ten segments, one per status, with the item's current status coloured, then its caption: two cells of a `.bars` grid. */
 function stepCells(status: Status): string {
   const at = STATUSES.indexOf(status);
-  const tone = AMBER_STATUSES.includes(status) ? 'amber' : status === 'Done' ? 'done' : 'now';
+  const tone = statusTone(status);
   const segments = STATUSES.map((s, i) => {
     const state = i < at ? 'past' : i === at ? `cur ${tone}` : 'next';
     return `<li class="${state}" title="${esc(s)}"></li>`;
   }).join('');
   return `<ol class="segbar steps" aria-hidden="true">${segments}</ol><span class="bar-label step-label ${tone}">${at + 1}/${STATUSES.length} · ${esc(status)}</span>`;
 }
-
-/** The popover lists blocked slices first, then active, waiting and done. */
-const SLICE_GROUPS: SliceProgress[] = ['blocked', 'active', 'waiting', 'done'];
-
-/** The slice states the line under a build's bars names, in order. */
-const NAMED_SLICES = ['blocked', 'active'] as const;
 
 /**
  * The status bar, and on a build with slices its slice bar under it: one segment per
@@ -151,15 +130,14 @@ function bars(item: Item, open: boolean): string {
   const done = slices.filter((s) => s.progress === 'done').length;
   const segments = slices.map((s) => `<li class="${s.progress}"></li>`).join('');
   const sep = '<span class="sep"> · </span>';
-  const groups = NAMED_SLICES.map((g) => ({ g, group: slices.filter((s) => s.progress === g) })).filter(({ group }) => group.length);
+  const groups = namedSlices(slices).map(({ progress: g, slices: group }) => ({ g, group }));
   // Both groups together show counts only, so the active ones never truncate away.
   const named = groups.map(({ g, group }) => {
     const count = `<span class="slices-${g}">${group.length} ${g}</span>`;
     return groups.length > 1 ? count : `${count} ${group.map((s) => `<span class="ref">#${s.number}</span> ${esc(s.title)}`).join(sep)}`;
   });
   const now = named.length ? `<p class="slices-now">${named.join(sep)}</p>` : '';
-  // Within each group, slices keep GitHub's sub-issue order.
-  const rows = SLICE_GROUPS.flatMap((g) => slices.filter((s) => s.progress === g)).map(
+  const rows = popoverOrder(slices).map(
     (s) => `<li class="row-item slice-row ${s.progress}"><span class="slice-mark" aria-hidden="true"></span><a class="row-title" href="${esc(s.url)}" title="${esc(s.title)}" target="_blank" rel="noopener"><span class="ref">#${s.number}</span> ${esc(s.title)}<span class="sr-only"> (${s.progress})</span></a></li>`,
   ).join('');
   const popId = `slices-${esc(item.id)}`;
@@ -167,24 +145,11 @@ function bars(item: Item, open: boolean): string {
 <div class="slices-pop" id="${popId}"><ul class="slice-rows" aria-label="Slices">${rows}</ul></div></div>`;
 }
 
-/** The badge after an open PR's link: running with counts and age, passed, failed, or nothing. */
-function checksBadge(pr: LinkedPr, now: number): string {
-  const checks = pr.checks;
-  const state = checkState(checks);
-  if (!checks || !state || pr.state !== 'OPEN') return '';
-  if (state === 'passed') return `<span class="checks passed" title="All ${plural(checks.total, 'check')} passed">checks passed</span>`;
-  if (state === 'failed') return `<span class="checks failed" title="${checks.failed} of ${plural(checks.total, 'check')} failed">checks failed</span>`;
-  const slow = isSlow(checks, now);
-  const title = `Checks running${slow ? ' for over 30 minutes' : ''}: ${checks.passed} of ${checks.total} passed, ${checks.running} running${checks.failed ? `, ${checks.failed} failed` : ''}`;
-  const age = checks.since ? ` · ${elapsed(checks.since, now)}` : '';
-  return `<span class="checks running${slow ? ' slow' : ''}" title="${esc(title)}">checks ${checks.passed}/${checks.total}${age}${slow ? '<span class="sr-only"> (running over 30 minutes)</span>' : ''}</span>`;
+function checksBadgeHtml(pr: LinkedPr, now: number): string {
+  const badge = checksBadge(pr, now);
+  if (!badge) return '';
+  return `<span class="${badge.className}" title="${esc(badge.title)}">${esc(badge.text)}${badge.slow ? '<span class="sr-only"> (running over 30 minutes)</span>' : ''}</span>`;
 }
-
-const HINTS: Partial<Record<Status, string>> = {
-  'Needs you': 'Answer in its T3 thread',
-  Verify: 'Test it with the steps in the PR, then merge',
-  'Ready to merge': 'Merge the PR',
-};
 
 /**
  * Agent time, wall time, total tokens and API cost, `Σ 3h 20m · wall 1h 10m · 12.4M · $41.20`,
@@ -196,11 +161,7 @@ function statsBadge(item: Item): string {
   const stats = item.stats;
   if (!stats) return '';
   if (stats === 'unavailable') return `<span class="stats" title="${UNREADABLE}">stats unavailable</span>`;
-  const title = "Σ is agent time: all agents' work, parallel work added up, less waits on you." +
-    (stats.wallMs === undefined ? '' : ' Wall is the time any agent was working, less waits on you.') +
-    " Tokens are counted as T3 Code's usage page counts them." +
-    (stats.costUsd !== undefined ? ' The cost is an API estimate at list prices, not the subscription bill.' : '') + frozenNote(stats);
-  return `<span class="stats" title="${title}"><span aria-hidden="true">Σ</span><span class="sr-only">agent time</span> ${figures(stats)}</span>`;
+  return `<span class="stats" title="${statsTitle(stats)}"><span aria-hidden="true">Σ</span><span class="sr-only">agent time</span> ${esc(figures(stats))}</span>`;
 }
 
 /**
@@ -213,24 +174,7 @@ function totalBadge(item: Item, data: BoardData): string {
   const total = itemTotal(item, data.items);
   if (!total) return '';
   if (total === 'unavailable') return `<span class="stats total" title="${UNREADABLE}">total unavailable</span>`;
-  const title = 'The total adds the item stats of this item and of its sub-issues on the board, each once: ' +
-    'agent time first, then wall time, tokens and API cost, as in the item stats. ' +
-    'Times are added up across sub-issues, wall time too, so builds that ran side by side count in full.' + frozenNote(total);
-  return `<span class="stats total" title="${title}">total ${figures(total)}</span>`;
-}
-
-const UNREADABLE = 'The T3 Code database could not be read';
-
-/** The tooltip sentence for figures read back from merged PRs; '' for live ones. */
-function frozenNote(stats: ItemStats): string {
-  return stats.frozen ? ` Frozen when the PR merged, times rounded${stats.costUsd !== undefined ? ', cost to the nearest dollar' : ''}.` : '';
-}
-
-/** Agent time, wall time when known, tokens and cost when priced; a frozen cost in whole dollars. */
-function figures(stats: ItemStats): string {
-  const wall = stats.wallMs === undefined ? '' : ` · wall ${duration(stats.wallMs)}`;
-  const cost = stats.costUsd === undefined ? '' : ` · ${esc(stats.frozen ? wholeUsd(stats.costUsd) : formatUsd(stats.costUsd))}`;
-  return `${duration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}`;
+  return `<span class="stats total" title="${totalTitle(total)}">total ${esc(figures(total))}</span>`;
 }
 
 /** `action` is a button for the card's top row, so it adds no height. `after` is a row below the item stats, as the Queued card's actions. */
@@ -249,7 +193,7 @@ function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', acti
   const prs = item.linkedPrs
     .map(
       (pr) =>
-        `<span class="linked-pr"><a class="pr" href="${esc(pr.url)}" target="_blank" rel="noopener">PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'OPEN' ? '' : ` (${esc(pr.state.toLowerCase())})`}</a>${checksBadge(pr, opts.now)}</span>`,
+        `<span class="linked-pr"><a class="pr" href="${esc(pr.url)}" target="_blank" rel="noopener">${esc(prLabel(pr))}</a>${checksBadgeHtml(pr, opts.now)}</span>`,
     )
     .join('');
   const stats = statsBadge(item) + totalBadge(item, data);
@@ -596,17 +540,7 @@ ${groups}
 // ---------- board view ----------
 
 function conceptBlock(concept: Item, data: BoardData, opts: RenderOptions): string {
-  const children = data.items
-    .filter(
-      (i) =>
-        i.parent &&
-        i.parent.repo === concept.repo &&
-        i.parent.number === concept.number &&
-        i.status !== 'Done' &&
-        i.state !== 'CLOSED' &&
-        i.state !== 'MERGED',
-    )
-    .sort(byFlowOrder);
+  const children = conceptChildren(concept, data.items);
   const { total, completed } = concept.subIssues;
   const pct = total ? Math.round((completed / total) * 100) : 0;
   const progress = `<div class="progress"><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${completed}" aria-label="Sub-issues done"><span style="width:${pct}%"></span></div><span class="progress-label">${completed}/${total} sub-issues done</span></div>`;
@@ -629,19 +563,7 @@ function conceptBlock(concept: Item, data: BoardData, opts: RenderOptions): stri
 
 export function renderBoardView(data: BoardData, opts: RenderOptions): string {
   const { now, ui } = opts;
-  const items = [...data.items].sort(byFlowOrder);
-  const inStatus = (...s: Status[]) => items.filter((i) => s.includes(i.status));
-
-  const needsYou = inStatus('Needs you', 'Verify', 'Ready to merge');
-  const inFlight = inStatus('Shaping', 'Ready', 'In progress', 'Review').filter(
-    (i) => kindOf(i) !== 'concept',
-  );
-  const concepts = items.filter((i) => kindOf(i) === 'concept' && i.status !== 'Done');
-  const queued = inStatus('Queued');
-  const list = inStatus('List');
-  const done = items
-    .filter((i) => isRecentlyDone(i, now))
-    .sort((a, b) => (b.closedAt ?? b.updatedAt).localeCompare(a.closedAt ?? a.updatedAt));
+  const { needsYou, inFlight, concepts, queued, list, listGroups, done } = boardSections(data, now);
 
   // Issues and drafts get a footer row; nothing queues a pull request, so it gets none.
   // A Start in flight, uncertain or done takes the row away.
@@ -655,15 +577,8 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
   const queuedAction = (i: Item) =>
     workMessage(i) ? `<span class="start-group">${startControl(i, data, opts.actions?.[i.id], ui).button}</span>` : '';
 
-  const platforms = [...data.repos.map((r) => r.platform)];
-  for (const i of list) {
-    const p = platformOf(i, data.repos);
-    if (!platforms.includes(p)) platforms.push(p);
-  }
-  const listBody = `<div class="platforms">${platforms
-    .map((p) => {
-      const mine = list.filter((i) => platformOf(i, data.repos) === p);
-      const id = listGroupId(p);
+  const listBody = `<div class="platforms">${listGroups
+    .map(({ platform: p, id, items: mine }) => {
       const body = mine.length
         ? `<ul class="rows">${mine.map((i) => row(i, data, queueButton(i, data, opts.actions?.[i.id]) + abandonButton(i, data, opts.actions?.[i.id]) + actionError(i, opts.actions?.[i.id]), false)).join('')}</ul>`
         : '<p class="empty">Nothing in List.</p>';

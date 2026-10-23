@@ -2,7 +2,8 @@
 // /api/events, or by fetching /api/board every 15 s while that stream is down
 // (every second during an update), and re-renders with the same template the server used.
 
-import { abandonPrompt, answeredRecheck, listGroupId, recheckAnswer, renderApp } from './render.ts';
+import { abandonPrompt, answeredRecheck, recheckAnswer, renderApp } from './render.ts';
+import { listGroupId } from './board-view.ts';
 import type { ItemAction, Notice, RecheckAnswer, UpdateView } from './render.ts';
 import { DEFAULT_UI } from './ui-state.ts';
 import type { UiState, View } from './ui-state.ts';

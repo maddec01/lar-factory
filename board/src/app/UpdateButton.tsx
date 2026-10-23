@@ -1,51 +1,45 @@
-// The header's update button, shown once the app's updater finds a newer Release: Update downloads it
-// with progress, then Install and restart quits into it, showing Installing until the app quits. A failed
-// download or install shows with a retry.
-// It shows the states T3 Code's update button shows. Hovering or focusing it opens the changelog of the
-// Releases since the running version, as T3 Code's SidebarUpdateReleaseNotes. It is a PreviewCard, not a
-// Popover, as a Popover's focus guards would take the Tab after the button and close it.
+// The title bar's update button: T3 Code's update pill, copied from
+// apps/web/src/components/sidebar/SidebarUpdatePill.tsx at 9a391eb. One round icon button that the board app
+// always shows: click to check, download or install, with the tooltip saying which. Without T3's "update
+// everything" run, its Intel build warning, and (for now) its install confirmation and toasts. The store keeps
+// the board's own install and busy flags: while the app installs, the button keeps the downloaded look, disabled.
+// Hovering or focusing it opens the changelog of the Releases since the running version below it, on both
+// channels where T3 shows it on nightly only, as T3 Code's SidebarUpdateReleaseNotes. It is a PreviewCard, not
+// a Popover, as a Popover's focus guards would take the Tab after the button and close it.
+//
+// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PreviewCard } from '@base-ui/react/preview-card';
-import type { UpdateState } from './board-app.ts';
-import { useUpdateStore, type UpdateStore } from './update-store.ts';
+import { Tooltip } from '@base-ui/react/tooltip';
+import { boardApp, type UpdateState } from './board-app.ts';
+import { useUpdateStore } from './update-store.ts';
+import {
+  canCheckForUpdate,
+  getUpdateButtonTooltip,
+  getUpdateIdleTooltip,
+  isUpdateButtonDisabled,
+  resolveUpdateButtonAction,
+} from './update-button-logic.ts';
+import {
+  shouldContinueCheckAnimation,
+  shouldShowCheckIcon,
+  UpdateStatusIcon,
+  type UpdateStatusIconState,
+} from './UpdateStatusIcon.tsx';
 
-interface UpdateAction { label: string; run?: () => unknown; title?: string; tone?: 'error' }
+const BUSY = 'The updater is busy. Try again in a moment.';
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
-/** The status the button shows: a check every 4 minutes keeps showing the update it already found. */
-function shownStatus(state: UpdateState): UpdateState['status'] {
-  if (state.status !== 'checking') return state.status;
-  if (state.downloadedVersion !== null) return 'downloaded';
-  if (state.availableVersion !== null) return 'available';
-  return 'checking';
-}
-
-/** What the button shows and does in `state`, or null when it doesn't show. */
-function actionFor(state: UpdateState, store: UpdateStore): UpdateAction | null {
-  const { installing, download, install } = store;
-  const version = state.downloadedVersion ?? state.availableVersion;
-  if (installing) return { label: 'Installing…', title: `Quits and opens ${version}.` };
-  // A failed download keeps the update available and a failed install keeps it downloaded, with the error.
-  if ((state.errorContext === 'download' || state.errorContext === 'install') && state.message !== null) {
-    const failedInstall = state.errorContext === 'install';
-    return {
-      label: 'Update failed, retry',
-      run: state.canRetry ? (failedInstall ? install : download) : undefined,
-      title: `Couldn't ${failedInstall ? 'install' : 'download'} ${version}: ${state.message}`,
-      tone: 'error',
-    };
-  }
-  switch (shownStatus(state)) {
-    case 'available':
-      return { label: `Update to ${version}`, run: download };
-    case 'downloading':
-      return { label: `Downloading ${Math.floor(state.downloadPercent ?? 0)}%` };
-    case 'downloaded':
-      return { label: 'Install and restart', run: install, title: `Quits and opens ${version}.` };
-    // A failed check has no update to show; the next check tries again.
-    default:
-      return null;
-  }
+function usePrefersReducedMotion(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia(REDUCED_MOTION);
+      query.addEventListener('change', onChange);
+      return () => query.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(REDUCED_MOTION).matches,
+  );
 }
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -69,7 +63,7 @@ function ReleaseNotes({ state }: { state: UpdateState }) {
   );
 }
 
-/** The space between the button and its changelog, so the changelog starts 4 px below the title bar the button sits in. */
+/** The space between the button and its changelog or tooltip, so either starts 4 px below the title bar the button sits in. */
 function gapBelowTitleBar(button: HTMLElement | null): number {
   const bar = button?.closest('.title-bar');
   if (!button || !bar) return 4;
@@ -77,45 +71,174 @@ function gapBelowTitleBar(button: HTMLElement | null): number {
 }
 
 export function UpdateButton() {
-  const store = useUpdateStore();
-  const { state, busy, follow } = store;
+  const { state, installing, busy, follow, check, download, install } = useUpdateStore();
   useEffect(follow, [follow]);
+  const [isActionPending, setIsActionPending] = useState(false);
+  const [checkAnimationKey, setCheckAnimationKey] = useState(0);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
-  const action = state && actionFor(state, store);
-  if (!action) return null;
-  const { label, run, tone } = action;
-  const title = busy ? 'The updater is busy. Try again in a moment.' : action.title;
-  const hasNotes = state.releaseNotes.length > 0;
-  const open = hasNotes && (hovered || focused);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // The spin finishes its turn before the icon shows the check's outcome.
+  const updateStatus = state?.status;
+  const [isCheckAnimationLatched, setIsCheckAnimationLatched] = useState(
+    () => !prefersReducedMotion && updateStatus === 'checking',
+  );
+  const [latchInputs, setLatchInputs] = useState({ prefersReducedMotion, updateStatus });
+  if (latchInputs.prefersReducedMotion !== prefersReducedMotion || latchInputs.updateStatus !== updateStatus) {
+    setLatchInputs({ prefersReducedMotion, updateStatus });
+    if (prefersReducedMotion) {
+      setIsCheckAnimationLatched(false);
+    } else if (updateStatus === 'checking') {
+      setIsCheckAnimationLatched(true);
+    }
+  }
+
+  const action = state ? resolveUpdateButtonAction(state) : 'none';
+  const isDownloading = state?.status === 'downloading';
+  const showCheckIcon = shouldShowCheckIcon({
+    isAnimationLatched: isCheckAnimationLatched,
+    isChecking: state?.status === 'checking',
+    prefersReducedMotion,
+  });
+  const showUpdateDetails = action !== 'none' || isDownloading || installing;
+  const iconStatus: UpdateStatusIconState = showCheckIcon
+    ? 'checking'
+    : isDownloading
+      ? 'downloading'
+      : action === 'install' || installing
+        ? 'downloaded'
+        : action === 'download'
+          ? 'available'
+          : 'idle';
+  const showUpdateIconState = showUpdateDetails && !showCheckIcon;
+  const idleTooltip = !showUpdateDetails && !showCheckIcon ? getUpdateIdleTooltip(state) : null;
+  const tooltip = installing
+    ? 'Installing…'
+    : busy
+      ? BUSY
+      : showUpdateDetails
+        ? state
+          ? getUpdateButtonTooltip(state)
+          : 'Update available'
+        : showCheckIcon
+          ? 'Checking for updates…'
+          : (idleTooltip?.title ?? 'Check for updates');
+  const disabled = showCheckIcon
+    ? true
+    : showUpdateDetails
+      ? isUpdateButtonDisabled(state) || installing
+      : !canCheckForUpdate(state);
+  const isInteractionDisabled = disabled || isActionPending;
+  const showReleaseNotes = showUpdateDetails && !!state && state.releaseNotes.length > 0;
+  const notesOpen = showReleaseNotes && (hovered || focused);
+
+  const handleAction = () => {
+    if (isInteractionDisabled || !state) return;
+    if (action === 'install') {
+      void install();
+      return;
+    }
+    setIsActionPending(true);
+    if (action === 'download') {
+      void download().finally(() => setIsActionPending(false));
+      return;
+    }
+    if (!prefersReducedMotion) {
+      setIsCheckAnimationLatched(true);
+      setCheckAnimationKey((key) => key + 1);
+    }
+    void check().finally(() => setIsActionPending(false));
+  };
+
+  const handleCheckAnimationIteration = () => {
+    setIsCheckAnimationLatched(
+      shouldContinueCheckAnimation({ isChecking: state?.status === 'checking', prefersReducedMotion }),
+    );
+  };
+
   // Base UI measures again whenever it places the changelog, as when the window resizes, and the bridge follows.
   const sideOffset = () => {
     const gap = gapBelowTitleBar(anchor.current);
     popup.current?.style.setProperty('--update-notes-gap', `${gap}px`);
     return gap;
   };
+
+  if (!boardApp()) return null;
+
+  const button = (
+    <button
+      type="button"
+      ref={anchor}
+      aria-label={idleTooltip?.detail ? `${tooltip}: ${idleTooltip.detail}` : tooltip}
+      aria-disabled={isInteractionDisabled || undefined}
+      aria-describedby={notesOpen ? 'update-notes' : undefined}
+      className={[
+        'update-button inline-flex size-8 items-center justify-center rounded-full outline-hidden ring-(--focus) transition-colors focus-visible:ring-2 focus-visible:ring-inset',
+        isInteractionDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        showUpdateIconState
+          ? ['bg-(--update-surface) text-(--fg)', !isInteractionDisabled && 'hover:bg-(--update-hover)']
+          : ['text-(--update-icon)', !isInteractionDisabled && 'hover:bg-(--update-hover) hover:text-(--fg)'],
+        disabled && !showUpdateIconState && 'opacity-60',
+      ].flat().filter(Boolean).join(' ')}
+      onClick={handleAction}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    >
+      <UpdateStatusIcon
+        key={showCheckIcon ? checkAnimationKey : iconStatus}
+        downloadPercent={state?.downloadPercent ?? null}
+        isCheckAnimating={showCheckIcon && !prefersReducedMotion}
+        onCheckAnimationIteration={handleCheckAnimationIteration}
+        status={iconStatus}
+      />
+    </button>
+  );
+
   // The popup is in <body>, but React's events still bubble from it here, so the pointer on it counts as on the button.
   return (
     <span className="update"
       onPointerEnter={(e) => e.pointerType !== 'touch' && setHovered(true)}
       onPointerLeave={(e) => e.pointerType !== 'touch' && setHovered(false)}>
-      {/* Busy rather than disabled while it downloads or installs, so focus stays on the button. */}
-      <button type="button" className="copy update-button" ref={anchor} title={hasNotes ? undefined : title}
-        data-tone={tone} aria-disabled={!run} aria-describedby={open ? 'update-notes' : undefined}
-        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        onClick={() => run && void run()}>
-        {label}
-      </button>
-      <PreviewCard.Root open={open} onOpenChange={(next) => {
+      <Tooltip.Root disabled={showReleaseNotes}>
+        <Tooltip.Trigger render={button} />
+        {!showReleaseNotes && (
+          <Tooltip.Portal>
+            <Tooltip.Positioner
+              className="pointer-events-none z-[140] h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
+              collisionPadding={5} align="center" side="bottom" sideOffset={() => gapBelowTitleBar(anchor.current)}>
+              <Tooltip.Popup className={[
+                'update-tooltip relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-balance rounded-md text-(--fg) text-xs transition-[width,height,scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-md)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]',
+                showUpdateDetails
+                  ? 'dropdown-glass shadow-xl shadow-black/25 before:hidden'
+                  : 'border border-(--bd) bg-(--surface) not-dark:bg-clip-padding shadow-md/5',
+                'max-w-80 wrap-anywhere whitespace-normal leading-snug',
+              ].join(' ')}>
+                <div className="relative size-full overflow-clip px-2 py-1">
+                  {idleTooltip?.detail ? (
+                    <div className="text-left">
+                      <div className="font-medium">{idleTooltip.title}</div>
+                      <div className="text-(--muted)">{idleTooltip.detail}</div>
+                    </div>
+                  ) : (
+                    <span className="whitespace-pre-line">{tooltip}</span>
+                  )}
+                </div>
+              </Tooltip.Popup>
+            </Tooltip.Positioner>
+          </Tooltip.Portal>
+        )}
+      </Tooltip.Root>
+      <PreviewCard.Root open={notesOpen} onOpenChange={(next) => {
         if (!next) { setHovered(false); setFocused(false); }
       }}>
         <PreviewCard.Portal>
           <PreviewCard.Positioner className="update-notes-positioner" side="bottom" align="end" sideOffset={sideOffset} anchor={anchor}>
             <PreviewCard.Popup className="update-notes" id="update-notes" ref={popup}>
-              {title && <p className="update-notes-title">{title}</p>}
-              <ReleaseNotes state={state} />
+              <p className="update-notes-title">{tooltip}</p>
+              {state && <ReleaseNotes state={state} />}
             </PreviewCard.Popup>
           </PreviewCard.Positioner>
         </PreviewCard.Portal>

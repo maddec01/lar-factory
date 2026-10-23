@@ -14,6 +14,8 @@ export interface UpdateStore {
   busy: boolean;
   /** Reads the state and follows the app's pushes; returns the function that stops following. */
   follow: () => () => void;
+  /** Asks the app to check for an update now. */
+  check: () => Promise<void>;
   /** Asks the app to download the available update. */
   download: () => Promise<void>;
   /** Asks the app to install the downloaded update; a second call while one runs does nothing. */
@@ -38,6 +40,13 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
     // A push that lands before the read answers is newer, so the read doesn't overwrite it.
     void bridge.getUpdateState().then((state) => pushed || set({ state }), () => {});
     return stop;
+  },
+  check: async () => {
+    try {
+      await boardApp()!.checkForUpdate();
+    } catch {
+      // The app checks again every 4 minutes.
+    }
   },
   download: async () => {
     set({ busy: false });

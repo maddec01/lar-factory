@@ -43,7 +43,7 @@ beforeEach(() => {
   // jsdom has no layout: scrolling does nothing, and nothing prefers reduced motion.
   vi.stubGlobal('scrollTo', vi.fn());
   vi.stubGlobal('scrollBy', vi.fn());
-  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
   Element.prototype.scrollIntoView = vi.fn();
   history.replaceState(null, '', '/');
 });
@@ -75,7 +75,7 @@ export async function settle(fn: () => unknown = () => {}): Promise<void> {
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 
-/** The updater in a `pnpm run dev` app: off, so the page shows no update button. */
+/** The updater in a `pnpm run dev` app: off, so the update button shows dimmed with the reason. */
 export const updatesOff: UpdateState = {
   enabled: false, status: 'disabled', channel: 'latest', currentVersion: '0.0.0', availableVersion: null,
   downloadedVersion: null, releaseNotes: [], omittedReleaseCount: 0, downloadPercent: null, checkedAt: null,

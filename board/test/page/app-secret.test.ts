@@ -2,7 +2,7 @@
 // outside it (a browser, `pnpm run sample`) it sends no secret header.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, fetchMock, mountPage, settle } from './support.ts';
+import { $, fetchMock, mountPage, settle, stubApp } from './support.ts';
 
 const secretOfLastPost = () => {
   const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
@@ -15,7 +15,7 @@ async function queueFirstItem(): Promise<void> {
 }
 
 test('in the app, a write carries the secret the bridge holds', async () => {
-  vi.stubGlobal('boardApp', { platform: 'darwin', secret: 'launch-secret' });
+  stubApp({ secret: 'launch-secret' });
   await queueFirstItem();
   expect(fetchMock.mock.calls.at(-1)![0]).toBe('/api/queue');
   expect(secretOfLastPost()).toBe('launch-secret');
@@ -28,7 +28,7 @@ test('outside the app, a write carries no secret header', async () => {
 });
 
 test('a bridge without a secret adds no header', async () => {
-  vi.stubGlobal('boardApp', { platform: 'darwin' });
+  stubApp({});
   await queueFirstItem();
   expect(secretOfLastPost()).toBeNull();
 });

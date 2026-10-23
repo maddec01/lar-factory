@@ -5,6 +5,7 @@ import { act } from 'react';
 import { afterEach, beforeEach, vi } from 'vite-plus/test';
 import { pageWithData } from '../../src/page.ts';
 import type { BoardData } from '../../src/model.ts';
+import type { BoardAppBridge, UpdateState } from '../../src/app/board-app.ts';
 import template from '../../index.html?raw';
 import sampleJson from '../sample.json' with { type: 'json' };
 
@@ -72,3 +73,29 @@ export async function settle(fn: () => unknown = () => {}): Promise<void> {
 
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
+
+/** The updater in a `pnpm run dev` app: off, so the page shows no update button. */
+export const updatesOff: UpdateState = {
+  enabled: false, status: 'disabled', channel: 'latest', currentVersion: '0.0.0', availableVersion: null,
+  downloadedVersion: null, downloadPercent: null, checkedAt: null, message: 'Updates work only in the packaged app.',
+  errorContext: null, canRetry: false,
+};
+
+/** Puts the app's preload bridge on the page: `parts`, with the rest doing nothing. */
+export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBridge & T {
+  const unused = () => Promise.reject(new Error('not stubbed'));
+  const bridge = {
+    platform: 'darwin',
+    listProfiles: unused,
+    setProfileTick: unused,
+    getUpdateState: async () => updatesOff,
+    onUpdateState: () => () => {},
+    checkForUpdate: unused,
+    downloadUpdate: unused,
+    installUpdate: unused,
+    setUpdateChannel: unused,
+    ...parts,
+  };
+  vi.stubGlobal('boardApp', bridge);
+  return bridge;
+}

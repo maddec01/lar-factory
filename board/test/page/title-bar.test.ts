@@ -2,12 +2,12 @@
 // "Factory" and the "for T3 Code" pill. Outside the app (a browser, `pnpm run sample`) it draws none.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, mountPage, sample } from './support.ts';
+import { $, mountPage, sample, stubApp } from './support.ts';
 
 const titleBar = () => $<HTMLElement>('.title-bar');
 
 test('in the Mac app, the page shows the title bar above the header', async () => {
-  vi.stubGlobal('boardApp', { platform: 'darwin', secret: 'launch-secret' });
+  stubApp({ secret: 'launch-secret' });
   await mountPage();
   expect(titleBar()?.textContent).toBe('Factoryfor T3 Code');
   expect(titleBar()?.querySelector('a, button')).toBeNull();
@@ -17,7 +17,7 @@ test('in the Mac app, the page shows the title bar above the header', async () =
 });
 
 test('the title bar also tops the missing-t3 notice', async () => {
-  vi.stubGlobal('boardApp', { platform: 'darwin' });
+  stubApp({});
   await mountPage({ ...sample, tools: { t3: { problem: 'missing' } } });
   expect(titleBar()).not.toBeNull();
 });

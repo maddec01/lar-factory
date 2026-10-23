@@ -2,7 +2,7 @@
 // and their place below the header. Ported from the toast cases of test/render.test.ts.
 
 import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { $, fetchMock, mountPage, sample, settle } from './support.ts';
+import { $, fetchMock, mountPage, sample, settle, stubApp } from './support.ts';
 import type { BoardData } from '../../src/model.ts';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';
@@ -105,7 +105,7 @@ test('toasts sit below the header while it is on screen, and at the top once it 
 });
 
 test("in the Mac app, toasts stay below the title bar once the header scrolls away", async () => {
-  vi.stubGlobal('boardApp', { platform: 'darwin' });
+  stubApp({});
   await mountPage();
   let bottom = 140;
   $('header.top')!.getBoundingClientRect = () => ({ bottom }) as DOMRect;

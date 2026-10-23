@@ -1,9 +1,10 @@
 // The page's header: the logo, when the data was read, the counts, the app's update button, Add item, its Settings,
 // and the banners for a gh the board can't use, stale data and an unreachable server, which closes.
 
+import { useEffect, useState } from 'react';
 import { countsOf, isStale } from '../model.ts';
 import type { BoardData } from '../model.ts';
-import { ago, clock } from '../format.ts';
+import { ago, clock, shortAgo } from '../format.ts';
 import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../brand-mark.ts';
 import { AddItem } from './AddItem.tsx';
 import { inMacApp } from './board-app.ts';
@@ -22,16 +23,17 @@ export function BrandMark() {
   );
 }
 
-function Refreshed({ data, now }: { data: BoardData; now: number }) {
-  const project = data.project.url
-    ? <a href={data.project.url} target="_blank" rel="noopener">{data.project.title} project</a>
-    : data.project.title;
+/** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. */
+function Refreshed({ fetchedAt }: { fetchedAt: string | null }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [fetchedAt]);
   return (
     <p className="refreshed">
-      {data.fetchedAt
-        ? <>Refreshed <time dateTime={data.fetchedAt}>{clock(data.fetchedAt, undefined)}</time> <span className="age">({ago(data.fetchedAt, now)})</span></>
-        : 'Not read yet'}
-      {' · '}{project}
+      {fetchedAt ? <>Refreshed <time dateTime={fetchedAt}>{shortAgo(fetchedAt, now)}</time></> : 'Not read yet'}
     </p>
   );
 }
@@ -54,7 +56,7 @@ export function Header() {
       <div className="title-row">
         {/* In the Mac app the title bar shows the logo, so the heading stays for screen readers only. */}
         <h1 className={inMacApp() ? 'sr-only' : undefined}><BrandMark /><span>factory</span></h1>
-        <Refreshed data={data} now={now} />
+        <Refreshed fetchedAt={data.fetchedAt} />
         <span className="header-actions"><UpdateButton /><AddItem /><Settings /></span>
       </div>
       <ul className="totals" aria-label="Counts">

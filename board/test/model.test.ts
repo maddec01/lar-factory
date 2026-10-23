@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { canAbandon, checkState, countsOf, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
-import { formatTokens, formatUsd } from '../src/format.ts';
+import { formatTokens, formatUsd, shortAgo } from '../src/format.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
   return {
@@ -134,6 +134,13 @@ test('token counts are compact as on T3 Code\'s usage page', () => {
 
 test('costs are shown as on T3 Code\'s usage page', () => {
   assert.deepEqual([0.004, 41.2, 1234.567].map(formatUsd), ['$0.00', '$41.20', '$1,234.57']);
+});
+
+test('a short age rounds each unit down, and a future time reads 0s ago', () => {
+  const now = Date.parse('2026-10-23T12:00:00Z');
+  const at = (s: number) => new Date(now - s * 1000).toISOString();
+  assert.deepEqual([0, 59, 60, 59 * 60 + 59, 60 * 60, 47 * 3600 + 59 * 60, 48 * 3600, -30].map((s) => shortAgo(at(s), now)),
+    ['0s ago', '59s ago', '1m ago', '59m ago', '1h ago', '47h ago', '2d ago', '0s ago']);
 });
 
 test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {

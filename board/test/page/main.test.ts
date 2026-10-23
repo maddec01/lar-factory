@@ -32,14 +32,28 @@ test('an entered title round-trips through the inline board data without closing
   expect(document.body.textContent).toContain(title);
 });
 
-test('the header shows the Mux logo followed by "factory", when the data was read, and the project', async () => {
+test('the header shows the Mux logo followed by "factory", and how long ago the data was read', async () => {
   await mountPage(fresh);
   const h1 = $('h1')!;
   expect(h1.querySelector('svg.brand-mark[role="img"][aria-label="Mux"]')!.getAttribute('viewBox')).toBe('0 0 56 32');
   expect(h1.lastElementChild!.outerHTML).toBe('<span>factory</span>');
-  expect($('.refreshed')!.textContent).toMatch(/^Refreshed \d\d:\d\d \(just now\) · Mux project$/);
+  expect($('.refreshed')!.textContent).toBe('Refreshed 0s ago');
+  expect($('.refreshed a')).toBeNull();
   expect($('.totals .amber')!.textContent).toBe('4 need you');
   expect($('.banner')).toBeNull();
+});
+
+test('Refreshed counts up each second, between the board\'s 15 s ticks', async () => {
+  await mountPage(fresh);
+  await settle(() => vi.advanceTimersByTime(12_000));
+  expect($('.refreshed')!.textContent).toBe('Refreshed 12s ago');
+  await settle(() => vi.advanceTimersByTime(1_000));
+  expect($('.refreshed')!.textContent).toBe('Refreshed 13s ago');
+});
+
+test('Refreshed reads "Not read yet" before the first read', async () => {
+  await mountPage({ ...fresh, fetchedAt: null });
+  expect($('.refreshed')!.textContent).toBe('Not read yet');
 });
 
 test('stale data and a failed read show a banner', async () => {
@@ -70,7 +84,7 @@ test('data pushed over /api/events replaces the board, and the open stream stops
   await settle(() => stream().onopen!());
   await settle(() => vi.advanceTimersByTime(60_000));
   expect(fetchMock).not.toHaveBeenCalled();
-  expect($('.refreshed')!.textContent).toMatch(/\(1 min ago\)/);
+  expect($('.refreshed')!.textContent).toBe('Refreshed 1m ago');
 
   await settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify({ ...fresh, items: fresh.items.slice(0, 1) }) })));
   expect($('.totals li:last-child')!.textContent).toBe('1 items');

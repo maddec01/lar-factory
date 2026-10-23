@@ -104,18 +104,19 @@ async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise
   throw new Error('The board never read its items');
 }
 
-test("a refresh finds build sub-issues and active slices with issue searches, not the board query's labels", async (t) => {
+test("a refresh finds build sub-issues, active and blocked slices with issue searches, not the board query's labels", async (t) => {
   const repository = { nameWithOwner: 'maddec01/mux-factory' };
   const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/mux-factory/issues/${number}`,
     state: 'OPEN', stateReason: null, repository });
   const parent = rawBuild(13, 'In progress');
-  const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref(12), ref(15)] } } }, rawBuild(12, 'In progress'), rawIssue(15, 'In progress')];
-  const board = await startBoard(t, { items, builds: [{ number: 12, repository }], active: [{ number: 15, repository }] });
+  const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref(12), ref(15), ref(16)] } } }, rawBuild(12, 'In progress'), rawIssue(15, 'In progress')];
+  const board = await startBoard(t, { items, builds: [{ number: 12, repository }], active: [{ number: 15, repository }, { number: 16, repository }],
+    blocked: [{ number: 16, repository }] });
   const read = await readItems(board);
   assert.deepEqual(read.map((i) => i.number), [13, 12], 'the build sub-issue stays a board item; the slice does not');
   const [built] = read;
   assert.deepEqual(built?.subIssues, { total: 1, completed: 0 });
-  assert.deepEqual(built?.slices.map((s) => [s.number, s.progress]), [[15, 'active']]);
+  assert.deepEqual(built?.slices.map((s) => [s.number, s.progress]), [[15, 'active'], [16, 'blocked']]);
 });
 
 test('a build sub-issue on the project stays a board item while the issue search still misses its new label', async (t) => {

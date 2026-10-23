@@ -29,15 +29,20 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
   };
 }
 
-test('a slice is done once closed as completed, active while open with the active label, else waiting; not planned is hidden', () => {
-  assert.equal(sliceProgress('CLOSED', 'COMPLETED', false), 'done');
-  assert.equal(sliceProgress('CLOSED', 'COMPLETED', true), 'done', 'a closed slice is done even if it still has active');
-  assert.equal(sliceProgress('CLOSED', null, false), 'done', 'closed before GitHub kept a reason');
-  assert.equal(sliceProgress('OPEN', null, true), 'active');
-  assert.equal(sliceProgress('OPEN', 'REOPENED', false), 'waiting');
-  assert.equal(sliceProgress('CLOSED', 'NOT_PLANNED', false), null);
-  assert.equal(sliceProgress('CLOSED', 'NOT_PLANNED', true), null);
-  assert.equal(sliceProgress('CLOSED', 'DUPLICATE', false), null, 'a duplicate is closed as not planned too');
+test('a slice is done once closed as completed, blocked or active while open with that label, else waiting; not planned is hidden', () => {
+  const active = { active: true };
+  const blocked = { blocked: true };
+  assert.equal(sliceProgress('CLOSED', 'COMPLETED', {}), 'done');
+  assert.equal(sliceProgress('CLOSED', 'COMPLETED', active), 'done', 'a closed slice is done even if it still has active');
+  assert.equal(sliceProgress('CLOSED', 'COMPLETED', blocked), 'done', 'a closed slice is done even if it still has blocked');
+  assert.equal(sliceProgress('CLOSED', null, {}), 'done', 'closed before GitHub kept a reason');
+  assert.equal(sliceProgress('OPEN', null, active), 'active');
+  assert.equal(sliceProgress('OPEN', null, blocked), 'blocked');
+  assert.equal(sliceProgress('OPEN', null, { active: true, blocked: true }), 'blocked', 'blocked wins over active');
+  assert.equal(sliceProgress('OPEN', 'REOPENED', {}), 'waiting');
+  assert.equal(sliceProgress('CLOSED', 'NOT_PLANNED', {}), null);
+  assert.equal(sliceProgress('CLOSED', 'NOT_PLANNED', blocked), null);
+  assert.equal(sliceProgress('CLOSED', 'DUPLICATE', {}), null, 'a duplicate is closed as not planned too');
 });
 
 test('kinds come from labels', () => {

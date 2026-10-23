@@ -10,7 +10,8 @@ const main = async () => {
   if (args[1] === 'graphql') {
     if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'Mux' }] } } } });
     if (args.some((a) => a.includes('search(type: ISSUE'))) {
-      const nodes = args.some((a) => a.includes('label:build')) ? options.builds : options.active;
+      const label = ['build', 'blocked', 'active'].find((l) => args.some((a) => a.includes(`label:${l} `)));
+      const nodes = { build: options.builds, blocked: options.blocked, active: options.active }[label];
       return output({ data: { search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: nodes ?? [] } } });
     }
     if (options.readDelay) await new Promise((r) => setTimeout(r, options.readDelay));

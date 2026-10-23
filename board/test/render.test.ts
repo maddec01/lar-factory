@@ -399,7 +399,7 @@ test('Flow replaces the old tabs, story text and diagram with the outline', () =
 
 test('capture form uses configured repositories and explains empty applicability selections', () => {
   const html = renderAddItemForm({ ...sample, repos: [
-    ...sample.repos, { repo: 'maddec01/mux-factory', platform: 'Factory', path: '~/test/mux-factory', role: 'The factory' },
+    ...sample.repos, { repo: 'maddec01/mux-factory', platform: 'Factory', role: 'The factory' },
   ] });
   for (const text of ['Server', 'Apple', 'Factory', 'bug', 'feature', 'improvement', 'app: books', 'os: watchos',
     'area: server', 'area: web', 'No apps selected means all apps.', 'No OSes selected means all OSes.',

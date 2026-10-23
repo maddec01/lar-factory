@@ -7,19 +7,16 @@
     {
       "repo": "maddec01/mux-server",
       "platform": "Server",
-      "path": "~/Developer/Mux/mux-server",
       "role": "Backend API server used by mux-apple"
     },
     {
       "repo": "maddec01/mux-apple",
       "platform": "Apple",
-      "path": "~/Developer/Mux/mux-apple",
       "role": "Apple client app for mux-server"
     },
     {
       "repo": "maddec01/mux-factory",
       "platform": "Factory",
-      "path": "~/Developer/Mux/mux-factory",
       "role": "The factory: board, mux-work skill and process docs"
     }
   ],

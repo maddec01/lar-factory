@@ -37,18 +37,10 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
   };
 }
 
+/** A repos entry with a role; an older entry's checkout `path` is dropped. */
 function checkRepo(entry: RepoConfig, url: URL): RepoConfig {
-  const fail = (problem: string) => { throw new Error(`${url.pathname}: ${entry.repo ?? 'a repos entry'} ${problem}`); };
-  for (const field of ['path', 'role'] as const) {
-    if (typeof entry[field] !== 'string' || !entry[field].trim()) fail(`needs a "${field}"`);
+  if (typeof entry.role !== 'string' || !entry.role.trim()) {
+    throw new Error(`${url.pathname}: ${entry.repo ?? 'a repos entry'} needs a "role"`);
   }
-  if (!entry.path.startsWith('~/')) fail(`"path" must start with ~/, since config.json is public: ${entry.path}`);
-  return entry;
-}
-
-/** Expands a leading ~, which execFile leaves alone; config.json is public, so it can't name the home folder. */
-export function expandHome(path: string, home: string | undefined): string {
-  if (path !== '~' && !path.startsWith('~/')) return path;
-  if (!home) throw new Error(`HOME is not set, so ${path} can't be expanded.`);
-  return home + path.slice(1);
+  return { repo: entry.repo, platform: entry.platform, role: entry.role };
 }

@@ -60,7 +60,9 @@ function AddItemForm() {
         <div className="form-pair">
           <div className="form-field">
             <label htmlFor="item-repo">Repository</label>
-            <select id="item-repo" name="repo" required value={repo} onChange={(event) => setRepo(event.target.value)}>
+            {/* Uncontrolled and read on input: the form's onInput re-renders before the select's change
+                event, and a controlled select would be set back to the old repo. */}
+            <select id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}>
               {data.repos.map((r) => <option value={r.repo} key={r.repo}>{r.platform}</option>)}
             </select>
           </div>

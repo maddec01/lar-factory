@@ -201,3 +201,9 @@ _Avoid_: test board, dev board
 **Launch-agent board**:
 The board process the launch agent runs on the port `config.json` names (4317), which Pedro uses every day.
 _Avoid_: live board, real board
+
+### Skills
+
+**Copy**:
+A skill or reference taken unchanged from an upstream source and recorded in UPSTREAM.md; it changes only through skill-sync.
+_Avoid_: vendored skill, dependency

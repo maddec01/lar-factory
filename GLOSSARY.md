@@ -46,8 +46,8 @@ _Avoid_: build issue
 
 **Slice**:
 A small, independently testable piece of a build, recorded as a sub-issue of
-its build and implemented by one implementer. A sub-issue labelled `build` is a
-build, never a slice.
+its build and implemented by one implementer. Slices stay off the Mux
+board. A sub-issue labelled `build` is a build, never a slice.
 _Avoid_: ticket, chunk, task
 
 **Active slice**:

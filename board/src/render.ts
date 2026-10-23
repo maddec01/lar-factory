@@ -23,20 +23,8 @@ import {
 import type { BoardData, ToolMissing, ToolProblem, IssueLinks, IssueRef, Item, ItemStats, LinkedPr, ModelChoice, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
 import { highlightedChoice } from './start-menu.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
-
-export type View = 'board' | 'flow';
-
-export interface UiState {
-  view: View;
-  /** Open or closed, by <details> id, for the ones the user toggled since the page loaded. */
-  toggled: Record<string, boolean>;
-  /** The item id of the build whose slice popover is open, if any. */
-  slicesOpen?: string;
-  /** The item id of the Queued card whose Start menu is open, if any. */
-  startMenuOpen?: string;
-  /** The model choice this browser last started with; none for "T3 default". */
-  lastChoice?: ModelChoice;
-}
+import { duration, esc, formatTokens, formatUsd, wholeUsd } from './format.ts';
+import type { UiState, View } from './ui-state.ts';
 
 export interface RenderOptions {
   now: number;
@@ -95,18 +83,7 @@ export interface ItemAction {
 /** The Mux logo: viewBox and path copied unchanged from mux-server's BrandMark.tsx. */
 export const BRAND_MARK = '<svg class="brand-mark" role="img" aria-label="Mux" viewBox="0 0 56 32" fill="none"><path d="M5 3.5v25M5 3.5V12a8.5 8.5 0 0 0 17 0V3.5M22 12c0 4.5 2 7.5 5.5 7.5M36 3.5l14 17M50 3.5l-14 17" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-export const DEFAULT_UI: UiState = { view: 'board', toggled: {} };
-
 // ---------- small helpers ----------
-
-export function esc(value: unknown): string {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
 
 function clock(iso: string, timeZone: string | undefined): string {
   return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone }).format(
@@ -130,50 +107,8 @@ export function ago(iso: string, now: number): string {
   return `${Math.round(h / 24)} days ago`;
 }
 
-/** A running time in whole minutes: `12m`, `1h 5m`. */
-export function duration(ms: number): string {
-  const m = Math.max(0, Math.floor(ms / 60_000));
-  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
-}
-
 function elapsed(iso: string, now: number): string {
   return duration(now - Date.parse(iso));
-}
-
-const INTEGER = new Intl.NumberFormat('en-US');
-
-/**
- * A compact token count as T3 Code's usage page shows it: 980, 40.2K, 12.4M.
- * Ported from `formatTokens` in pingdotgg/t3code packages/shared/src/usageFormat.ts
- * (main at f054d1b8018721bd997d99cbb918a7b17bf098a4).
- */
-export function formatTokens(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1e12) return `${trimDigits(value / 1e12)}T`;
-  if (abs >= 1e9) return `${trimDigits(value / 1e9)}B`;
-  if (abs >= 1e6) return `${trimDigits(value / 1e6)}M`;
-  if (abs >= 1e3) return `${trimDigits(value / 1e3)}K`;
-  return INTEGER.format(Math.round(value));
-}
-
-const CURRENCY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-/** A cost as T3 Code's usage page shows it: $41.20. Ported from `formatUsd` in the same file and commit. */
-export function formatUsd(value: number): string {
-  return CURRENCY.format(value);
-}
-
-const WHOLE_DOLLARS = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-
-/** A cost to the nearest whole dollar, `<$1` below a dollar: $41, $1,235. */
-export function wholeUsd(value: number): string {
-  return value < 1 ? '<$1' : WHOLE_DOLLARS.format(Math.round(value));
-}
-
-function trimDigits(value: number): string {
-  const abs = Math.abs(value);
-  const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
-  return value.toFixed(digits).replace(/\.0+$/, '');
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {

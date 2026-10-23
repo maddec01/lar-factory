@@ -9,9 +9,6 @@ export interface BoardConfig {
   /** Project number; found by title when config.json doesn't name it. */
   number: number | null;
   repos: RepoConfig[];
-  port: number;
-  /** The port config.json names; BOARD_PORT overrides it for other runs. */
-  configuredPort: number;
   refreshSeconds: number;
 }
 
@@ -21,7 +18,7 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
   const raw = JSON.parse(readFileSync(url, 'utf8')) as {
     project?: { owner?: string; title?: string; number?: number };
     repos?: RepoConfig[];
-    board?: { port?: number; refreshSeconds?: number };
+    board?: { refreshSeconds?: number };
   };
   const owner = raw.project?.owner;
   const title = raw.project?.title;
@@ -31,8 +28,6 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
     title,
     number: raw.project?.number ?? null,
     repos: (raw.repos ?? []).map((entry) => checkRepo(entry, url)),
-    port: Number(process.env.BOARD_PORT ?? raw.board?.port ?? 4317),
-    configuredPort: raw.board?.port ?? 4317,
     refreshSeconds: raw.board?.refreshSeconds ?? 45,
   };
 }

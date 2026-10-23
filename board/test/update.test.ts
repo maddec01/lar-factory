@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { checkouts, factoryRepo } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
-import { freePort, rawIssue, startBoard } from './server-support.ts';
+import { rawIssue, startBoard } from './server-support.ts';
 import type { TestContext } from 'node:test';
 import type { BoardData, UpdateProgress } from '../src/model.ts';
 
@@ -72,16 +72,10 @@ if (command === 'launchctl' && args[0] === 'bootstrap') {
   await once(server, 'listening');
   t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
   const port = (server.address() as { port: number }).port;
-  const config = JSON.parse(await readFile(join(f.repo, 'config.json'), 'utf8'));
-  config.board.port = port;
-  await writeFile(join(f.repo, 'config.json'), JSON.stringify(config));
-  f.git('add', '.');
-  f.git('commit', '-m', 'chore(board): set isolated port');
-  f.git('push', 'origin', 'main');
   const run = (env = {}) => new Promise<{ code: number | null; output: string }>((resolve) => {
     const inherited: NodeJS.ProcessEnv = { ...f.env };
-    delete inherited.BOARD_PORT;
-    const child = spawn('bash', [join(f.repo, 'board/scripts/update.sh')], { env: { ...inherited, HOME: home,
+    // A terminal run would check the launch-agent board on 4317: point it at the fake health server.
+    const child = spawn('bash', [join(f.repo, 'board/scripts/update.sh')], { env: { ...inherited, BOARD_PORT: String(port), HOME: home,
       PATH: `${bin}:${process.env.PATH}`, UPDATE_CALLS: calls, UPDATE_HEALTH: health, UPDATE_REPO: f.repo, ...env } });
     let output = '';
     child.stdout.on('data', (v: Buffer) => { output += v.toString(); });
@@ -349,17 +343,11 @@ test('one lock covers every update; a lock left by a dead process is cleared', a
   await assert.rejects(readFile(lock), 'the lock is released after the update');
 });
 
-/** A launch-agent board (token, configured port) serving the fixture checkout, with the fake commands on PATH. */
+/** A launch-agent board (token) serving the fixture checkout, with the fake commands on PATH. */
 async function launchAgentBoard(t: TestContext, options: object = {}, env: Record<string, string> = {}) {
   const f = await updateFixture(t);
-  const port = await freePort();
-  const config = JSON.parse(await readFile(join(f.repo, 'config.json'), 'utf8'));
-  config.board.port = port;
-  await writeFile(join(f.repo, 'config.json'), JSON.stringify(config));
-  f.git('commit', '-am', 'chore(board): use the board port');
-  f.git('push', 'origin', 'main');
   const board = await startBoard(t, options, false, false,
-    { ...f.commandEnv, BOARD_PORT: String(port), BOARD_LAUNCH_TOKEN: 'launch-1', ...env }, join(f.repo, 'board'));
+    { ...f.commandEnv, BOARD_LAUNCH_TOKEN: 'launch-1', ...env }, join(f.repo, 'board'));
   const update = () => board.post({}, board.url, '/api/update');
   // The first GitHub read can finish after the board starts answering.
   for (let i = 0; i < 80 && (await board.board() as BoardData).items.length < ((options as { items?: unknown[] }).items?.length ?? 0); i++) {
@@ -427,11 +415,10 @@ test('Update is refused while a Start runs', async (t) => {
   await f.settled();
 });
 
-test('dev runs, other ports and sample mode do not offer Update', async (t) => {
+test('dev runs and sample mode do not offer Update', async (t) => {
   const f = await updateFixture(t);
   const boards = [
     await startBoard(t, {}, false, false, f.commandEnv, join(f.repo, 'board')),
-    await startBoard(t, {}, false, false, { ...f.commandEnv, BOARD_LAUNCH_TOKEN: 'launch-1' }, join(f.repo, 'board')),
     await startBoard(t, {}, false, false, { ...f.commandEnv, BOARD_LAUNCH_TOKEN: 'launch-1', BOARD_DATA_FILE: join(f.repo, 'sample.json') }, join(f.repo, 'board')),
   ];
   for (const board of boards) {

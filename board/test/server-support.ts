@@ -50,11 +50,12 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   // T3 settings whose built-in Claude instance has no transcripts, so tests never read real ones.
   const settingsFile = join(dir, 't3-settings.json');
   await writeFile(settingsFile, JSON.stringify({ providerInstances: { claudeAgent: { driver: 'claudeAgent', config: { homePath: join(dir, 'no-claude') } } } }));
-  const port = env.BOARD_PORT ? Number(env.BOARD_PORT) : await freePort();
+  // Each test gets a spare port; BOARD_PORT '' leaves the board to pick one from its range.
+  const port = 'BOARD_PORT' in env ? env.BOARD_PORT : String(await freePort());
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),
-    env: { ...testEnv(), BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
+    env: { ...testEnv(), BOARD_PORT: port, GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname, SHELL: new URL('./fake-shell.sh', import.meta.url).pathname,
       FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '',
       ...(fixture ? SAMPLE_MODELS : {}), ...env },
@@ -64,21 +65,26 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   child.stdout.on('data', (data: Buffer) => { logs += data.toString(); });
   child.stderr.on('data', (data: Buffer) => { logs += data.toString(); });
   t.after(async () => {
-    const exited = once(child, 'exit');
-    child.kill();
-    await exited;
+    // A board that failed to start has already exited.
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, 'exit');
+      child.kill();
+      await exited;
+    }
     await rm(dir, { recursive: true, force: true });
   });
-  const url = `http://127.0.0.1:${port}`;
   for (let attempt = 0; attempt < 100; attempt++) {
     if (child.exitCode !== null) throw new Error(logs);
-    try {
+    // The board logs the address it bound.
+    const url = logs.match(/board on (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
+    if (url) try {
       const response = await fetch(`${url}/api/board`);
       if (response.ok) return {
         url,
         update: (value: object) => writeFile(stateFile, JSON.stringify(value)),
         calls: () => readCalls(stateFile + '.calls'),
         t3Calls: () => readCalls(stateFile + '.t3calls'),
+        logs: () => logs,
         board: () => fetch(`${url}/api/board`).then((r) => r.json()),
         post: (body: unknown, origin = url, path = '/api/items') => fetch(`${url}${path}`, { method: 'POST',
           headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),

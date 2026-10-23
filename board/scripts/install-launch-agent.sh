@@ -63,6 +63,5 @@ done
 launchctl bootstrap "$DOMAIN" "$PLIST"
 launchctl kickstart -k "$DOMAIN/$LABEL"
 
-PORT="$("$NODE" -e 'console.log(require(process.argv[1]).board?.port ?? 4317)' "$BOARD_DIR/../config.json")"
 echo "Installed $PLIST"
-echo "Board: http://127.0.0.1:$PORT  Log: $LOG"
+echo "Board: http://127.0.0.1:4317  Log: $LOG"

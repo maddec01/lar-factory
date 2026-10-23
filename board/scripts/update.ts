@@ -7,7 +7,6 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync } from '
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
-import { loadConfig } from '../src/config.ts';
 import { acquireLock, releaseLock, updatePaths, writeProgress } from '../src/update-state.ts';
 import type { UpdateProgress, UpdateStep } from '../src/model.ts';
 
@@ -88,7 +87,8 @@ try {
     throw new Error('Local main is ahead of or diverged from origin/main. Preserve and reconcile your commits manually, then rerun; only equal or fast-forward updates are allowed.');
   }
   git('merge', '--ff-only', remote);
-  const port = loadConfig().port;
+  // The board passes its own port; a terminal run checks the launch-agent board's.
+  const port = Number(process.env.BOARD_PORT || 4317);
   // Already on origin/main: only the skills can be behind.
   if (local !== remote || (await health(port))?.runningRevision !== remote) {
     begin('install');

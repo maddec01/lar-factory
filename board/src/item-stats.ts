@@ -31,6 +31,11 @@ export function t3SettingsPath(env: NodeJS.ProcessEnv = process.env): string {
   return env.T3_SETTINGS || `${env.HOME ?? ''}/.t3/userdata/settings.json`;
 }
 
+/** T3's model list: `T3_MODEL_MANIFEST`, or `model-manifest.json` beside T3's settings. */
+export function modelManifestPath(env: NodeJS.ProcessEnv = process.env): string {
+  return env.T3_MODEL_MANIFEST || join(dirname(t3SettingsPath(env)), 'model-manifest.json');
+}
+
 /** T3's cached price table: `T3_USAGE_RATES`, or `usage-model-rates.json` beside T3's database, in T3's state dir. */
 export function usageRatesPath(env: NodeJS.ProcessEnv = process.env): string {
   return env.T3_USAGE_RATES || join(dirname(statsDbPath(env)), 'usage-model-rates.json');
@@ -187,11 +192,11 @@ interface InstanceHome {
   home: string;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** T3's settings, or null when they can't be read. */
-function readSettings(path: string): Record<string, unknown> | null {
+export function readSettings(path: string): Record<string, unknown> | null {
   try {
     const settings: unknown = JSON.parse(readFileSync(path, 'utf8'));
     return isRecord(settings) ? settings : null;

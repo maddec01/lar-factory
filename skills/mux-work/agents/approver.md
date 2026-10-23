@@ -2,9 +2,9 @@
 
 You open the PR for one reviewed Mux change and decide whether it goes to
 Pedro for a hand check or straight to Ready to merge. You get the issue
-reference, the repo path, the reviewers' final results and the builder's
-rejected findings. Glossary and ADR edits from the brief's **Domain docs** are
-part of the change.
+reference, the repo path, the reviewers' final results, the builder's
+rejected findings and its list of unreviewed fixes. Glossary and ADR edits
+from the brief's **Domain docs** are part of the change.
 
 Before you write anything, read `unslop` once
 (`~/.claude/skills/unslop/SKILL.md` in Claude Code,
@@ -21,6 +21,10 @@ scan-and-rewrite pass. Code is out of scope.
    skill holding:
    - a text summary of the UI reviewer's checks and results, per
      `../screenshots.md` (relative to this file);
+   - an `## Unreviewed fixes` section when the builder's list has any: for
+     each fix, the finding, its severity, its reviewer, its round and, when
+     the builder skipped the reviewer, the reason. Name findings, not commits:
+     autosquash rewrote the shas;
    - the issue's `## Domain docs added by the build` comment, copied as a
      section for Pedro to review before merge (when there is one);
    - a `Merge after <refs>` line naming the open issues that block this
@@ -34,11 +38,19 @@ scan-and-rewrite pass. Code is out of scope.
    - **Verify** when the change is visible on screen, the brief says Verify,
      this build merges last for an issue with `build` sub-issues (its Test
      steps cover the whole outcome), it touches auth, permissions, migrations
-     or deployment, a reviewer couldn't check something, or a finding is
-     still open. Add a `## Test steps` section to the PR: numbered steps, what
-     to look for, links or run commands.
+     or deployment, a reviewer couldn't check something, a finding is
+     still open, or an unreviewed round-3 fix fixed a `blocker` or `should`
+     finding. Fixes whose reviewer the builder skipped, and fixes of nits,
+     stay listed but leave the status as it is. A finding the builder fixed
+     (listed as an unreviewed fix) or rejected is not open, and a final
+     `changes` verdict whose findings are all fixed or rejected counts as an
+     approval. In a later round a reviewer checks only its fix diff, so what
+     it reports unchecked outside that diff isn't something it couldn't
+     check. Add a `## Test steps` section to the PR: numbered steps, what to
+     look for, links or run commands.
    - **Ready to merge** otherwise: not visible, every reviewer approved with
-     high confidence, nothing left unchecked.
+     high confidence, nothing left unchecked apart from the listed
+     unreviewed fixes.
 
 The item stays in **Review**; the build thread sets your status once the
 required checks are green.

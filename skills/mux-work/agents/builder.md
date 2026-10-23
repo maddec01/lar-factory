@@ -38,16 +38,22 @@ catalogue. Read each file or skill a step names only when that step runs.
    `git branch --list 'slice/<n>-*'`, and `git branch -d` each `t3/*` branch
    no worktree uses (`-d` keeps any not merged here; other threads own
    `t3-*` worktrees too, so touch none off a `slice/<n>-*` branch). Clear
-   `active` from every open slice (the resume command in **Slices**) and
-   **Implement** the ready slices fresh.
+   `active` from every open slice (the resume command in **Slices**), start
+   a re-slice planner if any open slice is `blocked`, and go to
+   **Implement**.
    Otherwise start a **planner** subagent with `planner.md`, the issue
    reference and the repo path; it returns the slice list.
 3. **Implement.** In parallel, start an **implementer** child task for each
    ready slice (the ready-slices command in **Slices**) not already running,
-   per **Implementer** in `<mux-work>/orchestration.md`, and track it by its
-   `taskId`. Give it `implementer.md`, the slice reference and the build
-   branch, and add `active` to the slice (**Slices** in
-   `<mux-work>/issue-tracker.md`).
+   while no planner runs, per **Implementer** in
+   `<mux-work>/orchestration.md`, and track it by its `taskId`. Give it
+   `implementer.md`, the slice reference and the build branch, and add
+   `active` to the slice (**Slices** in `<mux-work>/issue-tracker.md`).
+   A **re-slice planner** is a planner also given one blocked slice's
+   reference; run one at a time. When it returns its outcome, start one for
+   another `blocked` slice if any, and run **Implement** again. If it fails
+   (errors or returns no outcome), add `blocked` back to its slice, start no
+   planner for that slice again, and follow the stop rule below.
 4. **Merge.** As each implementer reports, run
    `git merge --ff-only slice/<n>-<m>-<slug>` here; if it can't fast-forward,
    send a subagent to the implementer's reported worktree path to rebase onto
@@ -55,9 +61,10 @@ catalogue. Read each file or skill a step names only when that step runs.
    worktree behind, so after each merge run the **cleanup**, remove `active`
    and close the slice sub-issue (**Slices** in
    `<mux-work>/issue-tracker.md`), and run **Implement** again. A slice
-   reported blocked gets the **forced cleanup**, loses `active` and goes back
-   to the planner to re-slice; a slice closed any other way loses `active`
-   too. The **cleanup**, for the reported worktree path `.../t3-<id>`:
+   reported blocked gets the **forced cleanup**, then the blocked-slice
+   commands in **Slices**, and a re-slice planner if none runs. A slice
+   closed any other way loses `active` too.
+   The **cleanup**, for the reported worktree path `.../t3-<id>`:
    `git worktree remove <path>`, `git branch -d slice/<n>-<m>-<slug>` and
    `git branch -d t3/<id>` (the T3 branch is always `t3/<id>`, named from the
    worktree dir). The **forced cleanup**, for an unmerged slice, uses
@@ -83,8 +90,10 @@ Ordinary questions to Pedro follow `<mux-work>/questions.md`: Needs you,
 clarifications use chat and preserve the final status, per the same guide.
 
 Past about 150k tokens, while work before the PR step remains, start no new
-implementers, and merge or `task_cancel` every running child task: task IDs
-work only in the thread that created them, so the handoff carries none. Then
+implementers or planners, wait for any running planner to return (a native
+subagent outlives a handoff), and merge or `task_cancel` every running
+child task: task IDs work only in the thread that created them, so the
+handoff carries none. Then
 post a handoff written per `~/.agents/skills/handoff/SKILL.md` as an issue
 comment and relaunch with
 `t3_thread_launch`: message `Build <owner/repo#n>. Read <mux-work>/agents/builder.md and follow it.`,

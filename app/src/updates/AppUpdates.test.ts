@@ -20,6 +20,7 @@ const makeFakeUpdater = () => {
     channel: "" as string,
     allowPrerelease: false,
     allowDowngrade: false,
+    fullChangelog: false,
     autoDownload: true,
     checks: 0,
     installs: 0,
@@ -38,6 +39,7 @@ const makeFakeUpdater = () => {
     setAutoInstallOnAppQuit: () => Effect.void,
     setChannel: (channel) => Effect.sync(() => void (fake.channel = channel)),
     setAllowPrerelease: (value) => Effect.sync(() => void (fake.allowPrerelease = value)),
+    setFullChangelog: (value) => Effect.sync(() => void (fake.fullChangelog = value)),
     allowDowngrade: Effect.sync(() => fake.allowDowngrade),
     setAllowDowngrade: (value) => Effect.sync(() => void (fake.allowDowngrade = value)),
     checkForUpdates: Effect.suspend(() => {
@@ -133,6 +135,41 @@ describe("AppUpdates", () => {
       assert.strictEqual(fake.channel, "nightly");
       assert.isTrue(fake.allowPrerelease);
       assert.isFalse(fake.autoDownload);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("reads every newer Release's notes on both channels", () =>
+    Effect.gen(function* () {
+      const { fake, updates } = yield* setup();
+      assert.isTrue(fake.fullChangelog);
+      yield* updates.setChannel("nightly");
+      assert.isTrue(fake.fullChangelog);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("puts the changelog of an available update in the state, and drops it when nothing is newer", () =>
+    Effect.gen(function* () {
+      const { fake, updates } = yield* setup();
+      fake.onCheck = Effect.sync(() =>
+        fake.emit("update-available", {
+          version: "0.3.0",
+          releaseNotes: [
+            { version: "0.3.0", note: "* feat(board): show the changelog" },
+            { version: "0.3.0-nightly.20261023.41", note: "* feat: a nightly" },
+            { version: "0.2.0", note: "* fix(board): keep the header steady" },
+          ],
+        }),
+      );
+      const available = yield* updates.check;
+      assert.deepStrictEqual(available.state.releaseNotes, [
+        { version: "0.3.0", items: ["feat(board): show the changelog"], totalItems: 1 },
+        { version: "0.2.0", items: ["fix(board): keep the header steady"], totalItems: 1 },
+      ]);
+      assert.strictEqual(available.state.omittedReleaseCount, 0);
+
+      fake.onCheck = Effect.sync(() => fake.emit("update-not-available"));
+      const upToDate = yield* updates.check;
+      assert.deepStrictEqual(upToDate.state.releaseNotes, []);
     }).pipe(Effect.scoped),
   );
 

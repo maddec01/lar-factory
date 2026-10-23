@@ -77,8 +77,8 @@ export const $$ = <T extends Element = HTMLElement>(selector: string) => [...doc
 /** The updater in a `pnpm run dev` app: off, so the page shows no update button. */
 export const updatesOff: UpdateState = {
   enabled: false, status: 'disabled', channel: 'latest', currentVersion: '0.0.0', availableVersion: null,
-  downloadedVersion: null, downloadPercent: null, checkedAt: null, message: 'Updates work only in the packaged app.',
-  errorContext: null, canRetry: false,
+  downloadedVersion: null, releaseNotes: [], omittedReleaseCount: 0, downloadPercent: null, checkedAt: null,
+  message: 'Updates work only in the packaged app.', errorContext: null, canRetry: false,
 };
 
 /** Puts the app's preload bridge on the page: `parts`, with the rest doing nothing. */

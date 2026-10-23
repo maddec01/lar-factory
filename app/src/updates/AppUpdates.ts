@@ -1,7 +1,7 @@
 // The board app's updater: checks GitHub Releases 15 s after launch and every 4 minutes,
 // downloads when the page asks, stops the board server and installs with quitAndInstall.
 // Cut down from T3 Code's apps/desktop/src/updates/DesktopUpdates.ts, without remote
-// updates, release notes and the install record.
+// updates and the install record.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
@@ -16,6 +16,7 @@ import type {
   UpdateState,
 } from "../../../board/src/app/board-app.ts";
 import type { ElectronUpdater, ElectronUpdaterError } from "./ElectronUpdater.ts";
+import { normalizeReleaseNotes } from "./releaseNotes.ts";
 import * as Machine from "./updateMachine.ts";
 
 export interface PollTimes {
@@ -111,6 +112,8 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
         yield* updater.setChannel(channel);
         yield* updater.setAllowPrerelease(nightly);
         yield* updater.setAllowDowngrade(nightly);
+        // Unlike T3 Code, which does this on nightly only, both channels show the changelog.
+        yield* updater.setFullChangelog(true);
       });
 
     /** Checks the feed unless a download runs; `held` means the caller already holds the action. */
@@ -178,10 +181,14 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
         const available = versionOf(info);
         if (available === null) return;
         // A version of the other channel counts as no update, as T3 Code does.
+        if (Machine.defaultChannel(available) !== state.channel) {
+          setState(Machine.reduceOnNoUpdate(state, now()));
+          return;
+        }
+        const releaseNotes = (info as { releaseNotes?: unknown }).releaseNotes;
+        const notes = normalizeReleaseNotes(releaseNotes, available, state.channel);
         setState(
-          Machine.defaultChannel(available) === state.channel
-            ? Machine.reduceOnUpdateAvailable(state, available, now())
-            : Machine.reduceOnNoUpdate(state, now()),
+          Machine.reduceOnUpdateAvailable(state, available, now(), notes.releaseNotes, notes.omittedReleaseCount),
         );
       });
       yield* updater.on("update-not-available", () => setState(Machine.reduceOnNoUpdate(state, now())));

@@ -84,12 +84,6 @@ export function sliceProgress(state: 'OPEN' | 'CLOSED', stateReason: string | nu
   return labels.blocked ? 'blocked' : labels.active ? 'active' : 'waiting';
 }
 
-/** The first issues of a GitHub link list, and how many it holds in all. */
-export interface IssueLinks {
-  total: number;
-  nodes: IssueRef[];
-}
-
 /** An item's agent time, wall time, tokens and API cost, over every thread that worked on it. */
 export interface ItemStats {
   /** Agent time: every agent's work, a child's only outside its direct parent's work, less waits on Pedro. */
@@ -162,10 +156,6 @@ export interface Item {
   subIssues: { total: number; completed: number };
   /** Open blockers, for the card's badge. */
   blockedBy: number;
-  /** GitHub's blocked-by links, open and closed. */
-  blockers: IssueLinks;
-  /** GitHub's blocking links: the issues this one blocks. */
-  blocking: IssueLinks;
   updatedAt: string;
   closedAt: string | null;
   linkedPrs: LinkedPr[];

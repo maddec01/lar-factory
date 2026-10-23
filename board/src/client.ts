@@ -4,7 +4,7 @@
 import { DEFAULT_UI, abandonPrompt, listGroupId, renderApp } from './render.ts';
 import type { ItemAction, Notice, UiState, UpdateView, View } from './render.ts';
 import { platformOf } from './model.ts';
-import type { BoardData } from './model.ts';
+import type { BoardData, Status } from './model.ts';
 import { validateDraft } from './add-item.ts';
 import { anchorKeys, survivingAnchor } from './anchor.ts';
 import { NO_POPOVER, nextPopover, openPopover } from './slice-popover.ts';
@@ -89,6 +89,11 @@ function restoreAnchor(anchor: Anchor | null): void {
   window.scrollBy(0, els[keys.indexOf(key)]!.getBoundingClientRect().top - anchor.tops[anchor.keys.indexOf(key)]!);
 }
 
+/** The Queued card's button whose action failed: Back to List when the notice names where to, else Abandon. */
+function failedButton(itemId: string, to: Status | undefined): string {
+  return `[data-${to ? 'back-to-list' : 'abandon'}="${CSS.escape(itemId)}"]`;
+}
+
 function setNotice(next: DistributiveOmit<Notice, 'key'>): void {
   notice = { ...next, key: `notice-${++noticeCount}` };
 }
@@ -98,7 +103,11 @@ function dismiss(key: string): void {
   const closing = app.querySelector(`[data-dismiss="${CSS.escape(key)}"]`)?.parentElement;
   const hadFocus = Boolean(closing?.contains(document.activeElement));
   let next = '[data-add-item]';
-  if (key === notice?.key) notice = null;
+  if (key === notice?.key) {
+    // A card's failed Back to List or Abandon sends focus back to the button that failed.
+    if (notice.verb === 'Failed') next = `${failedButton(notice.item.id, notice.to)},${next}`;
+    notice = null;
+  }
   else if (key.startsWith('action:')) {
     const itemId = key.slice('action:'.length);
     const action = actions[itemId];
@@ -450,7 +459,7 @@ async function backToList(button: HTMLElement): Promise<void> {
   delete actions[itemId];
   setNotice(result.error ? { verb: 'Failed', item, to: 'List', message: result.error } : { verb: 'Moved', item, to: 'List' });
   render();
-  if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
+  if (document.activeElement === document.body) focusByKey(result.error ? `back-${itemId}` : nextFocus);
 }
 
 async function startUpdate(): Promise<void> {
@@ -517,18 +526,23 @@ async function abandonItem(itemId: string): Promise<void> {
   const button = app.querySelector<HTMLElement>(`[data-abandon="${CSS.escape(itemId)}"]`);
   const item = data.items.find((i) => i.id === itemId);
   if (!button || !item || actions[itemId]?.phase === 'pending') return;
-  const nextFocus = focusAfterLeaving(button, 'data-abandon');
+  const onCard = Boolean(button.closest('article'));
+  const nextFocus = onCard ? focusAfterCardLeaving(button) : focusAfterLeaving(button, 'data-abandon');
   actions[itemId] = { phase: 'pending', kind: 'abandon' };
   render();
   focusByKey(`abandon-${itemId}`);
   const result = await postAction('/api/abandon', { session: data.capture?.session, itemId });
-  if (result.error) actions[itemId] = { phase: 'error', kind: 'abandon', message: result.error };
+  // A List row keeps its error inline; a Queued card's is a toast only, and its footer goes back to its links.
+  if (result.error && !onCard) actions[itemId] = { phase: 'error', kind: 'abandon', message: result.error };
   else {
     delete actions[itemId];
-    setNotice({ verb: 'Abandoned', item });
+    setNotice(result.error ? { verb: 'Failed', item, message: result.error } : { verb: 'Abandoned', item });
   }
   render();
-  if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
+  if (document.activeElement !== document.body) return;
+  // A List row's error sits by its button, which the render kept; a card's failure goes back to its Abandon.
+  if (!result.error) focusByKey(nextFocus);
+  else if (onCard) focusByKey(`abandon-${itemId}`);
 }
 
 app.addEventListener('click', (event) => {

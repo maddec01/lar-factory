@@ -422,9 +422,9 @@ test('Queue buttons appear only on List rows and show the action in flight or it
     'an error stays on its card with a close button');
 });
 
-test('Abandon appears only on List rows, next to Queue, and shows the delete in flight', () => {
+test('Abandon appears on List rows next to Queue and on Queued cards, and shows the delete in flight', () => {
   const html = renderBoardView(sample, base);
-  assert.deepEqual(buttons(html, 'data-abandon').sort(), ids('List').sort());
+  assert.deepEqual(buttons(html, 'data-abandon').sort(), [...ids('List'), 'PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21'].sort());
   assert.match(html, /data-queue="PVTI_sample01"[^>]*>Queue<\/button><button[^>]*data-abandon="PVTI_sample01"[^>]*aria-label="Abandon #61 [^"]*"[^>]*>Abandon<\/button>/);
   const acting = renderBoardView(sample, { ...base, actions: {
     PVTI_sample01: { phase: 'pending', kind: 'abandon' },
@@ -488,20 +488,22 @@ const queuedPr: Item = { ...sample.items.find((i) => i.id === 'PVTI_sample05')!,
 const withPr: BoardData = { ...sample, items: [...sample.items, queuedPr] };
 const cardOf = (html: string, id: string) => html.split('<article').find((c) => c.includes(`data-anchor="${id}"`))!;
 
-test('Queued issues and drafts get a footer row with Back to List; pull requests and other views do not', () => {
+test('Queued issues and drafts get a footer row with Back to List and Abandon; pull requests and other views do not', () => {
   const html = renderBoardView(withPr, base);
   assert.deepEqual(buttons(html, 'data-back-to-list').sort(), ['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21']);
   assert.match(cardOf(html, 'PVTI_sample05'),
-    /<div class="card-actions"><button type="button" class="link-action" data-back-to-list="PVTI_sample05" aria-label="Back to List #129 Run more than one 4K HDR to 1080p stream at a time">\u2190 Back to List<\/button><\/div>\n<\/article>/);
+    /<div class="card-actions"><button type="button" class="link-action" data-back-to-list="PVTI_sample05" aria-label="Back to List #129 Run more than one 4K HDR to 1080p stream at a time">\u2190 Back to List<\/button><button type="button" class="link-action danger" data-abandon="PVTI_sample05" aria-label="Abandon #129 Run more than one 4K HDR to 1080p stream at a time">Abandon<\/button><\/div>\n<\/article>/);
   const draft = cardOf(html, 'PVTI_sample21');
   assert.ok(!draft.includes('start-group'), 'a draft gets only the footer row');
-  assert.match(draft, /needs an issue.*<div class="card-actions"><button[^>]*data-back-to-list="PVTI_sample21" aria-label="Back to List draft Offline downloads on watchOS"/s);
+  assert.match(draft, /needs an issue.*<div class="card-actions"><button[^>]*data-back-to-list="PVTI_sample21" aria-label="Back to List draft Offline downloads on watchOS"[^>]*>.*<\/button><button[^>]*data-abandon="PVTI_sample21" aria-label="Abandon draft Offline downloads on watchOS"/s);
   assert.ok(!cardOf(html, 'PVTI_pr').includes('card-actions'));
+  assert.ok(!cardOf(html, 'PVTI_pr').includes('data-abandon'));
   const off = renderBoardView({ ...sample, capture: { session: 's', enabled: false } }, base);
   assert.match(cardOf(off, 'PVTI_sample21'), /data-back-to-list="PVTI_sample21"[^>]* disabled title="Disabled in sample mode"/, 'off in sample mode');
+  assert.match(cardOf(off, 'PVTI_sample21'), /data-abandon="PVTI_sample21"[^>]* disabled title="Disabled in sample mode"/, 'off in sample mode');
 });
 
-test('Back to List and Start each show only their own pending state', () => {
+test('Back to List, Abandon and Start each show only their own pending state', () => {
   const card = (action: ItemAction) => cardOf(renderBoardView(sample, { ...base, actions: { PVTI_sample05: action } }), 'PVTI_sample05');
   const moving = card({ phase: 'pending', kind: 'back-to-list' });
   assert.match(moving, /data-back-to-list="PVTI_sample05" aria-label="Moving #129 [^"]*" aria-disabled="true">\u2190 Moving to List…<\/button>/);
@@ -509,15 +511,22 @@ test('Back to List and Start each show only their own pending state', () => {
   const starting = card({ phase: 'pending' });
   assert.match(starting, />Starting…<\/button>/);
   assert.match(starting, /data-back-to-list="PVTI_sample05"[^>]*>\u2190 Back to List<\/button>/, 'Back to List is not relabelled');
+  assert.match(starting, /data-abandon="PVTI_sample05"[^>]*>Abandon<\/button>/, 'Abandon is not relabelled');
+  const abandoning = card({ phase: 'pending', kind: 'abandon' });
+  assert.match(abandoning, /data-back-to-list="PVTI_sample05" aria-label="Back to List #129 [^"]*" aria-disabled="true">\u2190 Back to List<\/button><button[^>]*data-abandon="PVTI_sample05" aria-label="Abandoning… #129 [^"]*" aria-disabled="true">Abandoning…<\/button>/);
+  assert.match(abandoning, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'Start is not relabelled');
+  assert.match(moving, /data-abandon="PVTI_sample05"[^>]*>Abandon<\/button>/, 'Abandon is not relabelled by Back to List');
   const otherError = card({ phase: 'error', kind: 'abandon', message: 'Could not delete #129.' });
   assert.match(otherError, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'another action\'s error is not a Start error');
-  assert.ok(!otherError.includes('<p class="start">'));
+  assert.ok(!otherError.includes('<p class="start">') && !otherError.includes('action-error'), 'a card shows no inline error');
 });
 
 test('a failed card action shows as a toast naming the item, which stays until closed', () => {
   const item = sample.items.find((i) => i.id === 'PVTI_sample05')!;
   const html = renderApp(sample, { ...base, notice: { key: 'notice-3', verb: 'Failed', item, to: 'List', message: 'Could not set List. GitHub is down.' } });
   assert.match(html, /<div class="banner toast" role="alert"><button[^>]*data-dismiss="notice-3"[^>]*>&#215;<\/button>Couldn't move <a[^>]*>.*<\/a> to List\. Could not set List\. GitHub is down\.<\/div>/);
+  const abandon = renderApp(sample, { ...base, notice: { key: 'notice-4', verb: 'Failed', item, message: 'Could not delete #129.' } });
+  assert.match(abandon, /<div class="banner toast" role="alert"><button[^>]*data-dismiss="notice-4"[^>]*>&#215;<\/button>Couldn't abandon <a[^>]*>.*<\/a>\. Could not delete #129\.<\/div>/);
 });
 
 test('Start shows its progress, the started thread, or the error', () => {

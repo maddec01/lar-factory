@@ -283,11 +283,16 @@ p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px
 .start-item { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); padding: 0 10px; }
 .start-item:hover { background: color-mix(in srgb, var(--primary) 90%, var(--bg)); }
 .start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
-/* A Queued card's quiet footer row: Back to List on the left, room for Abandon on the right. */
-.card-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--bd); font-size: 11px; }
-.link-action { background: none; border: 0; padding: 0; font: inherit; color: var(--muted); cursor: pointer; }
-.link-action:hover { color: var(--fg); text-decoration: underline; }
-.link-action[aria-disabled="true"] { cursor: progress; opacity: 0.7; text-decoration: none; }
+/* A Queued card's quiet footer row: Back to List on the left, Abandon on the right. */
+/* margin-top: auto keeps the row on the card's bottom edge across a row of cards; the 8px above it moves to the item before. */
+.card > :has(+ .card-actions) { margin-bottom: 8px; }
+.card-actions { display: flex; align-items: center; gap: 12px; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--bd); font-size: 11px; }
+/* The padding gives a 24px target (WCAG 2.5.8); the matching negative margin keeps the row's height. */
+.link-action { background: none; border: 0; padding: 5px 0; margin-block: -5px; font: inherit; color: var(--muted); cursor: pointer; }
+.link-action:not([disabled], [aria-disabled="true"]):hover { color: var(--fg); text-decoration: underline; }
+.link-action.danger { margin-left: auto; }
+.link-action.danger:not([disabled], [aria-disabled="true"]):hover { color: var(--danger-text); }
+.link-action[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .thread-id { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .row-item:has(.action-error) { flex-wrap: wrap; }
 .action-error { order: 1; flex: 1 1 100%; min-width: 0; color: var(--danger-text); font-weight: 600; overflow-wrap: anywhere; }

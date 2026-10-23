@@ -192,7 +192,7 @@ function readSoon(): void {
 }
 
 // Browser modules: the shared template is served as JS by stripping its types.
-const ASSETS = new Map(['client.ts', 'render.ts', 'model.ts', 'add-item.ts', 'anchor.ts', 'slice-popover.ts', 'start-menu.ts'].map((name) =>
+const ASSETS = new Map(['client.ts', 'render.ts', 'model.ts', 'add-item.ts', 'anchor.ts', 'slice-popover.ts', 'start-menu.ts', 'prototype-title-bar.ts'].map((name) =>
   [name, stripTypeScriptTypes(readFileSync(new URL(`./${name}`, import.meta.url), 'utf8'))]));
 
 const SECURITY_HEADERS = {

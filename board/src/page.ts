@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { BRAND_MARK, renderAbandonDialog, renderAddItemForm, renderApp } from './render.ts';
 import type { RenderOptions } from './render.ts';
 import type { BoardData } from './model.ts';
+import { renderPrototypeTitleBar } from './prototype-title-bar.ts';
 
 const css = readFileSync(new URL('./styles.css', import.meta.url), 'utf8');
 /** The logo in a mid grey that reads on light and dark tabs. */
@@ -27,6 +28,7 @@ export function renderPage(data: BoardData, opts: RenderOptions): string {
 ${css}</style>
 </head>
 <body>
+${renderPrototypeTitleBar()}
 <div id="app">
 ${renderApp(data, opts)}
 </div>

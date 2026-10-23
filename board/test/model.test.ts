@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { checkState, countsOf, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
+import { canAbandon, checkState, countsOf, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
 import { esc } from '../src/render.ts';
 
@@ -137,4 +137,14 @@ test('a running badge wins over failures until every check finishes, and turns s
   assert.equal(isSlow(checks({ running: 1, total: 1, since: '2026-10-21T09:30:00Z' }), now), true);
   assert.equal(isSlow(checks({ passed: 1, total: 1, since: '2026-10-21T08:00:00Z' }), now), false, 'only a running pipeline is slow');
   assert.equal(isSlow(checks({ running: 1, total: 1 }), now), false);
+});
+
+test('canAbandon takes List and Queued issues and drafts, never pull requests or other statuses', () => {
+  const draft = { type: 'DraftIssue', number: null, repo: null } as const;
+  for (const status of ['List', 'Queued'] as const) {
+    assert.ok(canAbandon(item(status)), `${status} issue`);
+    assert.ok(canAbandon(item(status, [], draft)), `${status} draft`);
+    assert.ok(!canAbandon(item(status, [], { type: 'PullRequest' })), `${status} pull request`);
+  }
+  for (const status of ['Shaping', 'In progress', 'Done'] as const) assert.ok(!canAbandon(item(status)), status);
 });

@@ -172,3 +172,13 @@ _Avoid_: report total, aggregate, rollup
 **API cost**:
 What an item's tokens would cost at API list prices, as T3 Code estimates it, rather than the subscription bill.
 _Avoid_: cost, spend, price
+
+### Board processes
+
+**Sample board**:
+A board process started with `pnpm run sample` on a spare port, reading `board/test/sample.json` instead of GitHub.
+_Avoid_: test board, dev board
+
+**Launch-agent board**:
+The board process the launch agent runs on the port `config.json` names (4317), which Pedro uses every day.
+_Avoid_: live board, real board

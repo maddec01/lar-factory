@@ -237,7 +237,7 @@ A published version of the board app, made by CI from a commit on main whose che
 _Avoid_: build, version
 
 **Nightly**:
-A Release marked as a prerelease, published for every merge to main whose checks pass; the name comes from T3 Code.
+A Release marked as a prerelease, which Pedro publishes by hand from main's head once its checks pass; the name comes from T3 Code.
 _Avoid_: nightly build, preview
 
 **Stable Release**:

@@ -2,11 +2,14 @@
 // down the page fetches /api/board every 15 s, or every second while an update runs.
 
 import { useBoardStore } from './board-store.ts';
+import { useDismissStore } from './dismiss-store.ts';
 import { holdAnchor } from './keep-anchor.ts';
 import type { BoardData } from '../model.ts';
 
 const POLL_MS = 15_000;
 const UPDATE_POLL_MS = 1_000;
+/** The key of the banner that says the page can't reach the server. */
+export const CLIENT_ERROR = 'client-error';
 
 export function startLiveData(): void {
   const board = useBoardStore.getState();
@@ -18,6 +21,8 @@ export function startLiveData(): void {
   const receive = (text: string) => {
     holdAnchor();
     board.receive(JSON.parse(text) as BoardData);
+    // The server answered: if it goes away again, say so even if the last banner was closed.
+    useDismissStore.getState().restore(CLIENT_ERROR);
   };
 
   function schedule(): void {

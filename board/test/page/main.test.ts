@@ -118,12 +118,32 @@ test("a failed fetch says the server can't be reached and keeps the last data", 
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect($('.banner[role="alert"]')!.textContent).toBe("Can't reach the board server. HTTP 502 Showing the last data this page received.");
+  expect($('.banner[role="alert"]')!.textContent).toBe("×Can't reach the board server. HTTP 502 Showing the last data this page received.");
   expect($('.totals li:last-child')!.textContent).toBe('25 items');
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
   await settle(() => vi.advanceTimersByTime(15_000));
   expect($('.banner')).toBeNull();
+});
+
+test("the lost server's banner closes, and the next failure after the server answers shows it again", async () => {
+  await mountPage(fresh);
+  fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
+  await settle(() => vi.advanceTimersByTime(15_000));
+  const close = $<HTMLButtonElement>('.banner .dismiss')!;
+  expect(close.getAttribute('aria-label')).toBe("Dismiss: can't reach the board server");
+  close.focus();
+  await settle(() => close.click());
+  expect($('.banner')).toBeNull();
+  expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
+  await settle(() => vi.advanceTimersByTime(15_000));
+  expect($('.banner'), 'it stays closed while the server stays away').toBeNull();
+
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
+  await settle(() => vi.advanceTimersByTime(15_000));
+  fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
+  await settle(() => vi.advanceTimersByTime(15_000));
+  expect($('.banner[role="alert"]')!.textContent).toContain("Can't reach the board server.");
 });
 
 const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));

@@ -1,5 +1,5 @@
 // The page's header: the logo, when the data was read, the counts, and the banners for stale data
-// and an unreachable server.
+// and an unreachable server, which closes.
 
 import { countsOf, isStale } from '../model.ts';
 import type { BoardData } from '../model.ts';
@@ -7,6 +7,8 @@ import { ago, clock } from '../format.ts';
 import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../brand-mark.ts';
 import { AddItem } from './AddItem.tsx';
 import { useBoardStore } from './board-store.ts';
+import { ClosableBanner } from './ClosableBanner.tsx';
+import { CLIENT_ERROR } from './live-data.ts';
 
 function BrandMark() {
   return (
@@ -58,7 +60,9 @@ export function Header() {
         <li><b>{counts.total}</b> items</li>
       </ul>
       {clientError && (
-        <div className="banner" role="alert"><strong>Can't reach the board server.</strong> {clientError} Showing the last data this page received.</div>
+        <ClosableBanner dismissKey={CLIENT_ERROR} what=": can't reach the board server">
+          <strong>Can't reach the board server.</strong> {clientError} Showing the last data this page received.
+        </ClosableBanner>
       )}
       {isStale(data, now) && <StaleBanner data={data} now={now} />}
     </header>

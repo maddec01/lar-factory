@@ -169,13 +169,6 @@ test('entered titles round-trip through bootstrap JSON without closing its scrip
 
 const ids = (status: string) => sample.items.filter((i) => i.status === status).map((i) => i.id);
 
-test('failures and the lost server have a close button; ongoing warnings do not', () => {
-  const html = renderHeader({ ...sample, error: 'gh: HTTP 502' }, { ...base, clientError: 'HTTP 500' });
-  assert.match(html, /role="alert"><button type="button" class="dismiss" data-dismiss="client-error" aria-label="Dismiss: can&#39;t reach the board server">&#215;<\/button><strong>Can't reach the board server/);
-  assert.match(html, /role="alert"><strong>Stale\.<\/strong>/, 'stale data stays while it lasts');
-  assert.ok(!renderHeader(sample, { ...base, clientError: 'HTTP 500', dismissed: new Set(['client-error']) }).includes("Can't reach"));
-});
-
 test('Started replaces Start in its group, and a Start error shows under the card', () => {
   const started = renderBoardView(sample, { ...base, actions: { PVTI_sample05: { phase: 'started', thread: { threadId: 't', title: 'x' } } } })
     .split('<article')

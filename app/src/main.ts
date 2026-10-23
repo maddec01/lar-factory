@@ -25,6 +25,7 @@ import * as SkillInstall from "./backend/SkillInstall.ts";
 import * as ExternalLink from "./ExternalLink.ts";
 import * as IpcChannels from "./ipcChannels.ts";
 import * as LaunchSecret from "./LaunchSecret.ts";
+import * as RestartDialog from "./RestartDialog.ts";
 import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
 import * as StartingPage from "./StartingPage.ts";
 import * as AppUpdates from "./updates/AppUpdates.ts";
@@ -150,8 +151,12 @@ const handleProfiles = (boardOrigin: () => string) => {
   });
 };
 
-/** The updater's calls, as T3 Code's update IPC handlers. */
-const handleUpdates = (boardOrigin: () => string, updates: AppUpdates.AppUpdates) => {
+/** The updater's calls, as T3 Code's update IPC handlers, and the dialog that asks before installing. */
+const handleUpdates = (
+  window: Electron.BrowserWindow,
+  boardOrigin: () => string,
+  updates: AppUpdates.AppUpdates,
+) => {
   const checkSender = boardPageOnly(boardOrigin, "Only the board's page can use the app's updates");
   const handle = (channel: string, call: (...args: Array<unknown>) => Effect.Effect<unknown, Error>) =>
     Electron.ipcMain.handle(channel, (event, ...args) => {
@@ -166,6 +171,13 @@ const handleUpdates = (boardOrigin: () => string, updates: AppUpdates.AppUpdates
     channel === "latest" || channel === "nightly"
       ? updates.setChannel(channel)
       : Effect.fail(new Error("The update channel must be latest or nightly")),
+  );
+  handle(IpcChannels.CONFIRM_RESTART, (message) =>
+    typeof message === "string"
+      ? Effect.promise(() => Electron.dialog.showMessageBox(window, RestartDialog.options(message))).pipe(
+          Effect.map(RestartDialog.confirmed),
+        )
+      : Effect.fail(new Error("The restart question must be a string")),
   );
 };
 
@@ -222,7 +234,7 @@ const program = Effect.gen(function* () {
     Effect.andThen(board.forgetOrigin),
   );
   // A failed drain leaves the server refusing writes, so the install's failure path restarts it.
-  handleUpdates(board.origin, yield* startUpdates(board.window, {
+  handleUpdates(board.window, board.origin, yield* startUpdates(board.window, {
     stop: stopBoard,
     start: supervisor.stop.pipe(Effect.andThen(supervisor.start)),
   }));

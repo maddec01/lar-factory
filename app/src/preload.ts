@@ -1,8 +1,8 @@
 // The bridge between the main process and the board's page, as T3 Code's
 // apps/desktop/src/preload.ts. The page can tell from it that it runs in the app,
 // sends its secret with each write, the settings screen lists and ticks Claude
-// profiles through it, and it follows and drives the app's updates
-// (board/src/app/board-app.ts reads the bridge).
+// profiles through it, it follows and drives the app's updates,
+// and asks before restarting to install one (board/src/app/board-app.ts reads the bridge).
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
@@ -35,6 +35,7 @@ const bridge: BoardAppBridge = {
   downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD),
   installUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL),
   setUpdateChannel: (channel) => ipcRenderer.invoke(IpcChannels.UPDATE_SET_CHANNEL, channel),
+  confirmRestart: (message) => ipcRenderer.invoke(IpcChannels.CONFIRM_RESTART, message),
 };
 
 contextBridge.exposeInMainWorld("boardApp", bridge);

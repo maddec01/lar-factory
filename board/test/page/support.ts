@@ -95,6 +95,7 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
     downloadUpdate: unused,
     installUpdate: unused,
     setUpdateChannel: unused,
+    confirmRestart: unused,
     ...parts,
   };
   vi.stubGlobal('boardApp', bridge);
@@ -114,3 +115,6 @@ export function addStylesheet(): { noDrag: (el: Element) => boolean } {
 
 /** The title bar's height, from its h-[…px] class. */
 export const titleBarHeight = () => Number(/\bh-\[(\d+)px\]/.exec($('.title-bar')!.className)![1]);
+
+/** A fake `confirmRestart` for `stubApp`: it records each question and answers `answer`, true for Restart. */
+export const answerRestart = (answer: boolean) => vi.fn(async (_message: string) => answer);

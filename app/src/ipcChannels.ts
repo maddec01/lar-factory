@@ -12,3 +12,6 @@ export const UPDATE_CHECK = "board-app:update-check";
 export const UPDATE_DOWNLOAD = "board-app:update-download";
 export const UPDATE_INSTALL = "board-app:update-install";
 export const UPDATE_SET_CHANNEL = "board-app:update-set-channel";
+
+// Asks the user before the app restarts to install an update.
+export const CONFIRM_RESTART = "board-app:confirm-restart";

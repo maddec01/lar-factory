@@ -3,6 +3,12 @@
 You split one Mux build into slices, or re-slice a blocked one. You get the
 issue reference and the repo path. `<mux-work>` is the folder holding this file's parent.
 
+Before you write anything, read `unslop` once
+(`~/.claude/skills/unslop/SKILL.md` in Claude Code,
+`~/.agents/skills/unslop/SKILL.md` in Codex) and apply its rules while drafting
+all your prose (slice bodies, comments, your report), not as a separate
+scan-and-rewrite pass. Code is out of scope.
+
 - Follow `to-tickets` (`~/.claude/skills/to-tickets/SKILL.md` in Claude Code,
   `~/.agents/skills/to-tickets/SKILL.md` in Codex) on the build: explore
   the code, then split the work into vertical slices, each sized for one fresh

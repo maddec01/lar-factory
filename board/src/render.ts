@@ -23,8 +23,9 @@ import {
 import type { BoardData, ToolMissing, ToolProblem, IssueLinks, IssueRef, Item, ItemStats, LinkedPr, ModelChoice, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
 import { highlightedChoice } from './start-menu.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
-import { duration, esc, formatTokens, formatUsd, wholeUsd } from './format.ts';
+import { ago, clock, day, duration, elapsed, esc, formatTokens, formatUsd, plural, slug, wholeUsd } from './format.ts';
 import type { UiState, View } from './ui-state.ts';
+import { BRAND_MARK } from './brand-mark.ts';
 
 export interface RenderOptions {
   now: number;
@@ -80,40 +81,7 @@ export interface ItemAction {
   thread?: StartedThread;
 }
 
-/** The Mux logo: viewBox and path copied unchanged from mux-server's BrandMark.tsx. */
-export const BRAND_MARK = '<svg class="brand-mark" role="img" aria-label="Mux" viewBox="0 0 56 32" fill="none"><path d="M5 3.5v25M5 3.5V12a8.5 8.5 0 0 0 17 0V3.5M22 12c0 4.5 2 7.5 5.5 7.5M36 3.5l14 17M50 3.5l-14 17" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
 // ---------- small helpers ----------
-
-function clock(iso: string, timeZone: string | undefined): string {
-  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone }).format(
-    new Date(iso),
-  );
-}
-
-function day(iso: string, timeZone: string | undefined): string {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }).format(
-    new Date(iso),
-  );
-}
-
-export function ago(iso: string, now: number): string {
-  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 45) return 'just now';
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m} min ago`;
-  const h = Math.round(m / 60);
-  if (h < 48) return `${h} h ago`;
-  return `${Math.round(h / 24)} days ago`;
-}
-
-function elapsed(iso: string, now: number): string {
-  return duration(now - Date.parse(iso));
-}
-
-function plural(n: number, one: string, many = `${one}s`): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
 
 function byFlowOrder(a: Item, b: Item): number {
   return (
@@ -122,10 +90,6 @@ function byFlowOrder(a: Item, b: Item): number {
     (a.repo ?? '').localeCompare(b.repo ?? '') ||
     (a.number ?? 0) - (b.number ?? 0)
   );
-}
-
-function slug(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 export function listGroupId(platform: string): string {

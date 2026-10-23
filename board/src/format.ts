@@ -1,4 +1,4 @@
-// Text helpers the server and the page share: HTML escaping, durations, token counts and costs.
+// Text helpers the server and the page share: HTML escaping, times, durations, counts, token counts and costs.
 
 export function esc(value: unknown): string {
   return String(value)
@@ -49,4 +49,38 @@ function trimDigits(value: number): string {
   const abs = Math.abs(value);
   const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
   return value.toFixed(digits).replace(/\.0+$/, '');
+}
+
+export function clock(iso: string, timeZone: string | undefined): string {
+  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone }).format(
+    new Date(iso),
+  );
+}
+
+export function day(iso: string, timeZone: string | undefined): string {
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }).format(
+    new Date(iso),
+  );
+}
+
+export function ago(iso: string, now: number): string {
+  const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
+  if (s < 45) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} h ago`;
+  return `${Math.round(h / 24)} days ago`;
+}
+
+export function elapsed(iso: string, now: number): string {
+  return duration(now - Date.parse(iso));
+}
+
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+export function slug(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }

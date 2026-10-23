@@ -9,7 +9,12 @@ const execute = promisify(execFile);
 const options = { cwd: root, timeout: 10_000, maxBuffer: 1_000_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } };
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 
-export function revisionCheck(local: Pick<CodeUpdate, 'updatable' | 'logs'>): { status: CodeUpdate; refresh: () => Promise<void> } {
+/** With `disabled`, there is no status and refresh does nothing, so callers need not check. */
+export function revisionCheck(
+  local: Pick<CodeUpdate, 'updatable' | 'logs'>,
+  { disabled = false } = {},
+): { status: CodeUpdate | undefined; refresh: () => Promise<void> } {
+  if (disabled) return { status: undefined, refresh: async () => {} };
   let runningRevision: string | null = null;
   try { runningRevision = execFileSync('git', ['rev-parse', 'HEAD'], { ...options, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
   catch { /* A source archive or failed Git check must not claim to be current. */ }

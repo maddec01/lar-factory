@@ -45,6 +45,7 @@ const state: BoardData = {
   fetchedAt: null,
   error: null,
   items: [],
+  modelChoices: [],
 };
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };

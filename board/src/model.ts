@@ -173,6 +173,30 @@ export interface StartedThread {
   title: string;
 }
 
+/** A model Start offers: T3's name for it, else its slug. */
+export interface ModelOption {
+  slug: string;
+  label: string;
+}
+
+/** An enabled T3 provider instance, named as T3's picker names it, and the models Start offers on it. */
+export interface ModelGroup {
+  instanceId: string;
+  name: string;
+  models: ModelOption[];
+}
+
+/** The provider instance and model a new thread runs on; none leaves it to T3 ("T3 default"). */
+export interface ModelChoice {
+  instanceId: string;
+  model: string;
+}
+
+/** Whether `groups` offer `choice`: its instance is there with that model. */
+export function offers(groups: readonly ModelGroup[], choice: ModelChoice): boolean {
+  return groups.some((g) => g.instanceId === choice.instanceId && g.models.some((m) => m.slug === choice.model));
+}
+
 export interface RepoConfig {
   repo: string;
   platform: string;
@@ -195,6 +219,8 @@ export interface BoardData {
   /** Error from the latest read if it failed; the items are then from fetchedAt. */
   error: string | null;
   items: Item[];
+  /** The model choices Start offers besides "T3 default"; empty when T3's settings or model list can't be read. */
+  modelChoices: ModelGroup[];
   /** Threads this board run started, by item id, so every page shows them. */
   started?: Record<string, StartedThread>;
   /** The latest update of this checkout, from the button or a terminal; null on boards that can't update. */

@@ -55,8 +55,16 @@ A slice an implementer is working on right now.
 _Avoid_: in-progress slice, current slice
 
 **Work message**:
-The two-line text a Queued card copies and Start sends: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.
+The two-line text Start sends to a new thread: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.
 _Avoid_: work command, `/mux-work` command
+
+**Repository project**:
+The T3 project whose folder is a repository's main checkout; an issue's threads run in its repository's project.
+_Avoid_: Mux project, factory project (for where threads run)
+
+**Repository role**:
+A one-line description of what a repository is to the others, such as the API server a client app uses.
+_Avoid_: relationship, repo type
 
 **Overlay**:
 The board's temporary view of successful item creations and status changes
@@ -66,8 +74,8 @@ _Avoid_: Source of truth (for the overlay)
 ### Threads and roles
 
 **Shaping thread**:
-The conversation that resolves an issue's open decisions and produces a passing
-brief before handing off to a build thread.
+The conversation in the issue's repository project that resolves an issue's open
+decisions and produces a passing brief before handing off to a build thread.
 
 **Decision thread**:
 A top-level thread running `/mux-work` on one `decision: *` sub-issue of a map,
@@ -76,8 +84,7 @@ _Avoid_: Decision session
 
 **Build thread**:
 The separate conversation that takes a passing brief through implementation,
-review and PR checks in its build's repository's T3 project, in its own
-worktree.
+review and PR checks in its build's repository project, in its own worktree.
 
 **Child task**:
 Delegated work a thread owns and addresses only by its task ID; its backing thread is never used as a conversation.

@@ -7,7 +7,7 @@ A person decides and merges; agents do the rest.
 The [glossary](GLOSSARY.md) defines the factory's terms. Existing decisions are
 recorded in [ADRs](docs/adr/): [local GitHub access](docs/adr/0001-use-the-local-gh-login.md),
 [Pedro merges every PR](docs/adr/0002-pedro-merges-every-pr.md),
-[Start in the factory project, build in the build's repository](docs/adr/0003-start-in-the-factory-project-build-in-the-builds-repository.md), and
+[Start in the issue's repository project](docs/adr/0009-start-in-the-issues-repository-project.md), and
 [item stats from T3 Code's database](docs/adr/0005-read-item-stats-from-t3s-database.md).
 
 It's built for Mux, but the parts are plain [Agent Skills](https://agentskills.io)

@@ -468,20 +468,16 @@ test('Start appears only on Queued issues; a queued draft asks for an issue firs
   assert.ok(!draftCard.includes('data-start') && !draftCard.includes('data-copy'));
 });
 
-test('a Queued issue copies its work message from an icon left of Start, with no command box under the card', () => {
+test('a Queued issue shows Start with no copy icon and no command box under the card', () => {
   const card = renderBoardView(sample, base).split('<article').find((c) => c.includes('data-start="PVTI_sample05"'))!;
   assert.ok(!card.includes('class="cmd"'), 'no command box under the card');
+  assert.ok(!card.includes('data-copy') && !card.includes('<svg'), 'no copy icon');
   const meta = card.match(/<div class="meta">.*?<\/div>/s)![0];
-  assert.match(
-    meta,
-    /<button type="button" class="copy copy-icon" data-copy="#129 Run more than one 4K HDR to 1080p stream at a time\n\$mux-work maddec01\/[^"]+#129" data-label="Copy work message for #129" aria-label="Copy work message for #129" title="Copy work message for #129"><svg [^>]*aria-hidden="true"[^>]*>.*<\/svg><\/button><button type="button" class="copy start-item"[^>]*>Start<\/button><\/span>/s,
-    'the icon sits immediately left of Start',
-  );
-  assert.match(meta, /<span class="start-group"><button type="button" class="copy copy-icon"/, 'the icon and Start wrap together as one group');
+  assert.match(meta, /<span class="start-group"><button type="button" class="copy start-item"[^>]*>Start<\/button><\/span>/, 'Start alone in the top-right group');
   const started = renderBoardView(sample, { ...base, actions: { PVTI_sample05: { phase: 'started', thread: { threadId: 't', title: 'x' } } } })
     .split('<article')
     .find((c) => c.includes('data-start-result="PVTI_sample05"'))!;
-  assert.match(started, /class="copy copy-icon"[^>]*>.*<\/button><span class="started-tag"/s, 'the icon stays once Start is done');
+  assert.match(started, /<span class="start-group"><span class="started-tag"/, 'Started replaces Start in the group');
   const error = renderBoardView(sample, { ...base, actions: { PVTI_sample05: { phase: 'error', message: 'T3 is not running' } } })
     .split('<article')
     .find((c) => c.includes('data-start="PVTI_sample05"'))!;

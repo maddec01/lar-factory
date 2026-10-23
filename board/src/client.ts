@@ -266,28 +266,12 @@ async function copy(text: string, button: HTMLButtonElement): Promise<void> {
     document.execCommand('copy');
     area.remove();
   }
-  // An icon button swaps its icon and label; a text button swaps its text. The label to restore
-  // comes from data-label, so a second press inside the window cannot keep "Copied".
-  const icon = button.classList.contains('copy-icon');
-  const label = button.dataset.label ?? '';
-  const copied = icon ? label.replace(/^Copy\b/, 'Copied') : 'Copied';
-  if (icon) {
-    button.dataset.copied = '';
-    button.setAttribute('aria-label', copied);
-    button.title = copied;
-  } else button.textContent = 'Copied';
+  button.textContent = 'Copied';
   // Screen readers hear the feedback through a polite live region outside the re-rendered app.
   copyStatus.textContent = '';
-  setTimeout(() => (copyStatus.textContent = copied), 50);
+  setTimeout(() => (copyStatus.textContent = 'Copied'), 50);
   setTimeout(() => {
-    if (!button.isConnected) return;
-    if (!icon) {
-      button.textContent = 'Copy';
-      return;
-    }
-    delete button.dataset.copied;
-    button.setAttribute('aria-label', label);
-    button.title = label;
+    if (button.isConnected) button.textContent = 'Copy';
   }, 1500);
 }
 

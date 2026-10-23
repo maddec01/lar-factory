@@ -21,8 +21,7 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
   sets its Status. A toast shows the thread's id, and its title when T3 chose
   one other than line 1; every board page marks the card Started. While the
   board runs, a double press, a retry or another tab starts no second thread.
-  A queued draft needs an issue first; on an issue, the copy icon left of
-  Start copies the work message as a fallback.
+  A queued draft needs an issue first.
 - **Flow** is an outline of how items relate: sub-issues sit under their
   parent, and each issue lists the issues it is blocked by and the ones it
   blocks, as GitHub records them. A link to an item on the Board jumps to it;

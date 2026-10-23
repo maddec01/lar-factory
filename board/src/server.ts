@@ -1,5 +1,6 @@
 // The board server: refreshes the project through `gh` every refreshSeconds,
-// keeps the last good copy in memory and serves it on 127.0.0.1.
+// keeps the last good copy in memory, serves it on 127.0.0.1 and pushes each
+// change to open pages over /api/events.
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -79,6 +80,8 @@ const abandoning = new Map<string, Promise<string | null>>();
 /** Item ids this board deleted. GitHub can still list them for a while, so reads drop them. */
 const abandoned = new Set<string>();
 const REQUEST_ID = /^[a-f0-9-]{36}$/;
+/** Open /api/events responses, one per page. */
+const streams = new Set<ServerResponse>();
 
 function log(message: string): void {
   console.log(`${new Date().toISOString()} ${message}`);
@@ -176,6 +179,7 @@ async function refresh(): Promise<void> {
   } finally {
     refreshing = false;
   }
+  push();
   // PR edits take a gh call or two each; the board doesn't wait for them.
   if (read) void syncPrStats(state.items);
   if (readAgain) void refresh();
@@ -201,6 +205,25 @@ const SECURITY_HEADERS = {
 function send(res: ServerResponse, status: number, type: string, body: string): void {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
   res.end(body);
+}
+
+/** Sends the board data as one server-sent event. */
+function sendBoard(res: ServerResponse): void {
+  res.write(`data: ${JSON.stringify(state)}\n\n`);
+}
+
+/** Pushes the board data to every open page, after a read or a change made through the board. */
+function push(): void {
+  for (const res of streams) sendBoard(res);
+}
+
+/** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
+function openStream(req: IncomingMessage, res: ServerResponse): void {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+  if (req.method === 'HEAD') return void res.end();
+  streams.add(res);
+  res.on('close', () => streams.delete(res));
+  sendBoard(res);
 }
 
 /** Only answer requests addressed to this machine, to block DNS rebinding. */
@@ -244,6 +267,7 @@ function showChanged(item: Item): void {
   if (abandoned.has(item.id)) return;
   recentItems.set(item.id, { item, revision: ++revision, unconfirmedReads: 0 });
   state.items = [...state.items.filter((i) => i.id !== item.id), item];
+  push();
 }
 
 async function captureItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -357,7 +381,10 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
     pending = currentRepositoryProject(item.repo).then((project): Promise<Start> | Start =>
       project.error === undefined ? startThread(project.projectId, message, choice) : { thread: null, error: project.error, refused: true },
     ).then((result) => {
-      if (result.thread) state.started = { ...state.started, [itemId]: result.thread };
+      if (result.thread) {
+        state.started = { ...state.started, [itemId]: result.thread };
+        push();
+      }
       else if (!result.uncertain) starts.delete(itemId);
       return result;
     }).finally(() => { runningStarts--; });
@@ -444,6 +471,7 @@ async function abandonItemRequest(req: IncomingMessage, res: ServerResponse): Pr
         abandoned.add(itemId);
         recentItems.delete(itemId);
         state.items = state.items.filter((i) => i.id !== itemId);
+        push();
       }
       return error;
     });
@@ -481,6 +509,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (path === '/') {
     return send(res, 200, 'text/html; charset=utf-8', renderPage(state, { now: Date.now(), ui: DEFAULT_UI }));
   }
+  if (path === '/api/events') return openStream(req, res);
   if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(state));
   if (path === '/healthz') return json(res, 200, {
     runningRevision: code.status.runningRevision, launchToken: process.env.BOARD_LAUNCH_TOKEN ?? null,
@@ -522,6 +551,7 @@ const timer = setInterval(() => {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     clearInterval(timer);
+    for (const res of streams) res.end();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref();
   });

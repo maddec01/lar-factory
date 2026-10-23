@@ -31,13 +31,16 @@ export function startLiveData(): void {
 
   async function poll(): Promise<void> {
     const current = ++sequence;
+    const writes = useBoardStore.getState().writes;
+    // A write this page made meanwhile brought newer data than this poll's.
+    const fresh = () => current === sequence && writes === useBoardStore.getState().writes;
     try {
       const res = await fetch('/api/board', { cache: 'no-store', signal: AbortSignal.timeout(5_000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
-      if (current === sequence) receive(text);
+      if (fresh()) receive(text);
     } catch (err) {
-      if (current === sequence) board.fail(err instanceof Error ? err.message : String(err));
+      if (fresh()) board.fail(err instanceof Error ? err.message : String(err));
     } finally {
       if (current === sequence) schedule();
     }

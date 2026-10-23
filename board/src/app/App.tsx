@@ -3,6 +3,7 @@
 import { useLayoutEffect } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { View } from '../ui-state.ts';
+import { AbandonDialog } from './AbandonDialog.tsx';
 import { useBoardStore } from './board-store.ts';
 import { BoardView } from './BoardView.tsx';
 import { CopyStatus } from './CopyButton.tsx';
@@ -10,6 +11,7 @@ import { FlowView } from './FlowView.tsx';
 import { Header } from './Header.tsx';
 import { restoreAnchor } from './keep-anchor.ts';
 import { useSetView, useView } from './router.tsx';
+import { Toasts } from './Toasts.tsx';
 
 const VIEWS: { view: View; label: string }[] = [{ view: 'board', label: 'Board' }, { view: 'flow', label: 'Flow' }];
 
@@ -60,6 +62,8 @@ export function App() {
       </main>
       {/* Outside main, so the announcement sits apart from the views. */}
       <CopyStatus />
+      <Toasts />
+      <AbandonDialog />
     </>
   );
 }

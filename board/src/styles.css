@@ -227,11 +227,10 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .update-hint { margin: 6px 0 0; }
 .update-hint code { overflow-wrap: anywhere; }
 #add-item-dialog, #abandon-dialog { width: min(520px, calc(100% - 34px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); color: var(--fg); overflow: auto; margin: auto; }
-/* The Add item dialog is Base UI's: a fixed popup over a backdrop element, not a native <dialog>. */
-#add-item-dialog { position: fixed; inset: 0; z-index: 50; height: fit-content; }
-.dialog-backdrop { position: fixed; inset: 0; z-index: 50; }
-.dialog-backdrop, #abandon-dialog::backdrop { background: rgb(0 0 0 / 40%); }
-#abandon-dialog { width: min(420px, calc(100% - 24px)); }
+/* The Add item and Abandon dialogs are Base UI's: a fixed popup over a backdrop element, not a native <dialog>. */
+#add-item-dialog, #abandon-dialog { position: fixed; inset: 0; z-index: 50; height: fit-content; }
+.dialog-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 40%); }
+#abandon-dialog { width: min(420px, calc(100% - 34px)); }
 #abandon-heading { overflow-wrap: anywhere; }
 #abandon-dialog .form-actions { justify-content: flex-end; }
 .form-heading, .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -259,7 +258,7 @@ button:disabled[title] { cursor: not-allowed; }
 .dismiss { float: right; margin: -3px -6px 0 8px; width: 24px; height: 24px; border: 0; border-radius: var(--r-control); background: none; color: var(--muted); font: 16px/1 var(--font-sans); cursor: pointer; }
 .dismiss:hover { background: var(--accent); color: var(--fg); }
 .action-error .dismiss { float: none; margin: -4px 0 -4px 2px; vertical-align: middle; font-weight: 400; }
-/* client.ts keeps --toast-top below the header while it's on screen. */
+/* app/Toasts.tsx keeps --toast-top below the header while it's on screen. */
 .toasts { position: fixed; top: var(--toast-top, 12px); right: 12px; z-index: 60; display: grid; gap: 8px; width: min(400px, calc(100vw - 24px)); }
 .toast { margin: 0; background: var(--surface); border-color: var(--bd); box-shadow: var(--shadow), 0 1px 3px rgb(0 0 0 / 8%); animation: toast-in 0.18s cubic-bezier(0.32, 0.72, 0, 1); }
 .toast.seen { animation: none; }

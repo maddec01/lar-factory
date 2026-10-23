@@ -31,7 +31,7 @@ export function menuMove(key: string, index: number, count: number): number | nu
 }
 
 /** Whether a start's result makes its choice the one to remember: "Started" or "May have started", not a refusal or failure. */
-export function remembersChoice(result: StartResult): boolean {
+export function remembersChoice(result: Partial<StartResult>): boolean {
   return Boolean(result.thread || result.uncertain);
 }
 

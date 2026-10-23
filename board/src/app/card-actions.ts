@@ -9,20 +9,20 @@ import { useBoardStore } from './board-store.ts';
 import { holdAnchor } from './keep-anchor.ts';
 import { notify } from './notices.tsx';
 
-interface ActionResult {
+export interface ActionResult {
   error: string | null;
   board?: BoardData;
 }
 
 /** Posts an item action and returns the server's answer, or a message when the server can't be reached. */
-export async function postAction(path: string, body: object): Promise<ActionResult> {
+export async function postAction<T extends object = object>(path: string, body: object): Promise<ActionResult & Partial<T>> {
   useBoardStore.getState().beginWrite();
   try {
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const result = await response.json() as Partial<ActionResult>;
-    return { board: result.board, error: result.error ?? (response.ok ? null : `Request failed (HTTP ${response.status}).`) };
+    const result = await response.json() as Partial<ActionResult & T>;
+    return { ...result, error: result.error ?? (response.ok ? null : `Request failed (HTTP ${response.status}).`) };
   } catch {
-    return { error: "Can't reach the board server. Try again." };
+    return { error: "Can't reach the board server. Try again." } as ActionResult & Partial<T>;
   }
 }
 
@@ -61,7 +61,7 @@ function focusAfterCardLeaving(button: HTMLElement): string[] {
 }
 
 /** Moves focus to the first of `selectors` on the page, if the action took it away with its button. */
-function refocus(selectors: string[]): void {
+export function refocus(selectors: string[]): void {
   if (document.activeElement !== document.body) return;
   selectors.map((sel) => document.querySelector<HTMLElement>(sel)).find(Boolean)?.focus({ preventScroll: true });
 }

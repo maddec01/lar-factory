@@ -5,8 +5,9 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import { TestClock } from "effect/testing";
 
-import type { UpdateState } from "../../../board/src/app/board-app.ts";
+import type { UpdateChannel, UpdateState } from "../../../board/src/app/board-app.ts";
 import * as AppUpdates from "./AppUpdates.ts";
+import type { ChannelSetting } from "./ChannelSetting.ts";
 import { ElectronUpdaterError, type ElectronUpdater, type UpdaterEvent } from "./ElectronUpdater.ts";
 import * as Machine from "./updateMachine.ts";
 
@@ -66,7 +67,19 @@ const makeFakeUpdater = () => {
   return { fake, updater };
 };
 
-const setup = (options: { version?: string; disabledReason?: string | null } = {}) =>
+/** A channel setting kept in memory, which a test can hand to a second `make` as after a restart. */
+const makeChannelSetting = (saved: UpdateChannel | null = null) => {
+  const setting: ChannelSetting & { saved: UpdateChannel | null } = {
+    saved,
+    read: Effect.sync(() => setting.saved),
+    write: (channel: UpdateChannel) => Effect.sync(() => void (setting.saved = channel)),
+  };
+  return setting;
+};
+
+const setup = (
+  options: { version?: string; disabledReason?: string | null; channelSetting?: ChannelSetting } = {},
+) =>
   Effect.gen(function* () {
     const { fake, updater } = makeFakeUpdater();
     const board: AppUpdates.BoardServerControl & { onStop: Effect.Effect<void, Error> } = {
@@ -83,14 +96,15 @@ const setup = (options: { version?: string; disabledReason?: string | null } = {
       board,
       version: options.version ?? "0.1.0",
       disabledReason: options.disabledReason === undefined ? null : options.disabledReason,
+      channelSetting: options.channelSetting ?? makeChannelSetting(),
       publish: (state) => published.push(state),
     });
     const statuses = () => published.map((state) => state.status);
     return { fake, board, updates, published, statuses };
   });
 
-const failure = (operation: "check" | "download" | "install", message: string) =>
-  Effect.fail(new ElectronUpdaterError({ operation, cause: new Error(message) }));
+const failure = (operation: "check" | "download" | "install", message: string, code?: string) =>
+  Effect.fail(new ElectronUpdaterError({ operation, cause: Object.assign(new Error(message), code && { code }) }));
 
 describe("defaultChannel", () => {
   it("is nightly for nightly versions and latest otherwise", () => {
@@ -193,7 +207,14 @@ describe("AppUpdates", () => {
     Effect.gen(function* () {
       const { fake, updater } = makeFakeUpdater();
       const board = { stop: Effect.void, start: Effect.void };
-      yield* AppUpdates.make({ updater, board, version: "0.1.0", disabledReason: null, publish: () => {} }).pipe(Effect.scoped);
+      yield* AppUpdates.make({
+        updater,
+        board,
+        version: "0.1.0",
+        disabledReason: null,
+        channelSetting: makeChannelSetting(),
+        publish: () => {},
+      }).pipe(Effect.scoped);
       yield* TestClock.adjust(Duration.minutes(10));
       assert.strictEqual(fake.checks, 0);
       assert.strictEqual(fake.listenerCount(), 0);
@@ -413,6 +434,69 @@ describe("AppUpdates", () => {
       const refused = yield* updates.setChannel("latest").pipe(Effect.flip);
       assert.match(refused.message, /download is in progress/);
       yield* Deferred.succeed(release, undefined);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("keeps no downgrade on latest after a switch from nightly", () =>
+    Effect.gen(function* () {
+      const { fake, updates } = yield* setup({ version: "0.2.0-nightly.20261023.41" });
+      assert.isTrue(fake.allowDowngrade);
+      let downgradeDuringCheck = false;
+      fake.onCheck = Effect.sync(() => {
+        downgradeDuringCheck = fake.allowDowngrade;
+        fake.emit("update-not-available");
+      });
+      const state = yield* updates.setChannel("latest");
+      assert.strictEqual(state.channel, "latest");
+      assert.strictEqual(fake.channel, "latest");
+      assert.isTrue(downgradeDuringCheck);
+      assert.isFalse(fake.allowDowngrade);
+      assert.isFalse(fake.allowPrerelease);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("reads a channel with no Release or no feed file as up to date, and other failures as errors", () =>
+    Effect.gen(function* () {
+      for (const code of [
+        "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
+        "ERR_UPDATER_LATEST_VERSION_NOT_FOUND",
+        "ERR_UPDATER_NO_PUBLISHED_VERSIONS",
+      ]) {
+        const { fake, updates } = yield* setup({ version: "0.2.0-nightly.20261023.41" });
+        fake.onCheck = failure("check", "Cannot find latest-mac.yml in the latest release artifacts", code);
+        const state = yield* updates.setChannel("latest");
+        assert.strictEqual(state.status, "up-to-date", code);
+        assert.isNull(state.message);
+      }
+      const { fake, updates } = yield* setup();
+      fake.onCheck = failure("check", "socket hang up", "ECONNRESET");
+      assert.strictEqual((yield* updates.check).state.status, "error");
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("starts on the saved channel, saves a switch, and keeps it after a restart", () =>
+    Effect.gen(function* () {
+      const channelSetting = makeChannelSetting("latest");
+      const first = yield* setup({ version: "0.2.0-nightly.20261023.41", channelSetting });
+      assert.strictEqual((yield* first.updates.getState).channel, "latest");
+      assert.strictEqual(first.fake.channel, "latest");
+
+      yield* first.updates.setChannel("nightly");
+      assert.strictEqual(channelSetting.saved, "nightly");
+
+      const restarted = yield* setup({ version: "0.2.0", channelSetting });
+      assert.strictEqual((yield* restarted.updates.getState).channel, "nightly");
+      assert.strictEqual(restarted.fake.channel, "nightly");
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("saves a switch made while updates are off", () =>
+    Effect.gen(function* () {
+      const channelSetting = makeChannelSetting();
+      const { updates } = yield* setup({ disabledReason: "Updates work only in the packaged app.", channelSetting });
+      const state = yield* updates.setChannel("nightly");
+      assert.strictEqual(state.status, "disabled");
+      assert.strictEqual(channelSetting.saved, "nightly");
     }).pipe(Effect.scoped),
   );
 });

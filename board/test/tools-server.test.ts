@@ -35,6 +35,10 @@ test('Recheck finds a t3 that appeared after startup', async (t) => {
   const t3 = join(dir, 't3');
   const board = await startBoard(t, {}, false, false, { T3_PATH: t3 });
   assert.deepEqual((await board.board()).tools, { t3: { problem: 'missing', override: `T3_PATH=${t3}` } });
+  // The page paints its notice from the data inline in it.
+  const page = await (await fetch(`${board.url}/`)).text();
+  const inline = JSON.parse(page.match(/<script id="board-data" type="application\/json">(.*?)<\/script>/s)![1]!);
+  assert.deepEqual(inline.tools, { t3: { problem: 'missing', override: `T3_PATH=${t3}` } });
   copyFileSync(new URL('./fake-t3.cjs', import.meta.url), t3);
   chmodSync(t3, 0o755);
   const response = await recheck(board);

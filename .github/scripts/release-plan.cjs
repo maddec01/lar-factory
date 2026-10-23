@@ -1,4 +1,4 @@
-// Plans a board app Release from the event that started the Release workflow.
+// Plans a board app Release on the channel Pedro picked when he started the Release workflow.
 // The Nightly version scheme and the Stable Release's choice of the latest Nightly's
 // commit are adapted from T3 Code's scripts/resolve-nightly-release.ts and
 // .github/scripts/check-nightly-release.cjs (https://github.com/pingdotgg/t3code).
@@ -20,15 +20,6 @@ function parseRemoteTags(text) {
         if (peeled || !tags.has(name)) tags.set(name, sha);
     }
     return [...tags].map(([name, sha]) => ({ name, sha }));
-}
-
-function ciRunSkipReason(run, repository) {
-    if (run.conclusion !== 'success') return `CI run conclusion is ${run.conclusion}`;
-    if (run.event !== 'push') return `CI run event is ${run.event}`;
-    if (run.head_branch !== 'main') return `CI run branch is ${run.head_branch}`;
-    const headRepository = run.head_repository?.full_name;
-    if (headRepository !== repository) return `CI run head repository is ${headRepository}`;
-    return null;
 }
 
 function latestNightly(tags) {
@@ -55,12 +46,13 @@ function releaseVersion(sha, { isOnMain, versionAt }) {
     return version;
 }
 
-function planNightly({ workflowRun, repository, runNumber, date, tags, isOnMain, versionAt }) {
-    const reason = ciRunSkipReason(workflowRun, repository);
-    if (reason) return { publish: false, reason };
-    const sha = workflowRun.head_sha;
+// ciRun is CI's latest run for headSha on a push to main, or null when there is none.
+function planNightly({ headSha: sha, ciRun, runNumber, date, tags, isOnMain, versionAt }) {
+    const short = sha.slice(0, 12);
     const existing = tags.find((tag) => tag.sha === sha && NIGHTLY_TAG.test(tag.name));
-    if (existing) return { publish: false, reason: `commit ${sha.slice(0, 12)} already has Nightly ${existing.name}` };
+    if (existing) return { publish: false, reason: `commit ${short} already has Nightly ${existing.name}; nothing to publish` };
+    if (ciRun?.status !== 'completed') throw new Error(`CI has not finished on ${short}; try again when it has.`);
+    if (ciRun.conclusion !== 'success') throw new Error(`CI failed on ${short}; fix main before a Nightly.`);
     const version = releaseVersion(sha, { isOnMain, versionAt });
     const nightlyVersion = `${version}-nightly.${date}.${runNumber}`;
     return {
@@ -82,7 +74,7 @@ function planStable({ tags, isOnMain, versionAt }) {
     const tag = `v${version}`;
     if (tags.some((t) => t.name === tag)) {
         throw new Error(
-            `${tag} already exists; bump "version" in the app package's package.json and wait for its Nightly for a new Stable Release.`,
+            `${tag} already exists; bump "version" in the app package's package.json, merge it and start its Nightly before a new Stable Release.`,
         );
     }
     return {
@@ -101,9 +93,9 @@ function planStable({ tags, isOnMain, versionAt }) {
 // isOnMain(sha) tells whether main contains the commit; versionAt(sha) reads the
 // app package version at it.
 function planRelease(input) {
-    if (input.eventName === 'workflow_run') return planNightly(input);
-    if (input.eventName === 'workflow_dispatch') return planStable(input);
-    throw new Error(`A Release cannot start from a ${input.eventName} event.`);
+    if (input.channel === 'nightly') return planNightly(input);
+    if (input.channel === 'stable') return planStable(input);
+    throw new Error(`There is no ${input.channel} channel; pick nightly or stable.`);
 }
 
 function outputLines(plan) {
@@ -125,18 +117,19 @@ function outputLines(plan) {
 module.exports = { nightlyDate, parseRemoteTags, planRelease, outputLines };
 
 // Usage: git ls-remote --tags origin | node release-plan.cjs <app package.json path>
-// Run it in a clone with main's full history in origin/main.
+// Run it in a clone with main's full history in origin/main. CHANNEL names the
+// channel; a Nightly also takes HEAD_SHA, main's head, and CI_RUN, the JSON of
+// CI's latest run for it on a push to main (null when there is none).
 if (require.main === module) {
     const fs = require('node:fs');
     const { execFileSync } = require('node:child_process');
     const { env } = process;
-    const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
     let plan;
     try {
         plan = planRelease({
-            eventName: env.GITHUB_EVENT_NAME,
-            workflowRun: event.workflow_run,
-            repository: env.GITHUB_REPOSITORY,
+            channel: env.CHANNEL,
+            headSha: env.HEAD_SHA,
+            ciRun: JSON.parse(env.CI_RUN || 'null'),
             runNumber: Number(env.GITHUB_RUN_NUMBER),
             date: nightlyDate(new Date()),
             // Exit 1 means not an ancestor, 128 an unknown commit: neither is on main.
@@ -155,6 +148,7 @@ if (require.main === module) {
         console.error(`::error::${error.message}`);
         process.exit(1);
     }
+    if (!plan.publish) console.log(`::notice::${plan.reason}`);
     const lines = outputLines(plan);
     process.stdout.write(lines);
     if (env.GITHUB_OUTPUT) fs.appendFileSync(env.GITHUB_OUTPUT, lines);

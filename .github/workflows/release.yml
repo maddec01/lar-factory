@@ -5,16 +5,19 @@
 name: Release
 
 on:
-  # A Nightly for each CI run on main; release-plan.cjs publishes only green pushes.
-  # Only main's runs start it, so a pull request's CI run never joins the release
-  # group below and replaces a waiting run.
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-  # A Stable Release, rebuilt from the latest Nightly's commit.
+  # Pedro starts every Release by hand from Actions > Release > Run workflow on
+  # main. A Nightly builds main's head once CI passed on it; a Stable Release
+  # rebuilds the latest Nightly's commit. Nothing starts a Release on merge.
   workflow_dispatch:
     inputs:
+      channel:
+        description: "nightly builds main's head; stable rebuilds the latest Nightly"
+        required: true
+        default: nightly
+        type: choice
+        options:
+          - nightly
+          - stable
       dry_run:
         description: "Run everything except publishing"
         required: false
@@ -23,7 +26,7 @@ on:
 
 # One release job at a time, so two runs never publish out of order or tag the
 # same commit twice. A running publisher is never canceled, but GitHub keeps only
-# the newest waiting run: a Nightly started while another run waits replaces it.
+# the newest waiting run: a Release started while another waits replaces it.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -34,15 +37,17 @@ env:
   APP_PACKAGE_JSON: app/package.json
 
 jobs:
-  # Runs main's copy of the planning script, never code from the CI run's head,
-  # and holds no secrets. It reads the Release commit's version with git show and
-  # fails unless main contains that commit.
+  # Runs main's copy of the planning script and holds no secrets. It reads the
+  # Release commit's version with git show and fails unless main contains that
+  # commit.
   plan:
     name: Plan Release
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
+      # Reads CI's result for main's head.
+      actions: read
     outputs:
       publish: ${{ steps.plan.outputs.publish }}
       channel: ${{ steps.plan.outputs.channel }}
@@ -53,6 +58,16 @@ jobs:
       make_latest: ${{ steps.plan.outputs.make_latest }}
       feed: ${{ steps.plan.outputs.feed }}
     steps:
+      # Fails early with a clear error when the dispatch ran from another branch.
+      # It does not guard the signing secrets: a run from another branch uses that
+      # branch's copy of this workflow. The release environment's main-only branch
+      # policy is what keeps the secrets from other branches.
+      - name: Check the dispatch ran on main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Start a Release from main, not $GITHUB_REF."
+          exit 1
+
       - name: Check out main
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -61,8 +76,23 @@ jobs:
           # git ls-remote reads this public repo's tags without the token.
           persist-credentials: false
 
+      # A Nightly builds main's head as it is now, not the commit the dispatch
+      # started from, and passes on CI's latest push-to-main run for it.
+      - name: Read CI's result for main's head
+        if: inputs.channel == 'nightly'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head_sha=$(git rev-parse origin/main)
+          ci_run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$head_sha&event=push&branch=main&per_page=1" \
+            --jq '.workflow_runs[0] | if . then {status, conclusion} else null end')
+          echo "HEAD_SHA=$head_sha" >> "$GITHUB_ENV"
+          echo "CI_RUN=$ci_run" >> "$GITHUB_ENV"
+
       - id: plan
         name: Plan the Release
+        env:
+          CHANNEL: ${{ inputs.channel }}
         run: git ls-remote --tags origin | node .github/scripts/release-plan.cjs "$APP_PACKAGE_JSON"
 
   release:
@@ -150,6 +180,12 @@ jobs:
         run: |
           shasum -a 256 -- *.dmg *.zip > SHA256SUMS
           cat SHA256SUMS
+
+      - name: Report the dry run
+        if: ${{ inputs.dry_run }}
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: echo "::notice::Dry run, so nothing was published. $TAG was built but not released."
 
       - name: Publish release
         if: ${{ !inputs.dry_run }}

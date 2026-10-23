@@ -75,3 +75,11 @@ jobs:
       - name: skill-sync preview tests
         if: ${{ !cancelled() }}
         run: bash skills/skill-sync/scripts/preview-copy.test.sh
+
+      - name: Release plan tests
+        if: ${{ !cancelled() }}
+        run: node --test .github/scripts/release-plan.test.cjs
+
+      - name: Release secrets wizard tests
+        if: ${{ !cancelled() }}
+        run: bash scripts/release-secrets.test.sh

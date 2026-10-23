@@ -13,8 +13,6 @@ export interface BoardConfig {
   /** The port config.json names; BOARD_PORT overrides it for other runs. */
   configuredPort: number;
   refreshSeconds: number;
-  /** T3 Code project that Start opens threads in, as written in config.json (may start with ~). */
-  t3Project: string | null;
 }
 
 export const CONFIG_URL = new URL('../../config.json', import.meta.url);
@@ -23,7 +21,7 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
   const raw = JSON.parse(readFileSync(url, 'utf8')) as {
     project?: { owner?: string; title?: string; number?: number };
     repos?: RepoConfig[];
-    board?: { port?: number; refreshSeconds?: number; t3Project?: string };
+    board?: { port?: number; refreshSeconds?: number };
   };
   const owner = raw.project?.owner;
   const title = raw.project?.title;
@@ -36,7 +34,6 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
     port: Number(process.env.BOARD_PORT ?? raw.board?.port ?? 4317),
     configuredPort: raw.board?.port ?? 4317,
     refreshSeconds: raw.board?.refreshSeconds ?? 45,
-    t3Project: raw.board?.t3Project ?? null,
   };
 }
 

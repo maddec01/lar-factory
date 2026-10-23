@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom';
 import type { BoardData } from '../model.ts';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
+import { writeHeaders } from './board-app.ts';
 import { useBoardStore } from './board-store.ts';
 import { holdAnchor } from './keep-anchor.ts';
 import { notify } from './notices.tsx';
@@ -18,7 +19,7 @@ export interface ActionResult {
 export async function postAction<T extends object = object>(path: string, body: object): Promise<ActionResult & Partial<T>> {
   useBoardStore.getState().beginWrite();
   try {
-    const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const response = await fetch(path, { method: 'POST', headers: writeHeaders(), body: JSON.stringify(body) });
     const result = await response.json() as Partial<ActionResult & T>;
     return { ...result, error: result.error ?? (response.ok ? null : `Request failed (HTTP ${response.status}).`) };
   } catch {

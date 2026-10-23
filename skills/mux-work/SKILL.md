@@ -30,7 +30,8 @@ verifies visible changes and merges every PR; the rest is yours.
 - Past about 150k tokens, hand off: post a handoff written per
   `~/.agents/skills/handoff/SKILL.md` as an issue comment, then continue in a
   fresh thread with `t3_thread_launch`.
-  - Shaping thread: `/mux-work <issue>`, root workspace.
+  - Shaping thread: `/mux-work <issue>` in the issue's repository project,
+    `workspaceStrategy` `{"type":"root"}`.
   - Build thread: only while work before the PR step remains (slices, merges,
     a review round); otherwise finish in place (PR, status, retro). Past the
     mark, start no new implementers; merge the running ones, then hand off
@@ -50,7 +51,8 @@ Wherever this skill grills (open questions in **2. Size up**,
 against the repo's `GLOSSARY.md` and ADRs; capture each resolved term and
 ADR-worthy decision the moment it settles.
 
-Shaping, concept and decision threads run in the repo's main checkout with no
+Shaping, concept and decision threads run in the issue's repository project
+(the T3 project on its repo's main checkout) with no
 branch or PR, writing only to the issue and leaving the checkout as found. So
 draft each glossary entry and ADR instead of writing it: record it in the
 batch's answers comment, then in **Domain docs** of the brief (**3. Brief**) or
@@ -72,13 +74,17 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
 - Anything else: set Shaping. An **Explore subagent** reads the repo's
   `AGENTS.md`, `GLOSSARY.md`, relevant ADRs and the code this issue touches,
   and returns ≤300 words in `domain-modeling` vocabulary: what exists, where,
-  and what the issue would change.
+  and what the issue would change. It also returns each repository's **role**
+  from mux-factory's `config.json` on `main`, read with
+  `gh api -H "Accept: application/vnd.github.raw" "repos/maddec01/mux-factory/contents/config.json?ref=main"`
+  (this checkout may be another repo's).
 
 ## 2. Size up
 
 Pick the route yourself; never ask Pedro to pick one by name. Ask him to
 confirm it ([question UI](questions.md)) in a few lines: what you understood
-the item to be; the repositories that change; the open questions, or "none";
+the item to be; the repositories that change, named from the repository
+roles; the open questions, or "none";
 and what happens next in plain
 words ("I'll ask you three questions, then write the brief"; "a subagent
 reproduces the bug first; I only ask you if the expected behaviour is
@@ -100,7 +106,8 @@ label. Anything Pedro adds or corrects is another open question. Then:
   variant's file paths and a short description. Tell Pedro how to open them
   (T3 browser preview for web; the run scripts in the repo's T3 project for
   Apple), ask for his pick, and record it and the branch on the issue.
-- **Another repository changes**: that work becomes a build there, a
+- **Another repository changes** (its role says it serves or uses what this
+  item changes): that work becomes a build there, a
   sub-issue of this issue that blocks it (reuse an open issue that covers it),
   with its own brief and gate. This issue is a build only if its own repository
   changes.
@@ -152,7 +159,7 @@ while shaping, all Ready.
 1. **Launch check.** Before any `t3_thread_launch`, list each build and wait
    for Go:
    - `owner/repo#n`, title and a one-line What;
-   - its T3 project (`t3_project_list`). With none, "clone needed" if Pedro
+   - its repository project (`t3_project_list`). With none, "clone needed" if Pedro
      can push (`gh repo view <owner/repo> --json viewerPermission` is ADMIN,
      MAINTAIN or WRITE), else "no push access, needs your OK";
    - branch `<kind>/<n>-<slug>` (`fix`, `feat` or `chore`) from `main`;
@@ -165,13 +172,13 @@ while shaping, all Ready.
    **4. Gate** Doubt where What or Done when changed, and ask again. Only
    shaping and decision threads run the check, and never for a handoff thread.
 2. After Go, for each build:
-   1. With no T3 project, clone and register its repo (`t3_project_clone`,
+   1. With no repository project, clone and register its repo (`t3_project_clone`,
       then `t3_project_create`) and run
       [label setup](issue-tracker.md#label-setup) there.
    2. Add the `build` label
       (`gh issue edit <n> --repo <owner/repo> --add-label build`), so the
       board shows its sub-issues as slices.
-   3. Launch its build thread with `t3_thread_launch` in that project:
+   3. Launch its build thread with `t3_thread_launch` in that repository project:
       - `workspaceStrategy`: `{"type":"worktree","baseRef":"main","branch":"<kind>/<n>-<slug>","startFromOrigin":true}`;
       - `message`: `Build <owner/repo#n>. Read <this skill>/agents/builder.md and follow it.`
         with this skill's absolute path.

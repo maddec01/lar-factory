@@ -53,7 +53,7 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
    sub-issue.
 4. Keep the map in Shaping while decisions are open. For each unblocked
    `grill`, `prototype` or `task` decision, launch a **decision thread** with
-   `t3_thread_launch` in its repo's T3 project (cloned as in
+   `t3_thread_launch` in its repository project (cloned as in
    [5. Start the build](SKILL.md#5-start-the-build) if needed), with
    `workspaceStrategy` `{"type":"root"}` and message `/mux-work <owner/repo#n>`.
    Research decisions get no thread; blocked ones stay Queued.

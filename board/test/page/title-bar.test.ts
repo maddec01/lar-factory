@@ -7,12 +7,13 @@ import { $, $$, mountPage, sample, settle, stubApp } from './support.ts';
 const titleBar = () => $<HTMLElement>('.title-bar');
 const actions = () => $<HTMLElement>('.title-bar-actions');
 
-test('in the Mac app, the title bar holds the brand, then Refreshed, Add item and Settings at its right end', async () => {
+test('in the Mac app, the title bar holds the brand, then Refreshed, the update icon, Add item and Settings at its right end', async () => {
   stubApp({ secret: 'launch-secret' });
   await mountPage();
   expect(titleBar()!.className).toContain('pl-[89px]');
   expect(titleBar()!.compareDocumentPosition($('header.top')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect([...actions()!.children].map((el) => el.textContent)).toEqual(['Refreshed 20m ago', 'Add item', 'Settings']);
+  expect([...actions()!.children].map((el) => el.textContent)).toEqual(['Refreshed 20m ago', '', 'Add item', 'Settings']);
+  expect(actions()!.children[1]!.querySelector('.update-button')).not.toBeNull();
   expect($('header.top button')).toBeNull();
   expect($('header.top .refreshed')).toBeNull();
 });
@@ -23,7 +24,7 @@ test('clicking the right end\'s buttons never drags the window; the rest of the 
   expect(titleBar()!.className).toContain('[-webkit-app-region:drag]');
   expect(actions()!.className.split(' ')).toContain('[&_button]:[-webkit-app-region:no-drag]');
   expect(actions()!.className.split(' ')).not.toContain('[-webkit-app-region:no-drag]');
-  expect($$('.title-bar-actions button').map((el) => el.textContent)).toEqual(['Add item', 'Settings']);
+  expect($$('.title-bar-actions button').map((el) => el.textContent || el.getAttribute('aria-label'))).toEqual(['Updates unavailable: Updates work only in the packaged app.', 'Add item', 'Settings']);
 });
 
 test('screen readers reach the actions and Refreshed but skip the brand; the page keeps one h1, for screen readers only', async () => {

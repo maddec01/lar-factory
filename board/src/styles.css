@@ -8,6 +8,9 @@
    Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @import "tailwindcss" source(none);
 @source "./app/TitleBar.tsx";
+@source "./app/UpdateButton.tsx";
+@source "./app/UpdateStatusIcon.tsx";
+@source "./app/RefreshIcon.tsx";
 
 :root {
   color-scheme: light dark;
@@ -48,6 +51,14 @@
   --line: color-mix(in srgb, var(--fg) 14%, transparent);
   --soft: color-mix(in srgb, var(--fg) 7%, transparent);
   --focus: var(--primary);                      /* --ring */
+  /* The update button's colours, T3's sidebar ones, for a button on the page's background. */
+  --update-surface: var(--accent);              /* --sidebar-control-surface: zinc-100 */
+  /* zinc-200, a step darker than the pill's zinc-100: T3's zinc-25 row hover is the page's own background here. */
+  --update-hover: oklch(92% 0.004 286.32);
+  --update-icon: color-mix(in srgb, var(--muted) 60%, var(--bg)); /* --sidebar-icon-color */
+  --glass-blur: 12px;
+  --glass-opacity: 80%;
+  --glass-saturation: 1.14;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -70,6 +81,26 @@
     --shadow: 0 14px 32px -18px rgb(0 0 0 / 75%);
     --sub: oklch(70.2% 0.183 293.541);          /* violet-400 */
     --sub-text: var(--sub);
+    --update-surface: var(--muted-bg);          /* --muted */
+    --update-hover: var(--accent);
+    --glass-blur: 16px;
+    --glass-saturation: 1.08;
+  }
+}
+
+/* T3's utilities for the update button's spinning refresh icon and its tooltip. */
+@utility visible-animate-spin {
+  animation: var(--animate-spin);
+  animation-play-state: var(--visible-animation-state, paused);
+  will-change: var(--visible-animation-will-change, auto);
+}
+@utility dropdown-glass {
+  background: color-mix(in srgb, var(--surface) 18%, color-mix(in srgb, var(--surface) var(--glass-opacity), transparent));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    background: var(--surface) !important;
   }
 }
 
@@ -290,7 +321,6 @@ button:disabled[title] { cursor: not-allowed; }
 .abandon { color: var(--danger-text); }
 .abandon:hover { border-color: var(--danger-text); }
 .copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
-.update-button[data-tone="error"] { color: var(--error-fg); border-color: var(--error); }
 /* The update button's changelog: below the title bar, lined up with the button's right edge. In the Mac app it
    doesn't drag the window, so its links take clicks. */
 .update-notes-positioner { z-index: 50; }

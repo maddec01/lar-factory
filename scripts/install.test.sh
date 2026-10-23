@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests the reference check in install.sh against fake homes. No network.
+# Tests install.sh against fake homes and checkouts with stubbed npx and gh. No network.
 set -euo pipefail
 
 source "$(dirname "$0")/install.sh"
@@ -76,25 +76,55 @@ fi
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
-missing=()
-for dir in "$root"/skills/*/; do
-  name=$(basename "$dir")
-  [[ " ${SKILLS[*]} " == *" $name "* ]] || missing+=("$name")
-done
-if ((${#missing[@]} == 0)); then
-  pass "SKILLS lists every folder under skills/"
+# Runs install.sh from a checkout at $1 with stubbed npx and gh and an empty home,
+# and prints the skills it passes to `npx skills add`, sorted. The stubbed gh
+# fails once install.sh fetches references/, so main stops after npx.
+installed_skills() {
+  local stubs args
+  stubs=$(mktemp -d)
+  args="$stubs/npx-args"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" >%q\n' "$args" >"$stubs/npx"
+  printf '#!/usr/bin/env bash\n[[ $1 == auth ]]\n' >"$stubs/gh"
+  chmod +x "$stubs/npx" "$stubs/gh"
+  PATH="$stubs:$PATH" HOME=$(mktemp -d) bash "$1/scripts/install.sh" >/dev/null 2>&1 || true
+  [[ -f $args ]] && awk '/^-y$/ { f = 0 } f; /^-s$/ { f = 1 }' "$args" | sort
+}
+
+folders() {
+  for dir in "$1"/skills/*/; do basename "$dir"; done | sort
+}
+
+# A checkout with install.sh, UPSTREAM.md and an empty folder per skill.
+make_checkout() {
+  local checkout dir
+  checkout=$(mktemp -d)
+  mkdir -p "$checkout/scripts"
+  cp "$root/scripts/install.sh" "$checkout/scripts/"
+  cp "$root/UPSTREAM.md" "$checkout/"
+  for dir in "$root"/skills/*/; do mkdir -p "$checkout/skills/$(basename "$dir")"; done
+  printf '%s' "$checkout"
+}
+
+if [[ $(installed_skills "$root") == "$(folders "$root")" ]]; then
+  pass "installs exactly the folders under skills/"
 else
-  fail "SKILLS lists every folder under skills/; missing: ${missing[*]}"
+  fail "installs exactly the folders under skills/: $(diff <(installed_skills "$root") <(folders "$root") | tr '\n' ' ')"
 fi
 
-missing=()
-while read -r name; do
-  [[ -d "$root/skills/$name" ]] || missing+=("$name")
-done < <(awk -F'|' '/^\| `/ && $4 !~ /`references\// { gsub(/[ `]/, "", $2); print $2 }' "$root/UPSTREAM.md")
-if ((${#missing[@]} == 0)); then
-  pass "every skill row in UPSTREAM.md has a folder under skills/"
+checkout=$(make_checkout)
+mkdir "$checkout/skills/new-copy"
+if [[ $(installed_skills "$checkout") == "$(folders "$checkout")" ]]; then
+  fail "fails when a folder has no UPSTREAM.md row"
 else
-  fail "every skill row in UPSTREAM.md has a folder under skills/; missing: ${missing[*]}"
+  pass "fails when a folder has no UPSTREAM.md row"
+fi
+
+checkout=$(make_checkout)
+grep -v '^| `tdd`' "$root/UPSTREAM.md" >"$checkout/UPSTREAM.md"
+if [[ $(installed_skills "$checkout") == "$(folders "$checkout")" ]]; then
+  fail "fails when a row is missing from UPSTREAM.md"
+else
+  pass "fails when a row is missing from UPSTREAM.md"
 fi
 
 missing=()

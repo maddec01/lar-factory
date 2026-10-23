@@ -2,18 +2,14 @@
 # Installs or updates the factory's skills and the shared checklists they link to.
 # Run from a clone of main: bash scripts/install.sh
 # Skills and checklists come from main on GitHub, not from this checkout; only the
-# skill list below is read locally, so pull main first.
+# skill list is read locally, from UPSTREAM.md, so pull main first.
 set -euo pipefail
 
 REPO=maddec01/mux-factory
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
-SKILLS=(
-  mux-work skill-sync grilling domain-modeling prototype research
-  diagnosing-bugs tdd code-review codebase-design writing-for-agents pr
-  retro handoff to-tickets implement code-review-and-quality security-and-hardening
-  doubt-driven-development frontend-ui-engineering browser-testing-with-devtools
-  developer-profile
-)
+# Mux's own skills; every other skill is a copy listed in UPSTREAM.md.
+OWN_SKILLS=(mux-work skill-sync)
 
 # Skills whose copies link to ../../references/.
 CHECKED_SKILLS=(
@@ -25,6 +21,11 @@ CHECKED_SKILLS=(
 # Codex from ~/.agents/skills, Claude Code from ~/.claude/skills.
 reference_dirs() {
   printf '%s\n' "$1/.agents/references" "$1/.claude/references"
+}
+
+# Prints the name of every skill row in an UPSTREAM.md, skipping references/ rows.
+upstream_skills() {
+  awk -F'|' '/^\| `/ && $4 !~ /`references\// { gsub(/[ `]/, "", $2); print $2 }' "$1"
 }
 
 die() {
@@ -120,7 +121,13 @@ main() {
   command -v npx >/dev/null || die "needs npx (install Node.js)"
   command -v gh >/dev/null || die "needs gh (install GitHub CLI)"
   gh auth status >/dev/null 2>&1 || die "needs a gh login (gh auth login) to fetch references/"
-  npx --yes skills add "$REPO" -g -a claude-code codex -s "${SKILLS[@]}" -y
+  local -a skills=("${OWN_SKILLS[@]}")
+  local name
+  while IFS= read -r name; do
+    skills+=("$name")
+  done < <(upstream_skills "$ROOT/UPSTREAM.md")
+  ((${#skills[@]} > ${#OWN_SKILLS[@]})) || die "no skill rows in $ROOT/UPSTREAM.md"
+  npx --yes skills add "$REPO" -g -a claude-code codex -s "${skills[@]}" -y
   install_references
   check_references "$HOME" || die "some checklist links don't resolve; check that references/ on main has the files named above, then run again"
 }

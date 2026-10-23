@@ -15,7 +15,8 @@ scan-and-rewrite pass. Code is out of scope.
 1. Fold the fixups in with `git rebase -i --autosquash origin/main`
    (non-interactive: `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`),
    rerun the checks, and `git push --force-with-lease`.
-2. Open the PR with `gh pr create`: a conventional title naming the change as
+2. Open the PR with `gh pr create`, citing other-repo work per
+   `../cross-repo-citations.md`: a conventional title naming the change as
    Pedro would (it becomes the release note); a body written with the `pr`
    skill holding:
    - a text summary of the UI reviewer's checks and results, per

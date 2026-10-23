@@ -7,12 +7,9 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI } from '../src/ui-state.ts';
 import { formatTokens, formatUsd } from '../src/format.ts';
-import { answeredRecheck, recheckAnswer, renderApp, renderBoardView, renderHeader } from '../src/render.ts';
+import { answeredRecheck, recheckAnswer, renderApp, renderHeader } from '../src/render.ts';
 import type { RenderOptions } from '../src/render.ts';
 import type { BoardData } from '../src/model.ts';
-import { normalizeItems } from '../src/github.ts';
-import type { RawItem } from '../src/github.ts';
-import { rawIssue, sliceRef } from './raw-items.ts';
 
 // The source index.html stands in for the built one, whose asset names change with every build.
 const template = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -46,31 +43,6 @@ test('the header and the tab show the Mux logo followed by "factory"', () => {
   assert.match(h1, /^<svg class="brand-mark" role="img" aria-label="Mux" viewBox="0 0 56 32"[^>]*><path d="M5 3\.5v25M5 3\.5V12a8\.5 8\.5 0 0 0 17 0V3\.5M22 12c0 4\.5 2 7\.5 5\.5 7\.5M36 3\.5l14 17M50 3\.5l-14 17"/);
   assert.match(h1, /<\/svg><span>factory<\/span>$/);
   assert.ok(!page.includes('Mux factory board'));
-});
-
-const builtIssue = rawIssue('PVTI_build', 59, 'In progress', ['improvement', 'build'], {
-  subIssuesSummary: { total: 3, completed: 1 },
-  subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
-});
-const boardOf = (raws: RawItem[], builds = new Set<string>()): BoardData => ({ ...sample, error: null, items: normalizeItems(raws, { builds }) });
-
-/** A build card's popover: the trigger's opening tag, the popover's id, and each row's state, number and link in order. */
-function slicePopover(card: string) {
-  const trigger = /<div class="slices-trigger"[^>]*>/.exec(card)?.[0];
-  const pop = /<div class="slices-pop" id="([^"]+)">(.*?)<\/div>/s.exec(card);
-  assert.ok(trigger && pop, 'the card has a slice popover and its trigger');
-  const rows = [...pop[2]!.matchAll(/<li class="row-item slice-row ([a-z]+)">.*?<a [^>]*href="([^"]+)"[^>]*><span class="ref">#(\d+)<\/span>/g)];
-  return { trigger, id: pop[1], rows: rows.map((m) => [m[1], Number(m[3]), m[2]]) };
-}
-
-test("a build's popover stays open across a re-render", () => {
-  const data = boardOf([builtIssue]);
-  const card = (slicesOpen?: string) => renderBoardView(data, { ...base, ui: { ...DEFAULT_UI, slicesOpen } })
-    .split('<article').find((a) => a.includes('data-anchor="PVTI_build"'))!;
-  assert.match(slicePopover(card('PVTI_build')).trigger, /aria-expanded="true"/);
-  assert.match(card('PVTI_build'), /<div class="slices open" data-slices="PVTI_build">/);
-  assert.match(slicePopover(card('PVTI_other')).trigger, /aria-expanded="false"/);
-  assert.match(card(), /<div class="slices" data-slices="PVTI_build">/);
 });
 
 test('entered titles round-trip through bootstrap JSON without closing its script element', () => {

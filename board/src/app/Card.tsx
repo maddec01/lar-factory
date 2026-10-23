@@ -4,11 +4,12 @@
 import { Fragment } from 'react';
 import type { ReactNode } from 'react';
 import { AMBER_STATUSES, STATUSES } from '../model.ts';
-import type { BoardData, Item, LinkedPr, Slice, Status } from '../model.ts';
-import { HINTS, checksBadge, namedSlices, popoverOrder, prLabel, statusTone } from '../board-view.ts';
+import type { BoardData, Item, LinkedPr, Status } from '../model.ts';
+import { HINTS, checksBadge, namedSlices, prLabel, statusTone } from '../board-view.ts';
 import { plural } from '../format.ts';
 import type { ItemAction } from './action-store.ts';
 import { useBoardStore } from './board-store.ts';
+import { SlicePopover, sliceKey } from './SlicePopover.tsx';
 import { KindPill, PlatformBadge, TitleLink } from './item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
 
@@ -28,8 +29,6 @@ function StepCells({ status }: { status: Status }) {
 
 const Sep = () => <span className="sep"> · </span>;
 
-const sliceKey = (s: Slice) => `${s.repo}#${s.number}`;
-
 /**
  * The status bar, and on a build with slices its slice bar under it: one segment per slice, the
  * captions sharing a column, and one line naming the blocked or the active slices (counting them
@@ -48,28 +47,15 @@ function Bars({ item }: { item: Item }) {
       {groups.length === 1 && group.map((s, i) => <Fragment key={sliceKey(s)}>{i > 0 ? <Sep /> : ' '}<span className="ref">#{s.number}</span> {s.title}</Fragment>)}
     </Fragment>
   ));
-  const popId = `slices-${item.id}`;
   return (
-    <div className="slices" data-slices={item.id}>
-      <div className="slices-trigger" role="button" tabIndex={0} aria-expanded={false} aria-controls={popId}>
-        <div className="bars">
-          <StepCells status={item.status} />
-          <ol className="segbar slice-bar" aria-hidden="true">{slices.map((s) => <li className={s.progress} key={sliceKey(s)} />)}</ol>
-          <span className="bar-label">{done}/{slices.length} · Slices done</span>
-        </div>
-        {named.length > 0 && <p className="slices-now">{named}</p>}
+    <SlicePopover item={item}>
+      <div className="bars">
+        <StepCells status={item.status} />
+        <ol className="segbar slice-bar" aria-hidden="true">{slices.map((s) => <li className={s.progress} key={sliceKey(s)} />)}</ol>
+        <span className="bar-label">{done}/{slices.length} · Slices done</span>
       </div>
-      <div className="slices-pop" id={popId}>
-        <ul className="slice-rows" aria-label="Slices">
-          {popoverOrder(slices).map((s) => (
-            <li className={`row-item slice-row ${s.progress}`} key={sliceKey(s)}>
-              <span className="slice-mark" aria-hidden="true" />
-              <a className="row-title" href={s.url} title={s.title} target="_blank" rel="noopener"><span className="ref">#{s.number}</span> {s.title}<span className="sr-only"> ({s.progress})</span></a>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+      {named.length > 0 && <p className="slices-now">{named}</p>}
+    </SlicePopover>
   );
 }
 

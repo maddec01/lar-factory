@@ -3,17 +3,18 @@
 
 import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
-import { AMBER_STATUSES, STATUSES, ref, workMessage } from '../model.ts';
+import { AMBER_STATUSES, STATUSES, workMessage } from '../model.ts';
 import type { BoardData, Item } from '../model.ts';
 import { boardSections, conceptChildren } from '../board-view.ts';
 import { day, plural, slug } from '../format.ts';
 import { useBoardStore } from './board-store.ts';
-import { Card, writeState } from './Card.tsx';
+import { Card } from './Card.tsx';
 import { Disclosure } from './Disclosure.tsx';
 import { AbandonButton, ActionError, BackToListButton, QueueButton } from './ItemActions.tsx';
 import { jumpTo } from './jump.ts';
 import { useJumpStore } from './jump-store.ts';
 import { useSetView, useView } from './router.tsx';
+import { StartControl, StartMessage, useStartHolds } from './StartControl.tsx';
 import { KindPill, LabelPills, PlatformBadge, TitleLink } from './item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
 
@@ -85,24 +86,11 @@ function ConceptBlock({ concept, data }: { concept: Item; data: BoardData }) {
   return <Card item={concept} data={data} extra={extra} />;
 }
 
-/** Start in the card's top-right corner, or the tag of the T3 thread a page started for it. */
-function StartControl({ item, data }: { item: Item; data: BoardData }) {
-  const thread = data.started?.[item.id];
-  return (
-    <span className="start-group">
-      {thread
-        ? <span className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</span>
-        // Sample mode keeps Start's menu open-able, so the model choices can be seen.
-        : <button type="button" className="copy start-item" data-start={item.id} aria-label={`Start ${ref(item)} ${item.title}`} aria-haspopup="menu" aria-expanded={false}
-            {...(data.capture?.enabled === false ? {} : writeState(data))}>Start {'▾'}</button>}
-    </span>
-  );
-}
-
 function QueuedCard({ item, data }: { item: Item; data: BoardData }) {
   const issue = Boolean(workMessage(item));
-  // Issues and drafts get a footer row; nothing queues a pull request, and a started thread takes the row away.
-  const footer = item.type !== 'PullRequest' && !data.started?.[item.id] && (
+  const startHolds = useStartHolds(item, data);
+  // Issues and drafts get a footer row; nothing queues a pull request, and a Start in flight, uncertain or done takes the row away.
+  const footer = item.type !== 'PullRequest' && !startHolds && (
     <div className="card-actions">
       <BackToListButton item={item} data={data} />
       <AbandonButton item={item} data={data} className="link-action danger" />
@@ -111,7 +99,7 @@ function QueuedCard({ item, data }: { item: Item; data: BoardData }) {
   return (
     <Card item={item} data={data}
       action={issue && <StartControl item={item} data={data} />}
-      extra={!issue && <p className="foot"><span className="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>}
+      extra={issue ? <StartMessage item={item} /> : <p className="foot"><span className="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>}
       after={footer} />
   );
 }

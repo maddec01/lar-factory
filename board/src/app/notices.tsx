@@ -1,8 +1,8 @@
 // What this page just did to an item, announced in a toast: added or moved with View item,
-// abandoned, or a Queued card's action that failed.
+// abandoned, started in T3, or a Queued card's action that failed.
 
-import { platformOf, ref } from '../model.ts';
-import type { Item, Status } from '../model.ts';
+import { platformOf, ref, workTitle } from '../model.ts';
+import type { Item, StartedThread, Status } from '../model.ts';
 import { abandonPrompt, listGroupId } from '../board-view.ts';
 import { useBoardStore } from './board-store.ts';
 import { useDetailsStore } from './details-store.ts';
@@ -15,7 +15,8 @@ export type Notice =
   | { verb: 'Added' | 'Moved'; item: Item; to: Status }
   | { verb: 'Abandoned'; item: Item }
   /** A Queued card's Back to List (`to`) or Abandon (no `to`) failed. */
-  | { verb: 'Failed'; item: Item; to?: Status; message: string };
+  | { verb: 'Failed'; item: Item; to?: Status; message: string }
+  | { verb: 'Started'; item: Item; thread: StartedThread };
 
 /** Notices share one toast: a new one replaces the last. */
 const SLOT = 'notice';
@@ -44,6 +45,14 @@ function toastOf(notice: Notice): Omit<Toast, 'key'> {
         // Back to the button that failed.
         focusAfter: [`[data-${notice.to ? 'back-to-list' : 'abandon'}="${CSS.escape(item.id)}"]`],
       };
+    case 'Started': {
+      const { title, threadId } = notice.thread;
+      return {
+        slot: SLOT, what: `started ${ref(item)}`,
+        // T3 titles a thread after line 1 of the work message; don't repeat the issue.
+        body: <>Started T3 thread{title !== workTitle(item) && <> <b>{title}</b></>} <code className="thread-id">{threadId}</code> for <TitleLink item={item} />.</>,
+      };
+    }
     default:
       return {
         slot: SLOT, what: `${notice.verb} ${ref(item)}`,

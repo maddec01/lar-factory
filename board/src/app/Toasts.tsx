@@ -60,7 +60,7 @@ export function ToastView({ what, failed = false, focusAfter, onClose, children 
   );
 }
 
-/** Keeps --toast-top below the header while it's on screen, and always below the app's title bar, so toasts
+/** Keeps --toast-top below the header while it's on screen, and always below the title bar, so toasts
  * never cover the header's buttons or banners nor sit in the bar that drags the window. */
 function placeToasts(): void {
   const bottom = Math.max(...['header.top', '.title-bar'].map((sel) => document.querySelector(sel)?.getBoundingClientRect().bottom ?? 0));

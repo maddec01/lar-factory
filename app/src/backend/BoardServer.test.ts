@@ -13,7 +13,7 @@ const fakeBoard = NodePath.resolve(import.meta.dirname, "../../test/fake-board.m
 const boardDir = NodePath.resolve(import.meta.dirname, "../../../board");
 
 const fakeConfig = (env: Record<string, string>): BoardServer.StartConfig => ({
-  ...BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env: { ...process.env, ...env } }),
+  ...BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env: { ...process.env, ...env }, secret: "test-secret" }),
   args: [fakeBoard],
 });
 
@@ -27,17 +27,18 @@ const isRunning = (pid: number) => {
 };
 
 describe("makeStartConfig", () => {
-  it("runs board/src/server.ts with the given executable in Node mode", () => {
+  it("runs board/src/server.ts with the given executable in Node mode and the launch secret", () => {
     const config = BoardServer.makeStartConfig({
       executablePath: "/Applications/Board.app/Contents/MacOS/Board",
       boardDir: "/repo/board",
       env: { PATH: "/usr/bin", ELECTRON_RUN_AS_NODE: "0" },
+      secret: "launch-secret",
     });
     assert.deepStrictEqual(config, {
       executablePath: "/Applications/Board.app/Contents/MacOS/Board",
       args: ["--disable-warning=ExperimentalWarning", "/repo/board/src/server.ts"],
       cwd: "/repo/board",
-      env: { PATH: "/usr/bin", ELECTRON_RUN_AS_NODE: "1" },
+      env: { PATH: "/usr/bin", ELECTRON_RUN_AS_NODE: "1", BOARD_APP_SECRET: "launch-secret" },
     });
   });
 });
@@ -87,7 +88,7 @@ describe("start", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
   );
 
-  it.live("starts the real board in sample mode", () =>
+  it.live("starts the real board in sample mode, guarding writes with the launch secret", () =>
     Effect.gen(function* () {
       const config = BoardServer.makeStartConfig({
         executablePath: process.execPath,
@@ -98,10 +99,25 @@ describe("start", () => {
           T3_SETTINGS: "test/t3-settings.sample.json",
           T3_MODEL_MANIFEST: "test/model-manifest.sample.json",
         },
+        secret: "launch-secret",
       });
       const board = yield* BoardServer.start(config);
       const page = yield* Effect.promise(() => fetch(board.url).then((res) => res.text()));
       assert.include(page, "<html");
+      // Each POST comes from the page's origin, as JSON, as the page's and status.sh's do.
+      const post = (path: string, headers: Record<string, string> = {}) =>
+        Effect.promise(() =>
+          fetch(new URL(path, board.url), {
+            method: "POST",
+            headers: { Origin: board.url.origin, "Content-Type": "application/json", ...headers },
+            body: "{}",
+          }).then(async (res) => `${res.status} ${await res.text()}`),
+        );
+      const refused = '403 {"error":"Submit from the board app."}';
+      assert.strictEqual(yield* post("/api/queue"), refused, "a write without the launch secret");
+      // Sample mode turns the write down itself once the secret gets it past the check.
+      assert.notStrictEqual(yield* post("/api/queue", { "X-Board-Secret": "launch-secret" }), refused);
+      assert.match(yield* post("/api/read"), /^2\d\d /, "status.sh's refresh stays open");
     }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
   );
 });

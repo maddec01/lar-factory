@@ -1,6 +1,8 @@
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
+import { createServer } from 'node:net';
+import { get } from 'node:http';
 import assert from 'node:assert/strict';
-import { rawIssue, startBoard } from './server-support.ts';
+import { freePort, rawIssue, startBoard } from './server-support.ts';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
 import { itemTotal } from '../src/model.ts';
@@ -323,4 +325,39 @@ test('PR edits run beside the refreshes without holding them up, and never two s
   await new Promise((r) => setTimeout(r, 1700));
   assert.deepEqual((await prCalls()).map((args) => args[2] === 'PATCH' ? 'PATCH' : 'read'), ['read', 'PATCH'],
     'refreshes during the edit started no second sync');
+});
+
+/** Holds `port` for the test; a port something else already holds is taken all the same. */
+async function hold(t: TestContext, port: number): Promise<void> {
+  const server = createServer();
+  await new Promise<void>((resolve) => {
+    server.once('error', () => resolve());
+    server.listen(port, '127.0.0.1', resolve);
+  });
+  t.after(() => new Promise<void>((resolve) => server.listening ? server.close(() => resolve()) : resolve()));
+}
+
+test('without BOARD_PORT the board skips a taken 4317, binds the next free port and logs it', async (t) => {
+  await hold(t, 4317);
+  const board = await startBoard(t, {}, true, false, { BOARD_PORT: '' });
+  const port = Number(new URL(board.url).port);
+  assert.ok(port >= 4318 && port <= 4416, board.url);
+  assert.match(board.logs(), new RegExp(`board on http://127\\.0\\.0\\.1:${port}`));
+  assert.equal((await fetch(`${board.url}/api/board`)).status, 200, 'the host check accepts the bound port');
+  // fetch always sends the URL's host, so ask through http to name the old port.
+  const misdirected = await new Promise<number | undefined>((resolve, reject) => {
+    get(`${board.url}/api/board`, { headers: { Host: '127.0.0.1:4317' } }, (res) => { res.resume(); resolve(res.statusCode); }).on('error', reject);
+  });
+  assert.equal(misdirected, 421);
+});
+
+test('a BOARD_PORT that isn\'t a port exits with a log line, not a stack trace', async (t) => {
+  await assert.rejects(startBoard(t, {}, true, false, { BOARD_PORT: 'abc' }), (err: Error) =>
+    /BOARD_PORT=abc is not a port/.test(err.message) && !/ERR_SOCKET_BAD_PORT|\n\s+at /.test(err.message));
+});
+
+test('BOARD_PORT on a taken port exits with a log line', async (t) => {
+  const port = await freePort();
+  await hold(t, port);
+  await assert.rejects(startBoard(t, {}, true, false, { BOARD_PORT: String(port) }), new RegExp(`port ${port} is taken`));
 });

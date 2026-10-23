@@ -190,7 +190,7 @@ board/             the local board app
 references/        checklists Addy's skills link to
 scripts/install.sh installs or updates the skills and checklists
 scripts/setup-worktree.sh installs board/ in a new worktree (.githooks, t3.json)
-config.json        Mux repos (platform, role), board port and refresh, pickup limits
+config.json        Mux repos (platform, role), board refresh, pickup limits
 UPSTREAM.md        source and commit of every copy
 docs/plan.md       how this was set up
 ```

@@ -11,6 +11,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.ts';
+import { BOARD_PORTS, listenOnFreePort } from './port.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
@@ -35,8 +36,8 @@ const config = loadConfig();
 const fixture = process.env.BOARD_DATA_FILE;
 const capture = { session: randomUUID(), enabled: !fixture };
 const updates = updatePaths();
-// Only the launch-agent board updates itself: launchd sets its token, and it runs on the configured port.
-const updatable = !fixture && Boolean(process.env.BOARD_LAUNCH_TOKEN) && config.port === config.configuredPort;
+// Only the launch-agent board updates itself: launchd sets its token.
+const updatable = !fixture && Boolean(process.env.BOARD_LAUNCH_TOKEN);
 const code = revisionCheck({ updatable, logs: { update: updates.log, board: updates.boardLog } });
 
 const state: BoardData = {
@@ -290,7 +291,7 @@ function openStream(req: IncomingMessage, res: ServerResponse): void {
 /** Only answer requests addressed to this machine, to block DNS rebinding. */
 function allowedHost(req: IncomingMessage): boolean {
   const host = (req.headers.host ?? '').toLowerCase();
-  return [`127.0.0.1:${config.port}`, `localhost:${config.port}`].includes(host);
+  return [`127.0.0.1:${port}`, `localhost:${port}`].includes(host);
 }
 
 function json(res: ServerResponse, status: number, value: unknown): void {
@@ -475,7 +476,7 @@ function launchUpdater(): Promise<string | null> {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', fileURLToPath(new URL('../scripts/update.ts', import.meta.url))], {
       cwd: fileURLToPath(new URL('../', import.meta.url)), detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
-      env: { ...process.env, BOARD_PORT: String(config.port) },
+      env: { ...process.env, BOARD_PORT: String(port) },
     });
     let settled = false;
     const settle = (error: string | null) => {
@@ -603,9 +604,24 @@ const server = createServer((req, res) => {
 // Sample mode runs no tools, so it looks none up. The check starts the first read once gh works.
 if (!fixture) await recheckTools();
 
-server.listen(config.port, HOST, () => {
-  log(`board on http://${HOST}:${config.port}, refreshing every ${config.refreshSeconds} s`);
-});
+/** Logs why the board can't start and exits. */
+async function exitWith(message: string): Promise<never> {
+  log(message);
+  // Piped output is asynchronous on macOS: let the line out before exiting.
+  await new Promise((resolve) => process.stdout.write('', resolve));
+  process.exit(1);
+}
+
+// BOARD_PORT pins the port; otherwise take the first free one, so several boards can run.
+const pinned = process.env.BOARD_PORT;
+if (pinned && !(/^\d+$/.test(pinned) && Number(pinned) >= 1 && Number(pinned) <= 65535)) {
+  await exitWith(`BOARD_PORT=${pinned} is not a port; choose one from 1 to 65535 or unset it`);
+}
+const ports = pinned ? [Number(pinned)] : BOARD_PORTS;
+const port = await listenOnFreePort(server, HOST, ports) ?? await exitWith(ports.length === 1
+  ? `port ${ports[0]} is taken; stop what holds it or choose another BOARD_PORT`
+  : `ports ${ports[0]} to ${ports.at(-1)} are all taken; stop a board or set BOARD_PORT`);
+log(`board on http://${HOST}:${port}, refreshing every ${config.refreshSeconds} s`);
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with test/sample.json).

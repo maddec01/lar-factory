@@ -209,7 +209,7 @@ A board process started with `pnpm run sample` on a spare port, reading `board/t
 _Avoid_: test board, dev board
 
 **Launch-agent board**:
-The board process the launch agent runs on the port `config.json` names (4317), which Pedro uses every day.
+The board process the launch agent runs on port 4317, which Pedro uses every day. It is the only board that updates itself.
 _Avoid_: live board, real board
 
 ### Skills

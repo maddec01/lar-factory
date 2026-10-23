@@ -21,7 +21,6 @@
     }
   ],
   "board": {
-    "port": 4317,
     "refreshSeconds": 45
   },
   "limits": {

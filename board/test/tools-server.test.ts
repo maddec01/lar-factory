@@ -60,6 +60,7 @@ test('a logged-out gh that logs in is found by the timed retry, which keeps the 
 test('a missing gh names its override', async (t) => {
   const board = await startBoard(t, {}, false, false, { GH_PATH: '/nowhere/gh' });
   assert.deepEqual((await board.board()).tools, { gh: { problem: 'missing', override: 'GH_PATH=/nowhere/gh' } });
+  assert.match(board.logs(), /t3 at \S+; gh was not found at GH_PATH=\/nowhere\/gh; az /);
 });
 
 test('a failed read whose gh auth status fails without a logout shows gh\'s error as Stale', async (t) => {

@@ -55,7 +55,8 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),
-    env: { ...testEnv(), BOARD_PORT: port, GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
+    // A home of its own keeps a live board's record out of the real one.
+    env: { ...testEnv(), HOME: dir, BOARD_PORT: port, GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname, SHELL: new URL('./fake-shell.sh', import.meta.url).pathname,
       FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '',
       ...(fixture ? SAMPLE_MODELS : {}), ...env },
@@ -64,13 +65,16 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   let logs = '';
   child.stdout.on('data', (data: Buffer) => { logs += data.toString(); });
   child.stderr.on('data', (data: Buffer) => { logs += data.toString(); });
-  t.after(async () => {
+  const stop = async () => {
     // A board that failed to start has already exited.
     if (child.exitCode === null && child.signalCode === null) {
       const exited = once(child, 'exit');
       child.kill();
       await exited;
     }
+  };
+  t.after(async () => {
+    await stop();
     await rm(dir, { recursive: true, force: true });
   });
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -81,6 +85,8 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
       const response = await fetch(`${url}/api/board`);
       if (response.ok) return {
         url,
+        pid: child.pid!,
+        stop,
         update: (value: object) => writeFile(stateFile, JSON.stringify(value)),
         calls: () => readCalls(stateFile + '.calls'),
         t3Calls: () => readCalls(stateFile + '.t3calls'),

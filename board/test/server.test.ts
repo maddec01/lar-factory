@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import { freePort, rawIssue, startBoard } from './server-support.ts';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { itemTotal } from '../src/model.ts';
 import type { Item } from '../src/model.ts';
 
@@ -360,4 +363,17 @@ test('BOARD_PORT on a taken port exits with a log line', async (t) => {
   const port = await freePort();
   await hold(t, port);
   await assert.rejects(startBoard(t, {}, true, false, { BOARD_PORT: String(port) }), new RegExp(`port ${port} is taken`));
+});
+
+test('a live board records its port for status.sh and removes the record on exit; a sample board records nothing', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'mux-records-home-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  const records = join(home, 'Library/Application Support/Mux Factory/boards');
+  const sample = await startBoard(t, {}, true, false, { HOME: home });
+  const board = await startBoard(t, {}, false, false, { HOME: home });
+  assert.deepEqual(readdirSync(records), [`${board.pid}.json`]);
+  assert.deepEqual(JSON.parse(readFileSync(join(records, `${board.pid}.json`), 'utf8')), { port: Number(new URL(board.url).port) });
+  await sample.stop();
+  await board.stop();
+  assert.deepEqual(readdirSync(records), []);
 });

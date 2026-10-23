@@ -88,80 +88,23 @@ through a long conversation, and subagents return summaries instead of files.
 
 ### Install
 
-From a clone of `main`, run:
+Install the board app from
+[GitHub Releases](https://github.com/maddec01/mux-factory/releases): download the
+newest Release's dmg and drag Mux Factory into Applications. On the first launch of
+each new version the app installs every skill and the shared checklists from
+`references/` into `~/.agents`, and links them into the Claude profiles ticked in its
+Settings (`~/.claude` and each `~/.claude-*`). The copied skills' `../../references/`
+links point at those checklists.
 
-```sh
-bash scripts/install.sh
-```
-
-It installs every skill globally for Claude Code and Codex with the
-[`skills` CLI](https://github.com/vercel-labs/skills). Then it copies the shared
-checklists from `references/` on `main` to `~/.agents/references/` and
-`~/.claude/references/`, which is where the copied skills' `../../references/`
-links point. It ends by checking that those links resolve. It needs `npx` and a
-`gh` login.
-
-It installs every skill row in `UPSTREAM.md` plus `mux-work` and `skill-sync`,
-so a new copy needs no change to the script. If you run `npx skills add` yourself,
-always pass `-a`: `-y` without it installs into every agent the CLI knows.
-
-The CLI installs Claude's shared links in `~/.claude/skills`. If you also use
-extra Claude config directories such as `~/.claude-personal`, create those
-directories first, then synchronize their skills:
-
-```sh
-node board/scripts/sync-claude-skills.ts
-```
-
-This links only skills that `~/.claude/skills` already symlinks into
-`~/.agents/skills`, using relative links in each existing `~/.claude-*/skills`.
-It creates missing `skills` directories, preserves files and unrelated links,
-and lists conflicting destinations with a nonzero partial-update result.
-Resolve the conflicts yourself and rerun; other eligible links are still added.
+If you run `npx skills add` yourself, always pass `-a`: `-y` without it installs into
+every agent the CLI knows.
 
 ### Update
 
 The copies change only when a `skill-sync` PR merges here. Run `/skill-sync` to
-see what changed upstream and pick what to take; after merging, pull `main` and
-run the install again:
-
-```sh
-git pull && bash scripts/install.sh
-```
-
-It updates the skills, adds newly listed ones, and replaces the checklists with
-the ones on `main`.
-
-To update the installed board and the skills together, press **Update** in the
-board's header, or run from the main factory checkout:
-
-```sh
-bash board/scripts/update.sh
-```
-
-The command requires macOS with a logged-in launchd GUI session, Node 22.18+
-with npx, pnpm (`brew install pnpm`), Git, and a logged-in `gh`. Install the T3
-Code CLI for the board's Start button. It checks that the checkout is clean and
-on `main`, fetches `origin/main`, fast-forwards, runs
-`pnpm install --frozen-lockfile` in `board/` (replacing a `node_modules` that
-npm made), reinstalls/restarts the launch agent, and waits up to 15 seconds for
-the expected running revision and new launch identity. Then it runs
-`scripts/install.sh`, which adds newly listed skills and replaces the checklists
-with the ones on `main`, and synchronizes extra Claude profiles as above. The launch-agent configuration is refreshed too.
-When the checkout and the running board are already on `origin/main`, it skips
-the install and the restart and only updates the skills and profiles.
-
-Dirty, detached, local-ahead or diverged checkouts stop before installation or
-restart; your commits are never reset, rebased or merged into a new commit.
-Failures name the step and return nonzero. Completed steps are kept, so an
-update can be partial; resolve the reported problem and rerun. A launchctl
-success alone is not success: a crash, bind failure or old process answering
-on the port fails readiness. Check `~/Library/Logs/mux-board.log` in that case.
-
-One update runs at a time, from the button or a terminal. Each run writes its
-output to `~/Library/Logs/mux-board-update.log` and its progress and lock to
-`~/Library/Application Support/mux-factory-board/`, outside the checkout; a lock
-left by a dead process is cleared on the next run.
+see what changed upstream and pick what to take. After merging, start a Release (see
+[Releasing](#releasing)) and install it; its first launch updates the skills, adds
+newly listed ones, and replaces the checklists.
 
 ### Avoiding conflicts
 
@@ -191,8 +134,7 @@ Quitting the app stops the server. To open it from a checkout:
 cd app && pnpm install && pnpm run dev
 ```
 
-The first run downloads Electron's binary. The launch-agent board keeps running
-beside it.
+The first run downloads Electron's binary.
 
 To build a Mac app that runs without the checkout:
 
@@ -270,7 +212,6 @@ skills/            copies (original names), mux-work (with agents/), skill-sync
 board/             the local board app
 app/               the board app: the board in a Mac window (Electron)
 references/        checklists Addy's skills link to
-scripts/install.sh installs or updates the skills and checklists
 scripts/setup-worktree.sh installs board/ in a new worktree (.githooks, t3.json)
 scripts/release-secrets.sh stores the Release signing secrets on GitHub
 config.json        Mux repos (platform, role), board refresh, pickup limits

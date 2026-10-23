@@ -208,10 +208,6 @@ _Avoid_: cost, spend, price
 A board process started with `pnpm run sample` on a spare port, reading `board/test/sample.json` instead of GitHub.
 _Avoid_: test board, dev board
 
-**Launch-agent board**:
-The board process the launch agent runs on port 4317, which Pedro uses every day. It is the only board that updates itself.
-_Avoid_: live board, real board
-
 **Board app**:
 The installable desktop app that runs the board.
 _Avoid_: Electron app, desktop board

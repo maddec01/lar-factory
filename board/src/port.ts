@@ -2,7 +2,7 @@
 
 import type { Server } from 'node:net';
 
-/** The ports a board without BOARD_PORT tries, in order. The board app's board takes the first, 4317. */
+/** The ports a board without BOARD_PORT tries, in order. The board app's board usually gets the first, 4317. */
 export const BOARD_PORTS: readonly number[] = Array.from({ length: 100 }, (_, i) => 4317 + i);
 
 /** Listens on the first of `ports` that isn't in use and returns it; null when every one is. */

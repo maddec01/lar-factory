@@ -212,6 +212,10 @@ _Avoid_: test board, dev board
 The board process the launch agent runs on port 4317, which Pedro uses every day. It is the only board that updates itself.
 _Avoid_: live board, real board
 
+**Board app**:
+The installable desktop app that runs the board.
+_Avoid_: Electron app, desktop board
+
 ### Skills
 
 **Copy**:

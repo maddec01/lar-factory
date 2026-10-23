@@ -13,7 +13,6 @@
     "start": "vp build && node --disable-warning=ExperimentalWarning src/server.ts",
     "dev": "vp build && { vp build --watch --clearScreen false & trap 'kill $!' EXIT; node --disable-warning=ExperimentalWarning --watch --watch-path=src --watch-path=dist src/server.ts; }",
     "test": "vp build && node --disable-warning=ExperimentalWarning --test \"test/*.test.ts\" && vp test run",
-    "test:update": "vp build && UPDATE_EXPECTED=1 node --disable-warning=ExperimentalWarning --test \"test/*.test.ts\"",
     "typecheck": "tsc --noEmit -p .",
     "sample": "vp build && BOARD_DATA_FILE=test/sample.json T3_SETTINGS=test/t3-settings.sample.json T3_MODEL_MANIFEST=test/model-manifest.sample.json node --disable-warning=ExperimentalWarning src/server.ts"
   },

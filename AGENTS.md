@@ -15,9 +15,7 @@ the flow and `docs/plan.md` for how it was set up.
   `commit-msg` hook enforce it. Update branches by rebase; fold review fixes in with
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   Pedro merges every PR.
-- Board changes: run `pnpm test` and `pnpm run typecheck` in `board/`. A deliberate
-  layout change updates the saved copies with `pnpm run test:update`; a rebase
-  conflict in them resolves the same way, then `git add`.
+- Board changes: run `pnpm test` and `pnpm run typecheck` in `board/`.
 - Sample board: `BOARD_PORT=<port> pnpm run sample` in `board/`, on a port where
   `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing (4317 is the launch-agent
   board). Stop it with that command `| xargs kill`; never `pkill` by pattern.

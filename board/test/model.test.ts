@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { canAbandon, checkState, countsOf, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
-import { esc } from '../src/format.ts';
+import { formatTokens, formatUsd } from '../src/format.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
   return {
@@ -129,8 +129,13 @@ test('sample covers every status and both platforms', () => {
   assert.deepEqual(countsOf(sample), { total: 25, needsYou: 4, inFlight: 8, queued: 3, list: 4 });
 });
 
-test('escapes HTML', () => {
-  assert.equal(esc(`<a href="x">'&'</a>`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
+test('token counts are compact as on T3 Code\'s usage page', () => {
+  assert.deepEqual([0, 980, 1_000, 1_234, 40_200, 312_400, 999_999, 1_200_000, 12_436_000, 2.5e9, 3e12].map(formatTokens),
+    ['0', '980', '1K', '1.23K', '40.2K', '312K', '1000K', '1.20M', '12.4M', '2.50B', '3T']);
+});
+
+test('costs are shown as on T3 Code\'s usage page', () => {
+  assert.deepEqual([0.004, 41.2, 1234.567].map(formatUsd), ['$0.00', '$41.20', '$1,234.57']);
 });
 
 test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {

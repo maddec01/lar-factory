@@ -2,6 +2,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, fetchMock, mountPage, sample, settle, stream } from './support.ts';
+import { BRAND_MARK_PATH } from '../../src/brand-mark.ts';
 import type { BoardData } from '../../src/model.ts';
 
 const fresh: BoardData = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
@@ -15,6 +16,23 @@ test('the first paint shows the board data the server put in the page, with no f
   expect($$('.o-node').length).toBeGreaterThan(0);
   expect(fetchMock).not.toHaveBeenCalled();
   expect($('#board-data')).not.toBeNull();
+});
+
+test('the tab shows "µx factory" and the logo as its icon', async () => {
+  await mountPage(fresh);
+  expect(document.title).toBe('µx factory');
+  const icon = decodeURIComponent($<HTMLLinkElement>('link[rel="icon"]')!.getAttribute('href')!);
+  expect(icon).toMatch(/^data:image\/svg\+xml,<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 56 32"/);
+  expect(icon).toContain(`d="${BRAND_MARK_PATH}"`);
+});
+
+test('an entered title round-trips through the inline board data without closing its script element', async () => {
+  const title = 'Play <queue> & "mix" </script> $& $1';
+  await mountPage({ ...fresh, items: [{ ...fresh.items[0]!, title }] });
+  const script = $('#board-data')!;
+  expect(script.innerHTML).not.toContain('</script>');
+  expect((JSON.parse(script.textContent!) as BoardData).items[0]!.title).toBe(title);
+  expect(document.body.textContent).toContain(title);
 });
 
 test('the header shows the Mux logo followed by "factory", when the data was read, and the project', async () => {

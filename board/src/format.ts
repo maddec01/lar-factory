@@ -1,13 +1,4 @@
-// Text helpers the server and the page share: HTML escaping, times, durations, counts, token counts and costs.
-
-export function esc(value: unknown): string {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
+// Text helpers the server and the page share: times, durations, counts, token counts and costs.
 
 /** A running time in whole minutes: `12m`, `1h 5m`. */
 export function duration(ms: number): string {

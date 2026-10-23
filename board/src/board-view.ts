@@ -1,7 +1,7 @@
 // What the Board view shows, as data and plain text: its sections, each card's hint, badge texts
-// and titles. Both the React page (app/BoardView.tsx) and the text-built template use it.
+// and titles, and what Abandon asks. Both the React page (app/BoardView.tsx) and the text-built template use it.
 
-import { AMBER_STATUSES, STATUSES, checkState, isRecentlyDone, isSlow, kindOf, platformOf } from './model.ts';
+import { AMBER_STATUSES, STATUSES, checkState, isRecentlyDone, isSlow, kindOf, platformOf, ref } from './model.ts';
 import type { BoardData, Item, ItemStats, LinkedPr, Slice, SliceProgress, Status } from './model.ts';
 import { duration, elapsed, formatTokens, formatUsd, plural, slug, wholeUsd } from './format.ts';
 
@@ -153,4 +153,13 @@ export function figures(stats: ItemStats): string {
   const wall = stats.wallMs === undefined ? '' : ` · wall ${duration(stats.wallMs)}`;
   const cost = stats.costUsd === undefined ? '' : ` · ${stats.frozen ? wholeUsd(stats.costUsd) : formatUsd(stats.costUsd)}`;
   return `${duration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}`;
+}
+
+/** What Abandon asks before it deletes, and what it says after. */
+export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
+  return item.type === 'DraftIssue'
+    ? { question: `Remove draft ${item.title}?`, detail: "This removes the draft from the project. It can't be undone.",
+        confirm: 'Remove draft', done: `Removed draft ${item.title}.` }
+    : { question: `Delete ${ref(item)} ${item.title}?`, detail: `This permanently deletes the issue from ${item.repo} on GitHub. It can't be undone.`,
+        confirm: 'Delete issue', done: `Deleted ${ref(item)} ${item.title}.` };
 }

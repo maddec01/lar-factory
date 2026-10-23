@@ -7,12 +7,13 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI } from '../src/ui-state.ts';
 import { formatTokens, formatUsd } from '../src/format.ts';
-import { abandonPrompt, answeredRecheck, recheckAnswer, renderAbandonDialog, renderApp, renderBoardView, renderHeader } from '../src/render.ts';
+import { answeredRecheck, recheckAnswer, renderAbandonDialog, renderApp, renderBoardView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData, ModelGroup } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
 import type { RawItem } from '../src/github.ts';
 import { rawIssue, sliceRef } from './raw-items.ts';
+import { abandonPrompt } from '../src/board-view.ts';
 
 // The source index.html stands in for the built one, whose asset names change with every build.
 const template = readFileSync(new URL('../index.html', import.meta.url), 'utf8');

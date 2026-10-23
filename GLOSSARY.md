@@ -54,6 +54,16 @@ _Avoid_: ticket, chunk, task
 A slice an implementer is working on right now.
 _Avoid_: in-progress slice, current slice
 
+**Blocked slice**:
+A slice an implementer couldn't finish, waiting for a re-slice; it carries the
+`blocked` label. Not a slice with an open blocked-by link.
+_Avoid_: failed slice, stuck slice
+
+**Re-slice**:
+A planner's in-place rewrite of a blocked slice and the build's other open
+slices that aren't active.
+_Avoid_: re-plan
+
 **Work message**:
 The two-line text Start sends to a new thread: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.
 _Avoid_: work command, `/mux-work` command
@@ -89,6 +99,11 @@ _Avoid_: Decision session
 **Build thread**:
 The separate conversation that takes a passing brief through implementation,
 review and PR checks in its build's repository project, in its own worktree.
+
+**Planner**:
+The agent a build thread starts to split its build into slices or to re-slice a
+blocked slice.
+_Avoid_: slicer, ticket writer
 
 **Child task**:
 Delegated work a thread owns and addresses only by its task ID; its backing thread is never used as a conversation.

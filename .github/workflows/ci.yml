@@ -1,0 +1,77 @@
+# The board app's Release workflow follows this one with `workflows: [CI]` and
+# branch protection requires the `Tests` job, so keep both names as they are.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A PR's newer run cancels its older one. Each push to main gets its own group
+# because the Release workflow follows these runs: a later push must never
+# cancel an earlier push's run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.sha) }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    # The tests call /bin/zsh, launchctl and plutil.
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          # No step pushes; keep the token out of .git/config.
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: board/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: board/package.json
+
+      - name: Install board dependencies
+        id: install
+        working-directory: board
+        run: pnpm install --frozen-lockfile
+
+      - name: Board tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: board
+        run: pnpm test
+
+      - name: Board typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: board
+        run: pnpm run typecheck
+
+      - name: Install script tests
+        if: ${{ !cancelled() }}
+        run: bash scripts/install.test.sh
+
+      - name: Worktree setup tests
+        if: ${{ !cancelled() }}
+        run: bash scripts/setup-worktree.test.sh
+
+      - name: mux-work slice tests
+        if: ${{ !cancelled() }}
+        run: bash skills/mux-work/scripts/slice.test.sh
+
+      - name: mux-work status tests
+        if: ${{ !cancelled() }}
+        run: bash skills/mux-work/scripts/status.test.sh
+
+      - name: skill-sync preview tests
+        if: ${{ !cancelled() }}
+        run: bash skills/skill-sync/scripts/preview-copy.test.sh

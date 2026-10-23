@@ -1,11 +1,13 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
 import type { TestContext } from 'node:test';
-import { testEnv } from './repo-support.ts';
+import { checkouts, testEnv } from './repo-support.ts';
+import { projectsDb } from './stats-db.ts';
 
 async function readCalls(file: string): Promise<string[][]> {
   return (await readFile(file, 'utf8')).trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
@@ -78,4 +80,13 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     await new Promise((r) => setTimeout(r, 25));
   }
   throw new Error(`Board did not start: ${logs}`);
+}
+
+/** Environment for a board that can Start maddec01/mux-factory items: a temporary home holding its
+ * checkout, and a T3 database with a live project there. */
+export function startableEnv(t: TestContext): Record<string, string> {
+  const home = mkdtempSync(join(tmpdir(), 'mux-start-home-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  checkouts(home, { 'mux-factory': 'git@github.com:maddec01/mux-factory.git' });
+  return { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/Mux/mux-factory` }]) };
 }

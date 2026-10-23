@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rawIssue, startBoard } from './server-support.ts';
+import { rawIssue, startableEnv, startBoard } from './server-support.ts';
 import type { BoardData } from '../src/model.ts';
 
 type Board = Awaited<ReturnType<typeof startBoard>>;
@@ -121,4 +121,39 @@ test('Abandon rejects requests from other pages and sample mode', async (t) => {
   const sample = await startBoard(t, {}, true);
   assert.equal((await abandon(sample, 'PVTI_sample01')).status, 403);
   assert.equal((await sample.calls()).length, 0);
+});
+
+async function startItem(board: Board, itemId: string) {
+  const { capture } = await board.board() as BoardData;
+  return board.post({ session: capture!.session, itemId }, board.url, '/api/start');
+}
+
+test('Abandon is refused while a Start is in flight, uncertain or done for the item', async (t) => {
+  const refused = 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], t3: { delay: 300 } }, false, false, startableEnv(t));
+  await until(board, (d) => d.items.length === 1);
+  const starting = startItem(board, 'PVTI_12');
+  await new Promise((r) => setTimeout(r, 100));
+  const inFlight = await abandon(board, 'PVTI_12');
+  assert.equal(inFlight.status, 409);
+  assert.equal((await inFlight.json()).error, refused);
+  assert.equal((await starting).status, 200);
+  assert.equal((await abandon(board, 'PVTI_12')).status, 409, 'done');
+  const unsure = await startBoard(t, { items: [rawIssue(12, 'Queued')], t3: { fail: 'garbage' } }, false, false, startableEnv(t));
+  await until(unsure, (d) => d.items.length === 1);
+  assert.equal((await startItem(unsure, 'PVTI_12')).status, 502);
+  assert.equal((await abandon(unsure, 'PVTI_12')).status, 409, 'uncertain');
+  assert.deepEqual([...await deletes(board), ...await deletes(unsure)], []);
+});
+
+test('Abandon is refused while Back to List is pending for the item', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], writeDelay: 300 });
+  await until(board, (d) => d.items.length === 1);
+  const moving = board.post({ itemId: 'PVTI_12' }, board.url, '/api/back-to-list');
+  await new Promise((r) => setTimeout(r, 100));
+  const refused = await abandon(board, 'PVTI_12');
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, 'This item is being moved, so it can\'t be abandoned.');
+  assert.equal((await moving).status, 200);
+  assert.deepEqual(await deletes(board), []);
 });

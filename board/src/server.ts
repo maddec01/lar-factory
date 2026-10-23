@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port.ts';
@@ -37,7 +37,12 @@ const capture = { session: randomUUID(), enabled: !fixture };
 const updates = updatePaths();
 // Only the launch-agent board updates itself: launchd sets its token.
 const updatable = !fixture && Boolean(process.env.BOARD_LAUNCH_TOKEN);
-const code = revisionCheck({ updatable, logs: { update: updates.log, board: updates.boardLog } });
+/** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
+const appSecret = process.env.BOARD_APP_SECRET || null;
+/** Writes only the board app's page may make. /api/read stays open for status.sh, since it only starts a read. */
+const GUARDED_WRITES = new Set(['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/update', '/api/recheck']);
+// The app's server runs from inside the app, not a checkout it could compare with origin/main.
+const code = revisionCheck({ updatable, logs: { update: updates.log, board: updates.boardLog } }, { disabled: Boolean(appSecret) });
 
 const state: BoardData = {
   capture,
@@ -292,6 +297,14 @@ function allowedHost(req: IncomingMessage): boolean {
   return [`127.0.0.1:${port}`, `localhost:${port}`].includes(host);
 }
 
+/** Whether the request carries the app secret, compared in constant time. Hashing first evens out the lengths. */
+function hasAppSecret(req: IncomingMessage, secret: string): boolean {
+  const given = req.headers['x-board-secret'];
+  if (typeof given !== 'string') return false;
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  return timingSafeEqual(digest(given), digest(secret));
+}
+
 function json(res: ServerResponse, status: number, value: unknown): void {
   send(res, status, 'application/json; charset=utf-8', JSON.stringify(value));
 }
@@ -493,7 +506,7 @@ function launchUpdater(): Promise<string | null> {
 }
 
 async function updateBoard(res: ServerResponse): Promise<void> {
-  if (!updatable) return json(res, 403, { error: `Only the launch-agent board updates itself. Run ${code.status.command} instead.` });
+  if (!updatable) return json(res, 403, { error: `Only the launch-agent board updates itself.${code.status ? ` Run ${code.status.command} instead.` : ''}` });
   if (runningStarts) return json(res, 409, { error: 'A Start is running. Press Update when it finishes.', board: state });
   if (updating()) return json(res, 409, { error: 'An update is already running. Wait for it to finish, then retry.', board: state });
   launchingUpdate = true;
@@ -566,6 +579,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
     return json(res, 403, { error: 'Submit from this board page.' });
   }
+  if (req.method === 'POST' && appSecret && GUARDED_WRITES.has(path) && !hasAppSecret(req, appSecret)) {
+    return json(res, 403, { error: 'Submit from the board app.' });
+  }
   if (req.method === 'POST' && path === '/api/items') return captureItem(req, res);
   if (req.method === 'POST' && path === '/api/queue') return moveItem(req, res, QUEUE);
   if (req.method === 'POST' && path === '/api/back-to-list') return moveItem(req, res, BACK_TO_LIST);
@@ -583,7 +599,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (path === '/api/events') return openStream(req, res);
   if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(state));
   if (path === '/healthz') return json(res, 200, {
-    runningRevision: code.status.runningRevision, launchToken: process.env.BOARD_LAUNCH_TOKEN ?? null,
+    runningRevision: code.status?.runningRevision ?? null, launchToken: process.env.BOARD_LAUNCH_TOKEN ?? null,
   });
   const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
   if (asset) return send(res, 200, asset.type, asset.body);

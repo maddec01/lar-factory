@@ -21,6 +21,8 @@ const READINESS_TIMEOUT = Duration.minutes(1);
 const READINESS_INTERVAL = Duration.millis(100);
 const READINESS_REQUEST_TIMEOUT = Duration.seconds(1);
 const TERMINATE_GRACE = Duration.seconds(5);
+/** How long a drain may wait for running writes; a Start runs T3 Code's CLI, which takes seconds. */
+const DRAIN_TIMEOUT = Duration.minutes(2);
 const HOST = "127.0.0.1";
 
 /** How to run the board server: the program, its arguments, directory and full environment. */
@@ -88,6 +90,23 @@ export const start = Effect.fn("BoardServer.start")(function* (
   const url = new URL(`http://${HOST}:${port}/`);
   yield* waitForHealthz(url);
   return { pid: child.pid!, url, exited: exitReason(child) };
+});
+
+/**
+ * Asks the server at `url` to refuse new writes and succeeds once its running ones
+ * finish, so it can stop without cutting one off. Only the launch `secret` is let through.
+ */
+export const drain = Effect.fn("BoardServer.drain")(function* (url: URL, secret: string) {
+  const client = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
+  // The server takes writes only from its own origin.
+  const request = HttpClientRequest.post(new URL("/api/drain", url)).pipe(
+    HttpClientRequest.setHeaders({ Origin: url.origin, "X-Board-Secret": secret }),
+  );
+  yield* client.execute(request).pipe(
+    Effect.flatMap((response) => response.text),
+    Effect.timeout(DRAIN_TIMEOUT),
+    Effect.mapError((cause) => new BoardServerError({ message: `could not drain the board's writes: ${String(cause)}` })),
+  );
 });
 
 const spawn = (config: StartConfig) =>

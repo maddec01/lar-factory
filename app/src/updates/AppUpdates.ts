@@ -1,7 +1,7 @@
 // The board app's updater: checks GitHub Releases 15 s after launch and every 4 minutes,
-// downloads when the page asks and installs with quitAndInstall. Cut down from T3 Code's
-// apps/desktop/src/updates/DesktopUpdates.ts, without remote updates, release notes, the
-// install record and stopping the server before an install.
+// downloads when the page asks, stops the board server and installs with quitAndInstall.
+// Cut down from T3 Code's apps/desktop/src/updates/DesktopUpdates.ts, without remote
+// updates, release notes and the install record.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
@@ -40,8 +40,17 @@ export const disabledReason = (app: { readonly isPackaged: boolean; readonly has
   return null;
 };
 
+/** The board server, which an install stops first, as T3 Code stops its backends. */
+export interface BoardServerControl {
+  /** Drains the server's writes and stops it. */
+  readonly stop: Effect.Effect<void, Error>;
+  /** Starts the server again after an install that failed. */
+  readonly start: Effect.Effect<void>;
+}
+
 export interface AppUpdatesOptions {
   readonly updater: ElectronUpdater;
+  readonly board: BoardServerControl;
   readonly version: string;
   readonly disabledReason: string | null;
   /** Called with each new state, to send it to the page. */
@@ -70,7 +79,7 @@ const versionOf = (info: unknown): string | null => {
  */
 export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, never, Scope.Scope> =>
   Effect.gen(function* () {
-    const { updater, version, publish } = options;
+    const { updater, board, version, publish } = options;
     const pollTimes = options.pollTimes ?? DEFAULT_POLL_TIMES;
     const enabled = options.disabledReason === null;
     let state = Machine.createBaseUpdateState(version, Machine.defaultChannel(version), options.disabledReason);
@@ -137,16 +146,24 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
       return true;
     });
 
-    // A later slice stops the board server first, as T3 Code does.
+    // Whether quitAndInstall has returned and the app waits to quit; on macOS a failure then comes as an `error` event.
+    let quitting = false;
+    const failInstall = (message: string) =>
+      Effect.sync(() => void (quitting = false)).pipe(
+        Effect.andThen(board.start),
+        Effect.andThen(Effect.sync(() => setState(Machine.reduceOnInstallFailure(state, message)))),
+        Effect.andThen(Effect.logError(message)),
+        Effect.andThen(finish("install")),
+      );
+
+    // A successful install quits the app, so only a failure gives up the action.
     const install = Effect.gen(function* () {
       if (!enabled || state.status !== "downloaded" || !tryStart("install")) return false;
-      yield* updater.quitAndInstall({ isSilent: true, isForceRunAfter: true }).pipe(
-        Effect.catch((error: ElectronUpdaterError) =>
-          Effect.sync(() => setState(Machine.reduceOnInstallFailure(state, error.message))).pipe(
-            Effect.andThen(Effect.logError(error.message)),
-            Effect.andThen(finish("install")),
-          ),
-        ),
+      setState(Machine.reduceOnInstallStart(state));
+      yield* board.stop.pipe(
+        Effect.andThen(updater.quitAndInstall({ isSilent: true, isForceRunAfter: true })),
+        Effect.andThen(Effect.sync(() => void (quitting = true))),
+        Effect.catch((error: Error) => failInstall(error.message)),
       );
       return true;
     });
@@ -179,11 +196,15 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
         const downloaded = versionOf(info);
         if (downloaded !== null) setState(Machine.reduceOnDownloadComplete(state, downloaded));
       });
-      // During an action its own failure handling sets the state.
+      // During an action its own failure handling sets the state, except for an install that waits to quit.
       yield* updater.on("error", (error) => {
+        const message = (error instanceof Error ? error.message : String(error)).split("\n", 1)[0] ?? "";
+        if (quitting) {
+          Effect.runFork(failInstall(message));
+          return;
+        }
         if (activeAction !== null) return;
-        const message = error instanceof Error ? error.message : String(error);
-        setState(Machine.reduceOnBackgroundError(state, message.split("\n", 1)[0] ?? "", now()));
+        setState(Machine.reduceOnBackgroundError(state, message, now()));
       });
 
       // The 4 minutes count from the first check, not from launch.

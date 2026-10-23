@@ -6,6 +6,7 @@
 
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FiberHandle from "effect/FiberHandle";
 import type * as Scope from "effect/Scope";
 
 import type { BoardServerError, RunningBoard } from "./BoardServer.ts";
@@ -59,4 +60,25 @@ export const supervise = <R>(
       yield* onRestart(reason);
       yield* Effect.sleep(delay);
     }
+  });
+
+/** Starts and stops a supervised board server; the app stops it before installing an update. */
+export interface SupervisorControl {
+  /** Runs the supervisor unless it runs already. */
+  readonly start: Effect.Effect<void>;
+  /** Stops the running server, or cancels a pending restart, and waits until it has exited. */
+  readonly stop: Effect.Effect<void>;
+}
+
+/** Controls `run`, a `supervise` call, until the scope closes, which stops it as well. Nothing runs until `start`. */
+export const makeControl = <R>(
+  run: Effect.Effect<never, never, R>,
+): Effect.Effect<SupervisorControl, never, Scope.Scope | R> =>
+  Effect.gen(function* () {
+    const handle = yield* FiberHandle.make<never, never>();
+    const runFork = yield* FiberHandle.runtime(handle)<R>();
+    return {
+      start: Effect.sync(() => void runFork(run, { onlyIfMissing: true })),
+      stop: FiberHandle.clear(handle),
+    };
   });

@@ -187,6 +187,11 @@ export function reduceOnDownloadComplete(state: UpdateState, version: string): U
   };
 }
 
+/** Clears a failed install's error as a retry starts, so the page doesn't read the retry as failed. */
+export function reduceOnInstallStart(state: UpdateState): UpdateState {
+  return { ...state, message: null, errorContext: null };
+}
+
 export function reduceOnInstallFailure(state: UpdateState, message: string): UpdateState {
   return {
     ...state,

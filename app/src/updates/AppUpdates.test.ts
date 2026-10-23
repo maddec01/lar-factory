@@ -23,6 +23,8 @@ const makeFakeUpdater = () => {
     autoDownload: true,
     checks: 0,
     installs: 0,
+    /** The board server's stops and starts and the installs, in order. */
+    steps: [] as string[],
     onCheck: Effect.void as Step,
     onDownload: Effect.void as Step,
     onInstall: Effect.void as Step,
@@ -46,6 +48,7 @@ const makeFakeUpdater = () => {
     quitAndInstall: () =>
       Effect.suspend(() => {
         fake.installs += 1;
+        fake.steps.push("install");
         return fake.onInstall;
       }),
     on: (eventName, listener) =>
@@ -64,15 +67,24 @@ const makeFakeUpdater = () => {
 const setup = (options: { version?: string; disabledReason?: string | null } = {}) =>
   Effect.gen(function* () {
     const { fake, updater } = makeFakeUpdater();
+    const board: AppUpdates.BoardServerControl & { onStop: Effect.Effect<void, Error> } = {
+      onStop: Effect.void,
+      stop: Effect.suspend(() => {
+        fake.steps.push("stop");
+        return board.onStop;
+      }),
+      start: Effect.sync(() => void fake.steps.push("start")),
+    };
     const published: UpdateState[] = [];
     const updates = yield* AppUpdates.make({
       updater,
+      board,
       version: options.version ?? "0.1.0",
       disabledReason: options.disabledReason === undefined ? null : options.disabledReason,
       publish: (state) => published.push(state),
     });
     const statuses = () => published.map((state) => state.status);
-    return { fake, updates, published, statuses };
+    return { fake, board, updates, published, statuses };
   });
 
 const failure = (operation: "check" | "download" | "install", message: string) =>
@@ -143,7 +155,8 @@ describe("AppUpdates", () => {
   it.effect("stops checking and listening when the scope closes", () =>
     Effect.gen(function* () {
       const { fake, updater } = makeFakeUpdater();
-      yield* AppUpdates.make({ updater, version: "0.1.0", disabledReason: null, publish: () => {} }).pipe(Effect.scoped);
+      const board = { stop: Effect.void, start: Effect.void };
+      yield* AppUpdates.make({ updater, board, version: "0.1.0", disabledReason: null, publish: () => {} }).pipe(Effect.scoped);
       yield* TestClock.adjust(Duration.minutes(10));
       assert.strictEqual(fake.checks, 0);
       assert.strictEqual(fake.listenerCount(), 0);
@@ -237,7 +250,8 @@ describe("AppUpdates", () => {
 
       const install = yield* updates.install;
       assert.isTrue(install.accepted);
-      assert.strictEqual(fake.installs, 1);
+      // The board server drains and stops before the install, as T3 Code stops its backends.
+      assert.deepStrictEqual(fake.steps, ["stop", "install"]);
     }).pipe(Effect.scoped),
   );
 
@@ -267,9 +281,58 @@ describe("AppUpdates", () => {
       const install = yield* updates.install;
       assert.strictEqual(install.state.status, "downloaded");
       assert.strictEqual(install.state.errorContext, "install");
-      // The failed install no longer holds the updater: a retry goes through.
+      assert.isTrue(install.state.canRetry);
+      // The failed install starts the board server again and no longer holds the updater: a retry goes through.
+      assert.deepStrictEqual(fake.steps, ["stop", "install", "start"]);
       fake.onInstall = Effect.void;
       assert.isTrue((yield* updates.install).accepted);
+      assert.deepStrictEqual(fake.steps, ["stop", "install", "start", "stop", "install"]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("takes an error the updater reports after quitAndInstall returns as a failed install", () =>
+    Effect.gen(function* () {
+      const { fake, updates } = yield* setup();
+      fake.onCheck = Effect.sync(() => fake.emit("update-available", { version: "0.3.0" }));
+      yield* updates.check;
+      fake.onDownload = Effect.sync(() => fake.emit("update-downloaded", { version: "0.3.0" }));
+      yield* updates.download;
+      assert.isTrue((yield* updates.install).accepted);
+      assert.deepStrictEqual(fake.steps, ["stop", "install"]);
+
+      fake.emit("error", new Error("Squirrel.Mac: code signature invalid\nstack"));
+      yield* Effect.yieldNow;
+      const state = yield* updates.getState;
+      assert.strictEqual(state.status, "downloaded");
+      assert.strictEqual(state.errorContext, "install");
+      assert.strictEqual(state.message, "Squirrel.Mac: code signature invalid");
+      // The board server runs again and the install no longer holds the updater: a retry goes through.
+      assert.deepStrictEqual(fake.steps, ["stop", "install", "start"]);
+      assert.isTrue((yield* updates.install).accepted);
+      assert.deepStrictEqual(fake.steps, ["stop", "install", "start", "stop", "install"]);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("installs nothing when the board server won't drain, and starts it again", () =>
+    Effect.gen(function* () {
+      const { fake, board, updates } = yield* setup();
+      fake.onCheck = Effect.sync(() => fake.emit("update-available", { version: "0.3.0" }));
+      yield* updates.check;
+      fake.onDownload = Effect.sync(() => fake.emit("update-downloaded", { version: "0.3.0" }));
+      yield* updates.download;
+      board.onStop = Effect.fail(new Error("could not drain the board's writes: timed out"));
+      const install = yield* updates.install;
+      assert.strictEqual(install.state.status, "downloaded");
+      assert.strictEqual(install.state.errorContext, "install");
+      assert.strictEqual(install.state.message, "could not drain the board's writes: timed out");
+      assert.deepStrictEqual(fake.steps, ["stop", "start"]);
+      board.onStop = Effect.void;
+      // The retry answers without the old failure, which the page would read as the retry failing.
+      const retry = yield* updates.install;
+      assert.isTrue(retry.accepted);
+      assert.isNull(retry.state.errorContext);
+      assert.isNull(retry.state.message);
+      assert.deepStrictEqual(fake.steps, ["stop", "start", "stop", "install"]);
     }).pipe(Effect.scoped),
   );
 

@@ -1,8 +1,8 @@
 // The board app's main process: starts the board server as a child with the login
 // shell's PATH, shows its page in a window, starts the server again if it crashes,
 // installs the bundled skills, removes the old launch agent, answers the settings
-// screen's profile calls, checks Releases for updates and stops the server when the
-// app quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
+// screen's profile calls, checks Releases for updates, drains and stops the server
+// before it installs one and stops the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
@@ -14,6 +14,7 @@ import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
+import { HttpClient } from "effect/http";
 import * as Electron from "electron";
 
 import * as BoardServer from "./backend/BoardServer.ts";
@@ -109,7 +110,9 @@ const openBoardWindow = (secret: string) => {
         return boardShown ? Effect.void : load(StartingPage.url(reason));
       }),
   };
-  return { window, events, origin: () => origin, showStarting: load(StartingPage.url()) };
+  // A stopped server's page gets no secret, as after a crash.
+  const forgetOrigin = Effect.sync(() => void (origin = ""));
+  return { window, events, origin: () => origin, forgetOrigin, showStarting: load(StartingPage.url()) };
 };
 
 /** Installs the bundled skills and shows the user an error or conflicts. */
@@ -166,11 +169,12 @@ const handleUpdates = (boardOrigin: () => string, updates: AppUpdates.AppUpdates
 };
 
 /** Checks Releases for updates from now until the scope closes, telling the window each new state. */
-const startUpdates = (window: Electron.BrowserWindow) =>
+const startUpdates = (window: Electron.BrowserWindow, board: AppUpdates.BoardServerControl) =>
   Effect.gen(function* () {
     const isPackaged = Electron.app.isPackaged;
     return yield* AppUpdates.make({
       updater: yield* Effect.promise(ElectronUpdater.make),
+      board,
       version: Electron.app.getVersion(),
       // electron-builder writes the feed's app-update.yml beside app.asar.
       disabledReason: AppUpdates.disabledReason({
@@ -189,7 +193,6 @@ const program = Effect.gen(function* () {
   const secret = LaunchSecret.make();
   const board = openBoardWindow(secret);
   handleProfiles(board.origin);
-  handleUpdates(board.origin, yield* startUpdates(board.window));
   // Opening the app again brings this window forward; the second copy has already quit.
   Electron.app.on("second-instance", () => {
     if (board.window.isMinimized()) board.window.restore();
@@ -205,7 +208,23 @@ const program = Effect.gen(function* () {
     secret,
   });
   // Quitting closes the scope, which stops the server or cancels a pending restart.
-  yield* BoardSupervisor.supervise(BoardServer.start(config), board.events).pipe(Effect.forkScoped);
+  const supervisor = yield* BoardSupervisor.makeControl(BoardSupervisor.supervise(BoardServer.start(config), board.events));
+  const http = yield* HttpClient.HttpClient;
+  const stopBoard = Effect.suspend(() => {
+    const origin = board.origin();
+    // With no server ready there is no write to wait for.
+    return origin ? BoardServer.drain(new URL(origin), secret) : Effect.void;
+  }).pipe(
+    Effect.provideService(HttpClient.HttpClient, http),
+    Effect.andThen(supervisor.stop),
+    Effect.andThen(board.forgetOrigin),
+  );
+  // A failed drain leaves the server refusing writes, so the install's failure path restarts it.
+  handleUpdates(board.origin, yield* startUpdates(board.window, {
+    stop: stopBoard,
+    start: supervisor.stop.pipe(Effect.andThen(supervisor.start)),
+  }));
+  yield* supervisor.start;
   // Starts after the board server. The copy is synchronous, so it blocks the main
   // process briefly after start.
   yield* Effect.forkScoped(installSkills);

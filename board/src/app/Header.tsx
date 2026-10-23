@@ -1,4 +1,4 @@
-// The page's header: the logo, when the data was read, the counts, Add item, the app's Settings,
+// The page's header: the logo, when the data was read, the counts, the app's update button, Add item, its Settings,
 // and the banners for a gh the board can't use, stale data and an unreachable server, which closes.
 
 import { countsOf, isStale } from '../model.ts';
@@ -12,6 +12,7 @@ import { ClosableBanner } from './ClosableBanner.tsx';
 import { CLIENT_ERROR } from './live-data.ts';
 import { Settings } from './Settings.tsx';
 import { GhBanner } from './ToolNotices.tsx';
+import { UpdateButton } from './UpdateButton.tsx';
 
 export function BrandMark() {
   return (
@@ -54,7 +55,7 @@ export function Header() {
         {/* In the Mac app the title bar shows the logo, so the heading stays for screen readers only. */}
         <h1 className={inMacApp() ? 'sr-only' : undefined}><BrandMark /><span>factory</span></h1>
         <Refreshed data={data} now={now} />
-        <span className="header-actions"><AddItem /><Settings /></span>
+        <span className="header-actions"><UpdateButton /><AddItem /><Settings /></span>
       </div>
       <ul className="totals" aria-label="Counts">
         <li className={counts.needsYou ? 'amber' : ''}><b>{counts.needsYou}</b> need you</li>

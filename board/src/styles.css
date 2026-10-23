@@ -297,6 +297,7 @@ button:disabled[title] { cursor: not-allowed; }
 .abandon { color: var(--danger-text); }
 .abandon:hover { border-color: var(--danger-text); }
 .copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
+.update-button[data-tone="error"] { color: var(--error-fg); border-color: var(--error); }
 .profiles input[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .start { margin: 0; font-size: 12px; }
 p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }

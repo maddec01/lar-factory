@@ -3,8 +3,8 @@
 # Adds the item to the "Mux" project if it isn't there yet, then sets its Status.
 set -euo pipefail
 
-owner=maddec01
-project=1
+# shellcheck source=project.sh
+source "$(dirname "$0")/project.sh"
 ref=${1:?usage: status.sh <owner/repo#n | url> <Status>}
 status=${2:?usage: status.sh <owner/repo#n | url> <Status>}
 

@@ -1,7 +1,7 @@
 // Starts T3 Code threads through the local `t3` CLI.
 
 import { execFile } from 'node:child_process';
-import type { StartedThread } from './model.ts';
+import type { ModelChoice, StartedThread } from './model.ts';
 
 const T3 = process.env.T3_PATH || 't3';
 
@@ -15,10 +15,14 @@ export interface StartResult {
 const UNCERTAIN: StartResult = { thread: null, uncertain: true,
   error: "The thread's start could not be confirmed. Check the repository's project in T3 Code before starting it again." };
 
-/** Runs `t3 thread start <project id> <message> --json`. */
-export function startThread(project: string, message: string): Promise<StartResult> {
+/**
+ * Runs `t3 thread start <project id> <message> --json`, with `--provider <instance id>
+ * --model <slug>` for a model choice; without one T3 uses the project's default.
+ */
+export function startThread(project: string, message: string, choice?: ModelChoice): Promise<StartResult> {
+  const model = choice ? ['--provider', choice.instanceId, '--model', choice.model] : [];
   return new Promise((resolve) => {
-    execFile(T3, ['thread', 'start', project, message, '--json'], { timeout: 60_000 }, (err, stdout, stderr) => {
+    execFile(T3, ['thread', 'start', project, message, ...model, '--json'], { timeout: 60_000 }, (err, stdout, stderr) => {
       if (err) {
         const code = (err as NodeJS.ErrnoException).code as unknown;
         if (code === 'ENOENT') return resolve({ thread: null, error: `${T3} was not found. Install the T3 Code CLI or set T3_PATH.` });

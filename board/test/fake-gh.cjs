@@ -7,7 +7,20 @@ fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '
 const output = (value) => process.stdout.write(JSON.stringify(value));
 const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued' }];
 const main = async () => {
+  if (args[0] === '--version') return void process.stdout.write('gh version 2.80.0 (2026-09-01)\n');
+  if (args[0] === 'auth' && args[1] === 'status') {
+    if (options.ghAuth === 'logged-out') process.stderr.write('You are not logged into any GitHub hosts. To log in, run: gh auth login\n');
+    else if (options.ghAuth === 'failed') process.stderr.write('error connecting to api.github.com\n');
+    else return void process.stdout.write('github.com\n  ✓ Logged in to github.com account maddec01\n');
+    process.exitCode = 1;
+    return;
+  }
   if (args[1] === 'graphql') {
+    if (options.fail === 'read') {
+      process.stderr.write('HTTP 502: Bad Gateway');
+      process.exitCode = 1;
+      return;
+    }
     if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'Mux' }] } } } });
     if (args.some((a) => a.includes('search(type: ISSUE'))) {
       const label = ['build', 'blocked', 'active'].find((l) => args.some((a) => a.includes(`label:${l} `)));

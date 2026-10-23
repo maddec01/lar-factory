@@ -15,7 +15,9 @@ test('writes reject foreign and missing origins before touching GitHub', async (
     assert.equal(response.status, 403);
   }
   const calls = await board.calls();
-  assert.equal(calls.filter((args) => args[0] !== 'api' || args[1] !== 'graphql').length, 0);
+  // Reads and the startup gh probe touch nothing.
+  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && args[0] !== '--version' && args[0] !== 'auth');
+  assert.equal(writes.length, 0);
 });
 
 test('a completed submission is immediately visible and duplicate delivery reuses it', async (t) => {

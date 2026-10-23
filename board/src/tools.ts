@@ -5,8 +5,10 @@ import { execFile } from 'node:child_process';
 import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
+import type { ToolMissing, ToolProblem } from './model.ts';
 
-export type ToolName = 't3' | 'gh' | 'az';
+export const TOOL_NAMES = ['t3', 'gh', 'az'] as const;
+export type ToolName = typeof TOOL_NAMES[number];
 
 const OVERRIDES: Record<ToolName, string> = { t3: 'T3_PATH', gh: 'GH_PATH', az: 'AZ_PATH' };
 const FALLBACK_DIRS = ['/opt/homebrew/bin', '/usr/local/bin'];
@@ -86,10 +88,15 @@ export async function readLoginPath(env: NodeJS.ProcessEnv, launchctl = '/bin/la
 }
 
 let current: Tools | null = null;
+let loginPath: string | null = null;
 
-/** Reads the login shell PATH and looks every tool up again; the board does this at startup and on Recheck. */
-export async function lookUpTools(env: NodeJS.ProcessEnv = process.env): Promise<Tools> {
-  current = findTools(env, await readLoginPath(env));
+/**
+ * Looks every tool up again. It reads the login shell PATH first on the first lookup and when
+ * `rereadLoginPath` is set (startup and Recheck); the timed retry keeps the PATH it last read.
+ */
+export async function lookUpTools(env: NodeJS.ProcessEnv = process.env, rereadLoginPath = true): Promise<Tools> {
+  if (rereadLoginPath || !current) loginPath = await readLoginPath(env);
+  current = findTools(env, loginPath);
   return current;
 }
 
@@ -104,9 +111,57 @@ export function toolCommand(name: ToolName): { file: string; env: NodeJS.Process
   return path ? { file: path, env: { ...process.env, PATH: current!.searchPath } } : null;
 }
 
-/** Why a tool can't run: missing, naming the override that pointed nowhere. */
+/** Why a tool can't run, as a clause without a full stop: missing, naming the override that pointed nowhere. */
 export function missingTool(name: ToolName): string {
   const lookup = current?.[name];
   const override = lookup && lookup.path === null ? lookup.override : undefined;
-  return override ? `${name} was not found at ${override}.` : `${name} was not found.`;
+  return override ? `${name} was not found at ${override}` : `${name} was not found`;
+}
+
+/** The notice for a tool the last lookup didn't find, naming the override that pointed nowhere; undefined when found. */
+export function lookupProblem(name: ToolName): ToolMissing | undefined {
+  const lookup = current?.[name];
+  if (!lookup || lookup.path !== null) return undefined;
+  return lookup.override ? { problem: 'missing', override: lookup.override } : { problem: 'missing' };
+}
+
+/** What the gh probe found: a problem with a notice of its own, or gh's error for the Stale banner. Neither when gh works. */
+export interface GhProbe {
+  problem?: ToolProblem;
+  error?: string;
+}
+
+const LOGGED_OUT = /not logged in|gh auth login/i;
+
+/** Runs gh for the probe: null when it succeeds, else its exit or spawn code and what it printed. */
+function probe(file: string, args: string[], env: NodeJS.ProcessEnv): Promise<{ code: unknown; output: string } | null> {
+  return new Promise((resolve) => {
+    execFile(file, args, { env, timeout: 5_000 }, (err, stdout, stderr) => {
+      if (!err) return resolve(null);
+      const code = (err as NodeJS.ErrnoException).code as unknown;
+      // No code means a signal, which here is the timeout.
+      resolve({ code, output: code == null ? 'timed out after 5 s' : (stderr || stdout || err.message).trim() });
+    });
+  });
+}
+
+/**
+ * Probes gh as T3 Code does: `gh --version`, then `gh auth status`, 5 s each. A timeout, or
+ * an auth status failure that isn't a logout, returns gh's error for the Stale banner.
+ */
+export async function probeGh(): Promise<GhProbe> {
+  const command = toolCommand('gh');
+  if (!command) return { problem: lookupProblem('gh') ?? { problem: 'missing' } };
+  for (const args of [['--version'], ['auth', 'status']]) {
+    const failure = await probe(command.file, args, command.env);
+    if (!failure) continue;
+    // A string code is a spawn error: the binary went away or can't run since the lookup.
+    if (typeof failure.code === 'string') return { problem: { problem: 'missing' } };
+    if (args[0] === 'auth' && typeof failure.code === 'number' && LOGGED_OUT.test(failure.output)) {
+      return { problem: { problem: 'logged-out' } };
+    }
+    const detail = failure.output.split('\n').slice(0, 4).join('\n');
+    return { error: `gh ${args.join(' ')} failed: ${detail}` };
+  }
+  return {};
 }

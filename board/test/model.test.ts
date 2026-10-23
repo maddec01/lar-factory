@@ -117,6 +117,8 @@ test('stale when the last read failed or is too old', () => {
   assert.equal(isStale(sample, Date.parse('2026-10-21T09:41:00Z')), true);
   assert.equal(isStale(fresh, Date.parse('2026-10-21T10:00:00Z')), false);
   assert.equal(isStale(fresh, Date.parse('2026-10-21T10:30:00Z')), true);
+  assert.equal(isStale({ ...sample, error: null, fetchedAt: null }, Date.parse('2026-10-21T10:30:00Z')), false, 'a first read still running is not stale');
+  assert.equal(isStale({ ...sample, error: 'HTTP 502', fetchedAt: null }, Date.parse('2026-10-21T10:30:00Z')), true);
 });
 
 test('sample covers every status and both platforms', () => {

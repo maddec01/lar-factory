@@ -20,7 +20,7 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, IssueLinks, IssueRef, Item, ItemStats, LinkedPr, ModelChoice, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, ToolMissing, ToolProblem, IssueLinks, IssueRef, Item, ItemStats, LinkedPr, ModelChoice, SliceProgress, StartedThread, Status, UpdateStep } from './model.ts';
 import { highlightedChoice } from './start-menu.ts';
 import { applicability, ITEM_KINDS } from './add-item.ts';
 
@@ -53,6 +53,10 @@ export interface RenderOptions {
   updateView?: UpdateView | null;
   /** Keys of the notices closed on this page. */
   dismissed?: ReadonlySet<string>;
+  /** Set while this page's Recheck runs. */
+  rechecking?: boolean;
+  /** Set once this page's Recheck answered, while the tool problems are the ones it answered. */
+  rechecked?: RecheckAnswer;
 }
 
 export type Notice = { key: string } & (
@@ -539,6 +543,70 @@ function noticeToast(notice: Notice): string {
   }
 }
 
+// ---------- tool notices ----------
+
+/** A Recheck's answer: the error when it failed, else null, and the tool problems it left, serialised. */
+export interface RecheckAnswer {
+  error: string | null;
+  tools: string;
+}
+
+export function recheckAnswer(error: string | null, data: BoardData): RecheckAnswer {
+  return { error, tools: JSON.stringify(data.tools ?? {}) };
+}
+
+/**
+ * The answer while the tool problems are still the ones it answered, else undefined, so an old note never heads a new notice.
+ * `fresh` marks board data just in from the server, which answers a failed Recheck's "can't reach" too, so its error note goes.
+ */
+export function answeredRecheck(answer: RecheckAnswer | undefined, data: BoardData, fresh = false): RecheckAnswer | undefined {
+  if (fresh && answer?.error) return undefined;
+  return answer?.tools === JSON.stringify(data.tools ?? {}) ? answer : undefined;
+}
+
+/** The Recheck button and, once a Recheck answered with the notice still up, what it found. */
+function recheckButton(problem: ToolProblem, opts: RenderOptions): string {
+  const button = `<button type="button" class="copy recheck" data-recheck${opts.rechecking ? ' disabled' : ''}>${opts.rechecking ? 'Checking…' : 'Recheck'}</button>`;
+  if (opts.rechecking || !opts.rechecked) return button;
+  const note = opts.rechecked.error ?? (problem.problem === 'logged-out' ? 'Still logged out.' : 'Still not found.');
+  return `${button} <span class="recheck-note" role="status">${esc(note)}</span>`;
+}
+
+function copyableCommand(command: string): string {
+  return `<code>${esc(command)}</code> <button type="button" class="copy" data-copy="${esc(command)}" aria-label="Copy ${esc(command)}">Copy</button>`;
+}
+
+/** How to fix an override that points at nothing runnable, or null when no override is to blame. */
+function overrideFix(problem: ToolProblem, tool: string, what: string): string | null {
+  if (problem.problem !== 'missing' || !problem.override) return null;
+  const variable = problem.override.split('=')[0]!;
+  return `No runnable <code>${tool}</code> is at <code>${esc(problem.override)}</code>. Point ${esc(variable)} at ${what} or unset it, then press Recheck.`;
+}
+
+const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';
+
+/** The full-window notice that replaces the board while no t3 is found. */
+function renderT3Missing(problem: ToolMissing, opts: RenderOptions): string {
+  const fix = overrideFix(problem, 't3', 'the T3 Code CLI')
+    ?? "The board starts threads through T3 Code's <code>t3</code> command and didn't find it on the login shell's PATH, in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck.";
+  return `<main class="tool-missing">
+<div class="tool-missing-box" role="alert">
+<h1>${BRAND_MARK}<span>T3 Code not found</span></h1>
+<p>${fix} ${LOOKS_AGAIN}</p>
+<p>${recheckButton(problem, opts)}</p>
+</div>
+</main>`;
+}
+
+/** The banner for a missing or logged-out gh, which stops the board reading GitHub. */
+function ghBanner(problem: ToolProblem, opts: RenderOptions): string {
+  const message = problem.problem === 'logged-out'
+    ? `<strong>GitHub CLI is logged out.</strong> The board reads the project through <code>gh</code>. Run ${copyableCommand('gh auth login')} in a terminal, then press Recheck.`
+    : `<strong>GitHub CLI not found.</strong> The board reads the project through <code>gh</code>. ${overrideFix(problem, 'gh', 'gh')
+      ?? `Install it with ${copyableCommand('brew install gh')}, then press Recheck.`}`;
+  return `<div class="banner" role="alert">${message} ${LOOKS_AGAIN} ${recheckButton(problem, opts)}</div>`;
+}
+
 export function renderHeader(data: BoardData, opts: RenderOptions): string {
   const counts = countsOf(data);
   const refreshed = data.fetchedAt
@@ -566,7 +634,9 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
       `<div class="banner" role="alert">${dismissButton('client-error', ": can't reach the board server")}<strong>Can't reach the board server.</strong> ${esc(opts.clientError)} Showing the last data this page received.</div>`,
     );
   }
-  if (isStale(data, opts.now)) {
+  // A gh that can't read explains the old data itself.
+  if (data.tools?.gh) banners.push(ghBanner(data.tools.gh, opts));
+  else if (isStale(data, opts.now)) {
     const since = data.fetchedAt
       ? `Showing data from ${clock(data.fetchedAt, opts.timeZone)} (${ago(data.fetchedAt, opts.now)}).`
       : 'No data yet.';
@@ -856,6 +926,7 @@ ${links ? `<ul class="o-links">${links}</ul>` : ''}${kidRows ? `<ul class="o-tre
 // ---------- the whole app ----------
 
 export function renderApp(data: BoardData, opts: RenderOptions): string {
+  if (data.tools?.t3) return renderT3Missing(data.tools.t3, opts);
   const { view } = opts.ui;
   const tab = (v: View, label: string) =>
     `<button type="button" role="tab" class="vtab" id="tab-${v}" data-view="${v}" aria-controls="panel-${v}" aria-selected="${view === v}" tabindex="${view === v ? 0 : -1}">${label}</button>`;

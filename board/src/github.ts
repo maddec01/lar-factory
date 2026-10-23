@@ -77,8 +77,8 @@ fragment links on IssueConnection {
 }`;
 
 /**
- * One page of an issue search, for the sub-issue labels the board needs: `build` and
- * `active`. Labels on every sub-issue in ITEMS_QUERY cost 60 points a page, not 10; a
+ * One page of an issue search, for the sub-issue labels the board needs: `build`,
+ * `active` and `blocked`. Labels on every sub-issue in ITEMS_QUERY cost 60 points a page, not 10; a
  * search page costs 1.
  */
 export const ISSUE_SEARCH_QUERY = `query($q: String!, $after: String) {
@@ -109,9 +109,10 @@ export interface RawIssueSearch {
   data: { search: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: { number?: number; repository?: { nameWithOwner: string } }[] } };
 }
 
-/** What the issue searches found, as `repo#number` keys: open issues labelled `active`, and issues labelled `build`. */
+/** What the issue searches found, as `repo#number` keys: open issues labelled `active` or `blocked`, and issues labelled `build`. */
 export interface Searched {
   active?: ReadonlySet<string>;
+  blocked?: ReadonlySet<string>;
   builds?: ReadonlySet<string>;
 }
 
@@ -265,16 +266,17 @@ function subIssueCounts(raw: RawItem, builds: ReadonlySet<string>): Item['subIss
   return { total: found.length, completed: found.filter((b) => b.state === 'CLOSED').length };
 }
 
-/** Keeps GitHub's sub-issue order and hides slices closed as not planned. `active` holds the `repo#number` keys of open issues labelled `active`. */
-function normalizeSlices(raws: RawIssueRef[], active: ReadonlySet<string>): Slice[] {
+/** Keeps GitHub's sub-issue order and hides slices closed as not planned. `active` and `blocked` hold the `repo#number` keys of open issues with that label. */
+function normalizeSlices(raws: RawIssueRef[], active: ReadonlySet<string>, blocked: ReadonlySet<string>): Slice[] {
   return raws.flatMap((raw) => {
-    const progress = sliceProgress(raw.state, raw.stateReason ?? null, active.has(refKey(raw.repository.nameWithOwner, raw.number)));
+    const key = refKey(raw.repository.nameWithOwner, raw.number);
+    const progress = sliceProgress(raw.state, raw.stateReason ?? null, { active: active.has(key), blocked: blocked.has(key) });
     return progress ? [{ ...normalizeIssueRef(raw), progress }] : [];
   });
 }
 
 /** Turns one raw project item into the board's Item; null for items we can't see. */
-export function normalizeItem(raw: RawItem, { active = new Set(), builds = new Set() }: Searched = {}): Item | null {
+export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new Set(), builds = new Set() }: Searched = {}): Item | null {
   const c = raw.content;
   if (!c) return null;
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
@@ -296,7 +298,7 @@ export function normalizeItem(raw: RawItem, { active = new Set(), builds = new S
     updatedAt: updated,
     closedAt: c.closedAt ?? null,
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
-    slices: normalizeSlices(rawSlices(raw, builds), active),
+    slices: normalizeSlices(rawSlices(raw, builds), active, blocked),
   };
 }
 
@@ -332,11 +334,11 @@ export function buildSubIssueSearch(raws: RawItem[]): string | null {
   return repos.size ? ['is:issue label:build', ...repos].join(' ') : null;
 }
 
-/** The issue search for open `active` issues in the repos holding the builds' open slices; null when none is open. */
-export function activeSliceSearch(raws: RawItem[], builds: ReadonlySet<string> = new Set()): string | null {
+/** The issue search for open issues with a slice label in the repos holding the builds' open slices; null when none is open. */
+export function sliceLabelSearch(label: 'active' | 'blocked', raws: RawItem[], builds: ReadonlySet<string> = new Set()): string | null {
   const repos = new Set(raws.flatMap((raw) =>
     rawSlices(raw, builds).filter((s) => s.state === 'OPEN').map((s) => `repo:${s.repository.nameWithOwner}`)));
-  return repos.size ? ['is:issue is:open label:active', ...repos].join(' ') : null;
+  return repos.size ? [`is:issue is:open label:${label}`, ...repos].join(' ') : null;
 }
 
 // ---------- gh ----------
@@ -384,10 +386,14 @@ async function searchIssues(q: string | null): Promise<Set<string>> {
   throw new Error(`Issue search "${q}" has more than ${SEARCH_PAGE_SIZE * MAX_SEARCH_PAGES} results; stopped paging`);
 }
 
-/** Runs the issue searches; the active search needs the builds found, to know which sub-issues are slices. A project item's own labels decide whether it's a build. */
+/** Runs the issue searches; the slice label searches need the builds found, to know which sub-issues are slices. A project item's own labels decide whether it's a build. */
 async function searchLabels(raws: RawItem[]): Promise<Searched> {
   const builds = new Set([...projectBuilds(raws), ...await searchIssues(buildSubIssueSearch(raws))]);
-  return { builds, active: await searchIssues(activeSliceSearch(raws, builds)) };
+  const [active, blocked] = await Promise.all([
+    searchIssues(sliceLabelSearch('active', raws, builds)),
+    searchIssues(sliceLabelSearch('blocked', raws, builds)),
+  ]);
+  return { builds, active, blocked };
 }
 
 export interface ProjectSnapshot {

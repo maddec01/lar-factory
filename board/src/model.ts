@@ -59,21 +59,29 @@ export interface IssueRef {
 }
 
 /** Where a build's slice stands; see `sliceProgress`. */
-export type SliceProgress = 'done' | 'active' | 'waiting';
+export type SliceProgress = 'done' | 'blocked' | 'active' | 'waiting';
 
 /** One of a build's slices. */
 export interface Slice extends IssueRef {
   progress: SliceProgress;
 }
 
+/** Which of the slice labels the board reads an issue carries. */
+export interface SliceLabels {
+  active?: boolean;
+  /** An implementer couldn't finish it; it waits for a re-slice. Not GitHub's blocked-by link. */
+  blocked?: boolean;
+}
+
 /**
- * Done once closed as completed, even if it still has the `active` label; active
- * while open with that label; waiting otherwise. Null for a slice closed as not
- * planned (or as a duplicate): it's hidden and not counted.
+ * Done once closed as completed, even if it still has a label; while open, blocked
+ * with the `blocked` label, even if also `active`; active with the `active` label;
+ * waiting otherwise. Null for a slice closed as not planned (or as a duplicate):
+ * it's hidden and not counted.
  */
-export function sliceProgress(state: 'OPEN' | 'CLOSED', stateReason: string | null, active: boolean): SliceProgress | null {
+export function sliceProgress(state: 'OPEN' | 'CLOSED', stateReason: string | null, labels: SliceLabels): SliceProgress | null {
   if (state === 'CLOSED') return stateReason === 'NOT_PLANNED' || stateReason === 'DUPLICATE' ? null : 'done';
-  return active ? 'active' : 'waiting';
+  return labels.blocked ? 'blocked' : labels.active ? 'active' : 'waiting';
 }
 
 /** The first issues of a GitHub link list, and how many it holds in all. */

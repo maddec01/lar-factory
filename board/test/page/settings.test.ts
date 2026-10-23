@@ -1,9 +1,9 @@
-// The app's Settings dialog: the Claude profiles with their ticks, and what a tick change did.
+// The app's Settings dialog: the Claude profiles with their ticks, what a tick change did, and the update channel.
 // The bridge stands in for the app's preload; without it the page has no Settings.
 
-import { expect, test, vi } from 'vite-plus/test';
+import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, mountPage, settle, stubApp } from './support.ts';
-import type { ProfilesResult } from '../../src/app/board-app.ts';
+import type { ProfilesResult, UpdateChannel, UpdateState } from '../../src/app/board-app.ts';
 import { INSTALL_RECHECK_MS } from '../../src/app/settings-store.ts';
 
 const listed: ProfilesResult = {
@@ -201,4 +201,106 @@ test('a closed dialog stops reading the profiles', async () => {
   await settle(() => closeButton().click());
   await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS * 3));
   expect(bridge.listProfiles).toHaveBeenCalledOnce();
+});
+
+describe('update channel', () => {
+  const nightly: UpdateState = {
+    enabled: true, status: 'up-to-date', channel: 'nightly', currentVersion: '0.2.0-nightly.20261023.41',
+    availableVersion: null, downloadedVersion: null, releaseNotes: [], omittedReleaseCount: 0, downloadPercent: null,
+    checkedAt: '2026-10-23T09:00:00Z', message: null, errorContext: null, canRetry: false,
+  };
+
+  function stubChannel(start: UpdateState = nightly) {
+    let push: (state: UpdateState) => void = () => {};
+    const bridge = stubApp({
+      listProfiles: vi.fn(async () => listed),
+      getUpdateState: vi.fn(async () => start),
+      onUpdateState: vi.fn((listener: (state: UpdateState) => void) => { push = listener; return () => {}; }),
+      setUpdateChannel: vi.fn(async (channel: UpdateChannel) => ({ ...start, channel })),
+    });
+    return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
+  }
+
+  const radios = () => $$<HTMLInputElement>('#settings-dialog input[name="update-channel"]');
+  const checked = () => radios().find((radio) => radio.checked)?.value;
+  const radio = (channel: UpdateChannel) => radios().find((each) => each.value === channel)!;
+  const status = () => $('#update-channel-status')!.textContent;
+
+  test('shows the channel the app is on, nightly and latest to choose from', async () => {
+    stubChannel();
+    await open();
+    expect($('.update-channel legend')!.textContent).toBe('Update channel');
+    expect(radios().map((each) => [each.value, each.closest('label')!.textContent!.trim()])).toEqual([
+      ['nightly', 'Nightly'], ['latest', 'Latest']]);
+    expect(checked()).toBe('nightly');
+    expect(status()).toBe('Up to date on 0.2.0-nightly.20261023.41.');
+  });
+
+  test('choosing a channel switches the app to it and shows what its check found', async () => {
+    const { bridge, push } = stubChannel();
+    await open();
+    await settle(() => radio('latest').click());
+    expect(bridge.setUpdateChannel).toHaveBeenCalledWith('latest');
+    expect(checked()).toBe('latest');
+    await push({ ...nightly, channel: 'latest', status: 'checking' });
+    expect(status()).toBe('Checking for updates…');
+    await push({ ...nightly, channel: 'latest', status: 'available', availableVersion: '0.1.9-nightly.20261020.12' });
+    expect(status()).toBe('0.1.9-nightly.20261020.12 is available.');
+  });
+
+  test('a second choice waits until the first switch ends', async () => {
+    const { bridge } = stubChannel();
+    let finish!: (state: UpdateState) => void;
+    bridge.setUpdateChannel.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await open();
+    await settle(() => radio('latest').click());
+    expect(radio('nightly').getAttribute('aria-disabled')).toBe('true');
+    await settle(() => radio('nightly').click());
+    expect(bridge.setUpdateChannel).toHaveBeenCalledOnce();
+    await settle(() => finish({ ...nightly, channel: 'latest' }));
+    expect(checked()).toBe('latest');
+    expect(radio('nightly').getAttribute('aria-disabled')).toBe('false');
+  });
+
+  test('the channels are busy while an update downloads or installs, when the app would refuse a switch', async () => {
+    const downloaded: UpdateState = { ...nightly, status: 'downloaded', availableVersion: '0.2.0-nightly.20261024.42', downloadedVersion: '0.2.0-nightly.20261024.42', downloadPercent: 100, canRetry: true };
+    const { bridge, push } = stubChannel({ ...downloaded, status: 'downloading', downloadedVersion: null, downloadPercent: 40 });
+    bridge.installUpdate = vi.fn(() => new Promise<never>(() => {}));
+    await open();
+    expect(radio('latest').getAttribute('aria-disabled')).toBe('true');
+    await settle(() => radio('latest').click());
+    expect(bridge.setUpdateChannel).not.toHaveBeenCalled();
+    expect(checked()).toBe('nightly');
+
+    await push(downloaded);
+    expect(radio('latest').getAttribute('aria-disabled')).toBe('false');
+    await settle(() => $<HTMLButtonElement>('.update-button')!.click());
+    expect(radio('latest').getAttribute('aria-disabled')).toBe('true');
+  });
+
+  test('a refused switch keeps the old channel and says why', async () => {
+    const { bridge } = stubChannel();
+    bridge.setUpdateChannel.mockRejectedValueOnce(new Error('Cannot change the update channel to latest while an update download is in progress.'));
+    await open();
+    await settle(() => radio('latest').click());
+    expect(checked()).toBe('nightly');
+    expect(result().textContent).toBe('Couldn\'t switch to latest: Cannot change the update channel to latest while an update download is in progress.');
+    expect(result().dataset.tone).toBe('error');
+  });
+
+  test('a failed download or install says why under the channel', async () => {
+    // The states the app's reducers give them: the update stays available or downloaded.
+    const available: UpdateState = { ...nightly, status: 'available', availableVersion: '0.2.0-nightly.20261024.42', canRetry: true };
+    const { push } = stubChannel({ ...available, errorContext: 'download', message: 'net::ERR_TIMED_OUT' });
+    await open();
+    expect(status()).toBe('Couldn\'t download 0.2.0-nightly.20261024.42: net::ERR_TIMED_OUT');
+    await push({ ...available, status: 'downloaded', downloadedVersion: available.availableVersion, errorContext: 'install', message: 'quit refused' });
+    expect(status()).toBe('Couldn\'t install 0.2.0-nightly.20261024.42: quit refused');
+  });
+
+  test('an app whose updates are off says so under the channel', async () => {
+    stubChannel({ ...nightly, enabled: false, status: 'disabled', message: 'Updates work only in the packaged app.' });
+    await open();
+    expect(status()).toBe('Updates work only in the packaged app.');
+  });
 });

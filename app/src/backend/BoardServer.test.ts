@@ -79,6 +79,14 @@ describe("start", () => {
     }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
   );
 
+  it.live("reports how the server exited", () =>
+    Effect.gen(function* () {
+      const board = yield* BoardServer.start(fakeConfig({}));
+      process.kill(board.pid, "SIGKILL");
+      assert.strictEqual(yield* board.exited, "on SIGKILL");
+    }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
+  );
+
   it.live("starts the real board in sample mode", () =>
     Effect.gen(function* () {
       const config = BoardServer.makeStartConfig({

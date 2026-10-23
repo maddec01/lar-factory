@@ -31,10 +31,12 @@ export interface StartConfig {
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
-/** A running board server and the address of its page. */
+/** A running board server, the address of its page and how it ended. */
 export interface RunningBoard {
   readonly pid: number;
   readonly url: URL;
+  /** Succeeds with the exit code or signal once the server exits. */
+  readonly exited: Effect.Effect<string>;
 }
 
 export class BoardServerError extends Data.TaggedError("BoardServerError")<{
@@ -68,7 +70,7 @@ export const start = Effect.fn("BoardServer.start")(function* (
   const port = yield* reportedPort(child, options?.portTimeout ?? DEFAULT_PORT_TIMEOUT);
   const url = new URL(`http://${HOST}:${port}/`);
   yield* waitForHealthz(url);
-  return { pid: child.pid!, url };
+  return { pid: child.pid!, url, exited: exitReason(child) };
 });
 
 const spawn = (config: StartConfig) =>
@@ -84,6 +86,18 @@ const spawn = (config: StartConfig) =>
 
 const exited = (child: NodeChildProcess.ChildProcess) =>
   child.exitCode !== null || child.signalCode !== null;
+
+const describeExit = (code: number | null, signal: NodeJS.Signals | null) =>
+  signal ? `on ${signal}` : `with code ${code}`;
+
+const exitReason = (child: NodeChildProcess.ChildProcess) =>
+  Effect.callback<string>((resume) => {
+    if (exited(child)) return resume(Effect.succeed(describeExit(child.exitCode, child.signalCode)));
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) =>
+      resume(Effect.succeed(describeExit(code, signal)));
+    child.once("exit", onExit);
+    return Effect.sync(() => child.off("exit", onExit));
+  });
 
 const stop = (child: NodeChildProcess.ChildProcess) =>
   Effect.callback<void>((resume) => {
@@ -103,7 +117,7 @@ const reportedPort = (child: NodeChildProcess.ChildProcess, timeout: Duration.In
     };
     const onExit = (code: number | null, signal: NodeJS.Signals | null) =>
       resume(Effect.fail(new BoardServerError({
-        message: `the board server exited ${signal ? `on ${signal}` : `with code ${code}`} before it reported a port`,
+        message: `the board server exited ${describeExit(code, signal)} before it reported a port`,
       })));
     child.on("message", onMessage);
     child.once("exit", onExit);

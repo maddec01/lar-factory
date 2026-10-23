@@ -20,6 +20,9 @@ import * as NodeUtil from "node:util";
 
 import type { Configuration } from "electron-builder";
 
+import type { UpdateChannel } from "../../board/src/app/board-app.ts";
+import { defaultChannel as updateChannel } from "../src/updates/updateMachine.ts";
+
 const APP_DIR = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "..");
 const UPDATE_REPOSITORY = { owner: "maddec01", repo: "mux-factory" } as const;
 
@@ -47,12 +50,6 @@ export interface BuildOptions {
   readonly version: string;
   readonly signed: boolean;
   readonly outputDir: string;
-}
-
-type UpdateChannel = "latest" | "nightly";
-
-function updateChannel(version: string): UpdateChannel {
-  return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "latest";
 }
 
 // electron-builder names the feed after the publish config's channel.

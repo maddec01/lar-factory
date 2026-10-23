@@ -14,12 +14,62 @@ export interface ProfilesResult {
   error?: string;
 }
 
+/** Where the app looks for updates: `nightly-mac.yml` or `latest-mac.yml` on the Releases. */
+export type UpdateChannel = 'latest' | 'nightly';
+
+/** T3 Code's update states. An unpackaged dev app is `disabled`. */
+export type UpdateStatus =
+  | 'disabled'
+  | 'idle'
+  | 'checking'
+  | 'up-to-date'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
+
+/** What the app's updater knows, as T3 Code's `DesktopUpdateState` without release notes. */
+export interface UpdateState {
+  enabled: boolean;
+  status: UpdateStatus;
+  channel: UpdateChannel;
+  currentVersion: string;
+  availableVersion: string | null;
+  downloadedVersion: string | null;
+  downloadPercent: number | null;
+  /** ISO time of the last check. */
+  checkedAt: string | null;
+  /** Why updates are disabled, or the last error. */
+  message: string | null;
+  errorContext: 'check' | 'download' | 'install' | null;
+  canRetry: boolean;
+}
+
+/** Whether the app took a download or install request, and the state after it. */
+export interface UpdateActionResult {
+  accepted: boolean;
+  completed: boolean;
+  state: UpdateState;
+}
+
+export interface UpdateCheckResult {
+  checked: boolean;
+  state: UpdateState;
+}
+
 export interface BoardAppBridge {
   platform: string;
   /** The per-launch secret the app's server wants on each guarded write. */
   secret?: string | undefined;
   listProfiles: () => Promise<ProfilesResult>;
   setProfileTick: (name: string, ticked: boolean) => Promise<ProfilesResult>;
+  getUpdateState: () => Promise<UpdateState>;
+  /** Calls `listener` with each new update state; the returned function stops it. */
+  onUpdateState: (listener: (state: UpdateState) => void) => () => void;
+  checkForUpdate: () => Promise<UpdateCheckResult>;
+  downloadUpdate: () => Promise<UpdateActionResult>;
+  installUpdate: () => Promise<UpdateActionResult>;
+  setUpdateChannel: (channel: UpdateChannel) => Promise<UpdateState>;
 }
 
 declare global {

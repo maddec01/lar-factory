@@ -19,7 +19,7 @@ function stubBridge(setResult: ProfilesResult = listed) {
     platform: 'darwin',
     listProfiles: vi.fn(async () => listed),
     setProfileTick: vi.fn(async (_name: string, _ticked: boolean) => setResult),
-  } satisfies BoardAppBridge;
+  } satisfies Pick<BoardAppBridge, 'platform' | 'listProfiles' | 'setProfileTick'>;
   vi.stubGlobal('boardApp', bridge);
   return bridge;
 }

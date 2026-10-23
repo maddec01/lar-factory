@@ -47,11 +47,14 @@ export class SkillInstallError extends Data.TaggedError("SkillInstallError")<{
 export const locateBundle = (appPath: string, isPackaged: boolean) =>
   isPackaged ? NodePath.resolve(appPath, "../bundle") : NodePath.resolve(appPath, "dist-electron/bundle");
 
+/** The home the app installs into: the user's, or the folder ROOT_ENV names. */
+export const installHome = (home: string, env: LaunchInput["env"]) => env[ROOT_ENV] || home;
+
 /** What this launch installs, or undefined when it installs nothing. */
 export const plan = (input: LaunchInput): Plan | undefined => {
   const force = !input.isPackaged;
   if (force && !input.argv.includes(INSTALL_FLAG)) return undefined;
-  return { home: input.env[ROOT_ENV] || input.home, bundle: input.bundle, version: input.version, force };
+  return { home: installHome(input.home, input.env), bundle: input.bundle, version: input.version, force };
 };
 
 /**

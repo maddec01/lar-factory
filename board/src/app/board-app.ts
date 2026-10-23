@@ -1,10 +1,25 @@
 // What the board app's preload bridge (app/src/preload.ts) hands the page. Outside the app,
-// in a browser or `pnpm run sample`, there is no bridge.
+// in a browser or `pnpm run sample`, there is no bridge, so whatever needs it doesn't show there.
+
+import type { ClaudeProfile, TickResult } from '../install-skills.ts';
+
+/** The Claude profiles after a call, with what the last tick left alone and removed, or why it failed. */
+export interface ProfilesResult {
+  profiles: ClaudeProfile[];
+  /** False until the app first installs its skills; until then no tick can change. */
+  installed: boolean;
+  /** Paths in the home, as `~/…`. */
+  conflicts: string[];
+  removed?: TickResult['removed'];
+  error?: string;
+}
 
 export interface BoardAppBridge {
   platform: string;
   /** The per-launch secret the app's server wants on each guarded write. */
-  secret?: string;
+  secret?: string | undefined;
+  listProfiles: () => Promise<ProfilesResult>;
+  setProfileTick: (name: string, ticked: boolean) => Promise<ProfilesResult>;
 }
 
 declare global {

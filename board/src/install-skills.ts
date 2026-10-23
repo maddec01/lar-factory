@@ -169,7 +169,8 @@ function listProfileFolders(home: string): string[] {
     .sort();
 }
 
-function isProfileName(name: string): boolean {
+/** True for `.claude` or `.claude-<anything>` that is one folder name: the one rule for a Claude profile's name. */
+export function isProfileName(name: string): boolean {
   return (name === '.claude' || name.startsWith('.claude-')) && isFolderName(name);
 }
 

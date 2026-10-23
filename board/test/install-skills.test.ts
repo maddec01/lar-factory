@@ -49,7 +49,7 @@ test('a fresh install copies every skill and checklist and writes the manifest',
   const home = temporary(t);
   const result = installSkills(home, bundle(t, v1), '1.0.0');
 
-  assert.deepEqual(result, { installed: true, version: '1.0.0', skills: ['mux-work', 'tdd'] });
+  assert.deepEqual(result, { installed: true, version: '1.0.0', skills: ['mux-work', 'tdd'], conflicts: [] });
   for (const [path, content] of Object.entries(v1)) {
     assert.equal(readFileSync(join(home, '.agents', path), 'utf8'), content);
     assert.ok(lstatSync(join(home, '.agents', path)).isFile(), `${path} is a real file`);
@@ -66,7 +66,7 @@ test('the same version again changes nothing', (t) => {
 
   const result = installSkills(home, bundle(t, v2), '1.0.0');
 
-  assert.deepEqual(result, { installed: false, version: '1.0.0', skills: ['mux-work', 'tdd'] });
+  assert.deepEqual(result, { installed: false, version: '1.0.0', skills: ['mux-work', 'tdd'], conflicts: [] });
   assert.equal(read(home, 'skills/tdd/SKILL.md'), 'edited');
   assert.equal(read(home, 'references/review.md'), 'review v1');
 });
@@ -178,4 +178,104 @@ test('a failed checklist copy names the references folder', (t) => {
 
   assert.throws(() => installSkills(home, broken, '1.0.0'), /references/);
   assert.ok(!existsSync(join(home, '.agents', INSTALL_MANIFEST)));
+});
+
+function writeSkill(home: string, name: string, content: string): void {
+  mkdirSync(join(home, '.agents/skills', name), { recursive: true });
+  writeFileSync(join(home, '.agents/skills', name, 'SKILL.md'), content);
+}
+
+const lock = '{\n  "version": 3,\n  "skills": { "other": {} }\n}\n';
+
+test('a first install adopts earlier copies of bundled skills and leaves other skills alone', (t) => {
+  const home = temporary(t);
+  writeSkill(home, 'tdd', 'tdd from the skills CLI');
+  writeFileSync(join(home, '.agents/skills/tdd/extra.md'), 'extra');
+  writeSkill(home, 'other', 'other');
+  writeFileSync(join(home, '.agents/.skill-lock.json'), lock);
+
+  const result = installSkills(home, bundle(t, v1), '1.0.0');
+
+  assert.deepEqual(result.conflicts, []);
+  assert.equal(read(home, 'skills/tdd/SKILL.md'), 'tdd v1');
+  assert.ok(!existsSync(join(home, '.agents/skills/tdd/extra.md')));
+  assert.equal(read(home, 'skills/other/SKILL.md'), 'other');
+  assert.deepEqual(manifest(home), { version: '1.0.0', skills: ['mux-work', 'tdd'] });
+  assert.equal(read(home, '.skill-lock.json'), lock);
+});
+
+test('an upgrade whose bundle drops a skill removes its copy and manifest entry', (t) => {
+  const home = temporary(t);
+  writeSkill(home, 'other', 'other');
+  writeFileSync(join(home, '.agents/.skill-lock.json'), lock);
+  installSkills(home, bundle(t, v1), '1.0.0');
+  const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = v2;
+
+  const result = installSkills(home, bundle(t, withoutTdd), '2.0.0');
+
+  assert.deepEqual(result, { installed: true, version: '2.0.0', skills: ['mux-work'], conflicts: [] });
+  assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['mux-work', 'other']);
+  assert.deepEqual(manifest(home), { version: '2.0.0', skills: ['mux-work'] });
+  assert.equal(read(home, 'skills/other/SKILL.md'), 'other');
+  assert.equal(read(home, '.skill-lock.json'), lock);
+});
+
+test('a swap that fails partway removes the staged copies left and says files changed', (t) => {
+  if (process.getuid?.() === 0) return t.skip('root deletes from read-only folders');
+  const home = temporary(t);
+  installSkills(home, bundle(t, v1), '1.0.0');
+  // A read-only first skill folder moves aside but can't be deleted, so its swap throws.
+  const locked = join(home, '.agents/skills/mux-work');
+  chmodSync(locked, 0o500);
+
+  assert.throws(() => installSkills(home, bundle(t, v2), '2.0.0'), installError(true));
+  for (const entry of readdirSync(join(home, '.agents/skills'))) chmodSync(join(home, '.agents/skills', entry), 0o700);
+
+  const staged = [join(home, '.agents'), join(home, '.agents/skills')]
+    .flatMap((folder) => readdirSync(folder))
+    .filter((entry) => entry.includes('.installing-') && !entry.endsWith('.previous'));
+  assert.deepEqual(staged, []);
+  assert.equal(read(home, 'skills/tdd/SKILL.md'), 'tdd v1');
+});
+
+test('a skill the engine did not install survives installs and upgrades', (t) => {
+  const home = temporary(t);
+  writeSkill(home, 'other', 'other');
+  installSkills(home, bundle(t, v1), '1.0.0');
+  writeSkill(home, 'later', 'later');
+  installSkills(home, bundle(t, v2), '2.0.0');
+  installSkills(home, bundle(t, { 'skills/mux-work/SKILL.md': 'v3', 'references/review.md': 'v3' }), '3.0.0');
+
+  assert.equal(read(home, 'skills/other/SKILL.md'), 'other');
+  assert.equal(read(home, 'skills/later/SKILL.md'), 'later');
+  assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['later', 'mux-work', 'other']);
+});
+
+test('after the first install, a same-named folder the engine did not install is a conflict and stays', (t) => {
+  const home = temporary(t);
+  mkdirSync(join(home, '.agents'), { recursive: true });
+  writeFileSync(join(home, '.agents/.skill-lock.json'), lock);
+  installSkills(home, bundle(t, v1), '1.0.0');
+  writeSkill(home, 'grill', 'grill from the skills CLI');
+
+  const result = installSkills(home, bundle(t, { ...v2, 'skills/grill/SKILL.md': 'grill v2' }), '2.0.0');
+
+  assert.deepEqual(result, {
+    installed: true, version: '2.0.0', skills: ['mux-work', 'tdd'], conflicts: [join(home, '.agents/skills/grill')],
+  });
+  assert.equal(read(home, 'skills/grill/SKILL.md'), 'grill from the skills CLI');
+  assert.equal(read(home, 'skills/tdd/SKILL.md'), 'tdd v2');
+  assert.deepEqual(manifest(home), { version: '2.0.0', skills: ['mux-work', 'tdd'] });
+  assert.equal(read(home, '.skill-lock.json'), lock);
+});
+
+test('a bundled skill new to an upgrade installs when nothing holds its name', (t) => {
+  const home = temporary(t);
+  installSkills(home, bundle(t, v1), '1.0.0');
+
+  const result = installSkills(home, bundle(t, { ...v2, 'skills/grill/SKILL.md': 'grill v2' }), '2.0.0');
+
+  assert.deepEqual(result.conflicts, []);
+  assert.equal(read(home, 'skills/grill/SKILL.md'), 'grill v2');
+  assert.deepEqual(manifest(home), { version: '2.0.0', skills: ['grill', 'mux-work', 'tdd'] });
 });

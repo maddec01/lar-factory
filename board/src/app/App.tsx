@@ -4,6 +4,8 @@ import { useLayoutEffect } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { View } from '../ui-state.ts';
 import { useBoardStore } from './board-store.ts';
+import { BoardView } from './BoardView.tsx';
+import { CopyStatus } from './CopyButton.tsx';
 import { FlowView } from './FlowView.tsx';
 import { Header } from './Header.tsx';
 import { restoreAnchor } from './keep-anchor.ts';
@@ -50,12 +52,14 @@ export function App() {
       <Tabs />
       <main>
         <div className="panel" role="tabpanel" id="panel-board" aria-labelledby="tab-board" hidden={view !== 'board'}>
-          <p className="empty">The Board view is moving to the new page.</p>
+          <BoardView />
         </div>
         <div className="panel" role="tabpanel" id="panel-flow" aria-labelledby="tab-flow" hidden={view !== 'flow'}>
           <FlowView />
         </div>
       </main>
+      {/* Outside main, so the announcement sits apart from the views. */}
+      <CopyStatus />
     </>
   );
 }

@@ -209,7 +209,7 @@ A board process started with `pnpm run sample` on a spare port, reading `board/t
 _Avoid_: test board, dev board
 
 **Board app**:
-The installable desktop app that runs the board.
+The installable desktop app that runs the board and updates itself from Releases.
 _Avoid_: Electron app, desktop board
 
 ### Skills

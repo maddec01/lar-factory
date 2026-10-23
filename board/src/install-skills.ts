@@ -1,6 +1,6 @@
 // Installs a bundle's skills and checklists into a home's ~/.agents, once per app version.
 
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
 /** The manifest's file name in ~/.agents. The skills CLI owns .skill-lock.json, so this never touches it. */
@@ -11,6 +11,8 @@ export interface InstallResult {
   installed: boolean;
   version: string;
   skills: string[];
+  /** Folders named like a bundled skill that this engine didn't install, left as they were. */
+  conflicts: string[];
 }
 
 interface Manifest {
@@ -38,6 +40,9 @@ interface Copy {
 /**
  * Copies every folder in `<bundle>/skills` to `<home>/.agents/skills/<name>` and `<bundle>/references`
  * to `<home>/.agents/references`, unless the manifest already names `version`. `force` installs anyway.
+ * The manifest lists the skills this engine owns. The first install adopts any folder named like a bundled
+ * skill; later installs skip such a folder unless the manifest lists it, and return its path in `conflicts`.
+ * An upgrade removes owned skills the bundle no longer has. Other folders are never touched.
  * A copy that fails leaves the previous files and manifest in place and throws an error naming it.
  * A failure before any file is replaced throws an `InstallError` whose `changed` is false.
  */
@@ -45,12 +50,16 @@ export function installSkills(home: string, bundle: string, version: string, opt
   const agents = join(home, '.agents');
   const manifestPath = join(agents, INSTALL_MANIFEST);
   const current = readManifest(manifestPath);
-  if (current?.version === version && !options.force) return { installed: false, ...current };
+  if (current?.version === version && !options.force) return { installed: false, ...current, conflicts: [] };
 
-  const skills = readdirSync(join(bundle, 'skills'), { withFileTypes: true })
+  const bundled = readdirSync(join(bundle, 'skills'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
+  const owned = new Set(current?.skills ?? bundled);
+  const conflicting = bundled.filter((name) => !owned.has(name) && exists(join(agents, 'skills', name)));
+  const skills = bundled.filter((name) => !conflicting.includes(name));
+  const dropped = [...owned].filter((name) => !bundled.includes(name));
   const copies: Copy[] = [
     ...skills.map((name) => ({ label: `skill ${name}`, source: join(bundle, 'skills', name), target: join(agents, 'skills', name) })),
     { label: 'references', source: join(bundle, 'references'), target: join(agents, 'references') },
@@ -63,13 +72,26 @@ export function installSkills(home: string, bundle: string, version: string, opt
     for (const { temporary } of staged) rmSync(temporary, { recursive: true, force: true });
     throw new InstallError((error as Error).message, false, { cause: error });
   }
-  for (const { copy, temporary } of staged) swap(temporary, copy.target);
+  try {
+    for (const { copy, temporary } of staged) swap(temporary, copy.target);
+  } catch (error) {
+    throw new InstallError((error as Error).message, true, { cause: error });
+  } finally {
+    for (const { temporary } of staged) rmSync(temporary, { recursive: true, force: true });
+  }
+  for (const name of dropped) rmSync(join(agents, 'skills', name), { recursive: true, force: true });
 
   const manifest: Manifest = { version, skills };
   const temporaryManifest = `${manifestPath}.${process.pid}.tmp`;
   writeFileSync(temporaryManifest, `${JSON.stringify(manifest, null, 2)}\n`);
   renameSync(temporaryManifest, manifestPath);
-  return { installed: true, ...manifest };
+  return { installed: true, ...manifest, conflicts: conflicting.map((name) => join(agents, 'skills', name)) };
+}
+
+/** True when anything, even a dangling link, holds `path`. */
+function exists(path: string): boolean {
+  try { lstatSync(path); return true; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
 }
 
 /** Reads the manifest, or null when there is none. Names that aren't one folder name are dropped. */

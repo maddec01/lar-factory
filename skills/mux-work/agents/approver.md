@@ -6,6 +6,12 @@ reference, the repo path, the reviewers' final results and the builder's
 rejected findings. Glossary and ADR edits from the brief's **Domain docs** are
 part of the change.
 
+Before you write anything, read `unslop` once
+(`~/.claude/skills/unslop/SKILL.md` in Claude Code,
+`~/.agents/skills/unslop/SKILL.md` in Codex) and apply its rules while drafting
+all your prose (PR title and body, comments, your report), not as a separate
+scan-and-rewrite pass. Code is out of scope.
+
 1. Fold the fixups in with `git rebase -i --autosquash origin/main`
    (non-interactive: `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`),
    rerun the checks, and `git push --force-with-lease`.

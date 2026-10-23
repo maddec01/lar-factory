@@ -10,6 +10,16 @@ verifies visible changes and merges every PR; the rest is yours.
 
 ## Rules
 
+- **Prose**: before this thread writes anything, read `unslop` once
+  (`~/.claude/skills/unslop/SKILL.md` in Claude Code,
+  `~/.agents/skills/unslop/SKILL.md` in Codex). Apply its rules while drafting
+  every piece of prose: chat, questions, issue comments, briefs, PR bodies,
+  commit messages, docs and skill files (skill files also follow
+  `writing-for-agents`). Write each text clean the first time rather than as a
+  separate scan-and-rewrite pass, though unslop calls itself an editing pass.
+  Code is out of scope. This holds for every thread `/mux-work` starts:
+  shaping, concept and decision threads, and a fresh thread resuming one after
+  a handoff. Build threads get it from `agents/builder.md`.
 - Move the issue's Status on the "Mux" board at every step:
   `bash <this skill>/scripts/status.sh <owner/repo#n> "<Status>"`. Statuses:
   List, Queued, Shaping, Needs you, Ready, In progress, Review, Verify,

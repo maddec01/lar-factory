@@ -4,6 +4,12 @@ You build one slice of a Mux build as a child task in your own app-owned
 worktree. You get the slice reference and the build branch; first
 run `git switch -c slice/<n>-<m>-<slug> <build-branch>` there.
 
+Before you write anything, read `unslop` once
+(`~/.claude/skills/unslop/SKILL.md` in Claude Code,
+`~/.agents/skills/unslop/SKILL.md` in Codex) and apply its rules while drafting
+all your prose (commit messages, docs, skill files, your report), not as a
+separate scan-and-rewrite pass. Code is out of scope.
+
 Follow `implement` (`~/.claude/skills/implement/SKILL.md` in Claude Code,
 `~/.agents/skills/implement/SKILL.md` in Codex) for the slice, test-first with
 `tdd`, using `developer-profile`, plus `codebase-design` when a module's shape

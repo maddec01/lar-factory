@@ -12,6 +12,12 @@ name: the ones named here, plus `gh issue view <ref> --comments` and
 change or to read `inheritedOptions` before delegating; skip searching the tool
 catalogue. Read each file or skill a step names only when that step runs.
 
+Before you write anything, read `unslop` once (`~/.claude/skills/unslop/SKILL.md`
+in Claude Code, `~/.agents/skills/unslop/SKILL.md` in Codex), also in a fresh
+thread resuming after a handoff. Apply its rules while drafting all your prose
+(chat, issue comments, handoffs, retro text, docs), not as a separate
+scan-and-rewrite pass. Code is out of scope.
+
 ## Subagents
 
 - **Spawn**: a native subagent or a child task, per

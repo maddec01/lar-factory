@@ -79,7 +79,7 @@ The provider instance and model a new thread runs on, picked at Start; "T3 defau
 _Avoid_: model selection, provider setup
 
 **Repository project**:
-The T3 project whose folder is a repository's main checkout; an issue's threads run in its repository's project.
+The T3 project whose folder is a repository's main checkout, recognised by its git origin; an issue's threads run in its repository's project.
 _Avoid_: Mux project, factory project (for where threads run)
 
 **Repository role**:

@@ -11,11 +11,11 @@ export function testEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
 }
 
-/** Git checkouts under `home`/Developer/Mux, where config.json's paths point, each with the given `origin` (or none). */
-export function checkouts(home: string, origins: Record<string, string | null>): void {
+/** Git checkouts under `home`/`parent`, each with the given `origin` (or none). */
+export function checkouts(home: string, origins: Record<string, string | null>, parent = 'Developer/Mux'): void {
   const env = { ...testEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
   for (const [name, origin] of Object.entries(origins)) {
-    const checkout = join(home, 'Developer/Mux', name);
+    const checkout = join(home, parent, name);
     mkdirSync(checkout, { recursive: true });
     execFileSync('git', ['init', '-q', checkout], { env });
     if (origin) execFileSync('git', ['-C', checkout, 'remote', 'add', 'origin', origin], { env });

@@ -394,23 +394,22 @@ function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Ma
 const PROJECTS = `SELECT project_id AS id, workspace_root AS root FROM projection_projects WHERE deleted_at IS NULL`;
 
 /**
- * The id of T3's live project whose folder is `folder`, or null when there is none.
- * Unlike stats, this doesn't fail soft: it throws when the database is missing or
- * can't be read, e.g. T3 changed its schema.
+ * T3's live projects, each folder with `~` expanded and no trailing slash. Unlike
+ * stats, this doesn't fail soft: it throws when the database is missing or can't
+ * be read, e.g. T3 changed its schema.
  */
-export function projectIdAt(db: string, folder: string, home: string): string | null {
+export function liveProjects(db: string, home: string): { id: string; folder: string }[] {
   const open = new DatabaseSync(db, { readOnly: true });
   try {
     const projects = open.prepare(PROJECTS).all() as { id: unknown; root: unknown }[];
-    const wanted = normalPath(folder, home);
-    const match = projects.find((project) => typeof project.root === 'string' && normalPath(project.root, home) === wanted);
-    return typeof match?.id === 'string' ? match.id : null;
+    return projects.flatMap(({ id, root }) =>
+      typeof id === 'string' && typeof root === 'string' ? [{ id, folder: normalPath(root, home) }] : []);
   } finally {
     open.close();
   }
 }
 
-/** A folder with `~` expanded and no trailing slash, for comparing paths. */
+/** A folder with `~` expanded and no trailing slash. */
 function normalPath(path: string, home: string): string {
   return expandHome(path, home).replace(/(?<=.)\/+$/, '');
 }

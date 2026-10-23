@@ -26,7 +26,8 @@ the flow and `docs/plan.md` for how it was set up.
   `env -u CLAUDE_CONFIG_DIR GH_TOKEN=$(gh auth token) HOME=$(mktemp -d) bash scripts/install.sh`.
   The token keeps gh logged in under the new home; unsetting `CLAUDE_CONFIG_DIR`
   stops the skills CLI writing to the real Claude config.
-- mux-work script changes: run `bash skills/mux-work/scripts/slice.test.sh`.
+- mux-work script changes: run `bash skills/mux-work/scripts/slice.test.sh` and
+  `bash skills/mux-work/scripts/status.test.sh`.
 - A PR that no issue tracks goes on the Mux board too: `bash ~/.agents/skills/mux-work/scripts/status.sh <pr-url> "Ready to merge"`.
 
 ## Domain docs

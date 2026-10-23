@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startBoard } from './server-support.ts';
@@ -17,6 +17,17 @@ async function afterRead(board: Board) {
   }
   throw new Error('The board never finished its first read.');
 }
+
+test('the board listens before a slow login shell answers, and its data waits for that first lookup', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'mux-slow-shell-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const shell = join(dir, 'slow-shell');
+  writeFileSync(shell, '#!/bin/sh\nsleep 1\nexec /bin/sh -c "$2"\n', { mode: 0o755 });
+  const board = await startBoard(t, {}, false, false, { SHELL: shell, GH_PATH: '/nowhere/gh' });
+  assert.deepEqual((await board.board()).tools, { gh: { problem: 'missing', override: 'GH_PATH=/nowhere/gh' } });
+  const logs = board.logs();
+  assert.ok(logs.indexOf('board on ') < logs.indexOf('gh was not found'), logs);
+});
 
 test('Recheck finds a t3 that appeared after startup', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'mux-t3-later-'));

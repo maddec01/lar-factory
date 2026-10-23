@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.ts';
 import { BOARD_PORTS, listenOnFreePort } from './port.ts';
+import { recordBoard } from './board-record.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
@@ -601,9 +602,6 @@ const server = createServer((req, res) => {
   });
 });
 
-// Sample mode runs no tools, so it looks none up. The check starts the first read once gh works.
-if (!fixture) await recheckTools();
-
 /** Logs why the board can't start and exits. */
 async function exitWith(message: string): Promise<never> {
   log(message);
@@ -622,6 +620,10 @@ const port = await listenOnFreePort(server, HOST, ports) ?? await exitWith(ports
   ? `port ${ports[0]} is taken; stop what holds it or choose another BOARD_PORT`
   : `ports ${ports[0]} to ${ports.at(-1)} are all taken; stop a board or set BOARD_PORT`);
 log(`board on http://${HOST}:${port}, refreshing every ${config.refreshSeconds} s`);
+// status.sh finds live boards by their records; a sample board isn't one to refresh.
+if (!fixture) process.on('exit', recordBoard(port));
+// Sample mode runs no tools, so it looks none up. The check starts the first read once gh works.
+if (!fixture) firstToolCheck = recheckTools();
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with test/sample.json).

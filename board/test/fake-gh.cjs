@@ -14,7 +14,13 @@ const main = async () => {
       const nodes = { build: options.builds, blocked: options.blocked, active: options.active }[label];
       return output({ data: { search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: nodes ?? [] } } });
     }
-    if (options.readDelay) await new Promise((r) => setTimeout(r, options.readDelay));
+    if (options.readDelay) {
+      // Two project reads at once log an overlap, so tests can check the board never runs them together.
+      const lock = process.env.FAKE_GH_STATE + '.reading';
+      try { fs.writeFileSync(lock, '', { flag: 'wx' }); } catch { fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', '["overlap"]\n'); }
+      await new Promise((r) => setTimeout(r, options.readDelay));
+      fs.rmSync(lock, { force: true });
+    }
     return output({ data: { user: { projectV2: { title: 'Mux', url: 'https://github.com/users/maddec01/projects/1',
       items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: options.items ?? [] } } } } });
   }

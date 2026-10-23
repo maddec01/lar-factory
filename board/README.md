@@ -14,14 +14,19 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
   it is in the flow.
 - **Queue** on a List row sets the item's Status to Queued. The board shows it
   in Queued at once and keeps it there until GitHub reports the change.
-- **Start** on a Queued issue opens a T3 Code thread in the Mux project
-  (`board.t3Project` in `config.json`) whose first message is the issue's
-  work message: `#n title`, then `$mux-work owner/repo#n`. T3 titles the
+- **Start** on a Queued issue opens a T3 Code thread in the issue's repository
+  project, the T3 project whose folder is the repository's `path` in
+  `config.json`, whose first message is the issue's work message: `#n title`, then `$mux-work owner/repo#n`. T3 titles the
   thread from line 1 and runs mux-work, which shapes or builds the issue and
   sets its Status. A toast shows the thread's id, and its title when T3 chose
   one other than line 1; every board page marks the card Started. While the
   board runs, a double press, a retry or another tab starts no second thread.
-  A queued draft needs an issue first.
+  A queued draft needs an issue first. Before starting, Start checks that the
+  repository is in `config.json`, that its `path` exists and its git `origin`
+  is that repository, and that T3 Code's database (read-only) has a live
+  project at that path. The first check that fails stops Start with a hint
+  naming the fix, such as adding the project in T3 Code; the board never adds
+  or changes T3 projects, and it refuses when it can't read T3's database.
 - **Flow** is an outline of how items relate: sub-issues sit under their
   parent, and each issue lists the issues it is blocked by and the ones it
   blocks, as GitHub records them. A link to an item on the Board jumps to it;

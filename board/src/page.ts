@@ -1,11 +1,9 @@
 // The full HTML document the server sends on first load: the built index.html, filled with the
-// board's markup and data, and the built assets it loads. Server-only.
+// board's data for the page's first paint, and the built assets it loads. Server-only.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import { BRAND_MARK } from './brand-mark.ts';
-import { renderAbandonDialog, renderAddItemForm, renderApp } from './render.ts';
-import type { RenderOptions } from './render.ts';
 import type { BoardData } from './model.ts';
 
 /** The logo in a mid grey that reads on light and dark tabs. */
@@ -45,14 +43,9 @@ function scriptJson(value: unknown): string {
   return JSON.stringify(value).replaceAll('<', '\\u003c');
 }
 
-/** Fills index.html's <!--board-head--> and <!--board-body--> with the favicon, the board's markup and its data. */
-export function renderPage(template: string, data: BoardData, opts: RenderOptions): string {
-  const body = `<div id="app">
-${renderApp(data, opts)}
-</div>
-${renderAddItemForm(data)}
-${renderAbandonDialog()}
-<div id="copy-status" class="sr-only" role="status" aria-live="polite"></div>
+/** Fills index.html's <!--board-head--> and <!--board-body--> with the favicon, the app's root and the board data. */
+export function renderPage(template: string, data: BoardData): string {
+  const body = `<div id="app"></div>
 <script id="board-data" type="application/json">${scriptJson(data)}</script>`;
   // Functions, so a `$` in the board data is never read as a replacement pattern.
   return template

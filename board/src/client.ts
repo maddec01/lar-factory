@@ -4,7 +4,8 @@
 
 import { answeredRecheck, recheckAnswer, renderApp } from './render.ts';
 import { abandonPrompt, listGroupId } from './board-view.ts';
-import type { ItemAction, Notice, RecheckAnswer, UpdateView } from './render.ts';
+import type { ItemAction, Notice, RecheckAnswer } from './render.ts';
+import type { UpdateView } from './update-view.ts';
 import { DEFAULT_UI } from './ui-state.ts';
 import type { UiState, View } from './ui-state.ts';
 import { platformOf } from './model.ts';

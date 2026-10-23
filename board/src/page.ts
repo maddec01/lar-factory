@@ -3,7 +3,8 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { extname } from 'node:path';
-import { BRAND_MARK, renderAbandonDialog, renderAddItemForm, renderApp } from './render.ts';
+import { BRAND_MARK } from './brand-mark.ts';
+import { renderAbandonDialog, renderAddItemForm, renderApp } from './render.ts';
 import type { RenderOptions } from './render.ts';
 import type { BoardData } from './model.ts';
 

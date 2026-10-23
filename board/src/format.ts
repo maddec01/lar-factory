@@ -64,6 +64,16 @@ export function ago(iso: string, now: number): string {
   return `${Math.round(h / 24)} days ago`;
 }
 
+/** An age in its largest whole unit, rounded down: `12s ago`, `3m ago`, `2h ago`, `2d ago`. */
+export function shortAgo(iso: string, now: number): string {
+  const s = Math.max(0, Math.floor((now - Date.parse(iso)) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return h < 48 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
+}
+
 export function elapsed(iso: string, now: number): string {
   return duration(now - Date.parse(iso));
 }

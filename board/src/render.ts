@@ -412,9 +412,19 @@ function backToListButton(item: Item, data: BoardData, action: ItemAction | unde
   return `<button type="button" class="link-action" data-back-to-list="${esc(item.id)}" aria-label="${moving ? 'Moving' : 'Back to List'} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>\u2190 ${moving ? 'Moving to List…' : 'Back to List'}</button>`;
 }
 
+/** The T3 thread Start opened for the item, from this page or another. */
+function startedThread(item: Item, data: BoardData, action: ItemAction | undefined) {
+  return data.started?.[item.id] ?? (action?.phase === 'started' ? action.thread : undefined);
+}
+
+/** Whether Start is in flight, uncertain or done, which takes Back to List and Abandon away. */
+function startHolds(item: Item, data: BoardData, action: ItemAction | undefined): boolean {
+  return !!startedThread(item, data, action) || action?.phase === 'uncertain' || (action?.phase === 'pending' && !action.kind);
+}
+
 /** Start's button for the card's top row, and the message under the card when there is one. */
 function startControl(item: Item, data: BoardData, action: ItemAction | undefined): { button: string; message: string } {
-  const thread = data.started?.[item.id] ?? (action?.phase === 'started' ? action.thread : undefined);
+  const thread = startedThread(item, data, action);
   // The toast announces a start; the card only keeps Start from running twice.
   if (thread) return { button: `<span class="started-tag" tabindex="-1" data-start-result="${esc(item.id)}" title="T3 thread ${esc(thread.threadId)}">Started</span>`, message: '' };
   if (action?.phase === 'uncertain') {
@@ -648,8 +658,9 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
     .sort((a, b) => (b.closedAt ?? b.updatedAt).localeCompare(a.closedAt ?? a.updatedAt));
 
   // Issues and drafts get a footer row; nothing queues a pull request, so it gets none.
+  // A Start in flight, uncertain or done takes the row away.
   const footer = (i: Item) =>
-    i.type === 'PullRequest' ? '' : `<div class="card-actions">${backToListButton(i, data, opts.actions?.[i.id])}${abandonButton(i, data, opts.actions?.[i.id], 'link-action danger')}</div>`;
+    i.type === 'PullRequest' || startHolds(i, data, opts.actions?.[i.id]) ? '' : `<div class="card-actions">${backToListButton(i, data, opts.actions?.[i.id])}${abandonButton(i, data, opts.actions?.[i.id], 'link-action danger')}</div>`;
   const queuedExtra = (i: Item) =>
     (workMessage(i)
       ? startControl(i, data, opts.actions?.[i.id]).message

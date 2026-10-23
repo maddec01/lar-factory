@@ -508,10 +508,7 @@ test('Back to List, Abandon and Start each show only their own pending state', (
   const moving = card({ phase: 'pending', kind: 'back-to-list' });
   assert.match(moving, /data-back-to-list="PVTI_sample05" aria-label="Moving #129 [^"]*" aria-disabled="true">\u2190 Moving to List…<\/button>/);
   assert.match(moving, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'Start is not relabelled');
-  const starting = card({ phase: 'pending' });
-  assert.match(starting, />Starting…<\/button>/);
-  assert.match(starting, /data-back-to-list="PVTI_sample05"[^>]*>\u2190 Back to List<\/button>/, 'Back to List is not relabelled');
-  assert.match(starting, /data-abandon="PVTI_sample05"[^>]*>Abandon<\/button>/, 'Abandon is not relabelled');
+  assert.match(card({ phase: 'pending' }), />Starting…<\/button>/);
   const abandoning = card({ phase: 'pending', kind: 'abandon' });
   assert.match(abandoning, /data-back-to-list="PVTI_sample05" aria-label="Back to List #129 [^"]*" aria-disabled="true">\u2190 Back to List<\/button><button[^>]*data-abandon="PVTI_sample05" aria-label="Abandoning… #129 [^"]*" aria-disabled="true">Abandoning…<\/button>/);
   assert.match(abandoning, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'Start is not relabelled');
@@ -519,6 +516,20 @@ test('Back to List, Abandon and Start each show only their own pending state', (
   const otherError = card({ phase: 'error', kind: 'abandon', message: 'Could not delete #129.' });
   assert.match(otherError, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'another action\'s error is not a Start error');
   assert.ok(!otherError.includes('<p class="start">') && !otherError.includes('action-error'), 'a card shows no inline error');
+});
+
+test('a Queued card whose Start is pending, uncertain or done shows no footer actions', () => {
+  const card = (data: typeof sample, action?: ItemAction) =>
+    cardOf(renderBoardView(data, { ...base, actions: action ? { PVTI_sample05: action } : {} }), 'PVTI_sample05');
+  const thread = { threadId: 'thread-1', title: 'Shape it' };
+  for (const [why, html] of [
+    ['pending', card(sample, { phase: 'pending' })],
+    ['uncertain', card(sample, { phase: 'uncertain', message: 'Check T3.' })],
+    ['uncertain, message closed', card(sample, { phase: 'uncertain' })],
+    ['started on this page', card(sample, { phase: 'started', thread })],
+    ['started on another page', card({ ...sample, started: { PVTI_sample05: thread } })],
+  ] as const) assert.ok(!html.includes('card-actions'), `no footer while Start is ${why}`);
+  assert.match(card(sample, { phase: 'error', message: 'T3 is down.' }), /<div class="card-actions">/, 'a failed Start brings the footer back');
 });
 
 test('a failed card action shows as a toast naming the item, which stays until closed', () => {

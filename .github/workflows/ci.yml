@@ -1,5 +1,5 @@
-# The board app's Release workflow follows this one with `workflows: [CI]` and
-# branch protection requires the `Tests` job, so keep both names as they are.
+# Branch protection requires the `Tests` job, and before a Nightly the board app's
+# Release workflow looks up this workflow's runs, so keep both names as they are.
 name: CI
 
 on:
@@ -11,9 +11,9 @@ on:
 permissions:
   contents: read
 
-# A PR's newer run cancels its older one. Each push to main gets its own group
-# because the Release workflow follows these runs: a later push must never
-# cancel an earlier push's run.
+# A PR's newer run cancels its older one. Each push to main gets its own group,
+# so every commit on main keeps a finished run and a later push never cancels an
+# earlier one.
 concurrency:
   group: ci-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.sha) }}
   cancel-in-progress: true

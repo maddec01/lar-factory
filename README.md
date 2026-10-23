@@ -241,20 +241,27 @@ without running them.
 
 ### Releasing
 
-Each green merge to main publishes a Nightly, a prerelease tagged like
-`v0.1.0-nightly.20261023.57`. Its version comes from `app/package.json` at the
-merged commit.
+Pedro starts every Release by hand. Open Actions > Release > Run workflow on main
+and pick a channel, `nightly` (the default) or `stable`. Tick `dry_run` to build,
+sign and notarize without publishing.
 
-For a Stable Release, bump `version` in `app/package.json` and merge it. Once that
-merge's Nightly is out, open Actions > Release > Run workflow. The run rebuilds the
-latest Nightly's commit as `v<version>` and marks it the latest Release. It fails if
-that tag exists or main doesn't contain the commit. Tick `dry_run` to build, sign and
-notarize without publishing.
+A Nightly builds main's head as a prerelease tagged like
+`v0.1.0-nightly.20261023.57`. Its version comes from `app/package.json` at that
+commit. It publishes only if CI's run for that commit on a push to main passed. It
+fails when that run failed or hasn't finished, and publishes nothing when the commit
+already has a Nightly.
 
-One Release run goes at a time. A Stable Release started while a Nightly is running
-waits for it. While it waits, the Nightly of a later merge can replace it, because
-GitHub keeps only the newest waiting run. If that happens, the Stable Release shows
-as canceled; run it again.
+A Stable Release rebuilds the latest Nightly's commit as `v<version>` and marks it
+the latest Release. It fails if that tag exists or main doesn't contain the commit.
+To ship one:
+
+1. Bump `version` in `app/package.json` and merge it.
+2. Start a Nightly and wait for it to publish.
+3. Start a Stable Release.
+
+One Release run goes at a time. A run started while another is running waits for
+it, and GitHub keeps only the newest waiting run, so starting a third run replaces
+the waiting one. If a run shows as canceled, run it again.
 
 ## Repo layout
 

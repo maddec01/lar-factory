@@ -99,7 +99,8 @@ checklists from `references/` on `main` to `~/.agents/references/` and
 links point. It ends by checking that those links resolve. It needs `npx` and a
 `gh` login.
 
-The skill list is `SKILLS` in the script. If you run `npx skills add` yourself,
+It installs every skill row in `UPSTREAM.md` plus `mux-work` and `skill-sync`,
+so a new copy needs no change to the script. If you run `npx skills add` yourself,
 always pass `-a`: `-y` without it installs into every agent the CLI knows.
 
 The CLI installs Claude's shared links in `~/.claude/skills`. If you also use

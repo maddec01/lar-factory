@@ -197,13 +197,20 @@ beside it.
 To build a Mac app that runs without the checkout:
 
 ```bash
-cd app && pnpm run build
+cd app && pnpm run build --unsigned
 ```
 
 It writes an unsigned Apple Silicon app to `app/release/mac-arm64/Mux Factory.app`,
 with the board's server source, its built page and a copy of `config.json`
 inside. Rebuild it after changing `config.json`. If macOS refuses to open it,
-right-click it in Finder and choose Open.
+right-click it in Finder and choose Open. Beside it go a dmg, a zip and the update
+feed, `latest-mac.yml`.
+
+`--build-version <version>` builds another version; a Nightly version such as
+`0.1.0-nightly.20261023.57` writes `nightly-mac.yml` instead. Without `--unsigned`
+the build signs and notarizes, and fails unless `CSC_LINK`, `CSC_KEY_PASSWORD`,
+`APPLE_API_KEY` (the `.p8` file's path), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` and
+`APPLE_TEAM_ID` are set. The Release workflow builds that way.
 
 The app's build copies `skills/` and `references/` into `app/dist-electron/bundle`,
 which packaging puts in the app's `Resources/bundle`.

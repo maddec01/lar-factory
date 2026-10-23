@@ -45,6 +45,7 @@ decision: research|D4C5F9|Concept decision settled by research
 decision: task|D4C5F9|Concept decision settled by a small task
 build|0E8A16|Issue that becomes one PR
 active|FBCA04|Slice an implementer is working on now
+blocked|BFD4F2|Slice an implementer couldn't finish, waiting for a re-slice
 LABELS
 )
 ```
@@ -60,7 +61,7 @@ the result:
 gh api --paginate "repos/$repo/labels" --jq '.[].name'
 ```
 
-All ten names above must be present. List, Queued, Shaping, Needs you, Ready,
+All eleven names above must be present. List, Queued, Shaping, Needs you, Ready,
 In progress, Review, Verify, Ready to merge and Done are **Project Status
 values**, not labels: move them with `bash <mux-work>/scripts/status.sh
 <issue-url> "<Status>"` as the workflow directs.
@@ -133,30 +134,62 @@ blocked-by links with the commands above (`--parent "$build"`, then
 `--add-blocked-by`). An **active slice** carries the `active` label while
 an implementer works on it; the board reads it to show progress. Add it when
 the implementer starts and remove it when the slice merges or closes, when its
-implementer reports it blocked, and when the build stops. Close a merged slice,
-then list the build's ready slices (open, every blocker closed):
+implementer reports it blocked, and when the build stops. A **blocked slice**
+carries the `blocked` label (not a native blocked-by link): its implementer
+couldn't finish it and it waits for a re-slice. The builder adds the label with
+a comment giving the reason; a re-slice planner claims the slice by removing
+it. Close a merged slice, then list the build's ready slices (open, not
+blocked, every blocker closed):
 
 ```sh
 gh issue edit "$slice" --repo "$repo" --add-label active
 gh issue edit "$slice" --repo "$repo" --remove-label active
 
-# On resume: clear active from every open slice.
+# On resume: clear active from every open slice (blocked stays).
 gh issue list --repo "$repo" --label active --state open --json number,parent \
   --jq ".[] | select(.parent.number == $build) | .number" |
   xargs -I{} gh issue edit {} --repo "$repo" --remove-label active
 
-gh issue close "$slice" --repo "$repo" --reason completed
+# A slice reported blocked. The first line creates the label in repos set up before it.
+gh label create blocked --repo "$repo" --force --color BFD4F2 \
+  --description "Slice an implementer couldn't finish, waiting for a re-slice"
+gh issue edit "$slice" --repo "$repo" --remove-label active --add-label blocked
+reason=$(mktemp)  # write "Blocked: <implementer's reason>" to "$reason"
+gh issue comment "$slice" --repo "$repo" --body-file "$reason"
 
-# A re-sliced slice: repoint each dependent, then close the old slice.
-gh issue edit "$dependent" --repo "$repo" --add-blocked-by "$new" --remove-blocked-by "$slice"
-gh issue close "$slice" --repo "$repo" --reason "not planned"
+# The build's open blocked slices.
+gh issue list --repo "$repo" --label blocked --state open --json number,parent \
+  --jq ".[] | select(.parent.number == $build) | .number"
+
+# Is this slice still blocked? (true/false)
+gh issue view "$slice" --repo "$repo" --json labels --jq 'any(.labels[]; .name == "blocked")'
+
+# The planner's claim.
+gh issue edit "$slice" --repo "$repo" --remove-label blocked
+
+gh issue close "$slice" --repo "$repo" --reason completed
 
 gh api graphql -F owner="${repo%/*}" -F name="${repo#*/}" -F n="$build" -f query='
 query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){issue(number:$n){
-  subIssues(first:100){nodes{number title state blockedBy(first:50){nodes{state}}}}}}}' \
+  subIssues(first:100){nodes{number title state labels(first:20){nodes{name}}
+    blockedBy(first:50){nodes{state}}}}}}}' \
   --jq '.data.repository.issue.subIssues.nodes[]
-    | select(.state == "OPEN" and all(.blockedBy.nodes[]; .state == "CLOSED"))
+    | select(.state == "OPEN" and all(.labels.nodes[]; .name != "blocked")
+      and all(.blockedBy.nodes[]; .state == "CLOSED"))
     | "#\(.number) \(.title)"'
+```
+
+A **re-slice** works in place and keeps no history. The planner rewrites the
+blocked slice's title and body (`gh issue edit --title --body-file`) to hold
+the work left and may edit any other open slice without `active`. It creates a
+slice only when the work needs another, and closes one only once its content
+has moved into another. Blocked-by links follow the content: a rewritten or new
+slice is blocked by the slices whose work it needs, and a closed slice's
+dependents move to the slice that took its work:
+
+```sh
+gh issue edit "$dependent" --repo "$repo" --add-blocked-by "$into" --remove-blocked-by "$slice"
+gh issue close "$slice" --repo "$repo" --reason "not planned"
 ```
 
 ## Parent closing

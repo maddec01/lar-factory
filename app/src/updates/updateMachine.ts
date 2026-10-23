@@ -1,10 +1,9 @@
 // The update state's transitions, copied from T3 Code's apps/desktop/src/updates/updateMachine.ts
-// and updateChannels.ts, without release notes, the host and app architectures and the
-// install record.
+// and updateChannels.ts, without the host and app architectures and the install record.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
-import type { UpdateChannel, UpdateState } from "../../../board/src/app/board-app.ts";
+import type { UpdateChannel, UpdateReleaseNote, UpdateState } from "../../../board/src/app/board-app.ts";
 
 const NIGHTLY_VERSION_PATTERN = /^[^-+]+-nightly\.\d{8}\.\d+$/;
 
@@ -20,6 +19,8 @@ export function createInitialUpdateState(currentVersion: string, channel: Update
     currentVersion,
     availableVersion: null,
     downloadedVersion: null,
+    releaseNotes: [],
+    omittedReleaseCount: 0,
     downloadPercent: null,
     checkedAt: null,
     message: null,
@@ -43,16 +44,27 @@ export function createBaseUpdateState(
   };
 }
 
+/**
+ * A failed download's error, kept on an update still available until a new download starts, or
+ * the cleared error otherwise.
+ */
+const keptDownloadError = (state: UpdateState): Pick<UpdateState, "message" | "errorContext" | "canRetry"> =>
+  state.errorContext === "download" && state.availableVersion !== null
+    ? { message: state.message, errorContext: "download", canRetry: true }
+    : { message: null, errorContext: null, canRetry: false };
+
 export function reduceOnCheckStart(state: UpdateState, checkedAt: string): UpdateState {
   const hasDownloadedUpdate = state.downloadedVersion !== null;
+  // Unlike T3 Code, an update found but not yet downloaded keeps its notes through a check too, as its button stays.
+  const hasFoundUpdate = hasDownloadedUpdate || state.availableVersion !== null;
   return {
     ...state,
     status: "checking",
     checkedAt,
-    message: null,
+    releaseNotes: hasFoundUpdate ? state.releaseNotes : [],
+    omittedReleaseCount: hasFoundUpdate ? state.omittedReleaseCount : 0,
     downloadPercent: hasDownloadedUpdate ? 100 : null,
-    errorContext: null,
-    canRetry: false,
+    ...keptDownloadError(state),
   };
 }
 
@@ -74,10 +86,9 @@ function keepFoundUpdate(state: UpdateState, checkedAt: string): UpdateState | n
     return {
       ...state,
       status: "available",
-      message: null,
       checkedAt,
       downloadPercent: null,
-      errorContext: null,
+      ...keptDownloadError(state),
       canRetry: true,
     };
   }
@@ -99,18 +110,29 @@ export function reduceOnCheckFailure(state: UpdateState, message: string, checke
   };
 }
 
-export function reduceOnUpdateAvailable(state: UpdateState, version: string, checkedAt: string): UpdateState {
+export function reduceOnUpdateAvailable(
+  state: UpdateState,
+  version: string,
+  checkedAt: string,
+  releaseNotes: readonly UpdateReleaseNote[] = [],
+  omittedReleaseCount = 0,
+): UpdateState {
   const isDownloadedVersion = state.downloadedVersion === version;
+  const preserveReleaseNotes = isDownloadedVersion && releaseNotes.length === 0;
+  // The same version found again keeps a failed download's error until a new download starts.
+  const sameAvailable = !isDownloadedVersion && state.availableVersion === version;
+  const error = sameAvailable ? keptDownloadError(state) : { message: null, errorContext: null, canRetry: false };
   return {
     ...state,
     status: isDownloadedVersion ? "downloaded" : "available",
     availableVersion: version,
     downloadedVersion: isDownloadedVersion ? version : null,
+    releaseNotes: preserveReleaseNotes ? state.releaseNotes : releaseNotes,
+    omittedReleaseCount: preserveReleaseNotes ? state.omittedReleaseCount : omittedReleaseCount,
     downloadPercent: isDownloadedVersion ? 100 : null,
     checkedAt,
-    message: null,
-    errorContext: null,
-    canRetry: isDownloadedVersion,
+    ...error,
+    canRetry: isDownloadedVersion || error.canRetry,
   };
 }
 
@@ -133,6 +155,8 @@ export function reduceOnNoUpdate(state: UpdateState, checkedAt: string): UpdateS
     status: "up-to-date",
     availableVersion: null,
     downloadedVersion: null,
+    releaseNotes: [],
+    omittedReleaseCount: 0,
     downloadPercent: null,
     checkedAt,
     message: null,

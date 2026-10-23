@@ -28,7 +28,14 @@ export type UpdateStatus =
   | 'downloaded'
   | 'error';
 
-/** What the app's updater knows, as T3 Code's `DesktopUpdateState` without release notes. */
+/** One Release's changes: its last `items` of `totalItems`, newest first. */
+export interface UpdateReleaseNote {
+  version: string;
+  items: readonly string[];
+  totalItems: number;
+}
+
+/** What the app's updater knows, as T3 Code's `DesktopUpdateState`. */
 export interface UpdateState {
   enabled: boolean;
   status: UpdateStatus;
@@ -36,6 +43,10 @@ export interface UpdateState {
   currentVersion: string;
   availableVersion: string | null;
   downloadedVersion: string | null;
+  /** The changes of the Releases between the running version and the available one, newest first. */
+  releaseNotes: readonly UpdateReleaseNote[];
+  /** Releases with changes that `releaseNotes` leaves out. */
+  omittedReleaseCount: number;
   downloadPercent: number | null;
   /** ISO time of the last check. */
   checkedAt: string | null;

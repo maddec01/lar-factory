@@ -33,6 +33,8 @@ export interface ElectronUpdater {
   readonly setAutoInstallOnAppQuit: (value: boolean) => Effect.Effect<void>;
   readonly setChannel: (channel: UpdateChannel) => Effect.Effect<void>;
   readonly setAllowPrerelease: (value: boolean) => Effect.Effect<void>;
+  /** On, an update's `releaseNotes` hold every newer Release's notes rather than the new one's. */
+  readonly setFullChangelog: (value: boolean) => Effect.Effect<void>;
   readonly allowDowngrade: Effect.Effect<boolean>;
   readonly setAllowDowngrade: (value: boolean) => Effect.Effect<void>;
   readonly checkForUpdates: Effect.Effect<void, ElectronUpdaterError>;
@@ -58,6 +60,7 @@ export const make = async (): Promise<ElectronUpdater> => {
     setAutoInstallOnAppQuit: (value) => set(() => (autoUpdater.autoInstallOnAppQuit = value)),
     setChannel: (channel) => set(() => (autoUpdater.channel = channel)),
     setAllowPrerelease: (value) => set(() => (autoUpdater.allowPrerelease = value)),
+    setFullChangelog: (value) => set(() => (autoUpdater.fullChangelog = value)),
     allowDowngrade: Effect.sync(() => autoUpdater.allowDowngrade),
     setAllowDowngrade: (value) => set(() => (autoUpdater.allowDowngrade = value)),
     checkForUpdates: Effect.tryPromise({

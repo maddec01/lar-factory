@@ -7,8 +7,8 @@ import type { UpdateState } from '../../src/app/board-app.ts';
 
 const idle: UpdateState = {
   enabled: true, status: 'up-to-date', channel: 'latest', currentVersion: '1.0.0', availableVersion: null,
-  downloadedVersion: null, downloadPercent: null, checkedAt: '2026-10-21T09:00:00Z', message: null,
-  errorContext: null, canRetry: false,
+  downloadedVersion: null, releaseNotes: [], omittedReleaseCount: 0, downloadPercent: null, checkedAt: '2026-10-21T09:00:00Z',
+  message: null, errorContext: null, canRetry: false,
 };
 const available: UpdateState = { ...idle, status: 'available', availableVersion: '1.1.0' };
 const downloading: UpdateState = { ...available, status: 'downloading', downloadPercent: 42.4 };

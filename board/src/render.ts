@@ -20,7 +20,7 @@ import { highlightedChoice } from './start-menu.ts';
 import { ago, clock, day, esc, plural, slug } from './format.ts';
 import type { UiState, View } from './ui-state.ts';
 import { BRAND_MARK } from './brand-mark.ts';
-import { HINTS, UNREADABLE, boardSections, checksBadge, conceptChildren, figures, namedSlices, popoverOrder, prLabel, statsTitle, statusTone, totalTitle } from './board-view.ts';
+import { HINTS, UNREADABLE, abandonPrompt, boardSections, checksBadge, conceptChildren, figures, namedSlices, popoverOrder, prLabel, statsTitle, statusTone, totalTitle } from './board-view.ts';
 
 export interface RenderOptions {
   now: number;
@@ -489,15 +489,6 @@ export function renderHeader(data: BoardData, opts: RenderOptions): string {
 ${banners.join('\n')}
 <div class="toasts">${toasts.map((t) => `\n${t}`).join('')}</div>
 </header>`;
-}
-
-/** What Abandon asks before it deletes, and what it says after. */
-export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
-  return item.type === 'DraftIssue'
-    ? { question: `Remove draft ${item.title}?`, detail: "This removes the draft from the project. It can't be undone.",
-        confirm: 'Remove draft', done: `Removed draft ${item.title}.` }
-    : { question: `Delete ${ref(item)} ${item.title}?`, detail: `This permanently deletes the issue from ${item.repo} on GitHub. It can't be undone.`,
-        confirm: 'Delete issue', done: `Deleted ${ref(item)} ${item.title}.` };
 }
 
 /** Abandon's confirmation. The page fills in the item; it stays outside the polling render area. */

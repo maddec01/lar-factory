@@ -145,6 +145,11 @@ or hand checks, awaiting Pedro's merge.
 **Done**:
 Completed work, reached when its issue closes or its PR merges.
 
+**Abandon**:
+Discarding a List or Queued item for good. The issue is deleted, or the draft
+is removed from the board.
+_Avoid_: Cancel, Close (for discarded work)
+
 ### Item stats
 
 **Agent time**:

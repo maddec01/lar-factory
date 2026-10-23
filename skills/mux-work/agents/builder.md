@@ -151,8 +151,10 @@ findings you agree with to the fixer, with no further review.
 ## Approve
 
 Start the **Approver subagent** with `approver.md`, the issue reference, the
-repo path, every reviewer's final result and your rejected findings. It opens
-the PR and returns a recommended status; the item stays in Review. Link the PR to this thread (`link_pull_request`).
+repo path, every reviewer's final result, your rejected findings and the
+unreviewed fixes. An unreviewed fix is a round-3 fix or a fix whose reviewer
+you skipped; list each as a line naming the finding, its severity, its
+reviewer, its round and, for a skip, your recorded reason. It opens the PR and returns a recommended status; the item stays in Review. Link the PR to this thread (`link_pull_request`).
 
 ## Checks
 

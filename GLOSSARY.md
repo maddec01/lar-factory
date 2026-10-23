@@ -219,5 +219,13 @@ _Avoid_: Electron app, desktop board
 ### Skills
 
 **Copy**:
-A skill or reference taken unchanged from an upstream source and recorded in UPSTREAM.md; it changes only through skill-sync.
+A skill or checklist taken unchanged from an upstream source and recorded in UPSTREAM.md; it changes only through skill-sync.
 _Avoid_: vendored skill, dependency
+
+**Checklist**:
+A shared reference file that several skills link to, installed next to the skills.
+_Avoid_: reference, reference file
+
+**Claude profile**:
+One Claude Code config folder (`~/.claude` or a `~/.claude-*` folder) with its own login and its own skills.
+_Avoid_: Claude instance, config dir

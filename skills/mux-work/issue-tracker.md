@@ -80,6 +80,7 @@ blocker=102
 child_repo=$repo
 
 # Create a decision as a native sub-issue; retain the returned URL immediately.
+# Slices are created with slice.sh instead (see Slices).
 gh issue create --repo "$repo" --title "Decide the approach" \
   --body-file /path/to/decision.md --label "decision: grill" --parent "$parent"
 
@@ -129,9 +130,19 @@ and [issue dependencies API](https://docs.github.com/en/rest/issues/issue-depend
 ## Slices
 
 A slice is a native sub-issue of a `build` issue; a sub-issue labelled
-`build` is a build, never a slice. Create it and its
-blocked-by links with the commands above (`--parent "$build"`, then
-`--add-blocked-by`). An **active slice** carries the `active` label while
+`build` is a build, never a slice. Create it only with `slice.sh`: it makes the
+sub-issue, prints its URL and deletes the item GitHub auto-adds to the Mux
+Project, so slices stay off the board with no Status. Later label and body
+edits, closing and reopening never put it back. Put a build on the Mux board
+before slicing it, since adding a build later pulls its slices onto the board.
+Then add its blocked-by links with `--add-blocked-by`
+above.
+
+```sh
+bash <mux-work>/scripts/slice.sh "$repo" "$build" "<title>" /path/to/slice.md
+```
+
+An **active slice** carries the `active` label while
 an implementer works on it; the board reads it to show progress. Add it when
 the implementer starts and remove it when the slice merges or closes, when its
 implementer reports it blocked, and when the build stops. A **blocked slice**
@@ -173,8 +184,8 @@ query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){
 
 A **re-slice** works in place and keeps no history. The planner rewrites the
 blocked slice (`gh issue edit --title --body-file`) to hold the work left and
-may edit any other open slice without `active`. It creates a slice only when
-the work needs another, and closes one only once its content moved into
+may edit any other open slice without `active`. It creates a slice (with
+`slice.sh`) only when the work needs another, and closes one only once its content moved into
 another. Blocked-by links follow the content; a closed slice's dependents
 move to the slice that took its work:
 

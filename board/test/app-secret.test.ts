@@ -6,7 +6,7 @@ type Board = Awaited<ReturnType<typeof startBoard>>;
 
 const SECRET = 'app-secret-for-tests';
 const REFUSED = 'Submit from the board app.';
-const GUARDED = ['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/update', '/api/recheck'];
+const GUARDED = ['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/recheck'];
 
 const post = (board: Board, path: string, headers: Record<string, string> = {}) => fetch(`${board.url}${path}`, {
   method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json', ...headers }, body: '{}' });
@@ -41,15 +41,4 @@ test('without the app secret, guarded writes need no header', async (t) => {
   const board = await startBoard(t, { items: [rawIssue(1, 'List')] });
   for (const path of GUARDED) assert.notEqual((await answer(await post(board, path))).error, REFUSED, path);
   assert.equal((await post(board, '/api/read')).status, 202);
-});
-
-test('with the app secret set, the board runs no update check against the checkout', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')] }, false, false, { BOARD_APP_SECRET: SECRET });
-  assert.equal((await board.board()).codeUpdate, undefined);
-  assert.equal(((await (await fetch(`${board.url}/healthz`)).json()) as { runningRevision: unknown }).runningRevision, null);
-});
-
-test('without the app secret, the board checks its checkout for updates', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')] });
-  assert.ok((await board.board()).codeUpdate);
 });

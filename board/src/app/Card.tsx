@@ -66,10 +66,10 @@ function ChecksBadge({ pr }: { pr: LinkedPr }) {
   return <span className={badge.className} title={badge.title}>{badge.text}{badge.slow && <span className="sr-only"> (running over 30 minutes)</span>}</span>;
 }
 
-/** Board writes are off in sample mode, so its buttons are too; an action in flight or a running update holds them. */
+/** Board writes are off in sample mode, so its buttons are too; an action in flight holds them. */
 export function writeState(data: BoardData, action?: ItemAction): { disabled?: true; title?: string; 'aria-disabled'?: true } {
   if (data.capture?.enabled === false) return { disabled: true, title: 'Disabled in sample mode' };
-  return action?.phase === 'pending' || data.update?.state === 'running' ? { 'aria-disabled': true } : {};
+  return action?.phase === 'pending' ? { 'aria-disabled': true } : {};
 }
 
 /** `action` sits in the card's top row, so it adds no height; `after` is a row below the item stats. */

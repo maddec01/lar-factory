@@ -110,7 +110,7 @@ test('data pushed over /api/events replaces the board, and the open stream stops
   expect($('.totals li:last-child')!.textContent).toBe('1 items');
 });
 
-test('while the stream is down the page fetches /api/board every 15 s, and every second during an update', async () => {
+test('while the stream is down the page fetches /api/board every 15 s', async () => {
   await mountPage(fresh);
   await settle(() => vi.advanceTimersByTime(14_999));
   expect(fetchMock).not.toHaveBeenCalled();
@@ -123,13 +123,6 @@ test('while the stream is down the page fetches /api/board every 15 s, and every
   await settle(() => stream().onerror!());
   await settle(() => vi.advanceTimersByTime(15_000));
   expect(fetchMock).toHaveBeenCalledTimes(2);
-
-  const update = { state: 'running' as const, pid: 1, finished: [], current: 'check' as const, startedAt: new Date(NOW).toISOString(), finishedAt: null, revision: null, error: null, logTail: null };
-  fetchMock.mockImplementation(async () => new Response(JSON.stringify({ ...fresh, update })));
-  await settle(() => vi.advanceTimersByTime(15_000));
-  expect(fetchMock).toHaveBeenCalledTimes(3);
-  await settle(() => vi.advanceTimersByTime(1_000));
-  expect(fetchMock).toHaveBeenCalledTimes(4);
 });
 
 test("a failed fetch says the server can't be reached and keeps the last data", async () => {

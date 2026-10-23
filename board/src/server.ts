@@ -2,13 +2,11 @@
 // keeps the last good copy in memory, serves it on 127.0.0.1 and pushes each
 // change to open pages over /api/events.
 
-import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port.ts';
 import { recordBoard } from './board-record.ts';
@@ -26,27 +24,19 @@ import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { loadBuild, pageWithData } from './page.ts';
 import { canAbandon, workMessage } from './model.ts';
-import { revisionCheck } from './revision.ts';
-import { lockHolder, readProgress, updatePaths } from './update-state.ts';
 import type { BoardData, ContentType, Item, ModelChoice, ModelGroup, Status } from './model.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
 const fixture = process.env.BOARD_DATA_FILE;
 const capture = { session: randomUUID(), enabled: !fixture };
-const updates = updatePaths();
-// Only the launch-agent board updates itself: launchd sets its token.
-const updatable = !fixture && Boolean(process.env.BOARD_LAUNCH_TOKEN);
 /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
 const appSecret = process.env.BOARD_APP_SECRET || null;
 /** Writes only the board app's page may make. /api/read stays open for status.sh, since it only starts a read. */
-const GUARDED_WRITES = new Set(['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/update', '/api/recheck']);
-// The app's server runs from inside the app, not a checkout it could compare with origin/main.
-const code = revisionCheck({ updatable, logs: { update: updates.log, board: updates.boardLog } }, { disabled: Boolean(appSecret) });
+const GUARDED_WRITES = new Set(['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/recheck']);
 
 const state: BoardData = {
   capture,
-  codeUpdate: code.status,
   project: { title: config.title, url: null },
   repos: config.repos,
   refreshSeconds: config.refreshSeconds,
@@ -77,8 +67,6 @@ type Start = StartResult & { refused?: true };
 /** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
 const starts = new Map<string, Promise<Start>>();
 let runningStarts = 0;
-/** Set while the board waits for a new updater to take the lock. */
-let launchingUpdate = false;
 /** Status changes in flight by item id; Start and Abandon wait out a move, and a move waits out Abandon. */
 const moving = new Set<string>();
 /** Deletes in flight by item id, so a second press waits for the first. */
@@ -266,11 +254,6 @@ function send(res: ServerResponse, status: number, type: string, body: string | 
   res.end(body);
 }
 
-/** Reads the update's progress into the board data, so a page follows a running update. */
-function readUpdate(): void {
-  state.update = updatable ? readProgress(updates) : null;
-}
-
 /** Sends the board data as one server-sent event. */
 function sendBoard(res: ServerResponse): void {
   res.write(`data: ${JSON.stringify(state)}\n\n`);
@@ -278,7 +261,6 @@ function sendBoard(res: ServerResponse): void {
 
 /** Pushes the board data to every open page, after a read or a change made through the board. */
 function push(): void {
-  if (streams.size) readUpdate();
   for (const res of streams) sendBoard(res);
 }
 
@@ -438,9 +420,6 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
     choice = found;
   }
   let pending = starts.get(itemId);
-  if (!pending && updating()) {
-    return json(res, 409, { error: 'The board is updating and will restart. Press Start when the update finishes.', board: state });
-  }
   if (!pending) {
     const item = state.items.find((i) => i.id === itemId);
     if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
@@ -473,49 +452,6 @@ async function currentRepositoryProject(repo: string): Promise<RepositoryProject
   try { repos = loadConfig().repos; }
   catch (err) { return { error: `Can't read config.json: ${(err as Error).message}` }; }
   return repositoryProject(repo, repos);
-}
-
-function updating(): boolean {
-  return updatable && (launchingUpdate || lockHolder(updates) !== null);
-}
-
-/**
- * Starts scripts/update.ts in its own process group, so it outlives the board when
- * launchd restarts it, and waits until it holds the lock or reports why it can't.
- */
-function launchUpdater(): Promise<string | null> {
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', fileURLToPath(new URL('../scripts/update.ts', import.meta.url))], {
-      cwd: fileURLToPath(new URL('../', import.meta.url)), detached: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
-      env: { ...process.env, BOARD_PORT: String(port) },
-    });
-    let settled = false;
-    const settle = (error: string | null) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (child.connected) child.disconnect();
-      child.unref();
-      resolve(error);
-    };
-    const timer = setTimeout(() => settle(`The updater didn't start. See ${updates.log}.`), 10_000);
-    child.on('message', (message: { started?: boolean; busy?: string }) => settle(message.busy ?? null));
-    child.on('exit', () => settle(`The updater stopped before it started. See ${updates.log}.`));
-    child.on('error', (err) => settle(`The updater couldn't start: ${err.message}`));
-  });
-}
-
-async function updateBoard(res: ServerResponse): Promise<void> {
-  if (!updatable) return json(res, 403, { error: `Only the launch-agent board updates itself.${code.status ? ` Run ${code.status.command} instead.` : ''}` });
-  if (runningStarts) return json(res, 409, { error: 'A Start is running. Press Update when it finishes.', board: state });
-  if (updating()) return json(res, 409, { error: 'An update is already running. Wait for it to finish, then retry.', board: state });
-  launchingUpdate = true;
-  try {
-    const error = await launchUpdater();
-    state.update = readProgress(updates);
-    if (!error) log('update started');
-    json(res, error ? 409 : 202, { error, board: state });
-  } finally { launchingUpdate = false; }
 }
 
 const A_TYPE: Record<ContentType, string> = { Issue: 'an issue', PullRequest: 'a pull request', DraftIssue: 'a draft' };
@@ -573,8 +509,7 @@ async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<v
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-  if (!path.startsWith('/assets/')) readUpdate();
-  // The update health check must answer at once; everything else runs tools or shows what the lookup found.
+  // The health check must answer at once; everything else runs tools or shows what the lookup found.
   if (path !== '/healthz' && !path.startsWith('/assets/')) await firstToolCheck;
   if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
     return json(res, 403, { error: 'Submit from this board page.' });
@@ -586,7 +521,6 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (req.method === 'POST' && path === '/api/queue') return moveItem(req, res, QUEUE);
   if (req.method === 'POST' && path === '/api/back-to-list') return moveItem(req, res, BACK_TO_LIST);
   if (req.method === 'POST' && path === '/api/start') return startItem(req, res);
-  if (req.method === 'POST' && path === '/api/update') return updateBoard(res);
   if (req.method === 'POST' && path === '/api/abandon') return abandonItemRequest(req, res);
   if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
   if (req.method === 'POST' && path === '/api/recheck') return recheckRequest(req, res);
@@ -598,9 +532,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
   if (path === '/api/events') return openStream(req, res);
   if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(state));
-  if (path === '/healthz') return json(res, 200, {
-    runningRevision: code.status?.runningRevision ?? null, launchToken: process.env.BOARD_LAUNCH_TOKEN ?? null,
-  });
+  if (path === '/healthz') return json(res, 200, {});
   const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
   if (asset) return send(res, 200, asset.type, asset.body);
   send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
@@ -639,17 +571,14 @@ if (!fixture) firstToolCheck = recheckTools();
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with test/sample.json).
-void code.refresh();
 if (fixture) {
   Object.assign(state, JSON.parse(readFileSync(fixture, 'utf8')) as BoardData);
   state.repos = config.repos;
   state.capture = capture;
-  state.codeUpdate = code.status;
   offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
 }
 const timer = setInterval(() => {
-  void code.refresh();
   if (!fixture) void refresh();
 }, config.refreshSeconds * 1000);
 

@@ -1,6 +1,5 @@
-// The page's header: the logo, when the data was read, the counts, Add item, Update, the app's
-// Settings, and the banners for an update, a gh the board can't use, stale data and an
-// unreachable server, which closes.
+// The page's header: the logo, when the data was read, the counts, Add item, the app's Settings,
+// and the banners for a gh the board can't use, stale data and an unreachable server, which closes.
 
 import { countsOf, isStale } from '../model.ts';
 import type { BoardData } from '../model.ts';
@@ -13,7 +12,6 @@ import { ClosableBanner } from './ClosableBanner.tsx';
 import { CLIENT_ERROR } from './live-data.ts';
 import { Settings } from './Settings.tsx';
 import { GhBanner } from './ToolNotices.tsx';
-import { HeaderUpdateButton, UpdateBanners } from './Update.tsx';
 
 export function BrandMark() {
   return (
@@ -56,7 +54,7 @@ export function Header() {
         {/* In the Mac app the title bar shows the logo, so the heading stays for screen readers only. */}
         <h1 className={inMacApp() ? 'sr-only' : undefined}><BrandMark /><span>factory</span></h1>
         <Refreshed data={data} now={now} />
-        <span className="header-actions"><AddItem /><HeaderUpdateButton /><Settings /></span>
+        <span className="header-actions"><AddItem /><Settings /></span>
       </div>
       <ul className="totals" aria-label="Counts">
         <li className={counts.needsYou ? 'amber' : ''}><b>{counts.needsYou}</b> need you</li>
@@ -65,7 +63,6 @@ export function Header() {
         <li><b>{counts.list}</b> in List</li>
         <li><b>{counts.total}</b> items</li>
       </ul>
-      <UpdateBanners />
       {clientError && (
         <ClosableBanner dismissKey={CLIENT_ERROR} what=": can't reach the board server">
           <strong>Can't reach the board server.</strong> {clientError} Showing the last data this page received.

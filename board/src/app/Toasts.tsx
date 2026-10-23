@@ -67,8 +67,8 @@ function placeToasts(): void {
   document.documentElement.style.setProperty('--toast-top', `${Math.max(12, Math.round(bottom) + 8)}px`);
 }
 
-/** The page's toasts: `children` first, for toasts other parts of the page own, then the store's. */
-export function Toasts({ children }: { children?: ReactNode }) {
+/** The page's toasts, from the toast store. */
+export function Toasts() {
   const toasts = useToastStore((state) => state.toasts);
   const dismiss = useToastStore((state) => state.dismiss);
   // The header's height changes with its banners, so place them after every render too.
@@ -83,7 +83,6 @@ export function Toasts({ children }: { children?: ReactNode }) {
   }, []);
   return (
     <div className="toasts">
-      {children}
       {toasts.map((t: Toast) => (
         <ToastView key={t.key} what={t.what} failed={t.failed} focusAfter={t.focusAfter} onClose={() => dismiss(t.key)}>{t.body}</ToastView>
       ))}

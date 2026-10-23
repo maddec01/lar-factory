@@ -102,7 +102,6 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .banner { margin-top: 10px; border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent); background: var(--warning-surface); border-radius: var(--r); padding: 8px 12px; font-size: 13px; }
 .banner strong { color: var(--you-text); }
 .banner .err { white-space: pre-wrap; word-break: break-word; }
-.code-update code { overflow-wrap: anywhere; }
 
 /* tool notices */
 .banner code { overflow-wrap: anywhere; }
@@ -216,15 +215,6 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 
 /* Capture form: stays mounted while the board refreshes. */
 .header-actions { margin-left: auto; display: flex; gap: 8px; }
-.update-steps { display: flex; flex-wrap: wrap; gap: 2px 12px; list-style: none; padding: 0; margin: 6px 0 0; font-size: 12px; }
-.update-steps .finished::before { content: "✓ "; color: var(--build); }
-.update-steps .current { font-weight: 600; }
-.update-steps .current::after { content: "…"; }
-.update-steps .failed { color: var(--danger-text); font-weight: 600; }
-.update-steps .failed::before { content: "✕ "; }
-.update-log { margin: 6px 0 0; max-height: 14em; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.update-hint { margin: 6px 0 0; }
-.update-hint code { overflow-wrap: anywhere; }
 #add-item-dialog, #abandon-dialog, #settings-dialog { width: min(520px, calc(100% - 34px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); color: var(--fg); overflow: auto; margin: auto; }
 /* The Add item, Abandon and Settings dialogs are Base UI's: a fixed popup over a backdrop element, not a native <dialog>. */
 #add-item-dialog, #abandon-dialog, #settings-dialog { position: fixed; inset: 0; z-index: 50; height: fit-content; }

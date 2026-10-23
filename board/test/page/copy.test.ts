@@ -9,7 +9,7 @@ import { CopyButton, CopyStatus } from '../../src/app/CopyButton.tsx';
 async function mount(): Promise<HTMLButtonElement> {
   document.body.innerHTML = '<div id="root"></div>';
   await act(async () => createRoot($('#root')!).render(
-    createElement(Fragment, null, createElement(CopyButton, { text: 'bash update.sh', label: 'Copy board update command' }), createElement(CopyStatus)),
+    createElement(Fragment, null, createElement(CopyButton, { text: 'pnpm test', label: 'Copy test command' }), createElement(CopyStatus)),
   ));
   return $<HTMLButtonElement>('button')!;
 }
@@ -20,10 +20,10 @@ test('Copy copies its text, says Copied, and announces it in the copy-status liv
   const button = await mount();
   const status = $('#copy-status')!;
   expect([status.getAttribute('role'), status.getAttribute('aria-live'), status.className]).toEqual(['status', 'polite', 'sr-only']);
-  expect([button.textContent, button.className, button.getAttribute('aria-label')]).toEqual(['Copy', 'copy', 'Copy board update command']);
+  expect([button.textContent, button.className, button.getAttribute('aria-label')]).toEqual(['Copy', 'copy', 'Copy test command']);
 
   await settle(() => button.click());
-  expect(writeText).toHaveBeenCalledWith('bash update.sh');
+  expect(writeText).toHaveBeenCalledWith('pnpm test');
   expect(button.textContent).toBe('Copied');
   await settle(() => vi.advanceTimersByTime(50));
   expect(status.textContent).toBe('Copied');
@@ -51,7 +51,7 @@ test('without clipboard access, Copy falls back to a selected textarea', async (
   });
   const button = await mount();
   await settle(() => button.click());
-  expect(copied).toBe('bash update.sh');
+  expect(copied).toBe('pnpm test');
   expect($('textarea'), 'and removes it').toBeNull();
   expect(button.textContent).toBe('Copied');
 });

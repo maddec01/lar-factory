@@ -2,18 +2,11 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { nightlyDate, parseRemoteTags, planRelease, outputLines } = require('./release-plan.cjs');
 
-const REPO = 'maddec01/mux-factory';
 const HEAD = 'a'.repeat(40);
 
+// The latest CI run for HEAD on a push to main, as the Release workflow fetches it.
 function ciRun(overrides = {}) {
-    return {
-        conclusion: 'success',
-        event: 'push',
-        head_branch: 'main',
-        head_sha: HEAD,
-        head_repository: { full_name: REPO },
-        ...overrides,
-    };
+    return { status: 'completed', conclusion: 'success', ...overrides };
 }
 
 // A git where every commit is on main at app version 0.1.0, unless told otherwise.
@@ -24,11 +17,11 @@ function git({ versions = {}, offMain = [] } = {}) {
     };
 }
 
-function nightly(overrides = {}, tags = [], gitState) {
+function nightly(run = ciRun(), tags = [], gitState) {
     return planRelease({
-        eventName: 'workflow_run',
-        workflowRun: ciRun(overrides),
-        repository: REPO,
+        channel: 'nightly',
+        headSha: HEAD,
+        ciRun: run,
         runNumber: 57,
         date: '20261023',
         tags,
@@ -37,10 +30,10 @@ function nightly(overrides = {}, tags = [], gitState) {
 }
 
 function stable(tags, gitState) {
-    return planRelease({ eventName: 'workflow_dispatch', repository: REPO, runNumber: 60, date: '20261024', tags, ...git(gitState) });
+    return planRelease({ channel: 'stable', runNumber: 60, date: '20261024', tags, ...git(gitState) });
 }
 
-test('publishes a Nightly of the CI run head commit', () => {
+test('publishes a Nightly of main\'s head', () => {
     assert.deepEqual(nightly(), {
         publish: true,
         channel: 'nightly',
@@ -58,28 +51,26 @@ test('dates a Nightly by its UTC day', () => {
     assert.equal(nightlyDate(new Date('2026-01-02T00:00:00Z')), '20260102');
 });
 
-test('skips a CI run that is not a green push to main of this repository', () => {
-    const cases = [
-        [{ conclusion: 'failure' }, /conclusion is failure/],
-        [{ event: 'pull_request' }, /event is pull_request/],
-        [{ head_branch: 'feat/x' }, /branch is feat\/x/],
-        [{ head_repository: { full_name: 'someone/mux-factory' } }, /head repository is someone\/mux-factory/],
-    ];
-    for (const [overrides, reason] of cases) {
-        const plan = nightly(overrides);
-        assert.equal(plan.publish, false);
-        assert.match(plan.reason, reason);
+test('a Nightly fails when CI failed on the head', () => {
+    for (const conclusion of ['failure', 'cancelled', 'timed_out']) {
+        assert.throws(() => nightly(ciRun({ conclusion })), /^Error: CI failed on aaaaaaaaaaaa; fix main before a Nightly\.$/);
     }
 });
 
-test('skips a commit that already has a Nightly', () => {
-    const plan = nightly({}, [{ name: 'v0.1.0-nightly.20261023.56', sha: HEAD }]);
+test('a Nightly fails when CI has not finished on the head', () => {
+    for (const run of [null, ciRun({ status: 'in_progress', conclusion: null }), ciRun({ status: 'queued', conclusion: null })]) {
+        assert.throws(() => nightly(run), /^Error: CI has not finished on aaaaaaaaaaaa; try again when it has\.$/);
+    }
+});
+
+test('skips a head that already has a Nightly', () => {
+    const plan = nightly(ciRun(), [{ name: 'v0.1.0-nightly.20261023.56', sha: HEAD }]);
     assert.equal(plan.publish, false);
     assert.match(plan.reason, /already has Nightly v0\.1\.0-nightly\.20261023\.56/);
 });
 
 test('publishes a Nightly when only a Stable Release tag points at the commit', () => {
-    assert.equal(nightly({}, [{ name: 'v0.0.9', sha: HEAD }]).publish, true);
+    assert.equal(nightly(ciRun(), [{ name: 'v0.0.9', sha: HEAD }]).publish, true);
 });
 
 test('a Stable Release rebuilds the latest Nightly commit', () => {
@@ -103,7 +94,7 @@ test('a Stable Release rebuilds the latest Nightly commit', () => {
 
 test('a Stable Release fails when its tag exists', () => {
     const tags = [{ name: 'v0.1.0-nightly.20261023.57', sha: HEAD }, { name: 'v0.1.0', sha: HEAD }];
-    assert.throws(() => stable(tags), /v0\.1\.0 already exists.*bump "version" in the app package's package\.json and wait for its Nightly/);
+    assert.throws(() => stable(tags), /v0\.1\.0 already exists.*bump "version" in the app package's package\.json, merge it and start its Nightly/);
 });
 
 test('a Stable Release fails without a Nightly', () => {
@@ -111,7 +102,7 @@ test('a Stable Release fails without a Nightly', () => {
 });
 
 test('a Nightly takes the version of the commit it builds', () => {
-    assert.equal(nightly({}, [], { versions: { [HEAD]: '0.2.0' } }).version, '0.2.0-nightly.20261023.57');
+    assert.equal(nightly(ciRun(), [], { versions: { [HEAD]: '0.2.0' } }).version, '0.2.0-nightly.20261023.57');
 });
 
 test('a Stable Release takes the version of the Nightly commit it rebuilds', () => {
@@ -127,15 +118,15 @@ test('a Stable Release fails when the latest Nightly commit is not on main', () 
 });
 
 test('a Nightly fails when its commit is not on main', () => {
-    assert.throws(() => nightly({}, [], { offMain: [HEAD] }), /is not on main/);
+    assert.throws(() => nightly(ciRun(), [], { offMain: [HEAD] }), /is not on main/);
 });
 
-test('a skipped CI run reads nothing from git', () => {
+test('a head with a Nightly reads nothing from git', () => {
     const plan = planRelease({
-        eventName: 'workflow_run',
-        workflowRun: ciRun({ event: 'pull_request' }),
-        repository: REPO,
-        tags: [],
+        channel: 'nightly',
+        headSha: HEAD,
+        ciRun: ciRun(),
+        tags: [{ name: 'v0.1.0-nightly.20261023.56', sha: HEAD }],
         isOnMain: () => assert.fail('checked main'),
         versionAt: () => assert.fail('read the version'),
     });
@@ -143,11 +134,11 @@ test('a skipped CI run reads nothing from git', () => {
 });
 
 test('rejects a version that is not x.y.z', () => {
-    assert.throws(() => nightly({}, [], { versions: { [HEAD]: '0.1.0-beta' } }), /0\.1\.0-beta/);
+    assert.throws(() => nightly(ciRun(), [], { versions: { [HEAD]: '0.1.0-beta' } }), /0\.1\.0-beta/);
 });
 
-test('rejects other events', () => {
-    assert.throws(() => planRelease({ eventName: 'push', tags: [] }), /push/);
+test('rejects other channels', () => {
+    assert.throws(() => planRelease({ channel: 'preview', tags: [] }), /preview/);
 });
 
 test('reads tags and their commits from git ls-remote, peeling annotated tags', () => {
@@ -164,7 +155,7 @@ test('reads tags and their commits from git ls-remote, peeling annotated tags', 
 });
 
 test('writes the plan as GITHUB_OUTPUT lines', () => {
-    assert.equal(outputLines({ publish: false, reason: 'CI run event is pull_request' }), 'publish=false\nreason=CI run event is pull_request\n');
+    assert.equal(outputLines({ publish: false, reason: 'nothing to do' }), 'publish=false\nreason=nothing to do\n');
     assert.equal(
         outputLines(nightly()),
         [

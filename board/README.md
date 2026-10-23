@@ -2,8 +2,8 @@
 
 A local board for the Mux project. It reads the project through your `gh` login
 every 45 seconds (`config.json`) and serves it on the first free port from
-4317 to 4416, which it logs; `BOARD_PORT` pins the port. The launch-agent board
-runs on 4317. `BOARD_CONFIG_FILE`, an absolute path, makes it read that file in
+4317 to 4416, which it logs; `BOARD_PORT` pins the port. The board app's board
+usually gets 4317. `BOARD_CONFIG_FILE`, an absolute path, makes it read that file in
 place of the checkout's `config.json`; the board app sets it to its own copy.
 `BOARD_APP_SECRET`, which the board app sets on each launch, makes every write
 except `/api/read` answer 403 unless the request carries it in `X-Board-Secret`. Open it in a browser or in T3's browser preview.
@@ -88,33 +88,12 @@ If `gh` can't reach GitHub for another reason, the board keeps the last data it
 read and shows a stale warning. `pnpm run sample` serves `test/sample.json` instead of GitHub;
 adding, queuing and starting are disabled in sample mode.
 
-To start it at login, run `board/scripts/install-launch-agent.sh` from the main
-checkout. It's safe to rerun and logs to `~/Library/Logs/mux-board.log`;
-`board/scripts/uninstall-launch-agent.sh` removes it.
-
-The launch-agent board has an **Update** button in its header. It runs the
-updater for the checkout the board was started from, apart from the board so it
-survives the restart, and the page shows each step as it finishes, reloads onto
-the new revision, or names the failed step with the end of its log. Update is
-refused while a Start or another update runs, and Start waits for an update.
-From a terminal, run from the main factory checkout:
-
-```sh
-bash board/scripts/update.sh
-```
-
-See the [factory update instructions](../README.md#update) for requirements,
-refused histories, partial failures and extra Claude profiles. The updater
-refreshes the launch-agent configuration and confirms the new process is
-serving the expected revision before installing skills. It is safe to rerun.
-
-The board checks remote `main` every refresh cycle and shows **Board update
-available** when it contains commits absent from this process: with the Update
-button on the launch-agent board, and with a copyable command on dev and sample
-runs, which can't update themselves. Pulling the checkout does not clear the notice: restart the board to
-run that revision. A running process keeps the built page it started with,
-so a new browser load still works after checkout changes or a rebuild. Failed revision
-checks show their own warning, separate from stale GitHub project data.
+To use the board every day, install the board app from
+[GitHub Releases](https://github.com/maddec01/mux-factory/releases) (see the
+[factory install instructions](../README.md#install)). `pnpm start`, `pnpm run dev`
+and `pnpm run sample` are for developing the board. A running process keeps the built
+page it started with, so a new browser load still works after checkout changes or a
+rebuild.
 
 `pnpm test` runs the server tests with Node's test runner, then the page tests in
 `test/page/` with Vitest in a DOM. That DOM, jsdom, needs Node 22.22.2+, 24.15+ or 26+;

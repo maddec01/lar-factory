@@ -55,9 +55,9 @@ and copied files follow their own rules.
    <name> as a copy` or `chore(skills): drop <name>` for add and drop), push,
    and open a PR listing what was taken, skipped, added and dropped. Pedro
    merges it.
-7. Tell him to pull `main` after merging and run `bash scripts/install.sh`. It
-   updates the skills and the checklists in `references/`, and installs an added
-   copy with no script edit, since it reads its skill list from `UPSTREAM.md`.
+7. Tell him to start a Release after merging and install it. The board app's
+   first launch of the new version updates the skills and the checklists in
+   `references/`, and installs an added copy with no further edit.
 
 Never edit a copy for Mux reasons. Mux rules belong in `mux-work` or a repo's
 `AGENTS.md`.

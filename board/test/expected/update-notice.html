@@ -291,7 +291,18 @@ p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px
 .started-tag.unsure { background: var(--you-soft); color: var(--you-text); }
 .start-item { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); padding: 0 10px; }
 .start-item:hover { background: color-mix(in srgb, var(--primary) 90%, var(--bg)); }
-.start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
+.start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; position: relative; }
+/* Start's menu: under Start (over it when only above has room), lined up with its right edge, grouped by provider instance. */
+.start-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 50; min-width: 210px; max-height: 60vh; overflow-y: auto; padding: 4px; background: var(--surface); border: 1px solid var(--bd); border-radius: var(--r); box-shadow: var(--shadow), 0 1px 3px rgb(0 0 0 / 8%); font-size: 12px; }
+.start-menu.up { top: auto; bottom: calc(100% + 4px); }
+.start-menu ul { list-style: none; margin: 0; padding: 0; }
+.start-menu-head, .start-menu-group { margin: 6px 8px 2px; color: var(--muted); font-size: 11px; font-weight: 500; }
+.start-pick { width: 100%; min-height: 24px; text-align: left; font: inherit; border: 0; background: none; color: var(--fg); padding: 4px 8px; border-radius: var(--r-sm); cursor: pointer; }
+.start-pick::before { content: ""; display: inline-block; width: 1.25em; }
+.start-pick[aria-checked="true"] { background: color-mix(in srgb, var(--primary) 10%, transparent); font-weight: 500; }
+.start-pick[aria-checked="true"]::before { content: "\2713" / ""; }
+.start-pick:hover, .start-pick:focus-visible { background: var(--accent); }
+.start-pick[aria-disabled="true"] { cursor: not-allowed; }
 /* A Queued card's quiet footer row: Back to List on the left, Abandon on the right. */
 /* margin-top: auto keeps the row on the card's bottom edge across a row of cards; the 8px above it moves to the item before. */
 .card > :has(+ .card-actions) { margin-bottom: 8px; }
@@ -462,12 +473,12 @@ a.o-title:hover { text-decoration: underline; }
 <section class="section" id="queued" aria-labelledby="queued-h">
 <h2 id="queued-h" tabindex="-1">Queued <span class="count">3</span> <span class="note">Start opens a mux-work thread in T3 Code</span></h2>
 <div class="cards"><article class="card" data-anchor="PVTI_sample05">
-<div class="meta"><span class="badges"><span class="plat plat-server">Server</span><span class="kind kind-improvement">improvement</span><span class="blocked" title="Blocked by 1 issue">blocked by 1</span></span><span class="start-group"><button type="button" class="copy start-item" data-start="PVTI_sample05" aria-label="Start #129 Run more than one 4K HDR to 1080p stream at a time">Start</button></span></div>
+<div class="meta"><span class="badges"><span class="plat plat-server">Server</span><span class="kind kind-improvement">improvement</span><span class="blocked" title="Blocked by 1 issue">blocked by 1</span></span><span class="start-group"><button type="button" class="copy start-item" data-start="PVTI_sample05" aria-label="Start #129 Run more than one 4K HDR to 1080p stream at a time" aria-haspopup="menu" aria-expanded="false">Start ▾</button></span></div>
 <a class="title" href="https://github.com/maddec01/mux-server/issues/129" target="_blank" rel="noopener"><span class="ref">#129</span> Run more than one 4K HDR to 1080p stream at a time</a>
 <div class="bars"><ol class="segbar steps" aria-hidden="true"><li class="past" title="List"></li><li class="cur now" title="Queued"></li><li class="next" title="Shaping"></li><li class="next" title="Needs you"></li><li class="next" title="Ready"></li><li class="next" title="In progress"></li><li class="next" title="Review"></li><li class="next" title="Verify"></li><li class="next" title="Ready to merge"></li><li class="next" title="Done"></li></ol><span class="bar-label step-label now">2/10 · Queued</span></div><div class="card-actions"><button type="button" class="link-action" data-back-to-list="PVTI_sample05" aria-label="Back to List #129 Run more than one 4K HDR to 1080p stream at a time">← Back to List</button><button type="button" class="link-action danger" data-abandon="PVTI_sample05" aria-label="Abandon #129 Run more than one 4K HDR to 1080p stream at a time">Abandon</button></div>
 </article>
 <article class="card" data-anchor="PVTI_sample06">
-<div class="meta"><span class="badges"><span class="plat plat-apple">Apple</span><span class="kind kind-bug">bug</span></span><span class="start-group"><button type="button" class="copy start-item" data-start="PVTI_sample06" aria-label="Start #20 Player controls stay visible after scrubbing &lt;on tvOS&gt;">Start</button></span></div>
+<div class="meta"><span class="badges"><span class="plat plat-apple">Apple</span><span class="kind kind-bug">bug</span></span><span class="start-group"><button type="button" class="copy start-item" data-start="PVTI_sample06" aria-label="Start #20 Player controls stay visible after scrubbing &lt;on tvOS&gt;" aria-haspopup="menu" aria-expanded="false">Start ▾</button></span></div>
 <a class="title" href="https://github.com/maddec01/mux-apple/issues/20" target="_blank" rel="noopener"><span class="ref">#20</span> Player controls stay visible after scrubbing &lt;on tvOS&gt;</a>
 <div class="bars"><ol class="segbar steps" aria-hidden="true"><li class="past" title="List"></li><li class="cur now" title="Queued"></li><li class="next" title="Shaping"></li><li class="next" title="Needs you"></li><li class="next" title="Ready"></li><li class="next" title="In progress"></li><li class="next" title="Review"></li><li class="next" title="Verify"></li><li class="next" title="Ready to merge"></li><li class="next" title="Done"></li></ol><span class="bar-label step-label now">2/10 · Queued</span></div><div class="card-actions"><button type="button" class="link-action" data-back-to-list="PVTI_sample06" aria-label="Back to List #20 Player controls stay visible after scrubbing &lt;on tvOS&gt;">← Back to List</button><button type="button" class="link-action danger" data-abandon="PVTI_sample06" aria-label="Abandon #20 Player controls stay visible after scrubbing &lt;on tvOS&gt;">Abandon</button></div>
 </article>

@@ -4,10 +4,11 @@
 import { DEFAULT_UI, abandonPrompt, listGroupId, renderApp } from './render.ts';
 import type { ItemAction, Notice, UiState, UpdateView, View } from './render.ts';
 import { platformOf } from './model.ts';
-import type { BoardData, Status } from './model.ts';
+import type { BoardData, ModelChoice, Status } from './model.ts';
 import { validateDraft } from './add-item.ts';
 import { anchorKeys, survivingAnchor } from './anchor.ts';
 import { NO_POPOVER, nextPopover, openPopover } from './slice-popover.ts';
+import { choiceOf, menuMove, startRequest } from './start-menu.ts';
 import type { PopoverEvent } from './slice-popover.ts';
 import type { CreationResult, ItemDraft } from './add-item.ts';
 import type { StartResult } from './t3.ts';
@@ -36,6 +37,8 @@ const dismissed = new Set<string>();
 const expiring = new Set<string>();
 const actions: Record<string, ItemAction> = {};
 let mutationVersion = 0;
+/** Whether Start's menu opens above Start; chosen once, on opening, so a re-render doesn't flip it. */
+let startMenuUp = false;
 let pollSequence = 0;
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 let updateView: UpdateView | null = null;
@@ -53,6 +56,9 @@ function render(): void {
   const { scrollX, scrollY } = window;
   const anchor = captureAnchor();
   app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions, updateView, dismissed });
+  // A Start that went away, such as one another page started, takes its menu with it.
+  if (ui.startMenuOpen && !app.querySelector(`[data-start="${CSS.escape(ui.startMenuOpen)}"][aria-expanded="true"]`)) ui.startMenuOpen = undefined;
+  app.querySelector('.start-menu')?.classList.toggle('up', startMenuUp);
   tagFocusable();
   window.scrollTo(scrollX, scrollY);
   restoreAnchor(anchor);
@@ -153,7 +159,7 @@ function startToastClocks(): void {
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-dismiss],[data-view-item],.slices-trigger,.slices-pop a,details[id] > summary,section > h2').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-start-pick],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-dismiss],[data-view-item],.slices-trigger,.slices-pop a,details[id] > summary,section > h2').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
@@ -162,6 +168,7 @@ function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.queue) return `queue-${el.dataset.queue}`;
   if (el.dataset.backToList) return `back-${el.dataset.backToList}`;
   if (el.dataset.start) return `start-${el.dataset.start}`;
+  if (el.dataset.startPick) return `pick-${el.dataset.startPick}-${el.dataset.instanceId ?? ''}/${el.dataset.model ?? ''}`;
   if (el.dataset.startResult) return `result-${el.dataset.startResult}`;
   if (el.hasAttribute('data-update')) return 'update';
   if (el.dataset.dismiss) return `dismiss-${el.dataset.dismiss}`;
@@ -479,11 +486,11 @@ async function startUpdate(): Promise<void> {
   schedulePoll();
 }
 
-async function startItem(itemId: string): Promise<void> {
+async function startItem(itemId: string, choice?: ModelChoice): Promise<void> {
   if (actions[itemId]?.phase === 'pending') return;
   actions[itemId] = { phase: 'pending' };
   render();
-  const result = await postAction<StartResult & { error: string | null }>('/api/start', { session: data.capture?.session, itemId });
+  const result = await postAction<StartResult & { error: string | null }>('/api/start', startRequest(data.capture?.session, itemId, choice));
   actions[itemId] = result.thread ? { phase: 'started', thread: result.thread }
     : { phase: result.uncertain ? 'uncertain' : 'error', message: result.error ?? 'The thread did not start.' };
   const item = data.items.find((i) => i.id === itemId);
@@ -494,6 +501,64 @@ async function startItem(itemId: string): Promise<void> {
     app.querySelector<HTMLElement>(`[data-start-result="${CSS.escape(itemId)}"]`)?.focus({ preventScroll: true });
   }
 }
+
+// Start's menu (menu button pattern): Start opens it on the highlighted entry, arrow keys move,
+// Enter or a click picks and starts, and Escape or a click outside closes it and returns focus to Start.
+// Kept in `ui`, like the slice popover, so a re-render keeps it open.
+function toggleStartMenu(button: HTMLElement): void {
+  const itemId = button.dataset.start!;
+  if (button.getAttribute('aria-disabled') === 'true') return;
+  if (ui.startMenuOpen === itemId) return closeStartMenu(true);
+  ui.startMenuOpen = itemId;
+  startMenuUp = false;
+  render();
+  const start = app.querySelector<HTMLElement>(`[data-start="${CSS.escape(itemId)}"]`);
+  const menu = app.querySelector<HTMLElement>('.start-menu');
+  startMenuUp = Boolean(start && menu) && opensUp(start!.getBoundingClientRect(), menu!.offsetHeight);
+  menu?.classList.toggle('up', startMenuUp);
+  app.querySelector<HTMLElement>('.start-menu [aria-checked="true"]')?.focus();
+}
+
+/** Whether the menu opens above Start: it doesn't fit below, and above has more room. */
+function opensUp(start: DOMRect, menuHeight: number): boolean {
+  const below = window.innerHeight - start.bottom;
+  return menuHeight > below && start.top > below;
+}
+
+/** Closes the open menu; `refocus` returns focus to its Start. */
+function closeStartMenu(refocus: boolean): void {
+  const itemId = ui.startMenuOpen;
+  if (!itemId) return;
+  ui.startMenuOpen = undefined;
+  render();
+  if (refocus) focusByKey(`start-${itemId}`);
+}
+
+function pickStart(entry: HTMLElement): void {
+  if (entry.getAttribute('aria-disabled') === 'true') return;
+  ui.startMenuOpen = undefined;
+  focusByKey(`start-${entry.dataset.startPick}`);
+  void startItem(entry.dataset.startPick!, choiceOf(entry.dataset));
+}
+
+app.addEventListener('keydown', (event) => {
+  const entry = (event.target as HTMLElement).closest<HTMLElement>('[data-start-pick]');
+  if (!entry) return;
+  if (event.key === 'Tab') return closeStartMenu(true); // focus then moves on from Start
+  const entries = [...app.querySelectorAll<HTMLElement>('.start-menu [data-start-pick]')];
+  const next = menuMove(event.key, entries.indexOf(entry), entries.length);
+  if (next === null) return;
+  event.preventDefault();
+  entries[next]?.focus();
+});
+document.addEventListener('pointerdown', (event) => {
+  const itemId = ui.startMenuOpen;
+  if (!itemId || (event.target as Element).closest('.start-group')) return;
+  const hadFocus = Boolean(app.querySelector('.start-menu')?.contains(document.activeElement));
+  closeStartMenu(false);
+  // After the press has moved focus: a control it landed on keeps it; otherwise Start takes it back.
+  if (hadFocus) setTimeout(() => document.activeElement === document.body && focusByKey(`start-${itemId}`));
+});
 
 const abandonDialog = document.getElementById('abandon-dialog') as HTMLDialogElement;
 const abandonConfirm = abandonDialog.querySelector<HTMLButtonElement>('[data-abandon-confirm]')!;
@@ -546,7 +611,7 @@ async function abandonItem(itemId: string): Promise<void> {
 }
 
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-abandon],[data-add-item],[data-update],[data-outline-jump],[data-dismiss],[data-view-item]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-start-pick],[data-abandon],[data-add-item],[data-update],[data-outline-jump],[data-dismiss],[data-view-item]');
   if (!target) return;
   if (target.dataset.outlineJump) {
     // An in-page link: keep it out of the hash, which picks the view.
@@ -562,7 +627,8 @@ app.addEventListener('click', (event) => {
   else if (target.dataset.copy) void copy(target.dataset.copy, target as HTMLButtonElement);
   else if (target.dataset.queue) void queueItem(target);
   else if (target.dataset.backToList) void backToList(target);
-  else if (target.dataset.start) void startItem(target.dataset.start);
+  else if (target.dataset.start) toggleStartMenu(target);
+  else if (target.dataset.startPick) pickStart(target);
   else if (target.hasAttribute('data-update')) void startUpdate();
   else if (target.dataset.abandon) askAbandon(target.dataset.abandon);
 });
@@ -631,6 +697,10 @@ app.addEventListener('click', (event) => {
 // Escape anywhere closes it, such as one pinned by a click while focus is elsewhere, but not
 // while a dialog has the key; focus returns to the trigger only when it was in the popover.
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && ui.startMenuOpen && !(event.target as Element).closest('dialog')) {
+    event.preventDefault();
+    return closeStartMenu(true);
+  }
   const open = openPopover(popover);
   if (event.key !== 'Escape' || !open || (event.target as Element).closest('dialog')) return;
   event.preventDefault();

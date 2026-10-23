@@ -18,7 +18,10 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
   project, the T3 project whose folder is the repository's `path` in
   `config.json`, whose first message is the issue's work message: `#n title`, then `$mux-work owner/repo#n`. T3 titles the
   thread from line 1 and runs mux-work, which shapes or builds the issue and
-  sets its Status. A toast shows the thread's id, and its title when T3 chose
+  sets its Status. Start ▾ opens a menu of model choices: "T3 default" (the
+  project's default model), then each enabled T3 provider instance with its
+  models; picking one starts the thread on it, and Escape or a click outside
+  closes the menu without starting anything. A toast shows the thread's id, and its title when T3 chose
   one other than line 1; every board page marks the card Started. While the
   board runs, a double press, a retry or another tab starts no second thread.
   A queued draft needs an issue first. Before starting, Start checks that the

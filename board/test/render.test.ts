@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI, abandonPrompt, formatTokens, formatUsd, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
-import type { BoardData, Item } from '../src/model.ts';
+import type { BoardData, Item, ModelGroup } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
 import type { RawItem } from '../src/github.ts';
 
@@ -473,7 +473,7 @@ test('a Queued issue shows Start with no copy icon and no command box under the 
   assert.ok(!card.includes('class="cmd"'), 'no command box under the card');
   assert.ok(!card.includes('data-copy') && !card.includes('<svg'), 'no copy icon');
   const meta = card.match(/<div class="meta">.*?<\/div>/s)![0];
-  assert.match(meta, /<span class="start-group"><button type="button" class="copy start-item"[^>]*>Start<\/button><\/span>/, 'Start alone in the top-right group');
+  assert.match(meta, /<span class="start-group"><button type="button" class="copy start-item"[^>]*>Start \u25be<\/button><\/span>/, 'Start alone in the top-right group');
   const started = renderBoardView(sample, { ...base, actions: { PVTI_sample05: { phase: 'started', thread: { threadId: 't', title: 'x' } } } })
     .split('<article')
     .find((c) => c.includes('data-start-result="PVTI_sample05"'))!;
@@ -507,14 +507,14 @@ test('Back to List, Abandon and Start each show only their own pending state', (
   const card = (action: ItemAction) => cardOf(renderBoardView(sample, { ...base, actions: { PVTI_sample05: action } }), 'PVTI_sample05');
   const moving = card({ phase: 'pending', kind: 'back-to-list' });
   assert.match(moving, /data-back-to-list="PVTI_sample05" aria-label="Moving #129 [^"]*" aria-disabled="true">\u2190 Moving to List…<\/button>/);
-  assert.match(moving, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'Start is not relabelled');
+  assert.match(moving, /data-start="PVTI_sample05"[^>]*>Start \u25be<\/button>/, 'Start is not relabelled');
   assert.match(card({ phase: 'pending' }), />Starting…<\/button>/);
   const abandoning = card({ phase: 'pending', kind: 'abandon' });
   assert.match(abandoning, /data-back-to-list="PVTI_sample05" aria-label="Back to List #129 [^"]*" aria-disabled="true">\u2190 Back to List<\/button><button[^>]*data-abandon="PVTI_sample05" aria-label="Abandoning… #129 [^"]*" aria-disabled="true">Abandoning…<\/button>/);
-  assert.match(abandoning, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'Start is not relabelled');
+  assert.match(abandoning, /data-start="PVTI_sample05"[^>]*>Start \u25be<\/button>/, 'Start is not relabelled');
   assert.match(moving, /data-abandon="PVTI_sample05"[^>]*>Abandon<\/button>/, 'Abandon is not relabelled by Back to List');
   const otherError = card({ phase: 'error', kind: 'abandon', message: 'Could not delete #129.' });
-  assert.match(otherError, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'another action\'s error is not a Start error');
+  assert.match(otherError, /data-start="PVTI_sample05"[^>]*>Start \u25be<\/button>/, 'another action\'s error is not a Start error');
   assert.ok(!otherError.includes('<p class="start">') && !otherError.includes('action-error'), 'a card shows no inline error');
 });
 
@@ -540,6 +540,41 @@ test('a failed card action shows as a toast naming the item, which stays until c
   assert.match(abandon, /<div class="banner toast" role="alert"><button[^>]*data-dismiss="notice-4"[^>]*>&#215;<\/button>Couldn't abandon <a[^>]*>.*<\/a>\. Could not delete #129\.<\/div>/);
 });
 
+const MODEL_CHOICES: ModelGroup[] = [
+  { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
+  { instanceId: 'claudeAgent', name: 'VI <work>', models: [{ slug: 'claude-opus-5-5', label: 'Opus 5.5' }, { slug: 'claude-opus-5-5[1m]', label: 'claude-opus-5-5[1m]' }] },
+];
+
+test("a Queued card's Start opens a menu: 'T3 default' first, then each provider instance with its models", () => {
+  const data = { ...sample, modelChoices: MODEL_CHOICES };
+  const cardOf = (html: string, id: string) => html.split('<article').find((c) => c.includes(`data-start="${id}"`))!;
+  const closed = cardOf(renderBoardView(data, base), 'PVTI_sample05');
+  assert.match(closed, /<button type="button" class="copy start-item" data-start="PVTI_sample05" aria-label="Start [^"]*" aria-haspopup="menu" aria-expanded="false">Start \u25be<\/button>/);
+  assert.ok(!closed.includes('role="menu"'));
+  const html = renderBoardView(data, { ...base, ui: { ...DEFAULT_UI, startMenuOpen: 'PVTI_sample05' } });
+  const open = cardOf(html, 'PVTI_sample05');
+  assert.match(open, /data-start="PVTI_sample05"[^>]*aria-expanded="true"/);
+  const menu = open.match(/<div class="start-menu" role="menu"[^>]*>.*?<\/div>/s)![0];
+  const entries = [...menu.matchAll(/<button type="button" role="menuitemradio" aria-checked="(true|false)"[^>]*data-start-pick="PVTI_sample05"([^>]*)>([^<]*)</g)]
+    .map(([, checked, attrs, label]) => [label, checked, attrs!.trim()]);
+  assert.deepEqual(entries, [
+    ['T3 default', 'true', ''],
+    ['GPT-5.5', 'false', 'data-instance-id="codex" data-model="gpt-5.5"'],
+    ['Opus 5.5', 'false', 'data-instance-id="claudeAgent" data-model="claude-opus-5-5"'],
+    ['claude-opus-5-5[1m]', 'false', 'data-instance-id="claudeAgent" data-model="claude-opus-5-5[1m]"'],
+  ], '"T3 default" is the highlighted entry');
+  assert.deepEqual([...menu.matchAll(/<ul role="group" aria-label="([^"]*)"/g)].map((m) => m[1]), ['Codex', 'VI &lt;work&gt;'], 'grouped by instance, by its name');
+  assert.ok(!cardOf(html, 'PVTI_sample06').includes('role="menu"'), 'only the card whose menu is open shows it');
+  assert.equal(renderBoardView(data, { ...base, ui: { ...DEFAULT_UI, startMenuOpen: 'PVTI_sample05' }, actions: { PVTI_sample05: { phase: 'pending' } } }).includes('role="menu"'), false,
+    'no menu while a start is in flight');
+});
+
+test('without model choices, the menu offers only "T3 default"', () => {
+  const html = renderBoardView(sample, { ...base, ui: { ...DEFAULT_UI, startMenuOpen: 'PVTI_sample05' } });
+  assert.deepEqual([...html.matchAll(/data-start-pick="[^"]*"[^>]*>([^<]*)</g)].map((m) => m[1]), ['T3 default']);
+  assert.ok(!html.includes('role="group"'));
+});
+
 test('Start shows its progress, the started thread, or the error', () => {
   const [a, b, c, d] = ['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample05', 'PVTI_sample06'];
   const card = (actions: Record<string, ItemAction>, id: string) =>
@@ -556,7 +591,7 @@ test('Start shows its progress, the started thread, or the error', () => {
   assert.match(renderHeader(sample, { ...base, notice: { key: 'notice-3', verb: 'Started', item, thread: { ...thread, title: 'Renamed' } } }),
     /Started T3 thread <b>Renamed<\/b> <code class="thread-id">thread-1<\/code>/, 'a title T3 chose differently is shown');
   const failed = card({ [c]: { phase: 'error', message: 'T3 is down.' } }, c);
-  assert.match(failed, /<div class="meta">.*<button[^>]*data-start[^>]*>Retry start<\/button><\/span><\/div>/s, 'Start sits in the top row');
+  assert.match(failed, /<div class="meta">.*<button[^>]*data-start[^>]*>Retry start \u25be<\/button><\/span><\/div>/s, 'Start sits in the top row');
   assert.match(failed, /role="alert">T3 is down.<\/span> <button[^>]*data-dismiss="action:PVTI_sample05"/);
   const unsure = card({ [d]: { phase: 'uncertain', message: 'Check T3.' } }, d);
   assert.match(unsure, /role="alert">Check T3.<\/span> <button[^>]*data-dismiss="action:PVTI_sample06"/);
@@ -577,9 +612,14 @@ test('a thread another page started shows on every page, and sample mode disable
   assert.match(started, /data-start-result="PVTI_sample05" title="T3 thread thread-9">Started</);
   assert.ok(!started.includes('data-start="PVTI_sample05"'));
   const off = renderBoardView({ ...sample, capture: { session: 's', enabled: false } }, base);
-  const writes = [...off.matchAll(/<button[^>]*data-(?:queue|start|abandon)="[^"]*"[^>]*>/g)];
+  const writes = [...off.matchAll(/<button[^>]*data-(?:queue|abandon)="[^"]*"[^>]*>/g)];
   assert.ok(writes.some((m) => m[0].includes('data-abandon')));
   assert.ok(writes.every((m) => m[0].includes(' disabled')));
+  // Start still opens its menu, so sample mode shows the model choices; no entry in it starts anything.
+  const menu = renderBoardView({ ...sample, capture: { session: 's', enabled: false }, modelChoices: MODEL_CHOICES }, { ...base, ui: { ...DEFAULT_UI, startMenuOpen: 'PVTI_sample05' } });
+  const picks = [...menu.matchAll(/<button[^>]*data-start-pick="[^"]*"[^>]*>/g)];
+  assert.ok(picks.length > 1);
+  assert.ok(picks.every((m) => m[0].includes('aria-disabled="true"') && m[0].includes('title="Disabled in sample mode"')));
 });
 
 test("a linked PR shows its checks: running with counts and age, amber when slow, passed, failed, or nothing", () => {

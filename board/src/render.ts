@@ -53,7 +53,8 @@ export interface RenderOptions {
 export type Notice = { key: string } & (
   | { verb: 'Added' | 'Moved'; item: Item; to: Status }
   | { verb: 'Abandoned'; item: Item }
-  | { verb: 'Failed'; item: Item; to: Status; message: string }
+  /** A Queued card's Back to List (`to`) or Abandon (no `to`) failed. */
+  | { verb: 'Failed'; item: Item; to?: Status; message: string }
   | { verb: 'Started'; item: Item; thread: StartedThread }
 );
 
@@ -398,10 +399,11 @@ function queueButton(item: Item, data: BoardData, action: ItemAction | undefined
   return `<button type="button" class="copy row-action" data-queue="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
 }
 
-function abandonButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
+/** Abandon styled as a List row's button, or as a Queued card footer's link. */
+function abandonButton(item: Item, data: BoardData, action: ItemAction | undefined, cls = 'copy row-action abandon'): string {
   if (!canAbandon(item)) return '';
   const verb = action?.phase === 'pending' && action.kind === 'abandon' ? 'Abandoning…' : 'Abandon';
-  return `<button type="button" class="copy row-action abandon" data-abandon="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
+  return `<button type="button" class="${cls}" data-abandon="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
 }
 
 /** The muted link-style button in a Queued card's footer row that moves it back to List. */
@@ -486,7 +488,7 @@ function noticeToast(notice: Notice): string {
     case 'Abandoned':
       return toast(key, `${notice.verb} ${ref(item)}`, esc(abandonPrompt(item).done));
     case 'Failed':
-      return toast(key, `error for ${ref(item)}`, `Couldn't move ${titleLink(item)} to ${esc(notice.to)}. ${esc(notice.message)}`, true);
+      return toast(key, `error for ${ref(item)}`, `Couldn't ${notice.to ? `move ${titleLink(item)} to ${esc(notice.to)}` : `abandon ${titleLink(item)}`}. ${esc(notice.message)}`, true);
     case 'Started': {
       // T3 titles a thread after line 1 of the work message; don't repeat the issue.
       const title = notice.thread.title === workTitle(item) ? '' : ` <b>${esc(notice.thread.title)}</b>`;
@@ -647,7 +649,7 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
 
   // Issues and drafts get a footer row; nothing queues a pull request, so it gets none.
   const footer = (i: Item) =>
-    i.type === 'PullRequest' ? '' : `<div class="card-actions">${backToListButton(i, data, opts.actions?.[i.id])}</div>`;
+    i.type === 'PullRequest' ? '' : `<div class="card-actions">${backToListButton(i, data, opts.actions?.[i.id])}${abandonButton(i, data, opts.actions?.[i.id], 'link-action danger')}</div>`;
   const queuedExtra = (i: Item) =>
     (workMessage(i)
       ? startControl(i, data, opts.actions?.[i.id]).message

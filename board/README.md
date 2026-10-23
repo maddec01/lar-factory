@@ -29,7 +29,9 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
   or changes T3 projects, and it refuses when it can't read T3's database.
 - **Back to List**, in the footer row of a Queued issue or draft card, is the
   reverse of Queue: it sets the item's Status back to List, and the board moves
-  the card there at once. Queued pull requests get no footer row.
+  the card there at once. **Abandon**, on the right of the same row, works as
+  it does on List rows: after the same prompt it deletes the issue for good or
+  removes the draft. Queued pull requests get no footer row.
 - **Flow** is an outline of how items relate: sub-issues sit under their
   parent, and each issue lists the issues it is blocked by and the ones it
   blocks, as GitHub records them. A link to an item on the Board jumps to it;

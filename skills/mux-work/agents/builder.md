@@ -99,7 +99,7 @@ comment and relaunch with
 The handoff names the step and review round to resume at; at a review round,
 each reviewer's verdict, open findings, and rejected findings with reasons. Otherwise finish in place.
 
-Work in another repository (a planner or implementer `needs <owner/repo>`, a
+Work in another repository (a subagent's `needs <owner/repo>`, a
 failed check or a failed Verify) becomes a build there, and this build carries
 on. Write its short brief per **3. Brief** in `<mux-work>/SKILL.md`, with that
 repository's Domain docs only, as a sub-issue of this build that blocks it

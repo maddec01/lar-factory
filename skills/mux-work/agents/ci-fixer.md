@@ -20,6 +20,7 @@ scan-and-rewrite pass. Code is out of scope.
 2. Sort it:
    - **Conventional commits fails on the PR title**: run
      `gh pr edit <pr> --title "<type(scope): description>"`. No push.
+     Cite other-repo work per `../cross-repo-citations.md`.
    - **Infrastructure**: a runner offline or never picking the job up, network
      or registry errors, or a cancelled run with no newer run for the same
      head commit (`gh run list --commit <sha>`). A run cancelled because a

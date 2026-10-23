@@ -18,7 +18,8 @@ changes and `writing-for-agents` when the slice edits skills, `AGENTS.md` or
 with a conventional message (`AGENTS.md` lists types and scopes), never a
 fixup or `--no-verify`. Run the checks `AGENTS.md` names for the layers changed, then rebase
 onto the build branch tip. Work another repository needs is never a commit
-here: report it as `needs <owner/repo>: <the work>`.
+here: report it as `needs <owner/repo>: <the work>`. Cite other-repo work
+per `../cross-repo-citations.md`.
 
 Report your absolute worktree path and slice branch, or that the slice is
 blocked (too big, checks won't pass) and why, with your worktree path.

@@ -1,12 +1,13 @@
-// An Add item submission: its phase, the attempt it sends to /api/items, and what the dialog says
-// about it. A retry resends the same attempt, so the server finishes one issue rather than making two.
+// The Add item dialog: whether it's open, the submission's phase, the attempt it sends to /api/items,
+// and what the dialog says about it. A retry resends the same attempt, so the server finishes one
+// issue rather than making two. A created item closes the dialog and shows the Added toast.
 
 import { create } from 'zustand';
 import { validateDraft } from '../add-item.ts';
 import type { CreationResult, ItemDraft } from '../add-item.ts';
-import { ref } from '../model.ts';
 import type { BoardData } from '../model.ts';
 import { useBoardStore } from './board-store.ts';
+import { notify } from './notices.tsx';
 
 interface Attempt { requestId: string; session: string | undefined; draft: ItemDraft }
 
@@ -17,6 +18,9 @@ export type Submission =
 export interface ResultMessage { text: string; url?: string; label?: string }
 
 interface AddItemState {
+  open: boolean;
+  /** Opens or closes the dialog; opening after a created item starts a new draft. */
+  setOpen: (open: boolean) => void;
   submission: Submission;
   message: ResultMessage;
   /** Counts the drafts started, so the form clears its fields for a new one. */
@@ -34,9 +38,15 @@ const idle = (): ResultMessage => ({
 });
 
 export const useAddItemStore = create<AddItemState>()((set, get) => ({
+  open: false,
   submission: { phase: 'editing' },
   message: idle(),
   draft: 0,
+  setOpen: (open) => {
+    // A finished item is done with; the next opening starts a new one.
+    if (open && get().submission.phase === 'complete') get().reset();
+    set({ open });
+  },
   edit: () => {
     if (get().submission.phase === 'editing') set({ message: { text: '' } });
   },
@@ -58,14 +68,18 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
     }
     set({ submission: { phase: 'pending', attempt },
       message: { text: retrying ? 'Finishing this submission…' : 'Creating the issue and adding it to List…' } });
+    // A poll that started before this write would bring older data than its answer.
+    useBoardStore.getState().beginWrite();
     try {
       const response = await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(attempt) });
       const result = await response.json() as CreationResult & { board?: BoardData };
       if (result.item && result.board) {
+        useBoardStore.getState().beginWrite();
         useBoardStore.getState().receive(result.board);
-        set({ submission: { phase: 'complete' }, message: {
-          text: `Added ${ref(result.item)} ${result.item.title} to List.`, url: result.issueUrl ?? undefined, label: 'View created issue' } });
+        // The page stays where it was; the Added toast's View item goes to the new item.
+        set({ submission: { phase: 'complete' }, open: false });
+        notify({ verb: 'Added', item: result.item, to: 'List' });
       } else {
         const created = result.issueUrl ? 'Issue created. ' : '';
         const retry = result.issueUrl ? ' Retry to finish this issue.' : '';

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { canAbandon, checkState, countsOf, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
 import type { BoardData, Checks, Item, Status } from '../src/model.ts';
-import { esc } from '../src/render.ts';
+import { esc } from '../src/format.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
   return {

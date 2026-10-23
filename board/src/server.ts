@@ -26,7 +26,7 @@ import { mergedStats, prStatsEdits, updatedBody } from './pr-stats.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
 import { renderPage } from './page.ts';
-import { DEFAULT_UI } from './render.ts';
+import { DEFAULT_UI } from './ui-state.ts';
 import { canAbandon, workMessage } from './model.ts';
 import { revisionCheck } from './revision.ts';
 import { lockHolder, readProgress, updatePaths } from './update-state.ts';

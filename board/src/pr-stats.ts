@@ -3,7 +3,7 @@
 // edit again, and sends the edits.
 
 import { isBuild, type Item, type ItemStats } from './model.ts';
-import { duration, formatTokens, wholeUsd } from './render.ts';
+import { duration, formatTokens, wholeUsd } from './format.ts';
 
 const START = '<!-- mux-stats -->';
 const END = '<!-- /mux-stats -->';

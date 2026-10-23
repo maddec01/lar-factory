@@ -13,6 +13,8 @@ import type { BoardData, Item, ModelGroup } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
 import type { RawItem } from '../src/github.ts';
 
+// The source index.html stands in for the built one, whose asset names change with every build.
+const template = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const sample = JSON.parse(readFileSync(new URL('./sample.json', import.meta.url), 'utf8')) as BoardData;
 const expectedDir = new URL('./expected/', import.meta.url);
 const update = process.env.UPDATE_EXPECTED === '1';
@@ -32,11 +34,11 @@ function matchesSaved(name: string, actual: string): void {
 }
 
 test('page: header, stale banner and both views', () => {
-  matchesSaved('page.html', renderPage(sample, base));
+  matchesSaved('page.html', renderPage(template, sample, base));
 });
 
 test('the header and the tab show the Mux logo followed by "factory"', () => {
-  const page = renderPage(sample, base);
+  const page = renderPage(template, sample, base);
   assert.match(page, /<title>µx factory<\/title>/);
   assert.match(page, /<link rel="icon" href="data:image\/svg\+xml,[^"]*viewBox%3D%220%200%2056%2032%22/, 'the favicon is the logo');
   const h1 = renderHeader(sample, base).match(/<h1>(.*?)<\/h1>/)?.[1] ?? '';
@@ -51,7 +53,7 @@ test('code updates have a copyable command and a warning independent of project 
     command: "bash '/Users/pedro/Developer/Mux/mux-factory/board/scripts/update.sh'", updatable: false,
     logs: { update: '/Users/pedro/Library/Logs/mux-board-update.log', board: '/Users/pedro/Library/Logs/mux-board.log' },
   } };
-  const html = renderPage(data, base);
+  const html = renderPage(template, data, base);
   matchesSaved('update-notice.html', html);
   assert.match(html, /Board update available/);
   assert.match(html, /aria-label="Copy board update command"/);
@@ -416,7 +418,7 @@ test('capture form uses configured repositories and explains empty applicability
 test('entered titles round-trip through bootstrap JSON without closing its script element', () => {
   const title = 'Play <queue> & "mix" </script>';
   const data = { ...sample, items: [{ ...sample.items[0]!, title }] };
-  const html = renderPage(data, base);
+  const html = renderPage(template, data, base);
   const embedded = html.match(/<script id="board-data" type="application\/json">([\s\S]*?)<\/script>/)?.[1];
   assert.ok(embedded);
   assert.equal((JSON.parse(embedded) as BoardData).items[0]?.title, title);
@@ -456,7 +458,7 @@ test('Abandon names the item it will delete or remove, and announces it without 
   assert.equal(abandonPrompt(draft).question, `Remove draft ${draft.title}?`);
   const html = renderApp(sample, { ...base, notice: { key: 'notice-1', verb: 'Abandoned', item: issue } });
   assert.match(html, new RegExp(`<div class="banner toast" role="status" data-expires="notice-1"><button[^>]*data-dismiss="notice-1"[^>]*>&#215;</button>Deleted #61 ${issue.title}\\.</div>`));
-  assert.match(renderPage(sample, base), /<dialog id="abandon-dialog"[^>]*>[\s\S]*data-abandon-cancel autofocus>Cancel<\/button>/);
+  assert.match(renderPage(template, sample, base), /<dialog id="abandon-dialog"[^>]*>[\s\S]*data-abandon-cancel autofocus>Cancel<\/button>/);
 });
 
 test('a queued or added item is announced in a toast that offers View item', () => {
@@ -754,7 +756,7 @@ test('costs are shown as on T3 Code\'s usage page', () => {
 });
 
 test('a missing t3 replaces the board with a notice and Recheck', () => {
-  const page = renderPage({ ...sample, tools: { t3: { problem: 'missing' } } }, base);
+  const page = renderPage(template, { ...sample, tools: { t3: { problem: 'missing' } } }, base);
   matchesSaved('t3-missing.html', page);
   assert.match(page, /T3 Code not found/);
   assert.match(page, /data-recheck/);

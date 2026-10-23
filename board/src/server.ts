@@ -7,7 +7,6 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.ts';
@@ -25,7 +24,7 @@ import type { StatsSources } from './item-stats.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './pr-stats.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
-import { renderPage } from './page.ts';
+import { loadBuild, renderPage } from './page.ts';
 import { DEFAULT_UI } from './ui-state.ts';
 import { canAbandon, workMessage } from './model.ts';
 import { revisionCheck } from './revision.ts';
@@ -248,9 +247,8 @@ function readSoon(): void {
   else void refresh();
 }
 
-// Browser modules: the shared template is served as JS by stripping its types.
-const ASSETS = new Map(['client.ts', 'render.ts', 'model.ts', 'add-item.ts', 'anchor.ts', 'slice-popover.ts', 'start-menu.ts'].map((name) =>
-  [name, stripTypeScriptTypes(readFileSync(new URL(`./${name}`, import.meta.url), 'utf8'))]));
+// The page `pnpm run build` wrote, read once at startup.
+const page = loadBuild();
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -259,7 +257,7 @@ const SECURITY_HEADERS = {
     "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'",
 };
 
-function send(res: ServerResponse, status: number, type: string, body: string): void {
+function send(res: ServerResponse, status: number, type: string, body: string | Buffer): void {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
   res.end(body);
 }
@@ -581,17 +579,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }
   if (path === '/') {
-    return send(res, 200, 'text/html; charset=utf-8', renderPage(state, { now: Date.now(), ui: DEFAULT_UI }));
+    return send(res, 200, 'text/html; charset=utf-8', renderPage(page.template, state, { now: Date.now(), ui: DEFAULT_UI }));
   }
   if (path === '/api/events') return openStream(req, res);
   if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(state));
   if (path === '/healthz') return json(res, 200, {
     runningRevision: code.status.runningRevision, launchToken: process.env.BOARD_LAUNCH_TOKEN ?? null,
   });
-  const asset = path.startsWith('/assets/') ? path.slice('/assets/'.length) : '';
-  if (ASSETS.has(asset)) {
-    return send(res, 200, 'text/javascript; charset=utf-8', ASSETS.get(asset)!);
-  }
+  const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
+  if (asset) return send(res, 200, asset.type, asset.body);
   send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
 }
 

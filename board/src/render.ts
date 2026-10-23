@@ -53,6 +53,7 @@ export interface RenderOptions {
 export type Notice = { key: string } & (
   | { verb: 'Added' | 'Moved'; item: Item; to: Status }
   | { verb: 'Abandoned'; item: Item }
+  | { verb: 'Failed'; item: Item; to: Status; message: string }
   | { verb: 'Started'; item: Item; thread: StartedThread }
 );
 
@@ -75,8 +76,8 @@ const UPDATE_HINTS: Record<UpdateStep, string> = {
 /** An action this page started for an item: in flight, failed, or (for Start) done. */
 export interface ItemAction {
   phase: 'pending' | 'error' | 'uncertain' | 'started';
-  /** Set for Abandon; Queue and Start leave it unset. */
-  kind?: 'abandon';
+  /** Set for Abandon and Back to List; Queue and Start leave it unset. */
+  kind?: 'abandon' | 'back-to-list';
   message?: string;
   thread?: StartedThread;
 }
@@ -359,7 +360,7 @@ function subsDone(item: Item): string {
 
 function section(id: string, title: string, count: number, body: string, note = ''): string {
   return `<section class="section" id="${id}" aria-labelledby="${id}-h">
-<h2 id="${id}-h">${esc(title)} <span class="count">${count}</span>${note ? ` <span class="note">${esc(note)}</span>` : ''}</h2>
+<h2 id="${id}-h" tabindex="-1">${esc(title)} <span class="count">${count}</span>${note ? ` <span class="note">${esc(note)}</span>` : ''}</h2>
 ${body}
 </section>`;
 }
@@ -393,7 +394,7 @@ function writeState(data: BoardData, action: ItemAction | undefined): string {
 }
 
 function queueButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
-  const verb = action?.phase === 'pending' && action.kind !== 'abandon' ? 'Queuing…' : 'Queue';
+  const verb = action?.phase === 'pending' && !action.kind ? 'Queuing…' : 'Queue';
   return `<button type="button" class="copy row-action" data-queue="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
 }
 
@@ -401,6 +402,12 @@ function abandonButton(item: Item, data: BoardData, action: ItemAction | undefin
   if (!canAbandon(item)) return '';
   const verb = action?.phase === 'pending' && action.kind === 'abandon' ? 'Abandoning…' : 'Abandon';
   return `<button type="button" class="copy row-action abandon" data-abandon="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`;
+}
+
+/** The muted link-style button in a Queued card's footer row that moves it back to List. */
+function backToListButton(item: Item, data: BoardData, action: ItemAction | undefined): string {
+  const moving = action?.phase === 'pending' && action.kind === 'back-to-list';
+  return `<button type="button" class="link-action" data-back-to-list="${esc(item.id)}" aria-label="${moving ? 'Moving' : 'Back to List'} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>\u2190 ${moving ? 'Moving to List…' : 'Back to List'}</button>`;
 }
 
 /** Start's button for the card's top row, and the message under the card when there is one. */
@@ -413,10 +420,12 @@ function startControl(item: Item, data: BoardData, action: ItemAction | undefine
     if (!action.message) return { button: `<span class="started-tag unsure" tabindex="-1" data-start-result="${esc(item.id)}" title="Check T3 before starting it again">May have started</span>`, message: '' };
     return { button: '', message: `<p class="start" tabindex="-1" data-start-result="${esc(item.id)}">${actionError(item, action)}</p>` };
   }
-  const verb = action?.phase === 'pending' ? 'Starting…' : action?.phase === 'error' ? 'Retry start' : 'Start';
+  // Back to List and Abandon carry a kind; only Start's own action relabels it.
+  const own = action?.kind ? undefined : action;
+  const verb = own?.phase === 'pending' ? 'Starting…' : own?.phase === 'error' ? 'Retry start' : 'Start';
   return {
     button: `<button type="button" class="copy start-item" data-start="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`,
-    message: action?.phase === 'error' ? `<p class="start">${actionError(item, action)}</p>` : '',
+    message: own?.phase === 'error' ? `<p class="start">${actionError(item, own)}</p>` : '',
   };
 }
 
@@ -427,9 +436,9 @@ function updateButton(data: BoardData, opts: RenderOptions): string {
   return `<button type="button" class="copy" data-update aria-label="${busy ? 'Updating' : 'Update'} the board and skills"${busy ? ' aria-disabled="true"' : ''}>${busy ? 'Updating…' : 'Update'}</button>`;
 }
 
-/** A success that clears itself: the page closes it after a few seconds. */
-function toast(key: string, what: string, body: string): string {
-  return `<div class="banner toast" role="status" data-expires="${esc(key)}">${dismissButton(key, `: ${what}`)}${body}</div>`;
+/** A success that clears itself after a few seconds; a failure stays until it's closed. */
+function toast(key: string, what: string, body: string, failed = false): string {
+  return `<div class="banner toast" ${failed ? 'role="alert"' : `role="status" data-expires="${esc(key)}"`}>${dismissButton(key, `: ${what}`)}${body}</div>`;
 }
 
 /** The update this page or a terminal started: its steps as they finish, then a toast or the failure. */
@@ -476,6 +485,8 @@ function noticeToast(notice: Notice): string {
     // The issue is gone, so there is nothing to link to.
     case 'Abandoned':
       return toast(key, `${notice.verb} ${ref(item)}`, esc(abandonPrompt(item).done));
+    case 'Failed':
+      return toast(key, `error for ${ref(item)}`, `Couldn't move ${titleLink(item)} to ${esc(notice.to)}. ${esc(notice.message)}`, true);
     case 'Started': {
       // T3 titles a thread after line 1 of the work message; don't repeat the issue.
       const title = notice.thread.title === workTitle(item) ? '' : ` <b>${esc(notice.thread.title)}</b>`;
@@ -634,10 +645,13 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
     .filter((i) => isRecentlyDone(i, now))
     .sort((a, b) => (b.closedAt ?? b.updatedAt).localeCompare(a.closedAt ?? a.updatedAt));
 
+  // Issues and drafts get a footer row; nothing queues a pull request, so it gets none.
+  const footer = (i: Item) =>
+    i.type === 'PullRequest' ? '' : `<div class="card-actions">${backToListButton(i, data, opts.actions?.[i.id])}</div>`;
   const queuedExtra = (i: Item) =>
-    workMessage(i)
+    (workMessage(i)
       ? startControl(i, data, opts.actions?.[i.id]).message
-      : '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>';
+      : '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>') + footer(i);
   // A group, so Start sits in the card's top-right corner.
   const queuedAction = (i: Item) =>
     workMessage(i) ? `<span class="start-group">${startControl(i, data, opts.actions?.[i.id]).button}</span>` : '';

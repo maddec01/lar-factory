@@ -484,6 +484,42 @@ test('a Queued issue shows Start with no copy icon and no command box under the 
   assert.match(error, /<p class="start">.*T3 is not running/s, 'the Start error still shows under the card');
 });
 
+const queuedPr: Item = { ...sample.items.find((i) => i.id === 'PVTI_sample05')!, id: 'PVTI_pr', type: 'PullRequest', number: 300, title: 'A queued pull request' };
+const withPr: BoardData = { ...sample, items: [...sample.items, queuedPr] };
+const cardOf = (html: string, id: string) => html.split('<article').find((c) => c.includes(`data-anchor="${id}"`))!;
+
+test('Queued issues and drafts get a footer row with Back to List; pull requests and other views do not', () => {
+  const html = renderBoardView(withPr, base);
+  assert.deepEqual(buttons(html, 'data-back-to-list').sort(), ['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21']);
+  assert.match(cardOf(html, 'PVTI_sample05'),
+    /<div class="card-actions"><button type="button" class="link-action" data-back-to-list="PVTI_sample05" aria-label="Back to List #129 Run more than one 4K HDR to 1080p stream at a time">\u2190 Back to List<\/button><\/div>\n<\/article>/);
+  const draft = cardOf(html, 'PVTI_sample21');
+  assert.ok(!draft.includes('start-group'), 'a draft gets only the footer row');
+  assert.match(draft, /needs an issue.*<div class="card-actions"><button[^>]*data-back-to-list="PVTI_sample21" aria-label="Back to List draft Offline downloads on watchOS"/s);
+  assert.ok(!cardOf(html, 'PVTI_pr').includes('card-actions'));
+  const off = renderBoardView({ ...sample, capture: { session: 's', enabled: false } }, base);
+  assert.match(cardOf(off, 'PVTI_sample21'), /data-back-to-list="PVTI_sample21"[^>]* disabled title="Disabled in sample mode"/, 'off in sample mode');
+});
+
+test('Back to List and Start each show only their own pending state', () => {
+  const card = (action: ItemAction) => cardOf(renderBoardView(sample, { ...base, actions: { PVTI_sample05: action } }), 'PVTI_sample05');
+  const moving = card({ phase: 'pending', kind: 'back-to-list' });
+  assert.match(moving, /data-back-to-list="PVTI_sample05" aria-label="Moving #129 [^"]*" aria-disabled="true">\u2190 Moving to List…<\/button>/);
+  assert.match(moving, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'Start is not relabelled');
+  const starting = card({ phase: 'pending' });
+  assert.match(starting, />Starting…<\/button>/);
+  assert.match(starting, /data-back-to-list="PVTI_sample05"[^>]*>\u2190 Back to List<\/button>/, 'Back to List is not relabelled');
+  const otherError = card({ phase: 'error', kind: 'abandon', message: 'Could not delete #129.' });
+  assert.match(otherError, /data-start="PVTI_sample05"[^>]*>Start<\/button>/, 'another action\'s error is not a Start error');
+  assert.ok(!otherError.includes('<p class="start">'));
+});
+
+test('a failed card action shows as a toast naming the item, which stays until closed', () => {
+  const item = sample.items.find((i) => i.id === 'PVTI_sample05')!;
+  const html = renderApp(sample, { ...base, notice: { key: 'notice-3', verb: 'Failed', item, to: 'List', message: 'Could not set List. GitHub is down.' } });
+  assert.match(html, /<div class="banner toast" role="alert"><button[^>]*data-dismiss="notice-3"[^>]*>&#215;<\/button>Couldn't move <a[^>]*>.*<\/a> to List\. Could not set List\. GitHub is down\.<\/div>/);
+});
+
 test('Start shows its progress, the started thread, or the error', () => {
   const [a, b, c, d] = ['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample05', 'PVTI_sample06'];
   const card = (actions: Record<string, ItemAction>, id: string) =>

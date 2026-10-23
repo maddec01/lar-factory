@@ -2,8 +2,8 @@
 // /api/events, or by fetching /api/board every 15 s while that stream is down
 // (every second during an update), and re-renders with the same template the server used.
 
-import { DEFAULT_UI, abandonPrompt, listGroupId, renderApp } from './render.ts';
-import type { ItemAction, Notice, UiState, UpdateView, View } from './render.ts';
+import { DEFAULT_UI, abandonPrompt, answeredRecheck, listGroupId, recheckAnswer, renderApp } from './render.ts';
+import type { ItemAction, Notice, RecheckAnswer, UiState, UpdateView, View } from './render.ts';
 import { platformOf } from './model.ts';
 import type { BoardData, ModelChoice, Status } from './model.ts';
 import { validateDraft } from './add-item.ts';
@@ -47,6 +47,8 @@ let pollTimer: ReturnType<typeof setTimeout> | undefined;
 /** Whether the server's event stream is open; the page then stops polling. */
 let streaming = false;
 let updateView: UpdateView | null = null;
+let rechecking = false;
+let rechecked: RecheckAnswer | undefined;
 let lastBoard = '';
 /** The update this page follows: the session it started in, and since when the board has been away. */
 let updating: { session: string | undefined; awaySince: number | null } | null = null;
@@ -61,7 +63,8 @@ function render(): void {
   const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.focusKey;
   const { scrollX, scrollY } = window;
   const anchor = captureAnchor();
-  app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions, updateView, dismissed });
+  rechecked = answeredRecheck(rechecked, data);
+  app.innerHTML = renderApp(data, { now: Date.now(), ui, clientError, notice, actions, updateView, dismissed, rechecking, rechecked });
   // A Start that went away, such as one another page started, takes its menu with it.
   if (ui.startMenuOpen && !app.querySelector(`[data-start="${CSS.escape(ui.startMenuOpen)}"][aria-expanded="true"]`)) ui.startMenuOpen = undefined;
   app.querySelector('.start-menu')?.classList.toggle('up', startMenuUp);
@@ -165,7 +168,7 @@ function startToastClocks(): void {
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-start-pick],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-dismiss],[data-view-item],.slices-trigger,.slices-pop a,details[id] > summary,section > h2').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-start-pick],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-recheck],[data-dismiss],[data-view-item],.slices-trigger,.slices-pop a,details[id] > summary,section > h2').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
@@ -177,6 +180,7 @@ function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.startPick) return `pick-${el.dataset.startPick}-${el.dataset.instanceId ?? ''}/${el.dataset.model ?? ''}`;
   if (el.dataset.startResult) return `result-${el.dataset.startResult}`;
   if (el.hasAttribute('data-update')) return 'update';
+  if (el.hasAttribute('data-recheck')) return 'recheck';
   if (el.dataset.dismiss) return `dismiss-${el.dataset.dismiss}`;
   if (el.dataset.viewItem) return `view-${el.dataset.viewItem}`;
   // Keyed by project item id, since a draft has no number.
@@ -206,6 +210,7 @@ function receive(text: string): boolean {
   const unchanged = updating !== null && clientError === null && text === lastBoard;
   lastBoard = text;
   data = JSON.parse(text) as BoardData;
+  rechecked = answeredRecheck(rechecked, data, true);
   clientError = null;
   dismissed.delete('client-error');
   const view = updateView;
@@ -524,6 +529,19 @@ async function startUpdate(): Promise<void> {
   schedulePoll();
 }
 
+/** Asks the server to look t3 and gh up again; the answer's board data drops a notice once its tool works, and a notice that stays says why. */
+async function recheck(): Promise<void> {
+  if (rechecking) return;
+  rechecking = true;
+  render();
+  const result = await postAction('/api/recheck', {});
+  rechecking = false;
+  rechecked = recheckAnswer(result.error, data);
+  render();
+  // The button was disabled while checking, which dropped its focus.
+  if (document.activeElement === document.body) focusByKey('recheck');
+}
+
 async function startItem(itemId: string, choice?: ModelChoice): Promise<void> {
   if (actions[itemId]?.phase === 'pending') return;
   actions[itemId] = { phase: 'pending' };
@@ -654,7 +672,7 @@ async function abandonItem(itemId: string): Promise<void> {
 }
 
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-start-pick],[data-abandon],[data-add-item],[data-update],[data-outline-jump],[data-dismiss],[data-view-item]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-start-pick],[data-abandon],[data-add-item],[data-update],[data-recheck],[data-outline-jump],[data-dismiss],[data-view-item]');
   if (!target) return;
   if (target.dataset.outlineJump) {
     // An in-page link: keep it out of the hash, which picks the view.
@@ -673,6 +691,7 @@ app.addEventListener('click', (event) => {
   else if (target.dataset.start) toggleStartMenu(target);
   else if (target.dataset.startPick) pickStart(target);
   else if (target.hasAttribute('data-update')) void startUpdate();
+  else if (target.hasAttribute('data-recheck')) void recheck();
   else if (target.dataset.abandon) askAbandon(target.dataset.abandon);
 });
 

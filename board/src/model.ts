@@ -231,6 +231,19 @@ export interface BoardData {
   started?: Record<string, StartedThread>;
   /** The latest update of this checkout, from the button or a terminal; null on boards that can't update. */
   update?: UpdateProgress | null;
+  /** What's wrong with t3 and gh, from the latest lookup; a tool that works has no entry. Absent in sample mode. */
+  tools?: ToolProblems;
+}
+
+/** A tool the lookup didn't find, naming the override that pointed nowhere, if one did. */
+export type ToolMissing = { problem: 'missing'; override?: string };
+
+/** A tool the board can't use: missing, or (gh only) logged out. */
+export type ToolProblem = ToolMissing | { problem: 'logged-out' };
+
+export interface ToolProblems {
+  t3?: ToolMissing;
+  gh?: ToolProblem;
 }
 
 export interface CodeUpdate {
@@ -373,10 +386,10 @@ export function workMessage(item: Item): string | null {
   return title && `${title}\n$mux-work ${item.repo}#${item.number}`;
 }
 
-/** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. */
+/** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */
 export function isStale(data: BoardData, now: number): boolean {
   if (data.error) return true;
-  if (!data.fetchedAt) return true;
+  if (!data.fetchedAt) return false;
   return now - Date.parse(data.fetchedAt) > data.refreshSeconds * 3 * 1000;
 }
 

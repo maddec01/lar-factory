@@ -21,7 +21,7 @@ const UNCERTAIN: StartResult = { thread: null, uncertain: true,
 export function startThread(project: string, message: string, choice?: ModelChoice): Promise<StartResult> {
   const model = choice ? ['--provider', choice.instanceId, '--model', choice.model] : [];
   const command = toolCommand('t3');
-  const missing = `${missingTool('t3')} Install the T3 Code CLI or set T3_PATH.`;
+  const missing = `${missingTool('t3')}. Install the T3 Code CLI or set T3_PATH.`;
   if (!command) return Promise.resolve({ thread: null, error: missing });
   return new Promise((resolve) => {
     execFile(command.file, ['thread', 'start', project, message, ...model, '--json'], { env: command.env, timeout: 60_000 }, (err, stdout, stderr) => {

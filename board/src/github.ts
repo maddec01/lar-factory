@@ -345,7 +345,7 @@ export function sliceLabelSearch(label: 'active' | 'blocked', raws: RawItem[], b
 
 function gh(args: string[]): Promise<string> {
   const command = toolCommand('gh');
-  if (!command) return Promise.reject(new Error(`${missingTool('gh')} Install it with \`brew install gh\` or set GH_PATH.`));
+  if (!command) return Promise.reject(new Error(`${missingTool('gh')}. Install it with \`brew install gh\` or set GH_PATH.`));
   return new Promise((resolve, reject) => {
     execFile(command.file, args, { env: command.env, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {

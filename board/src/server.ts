@@ -14,8 +14,7 @@ import { loadConfig } from './config.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
-import { lookUpTools, missingTool } from './tools.ts';
-import type { ToolName } from './tools.ts';
+import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools.ts';
 import { repositoryProject } from './repository-project.ts';
 import type { RepositoryProject } from './repository-project.ts';
 import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './item-stats.ts';
@@ -84,6 +83,14 @@ const abandoned = new Set<string>();
 const REQUEST_ID = /^[a-f0-9-]{36}$/;
 /** Open /api/events responses, one per page. */
 const streams = new Set<ServerResponse>();
+/** The running tool check, so Recheck and the retry never run two at once. */
+let checkingTools: Promise<void> | null = null;
+/** The startup tool check, which runs once the board listens; requests other than /healthz and assets wait for it. */
+let firstToolCheck: Promise<void> | undefined;
+let toolRetry: NodeJS.Timeout | undefined;
+let toolLog = '';
+/** How often the board looks again for a missing t3 or gh, or a logged-out gh. Tests shorten it with BOARD_TOOL_RETRY_MS. */
+const TOOL_RETRY_MS = Number(process.env.BOARD_TOOL_RETRY_MS) || 10_000;
 
 function log(message: string): void {
   console.log(`${new Date().toISOString()} ${message}`);
@@ -151,9 +158,52 @@ function offerModelChoices(): ModelGroup[] {
   return state.modelChoices = groups;
 }
 
+/** Logs where each tool is, or why it's missing, when that changes. */
+function logTools(): void {
+  const lines = TOOL_NAMES.map((name) => {
+    const path = tools()?.[name].path;
+    return path ? `${name} at ${path}` : missingTool(name);
+  });
+  if (state.tools?.gh?.problem === 'logged-out') lines.push('gh is logged out');
+  const message = lines.join('; ');
+  if (message !== toolLog) log(message);
+  toolLog = message;
+}
+
+/** Shows a gh problem in place of reading GitHub, and looks again in TOOL_RETRY_MS. */
+function showToolProblems(problems: BoardData['tools']): void {
+  state.tools = problems;
+  logTools();
+  clearTimeout(toolRetry);
+  if (problems?.t3 || problems?.gh) toolRetry = setTimeout(() => void recheckTools(false), TOOL_RETRY_MS);
+}
+
+/**
+ * Looks t3, gh and az up again and probes gh, then reads GitHub if gh works now and didn't before.
+ * Startup and Recheck reread the login shell PATH; the timed retry passes false to keep the last one.
+ * A check asked for during a running one waits for it, then runs.
+ */
+async function recheckTools(rereadLoginPath = true): Promise<void> {
+  while (checkingTools) await checkingTools;
+  const ghBroken = !state.tools || Boolean(state.tools.gh);
+  checkingTools = (async () => {
+    await lookUpTools(process.env, rereadLoginPath);
+    const gh = await probeGh();
+    const t3 = lookupProblem('t3');
+    showToolProblems({ ...(t3 ? { t3 } : {}), ...(gh.problem ? { gh: gh.problem } : {}) });
+    if (gh.error) log(`gh probe failed: ${gh.error}`);
+  })().finally(() => { checkingTools = null; });
+  await checkingTools;
+  push();
+  if (ghBroken && !state.tools?.gh) readSoon();
+}
+
 /** Reads GitHub now; while a read runs this one is skipped, so two reads never run together. */
 async function refresh(): Promise<void> {
   if (refreshing) return;
+  // Before the first tool check there's no gh to read with; that check starts the first read.
+  // A missing or logged-out gh has its own notice and retries; reading would only fail.
+  if (!state.tools || state.tools.gh) return;
   refreshing = true;
   readAgain = false;
   let read = false;
@@ -176,8 +226,11 @@ async function refresh(): Promise<void> {
     if (recovered) log(`read ${snapshot.items.length} items from ${snapshot.url}`);
     read = true;
   } catch (err) {
-    state.error = err instanceof Error ? err.message : String(err);
-    log(`refresh failed, serving data from ${state.fetchedAt ?? 'never'}: ${state.error}`);
+    // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale.
+    const gh = await probeGh();
+    if (gh.problem) showToolProblems({ ...state.tools, gh: gh.problem });
+    state.error = gh.problem ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
+    if (state.error) log(`refresh failed, serving data from ${state.fetchedAt ?? 'never'}: ${state.error}`);
   } finally {
     refreshing = false;
   }
@@ -489,6 +542,14 @@ async function abandonItemRequest(req: IncomingMessage, res: ServerResponse): Pr
   json(res, error ? 502 : 200, { error, board: state });
 }
 
+/** Looks the tools up again for the notices' Recheck button and answers with the board data. */
+async function recheckRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!await readJson(req, res, 'the recheck request')) return;
+  if (fixture) return json(res, 403, { error: 'Sample mode looks no tools up.' });
+  await recheckTools();
+  json(res, 200, { error: null, board: state });
+}
+
 /** Starts a read of GitHub for status.sh, so a moved item reaches the board before the next interval read. */
 async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!await readJson(req, res, 'the read request')) return;
@@ -501,6 +562,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
   if (!path.startsWith('/assets/')) readUpdate();
+  // The update health check must answer at once; everything else runs tools or shows what the lookup found.
+  if (path !== '/healthz' && !path.startsWith('/assets/')) await firstToolCheck;
   if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
     return json(res, 403, { error: 'Submit from this board page.' });
   }
@@ -511,6 +574,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (req.method === 'POST' && path === '/api/update') return updateBoard(res);
   if (req.method === 'POST' && path === '/api/abandon') return abandonItemRequest(req, res);
   if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
+  if (req.method === 'POST' && path === '/api/recheck') return recheckRequest(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }
@@ -536,14 +600,8 @@ const server = createServer((req, res) => {
   });
 });
 
-// Sample mode runs no tools, so it looks none up.
-if (!fixture) {
-  const found = await lookUpTools();
-  for (const name of ['t3', 'gh', 'az'] as ToolName[]) {
-    const path = found[name].path;
-    log(path ? `${name} at ${path}` : missingTool(name));
-  }
-}
+// Sample mode runs no tools, so it looks none up. The check starts the first read once gh works.
+if (!fixture) await recheckTools();
 
 server.listen(config.port, HOST, () => {
   log(`board on http://${HOST}:${config.port}, refreshing every ${config.refreshSeconds} s`);
@@ -559,7 +617,7 @@ if (fixture) {
   state.codeUpdate = code.status;
   offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
-} else await refresh();
+}
 const timer = setInterval(() => {
   void code.refresh();
   if (!fixture) void refresh();
@@ -568,6 +626,7 @@ const timer = setInterval(() => {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     clearInterval(timer);
+    clearTimeout(toolRetry);
     for (const res of streams) res.end();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref();

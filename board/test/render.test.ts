@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
-import { DEFAULT_UI, abandonPrompt, formatTokens, formatUsd, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
+import { DEFAULT_UI, abandonPrompt, answeredRecheck, formatTokens, formatUsd, recheckAnswer, renderAddItemForm, renderApp, renderBoardView, renderFlowView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData, Item, ModelGroup } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
@@ -749,4 +749,61 @@ test('token counts are compact as on T3 Code\'s usage page', () => {
 
 test('costs are shown as on T3 Code\'s usage page', () => {
   assert.deepEqual([0.004, 41.2, 1234.567].map(formatUsd), ['$0.00', '$41.20', '$1,234.57']);
+});
+
+test('a missing t3 replaces the board with a notice and Recheck', () => {
+  const page = renderPage({ ...sample, tools: { t3: { problem: 'missing' } } }, base);
+  matchesSaved('t3-missing.html', page);
+  assert.match(page, /T3 Code not found/);
+  assert.match(page, /data-recheck/);
+  assert.doesNotMatch(page, /role="tab"/, 'the notice replaces the board');
+  const broken = renderApp({ ...sample, tools: { t3: { problem: 'missing', override: 'T3_PATH=/nowhere/t3' } } }, base);
+  assert.match(broken, /<code>T3_PATH=\/nowhere\/t3<\/code>/, 'a broken override is named');
+});
+
+test('after Recheck a notice that stays says the tool is still missing, or why Recheck failed', () => {
+  const t3 = { ...sample, tools: { t3: { problem: 'missing' as const } } };
+  assert.doesNotMatch(renderApp(t3, base), /recheck-note/, 'nothing before a Recheck');
+  assert.match(renderApp(t3, { ...base, rechecked: recheckAnswer(null, t3) }), /<span class="recheck-note" role="status">Still not found\.<\/span>/);
+  const loggedOut = { ...sample, tools: { gh: { problem: 'logged-out' as const } } };
+  assert.match(renderHeader(loggedOut, { ...base, rechecked: recheckAnswer(null, loggedOut) }), /role="status">Still logged out\.</);
+  assert.match(renderHeader(loggedOut, { ...base, rechecked: recheckAnswer("Can't reach the board server. Try again.", loggedOut) }),
+    /role="status">Can&#39;t reach the board server\. Try again\.</);
+  assert.doesNotMatch(renderHeader(loggedOut, { ...base, rechecking: true, rechecked: recheckAnswer(null, loggedOut) }), /recheck-note/, 'not while checking');
+});
+
+test('a Recheck note answers only the tool problems it found, and goes once they change', () => {
+  const loggedOut = { ...sample, tools: { gh: { problem: 'logged-out' as const } } };
+  const missing = { ...sample, tools: { gh: { problem: 'missing' as const } } };
+  const working = { ...sample, tools: {} };
+  const answer = recheckAnswer(null, loggedOut);
+  assert.equal(answeredRecheck(answer, loggedOut), answer, 'kept while gh is still logged out');
+  assert.equal(answeredRecheck(answer, missing), undefined, 'a different problem is not what Recheck answered');
+  assert.equal(answeredRecheck(answer, working), undefined, 'gone once the notice clears');
+  // The page keeps what answeredRecheck returns, so a gh that logs out again opens a banner without the note.
+  assert.doesNotMatch(renderHeader(loggedOut, { ...base, rechecked: answeredRecheck(answeredRecheck(answer, working), loggedOut) }), /recheck-note/);
+});
+
+test("a failed Recheck's note goes with the next board data, a found problem's note stays", () => {
+  const loggedOut = { ...sample, tools: { gh: { problem: 'logged-out' as const } } };
+  const found = recheckAnswer(null, loggedOut);
+  assert.equal(answeredRecheck(found, loggedOut, true), found, 'Still logged out stays across polls');
+  const failed = recheckAnswer("Can't reach the board server. Try again.", loggedOut);
+  assert.equal(answeredRecheck(failed, loggedOut), failed, 'kept until board data arrives');
+  assert.equal(answeredRecheck(failed, loggedOut, true), undefined, 'gone once the server answers again');
+});
+
+test('a missing or logged-out gh shows its own notice instead of Stale', () => {
+  const failed = { ...sample, error: 'gh api graphql failed: HTTP 401' };
+  const missing = renderHeader({ ...failed, tools: { gh: { problem: 'missing' } } }, base);
+  matchesSaved('gh-missing.html', missing);
+  assert.match(missing, /brew install gh/);
+  assert.doesNotMatch(missing, /<strong>Stale\.<\/strong>/);
+  const loggedOut = renderHeader({ ...failed, tools: { gh: { problem: 'logged-out' } } }, base);
+  matchesSaved('gh-logged-out.html', loggedOut);
+  assert.match(loggedOut, /gh auth login/);
+  assert.doesNotMatch(loggedOut, /<strong>Stale\.<\/strong>/);
+  const broken = renderHeader({ ...sample, tools: { gh: { problem: 'missing', override: 'GH_PATH=/nowhere/gh' } } }, base);
+  assert.match(broken, /<code>GH_PATH=\/nowhere\/gh<\/code>/, 'a broken override is named');
+  assert.match(renderHeader({ ...failed, tools: {} }, base), /<strong>Stale\.<\/strong> .*HTTP 401/s, 'other read failures stay Stale');
 });

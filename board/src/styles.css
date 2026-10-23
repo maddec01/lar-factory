@@ -98,6 +98,13 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .banner .err { white-space: pre-wrap; word-break: break-word; }
 .code-update code { overflow-wrap: anywhere; }
 
+/* tool notices */
+.banner code { overflow-wrap: anywhere; }
+.tool-missing { min-height: calc(100vh - 62px); display: grid; place-items: center; }
+.tool-missing-box { max-width: 520px; border: 1px solid var(--bd); background: var(--surface); border-radius: var(--r); padding: 20px 24px; }
+.tool-missing-box p { margin: 12px 0 0; color: var(--muted); }
+.tool-missing-box code { color: var(--fg); overflow-wrap: anywhere; }
+
 /* view tabs */
 .vtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--bd); margin: 4px 0 16px; }
 .vtab { font: inherit; font-weight: 600; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; margin-bottom: -1px; cursor: pointer; }

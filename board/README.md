@@ -69,8 +69,14 @@ finds them when opened with a bare PATH. For each tool it tries the override
 given, and if it isn't runnable the tool counts as missing. A bare name is
 looked up on the PATH. Sample mode looks up no tools.
 
-If `gh` can't reach GitHub, the board keeps the last data it read and shows a
-stale warning. `pnpm run sample` serves `test/sample.json` instead of GitHub;
+With no `t3` found, a "T3 Code not found" notice replaces the board. A missing
+`gh` gets a notice with `brew install gh`, and a logged-out one a notice with
+`gh auth login`. Each notice has a Recheck button that looks the tools up again
+without a restart, and the board also looks again every 10 seconds while one
+shows. A broken override is named in its notice. A missing `az` shows nothing.
+
+If `gh` can't reach GitHub for another reason, the board keeps the last data it
+read and shows a stale warning. `pnpm run sample` serves `test/sample.json` instead of GitHub;
 adding, queuing and starting are disabled in sample mode.
 
 To start it at login, run `board/scripts/install-launch-agent.sh` from the main

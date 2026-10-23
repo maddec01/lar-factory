@@ -212,6 +212,10 @@ _Avoid_: test board, dev board
 The installable desktop app that runs the board and updates itself from Releases.
 _Avoid_: Electron app, desktop board
 
+**Title bar**:
+The bar at the top of the board page, in the board app and in a browser. It holds the brand on the left, and the Refreshed time and the board's actions on the right.
+_Avoid_: toolbar, top bar
+
 ### Skills
 
 **Copy**:

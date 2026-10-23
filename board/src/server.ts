@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.ts';
-import { BOARD_PORTS, listenOnFreePort } from './port.ts';
+import { BOARD_PORTS, listenOnFreePort, reportListening } from './port.ts';
 import { recordBoard } from './board-record.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
@@ -615,6 +615,7 @@ const port = await listenOnFreePort(server, HOST, ports) ?? await exitWith(ports
   ? `port ${ports[0]} is taken; stop what holds it or choose another BOARD_PORT`
   : `ports ${ports[0]} to ${ports.at(-1)} are all taken; stop a board or set BOARD_PORT`);
 log(`board on http://${HOST}:${port}, refreshing every ${config.refreshSeconds} s`);
+reportListening(port);
 // status.sh finds live boards by their records; a sample board isn't one to refresh.
 if (!fixture) process.on('exit', recordBoard(port));
 // Sample mode runs no tools, so it looks none up. The check starts the first read once gh works.

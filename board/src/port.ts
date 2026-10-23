@@ -13,6 +13,16 @@ export async function listenOnFreePort(server: Server, host: string, ports: read
   return null;
 }
 
+/** What a board sends the process that started it with an IPC channel, such as the board app. */
+export type ParentMessage = { type: 'listening'; port: number };
+
+/** Tells the parent process, when there is one with an IPC channel, that the board listens on `port`. */
+export function reportListening(port: number): void {
+  if (!process.send || !process.connected) return;
+  const message: ParentMessage = { type: 'listening', port };
+  process.send(message);
+}
+
 function listen(server: Server, host: string, port: number): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const failed = (error: NodeJS.ErrnoException) => {

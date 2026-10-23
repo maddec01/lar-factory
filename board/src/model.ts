@@ -208,8 +208,6 @@ export function offers(groups: readonly ModelGroup[], choice: ModelChoice): bool
 export interface RepoConfig {
   repo: string;
   platform: string;
-  /** The repository's main checkout, starting with ~/ because config.json is public. */
-  path: string;
   /** Repository role: what this repository is to the others. */
   role: string;
 }

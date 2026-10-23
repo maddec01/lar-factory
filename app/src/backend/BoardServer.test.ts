@@ -110,7 +110,7 @@ describe("start", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
   );
 
-  it.live("starts the real board in sample mode, guarding writes with the launch secret", () =>
+  it.live("starts the real board in sample mode, guarding writes and drains with the launch secret", () =>
     Effect.gen(function* () {
       const config = BoardServer.makeStartConfig({
         ...BoardServer.locate(appDir),
@@ -140,6 +140,13 @@ describe("start", () => {
       // Sample mode turns the write down itself once the secret gets it past the check.
       assert.notStrictEqual(yield* post("/api/queue", { "X-Board-Secret": "launch-secret" }), refused);
       assert.match(yield* post("/api/read"), /^2\d\d /, "status.sh's refresh stays open");
+
+      // A drain with the wrong secret fails and leaves writes open; with the launch secret it closes them.
+      const failed = yield* Effect.exit(BoardServer.drain(board.url, "wrong-secret"));
+      assert.match(String(Exit.isFailure(failed) && failed.cause), /could not drain the board's writes/);
+      assert.notMatch(yield* post("/api/queue", { "X-Board-Secret": "launch-secret" }), /^503 /);
+      yield* BoardServer.drain(board.url, "launch-secret");
+      assert.match(yield* post("/api/queue", { "X-Board-Secret": "launch-secret" }), /^503 /);
     }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
   );
 });

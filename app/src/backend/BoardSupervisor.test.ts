@@ -138,6 +138,30 @@ describe("supervise", () => {
   );
 });
 
+describe("makeControl", () => {
+  it.effect("stops the running server and starts supervising again", () =>
+    Effect.gen(function* () {
+      const server = yield* makeFakeServer();
+      const ready = readyUrls();
+      const control = yield* BoardSupervisor.makeControl(BoardSupervisor.supervise(server.start, ready, delays));
+      yield* control.start;
+      yield* control.start;
+      yield* Effect.yieldNow;
+      // A second start while one runs starts no second server.
+      assert.deepStrictEqual(ready.urls, ["http://127.0.0.1:5000/"]);
+
+      yield* control.stop;
+      assert.isTrue(server.children[0]!.stopped);
+      yield* TestClock.adjust(Duration.seconds(10));
+      assert.strictEqual(server.children.length, 1);
+
+      yield* control.start;
+      yield* Effect.yieldNow;
+      assert.deepStrictEqual(ready.urls, ["http://127.0.0.1:5000/", "http://127.0.0.1:5001/"]);
+    }).pipe(Effect.scoped),
+  );
+});
+
 describe("supervise with a real server", () => {
   it.live("brings the board back after the server is killed", () =>
     Effect.gen(function* () {

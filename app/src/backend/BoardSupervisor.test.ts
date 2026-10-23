@@ -146,6 +146,7 @@ describe("supervise with a real server", () => {
           executablePath: process.execPath,
           boardDir: NodePath.resolve(import.meta.dirname, "../../../board"),
           env: process.env,
+          secret: "test-secret",
         }),
         args: [NodePath.resolve(import.meta.dirname, "../../test/fake-board.mjs")],
       };

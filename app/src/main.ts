@@ -16,6 +16,7 @@ import * as Electron from "electron";
 import * as BoardServer from "./backend/BoardServer.ts";
 import * as BoardSupervisor from "./backend/BoardSupervisor.ts";
 import * as ExternalLink from "./ExternalLink.ts";
+import * as LaunchSecret from "./LaunchSecret.ts";
 import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
 import * as StartingPage from "./StartingPage.ts";
 
@@ -41,7 +42,7 @@ const openInBrowser = (target: string) => {
   if (url) void Electron.shell.openExternal(url);
 };
 
-const createWindow = (boardOrigin: () => string) => {
+const createWindow = (boardOrigin: () => string, secret: string) => {
   const window = new Electron.BrowserWindow({
     width: 1280,
     height: 860,
@@ -54,6 +55,9 @@ const createWindow = (boardOrigin: () => string) => {
       nodeIntegration: false,
       sandbox: true,
     },
+  });
+  window.webContents.ipc.on(LaunchSecret.CHANNEL, (event) => {
+    event.returnValue = LaunchSecret.forFrame(event.senderFrame?.url ?? "", boardOrigin(), secret);
   });
   // Links to GitHub and elsewhere open in the browser; only the board stays in the window.
   window.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -72,10 +76,10 @@ const createWindow = (boardOrigin: () => string) => {
  * Opens the window at once on the starting page, and loads each ready server's page in it.
  * Until the board first shows, the starting page says why its server isn't up yet.
  */
-const openBoardWindow = () => {
+const openBoardWindow = (secret: string) => {
   let origin = "";
   let boardShown = false;
-  const window = createWindow(() => origin);
+  const window = createWindow(() => origin, secret);
   const load = (href: string) =>
     Effect.tryPromise(() => window.loadURL(href)).pipe(
       Effect.catch((error) => Effect.logError(`could not load ${href.slice(0, 100)}: ${String(error)}`)),
@@ -87,14 +91,21 @@ const openBoardWindow = () => {
         boardShown = true;
         return load(url.href);
       }),
-    onRestart: (reason) => Effect.suspend(() => (boardShown ? Effect.void : load(StartingPage.url(reason)))),
+    onRestart: (reason) =>
+      Effect.suspend(() => {
+        // The old server is gone: no page gets the secret until the next one is ready.
+        origin = "";
+        return boardShown ? Effect.void : load(StartingPage.url(reason));
+      }),
   };
   return { window, events, showStarting: load(StartingPage.url()) };
 };
 
 const program = Effect.gen(function* () {
   yield* Effect.promise(() => Electron.app.whenReady());
-  const board = openBoardWindow();
+  // One secret per launch, shared by the restarted servers and the page.
+  const secret = LaunchSecret.make();
+  const board = openBoardWindow(secret);
   // Opening the app again brings this window forward; the second copy has already quit.
   Electron.app.on("second-instance", () => {
     if (board.window.isMinimized()) board.window.restore();
@@ -104,7 +115,7 @@ const program = Effect.gen(function* () {
   const boardDir = NodePath.resolve(Electron.app.getAppPath(), "../board");
   // Read once: a restarted server keeps the PATH the first one got.
   const env = yield* ShellEnvironment.childEnvironment(process.env);
-  const config = BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env });
+  const config = BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env, secret });
   // Quitting closes the scope, which stops the server or cancels a pending restart.
   yield* BoardSupervisor.supervise(BoardServer.start(config), board.events).pipe(Effect.forkScoped);
   yield* quitRequested;

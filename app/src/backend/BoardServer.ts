@@ -46,16 +46,18 @@ export class BoardServerError extends Data.TaggedError("BoardServerError")<{
 /**
  * Runs `boardDir/src/server.ts` with `executablePath` in Node mode. In the app that
  * is the Electron binary, whose Node strips the types, so the server runs as source.
+ * The server refuses guarded writes that don't carry `secret`.
  */
 export const makeStartConfig = (input: {
   readonly executablePath: string;
   readonly boardDir: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  readonly secret: string;
 }): StartConfig => ({
   executablePath: input.executablePath,
   args: ["--disable-warning=ExperimentalWarning", NodePath.join(input.boardDir, "src/server.ts")],
   cwd: input.boardDir,
-  env: { ...input.env, ELECTRON_RUN_AS_NODE: "1" },
+  env: { ...input.env, ELECTRON_RUN_AS_NODE: "1", BOARD_APP_SECRET: input.secret },
 });
 
 /**

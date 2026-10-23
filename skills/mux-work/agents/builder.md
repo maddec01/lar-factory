@@ -99,7 +99,9 @@ comment and relaunch with
 `t3_thread_launch`: message `Build <owner/repo#n>. Read <mux-work>/agents/builder.md and follow it.`,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
 The handoff names the step and review round to resume at; at a review round,
-each reviewer's verdict, open findings, and rejected findings with reasons. Otherwise finish in place.
+the round's base sha, each reviewer's verdict, open findings, fixed findings,
+and rejected findings with reasons, and the unreviewed fixes so far, each as
+the line **Approve** describes. Otherwise finish in place.
 
 Work in another repository (a planner or implementer `needs <owner/repo>`, a
 failed check or a failed Verify) becomes a build there, and this build carries
@@ -120,16 +122,31 @@ remove `active` from every slice still carrying it.
 
 ## Review
 
-Set **Review**. In parallel, start one **reviewer subagent** per file in this
+Set **Review**. Review runs in review rounds, at most three.
+
+Round 1: in parallel, start one **reviewer subagent** per file in this
 folder: `reviewer-code.md`, `reviewer-security.md`, `reviewer-ux.md`,
 `reviewer-ui.md`. Give each only its file's path, the issue reference, the repo
 path and the diff command `git diff origin/main...HEAD`. Skip the UI reviewer
 when nothing user-visible changed, and say so.
 
 Each returns a verdict (`approve` or `changes`), findings and what it couldn't
-check. Hand findings you agree with to the fixer; reply to the rest with a
-reason. Rerun only reviewers that asked for changes. After two rounds, hand
-what's left to the approver.
+check. Reply to the findings you reject with a reason. Before handing the ones
+you agree with to the fixer, note HEAD (`git rev-parse HEAD`) as this round's
+base.
+
+Next round: for each fixed finding, decide whether its reviewer comes back,
+nits included, whatever that reviewer's verdict; record each skip with a
+reason. Rerun, in parallel, each reviewer with a fixed finding you didn't skip.
+Give it its file's path, the issue reference, the repo path, the diff command
+`git diff <round base>..HEAD` (every fixup of the round, not only its own) and
+the list of its findings that were fixed; never the whole-branch diff. Its
+findings stay within that fix diff. Handle its findings as in round 1. A
+reviewer's final result is its latest round's.
+
+Review ends when no reviewer comes back (the round fixed no finding, or you
+skipped the reviewer of every fixed finding), or after round 3: hand round 3's
+findings you agree with to the fixer, with no further review.
 
 ## Approve
 

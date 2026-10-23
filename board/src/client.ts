@@ -1,5 +1,6 @@
-// Browser side: keeps the page live by fetching /api/board every 15 s (every
-// second during an update) and re-rendering with the same template the server used.
+// Browser side: keeps the page live with the board data the server pushes over
+// /api/events, or by fetching /api/board every 15 s while that stream is down
+// (every second during an update), and re-renders with the same template the server used.
 
 import { DEFAULT_UI, abandonPrompt, listGroupId, renderApp } from './render.ts';
 import type { ItemAction, Notice, UiState, UpdateView, View } from './render.ts';
@@ -43,6 +44,8 @@ let mutationVersion = 0;
 let startMenuUp = false;
 let pollSequence = 0;
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
+/** Whether the server's event stream is open; the page then stops polling. */
+let streaming = false;
 let updateView: UpdateView | null = null;
 let lastBoard = '';
 /** The update this page follows: the session it started in, and since when the board has been away. */
@@ -191,7 +194,46 @@ function focusByKey(key: string): void {
 
 function schedulePoll(): void {
   clearTimeout(pollTimer);
-  pollTimer = setTimeout(() => void poll(), updating && updateView?.phase !== 'lost' ? UPDATE_POLL_MS : POLL_MS);
+  if (updating && updateView?.phase !== 'lost') pollTimer = setTimeout(() => void poll(), UPDATE_POLL_MS);
+  // A silent stream sends no new data; re-rendering still shows it as stale once it is.
+  else if (streaming) pollTimer = setTimeout(() => { render(); schedulePoll(); }, POLL_MS);
+  else pollTimer = setTimeout(() => void poll(), POLL_MS);
+}
+
+/** Takes in board data from a poll or a push; false when the page has nothing new to draw. */
+function receive(text: string): boolean {
+  // Polls each second during an update: redraw only on change, so the progress isn't announced again.
+  const unchanged = updating !== null && clientError === null && text === lastBoard;
+  lastBoard = text;
+  data = JSON.parse(text) as BoardData;
+  clientError = null;
+  dismissed.delete('client-error');
+  const view = updateView;
+  return !followUpdate() && !(unchanged && view === updateView);
+}
+
+/** Opens the server's event stream; the browser reconnects a dropped one by itself. */
+function openStream(): void {
+  const source = new EventSource('/api/events');
+  source.onopen = () => {
+    streaming = true;
+    schedulePoll();
+  };
+  source.onmessage = (event: MessageEvent<string>) => {
+    // A push is the newest data: drop any poll still in flight.
+    ++pollSequence;
+    if (receive(event.data)) render();
+    schedulePoll();
+  };
+  source.onerror = () => {
+    // Fires on each failed reconnect too; only the first may restart the poll clock.
+    if (streaming) {
+      streaming = false;
+      schedulePoll();
+    }
+    // A refused stream isn't retried by the browser.
+    if (source.readyState === EventSource.CLOSED) setTimeout(openStream, POLL_MS);
+  };
 }
 
 async function poll(): Promise<void> {
@@ -202,14 +244,7 @@ async function poll(): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     if (version !== mutationVersion || sequence !== pollSequence) return;
-    // Polls each second during an update: redraw only on change, so the progress isn't announced again.
-    const unchanged = updating !== null && clientError === null && text === lastBoard;
-    lastBoard = text;
-    data = JSON.parse(text) as BoardData;
-    clientError = null;
-    dismissed.delete('client-error');
-    const view = updateView;
-    if (followUpdate() || (unchanged && view === updateView)) return;
+    if (!receive(text)) return;
   } catch (err) {
     if (version !== mutationVersion || sequence !== pollSequence) return;
     if (updating) {
@@ -746,3 +781,4 @@ else {
 resetDraft();
 followUpdate();
 schedulePoll();
+openStream();

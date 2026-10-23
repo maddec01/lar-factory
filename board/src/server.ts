@@ -207,6 +207,11 @@ function send(res: ServerResponse, status: number, type: string, body: string): 
   res.end(body);
 }
 
+/** Reads the update's progress into the board data, so a page follows a running update. */
+function readUpdate(): void {
+  state.update = updatable ? readProgress(updates) : null;
+}
+
 /** Sends the board data as one server-sent event. */
 function sendBoard(res: ServerResponse): void {
   res.write(`data: ${JSON.stringify(state)}\n\n`);
@@ -214,6 +219,7 @@ function sendBoard(res: ServerResponse): void {
 
 /** Pushes the board data to every open page, after a read or a change made through the board. */
 function push(): void {
+  if (streams.size) readUpdate();
   for (const res of streams) sendBoard(res);
 }
 
@@ -492,7 +498,7 @@ async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<v
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-  if (!path.startsWith('/assets/')) state.update = updatable ? readProgress(updates) : null;
+  if (!path.startsWith('/assets/')) readUpdate();
   if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
     return json(res, 403, { error: 'Submit from this board page.' });
   }

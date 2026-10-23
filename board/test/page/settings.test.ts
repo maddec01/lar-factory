@@ -2,7 +2,7 @@
 // The bridge stands in for the app's preload; without it the page has no Settings.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, mountPage, settle, stubApp, titleBarHeight } from './support.ts';
+import { $, $$, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight } from './support.ts';
 import type { ProfilesResult, UpdateChannel, UpdateState } from '../../src/app/board-app.ts';
 import { INSTALL_RECHECK_MS } from '../../src/app/settings-store.ts';
 
@@ -275,6 +275,7 @@ describe('update channel', () => {
     const downloaded: UpdateState = { ...nightly, status: 'downloaded', availableVersion: '0.2.0-nightly.20261024.42', downloadedVersion: '0.2.0-nightly.20261024.42', downloadPercent: 100, canRetry: true };
     const { bridge, push } = stubChannel({ ...downloaded, status: 'downloading', downloadedVersion: null, downloadPercent: 40 });
     bridge.installUpdate = vi.fn(() => new Promise<never>(() => {}));
+    bridge.confirmRestart = answerRestart(true);
     await open();
     expect(radio('latest').getAttribute('aria-disabled')).toBe('true');
     await settle(() => radio('latest').click());

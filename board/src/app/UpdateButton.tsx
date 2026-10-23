@@ -1,8 +1,9 @@
 // The title bar's update button: T3 Code's update pill, copied from
 // apps/web/src/components/sidebar/SidebarUpdatePill.tsx at 9a391eb. One round icon button that the board app
-// always shows: click to check, download or install, with the tooltip saying which. Without T3's "update
-// everything" run, its Intel build warning, and (for now) its install confirmation and toasts. The store keeps
-// the board's own install and busy flags: while the app installs, the button keeps the downloaded look, disabled.
+// always shows: click to check, download or install, with the tooltip saying which, and T3's toasts from the
+// store. Installing asks first in the app's native dialog, as T3 does. Without T3's "update everything" run and
+// its Intel build warning. The store keeps the board's own install flag: while the app installs, the button keeps
+// the downloaded look, disabled.
 // Hovering or focusing it opens the changelog of the Releases since the running version below it, on both
 // channels where T3 shows it on nightly only, as T3 Code's SidebarUpdateReleaseNotes. It is a PreviewCard, not
 // a Popover, as a Popover's focus guards would take the Tab after the button and close it.
@@ -18,6 +19,7 @@ import {
   canCheckForUpdate,
   getUpdateButtonTooltip,
   getUpdateIdleTooltip,
+  getUpdateInstallConfirmationMessage,
   isUpdateButtonDisabled,
   resolveUpdateButtonAction,
 } from './update-button-logic.ts';
@@ -27,8 +29,8 @@ import {
   UpdateStatusIcon,
   type UpdateStatusIconState,
 } from './UpdateStatusIcon.tsx';
+import { errorMessage, toastUpdateError } from './update-toasts.tsx';
 
-const BUSY = 'The updater is busy. Try again in a moment.';
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
 function usePrefersReducedMotion(): boolean {
@@ -71,7 +73,7 @@ function gapBelowTitleBar(button: HTMLElement | null): number {
 }
 
 export function UpdateButton() {
-  const { state, installing, busy, follow, check, download, install } = useUpdateStore();
+  const { state, installing, follow, check, download, install } = useUpdateStore();
   useEffect(follow, [follow]);
   const [isActionPending, setIsActionPending] = useState(false);
   const [checkAnimationKey, setCheckAnimationKey] = useState(0);
@@ -117,15 +119,13 @@ export function UpdateButton() {
   const idleTooltip = !showUpdateDetails && !showCheckIcon ? getUpdateIdleTooltip(state) : null;
   const tooltip = installing
     ? 'Installing…'
-    : busy
-      ? BUSY
-      : showUpdateDetails
-        ? state
-          ? getUpdateButtonTooltip(state)
-          : 'Update available'
-        : showCheckIcon
-          ? 'Checking for updates…'
-          : (idleTooltip?.title ?? 'Check for updates');
+    : showUpdateDetails
+      ? state
+        ? getUpdateButtonTooltip(state)
+        : 'Update available'
+      : showCheckIcon
+        ? 'Checking for updates…'
+        : (idleTooltip?.title ?? 'Check for updates');
   const disabled = showCheckIcon
     ? true
     : showUpdateDetails
@@ -135,15 +135,28 @@ export function UpdateButton() {
   const showReleaseNotes = showUpdateDetails && !!state && state.releaseNotes.length > 0;
   const notesOpen = showReleaseNotes && (hovered || focused);
 
-  const handleAction = () => {
-    if (isInteractionDisabled || !state) return;
-    if (action === 'install') {
-      void install();
-      return;
-    }
+  const handleAction = async () => {
+    const bridge = boardApp();
+    if (isInteractionDisabled || !bridge || !state) return;
     setIsActionPending(true);
     if (action === 'download') {
       void download().finally(() => setIsActionPending(false));
+      return;
+    }
+    if (action === 'install') {
+      let confirmed = false;
+      try {
+        confirmed = await bridge.confirmRestart(getUpdateInstallConfirmationMessage(state));
+      } catch (error) {
+        setIsActionPending(false);
+        toastUpdateError('Could not confirm update', errorMessage(error, 'Update confirmation failed.'));
+        return;
+      }
+      if (!confirmed) {
+        setIsActionPending(false);
+        return;
+      }
+      void install().finally(() => setIsActionPending(false));
       return;
     }
     if (!prefersReducedMotion) {
@@ -183,7 +196,7 @@ export function UpdateButton() {
           : ['text-(--update-icon)', !isInteractionDisabled && 'hover:bg-(--update-hover) hover:text-(--fg)'],
         disabled && !showUpdateIconState && 'opacity-60',
       ].flat().filter(Boolean).join(' ')}
-      onClick={handleAction}
+      onClick={() => void handleAction()}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
     >

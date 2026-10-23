@@ -4,7 +4,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
 
-import type { UpdateState } from './board-app.ts';
+import type { UpdateActionResult, UpdateState } from './board-app.ts';
 
 export type UpdateButtonAction = 'download' | 'install' | 'none';
 
@@ -55,6 +55,19 @@ export function getUpdateButtonTooltip(state: UpdateState): string {
     return state.message ?? 'Update failed';
   }
   return 'Up to date';
+}
+
+/** The board's wording, not T3's running-tasks warning. */
+export function getUpdateInstallConfirmationMessage(state: Pick<UpdateState, 'availableVersion' | 'downloadedVersion'>): string {
+  const version = state.downloadedVersion ?? state.availableVersion;
+  return `The board app will restart to install${version ? ` ${version}` : ' the update'}.`;
+}
+
+export function getUpdateActionError(result: UpdateActionResult): string | null {
+  if (!result.accepted || result.completed) return null;
+  if (typeof result.state.message !== 'string') return null;
+  const message = result.state.message.trim();
+  return message.length > 0 ? message : null;
 }
 
 export function canCheckForUpdate(state: UpdateState | null): boolean {

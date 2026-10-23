@@ -78,3 +78,50 @@ test('Queue rejects requests from other pages and sample mode', async (t) => {
   assert.equal((await queue(sample, 'PVTI_sample01')).status, 403);
   assert.equal((await sample.calls()).length, 0);
 });
+
+const backToList = (board: Board, itemId: string, origin = board.url) => board.post({ itemId }, origin, '/api/back-to-list');
+
+test('Back to List sets List on GitHub and the board shows it at once', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')] });
+  await until(board, (d) => d.items.length === 1);
+  const response = await backToList(board, 'PVTI_12');
+  assert.equal(response.status, 200);
+  assert.equal(statusOf((await response.json()).board, 'PVTI_12'), 'List');
+  assert.equal(statusOf(await board.board(), 'PVTI_12'), 'List');
+  const edits = (await board.calls()).filter((args) => args[1] === 'item-edit');
+  assert.deepEqual(edits, [['project', 'item-edit', '--project-id', 'PVT_1', '--id', 'PVTI_12',
+    '--field-id', 'FIELD_1', '--single-select-option-id', 'LIST_1']]);
+});
+
+test('Back to List only moves Queued items and is a no-op for an item already in List', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'List'), rawIssue(13, 'Ready')] });
+  await until(board, (d) => d.items.length === 2);
+  assert.equal((await backToList(board, 'PVTI_12')).status, 200);
+  const refused = await backToList(board, 'PVTI_13');
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, 'Only Queued items can be moved back to List; this one is in Ready.');
+  assert.equal((await backToList(board, 'PVTI_missing')).status, 404);
+  assert.equal((await board.post({ itemId: 7 }, board.url, '/api/back-to-list')).status, 400);
+  assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
+});
+
+test('a failed Back to List write leaves the item Queued and reports the error', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], fail: 'status' });
+  await until(board, (d) => d.items.length === 1);
+  const response = await backToList(board, 'PVTI_12');
+  assert.equal(response.status, 502);
+  assert.match((await response.json()).error, /GitHub temporarily unavailable/);
+  assert.equal(statusOf(await board.board(), 'PVTI_12'), 'Queued');
+});
+
+test('Back to List rejects requests from other pages and sample mode', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')] });
+  await until(board, (d) => d.items.length === 1);
+  for (const origin of ['https://evil.example', 'null', '']) assert.equal((await backToList(board, 'PVTI_12', origin)).status, 403);
+  assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
+  const sample = await startBoard(t, {}, true);
+  const response = await backToList(sample, 'PVTI_sample01');
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error, 'Moving items back to List is disabled in sample mode.');
+  assert.equal((await sample.calls()).length, 0);
+});

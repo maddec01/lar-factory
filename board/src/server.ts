@@ -25,7 +25,7 @@ import { DEFAULT_UI } from './render.ts';
 import { canAbandon, workMessage } from './model.ts';
 import { revisionCheck } from './revision.ts';
 import { lockHolder, readProgress, updatePaths } from './update-state.ts';
-import type { BoardData, Item } from './model.ts';
+import type { BoardData, Item, Status } from './model.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
@@ -250,18 +250,38 @@ async function captureItem(req: IncomingMessage, res: ServerResponse): Promise<v
   json(res, result.error ? 502 : 200, { ...result, board: state });
 }
 
-async function queueItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!capture.enabled) return json(res, 403, { error: 'Queuing is disabled in sample mode.' });
-  const input = await readJson(req, res, 'the item to queue');
+/** A status change the board's buttons make: Queue moves List to Queued, Back to List the reverse. */
+interface Move {
+  from: Status;
+  to: Status;
+  disabled: string;
+  what: string;
+  unnamed: string;
+  refused: (status: Status) => string;
+}
+
+const QUEUE: Move = {
+  from: 'List', to: 'Queued', disabled: 'Queuing is disabled in sample mode.', what: 'the item to queue',
+  unnamed: 'Name the item to queue.', refused: (status) => `Only List items can be queued; this one is in ${status}.`,
+};
+
+const BACK_TO_LIST: Move = {
+  from: 'Queued', to: 'List', disabled: 'Moving items back to List is disabled in sample mode.', what: 'the item to move back to List',
+  unnamed: 'Name the item to move back to List.', refused: (status) => `Only Queued items can be moved back to List; this one is in ${status}.`,
+};
+
+async function moveItem(req: IncomingMessage, res: ServerResponse, move: Move): Promise<void> {
+  if (!capture.enabled) return json(res, 403, { error: move.disabled });
+  const input = await readJson(req, res, move.what);
   if (!input) return;
-  if (typeof input.itemId !== 'string') return json(res, 400, { error: 'Name the item to queue.' });
+  if (typeof input.itemId !== 'string') return json(res, 400, { error: move.unnamed });
   const item = state.items.find((i) => i.id === input.itemId);
   if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
-  if (item.status === 'Queued') return json(res, 200, { error: null, board: state });
-  if (item.status !== 'List') return json(res, 409, { error: `Only List items can be queued; this one is in ${item.status}.` });
-  const error = await setItemStatus({ ...config, number: projectNumber }, item.id, 'Queued');
+  if (item.status === move.to) return json(res, 200, { error: null, board: state });
+  if (item.status !== move.from) return json(res, 409, { error: move.refused(item.status) });
+  const error = await setItemStatus({ ...config, number: projectNumber }, item.id, move.to);
   if (error) return json(res, 502, { error, board: state });
-  showChanged({ ...item, status: 'Queued' });
+  showChanged({ ...item, status: move.to });
   json(res, 200, { error: null, board: state });
 }
 
@@ -389,7 +409,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return json(res, 403, { error: 'Submit from this board page.' });
   }
   if (req.method === 'POST' && path === '/api/items') return captureItem(req, res);
-  if (req.method === 'POST' && path === '/api/queue') return queueItem(req, res);
+  if (req.method === 'POST' && path === '/api/queue') return moveItem(req, res, QUEUE);
+  if (req.method === 'POST' && path === '/api/back-to-list') return moveItem(req, res, BACK_TO_LIST);
   if (req.method === 'POST' && path === '/api/start') return startItem(req, res);
   if (req.method === 'POST' && path === '/api/update') return updateBoard(res);
   if (req.method === 'POST' && path === '/api/abandon') return abandonListItem(req, res);

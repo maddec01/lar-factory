@@ -1,11 +1,12 @@
 // The board app's main process: starts the board server as a child with the login
 // shell's PATH, shows its page in a window, starts the server again if it crashes,
-// installs the bundled skills, answers the settings screen's profile calls and stops
-// the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and
+// installs the bundled skills, answers the settings screen's profile calls, checks
+// Releases for updates and stops the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and
 // window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
+import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
@@ -24,6 +25,8 @@ import * as IpcChannels from "./ipcChannels.ts";
 import * as LaunchSecret from "./LaunchSecret.ts";
 import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
 import * as StartingPage from "./StartingPage.ts";
+import * as AppUpdates from "./updates/AppUpdates.ts";
+import * as ElectronUpdater from "./updates/ElectronUpdater.ts";
 import * as WindowTitleBar from "./WindowTitleBar.ts";
 
 /** Resolves once the user quits the app or closes its last window. */
@@ -123,16 +126,14 @@ const installSkills = SkillInstall.onLaunch({
   ),
 );
 
-/**
- * The settings screen's calls: list the Claude profiles and tick or untick one by name.
- * Each is refused from any page but the current board server's, and while no server is ready.
- */
+/** Throws for a call from any page but the current board server's, and while no server is ready. */
+const boardPageOnly = (boardOrigin: () => string, refusal: string) => (event: Electron.IpcMainInvokeEvent) => {
+  if (!ClaudeProfiles.fromBoard(event.senderFrame?.url, boardOrigin())) throw new Error(refusal);
+};
+
+/** The settings screen's calls: list the Claude profiles and tick or untick one by name. */
 const handleProfiles = (boardOrigin: () => string) => {
-  const checkSender = (event: Electron.IpcMainInvokeEvent) => {
-    if (!ClaudeProfiles.fromBoard(event.senderFrame?.url, boardOrigin())) {
-      throw new Error("Only the board's page can change the Claude profiles");
-    }
-  };
+  const checkSender = boardPageOnly(boardOrigin, "Only the board's page can change the Claude profiles");
   const home = SkillInstall.installHome(NodeOS.homedir(), process.env);
   Electron.ipcMain.handle(IpcChannels.LIST_PROFILES, (event) => {
     checkSender(event);
@@ -144,12 +145,50 @@ const handleProfiles = (boardOrigin: () => string) => {
   });
 };
 
+/** The updater's calls, as T3 Code's update IPC handlers. */
+const handleUpdates = (boardOrigin: () => string, updates: AppUpdates.AppUpdates) => {
+  const checkSender = boardPageOnly(boardOrigin, "Only the board's page can use the app's updates");
+  const handle = (channel: string, call: (...args: Array<unknown>) => Effect.Effect<unknown, Error>) =>
+    Electron.ipcMain.handle(channel, (event, ...args) => {
+      checkSender(event);
+      return Effect.runPromise(call(...args));
+    });
+  handle(IpcChannels.UPDATE_GET_STATE, () => updates.getState);
+  handle(IpcChannels.UPDATE_CHECK, () => updates.check);
+  handle(IpcChannels.UPDATE_DOWNLOAD, () => updates.download);
+  handle(IpcChannels.UPDATE_INSTALL, () => updates.install);
+  handle(IpcChannels.UPDATE_SET_CHANNEL, (channel) =>
+    channel === "latest" || channel === "nightly"
+      ? updates.setChannel(channel)
+      : Effect.fail(new Error("The update channel must be latest or nightly")),
+  );
+};
+
+/** Checks Releases for updates from now until the scope closes, telling the window each new state. */
+const startUpdates = (window: Electron.BrowserWindow) =>
+  Effect.gen(function* () {
+    const isPackaged = Electron.app.isPackaged;
+    return yield* AppUpdates.make({
+      updater: yield* Effect.promise(ElectronUpdater.make),
+      version: Electron.app.getVersion(),
+      // electron-builder writes the feed's app-update.yml beside app.asar.
+      disabledReason: AppUpdates.disabledReason({
+        isPackaged,
+        hasFeedConfig: isPackaged && NodeFS.existsSync(NodePath.join(process.resourcesPath, "app-update.yml")),
+      }),
+      publish: (state) => {
+        if (!window.isDestroyed()) window.webContents.send(IpcChannels.UPDATE_STATE, state);
+      },
+    });
+  });
+
 const program = Effect.gen(function* () {
   yield* Effect.promise(() => Electron.app.whenReady());
   // One secret per launch, shared by the restarted servers and the page.
   const secret = LaunchSecret.make();
   const board = openBoardWindow(secret);
   handleProfiles(board.origin);
+  handleUpdates(board.origin, yield* startUpdates(board.window));
   // Opening the app again brings this window forward; the second copy has already quit.
   Electron.app.on("second-instance", () => {
     if (board.window.isMinimized()) board.window.restore();

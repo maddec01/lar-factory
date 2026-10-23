@@ -2,7 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import { STATUSES, isBuild, sliceProgress } from './model.ts';
-import type { Checks, ContentType, IssueLinks, IssueRef, Item, LinkedPr, Slice, Status } from './model.ts';
+import type { Checks, ContentType, IssueRef, Item, LinkedPr, Slice, Status } from './model.ts';
 import type { BoardConfig } from './config.ts';
 import type { CreationProgress, CreationResult } from './add-item.ts';
 import { validateDraft } from './add-item.ts';
@@ -12,8 +12,6 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 /** Checks read per PR for the start time; the counts always cover all of them. */
 const CHECK_SLICE = 20;
-/** Blocked-by and blocking links read per issue; the rest are counted. */
-const LINK_SLICE = 20;
 /** A build's slices read per build; more than this is a build to split. */
 const SLICE_LIMIT = 50;
 /** Issues read per search page; a search pages up to GitHub's 1000 results. */
@@ -44,8 +42,6 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               subIssuesSummary { total completed }
               subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state stateReason repository { nameWithOwner } } }
               issueDependenciesSummary { blockedBy }
-              blockedBy(first: ${LINK_SLICE}) { ...links }
-              blocking(first: ${LINK_SLICE}) { ...links }
               closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
                 nodes {
                   number url state isDraft body mergedAt
@@ -69,11 +65,6 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
       }
     }
   }
-}
-
-fragment links on IssueConnection {
-  totalCount
-  nodes { number title url state repository { nameWithOwner } }
 }`;
 
 /**
@@ -116,11 +107,6 @@ export interface Searched {
   builds?: ReadonlySet<string>;
 }
 
-interface RawIssueLinks {
-  totalCount: number;
-  nodes: RawIssueRef[];
-}
-
 interface RawContent {
   __typename: ContentType;
   title: string;
@@ -136,8 +122,6 @@ interface RawContent {
   subIssuesSummary?: { total: number; completed: number };
   subIssues?: { nodes: RawIssueRef[] };
   issueDependenciesSummary?: { blockedBy: number };
-  blockedBy?: RawIssueLinks;
-  blocking?: RawIssueLinks;
   closedByPullRequestsReferences?: { nodes: RawLinkedPr[] };
 }
 
@@ -239,11 +223,6 @@ function normalizeIssueRef(raw: RawIssueRef): IssueRef {
   return { number: raw.number, title: raw.title, url: raw.url, repo: raw.repository.nameWithOwner, state: raw.state };
 }
 
-/** Drafts and PRs have no links. */
-function normalizeLinks(raw: RawIssueLinks | undefined): IssueLinks {
-  return { total: raw?.totalCount ?? 0, nodes: raw?.nodes.map(normalizeIssueRef) ?? [] };
-}
-
 const rawLabels = (raw: RawItem): string[] => raw.content?.labels?.nodes.map((l) => l.name) ?? [];
 
 const refKey = (repo: string | null, number: number | null) => `${repo}#${number}`;
@@ -293,8 +272,6 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
     subIssues: subIssueCounts(raw, builds),
     blockedBy: c.issueDependenciesSummary?.blockedBy ?? 0,
-    blockers: normalizeLinks(c.blockedBy),
-    blocking: normalizeLinks(c.blocking),
     updatedAt: updated,
     closedAt: c.closedAt ?? null,
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
@@ -534,7 +511,6 @@ export async function addProjectItem(
       id: progress.itemId, status: 'List', type: 'Issue', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'OPEN',
       parent: null, subIssues: { total: 0, completed: 0 }, blockedBy: 0,
-      blockers: { total: 0, nodes: [] }, blocking: { total: 0, nodes: [] },
       updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],
     };
     return { item: progress.item, issueUrl: issue.html_url, error: null };

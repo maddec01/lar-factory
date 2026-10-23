@@ -1,10 +1,11 @@
 // The app's Settings dialog: whether it's open, the Claude profiles the app's bridge lists, the tick
-// being changed, and what the last call did. Opening reads the profiles again, and keeps reading them until
-// the app has installed its skills.
+// being changed, the update channel being switched to, and what the last call did. Opening reads the
+// profiles again, and keeps reading them until the app has installed its skills.
 
 import { create } from 'zustand';
 import type { ClaudeProfile } from '../install-skills.ts';
-import { boardApp, type ProfilesResult } from './board-app.ts';
+import { boardApp, type ProfilesResult, type UpdateChannel } from './board-app.ts';
+import { useUpdateStore } from './update-store.ts';
 
 export interface SettingsResult { text: string; tone?: 'success' | 'warning' | 'error'; paths?: string[] }
 
@@ -19,6 +20,9 @@ interface SettingsState {
   pending: string | null;
   result: SettingsResult;
   setTick: (name: string, ticked: boolean) => Promise<void>;
+  /** The channel the app is switching to. */
+  switchingTo: UpdateChannel | null;
+  setChannel: (channel: UpdateChannel) => Promise<void>;
 }
 
 /** The profile as its path in the home. */
@@ -47,6 +51,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   profiles: null,
   installed: true,
   pending: null,
+  switchingTo: null,
   result: { text: '' },
   setOpen: (open) => {
     const call = ++listing;
@@ -79,6 +84,17 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       set({ result: { text: `Couldn't change ${where}: ${failure(error)}`, tone: 'error' } });
     } finally {
       set({ pending: null });
+    }
+  },
+  setChannel: async (channel) => {
+    if (get().switchingTo) return;
+    set({ switchingTo: channel, result: { text: '' } });
+    try {
+      useUpdateStore.setState({ state: await boardApp()!.setUpdateChannel(channel) });
+    } catch (error) {
+      set({ result: { text: `Couldn't switch to ${channel}: ${failure(error)}`, tone: 'error' } });
+    } finally {
+      set({ switchingTo: null });
     }
   },
 }));

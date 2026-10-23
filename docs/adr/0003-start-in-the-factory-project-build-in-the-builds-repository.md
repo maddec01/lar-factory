@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0009
+---
+
 # Start in the factory project; build in the build's repository
 
 [Issue #9's confirmed brief](https://github.com/maddec01/mux-factory/issues/9)
@@ -20,3 +24,5 @@ that needs it and blocking it, so a request spanning repositories needs no
 concept map ([issue #86](https://github.com/maddec01/mux-factory/issues/86)); the benefit of shared planning context
 with separate build workspaces is an inference from that arrangement, not a
 recorded historical rationale or comparison of alternatives.
+
+Superseded by [ADR 0009](0009-start-in-the-issues-repository-project.md): Start now opens the thread in the issue's repository project.

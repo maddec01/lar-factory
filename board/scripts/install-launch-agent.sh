@@ -48,6 +48,10 @@ if [[ "${1:-}" == "--print" ]]; then
   exit 0
 fi
 
+# Build the page before stopping the running board: if the build fails, the old board keeps running.
+command -v pnpm >/dev/null || { echo "pnpm not found on PATH" >&2; exit 1; }
+(cd "$BOARD_DIR" && pnpm run build) || { echo "the board page did not build; the running board was left as it was" >&2; exit 1; }
+
 mkdir -p "$(dirname "$PLIST")" "$(dirname "$LOG")"
 render > "$PLIST.tmp"
 plutil -lint "$PLIST.tmp" >/dev/null

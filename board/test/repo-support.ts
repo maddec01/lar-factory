@@ -24,7 +24,7 @@ export function checkouts(home: string, origins: Record<string, string | null>, 
 
 /** Real, isolated Git histories; no network or user Git configuration. */
 export async function factoryRepo(t: TestContext) {
-  const dir = await mkdtemp(join(tmpdir(), 'mux update test '));
+  const dir = await mkdtemp(join(tmpdir(), 'mux factory test '));
   // Runs before a board started later is killed, so its git fetch may still be writing: retry.
   t.after(() => rm(dir, { recursive: true, force: true, maxRetries: 10 }));
   const repo = join(dir, 'factory');
@@ -35,15 +35,11 @@ export async function factoryRepo(t: TestContext) {
   git('init', '-b', 'main');
   git('config', 'user.name', 'Test');
   git('config', 'user.email', 'test@example.invalid');
-  for (const folder of ['src', 'scripts', 'launchd']) {
-    await cp(new URL(`../${folder}`, import.meta.url), join(repo, 'board', folder), { recursive: true });
-  }
+  await cp(new URL('../src', import.meta.url), join(repo, 'board/src'), { recursive: true });
   await cp(new URL('../.gitignore', import.meta.url), join(repo, 'board/.gitignore'));
   // The built page, which .gitignore keeps out of the fixture's commits as it does in the real repo.
   await cp(new URL('../dist', import.meta.url), join(repo, 'board/dist'), { recursive: true });
-  await cp(new URL('../../scripts/install.sh', import.meta.url), join(repo, 'scripts/install.sh'));
   await cp(new URL('../../config.json', import.meta.url), join(repo, 'config.json'));
-  await cp(new URL('../../UPSTREAM.md', import.meta.url), join(repo, 'UPSTREAM.md'));
   await cp(new URL('./sample.json', import.meta.url), join(repo, 'sample.json'));
   await writeFile(join(repo, 'board/package.json'), '{"type":"module"}');
   git('add', '.');

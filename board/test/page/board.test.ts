@@ -262,11 +262,6 @@ test('sample mode disables every write button; Start still opens its menu', asyn
   expect($$<HTMLButtonElement>('[data-start]').every((b) => !b.disabled && !b.hasAttribute('aria-disabled'))).toBe(true);
 });
 
-test('a running update holds the write buttons', async () => {
-  await mountPage({ ...sample, update: { state: 'running', pid: 1, finished: [], current: 'check', startedAt: '2026-10-21T09:59:00Z', finishedAt: null, revision: null, error: null, logTail: null } });
-  expect($$('[data-queue], [data-abandon], [data-back-to-list], [data-start]').every((b) => b.getAttribute('aria-disabled') === 'true')).toBe(true);
-});
-
 test('empty sections say what would go there, and how to queue', async () => {
   await mountPage({ ...sample, items: [] });
   expect($$('#panel-board .empty').map(text)).toEqual([

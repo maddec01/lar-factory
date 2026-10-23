@@ -1,8 +1,8 @@
 // The board app's main process: starts the board server as a child with the login
 // shell's PATH, shows its page in a window, starts the server again if it crashes,
-// installs the bundled skills, answers the settings screen's profile calls, checks
-// Releases for updates and stops the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and
-// window/DesktopWindow.ts.
+// installs the bundled skills, removes the old launch agent, answers the settings
+// screen's profile calls, checks Releases for updates and stops the server when the
+// app quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
@@ -19,6 +19,7 @@ import * as Electron from "electron";
 import * as BoardServer from "./backend/BoardServer.ts";
 import * as BoardSupervisor from "./backend/BoardSupervisor.ts";
 import * as ClaudeProfiles from "./backend/ClaudeProfiles.ts";
+import * as LaunchAgentCleanup from "./backend/LaunchAgentCleanup.ts";
 import * as SkillInstall from "./backend/SkillInstall.ts";
 import * as ExternalLink from "./ExternalLink.ts";
 import * as IpcChannels from "./ipcChannels.ts";
@@ -208,6 +209,15 @@ const program = Effect.gen(function* () {
   // Starts after the board server. The copy is synchronous, so it blocks the main
   // process briefly after start.
   yield* Effect.forkScoped(installSkills);
+  // The app replaces the launch agent that ran the board before it.
+  yield* Effect.forkScoped(
+    LaunchAgentCleanup.onLaunch({
+      isPackaged: Electron.app.isPackaged,
+      home: NodeOS.homedir(),
+      uid: process.getuid?.() ?? NodeOS.userInfo().uid,
+      launchctl: "/bin/launchctl",
+    }),
+  );
   yield* quitRequested;
 }).pipe(
   Effect.scoped,

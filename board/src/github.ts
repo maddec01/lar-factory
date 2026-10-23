@@ -6,8 +6,8 @@ import type { Checks, ContentType, IssueLinks, IssueRef, Item, LinkedPr, Slice, 
 import type { BoardConfig } from './config.ts';
 import type { CreationProgress, CreationResult } from './add-item.ts';
 import { validateDraft } from './add-item.ts';
+import { missingTool, toolCommand } from './tools.ts';
 
-const GH = process.env.GH_PATH || 'gh';
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 /** Checks read per PR for the start time; the counts always cover all of them. */
@@ -344,8 +344,10 @@ export function sliceLabelSearch(label: 'active' | 'blocked', raws: RawItem[], b
 // ---------- gh ----------
 
 function gh(args: string[]): Promise<string> {
+  const command = toolCommand('gh');
+  if (!command) return Promise.reject(new Error(`${missingTool('gh')} Install it with \`brew install gh\` or set GH_PATH.`));
   return new Promise((resolve, reject) => {
-    execFile(GH, args, { timeout: 30_000, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(command.file, args, { env: command.env, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         const detail = (stderr || stdout || err.message).trim().split('\n').slice(0, 4).join('\n');
         reject(new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${detail}`));

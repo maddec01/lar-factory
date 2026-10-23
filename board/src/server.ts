@@ -14,6 +14,8 @@ import { loadConfig } from './config.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
 import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
+import { lookUpTools, missingTool } from './tools.ts';
+import type { ToolName } from './tools.ts';
 import { repositoryProject } from './repository-project.ts';
 import type { RepositoryProject } from './repository-project.ts';
 import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './item-stats.ts';
@@ -533,6 +535,15 @@ const server = createServer((req, res) => {
     if (!res.headersSent) send(res, 500, 'text/plain; charset=utf-8', 'Internal error\n');
   });
 });
+
+// Sample mode runs no tools, so it looks none up.
+if (!fixture) {
+  const found = await lookUpTools();
+  for (const name of ['t3', 'gh', 'az'] as ToolName[]) {
+    const path = found[name].path;
+    log(path ? `${name} at ${path}` : missingTool(name));
+  }
+}
 
 server.listen(config.port, HOST, () => {
   log(`board on http://${HOST}:${config.port}, refreshing every ${config.refreshSeconds} s`);

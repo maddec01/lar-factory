@@ -2,8 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import type { ModelChoice, StartedThread } from './model.ts';
-
-const T3 = process.env.T3_PATH || 't3';
+import { missingTool, toolCommand } from './tools.ts';
 
 export interface StartResult {
   thread: StartedThread | null;
@@ -21,11 +20,14 @@ const UNCERTAIN: StartResult = { thread: null, uncertain: true,
  */
 export function startThread(project: string, message: string, choice?: ModelChoice): Promise<StartResult> {
   const model = choice ? ['--provider', choice.instanceId, '--model', choice.model] : [];
+  const command = toolCommand('t3');
+  const missing = `${missingTool('t3')} Install the T3 Code CLI or set T3_PATH.`;
+  if (!command) return Promise.resolve({ thread: null, error: missing });
   return new Promise((resolve) => {
-    execFile(T3, ['thread', 'start', project, message, ...model, '--json'], { timeout: 60_000 }, (err, stdout, stderr) => {
+    execFile(command.file, ['thread', 'start', project, message, ...model, '--json'], { env: command.env, timeout: 60_000 }, (err, stdout, stderr) => {
       if (err) {
         const code = (err as NodeJS.ErrnoException).code as unknown;
-        if (code === 'ENOENT') return resolve({ thread: null, error: `${T3} was not found. Install the T3 Code CLI or set T3_PATH.` });
+        if (code === 'ENOENT') return resolve({ thread: null, error: missing });
         // An exit code means t3 itself reported the failure; a signal (such as our timeout) leaves it unknown.
         if (typeof code !== 'number') return resolve(UNCERTAIN);
         const detail = (stderr || stdout || err.message).trim().split('\n').slice(0, 4).join('\n');

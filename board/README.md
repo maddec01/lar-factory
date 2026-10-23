@@ -57,10 +57,17 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
   issue is created, its link and **Retry this submission** finish the same issue.
 
 Creation and Queue use the same local `gh` login as reads and need permission
-to create issues and edit the Mux project. Start runs the local `t3` CLI (or
-`T3_PATH`) and needs T3 Code running. If a response is lost, retry the current
-submission. An uncertain GitHub creation or a board restart asks you to check
-the repository issues before starting another item.
+to create issues and edit the Mux project. Start runs the local `t3` CLI and
+needs T3 Code running. If a response is lost, retry the current submission. An
+uncertain GitHub creation or a board restart asks you to check the repository
+issues before starting another item.
+
+At startup the board looks up `t3`, `gh` and `az` the way T3 Code does, so it
+finds them when opened with a bare PATH. For each tool it tries the override
+(`T3_PATH`, `GH_PATH`, `AZ_PATH`), then your login shell's PATH, then
+`/opt/homebrew/bin` and `/usr/local/bin`. An override with a `/` is used as
+given, and if it isn't runnable the tool counts as missing. A bare name is
+looked up on the PATH. Sample mode looks up no tools.
 
 If `gh` can't reach GitHub, the board keeps the last data it read and shows a
 stale warning. `pnpm run sample` serves `test/sample.json` instead of GitHub;

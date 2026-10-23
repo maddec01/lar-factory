@@ -12,6 +12,7 @@ import { Header } from './Header.tsx';
 import { restoreAnchor } from './keep-anchor.ts';
 import { useSetView, useView } from './router.tsx';
 import { Toasts } from './Toasts.tsx';
+import { UpdateToast } from './Update.tsx';
 
 const VIEWS: { view: View; label: string }[] = [{ view: 'board', label: 'Board' }, { view: 'flow', label: 'Flow' }];
 
@@ -62,7 +63,7 @@ export function App() {
       </main>
       {/* Outside main, so the announcement sits apart from the views. */}
       <CopyStatus />
-      <Toasts />
+      <Toasts><UpdateToast /></Toasts>
       <AbandonDialog />
     </>
   );

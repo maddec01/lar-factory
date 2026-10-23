@@ -1,7 +1,8 @@
 // The board app's main process: starts the board server as a child with the login
 // shell's PATH, shows its page in a window, starts the server again if it crashes,
-// installs the bundled skills and stops the server when the app quits. Modelled on
-// T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
+// installs the bundled skills, answers the settings screen's profile calls and stops
+// the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and
+// window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
@@ -16,8 +17,10 @@ import * as Electron from "electron";
 
 import * as BoardServer from "./backend/BoardServer.ts";
 import * as BoardSupervisor from "./backend/BoardSupervisor.ts";
+import * as ClaudeProfiles from "./backend/ClaudeProfiles.ts";
 import * as SkillInstall from "./backend/SkillInstall.ts";
 import * as ExternalLink from "./ExternalLink.ts";
+import * as IpcChannels from "./ipcChannels.ts";
 import * as LaunchSecret from "./LaunchSecret.ts";
 import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
 import * as StartingPage from "./StartingPage.ts";
@@ -102,7 +105,7 @@ const openBoardWindow = (secret: string) => {
         return boardShown ? Effect.void : load(StartingPage.url(reason));
       }),
   };
-  return { window, events, showStarting: load(StartingPage.url()) };
+  return { window, events, origin: () => origin, showStarting: load(StartingPage.url()) };
 };
 
 /** Installs the bundled skills and shows the user an error or conflicts. */
@@ -120,11 +123,33 @@ const installSkills = SkillInstall.onLaunch({
   ),
 );
 
+/**
+ * The settings screen's calls: list the Claude profiles and tick or untick one by name.
+ * Each is refused from any page but the current board server's, and while no server is ready.
+ */
+const handleProfiles = (boardOrigin: () => string) => {
+  const checkSender = (event: Electron.IpcMainInvokeEvent) => {
+    if (!ClaudeProfiles.fromBoard(event.senderFrame?.url, boardOrigin())) {
+      throw new Error("Only the board's page can change the Claude profiles");
+    }
+  };
+  const home = SkillInstall.installHome(NodeOS.homedir(), process.env);
+  Electron.ipcMain.handle(IpcChannels.LIST_PROFILES, (event) => {
+    checkSender(event);
+    return ClaudeProfiles.list(home);
+  });
+  Electron.ipcMain.handle(IpcChannels.SET_PROFILE_TICK, (event, name: unknown, ticked: unknown) => {
+    checkSender(event);
+    return ClaudeProfiles.setTick(home, name, ticked);
+  });
+};
+
 const program = Effect.gen(function* () {
   yield* Effect.promise(() => Electron.app.whenReady());
   // One secret per launch, shared by the restarted servers and the page.
   const secret = LaunchSecret.make();
   const board = openBoardWindow(secret);
+  handleProfiles(board.origin);
   // Opening the app again brings this window forward; the second copy has already quit.
   Electron.app.on("second-instance", () => {
     if (board.window.isMinimized()) board.window.restore();

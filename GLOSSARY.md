@@ -124,6 +124,10 @@ _Avoid_: child task (for native subagents), helper
 A fresh-context agent assessing a change on one review axis: code, security,
 UX or UI.
 
+**Review round**:
+One pass of the reviewers over a diff. The first covers the whole branch; each later one covers only the fixes from the round before, with at most three per build.
+_Avoid_: Review pass, re-review
+
 **Approver**:
 The agent that opens the reviewed change's PR and recommends Verify or Ready
 to merge; Pedro remains the person who merges it.

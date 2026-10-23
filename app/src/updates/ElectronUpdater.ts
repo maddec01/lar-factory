@@ -18,6 +18,12 @@ export class ElectronUpdaterError extends Data.TaggedError("ElectronUpdaterError
     const reason = this.cause instanceof Error ? this.cause.message : String(this.cause);
     return `Could not ${this.operation} the update: ${reason.split("\n", 1)[0]}`;
   }
+
+  /** electron-updater's error code, such as `ERR_UPDATER_CHANNEL_FILE_NOT_FOUND`, if it gave one. */
+  get code(): string | null {
+    const code = (this.cause as { code?: unknown } | null)?.code;
+    return typeof code === "string" ? code : null;
+  }
 }
 
 /** The updater events the app listens to. */

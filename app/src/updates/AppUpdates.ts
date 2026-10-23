@@ -15,6 +15,7 @@ import type {
   UpdateCheckResult,
   UpdateState,
 } from "../../../board/src/app/board-app.ts";
+import type { ChannelSetting } from "./ChannelSetting.ts";
 import type { ElectronUpdater, ElectronUpdaterError } from "./ElectronUpdater.ts";
 import { normalizeReleaseNotes } from "./releaseNotes.ts";
 import * as Machine from "./updateMachine.ts";
@@ -41,6 +42,14 @@ export const disabledReason = (app: { readonly isPackaged: boolean; readonly has
   return null;
 };
 
+// electron-updater's codes for a channel with no Release or no feed file. With no Stable
+// Release yet, latest has neither, which means there is no update rather than a failure.
+const NO_RELEASE_CODES = new Set([
+  "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
+  "ERR_UPDATER_LATEST_VERSION_NOT_FOUND",
+  "ERR_UPDATER_NO_PUBLISHED_VERSIONS",
+]);
+
 /** The board server, which an install stops first, as T3 Code stops its backends. */
 export interface BoardServerControl {
   /** Drains the server's writes and stops it. */
@@ -54,6 +63,8 @@ export interface AppUpdatesOptions {
   readonly board: BoardServerControl;
   readonly version: string;
   readonly disabledReason: string | null;
+  /** The channel chosen in Settings; before a choice the app follows the installed version's. */
+  readonly channelSetting: ChannelSetting;
   /** Called with each new state, to send it to the page. */
   readonly publish: (state: UpdateState) => void;
   readonly pollTimes?: PollTimes;
@@ -83,7 +94,8 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
     const { updater, board, version, publish } = options;
     const pollTimes = options.pollTimes ?? DEFAULT_POLL_TIMES;
     const enabled = options.disabledReason === null;
-    let state = Machine.createBaseUpdateState(version, Machine.defaultChannel(version), options.disabledReason);
+    const channel = (yield* options.channelSetting.read) ?? Machine.defaultChannel(version);
+    let state = Machine.createBaseUpdateState(version, channel, options.disabledReason);
     let activeAction: UpdateAction | null = null;
 
     const setState = (next: UpdateState) => {
@@ -125,9 +137,11 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
           setState(Machine.reduceOnCheckStart(state, now()));
           yield* updater.checkForUpdates.pipe(
             Effect.catch((error: ElectronUpdaterError) =>
-              Effect.sync(() => setState(Machine.reduceOnCheckFailure(state, error.message, now()))).pipe(
-                Effect.andThen(Effect.logError(error.message)),
-              ),
+              error.code !== null && NO_RELEASE_CODES.has(error.code)
+                ? Effect.sync(() => setState(Machine.reduceOnNoUpdate(state, now())))
+                : Effect.sync(() => setState(Machine.reduceOnCheckFailure(state, error.message, now()))).pipe(
+                    Effect.andThen(Effect.logError(error.message)),
+                  ),
             ),
           );
           return true;
@@ -237,6 +251,7 @@ export const make = (options: AppUpdatesOptions): Effect.Effect<AppUpdates, neve
           activeAction = "channel";
           return yield* Effect.gen(function* () {
             setState(Machine.createBaseUpdateState(version, channel, options.disabledReason));
+            yield* options.channelSetting.write(channel);
             if (!enabled) return state;
             yield* applyChannel(channel);
             // Switching channels may offer a lower version once, as T3 Code allows.

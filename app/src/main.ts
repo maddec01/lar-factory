@@ -28,6 +28,7 @@ import * as LaunchSecret from "./LaunchSecret.ts";
 import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
 import * as StartingPage from "./StartingPage.ts";
 import * as AppUpdates from "./updates/AppUpdates.ts";
+import * as ChannelSetting from "./updates/ChannelSetting.ts";
 import * as ElectronUpdater from "./updates/ElectronUpdater.ts";
 import * as WindowTitleBar from "./WindowTitleBar.ts";
 
@@ -181,6 +182,7 @@ const startUpdates = (window: Electron.BrowserWindow, board: AppUpdates.BoardSer
         isPackaged,
         hasFeedConfig: isPackaged && NodeFS.existsSync(NodePath.join(process.resourcesPath, "app-update.yml")),
       }),
+      channelSetting: ChannelSetting.atFile(NodePath.join(Electron.app.getPath("userData"), "update-channel.json")),
       publish: (state) => {
         if (!window.isDestroyed()) window.webContents.send(IpcChannels.UPDATE_STATE, state);
       },

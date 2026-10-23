@@ -194,6 +194,17 @@ cd app && pnpm install && pnpm run dev
 The first run downloads Electron's binary. The launch-agent board keeps running
 beside it.
 
+To build a Mac app that runs without the checkout:
+
+```bash
+cd app && pnpm run build
+```
+
+It writes an unsigned Apple Silicon app to `app/release/mac-arm64/Mux Factory.app`,
+with the board's server source, its built page and a copy of `config.json`
+inside. Rebuild it after changing `config.json`. If macOS refuses to open it,
+right-click it in Finder and choose Open.
+
 ## Repo layout
 
 ```

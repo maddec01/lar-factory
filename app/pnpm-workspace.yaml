@@ -4,8 +4,11 @@
 # the repo's scripts/setup-worktree.sh runs node_modules/electron/install.js to fetch the
 # binary, and scripts/ensure-electron-runtime.mjs repairs it when the dev command
 # runs. The key stays so pnpm asks nothing.
+# electron-builder's Windows installer tool needs no build script for a Mac build;
+# T3 Code also leaves it off.
 allowBuilds:
   electron: false
+  electron-winstaller: false
   esbuild: true
 
 # Vite+ ships its own Vite. Point every dependent at that copy, as T3 Code does,

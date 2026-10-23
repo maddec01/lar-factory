@@ -24,6 +24,8 @@ files:
   - package.json
   - dist-electron/**/*
   - "!**/*.map"
+  # Goes to Resources/bundle below: Electron's fs can't copy a folder out of an asar.
+  - "!dist-electron/bundle/**/*"
   # Bundled into dist-electron/main.cjs already.
   - "!node_modules/**/*"
 
@@ -37,6 +39,8 @@ extraResources:
   # Its "type": "module" makes Node load board/src as ES modules.
   - from: ../board/package.json
     to: board/package.json
+  - from: dist-electron/bundle
+    to: bundle
   - from: ../config.json
     to: config.json
   # T3 Code's MIT licence: the main process, preload and scripts copy its code.

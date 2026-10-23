@@ -82,7 +82,7 @@ test('a draft without a kind is not sent and says why', async () => {
   expect(result().textContent, 'editing clears the message').toBe('');
 });
 
-test('submitting posts the draft, shows it sending, then the created issue, and New item starts over', async () => {
+test('submitting posts the draft, shows it sending, then closes and announces the new item', async () => {
   await open();
   await settle(() => $<HTMLInputElement>('input[value="area: web"]')!.click());
   await fillDraft();
@@ -103,17 +103,13 @@ test('submitting posts the draft, shows it sending, then the created issue, and 
   const item = { ...sample.items[0]!, title: 'Playback stalls', number: 501 };
   const board = { ...sample, items: [...sample.items, item] };
   await settle(() => finish(new Response(JSON.stringify({ item, issueUrl: created.html_url, error: null, board }))));
-  expect(result().textContent).toBe('Added #501 Playback stalls to List.View created issue');
-  expect(result().querySelector('a')!.href).toBe(created.html_url);
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(dialog()!.hidden, 'the dialog closes').toBe(true);
+  expect(document.activeElement, 'focus goes back to Add item').toBe(addButton());
+  const toast = $('.toast[role="status"]')!;
+  expect(toast.textContent).toBe('×Added #501 Playback stalls to List. View item');
+  expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added #501');
   expect($('.totals')!.textContent, 'the board shows the new data').toContain(`${sample.items.length + 1} items`);
-  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
-
-  await settle(() => field<HTMLButtonElement>('item-new').click());
-  expect(field('item-title').value).toBe('');
-  expect(field<HTMLSelectElement>('item-kind').value).toBe('');
-  expect(result().textContent).toBe('');
-  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(false);
-  expect(submit().textContent).toBe('Add to List');
 });
 
 test('a created issue the server could not add offers a retry of the same request', async () => {
@@ -183,8 +179,11 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
   const item = { ...sample.items[0]!, title: 'Playback stalls', number: 501 };
   respond({ item, issueUrl: created.html_url, error: null, board: withFactory });
   await settle(() => submit().click());
-  await settle(() => $<HTMLButtonElement>('[data-close-item]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(dialog()!.hidden).toBe(true);
   await settle(() => addButton().click());
   expect(field('item-title').value).toBe('');
   expect(result().textContent).toBe('');
+  expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(false);
+  expect(submit().textContent).toBe('Add to List');
 });

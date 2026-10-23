@@ -86,23 +86,19 @@ function AddItemForm() {
       <Result message={message} />
       <div className="form-actions">
         <button type="submit" className="copy submit-item" id="item-submit"
-          disabled={phase === 'pending' || phase === 'uncertain' || phase === 'complete' || data.capture?.enabled === false}>
+          disabled={phase === 'pending' || phase === 'uncertain' || data.capture?.enabled === false}>
           {phase === 'pending' ? 'Adding…' : phase === 'retry' ? 'Retry this submission' : 'Add to List'}
         </button>
-        <button type="button" className="copy" id="item-new" hidden={phase !== 'uncertain' && phase !== 'complete'} onClick={reset}>New item</button>
+        <button type="button" className="copy" id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>New item</button>
       </div>
     </form>
   );
 }
 
 export function AddItem() {
-  const draft = useAddItemStore((state) => state.draft);
-  const onOpenChange = (open: boolean) => {
-    // A finished item is done with; the next opening starts a new one.
-    if (open && useAddItemStore.getState().submission.phase === 'complete') useAddItemStore.getState().reset();
-  };
+  const { draft, open, setOpen } = useAddItemStore();
   return (
-    <Dialog.Root onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger className="copy add-item">Add item</Dialog.Trigger>
       <Dialog.Portal keepMounted>
         <Dialog.Backdrop className="dialog-backdrop" />

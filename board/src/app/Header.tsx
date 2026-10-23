@@ -1,5 +1,5 @@
-// The page's header: the logo, when the data was read, the counts, and the banners for stale data
-// and an unreachable server, which closes.
+// The page's header: the logo, when the data was read, the counts, Add item and Update, and the
+// banners for an update, stale data and an unreachable server, which closes.
 
 import { countsOf, isStale } from '../model.ts';
 import type { BoardData } from '../model.ts';
@@ -9,6 +9,7 @@ import { AddItem } from './AddItem.tsx';
 import { useBoardStore } from './board-store.ts';
 import { ClosableBanner } from './ClosableBanner.tsx';
 import { CLIENT_ERROR } from './live-data.ts';
+import { HeaderUpdateButton, UpdateBanners } from './Update.tsx';
 
 function BrandMark() {
   return (
@@ -50,7 +51,7 @@ export function Header() {
       <div className="title-row">
         <h1><BrandMark /><span>factory</span></h1>
         <Refreshed data={data} now={now} />
-        <span className="header-actions"><AddItem /></span>
+        <span className="header-actions"><AddItem /><HeaderUpdateButton /></span>
       </div>
       <ul className="totals" aria-label="Counts">
         <li className={counts.needsYou ? 'amber' : ''}><b>{counts.needsYou}</b> need you</li>
@@ -59,6 +60,7 @@ export function Header() {
         <li><b>{counts.list}</b> in List</li>
         <li><b>{counts.total}</b> items</li>
       </ul>
+      <UpdateBanners />
       {clientError && (
         <ClosableBanner dismissKey={CLIENT_ERROR} what=": can't reach the board server">
           <strong>Can't reach the board server.</strong> {clientError} Showing the last data this page received.

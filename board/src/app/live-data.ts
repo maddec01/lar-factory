@@ -1,15 +1,20 @@
 // Keeps the board data live: the server pushes it over /api/events, and while that stream is
-// down the page fetches /api/board every 15 s, or every second while an update runs.
+// down the page fetches /api/board every 15 s, or every second while an update runs. When the
+// update restarts the board, the page reloads onto it.
 
 import { useBoardStore } from './board-store.ts';
 import { useDismissStore } from './dismiss-store.ts';
 import { holdAnchor } from './keep-anchor.ts';
+import { followsUpdate, useUpdateStore } from './update-store.ts';
 import type { BoardData } from '../model.ts';
 
 const POLL_MS = 15_000;
 const UPDATE_POLL_MS = 1_000;
 /** The key of the banner that says the page can't reach the server. */
 export const CLIENT_ERROR = 'client-error';
+
+/** Loads the restarted board's page; tests replace it, as jsdom can't reload. */
+export const restart = { reload: (): void => location.reload() };
 
 export function startLiveData(): void {
   const board = useBoardStore.getState();
@@ -18,9 +23,13 @@ export function startLiveData(): void {
   /** Whether the server's event stream is open; the page then stops polling. */
   let streaming = false;
 
+  const update = useUpdateStore.getState();
   const receive = (text: string) => {
+    const data = JSON.parse(text) as BoardData;
+    // A new session means the board restarted: reload to run its new revision.
+    if (update.follow(data)) return restart.reload();
     holdAnchor();
-    board.receive(JSON.parse(text) as BoardData);
+    board.receive(data);
     // The server answered: if it goes away again, say so even if the last banner was closed.
     useDismissStore.getState().restore(CLIENT_ERROR);
   };
@@ -28,7 +37,7 @@ export function startLiveData(): void {
   function schedule(): void {
     clearTimeout(timer);
     // The stream drops while an update restarts the board, so an update is always polled.
-    if (useBoardStore.getState().data.update?.state === 'running') timer = setTimeout(() => void poll(), UPDATE_POLL_MS);
+    if (followsUpdate(useUpdateStore.getState())) timer = setTimeout(() => void poll(), UPDATE_POLL_MS);
     // A silent stream sends no new data; the clock still moves on, so stale data shows as stale.
     else if (streaming) timer = setTimeout(() => { board.tick(); schedule(); }, POLL_MS);
     else timer = setTimeout(() => void poll(), POLL_MS);
@@ -45,7 +54,7 @@ export function startLiveData(): void {
       const text = await res.text();
       if (fresh()) receive(text);
     } catch (err) {
-      if (fresh()) board.fail(err instanceof Error ? err.message : String(err));
+      if (fresh() && !update.away()) board.fail(err instanceof Error ? err.message : String(err));
     } finally {
       if (current === sequence) schedule();
     }
@@ -74,6 +83,11 @@ export function startLiveData(): void {
     };
   }
 
+  update.follow(useBoardStore.getState().data);
+  // Starting an update, or losing the board in one, changes how often the page polls.
+  useUpdateStore.subscribe((state, prev) => {
+    if (followsUpdate(state) !== followsUpdate(prev)) schedule();
+  });
   schedule();
   openStream();
 }

@@ -15,7 +15,7 @@ interface ActionResult {
 }
 
 /** Posts an item action and returns the server's answer, or a message when the server can't be reached. */
-async function postAction(path: string, body: object): Promise<ActionResult> {
+export async function postAction(path: string, body: object): Promise<ActionResult> {
   useBoardStore.getState().beginWrite();
   try {
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -27,7 +27,7 @@ async function postAction(path: string, body: object): Promise<ActionResult> {
 }
 
 /** Shows the board the server sent back with the action. Call inside the flushSync that shows the result. */
-function receive(result: ActionResult): void {
+export function receive(result: ActionResult): void {
   if (!result.board) return;
   const board = useBoardStore.getState();
   board.beginWrite();

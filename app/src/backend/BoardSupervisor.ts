@@ -24,14 +24,21 @@ export const restartDelay = (attempt: number, delays: RestartDelays = DEFAULT_DE
     Duration.fromInputUnsafe(delays.maxDelay),
   );
 
+export interface SupervisorEvents {
+  /** Called with each ready server's page. */
+  readonly onReady: (url: URL) => Effect.Effect<void>;
+  /** Called with why the server stopped or didn't start, before the wait to restart it. */
+  readonly onRestart?: (reason: string) => Effect.Effect<void>;
+}
+
 /**
- * Runs `start` and calls `onReady` with each server's page, until interrupted.
- * Interrupting it stops the running server, or cancels a pending restart so no
- * new server starts.
+ * Runs `start` and calls `onReady` with each server's page, and `onRestart` with
+ * why each one stopped or failed, until interrupted. Interrupting it stops the
+ * running server, or cancels a pending restart so no new server starts.
  */
 export const supervise = <R>(
   start: Effect.Effect<RunningBoard, BoardServerError, Scope.Scope | R>,
-  onReady: (url: URL) => Effect.Effect<void>,
+  { onReady, onRestart = () => Effect.void }: SupervisorEvents,
   delays: RestartDelays = DEFAULT_DELAYS,
 ): Effect.Effect<never, never, Exclude<R, Scope.Scope>> =>
   Effect.gen(function* () {
@@ -49,6 +56,7 @@ export const supervise = <R>(
       const delay = restartDelay(attempt, delays);
       attempt += 1;
       yield* Effect.logError(`${reason}; restarting in ${Duration.format(delay)}`);
+      yield* onRestart(reason);
       yield* Effect.sleep(delay);
     }
   });

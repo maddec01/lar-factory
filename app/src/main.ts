@@ -1,6 +1,6 @@
 // The board app's main process: starts the board server as a child, shows its page
-// in a window and stops the server when the app quits. Modelled on T3 Code's
-// apps/desktop/src/main.ts and window/DesktopWindow.ts.
+// in a window, starts the server again if it crashes and stops it when the app
+// quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
@@ -12,6 +12,9 @@ import * as Effect from "effect/Effect";
 import * as Electron from "electron";
 
 import * as BoardServer from "./backend/BoardServer.ts";
+import * as BoardSupervisor from "./backend/BoardSupervisor.ts";
+import * as ExternalLink from "./ExternalLink.ts";
+import * as StartingPage from "./StartingPage.ts";
 
 /** Resolves once the user quits the app or closes its last window. */
 const quitRequested = Effect.callback<void>((resume) => {
@@ -29,47 +32,76 @@ const quitRequested = Effect.callback<void>((resume) => {
   });
 });
 
-const openWindow = (url: URL) =>
-  Effect.promise(async () => {
-    const window = new Electron.BrowserWindow({
-      width: 1280,
-      height: 860,
-      minWidth: 840,
-      minHeight: 620,
-      title: "Mux Factory",
-      webPreferences: {
-        preload: NodePath.join(import.meta.dirname, "preload.cjs"),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-    // Links to GitHub and elsewhere open in the browser; only the board stays in the window.
-    window.webContents.setWindowOpenHandler(({ url: target }) => {
-      void Electron.shell.openExternal(target);
-      return { action: "deny" };
-    });
-    window.webContents.on("will-navigate", (event, target) => {
-      if (new URL(target).origin === url.origin) return;
-      event.preventDefault();
-      void Electron.shell.openExternal(target);
-    });
-    await window.loadURL(url.href);
-    return window;
+/** Opens a web link in the browser; any other link opens nothing. */
+const openInBrowser = (target: string) => {
+  const url = ExternalLink.browserUrl(target);
+  if (url) void Electron.shell.openExternal(url);
+};
+
+const createWindow = (boardOrigin: () => string) => {
+  const window = new Electron.BrowserWindow({
+    width: 1280,
+    height: 860,
+    minWidth: 840,
+    minHeight: 620,
+    title: "Mux Factory",
+    webPreferences: {
+      preload: NodePath.join(import.meta.dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
+  // Links to GitHub and elsewhere open in the browser; only the board stays in the window.
+  window.webContents.setWindowOpenHandler(({ url: target }) => {
+    openInBrowser(target);
+    return { action: "deny" };
+  });
+  window.webContents.on("will-navigate", (event, target) => {
+    if (ExternalLink.isOn(target, boardOrigin())) return;
+    event.preventDefault();
+    openInBrowser(target);
+  });
+  return window;
+};
+
+/**
+ * Opens the window at once on the starting page, and loads each ready server's page in it.
+ * Until the board first shows, the starting page says why its server isn't up yet.
+ */
+const openBoardWindow = () => {
+  let origin = "";
+  let boardShown = false;
+  const window = createWindow(() => origin);
+  const load = (href: string) =>
+    Effect.tryPromise(() => window.loadURL(href)).pipe(
+      Effect.catch((error) => Effect.logError(`could not load ${href.slice(0, 100)}: ${String(error)}`)),
+    );
+  const events: BoardSupervisor.SupervisorEvents = {
+    onReady: (url) =>
+      Effect.suspend(() => {
+        origin = url.origin;
+        boardShown = true;
+        return load(url.href);
+      }),
+    onRestart: (reason) => Effect.suspend(() => (boardShown ? Effect.void : load(StartingPage.url(reason)))),
+  };
+  return { window, events, showStarting: load(StartingPage.url()) };
+};
 
 const program = Effect.gen(function* () {
   yield* Effect.promise(() => Electron.app.whenReady());
-  const boardDir = NodePath.resolve(Electron.app.getAppPath(), "../board");
-  const board = yield* BoardServer.start(
-    BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env: process.env }),
-  );
-  const window = yield* openWindow(board.url);
+  const board = openBoardWindow();
   // Opening the app again brings this window forward; the second copy has already quit.
   Electron.app.on("second-instance", () => {
-    if (window.isMinimized()) window.restore();
-    window.focus();
+    if (board.window.isMinimized()) board.window.restore();
+    board.window.focus();
   });
+  yield* board.showStarting;
+  const boardDir = NodePath.resolve(Electron.app.getAppPath(), "../board");
+  const config = BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env: process.env });
+  // Quitting closes the scope, which stops the server or cancels a pending restart.
+  yield* BoardSupervisor.supervise(BoardServer.start(config), board.events).pipe(Effect.forkScoped);
   yield* quitRequested;
 }).pipe(
   Effect.scoped,

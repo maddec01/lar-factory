@@ -25,7 +25,7 @@ import { DEFAULT_UI } from './render.ts';
 import { canAbandon, workMessage } from './model.ts';
 import { revisionCheck } from './revision.ts';
 import { lockHolder, readProgress, updatePaths } from './update-state.ts';
-import type { BoardData, Item, Status } from './model.ts';
+import type { BoardData, ContentType, Item, Status } from './model.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
@@ -370,7 +370,9 @@ async function updateBoard(res: ServerResponse): Promise<void> {
   } finally { launchingUpdate = false; }
 }
 
-async function abandonListItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
+const A_TYPE: Record<ContentType, string> = { Issue: 'an issue', PullRequest: 'a pull request', DraftIssue: 'a draft' };
+
+async function abandonItemRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!capture.enabled) return json(res, 403, { error: 'Abandoning is disabled in sample mode.' });
   const input = await readJson(req, res, 'the item to abandon');
   if (!input) return;
@@ -385,7 +387,7 @@ async function abandonListItem(req: IncomingMessage, res: ServerResponse): Promi
     // A second press after the delete finished has nothing left to do.
     if (!item && abandoned.has(itemId)) return json(res, 200, { error: null, board: state });
     if (!item) return json(res, 404, { error: 'That item is no longer on the board.', board: state });
-    if (!canAbandon(item)) return json(res, 409, { error: `Only List issues and drafts can be abandoned; this one is a ${item.type} in ${item.status}.` });
+    if (!canAbandon(item)) return json(res, 409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${A_TYPE[item.type]} in ${item.status}.` });
     pending = abandonItem({ ...config, number: projectNumber }, item).then((error) => {
       abandoning.delete(itemId);
       if (!error) {
@@ -413,7 +415,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (req.method === 'POST' && path === '/api/back-to-list') return moveItem(req, res, BACK_TO_LIST);
   if (req.method === 'POST' && path === '/api/start') return startItem(req, res);
   if (req.method === 'POST' && path === '/api/update') return updateBoard(res);
-  if (req.method === 'POST' && path === '/api/abandon') return abandonListItem(req, res);
+  if (req.method === 'POST' && path === '/api/abandon') return abandonItemRequest(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }

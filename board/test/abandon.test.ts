@@ -88,10 +88,26 @@ test('an item this board just created does not come back after Abandon', async (
   assert.ok(!has(await board.board(), 'PVTI_900001'));
 });
 
-test('Abandon only removes List items', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')] });
+test('Abandon deletes a Queued issue and removes a Queued draft', async (t) => {
+  const queuedDraft = { ...draft, status: { name: 'Queued' } };
+  const board = await startBoard(t, { items: [rawIssue(12, 'Queued'), queuedDraft] });
+  await until(board, (d) => d.items.length === 2);
+  assert.equal((await abandon(board, 'PVTI_12')).status, 200);
+  const response = await abandon(board, 'PVTI_draft');
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).board.items, []);
+  assert.deepEqual(await deletes(board), [
+    ['issue', 'delete', '12', '-R', 'maddec01/mux-factory', '--yes'],
+    ['project', 'item-delete', '1', '--owner', 'maddec01', '--id', 'PVTI_draft'],
+  ]);
+});
+
+test('Abandon only removes List and Queued items', async (t) => {
+  const board = await startBoard(t, { items: [rawIssue(12, 'Shaping')] });
   await until(board, (d) => d.items.length === 1);
-  assert.equal((await abandon(board, 'PVTI_12')).status, 409);
+  const refused = await abandon(board, 'PVTI_12');
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, 'Only List and Queued issues and drafts can be abandoned; this one is an issue in Shaping.');
   assert.equal((await abandon(board, 'PVTI_missing')).status, 404);
   assert.equal((await board.post({ itemId: 'PVTI_12' }, board.url, '/api/abandon')).status, 409, 'needs this board session');
   assert.deepEqual(await deletes(board), []);

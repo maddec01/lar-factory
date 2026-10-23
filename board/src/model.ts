@@ -324,9 +324,9 @@ export function ref(item: Item): string {
   return item.number === null ? 'draft' : `#${item.number}`;
 }
 
-/** Abandon deletes a List issue or removes a List draft. Pull requests stay. */
+/** Abandon deletes a List or Queued issue, or removes such a draft. Pull requests stay. */
 export function canAbandon(item: Item): boolean {
-  return item.status === 'List' && (item.type === 'DraftIssue' || (item.type === 'Issue' && item.number !== null && item.repo !== null));
+  return (item.status === 'List' || item.status === 'Queued') && (item.type === 'DraftIssue' || (item.type === 'Issue' && item.number !== null && item.repo !== null));
 }
 
 /** Line 1 of the work message, which T3 titles the thread from. Null for a draft. */

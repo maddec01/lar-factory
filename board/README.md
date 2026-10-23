@@ -3,7 +3,8 @@
 A local board for the Mux project. It reads the project through your `gh` login
 every 45 seconds (`config.json`) and serves it on the first free port from
 4317 to 4416, which it logs; `BOARD_PORT` pins the port. The launch-agent board
-runs on 4317. Open it in a browser or in T3's browser preview.
+runs on 4317. `BOARD_CONFIG_FILE`, an absolute path, makes it read that file in
+place of the checkout's `config.json`; the board app sets it to its own copy. Open it in a browser or in T3's browser preview.
 
 ```sh
 cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes

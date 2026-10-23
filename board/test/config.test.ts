@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { CONFIG_URL, loadConfig } from '../src/config.ts';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { CONFIG_URL, configUrl, loadConfig } from '../src/config.ts';
 
 const server = { repo: 'maddec01/mux-server', platform: 'Server', role: 'Backend API server' };
 
@@ -47,4 +47,20 @@ test('an older config with board.port still loads, with the port ignored', async
 test('the factory config names no board port', () => {
   const shipped = JSON.parse(readFileSync(CONFIG_URL, 'utf8')) as { board?: object };
   assert.equal('port' in (shipped.board ?? {}), false);
+});
+
+test('BOARD_CONFIG_FILE names the config file in place of the checkout\'s; unset or empty, the checkout\'s is read', async (t) => {
+  const elsewhere = await configWith(t, [server], { project: { owner: 'someone', title: 'Elsewhere' } });
+  const config = loadConfig(configUrl({ BOARD_CONFIG_FILE: fileURLToPath(elsewhere) }));
+  assert.equal(config.owner, 'someone');
+  assert.equal(config.title, 'Elsewhere');
+  assert.deepEqual(config.repos, [server]);
+  assert.equal(configUrl({}).href, CONFIG_URL.href);
+  assert.equal(configUrl({ BOARD_CONFIG_FILE: '' }).href, CONFIG_URL.href);
+});
+
+test('a BOARD_CONFIG_FILE that doesn\'t exist is refused, naming the path', () => {
+  const missing = join(tmpdir(), 'no such dir', 'config.json');
+  assert.throws(() => loadConfig(configUrl({ BOARD_CONFIG_FILE: missing })),
+    (err: Error) => err.message.includes(missing) && /no config file/.test(err.message));
 });

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { freePort, rawIssue, startBoard } from './server-support.ts';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { itemTotal } from '../src/model.ts';
@@ -386,4 +386,16 @@ test('a live board records its port for status.sh and removes the record on exit
   await sample.stop();
   await board.stop();
   assert.deepEqual(readdirSync(records), []);
+});
+
+test('BOARD_CONFIG_FILE gives the board its project and repos from a file outside the checkout', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'mux-config-file-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const file = join(dir, 'config.json');
+  const repos = [{ repo: 'maddec01/mux-elsewhere', platform: 'Server', role: 'A repo only this file names' }];
+  writeFileSync(file, JSON.stringify({ project: { owner: 'maddec01', title: 'Elsewhere' }, repos }));
+  const board = await startBoard(t, {}, false, false, { BOARD_CONFIG_FILE: file });
+  const state = await board.board() as { project: { title: string }; repos: unknown[] };
+  assert.equal(state.project.title, 'Elsewhere');
+  assert.deepEqual(state.repos, repos);
 });

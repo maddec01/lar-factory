@@ -1,6 +1,8 @@
-// Reads ../config.json (the factory's shared config) relative to board/.
+// Reads ../config.json (the factory's shared config) relative to board/, or the file
+// BOARD_CONFIG_FILE names (the board app ships its own copy).
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { RepoConfig } from './model.ts';
 
 export interface BoardConfig {
@@ -14,7 +16,14 @@ export interface BoardConfig {
 
 export const CONFIG_URL = new URL('../../config.json', import.meta.url);
 
-export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
+/** BOARD_CONFIG_FILE's absolute path when set, else the checkout's config.json. */
+export function configUrl(env: NodeJS.ProcessEnv = process.env): URL {
+  const file = env.BOARD_CONFIG_FILE;
+  return file ? pathToFileURL(file) : CONFIG_URL;
+}
+
+export function loadConfig(url: URL = configUrl()): BoardConfig {
+  if (!existsSync(url)) throw new Error(`${fileURLToPath(url)}: no config file there`);
   const raw = JSON.parse(readFileSync(url, 'utf8')) as {
     project?: { owner?: string; title?: string; number?: number };
     repos?: RepoConfig[];
@@ -22,7 +31,7 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
   };
   const owner = raw.project?.owner;
   const title = raw.project?.title;
-  if (!owner || !title) throw new Error(`${url.pathname}: project.owner and project.title are required`);
+  if (!owner || !title) throw new Error(`${fileURLToPath(url)}: project.owner and project.title are required`);
   return {
     owner,
     title,
@@ -35,7 +44,7 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
 /** A repos entry with a role; an older entry's checkout `path` is dropped. */
 function checkRepo(entry: RepoConfig, url: URL): RepoConfig {
   if (typeof entry.role !== 'string' || !entry.role.trim()) {
-    throw new Error(`${url.pathname}: ${entry.repo ?? 'a repos entry'} needs a "role"`);
+    throw new Error(`${fileURLToPath(url)}: ${entry.repo ?? 'a repos entry'} needs a "role"`);
   }
   return { repo: entry.repo, platform: entry.platform, role: entry.role };
 }

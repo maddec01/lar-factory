@@ -569,6 +569,15 @@ test("a Queued card's Start opens a menu: 'T3 default' first, then each provider
     'no menu while a start is in flight');
 });
 
+test('the menu highlights the remembered model choice while it is offered, else "T3 default"', () => {
+  const data = { ...sample, modelChoices: MODEL_CHOICES };
+  const checked = (lastChoice: { instanceId: string; model: string }) =>
+    [...renderBoardView(data, { ...base, ui: { ...DEFAULT_UI, startMenuOpen: 'PVTI_sample05', lastChoice } })
+      .matchAll(/aria-checked="true"[^>]*>([^<]*)</g)].map((m) => m[1]);
+  assert.deepEqual(checked({ instanceId: 'claudeAgent', model: 'claude-opus-5-5[1m]' }), ['claude-opus-5-5[1m]']);
+  assert.deepEqual(checked({ instanceId: 'claudeAgent', model: 'gpt-5.5' }), ['T3 default'], 'not offered on that instance');
+});
+
 test('without model choices, the menu offers only "T3 default"', () => {
   const html = renderBoardView(sample, { ...base, ui: { ...DEFAULT_UI, startMenuOpen: 'PVTI_sample05' } });
   assert.deepEqual([...html.matchAll(/data-start-pick="[^"]*"[^>]*>([^<]*)</g)].map((m) => m[1]), ['T3 default']);

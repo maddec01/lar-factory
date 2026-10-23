@@ -1,6 +1,8 @@
 // Start ▾'s menu on a Queued card: what picking an entry posts, and how keys move through it.
 
-import type { ModelChoice } from './model.ts';
+import { offers } from './model.ts';
+import type { ModelChoice, ModelGroup } from './model.ts';
+import type { StartResult } from './t3.ts';
 
 /** The model choice an entry names by its data attributes; "T3 default" names none. */
 export function choiceOf(entry: { instanceId?: string; model?: string }): ModelChoice | undefined {
@@ -26,4 +28,29 @@ export function menuMove(key: string, index: number, count: number): number | nu
     default:
       return null;
   }
+}
+
+/** Whether a start's result makes its choice the one to remember: "Started" or "May have started", not a refusal or failure. */
+export function remembersChoice(result: StartResult): boolean {
+  return Boolean(result.thread || result.uncertain);
+}
+
+/** A choice as the browser stores it; "T3 default" stores as null. */
+export function storedChoice(choice: ModelChoice | undefined): string {
+  return JSON.stringify(choice ?? null);
+}
+
+/** The choice the browser stored; none for "T3 default", nothing stored, or anything unreadable. */
+export function readChoice(raw: string | null): ModelChoice | undefined {
+  try {
+    const value = JSON.parse(raw ?? 'null') as Partial<ModelChoice> | null;
+    return typeof value?.instanceId === 'string' && typeof value.model === 'string' ? { instanceId: value.instanceId, model: value.model } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The entry the menu highlights: the remembered choice while it is still offered, else none ("T3 default"). */
+export function highlightedChoice(groups: ModelGroup[], remembered: ModelChoice | undefined): ModelChoice | undefined {
+  return remembered && offers(groups, remembered) ? remembered : undefined;
 }

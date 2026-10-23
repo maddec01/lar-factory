@@ -8,7 +8,7 @@ import type { BoardData, ModelChoice, Status } from './model.ts';
 import { validateDraft } from './add-item.ts';
 import { anchorKeys, survivingAnchor } from './anchor.ts';
 import { NO_POPOVER, nextPopover, openPopover } from './slice-popover.ts';
-import { choiceOf, menuMove, startRequest } from './start-menu.ts';
+import { choiceOf, menuMove, readChoice, remembersChoice, startRequest, storedChoice } from './start-menu.ts';
 import type { PopoverEvent } from './slice-popover.ts';
 import type { CreationResult, ItemDraft } from './add-item.ts';
 import type { StartResult } from './t3.ts';
@@ -16,6 +16,8 @@ import type { StartResult } from './t3.ts';
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 const POLL_MS = 15_000;
+/** Where this browser keeps the last model choice Start started with. */
+const CHOICE_KEY = 'mux-board:model-choice';
 const UPDATE_POLL_MS = 1_000;
 /** How long the board may stay away during an update before the page says it didn't restart. */
 const RESTART_MS = 30_000;
@@ -49,6 +51,7 @@ const ui: UiState = {
   ...DEFAULT_UI,
   view: location.hash === '#flow' ? 'flow' : 'board',
   toggled: {},
+  lastChoice: readChoice(localStorage.getItem(CHOICE_KEY)),
 };
 
 function render(): void {
@@ -493,6 +496,11 @@ async function startItem(itemId: string, choice?: ModelChoice): Promise<void> {
   const result = await postAction<StartResult & { error: string | null }>('/api/start', startRequest(data.capture?.session, itemId, choice));
   actions[itemId] = result.thread ? { phase: 'started', thread: result.thread }
     : { phase: result.uncertain ? 'uncertain' : 'error', message: result.error ?? 'The thread did not start.' };
+  // A refused or failed start keeps the previous choice.
+  if (remembersChoice(result)) {
+    ui.lastChoice = choice;
+    localStorage.setItem(CHOICE_KEY, storedChoice(choice));
+  }
   const item = data.items.find((i) => i.id === itemId);
   if (result.thread && item) setNotice({ verb: 'Started', item, thread: result.thread });
   render();

@@ -16,10 +16,6 @@
   <string>@BOARD_DIR@</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>GH_PATH</key>
-    <string>@GH@</string>
-    <key>T3_PATH</key>
-    <string>@T3@</string>
     <key>PATH</key>
     <string>@PATH@</string>
     <key>HOME</key>

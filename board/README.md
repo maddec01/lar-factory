@@ -15,8 +15,8 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
 - **Queue** on a List row sets the item's Status to Queued. The board shows it
   in Queued at once and keeps it there until GitHub reports the change.
 - **Start** on a Queued issue opens a T3 Code thread in the issue's repository
-  project, the T3 project whose folder is the repository's `path` in
-  `config.json`, whose first message is the issue's work message: `#n title`, then `$mux-work owner/repo#n`. T3 titles the
+  project, the T3 project whose folder is a main checkout with the repository
+  as its git `origin`, whose first message is the issue's work message: `#n title`, then `$mux-work owner/repo#n`. T3 titles the
   thread from line 1 and runs mux-work, which shapes or builds the issue and
   sets its Status. Start ▾ opens a menu of model choices: "T3 default" (the
   project's default model), then each enabled T3 provider instance with its
@@ -25,11 +25,13 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
   one other than line 1; every board page marks the card Started. While the
   board runs, a double press, a retry or another tab starts no second thread.
   A queued draft needs an issue first. Before starting, Start checks that the
-  repository is in `config.json`, that its `path` exists and its git `origin`
-  is that repository, and that T3 Code's database (read-only) has a live
-  project at that path. The first check that fails stops Start with a hint
-  naming the fix, such as adding the project in T3 Code; the board never adds
-  or changes T3 projects, and it refuses when it can't read T3's database.
+  repository is in `config.json`, then reads T3 Code's live projects from its
+  database (read-only) and keeps those whose folder exists, has a `.git`
+  directory (so a worktree doesn't count) and has the repository as its git
+  `origin`. The folder can have any name and live anywhere. With no such
+  project, Start refuses with a hint to add the checkout in T3 Code; with two
+  or more, it refuses and names their folders. The board never adds or changes
+  T3 projects, and it refuses when it can't read T3's database.
 - **Back to List**, in the footer row of a Queued issue or draft card, is the
   reverse of Queue: it sets the item's Status back to List, and the board moves
   the card there at once. **Abandon**, on the right of the same row, works as

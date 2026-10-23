@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -9,14 +9,13 @@ import { rawIssue, SAMPLE_MODELS, startBoard } from './server-support.ts';
 import { checkouts, factoryRepo } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
-import { expandHome } from '../src/config.ts';
 import type { BoardData } from '../src/model.ts';
 
 type Board = Awaited<ReturnType<typeof startBoard>>;
 
 const MESSAGE = '#12 Issue 12\n$mux-work maddec01/mux-factory#12';
 
-/** A temporary home with git checkouts of the given origins where config.json's paths point. */
+/** A temporary home with git checkouts of the given origins under ~/Developer/Mux. */
 function home(t: TestContext, origins: Record<string, string | null>): string {
   const dir = mkdtempSync(join(tmpdir(), 'mux-start-home-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -33,7 +32,7 @@ async function boardIn(t: TestContext, items: object[], origins: Record<string, 
   return { board, home: dir };
 }
 
-/** The live Mux project holds every checkout, so only the project id tells repositories apart. */
+/** The live Mux project holds every checkout but is no checkout itself, so only origins tell repositories apart. */
 const PROJECTS = (dir: string): FixtureProject[] => [
   { id: 'project-mux', root: `${dir}/Developer/Mux` },
   { id: 'project-factory', root: `${dir}/Developer/Mux/mux-factory/` },
@@ -65,13 +64,6 @@ async function start(board: Board, itemId: string, origin = board.url, model?: u
   const { capture } = await board.board() as BoardData;
   return board.post({ session: capture!.session, itemId, model }, origin, '/api/start');
 }
-
-test('expands ~ from HOME so the public config never holds a username', () => {
-  assert.equal(expandHome('~/Developer/Mux', '/Users/someone'), '/Users/someone/Developer/Mux');
-  assert.equal(expandHome('~', '/Users/someone'), '/Users/someone');
-  assert.equal(expandHome('/opt/Mux', '/Users/someone'), '/opt/Mux');
-  assert.throws(() => expandHome('~/Developer/Mux', undefined), /HOME/);
-});
 
 test("Start begins one mux-work thread in the card's repository project and leaves the Status alone", async (t) => {
   const board = await factoryBoard(t, [rawIssue(12, 'Queued'), rawIssue(30, 'Queued', 'maddec01/mux-server')]);
@@ -119,19 +111,46 @@ for (const [name, model] of [
   });
 }
 
+test('Start finds the repository project by origin, whatever its folder is called or wherever it lives', async (t) => {
+  const { board } = await boardIn(t, [rawIssue(12, 'Queued')], {}, (dir) => {
+    checkouts(dir, { 'factory-clone': 'https://github.com/maddec01/mux-factory' }, 'code');
+    return projectsDb(t, [{ id: 'project-mux', root: `${dir}/Developer/Mux` },
+      { id: 'project-clone', root: '~/code/factory-clone' }]);
+  });
+  assert.equal((await start(board, 'PVTI_12')).status, 200);
+  assert.equal((await board.t3Calls())[0]?.[2], 'project-clone');
+});
+
+const NO_PROJECT = 'No T3 project is a checkout of maddec01/mux-factory; add the checkout in T3 Code';
+
+/** A folder whose `.git` is a file, as in a git worktree of the mux-factory checkout. */
+function worktree(dir: string): string {
+  const folder = join(dir, 'worktrees/mux-factory-1');
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, '.git'), `gitdir: ${dir}/Developer/Mux/mux-factory/.git\n`);
+  return folder;
+}
+
 const refusals: { name: string; repo?: string; origins?: Record<string, string | null>;
   projects?: (home: string) => FixtureProject[]; db?: (home: string) => string; error: (home: string) => string }[] = [
   { name: 'an unlisted repository', repo: 'maddec01/other',
-    error: () => "maddec01/other isn't in config.json; add it with a path and role" },
-  { name: 'a missing checkout', origins: {},
-    error: () => "mux-factory isn't at ~/Developer/Mux/mux-factory; update its path in config.json" },
+    error: () => "maddec01/other isn't in config.json; add it with a role" },
+  { name: 'a project whose folder is gone', origins: {}, error: () => NO_PROJECT },
   { name: "another repository's checkout", origins: { 'mux-factory': 'https://github.com/maddec01/mux-server.git' },
-    error: () => '~/Developer/Mux/mux-factory is a checkout of maddec01/mux-server, not maddec01/mux-factory; update its path in config.json' },
-  { name: 'a checkout with no origin', origins: { 'mux-factory': null },
-    error: () => '~/Developer/Mux/mux-factory is a checkout of no GitHub repository, not maddec01/mux-factory; update its path in config.json' },
-  { name: 'no live T3 project', projects: (dir) => [{ id: 'project-mux', root: `${dir}/Developer/Mux` },
+    error: () => NO_PROJECT },
+  { name: 'a checkout with no origin', origins: { 'mux-factory': null }, error: () => NO_PROJECT },
+  { name: 'a deleted T3 project', projects: (dir) => [{ id: 'project-mux', root: `${dir}/Developer/Mux` },
     { id: 'project-factory', root: `${dir}/Developer/Mux/mux-factory`, deletedAt: '2026-10-01T00:00:00Z' }],
-    error: () => 'No T3 project for ~/Developer/Mux/mux-factory; add it in T3 Code' },
+    error: () => NO_PROJECT },
+  { name: 'a worktree or a folder inside the checkout', projects: (dir) => [
+    { id: 'project-worktree', root: worktree(dir) }, { id: 'project-board', root: `${dir}/Developer/Mux/mux-factory/board` }],
+    error: () => NO_PROJECT },
+  { name: 'two checkouts of the repository',
+    projects: (dir) => {
+      checkouts(dir, { 'factory-clone': 'git@github.com:maddec01/mux-factory.git' }, 'code');
+      return [...PROJECTS(dir), { id: 'project-clone', root: `${dir}/code/factory-clone` }];
+    },
+    error: () => 'Several T3 projects are checkouts of maddec01/mux-factory: ~/Developer/Mux/mux-factory, ~/code/factory-clone; remove all but one in T3 Code' },
   { name: 'a missing T3 database', db: (dir) => join(dir, 'none.sqlite'),
     error: (dir) => `Can't read T3 Code's projects at ${join(dir, 'none.sqlite')}` },
 ];
@@ -172,17 +191,17 @@ test("a card's repository matches its config.json entry whatever the case", asyn
   assert.equal((await board.t3Calls())[0]?.[2], 'project-factory');
 });
 
-test('Start reads config.json each time, so a fixed path works without restarting the board', async (t) => {
+test('Start reads config.json each time, so an added repository works without restarting the board', async (t) => {
   const f = await factoryRepo(t);
   const config = join(f.repo, 'config.json');
   const original = readFileSync(config, 'utf8');
-  writeFileSync(config, original.replace('~/Developer/Mux/mux-factory', '~/Developer/Mux/elsewhere'));
+  writeFileSync(config, original.replace('"maddec01/mux-factory"', '"maddec01/elsewhere"'));
   const dir = home(t, ORIGINS);
   const board = await startBoard(t, { items: [rawIssue(12, 'Queued')] }, false, false,
     { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'board'));
   await ready(board, 1);
   const refused = await start(board, 'PVTI_12');
-  assert.match((await refused.json()).error, /isn't at ~\/Developer\/Mux\/elsewhere/);
+  assert.match((await refused.json()).error, /maddec01\/mux-factory isn't in config\.json/);
   writeFileSync(config, original);
   const retried = await start(board, 'PVTI_12');
   assert.equal(retried.status, 200);

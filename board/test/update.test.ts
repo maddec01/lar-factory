@@ -301,7 +301,7 @@ test('a missing pnpm fails the install step with the brew hint', async (t) => {
 
 test('the skills step installs every listed skill and replaces the checklists with main\'s', async (t) => {
   const f = await updateFixture(t);
-  const listed = execFileSync('bash', ['-c', 'source "$1"; printf "%s\\n" "${SKILLS[@]}"', '_', join(f.repo, 'scripts/install.sh')], { encoding: 'utf8' }).trim().split('\n');
+  const listed = execFileSync('bash', ['-c', 'source "$1"; printf "%s\\n" "${OWN_SKILLS[@]}"; upstream_skills "$ROOT/UPSTREAM.md"', '_', join(f.repo, 'scripts/install.sh')], { encoding: 'utf8' }).trim().split('\n');
   for (const folder of ['.agents/references', '.claude/references']) {
     await mkdir(join(f.home, folder), { recursive: true });
     await writeFile(join(f.home, folder, 'removed-upstream.md'), 'old');

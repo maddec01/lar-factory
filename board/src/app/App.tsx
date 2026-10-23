@@ -1,4 +1,5 @@
-// The page: the header, the Board and Flow tabs, and the panel of the chosen view.
+// The page: the header, the Board and Flow tabs, and the panel of the chosen view; or, while no
+// t3 is found, the notice that replaces them.
 
 import { useLayoutEffect } from 'react';
 import type { KeyboardEvent } from 'react';
@@ -12,6 +13,7 @@ import { Header } from './Header.tsx';
 import { restoreAnchor } from './keep-anchor.ts';
 import { useSetView, useView } from './router.tsx';
 import { Toasts } from './Toasts.tsx';
+import { T3Missing } from './ToolNotices.tsx';
 import { UpdateToast } from './Update.tsx';
 
 const VIEWS: { view: View; label: string }[] = [{ view: 'board', label: 'Board' }, { view: 'flow', label: 'Flow' }];
@@ -49,6 +51,7 @@ export function App() {
   const data = useBoardStore((state) => state.data);
   // New data may change what's above the reading position; put it back before the browser paints.
   useLayoutEffect(restoreAnchor, [data]);
+  if (data.tools?.t3) return <T3Missing problem={data.tools.t3} />;
   return (
     <>
       <Header />

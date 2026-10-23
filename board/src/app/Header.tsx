@@ -1,5 +1,5 @@
 // The page's header: the logo, when the data was read, the counts, Add item and Update, and the
-// banners for an update, stale data and an unreachable server, which closes.
+// banners for an update, a gh the board can't use, stale data and an unreachable server, which closes.
 
 import { countsOf, isStale } from '../model.ts';
 import type { BoardData } from '../model.ts';
@@ -9,9 +9,10 @@ import { AddItem } from './AddItem.tsx';
 import { useBoardStore } from './board-store.ts';
 import { ClosableBanner } from './ClosableBanner.tsx';
 import { CLIENT_ERROR } from './live-data.ts';
+import { GhBanner } from './ToolNotices.tsx';
 import { HeaderUpdateButton, UpdateBanners } from './Update.tsx';
 
-function BrandMark() {
+export function BrandMark() {
   return (
     <svg className="brand-mark" role="img" aria-label="Mux" viewBox={BRAND_MARK_VIEWBOX} fill="none">
       <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -66,7 +67,8 @@ export function Header() {
           <strong>Can't reach the board server.</strong> {clientError} Showing the last data this page received.
         </ClosableBanner>
       )}
-      {isStale(data, now) && <StaleBanner data={data} now={now} />}
+      {/* A gh that can't read explains the old data itself. */}
+      {data.tools?.gh ? <GhBanner problem={data.tools.gh} /> : isStale(data, now) && <StaleBanner data={data} now={now} />}
     </header>
   );
 }

@@ -31,6 +31,8 @@ export interface UiState {
   toggled: Record<string, boolean>;
   /** The item id of the build whose slice popover is open, if any. */
   slicesOpen?: string;
+  /** The item id of the Queued card whose Start menu is open, if any. */
+  startMenuOpen?: string;
 }
 
 export interface RenderOptions {
@@ -422,8 +424,21 @@ function startHolds(item: Item, data: BoardData, action: ItemAction | undefined)
   return !!startedThread(item, data, action) || action?.phase === 'uncertain' || (action?.phase === 'pending' && !action.kind);
 }
 
-/** Start's button for the card's top row, and the message under the card when there is one. */
-function startControl(item: Item, data: BoardData, action: ItemAction | undefined): { button: string; message: string } {
+/** Start's menu: "T3 default" (highlighted), then each provider instance's models. Sample mode shows it but starts nothing. */
+function startMenu(item: Item, data: BoardData): string {
+  const off = data.capture?.enabled === false ? ' aria-disabled="true" title="Disabled in sample mode"' : '';
+  const entry = (label: string, checked: boolean, choice = '') =>
+    `<li role="none"><button type="button" role="menuitemradio" aria-checked="${checked}" class="start-pick"${off} data-start-pick="${esc(item.id)}"${choice}>${esc(label)}</button></li>`;
+  const groups = (data.modelChoices ?? []).map((g) =>
+    `<p class="start-menu-group" aria-hidden="true">${esc(g.name)}</p><ul role="group" aria-label="${esc(g.name)}">${g.models
+      .map((m) => entry(m.label, false, ` data-instance-id="${esc(g.instanceId)}" data-model="${esc(m.slug)}"`)).join('')}</ul>`).join('');
+  return `<div class="start-menu" role="menu" aria-label="Start ${esc(ref(item))} with">
+<p class="start-menu-head" aria-hidden="true">Start with</p><ul role="none">${entry('T3 default', true)}</ul>${groups}
+</div>`;
+}
+
+/** Start's button for the card's top row, with its menu when open, and the message under the card when there is one. */
+function startControl(item: Item, data: BoardData, action: ItemAction | undefined, menuOpen: boolean): { button: string; message: string } {
   const thread = startedThread(item, data, action);
   // The toast announces a start; the card only keeps Start from running twice.
   if (thread) return { button: `<span class="started-tag" tabindex="-1" data-start-result="${esc(item.id)}" title="T3 thread ${esc(thread.threadId)}">Started</span>`, message: '' };
@@ -435,8 +450,15 @@ function startControl(item: Item, data: BoardData, action: ItemAction | undefine
   // Back to List and Abandon carry a kind; only Start's own action relabels it.
   const own = action?.kind ? undefined : action;
   const verb = own?.phase === 'pending' ? 'Starting…' : own?.phase === 'error' ? 'Retry start' : 'Start';
+  if (own?.phase === 'pending') {
+    return { button: `<button type="button" class="copy start-item" data-start="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`, message: '' };
+  }
+  // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
+  // An update, or Back to List or Abandon in flight, holds Start.
+  const busy = data.update?.state === 'running' || action?.phase === 'pending' ? ' aria-disabled="true"' : '';
+  const open = menuOpen && !busy;
   return {
-    button: `<button type="button" class="copy start-item" data-start="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}"${writeState(data, action)}>${verb}</button>`,
+    button: `<button type="button" class="copy start-item" data-start="${esc(item.id)}" aria-label="${verb} ${esc(ref(item))} ${esc(item.title)}" aria-haspopup="menu" aria-expanded="${open}"${busy}>${verb} \u25be</button>${open ? startMenu(item, data) : ''}`,
     message: own?.phase === 'error' ? `<p class="start">${actionError(item, own)}</p>` : '',
   };
 }
@@ -663,11 +685,11 @@ export function renderBoardView(data: BoardData, opts: RenderOptions): string {
     i.type === 'PullRequest' || startHolds(i, data, opts.actions?.[i.id]) ? '' : `<div class="card-actions">${backToListButton(i, data, opts.actions?.[i.id])}${abandonButton(i, data, opts.actions?.[i.id], 'link-action danger')}</div>`;
   const queuedExtra = (i: Item) =>
     (workMessage(i)
-      ? startControl(i, data, opts.actions?.[i.id]).message
+      ? startControl(i, data, opts.actions?.[i.id], false).message
       : '<p class="foot"><span class="hint">This draft needs an issue before it can start. Convert it to an issue in a repo.</span></p>') + footer(i);
   // A group, so Start sits in the card's top-right corner.
   const queuedAction = (i: Item) =>
-    workMessage(i) ? `<span class="start-group">${startControl(i, data, opts.actions?.[i.id]).button}</span>` : '';
+    workMessage(i) ? `<span class="start-group">${startControl(i, data, opts.actions?.[i.id], ui.startMenuOpen === i.id).button}</span>` : '';
 
   const platforms = [...data.repos.map((r) => r.platform)];
   for (const i of list) {

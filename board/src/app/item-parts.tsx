@@ -1,4 +1,4 @@
-// The bits every view draws for an item: its platform badge, kind pill and title link.
+// The bits every view draws for an item: its platform badge, kind pill, label pills and title link.
 
 import { kindLabel, kindOf, platformOf, ref } from '../model.ts';
 import type { BoardData, Item } from '../model.ts';
@@ -18,4 +18,9 @@ export function TitleLink({ item, className = 'title' }: { item: Item; className
   return item.url
     ? <a className={className} href={item.url} target="_blank" rel="noopener">{text}</a>
     : <span className={className}>{text}</span>;
+}
+
+/** One pill per GitHub label, kind included; a kind label keeps its colour. Always rendered, so it pushes a row's buttons to the end. */
+export function LabelPills({ item }: { item: Item }) {
+  return <span className="labels">{item.labels.map((l) => <span className={`label kind-${slug(l)}`} key={l}>{l}</span>)}</span>;
 }

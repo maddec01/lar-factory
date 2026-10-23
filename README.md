@@ -24,7 +24,8 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
 
 1. **List.** Capture bugs, features and ideas as issues.
 2. **Queued.** Pick one by moving it to Queued, then run `/mux-work <owner/repo#n>`
-   in a new thread. Nothing starts without this.
+   in a new thread in the issue's repository project (the board's Start does
+   this). Nothing starts without this.
 3. **Shaping.** `mux-work` reads the issue and the code through subagents, and
    proposes a route:
    - **clear**: a bug a subagent can reproduce and diagnose, or a small change;
@@ -186,7 +187,7 @@ board/             the local board app
 references/        checklists Addy's skills link to
 scripts/install.sh installs or updates the skills and checklists
 scripts/setup-worktree.sh installs board/ in a new worktree (.githooks, t3.json)
-config.json        Mux repos, board port and refresh, pickup limits
+config.json        Mux repos (checkout path, role), board port and refresh, pickup limits
 UPSTREAM.md        source and commit of every copy
 docs/plan.md       how this was set up
 ```

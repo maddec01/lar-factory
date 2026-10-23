@@ -8,7 +8,8 @@ the flow and `docs/plan.md` for how it was set up.
   through `skill-sync`, which updates `UPSTREAM.md`. Mux rules go in `mux-work` or
   in each Mux repo's `AGENTS.md`.
 - `board/` is the local board app. Nothing secret goes in this public repo; the
-  board reads GitHub through the local `gh` login and `config.json` only names repos.
+  board reads GitHub through the local `gh` login, and `config.json` holds only repos,
+  their checkout paths under `~` and their roles.
 - Every commit and PR title uses conventional commits (`type(scope): description`;
   scopes: `board`, `mux-work`, `skill-sync`, `skills`, `ci`). A required check and the
   `commit-msg` hook enforce it. Update branches by rebase; fold review fixes in with

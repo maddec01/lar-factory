@@ -1,5 +1,5 @@
 // Toasts: a success clears itself after 5 s, later while it's hovered or has focus; a failure
-// stays until it's closed. They sit top right, below the header while it's on screen.
+// stays until it's closed. They sit top right, below the header while it's on screen and below the app's title bar.
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
@@ -60,9 +60,10 @@ export function ToastView({ what, failed = false, focusAfter, onClose, children 
   );
 }
 
-/** Keeps --toast-top below the header while it's on screen, so toasts never cover its buttons or banners. */
+/** Keeps --toast-top below the header while it's on screen, and always below the app's title bar, so toasts
+ * never cover the header's buttons or banners nor sit in the bar that drags the window. */
 function placeToasts(): void {
-  const bottom = document.querySelector('header.top')?.getBoundingClientRect().bottom ?? 0;
+  const bottom = Math.max(...['header.top', '.title-bar'].map((sel) => document.querySelector(sel)?.getBoundingClientRect().bottom ?? 0));
   document.documentElement.style.setProperty('--toast-top', `${Math.max(12, Math.round(bottom) + 8)}px`);
 }
 

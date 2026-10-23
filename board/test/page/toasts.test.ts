@@ -104,6 +104,20 @@ test('toasts sit below the header while it is on screen, and at the top once it 
   expect(top()).toBe('68px');
 });
 
+test("in the Mac app, toasts stay below the title bar once the header scrolls away", async () => {
+  vi.stubGlobal('boardApp', { platform: 'darwin' });
+  await mountPage();
+  let bottom = 140;
+  $('header.top')!.getBoundingClientRect = () => ({ bottom }) as DOMRect;
+  $('.title-bar')!.getBoundingClientRect = () => ({ bottom: 52 }) as DOMRect;
+  await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
+  const top = () => document.documentElement.style.getPropertyValue('--toast-top');
+  expect(top()).toBe('148px');
+  bottom = -40;
+  dispatchEvent(new Event('scroll'));
+  expect(top()).toBe('60px');
+});
+
 test("a poll that started before the page's own write doesn't bring back older data", async () => {
   await mountPage();
   let answerPoll!: () => void;

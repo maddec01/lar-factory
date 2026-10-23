@@ -1,10 +1,11 @@
-// The page: the header, the Board and Flow tabs, and the panel of the chosen view; or, while no
+// The page: in the Mac app the title bar, then the header, the Board and Flow tabs, and the panel of the chosen view; or, while no
 // t3 is found, the notice that replaces them.
 
 import { useLayoutEffect } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { View } from '../ui-state.ts';
 import { AbandonDialog } from './AbandonDialog.tsx';
+import { inMacApp } from './board-app.ts';
 import { useBoardStore } from './board-store.ts';
 import { BoardView } from './BoardView.tsx';
 import { CopyStatus } from './CopyButton.tsx';
@@ -13,6 +14,7 @@ import { Header } from './Header.tsx';
 import { restoreAnchor } from './keep-anchor.ts';
 import { useSetView, useView } from './router.tsx';
 import { Toasts } from './Toasts.tsx';
+import { TitleBar } from './TitleBar.tsx';
 import { T3Missing } from './ToolNotices.tsx';
 import { UpdateToast } from './Update.tsx';
 
@@ -51,9 +53,11 @@ export function App() {
   const data = useBoardStore((state) => state.data);
   // New data may change what's above the reading position; put it back before the browser paints.
   useLayoutEffect(restoreAnchor, [data]);
-  if (data.tools?.t3) return <T3Missing problem={data.tools.t3} />;
+  const titleBar = inMacApp() && <TitleBar />;
+  if (data.tools?.t3) return <>{titleBar}<T3Missing problem={data.tools.t3} /></>;
   return (
     <>
+      {titleBar}
       <Header />
       <Tabs />
       <main>

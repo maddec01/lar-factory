@@ -21,3 +21,6 @@ export function writeHeaders(): Record<string, string> {
   const secret = boardApp()?.secret;
   return { 'Content-Type': 'application/json', ...(secret && { 'X-Board-Secret': secret }) };
 }
+
+/** Whether the page runs in the Mac app, whose window leaves its title bar to the page. */
+export const inMacApp = (): boolean => boardApp()?.platform === 'darwin';

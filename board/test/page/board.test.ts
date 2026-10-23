@@ -130,7 +130,8 @@ test('a build card shows its slices as a bar under the status bar, with captions
     .toEqual(['segbar steps', 'bar-label step-label now', 'segbar slice-bar', 'bar-label']);
   expect(text(bars.querySelector('.step-label'))).toBe('6/10 · In progress');
   expect(build.querySelector('.subs'), 'the caption replaces the meta row counter').toBeNull();
-  expect([...build.querySelectorAll('.row-item')].every((r) => r.closest('.slices-pop')), 'no slice rows on the card outside the popover').toBe(true);
+  expect(build.querySelector('.row-item'), 'no slice rows on the card: they are in the popover').toBeNull();
+  expect(document.getElementById('slices-PVTI_build')!.querySelectorAll('.row-item').length).toBe(3);
 });
 
 test('a build card counts its blocked slices before its active ones, names either alone, and marks them in the bar', async () => {
@@ -153,7 +154,7 @@ test("a build card's popover lists every slice, blocked then active then waiting
   });
   const build = await buildCard([raw], [67], [68]);
   const url = (n: number) => `https://github.com/maddec01/mux-factory/issues/${n}`;
-  const pop = build.querySelector('.slices-pop')!;
+  const pop = document.getElementById('slices-PVTI_build')!;
   expect([...pop.querySelectorAll('li.slice-row')].map((li) => [li.classList[2], text(li.querySelector('.ref')), li.querySelector('a')!.getAttribute('href')]))
     .toEqual([['blocked', '#68', url(68)], ['active', '#67', url(67)], ['waiting', '#65', url(65)], ['done', '#66', url(66)]]);
   expect(text(pop.querySelector('li.blocked .sr-only'))).toBe(' (blocked)');

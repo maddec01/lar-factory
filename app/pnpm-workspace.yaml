@@ -1,7 +1,9 @@
 # Settings for this package alone; it is not a workspace of several packages.
 
-# Electron 44 has no install script; scripts/ensure-electron-runtime.mjs fetches
-# the binary when the dev command runs. The key stays so pnpm asks nothing.
+# electron's package.json declares no install script for pnpm to run here, so
+# the repo's scripts/setup-worktree.sh runs node_modules/electron/install.js to fetch the
+# binary, and scripts/ensure-electron-runtime.mjs repairs it when the dev command
+# runs. The key stays so pnpm asks nothing.
 allowBuilds:
   electron: false
   esbuild: true

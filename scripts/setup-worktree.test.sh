@@ -14,6 +14,8 @@ fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
 # A fake pnpm that logs "<dir> <args>" and lays out node_modules like pnpm does.
+# A package that depends on electron gets a fake electron/install.js that logs
+# "<dir> electron install.js" instead of downloading.
 bin=$(mktemp -d)
 calls="$bin/calls"
 cat >"$bin/pnpm" <<'EOF'
@@ -21,6 +23,11 @@ cat >"$bin/pnpm" <<'EOF'
 printf '%s %s\n' "$PWD" "$*" >>"$FAKE_PNPM_CALLS"
 [[ -z "${FAKE_PNPM_FAIL:-}" ]] || exit 1
 [[ -f node_modules/.modules.yaml ]] || { mkdir -p node_modules; echo 'layoutVersion: 5' >node_modules/.modules.yaml; }
+if grep -q electron package.json; then
+  mkdir -p node_modules/electron
+  echo 'require("fs").appendFileSync(process.env.FAKE_PNPM_CALLS, process.cwd() + " electron install.js\n")' \
+    >node_modules/electron/install.js
+fi
 EOF
 chmod +x "$bin/pnpm"
 export FAKE_PNPM_CALLS="$calls" PATH="$bin:$PATH"
@@ -41,6 +48,16 @@ make_repo() {
   printf '%s' "$repo"
 }
 
+# Adds an app/ package that depends on electron, as the board app does.
+add_app() {
+  mkdir "$1/app"
+  printf '{"devDependencies":{"electron":"44.9.3"}}\n' >"$1/app/package.json"
+  printf "lockfileVersion: '9.0'\n" >"$1/app/pnpm-lock.yaml"
+  printf 'node_modules/\n' >"$1/app/.gitignore"
+  git -C "$1" add app
+  git -C "$1" commit -qm 'feat(board): add the app package'
+}
+
 state() { find "$1/board" -exec stat -f '%N %m %z' {} + | sort; }
 
 repo=$(make_repo)
@@ -58,6 +75,30 @@ if output=$(bash "$setup" "$repo" 2>&1) && [[ $(state "$repo") == "$before" ]]; 
   pass "a second run changes nothing"
 else
   fail "a second run changes nothing: $output"
+fi
+
+repo=$(make_repo)
+add_app "$repo"
+: >"$calls"
+expected="$repo/board install --frozen-lockfile --prefer-offline --ignore-scripts
+$repo/app install --frozen-lockfile --prefer-offline --ignore-scripts
+$repo/app electron install.js"
+if output=$(bash "$setup" "$repo" 2>&1) && [[ $(cat "$calls") == "$expected" ]] &&
+  [[ -z $(git -C "$repo" status --porcelain) ]]; then
+  pass "installs app/ too and fetches its Electron binary"
+else
+  fail "installs app/ too and fetches its Electron binary: $output / $(cat "$calls")"
+fi
+
+repo=$(make_repo)
+add_app "$repo"
+mkdir "$repo/board/node_modules"
+: >"$calls"
+if output=$(bash "$setup" "$repo" 2>&1) && [[ $output == *"$repo/board/node_modules"*npm* ]] &&
+  [[ $(cat "$calls") == "$repo/app install"*"$repo/app electron install.js" ]]; then
+  pass "an npm-made board/node_modules still lets app/ install"
+else
+  fail "an npm-made board/node_modules still lets app/ install: $output / $(cat "$calls")"
 fi
 
 repo=$(make_repo)

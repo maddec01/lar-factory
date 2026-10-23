@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets up board/ in a new worktree. Git passes the null SHA as the previous HEAD
+# Sets up board/ and app/ in a new worktree. Git passes the null SHA as the previous HEAD
 # only when `git worktree add` (or a clone) creates the checkout, and runs the hook
 # from the new worktree's root.
 # Set core.hooksPath to main's absolute .githooks, so worktrees of older branches,

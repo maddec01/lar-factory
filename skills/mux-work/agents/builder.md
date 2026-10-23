@@ -37,46 +37,38 @@ scan-and-rewrite pass. Code is out of scope.
 1. Set **In progress**, unless a handoff resumes past **Build**. Read the issue
    (brief, comments, linked prototype or research branches) and the repo's
    `AGENTS.md`; run its worktree setup if it asks.
-2. **Plan.** If the build already has slices (a handoff), clear the
-   leftovers: run `git worktree prune`; give the **forced cleanup** (in
-   **Merge**) to each `t3-<id>` worktree in `git worktree list` on a
-   `slice/<n>-*` branch; then `git branch -D` each branch left in
-   `git branch --list 'slice/<n>-*'`, and `git branch -d` each `t3/*` branch
-   no worktree uses (`-d` keeps any not merged here; other threads own
-   `t3-*` worktrees too, so touch none off a `slice/<n>-*` branch). Clear
-   `active` from every open slice (the resume command in **Slices**), start
-   a re-slice planner if any open slice is `blocked`, and go to
-   **Implement**.
+2. **Plan.** If the build already has slices (a handoff), clear `active` from
+   every open slice (the resume command in **Slices**), start a re-slice
+   planner if any open slice is `blocked`, and go to **Implement**.
    Otherwise start a **planner** subagent with `planner.md`, the issue
    reference and the repo path; it returns the slice list.
 3. **Implement.** In parallel, start an **implementer** child task for each
    ready slice (the ready-slices command in **Slices**) not already running,
    while no planner runs, per **Implementer** in
    `<mux-work>/orchestration.md`, and track it by its `taskId`. Give it
-   `implementer.md`, the slice reference and the build branch, and add
-   `active` to the slice (**Slices** in `<mux-work>/issue-tracker.md`).
+   `implementer.md`, the slice reference, the build branch and the full
+   slice branch name, and add `active` to the slice (**Slices** in
+   `<mux-work>/issue-tracker.md`). Derive the name from the build issue
+   number `<n>`, the slice issue number `<m>` and a slug of the slice title.
+   The first attempt uses `slice/<n>-<m>-<slug>`. When
+   `git branch --list 'slice/<n>-<m>-*'` finds a branch, a restart (after a
+   handoff, a re-slice or a retry) uses `slice/<n>-<m>-<slug>-<k>`, where `k`
+   is the lowest number from 2 up for which that branch does not exist.
    A **re-slice planner** is a planner also given one blocked slice's
    reference; run one at a time. When it returns its outcome, start one for
    another `blocked` slice if any, and run **Implement** again. If it fails
    (errors or returns no outcome), add `blocked` back to its slice, start no
    planner for that slice again, and follow the stop rule below.
 4. **Merge.** As each implementer reports, run
-   `git merge --ff-only slice/<n>-<m>-<slug>` here; if it can't fast-forward,
-   send a subagent to the implementer's reported worktree path to rebase onto
-   the build branch tip, then merge again. A finished child task leaves its
-   worktree behind, so after each merge run the **cleanup**, remove `active`
-   and close the slice sub-issue (**Slices** in
+   `git merge --ff-only <reported slice branch>` here; if it can't
+   fast-forward, send a subagent to the implementer's reported worktree path to
+   rebase onto the build branch tip, then merge again. After each merge, remove
+   `active` and close the slice sub-issue (**Slices** in
    `<mux-work>/issue-tracker.md`), and run **Implement** again. A slice
-   reported blocked gets the **forced cleanup**, then the blocked-slice
-   commands in **Slices**, and a re-slice planner if none runs. A slice
-   closed any other way loses `active` too.
-   The **cleanup**, for the reported worktree path `.../t3-<id>`:
-   `git worktree remove <path>`, `git branch -d slice/<n>-<m>-<slug>` and
-   `git branch -d t3/<id>` (the T3 branch is always `t3/<id>`, named from the
-   worktree dir). The **forced cleanup**, for an unmerged slice, uses
-   `--force` and `-D` and skips any worktree or branch that doesn't exist (a
-   slice can block before `slice/...` exists). A wrong brief follows the stop
-   rule below. Done when every slice is closed.
+   reported blocked gets the blocked-slice commands in **Slices**, and a
+   re-slice planner if none runs. A slice closed any other way loses `active`
+   too. A wrong brief follows the stop rule below. Done when every slice is
+   closed.
 5. A subagent writes the brief's **Domain docs** in its own commit,
    following `domain-modeling`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
    links them from `AGENTS.md` as the repo's `docs/agents/domain.md` says
@@ -114,11 +106,10 @@ repository's Domain docs only, as a sub-issue of this build that blocks it
 (reuse an open issue that covers the work); run its **4. Gate** Doubt, set it
 **Ready** and launch its thread per step 2 of **5. Start the build**, with no
 launch check. Ask Pedro only a product question he hasn't confirmed, or
-before cloning a repo he can't push to. A slice holding that work gets the
-**forced cleanup**, loses `active` and closes as not planned, its text moving
-into the new brief. A failed Verify is fixed in this build, or by a new
-blocking build when another repository must change; a merged build is never
-reopened.
+before cloning a repo he can't push to. A slice holding that work
+loses `active` and closes as not planned, its text moving into the new brief.
+A failed Verify is fixed in this build, or by a new blocking build when
+another repository must change; a merged build is never reopened.
 
 If the brief is wrong or a decision is missing, stop: comment on the issue with
 what you found and your recommendation, ask Pedro and continue when he

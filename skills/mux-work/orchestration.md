@@ -32,7 +32,8 @@ options against the request; report a capability mismatch, never downgrade.
 ## Roles
 
 - **Implementer**: worktree child task; it first runs
-  `git switch -c slice/<n>-<m>-<slug> <build-branch>`.
+  `git switch -c <given name> <build-branch>`, the slice branch name the builder
+  gives it.
 - **Prototype**: worktree child task; its local commit may be stale, so it
   first runs `git fetch origin main` and
   `git switch -c prototype/<n>-<slug> origin/main`. It returns each variant's start command (or

@@ -27,7 +27,8 @@ scan-and-rewrite pass. Code is out of scope.
   failures that matter.
 - **Fixer**: commits on the build branch here as `git commit --fixup <sha>`
   (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
-  never `--no-verify`, and reruns the checks.
+  never `--no-verify`, and reruns the checks. Its prompt carries
+  `<mux-work>/cross-repo-citations.md` for citing other-repo work.
 - **UI-check**: runs the visible checks and Verify captures per
   `<mux-work>/screenshots.md`, keeps screenshots in its own context, and
   returns their absolute paths and a verdict.
@@ -73,7 +74,8 @@ scan-and-rewrite pass. Code is out of scope.
    following `domain-modeling`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
    links them from `AGENTS.md` as the repo's `docs/agents/domain.md` says
    (without that file, it adds a **Domain docs** section to `AGENTS.md`
-   pointing to both).
+   pointing to both). Its prompt carries
+   `<mux-work>/cross-repo-citations.md` for citing other-repo work.
    A new term or ADR-worthy decision (all three conditions) settled during the
    build is added the same way (by the fixer during review) without stopping;
    list each in one issue comment headed **Domain docs added by the build**,
@@ -99,7 +101,7 @@ comment and relaunch with
 The handoff names the step and review round to resume at; at a review round,
 each reviewer's verdict, open findings, and rejected findings with reasons. Otherwise finish in place.
 
-Work in another repository (a subagent's `needs <owner/repo>`, a
+Work in another repository (a planner or implementer `needs <owner/repo>`, a
 failed check or a failed Verify) becomes a build there, and this build carries
 on. Write its short brief per **3. Brief** in `<mux-work>/SKILL.md`, with that
 repository's Domain docs only, as a sub-issue of this build that blocks it

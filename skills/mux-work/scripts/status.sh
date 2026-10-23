@@ -1,7 +1,8 @@
 #!/bin/bash
 # Usage: status.sh <owner/repo#number | issue or PR URL> <Status>
 # Adds the item to the "Mux" project if it isn't there yet, then sets its Status.
-# Then asks the local board (port MUX_BOARD_PORT, default 4317) to read GitHub now.
+# Then asks each running local board to read GitHub now: the one on MUX_BOARD_PORT when
+# that is set, else every board recorded in ~/Library/Application Support/Mux Factory/boards.
 set -euo pipefail
 
 # shellcheck source=project.sh
@@ -27,9 +28,24 @@ item_id=$(gh project item-add "$project" --owner "$owner" --url "$url" --format 
 gh project item-edit --project-id "$project_id" --id "$item_id" --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null
 echo "$url → $status"
 
-# The status is set; the board's answer, or no board at all, changes nothing.
-port=${MUX_BOARD_PORT:-}
-[[ $port =~ ^[0-9]+$ ]] || port=4317
-board="127.0.0.1:$port"
-curl --silent --output /dev/null --max-time 1 --request POST --header 'Content-Type: application/json' \
-    --header "Origin: http://$board" --data '{}' "http://$board/api/read" || true
+# The status is set; the boards' answers, or no board at all, change nothing.
+read_board() {
+    curl --silent --output /dev/null --max-time 1 --request POST --header 'Content-Type: application/json' \
+        --header "Origin: http://127.0.0.1:$1" --data '{}' "http://127.0.0.1:$1/api/read" || true
+}
+if [[ ${MUX_BOARD_PORT:-} =~ ^[0-9]+$ ]]; then
+    read_board "$MUX_BOARD_PORT"
+    exit 0
+fi
+# Each live board records its port in <pid>.json. A record whose process is gone,
+# or whose port no longer answers /healthz, is left over from a board that died.
+for record in "$HOME/Library/Application Support/Mux Factory/boards/"*.json; do
+    [[ -f $record ]] || continue
+    pid=$(basename "$record" .json)
+    port=$(jq -r '.port' "$record" 2>/dev/null || true)
+    [[ $pid =~ ^[0-9]+$ && $port =~ ^[0-9]+$ ]] || continue
+    kill -0 "$pid" 2>/dev/null || continue
+    if curl --silent --fail --output /dev/null --max-time 1 "http://127.0.0.1:$port/healthz"; then
+        read_board "$port"
+    fi
+done

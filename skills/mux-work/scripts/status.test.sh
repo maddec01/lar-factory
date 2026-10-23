@@ -33,13 +33,22 @@ exec "$real_curl" "\$@"
 CURL
 # listen <mode>: a one-connection listener on a free port. "board" answers 202
 # and saves the request; "slow" never answers; "other" answers a 404 page.
+# "live" is a board that keeps answering: /healthz with 200, anything else with
+# 202, appending each request line to the request file.
 cat >"$bin/listen.py" <<'PY'
 import socket, sys, time
 mode, port_file, request_file = sys.argv[1:4]
 server = socket.socket()
 server.bind(('127.0.0.1', 0))
-server.listen(1)
+server.listen(5)
 open(port_file, 'w').write(str(server.getsockname()[1]))
+while mode == 'live':
+    conn, _ = server.accept()
+    line = conn.makefile('rb').readline()
+    open(request_file, 'ab').write(line)
+    code = b'200 OK' if line.split()[1:2] == [b'/healthz'] else b'202 Accepted'
+    conn.sendall(b'HTTP/1.1 ' + code + b'\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}')
+    conn.close()
 conn, _ = server.accept()
 conn.settimeout(2)
 data = b''
@@ -64,14 +73,20 @@ listeners=
 trap 'kill $listeners 2>/dev/null; rm -rf "$bin"' EXIT
 
 port=
+pid=
 listen() {
     rm -f "$bin/port" "$bin/request"
-    python3 "$bin/listen.py" "$1" "$bin/port" "$bin/request" &
-    listeners="$listeners $!"
-    disown $!
+    python3 "$bin/listen.py" "$1" "$bin/port" "${2:-$bin/request}" &
+    pid=$!
+    listeners="$listeners $pid"
+    disown $pid
     for _ in $(seq 50); do [[ -s "$bin/port" ]] && break; python3 -c 'import time; time.sleep(0.05)'; done
     port=$(cat "$bin/port")
 }
+# status.sh reads board records from this home, never the real one.
+export HOME="$bin/home"
+records="$HOME/Library/Application Support/Mux Factory/boards"
+record() { mkdir -p "$records"; printf '{"port":%s}' "$2" >"$records/$1.json"; }
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
 
 url=https://github.com/maddec01/mux-factory/issues/7
@@ -102,24 +117,54 @@ else
     fail "after setting the status, asks the board for a read once with JSON and its Origin: $status $output / $errors / $(cat "$log") / $request"
 fi
 
+# With no records and no MUX_BOARD_PORT there is no board to ask.
 : >"$log"
 status=0
-# FAKE_CURL_OFF keeps the test away from a launch-agent board running on 4317.
-output=$(env -u MUX_BOARD_PORT FAKE_CURL_OFF=1 bash "$status_sh" maddec01/mux-factory#7 "Ready to merge" 2>"$bin/err") || status=$?
+output=$(env -u MUX_BOARD_PORT bash "$status_sh" maddec01/mux-factory#7 "Ready to merge" 2>"$bin/err") || status=$?
 errors=$(cat "$bin/err")
-if grep -q 'http://127.0.0.1:4317/api/read' "$log"; then
-    pass "the board port defaults to 4317"
+if same_as_today && (($(curls) == 0)); then
+    pass "with no board records and no MUX_BOARD_PORT, asks no board"
 else
-    fail "the board port defaults to 4317: $(cat "$log")"
+    fail "with no board records and no MUX_BOARD_PORT, asks no board: $status $output / $errors / $(cat "$log")"
 fi
 
-: >"$log"
-output=$(MUX_BOARD_PORT='4317/x?' FAKE_CURL_OFF=1 bash "$status_sh" maddec01/mux-factory#7 "Ready to merge" 2>"$bin/err") || true
-if grep -q 'http://127.0.0.1:4317/api/read' "$log" && ! grep -q '4317/x' "$log"; then
-    pass "a port that isn't a number falls back to 4317"
+# Two live boards, a stale record whose process is gone (its port answers, to
+# show the PID decides) and a live process whose port answers nothing.
+listen live "$bin/a"; a_pid=$pid a_port=$port
+listen live "$bin/b"; b_pid=$pid b_port=$port
+listen live "$bin/stale"; stale_port=$port
+sleep 0 & dead_pid=$!; wait $dead_pid
+record "$a_pid" "$a_port"
+record "$b_pid" "$b_port"
+record "$dead_pid" "$stale_port"
+record $$ "$(free_port)"
+requests() { cat "$bin/$1" 2>/dev/null || true; }
+reads() { grep -c '^POST /api/read ' "$bin/$1" 2>/dev/null || true; }
+: >"$bin/a"; : >"$bin/b"; : >"$bin/stale"
+run
+if same_as_today && [[ $(requests a) == "GET /healthz"*"POST /api/read"* && $(requests b) == "GET /healthz"*"POST /api/read"* ]] &&
+    (($(reads a) == 1 && $(reads b) == 1)) && [[ -z $(requests stale) ]]; then
+    pass "asks each recorded board whose process lives and whose /healthz answers, and skips stale records"
 else
-    fail "a port that isn't a number falls back to 4317: $(cat "$log")"
+    fail "asks each recorded board whose process lives and whose /healthz answers, and skips stale records: $status $output / $errors / a: $(requests a) / b: $(requests b) / stale: $(requests stale)"
 fi
+
+: >"$bin/a"; : >"$bin/b"
+run "$b_port"
+if same_as_today && (($(reads b) == 1)) && [[ -z $(requests a) ]]; then
+    pass "MUX_BOARD_PORT asks only the board on that port"
+else
+    fail "MUX_BOARD_PORT asks only the board on that port: $status $output / $errors / a: $(requests a) / b: $(requests b)"
+fi
+
+: >"$bin/a"; : >"$bin/b"
+run '4317/x?'
+if same_as_today && (($(reads a) == 1 && $(reads b) == 1)) && ! grep -q '4317' "$log"; then
+    pass "a MUX_BOARD_PORT that isn't a number is ignored for the records"
+else
+    fail "a MUX_BOARD_PORT that isn't a number is ignored for the records: $status $output / $errors / $(cat "$log")"
+fi
+rm -rf "$records"
 
 run "$(free_port)"
 if same_as_today && (($(curls) == 1)); then

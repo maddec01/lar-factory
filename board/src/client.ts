@@ -106,7 +106,7 @@ function dismiss(key: string): void {
     if (action?.phase === 'uncertain') actions[itemId] = { phase: 'uncertain' };
     else if (action?.phase === 'error') delete actions[itemId];
     const id = CSS.escape(itemId);
-    next = `${action?.kind === 'abandon' ? `[data-abandon="${id}"],` : ''}[data-queue="${id}"],[data-start="${id}"],[data-start-result="${id}"],[data-add-item]`;
+    next = `${action?.kind === 'abandon' ? `[data-abandon="${id}"],` : ''}[data-queue="${id}"],[data-back-to-list="${id}"],[data-start="${id}"],[data-start-result="${id}"],[data-add-item]`;
   } else dismissed.add(key);
   render();
   if (hadFocus && document.activeElement === document.body) {
@@ -144,13 +144,14 @@ function startToastClocks(): void {
 
 function tagFocusable(): void {
   // Give tabs, toggles and buttons stable keys so focus survives a re-render.
-  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-dismiss],[data-view-item],.slices-trigger,.slices-pop a,details[id] > summary').forEach((el) => {
+  app.querySelectorAll<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-start-result],[data-abandon],[data-add-item],[data-update],[data-dismiss],[data-view-item],.slices-trigger,.slices-pop a,details[id] > summary,section > h2').forEach((el) => {
     el.dataset.focusKey = focusKeyOf(el);
   });
 }
 
 function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.queue) return `queue-${el.dataset.queue}`;
+  if (el.dataset.backToList) return `back-${el.dataset.backToList}`;
   if (el.dataset.start) return `start-${el.dataset.start}`;
   if (el.dataset.startResult) return `result-${el.dataset.startResult}`;
   if (el.hasAttribute('data-update')) return 'update';
@@ -158,6 +159,7 @@ function focusKeyOf(el: HTMLElement): string {
   if (el.dataset.viewItem) return `view-${el.dataset.viewItem}`;
   // Keyed by project item id, since a draft has no number.
   if (el.dataset.abandon) return `abandon-${el.dataset.abandon}`;
+  if (el.matches('section > h2')) return `heading-${el.closest('section')!.id}`;
   if (el.matches('.slices-trigger')) return `slices-${slicesOf(el)}`;
   if (el.closest('.slices-pop')) return `slice-${slicesOf(el)}-${el.getAttribute('href')}`;
   return el.dataset.view ?? el.dataset.copy ?? (el.hasAttribute('data-add-item') ? 'add-item' : `summary-${el.parentElement?.id}`);
@@ -406,6 +408,19 @@ function focusAfterLeaving(button: HTMLElement, attr: string): string {
   return neighbour ? focusKeyOf(neighbour) : `summary-${button.closest('details')?.id}`;
 }
 
+/** When a Queued card leaves, keep keyboard focus in the section: the nearest card's first action (later cards first), else its heading. */
+function focusAfterCardLeaving(button: HTMLElement): string {
+  const card = button.closest('article');
+  const actions = '[data-start],[data-back-to-list],[data-abandon]';
+  for (const step of ['nextElementSibling', 'previousElementSibling'] as const) {
+    for (let sibling = card?.[step]; sibling; sibling = sibling[step]) {
+      const action = sibling.querySelector<HTMLElement>(actions);
+      if (action) return focusKeyOf(action);
+    }
+  }
+  return `heading-${button.closest('section')?.id}`;
+}
+
 async function queueItem(button: HTMLElement): Promise<void> {
   const itemId = button.dataset.queue!;
   if (actions[itemId]?.phase === 'pending') return;
@@ -419,6 +434,21 @@ async function queueItem(button: HTMLElement): Promise<void> {
     delete actions[itemId];
     setNotice({ verb: 'Moved', item, to: 'Queued' });
   }
+  render();
+  if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
+}
+
+async function backToList(button: HTMLElement): Promise<void> {
+  const itemId = button.dataset.backToList!;
+  const item = data.items.find((i) => i.id === itemId);
+  if (!item || actions[itemId]?.phase === 'pending') return;
+  const nextFocus = focusAfterCardLeaving(button);
+  actions[itemId] = { phase: 'pending', kind: 'back-to-list' };
+  render();
+  const result = await postAction('/api/back-to-list', { itemId });
+  // A failure is a toast only: the card's footer goes back to its links.
+  delete actions[itemId];
+  setNotice(result.error ? { verb: 'Failed', item, to: 'List', message: result.error } : { verb: 'Moved', item, to: 'List' });
   render();
   if (!result.error && document.activeElement === document.body) focusByKey(nextFocus);
 }
@@ -502,7 +532,7 @@ async function abandonItem(itemId: string): Promise<void> {
 }
 
 app.addEventListener('click', (event) => {
-  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-start],[data-abandon],[data-add-item],[data-update],[data-outline-jump],[data-dismiss],[data-view-item]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-view],[data-copy],[data-queue],[data-back-to-list],[data-start],[data-abandon],[data-add-item],[data-update],[data-outline-jump],[data-dismiss],[data-view-item]');
   if (!target) return;
   if (target.dataset.outlineJump) {
     // An in-page link: keep it out of the hash, which picks the view.
@@ -517,6 +547,7 @@ app.addEventListener('click', (event) => {
   } else if (target.dataset.view) setView(target.dataset.view as View);
   else if (target.dataset.copy) void copy(target.dataset.copy, target as HTMLButtonElement);
   else if (target.dataset.queue) void queueItem(target);
+  else if (target.dataset.backToList) void backToList(target);
   else if (target.dataset.start) void startItem(target.dataset.start);
   else if (target.hasAttribute('data-update')) void startUpdate();
   else if (target.dataset.abandon) askAbandon(target.dataset.abandon);

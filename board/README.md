@@ -27,6 +27,9 @@ cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
   project at that path. The first check that fails stops Start with a hint
   naming the fix, such as adding the project in T3 Code; the board never adds
   or changes T3 projects, and it refuses when it can't read T3's database.
+- **Back to List**, in the footer row of a Queued issue or draft card, is the
+  reverse of Queue: it sets the item's Status back to List, and the board moves
+  the card there at once. Queued pull requests get no footer row.
 - **Flow** is an outline of how items relate: sub-issues sit under their
   parent, and each issue lists the issues it is blocked by and the ones it
   blocks, as GitHub records them. A link to an item on the Board jumps to it;

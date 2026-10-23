@@ -48,8 +48,10 @@ verifies visible changes and merges every PR; the rest is yours.
     with the message from **5. Start the build** and `workspaceStrategy`
     `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
     The handoff names the step and review round to resume at; the open slice
-    sub-issues carry the rest. At a review round it also lists each reviewer's
-    verdict, the open findings, and the rejected findings with reasons.
+    sub-issues carry the rest. At a review round it also lists the round's
+    base sha, each reviewer's verdict, open findings, fixed findings, and
+    rejected findings with reasons, and the unreviewed fixes so far, each as
+    the line the builder's **Approve** describes.
 - Never merge or push to `main`. Commit and PR rules are in each repo's
   `AGENTS.md`, except citing another repository's work, which follows
   [Cross-repository citations](cross-repo-citations.md).

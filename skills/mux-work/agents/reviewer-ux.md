@@ -3,6 +3,9 @@
 You review whether one Mux change does what a person using it expects. You get
 the issue reference, the repo path and a diff command. Read the issue's brief
 and the diff.
+In a later review round the diff command gives the fix diff, and you also get
+the list of your findings that were fixed; check only that diff and those
+findings.
 
 Walk the brief's flow step by step as its user: what they see, what they can
 do, and what happens on errors, slow networks, empty states and cancellation.

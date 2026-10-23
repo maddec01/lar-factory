@@ -1,6 +1,7 @@
-// The board app's main process: starts the board server as a child, shows its page
-// in a window, starts the server again if it crashes and stops it when the app
-// quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
+// The board app's main process: starts the board server as a child with the login
+// shell's PATH, shows its page in a window, starts the server again if it crashes
+// and stops it when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts
+// and window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
@@ -8,12 +9,14 @@ import * as NodePath from "node:path";
 
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Electron from "electron";
 
 import * as BoardServer from "./backend/BoardServer.ts";
 import * as BoardSupervisor from "./backend/BoardSupervisor.ts";
 import * as ExternalLink from "./ExternalLink.ts";
+import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
 import * as StartingPage from "./StartingPage.ts";
 
 /** Resolves once the user quits the app or closes its last window. */
@@ -99,13 +102,15 @@ const program = Effect.gen(function* () {
   });
   yield* board.showStarting;
   const boardDir = NodePath.resolve(Electron.app.getAppPath(), "../board");
-  const config = BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env: process.env });
+  // Read once: a restarted server keeps the PATH the first one got.
+  const env = yield* ShellEnvironment.childEnvironment(process.env);
+  const config = BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env });
   // Quitting closes the scope, which stops the server or cancels a pending restart.
   yield* BoardSupervisor.supervise(BoardServer.start(config), board.events).pipe(Effect.forkScoped);
   yield* quitRequested;
 }).pipe(
   Effect.scoped,
-  Effect.provide(NodeHttpClient.layerUndici),
+  Effect.provide([NodeHttpClient.layerUndici, NodeServices.layer]),
   Effect.ensuring(Effect.sync(() => Electron.app.exit(0))),
 );
 

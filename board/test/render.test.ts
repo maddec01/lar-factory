@@ -232,9 +232,9 @@ function sliceBar(card: string) {
   };
 }
 
-const buildCard = (raws: RawItem[], active: number[] = []) => {
-  const keys = new Set(active.map((n) => `maddec01/mux-factory#${n}`));
-  const data: BoardData = { ...sample, error: null, items: normalizeItems(raws, { active: keys }) };
+const buildCard = (raws: RawItem[], active: number[] = [], blocked: number[] = []) => {
+  const keys = (numbers: number[]) => new Set(numbers.map((n) => `maddec01/mux-factory#${n}`));
+  const data: BoardData = { ...sample, error: null, items: normalizeItems(raws, { active: keys(active), blocked: keys(blocked) }) };
   return renderBoardView(data, base).split('<article').find((a) => a.includes('data-anchor="PVTI_build"'))!;
 };
 
@@ -251,6 +251,19 @@ test('a build card shows its slices as a bar under the status bar, with captions
   assert.ok(!card.replace(/<div class="slices-pop".*?<\/div>/s, '').includes('row-item'), 'no slice rows on the card outside the popover');
 });
 
+test('a build card counts its blocked slices before its active ones, names either alone, and marks them in the bar', () => {
+  const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
+    subIssuesSummary: { total: 4, completed: 1 },
+    subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
+  });
+  assert.deepEqual(sliceBar(buildCard([raw], [66, 67], [67])), {
+    segments: ['done', 'active', 'blocked', 'waiting'],
+    caption: '1/4 · Slices done',
+    active: '<span class="slices-blocked">1 blocked</span><span class="sep"> · </span><span class="slices-active">1 active</span>',
+  });
+  assert.deepEqual(sliceBar(buildCard([raw], [], [67])).active, '<span class="slices-blocked">1 blocked</span> <span class="ref">#67</span> Issue 67');
+});
+
 /** A build card's popover: the trigger's opening tag, the popover's id, and each row's state, number and link in order. */
 function slicePopover(card: string) {
   const trigger = /<div class="slices-trigger"[^>]*>/.exec(card)?.[0];
@@ -260,15 +273,15 @@ function slicePopover(card: string) {
   return { trigger, id: pop[1], rows: rows.map((m) => [m[1], Number(m[3]), m[2]]) };
 }
 
-test("a build card's popover lists every slice, active then waiting then done, behind a disclosure trigger", () => {
+test("a build card's popover lists every slice, blocked then active then waiting then done, behind a disclosure trigger", () => {
   const raw = rawIssue('PVTI_build', 59, 'In progress', ['improvement', 'build'], {
-    subIssuesSummary: { total: 3, completed: 1 },
-    subIssues: { nodes: [sliceRef(65, 'OPEN'), sliceRef(66, 'CLOSED'), sliceRef(67, 'OPEN')] },
+    subIssuesSummary: { total: 4, completed: 1 },
+    subIssues: { nodes: [sliceRef(65, 'OPEN'), sliceRef(66, 'CLOSED'), sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
   });
-  const card = buildCard([raw], [67]);
+  const card = buildCard([raw], [67], [68]);
   const pop = slicePopover(card);
   const url = (n: number) => `https://github.com/maddec01/mux-factory/issues/${n}`;
-  assert.deepEqual(pop.rows, [['active', 67, url(67)], ['waiting', 65, url(65)], ['done', 66, url(66)]]);
+  assert.deepEqual(pop.rows, [['blocked', 68, url(68)], ['active', 67, url(67)], ['waiting', 65, url(65)], ['done', 66, url(66)]]);
   assert.match(pop.trigger, /role="button"/);
   assert.match(pop.trigger, /tabindex="0"/);
   assert.match(pop.trigger, /aria-expanded="false"/);
@@ -343,8 +356,8 @@ test('a build shows its `build` sub-issues like any parent: a counter, and Flow 
 
 test('Flow shows blocked-by and blocks links from GitHub, jumping to Board items and referencing the rest', () => {
   const html = renderFlowView(sample, base);
-  assert.match(flowNode(html, 'PVTI_sample12'), /<li class="o-link blocked-by"><span class="o-rel">blocked by<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample10"><b>#201<\/b> Relay: broker only or full TURN\?<\/a> <span class="o-status">Shaping<\/span><\/li>/);
-  assert.match(flowNode(html, 'PVTI_sample10'), /<li class="o-link blocks"><span class="o-rel">blocks<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample12"><b>#202<\/b> Sign-in screen<\/a>/);
+  assert.match(flowNode(html, 'PVTI_sample12'), /<li class="o-link o-blocked-by"><span class="o-rel">blocked by<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample10"><b>#201<\/b> Relay: broker only or full TURN\?<\/a> <span class="o-status">Shaping<\/span><\/li>/);
+  assert.match(flowNode(html, 'PVTI_sample10'), /<li class="o-link o-blocks"><span class="o-rel">blocks<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample12"><b>#202<\/b> Sign-in screen<\/a>/);
   const owner = flowNode(html, 'PVTI_sample13');
   assert.match(owner, /blocked by<\/span> <a class="o-ref off" href="https:\/\/github\.com\/maddec01\/mux-server\/issues\/118" target="_blank" rel="noopener"><b>#118<\/b> Accounts table migration<\/a> <span class="o-off">not on board · open<\/span>/);
   assert.match(owner, /blocks<\/span> <a class="o-ref" href="#flow" data-outline-jump="PVTI_sample05"><b>#129<\/b>/);
@@ -371,8 +384,8 @@ test('Flow counts links beyond the first ones GitHub returned, and never infers 
   const blocker = { ...sample.items[1]!, number: 1, title: 'Issue 1' };
   const html = renderFlowView({ ...sample, items: [blocked, blocker] }, base);
   const node = flowNode(html, blocked.id);
-  assert.match(node, /<li class="o-link blocked-by o-more"><span class="o-rel">blocked by<\/span> 21 more issues<\/li>/);
-  assert.match(node, /<li class="o-link blocks o-more"><span class="o-rel">blocks<\/span> 3 more issues<\/li>/);
+  assert.match(node, /<li class="o-link o-blocked-by o-more"><span class="o-rel">blocked by<\/span> 21 more issues<\/li>/);
+  assert.match(node, /<li class="o-link o-blocks o-more"><span class="o-rel">blocks<\/span> 3 more issues<\/li>/);
   assert.ok(!hasNode(html, blocker.id) || !flowNode(html, blocker.id).includes('o-link'), "the blocker's own blocking list is empty, so it shows no link back");
 });
 

@@ -231,12 +231,15 @@ function stepCells(status: Status): string {
   return `<ol class="segbar steps" aria-hidden="true">${segments}</ol><span class="bar-label step-label ${tone}">${at + 1}/${STATUSES.length} · ${esc(status)}</span>`;
 }
 
-/** The popover lists active slices first, then waiting, then done. */
-const SLICE_GROUPS: SliceProgress[] = ['active', 'waiting', 'done'];
+/** The popover lists blocked slices first, then active, waiting and done. */
+const SLICE_GROUPS: SliceProgress[] = ['blocked', 'active', 'waiting', 'done'];
+
+/** The slice states the line under a build's bars names, in order. */
+const NAMED_SLICES = ['blocked', 'active'] as const;
 
 /**
  * The status bar, and on a build with slices its slice bar under it: one segment per
- * slice, the captions sharing a column, and one line naming the active slices. Its
+ * slice, the captions sharing a column, and one line naming the blocked or the active slices (counting them when both are present). Its
  * height doesn't grow with the number of slices: they're listed in a popover that
  * floats over the board. The block is the popover's disclosure trigger; `open` is
  * kept in `UiState.slicesOpen` so a re-render keeps it open.
@@ -245,11 +248,15 @@ function bars(item: Item, open: boolean): string {
   const slices = item.slices;
   if (!slices.length) return `<div class="bars">${stepCells(item.status)}</div>`;
   const done = slices.filter((s) => s.progress === 'done').length;
-  const active = slices.filter((s) => s.progress === 'active');
   const segments = slices.map((s) => `<li class="${s.progress}"></li>`).join('');
-  const now = active.length
-    ? `<p class="slices-now"><span class="slices-active">${active.length} active</span> ${active.map((s) => `<span class="ref">#${s.number}</span> ${esc(s.title)}`).join('<span class="sep"> · </span>')}</p>`
-    : '';
+  const sep = '<span class="sep"> · </span>';
+  const groups = NAMED_SLICES.map((g) => ({ g, group: slices.filter((s) => s.progress === g) })).filter(({ group }) => group.length);
+  // Both groups together show counts only, so the active ones never truncate away.
+  const named = groups.map(({ g, group }) => {
+    const count = `<span class="slices-${g}">${group.length} ${g}</span>`;
+    return groups.length > 1 ? count : `${count} ${group.map((s) => `<span class="ref">#${s.number}</span> ${esc(s.title)}`).join(sep)}`;
+  });
+  const now = named.length ? `<p class="slices-now">${named.join(sep)}</p>` : '';
   // Within each group, slices keep GitHub's sub-issue order.
   const rows = SLICE_GROUPS.flatMap((g) => slices.filter((s) => s.progress === g)).map(
     (s) => `<li class="row-item slice-row ${s.progress}"><span class="slice-mark" aria-hidden="true"></span><a class="row-title" href="${esc(s.url)}" title="${esc(s.title)}" target="_blank" rel="noopener"><span class="ref">#${s.number}</span> ${esc(s.title)}<span class="sr-only"> (${s.progress})</span></a></li>`,
@@ -331,7 +338,7 @@ function card(item: Item, data: BoardData, opts: RenderOptions, extra = '', acti
     ? `<p class="parent">Part of <a href="${esc(item.parent.url)}" target="_blank" rel="noopener">#${item.parent.number} ${esc(item.parent.title)}</a></p>`
     : '';
   const blocked = item.blockedBy
-    ? `<span class="blocked" title="Blocked by ${plural(item.blockedBy, 'issue')}">blocked by ${item.blockedBy}</span>`
+    ? `<span class="blocked-by" title="Blocked by ${plural(item.blockedBy, 'issue')}">blocked by ${item.blockedBy}</span>`
     : '';
   // A build's slices aren't counted here: its slice bar shows them.
   const subs = item.subIssues.total
@@ -652,7 +659,7 @@ function conceptBlock(concept: Item, data: BoardData, opts: RenderOptions): stri
       const amber = AMBER_STATUSES.includes(s) ? ' amber' : '';
       return `<li class="sub-group"><span class="sub-status${amber}">${esc(s)}</span><ul>${list
         .map((c) =>
-          row(c, data, c.blockedBy ? `<span class="blocked">blocked by ${c.blockedBy}</span>` : '', true, 'kind'),
+          row(c, data, c.blockedBy ? `<span class="blocked-by">blocked by ${c.blockedBy}</span>` : '', true, 'kind'),
         )
         .join('')}</ul></li>`;
     })
@@ -786,7 +793,7 @@ function issueRefLink(r: IssueRef, from: string | null, shown: Map<string, Item>
 
 /** One row per link GitHub returned, then a count of the rest. */
 function linkRows(rel: 'blocked by' | 'blocks', links: IssueLinks, from: string | null, shown: Map<string, Item>): string {
-  const cls = rel === 'blocked by' ? 'blocked-by' : 'blocks';
+  const cls = rel === 'blocked by' ? 'o-blocked-by' : 'o-blocks';
   const rows = links.nodes.map((r) => `<li class="o-link ${cls}"><span class="o-rel">${rel}</span> ${issueRefLink(r, from, shown)}</li>`);
   const more = links.total - links.nodes.length;
   if (more > 0) rows.push(`<li class="o-link ${cls} o-more"><span class="o-rel">${rel}</span> ${plural(more, 'more issue', 'more issues')}</li>`);

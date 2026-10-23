@@ -52,11 +52,6 @@ new build or `src/` change.
   Start is running, may have started or has started, the row disappears and
   the board refuses both actions for it; while either is running, it refuses
   Start. The board remembers Started only until it restarts.
-- **Flow** is an outline of how items relate: sub-issues sit under their
-  parent, and each issue lists the issues it is blocked by and the ones it
-  blocks, as GitHub records them. A link to an item on the Board jumps to it;
-  issues that aren't on the Board (including Done items older than 7 days) show
-  as dashed references with their open or closed state. Nothing is inferred.
 - **Notices**: a success (Added, Moved, Abandoned, Started, a finished update)
   is a toast that clears after about 5 s. A failure stays until you close it
   or the next attempt succeeds. Warnings such as stale data or an available

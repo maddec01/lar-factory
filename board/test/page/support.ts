@@ -64,7 +64,7 @@ export async function mountPage(data: BoardData = sample, hash = ''): Promise<vo
   });
 }
 
-/** Runs `fn`, then lets React and the router finish rendering. */
+/** Runs `fn`, then lets React finish rendering. */
 export async function settle(fn: () => unknown = () => {}): Promise<void> {
   await act(async () => {
     await fn();

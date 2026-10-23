@@ -4,8 +4,8 @@
    (tailwindcss/packages/tailwindcss/theme.css). Badges and buttons follow
    apps/web/src/components/ui/badge.tsx and button.tsx; grouped lists follow
    components/settings/SettingsGroup.tsx. */
-/* Tailwind scans only the files listed here: the page's own class names (such as "outline") would
-   otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
+/* Tailwind scans only the files listed here: the page's own class names would otherwise turn on
+   Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @import "tailwindcss" source(none);
 @source "./app/TitleBar.tsx";
 
@@ -86,7 +86,7 @@ code { font: 12px var(--font-mono); }
 [hidden] { display: none !important; }
 
 /* header */
-.top { margin-bottom: 12px; }
+.top { margin-bottom: 22px; }
 .title-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; display: inline-flex; align-items: baseline; gap: 8px; }
 /* Baseline alignment puts the logo's bottom edge on the text's baseline. The x's strokes end 8.75 of the
@@ -109,12 +109,6 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .tool-missing-box { max-width: 520px; border: 1px solid var(--bd); background: var(--surface); border-radius: var(--r); padding: 20px 24px; }
 .tool-missing-box p { margin: 12px 0 0; color: var(--muted); }
 .tool-missing-box code { color: var(--fg); overflow-wrap: anywhere; }
-
-/* view tabs */
-.vtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--bd); margin: 4px 0 16px; }
-.vtab { font: inherit; font-weight: 600; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; margin-bottom: -1px; cursor: pointer; }
-.vtab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--primary); }
-.vtab:hover { color: var(--fg); }
 
 /* sections */
 .section { margin: 0 0 22px; }
@@ -351,36 +345,6 @@ details.platform summary::after { content: "Show"; margin-left: auto; color: var
 details.platform[open] summary::after { content: "Hide"; }
 details.platform summary b { font-size: 15px; font-variant-numeric: tabular-nums; }
 
-/* flow: an outline of parent/child and blocked-by links */
-.outline { display: grid; gap: 12px; }
-.o-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; color: var(--muted); font-size: 12px; }
-.o-legend li { display: inline-flex; align-items: center; gap: 6px; }
-.o-legend .o-ref.off { font-size: 11px; }
-.o-tree { list-style: none; margin: 0; padding: 0; }
-.o-root { display: grid; gap: 8px; }
-.o-root > .o-node { border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); padding: 4px; box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
-.o-node .o-tree { margin-left: 15px; padding-left: 14px; border-left: 1px solid var(--line); }
-.o-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 32px; padding: 3px 8px; border-radius: var(--r-control); }
-.o-row:hover { background: var(--muted-bg); }
-.o-title { text-decoration: none; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
-a.o-title:hover { text-decoration: underline; }
-.o-status { font-size: 11px; font-weight: 500; padding: 0 6px; min-height: 18px; display: inline-flex; align-items: center; border-radius: var(--r-sm); background: var(--accent); color: var(--muted); white-space: nowrap; }
-.o-status.amber { background: var(--you-soft); color: var(--you-text); }
-.o-status.done { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-fg); }
-.o-subs { font-size: 12px; color: var(--muted); }
-.o-links { list-style: none; margin: 0 0 2px; padding: 0 8px 0 30px; display: grid; gap: 2px; font-size: 12px; }
-.o-link { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 22px; }
-.o-more { color: var(--muted); }
-.o-rel { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.o-blocked-by .o-rel { color: var(--danger-text); }
-.o-ref { text-decoration: none; color: var(--fg); overflow-wrap: anywhere; }
-.o-ref:hover { text-decoration: underline; }
-.o-ref.off { border: 1px dashed var(--input); border-radius: var(--r-sm); padding: 0 6px; color: var(--muted); }
-.o-off { font-size: 11px; color: var(--muted); }
-.o-offroot > .o-row { color: var(--muted); }
-.o-missing { padding: 4px 8px; font-size: 12px; color: var(--muted); }
-.o-missing::before { content: "+ "; }
-.o-loose .rows { margin-top: 8px; }
 /* Where a jump landed. */
 .anchor-flash { animation: anchor-flash 1.6s ease-out; }
 @keyframes anchor-flash { from { box-shadow: 0 0 0 2px var(--primary); } to { box-shadow: 0 0 0 2px transparent; } }
@@ -395,8 +359,6 @@ a.o-title:hover { text-decoration: underline; }
   .rows .row-item:has(.stats) .row-title { flex: 1 1 0; }
   .rows .row-item:has(.stats) .labels { flex: 1 0 100%; flex-wrap: wrap; mask-image: none; }
   .rows .row-item:has(.stats) .labels:empty { display: none; }
-  .o-links { padding-left: 12px; }
-  .o-node .o-tree { margin-left: 6px; padding-left: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .anchor-flash, .toast, .slice-bar li.active { animation: none; }

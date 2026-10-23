@@ -7,5 +7,5 @@ export function jumpTo(el: HTMLElement | null): void {
   void el.offsetWidth; // restart the animation
   el.classList.add('anchor-flash');
   // The title first: on a Queued card Start comes earlier in the page, and Enter must not start a thread.
-  el.querySelector<HTMLElement>('a.title, a.row-title, a.o-title, a, button')?.focus({ preventScroll: true });
+  el.querySelector<HTMLElement>('a.title, a.row-title, a, button')?.focus({ preventScroll: true });
 }

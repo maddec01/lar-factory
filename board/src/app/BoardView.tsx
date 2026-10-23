@@ -13,7 +13,6 @@ import { Disclosure } from './Disclosure.tsx';
 import { AbandonButton, ActionError, BackToListButton, QueueButton } from './ItemActions.tsx';
 import { jumpTo } from './jump.ts';
 import { useJumpStore } from './jump-store.ts';
-import { useSetView, useView } from './router.tsx';
 import { StartControl, StartMessage, useStartHolds } from './StartControl.tsx';
 import { KindPill, LabelPills, PlatformBadge, TitleLink } from './item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
@@ -106,16 +105,13 @@ function QueuedCard({ item, data }: { item: Item; data: BoardData }) {
 
 /** Brings the item View item asked for into view on the Board: its own card or row, not the copy inside a concept card. */
 function useJump(): void {
-  const view = useView();
-  const setView = useSetView();
   const target = useJumpStore((state) => state.target);
   useLayoutEffect(() => {
     if (!target) return;
-    if (view !== 'board') return setView('board');
     useJumpStore.getState().done();
     const copies = [...document.querySelectorAll<HTMLElement>(`#panel-board [data-anchor="${CSS.escape(target)}"]`)];
     jumpTo(copies.find((el) => !el.closest('.sub-groups')) ?? copies[0] ?? null);
-  }, [target, view, setView]);
+  }, [target]);
 }
 
 export function BoardView() {

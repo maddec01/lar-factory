@@ -1,10 +1,11 @@
 // The board app's main process: starts the board server as a child with the login
-// shell's PATH, shows its page in a window, starts the server again if it crashes
-// and stops it when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts
-// and window/DesktopWindow.ts.
+// shell's PATH, shows its page in a window, starts the server again if it crashes,
+// installs the bundled skills and stops the server when the app quits. Modelled on
+// T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
+import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
@@ -15,6 +16,7 @@ import * as Electron from "electron";
 
 import * as BoardServer from "./backend/BoardServer.ts";
 import * as BoardSupervisor from "./backend/BoardSupervisor.ts";
+import * as SkillInstall from "./backend/SkillInstall.ts";
 import * as ExternalLink from "./ExternalLink.ts";
 import * as LaunchSecret from "./LaunchSecret.ts";
 import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
@@ -103,6 +105,21 @@ const openBoardWindow = (secret: string) => {
   return { window, events, showStarting: load(StartingPage.url()) };
 };
 
+/** Installs the bundled skills and shows the user an error or conflicts. */
+const installSkills = SkillInstall.onLaunch({
+  isPackaged: Electron.app.isPackaged,
+  version: Electron.app.getVersion(),
+  home: NodeOS.homedir(),
+  bundle: SkillInstall.locateBundle(Electron.app.getAppPath(), Electron.app.isPackaged),
+  argv: process.argv,
+  env: process.env,
+}).pipe(
+  Effect.match({ onFailure: SkillInstall.notice, onSuccess: (result) => result && SkillInstall.notice(result) }),
+  Effect.flatMap((notice) =>
+    notice ? Effect.promise(() => Electron.dialog.showMessageBox({ ...notice, buttons: ["OK"] })) : Effect.void,
+  ),
+);
+
 const program = Effect.gen(function* () {
   yield* Effect.promise(() => Electron.app.whenReady());
   // One secret per launch, shared by the restarted servers and the page.
@@ -124,6 +141,9 @@ const program = Effect.gen(function* () {
   });
   // Quitting closes the scope, which stops the server or cancels a pending restart.
   yield* BoardSupervisor.supervise(BoardServer.start(config), board.events).pipe(Effect.forkScoped);
+  // Starts after the board server. The copy is synchronous, so it blocks the main
+  // process briefly after start.
+  yield* Effect.forkScoped(installSkills);
   yield* quitRequested;
 }).pipe(
   Effect.scoped,

@@ -205,6 +205,18 @@ with the board's server source, its built page and a copy of `config.json`
 inside. Rebuild it after changing `config.json`. If macOS refuses to open it,
 right-click it in Finder and choose Open.
 
+The app's build copies `skills/` and `references/` into `app/dist-electron/bundle`,
+which packaging puts in the app's `Resources/bundle`.
+A packaged app installs them into `~/.agents` and the ticked Claude profiles on the
+first launch of each new version, after its window opens, and shows a dialog for
+an error or a conflict. A run from a checkout installs only with `--install-skills`,
+and `MUX_FACTORY_INSTALL_ROOT` puts the install in another folder instead of your
+home:
+
+```bash
+MUX_FACTORY_INSTALL_ROOT="$(mktemp -d)" pnpm run dev --install-skills
+```
+
 ## Repo layout
 
 ```

@@ -17,7 +17,8 @@ const electronPath = ensureElectronRuntime();
 const childEnv = { ...process.env };
 delete childEnv.ELECTRON_RUN_AS_NODE;
 
-const child = NodeChildProcess.spawn(electronPath, ["."], { stdio: "inherit", cwd: appDir, env: childEnv });
+// Arguments pass through, so `pnpm run dev --install-skills` reaches the app.
+const child = NodeChildProcess.spawn(electronPath, [".", ...process.argv.slice(2)], { stdio: "inherit", cwd: appDir, env: childEnv });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => child.kill(signal));

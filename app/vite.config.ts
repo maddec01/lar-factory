@@ -16,6 +16,11 @@ export default defineConfig({
       outputOptions: { codeSplitting: false },
       entry: ["src/main.ts"],
       clean: true,
+      // The skills and checklists of the commit being built, which the app installs on launch.
+      copy: [
+        { from: "../skills", to: "dist-electron/bundle" },
+        { from: "../references", to: "dist-electron/bundle" },
+      ],
       deps: {
         alwaysBundle: (id) => !id.startsWith("node:") && !electronOnly(id),
         neverBundle: electronOnly,

@@ -32,12 +32,21 @@ export function loadConfig(url: URL = CONFIG_URL): BoardConfig {
     owner,
     title,
     number: raw.project?.number ?? null,
-    repos: raw.repos ?? [],
+    repos: (raw.repos ?? []).map((entry) => checkRepo(entry, url)),
     port: Number(process.env.BOARD_PORT ?? raw.board?.port ?? 4317),
     configuredPort: raw.board?.port ?? 4317,
     refreshSeconds: raw.board?.refreshSeconds ?? 45,
     t3Project: raw.board?.t3Project ?? null,
   };
+}
+
+function checkRepo(entry: RepoConfig, url: URL): RepoConfig {
+  const fail = (problem: string) => { throw new Error(`${url.pathname}: ${entry.repo ?? 'a repos entry'} ${problem}`); };
+  for (const field of ['path', 'role'] as const) {
+    if (typeof entry[field] !== 'string' || !entry[field].trim()) fail(`needs a "${field}"`);
+  }
+  if (!entry.path.startsWith('~/')) fail(`"path" must start with ~/, since config.json is public: ${entry.path}`);
+  return entry;
 }
 
 /** Expands a leading ~, which execFile leaves alone; config.json is public, so it can't name the home folder. */

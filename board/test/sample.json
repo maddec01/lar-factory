@@ -6,11 +6,15 @@
   "repos": [
     {
       "repo": "maddec01/mux-server",
-      "platform": "Server"
+      "platform": "Server",
+      "path": "~/test/mux-server",
+      "role": "Backend API server"
     },
     {
       "repo": "maddec01/mux-apple",
-      "platform": "Apple"
+      "platform": "Apple",
+      "path": "~/test/mux-apple",
+      "role": "Apple client app"
     }
   ],
   "refreshSeconds": 45,

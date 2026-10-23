@@ -2,7 +2,7 @@
 // The bridge stands in for the app's preload and pushes each new update state, as the app does.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, mountPage, settle, stubApp, updatesOff } from './support.ts';
+import { $, addStylesheet, mountPage, settle, stubApp, titleBarHeight, updatesOff } from './support.ts';
 import type { UpdateState } from '../../src/app/board-app.ts';
 
 const idle: UpdateState = {
@@ -278,5 +278,29 @@ describe('the changelog', () => {
     expect(button()!.title).toBe('');
     await hover(button()!);
     expect(notes()!.querySelector('p')!.textContent).toBe('Couldn\'t install 1.1.0: quit refused');
+  });
+
+  test('opens below the title bar, bridged to the button, and drags nothing', async () => {
+    stubBridge(withNotes);
+    await mountPage();
+    const { noDrag } = addStylesheet();
+    // jsdom has no layout: the bar is 52 px tall, and the button sits in its middle, 14 px to 38 px down.
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(800);
+    const bar = $('.title-bar')!;
+    vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, titleBarHeight()));
+    vi.spyOn(button()!, 'getBoundingClientRect').mockReturnValue(new DOMRect(900, 14, 80, 24));
+    await hover(button()!);
+    await settle(() => vi.advanceTimersByTime(50));
+    const top = Number(/translate\([^,]+, ([\d.]+)px\)/.exec($('.update-notes-positioner')!.style.transform)![1]);
+    expect(top).toBeGreaterThanOrEqual(titleBarHeight());
+    // The pointer crosses the whole gap from the button's bottom on the changelog's bridge.
+    expect(notes()!.style.getPropertyValue('--update-notes-gap')).toBe(`${top - 38}px`);
+    expect(noDrag(notes()!)).toBe(true);
+    // A resize that moves the button while the changelog is open measures again, so the gap stays bridged.
+    vi.spyOn(button()!, 'getBoundingClientRect').mockReturnValue(new DOMRect(900, 20, 80, 24));
+    await settle(() => dispatchEvent(new Event('resize')));
+    await settle(() => vi.advanceTimersByTime(50));
+    expect(notes()!.style.getPropertyValue('--update-notes-gap')).toBe(`${titleBarHeight() + 4 - 44}px`);
   });
 });

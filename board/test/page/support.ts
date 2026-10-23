@@ -1,6 +1,7 @@
 // Page test setup: mounts the page's entry (src/main.tsx) on the page the server sends, in a DOM,
 // with the network stubbed and the clock fixed. Copy a page test for new ones.
 
+import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { afterEach, beforeEach, vi } from 'vite-plus/test';
 import { pageWithData } from '../../src/page.ts';
@@ -99,3 +100,17 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
   vi.stubGlobal('boardApp', bridge);
   return bridge;
 }
+
+/** Puts src/styles.css on the page. jsdom has no layout but cascades its rules into getComputedStyle; it can't apply
+ *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheet's text. */
+export function addStylesheet(): { noDrag: (el: Element) => boolean } {
+  const css = readFileSync('src/styles.css', 'utf8');
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.append(style);
+  const selectors = [...css.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) => rule[1]!.replace(/\/\*[^]*?\*\//g, ''));
+  return { noDrag: (el) => selectors.some((selector) => el.matches(selector)) };
+}
+
+/** The title bar's height, from its h-[…px] class. */
+export const titleBarHeight = () => Number(/\bh-\[(\d+)px\]/.exec($('.title-bar')!.className)![1]);

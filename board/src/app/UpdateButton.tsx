@@ -69,6 +69,13 @@ function ReleaseNotes({ state }: { state: UpdateState }) {
   );
 }
 
+/** The space between the button and its changelog, so the changelog starts 4 px below the title bar the button sits in. */
+function gapBelowTitleBar(button: HTMLElement | null): number {
+  const bar = button?.closest('.title-bar');
+  if (!button || !bar) return 4;
+  return Math.max(4, bar.getBoundingClientRect().bottom + 4 - button.getBoundingClientRect().bottom);
+}
+
 export function UpdateButton() {
   const store = useUpdateStore();
   const { state, busy, follow } = store;
@@ -76,12 +83,19 @@ export function UpdateButton() {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
   const action = state && actionFor(state, store);
   if (!action) return null;
   const { label, run, tone } = action;
   const title = busy ? 'The updater is busy. Try again in a moment.' : action.title;
   const hasNotes = state.releaseNotes.length > 0;
   const open = hasNotes && (hovered || focused);
+  // Base UI measures again whenever it places the changelog, as when the window resizes, and the bridge follows.
+  const sideOffset = () => {
+    const gap = gapBelowTitleBar(anchor.current);
+    popup.current?.style.setProperty('--update-notes-gap', `${gap}px`);
+    return gap;
+  };
   // The popup is in <body>, but React's events still bubble from it here, so the pointer on it counts as on the button.
   return (
     <span className="update"
@@ -98,8 +112,8 @@ export function UpdateButton() {
         if (!next) { setHovered(false); setFocused(false); }
       }}>
         <PreviewCard.Portal>
-          <PreviewCard.Positioner className="update-notes-positioner" side="bottom" align="end" sideOffset={4} anchor={anchor}>
-            <PreviewCard.Popup className="update-notes" id="update-notes">
+          <PreviewCard.Positioner className="update-notes-positioner" side="bottom" align="end" sideOffset={sideOffset} anchor={anchor}>
+            <PreviewCard.Popup className="update-notes" id="update-notes" ref={popup}>
               {title && <p className="update-notes-title">{title}</p>}
               <ReleaseNotes state={state} />
             </PreviewCard.Popup>

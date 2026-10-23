@@ -291,11 +291,13 @@ button:disabled[title] { cursor: not-allowed; }
 .abandon:hover { border-color: var(--danger-text); }
 .copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .update-button[data-tone="error"] { color: var(--error-fg); border-color: var(--error); }
-/* The update button's changelog: under the button, lined up with its right edge. */
+/* The update button's changelog: below the title bar, lined up with the button's right edge. In the Mac app it
+   doesn't drag the window, so its links take clicks. */
 .update-notes-positioner { z-index: 50; }
+.update-notes, .update-notes::before { -webkit-app-region: no-drag; }
 .update-notes { width: min(24rem, calc(100vw - 2rem)); max-height: min(28rem, calc(100vh - 6rem)); overflow-y: auto; padding: 8px 12px; background: var(--surface); border: 1px solid var(--bd); border-radius: var(--r); box-shadow: var(--shadow), 0 1px 3px rgb(0 0 0 / 8%); font-size: 12px; line-height: 1.45; outline: none; }
 /* Bridges the gap so the pointer can cross from the button into the changelog. */
-.update-notes::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 6px; }
+.update-notes::before { content: ""; position: absolute; left: 0; right: 0; top: calc(-2px - var(--update-notes-gap, 4px)); height: calc(2px + var(--update-notes-gap, 4px)); }
 .update-notes-title { margin: 0 0 8px; font-weight: 500; }
 .update-notes section + section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--bd); }
 .update-notes h3 { margin: 0; font-size: 12px; font-weight: 600; }

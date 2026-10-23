@@ -114,7 +114,5 @@ so a new browser load still works after checkout changes or a rebuild. Failed re
 checks show their own warning, separate from stale GitHub project data.
 
 `pnpm test` runs the server tests with Node's test runner, then the page tests in
-`test/page/` with Vitest in a DOM. It renders the sample and compares it with the saved copies in
-`test/expected/`; `pnpm run test:update` rewrites them after a deliberate change.
-That DOM, jsdom, needs Node 22.22.2+, 24.15+ or 26+;
+`test/page/` with Vitest in a DOM. That DOM, jsdom, needs Node 22.22.2+, 24.15+ or 26+;
 the board itself runs on 22.18+.

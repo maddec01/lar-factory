@@ -24,7 +24,7 @@ import type { StatsSources } from './item-stats.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './pr-stats.ts';
 import type { StartResult } from './t3.ts';
 import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
-import { loadBuild, renderPage } from './page.ts';
+import { loadBuild, pageWithData } from './page.ts';
 import { canAbandon, workMessage } from './model.ts';
 import { revisionCheck } from './revision.ts';
 import { lockHolder, readProgress, updatePaths } from './update-state.ts';
@@ -578,7 +578,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }
   if (path === '/') {
-    return send(res, 200, 'text/html; charset=utf-8', renderPage(page.template, state));
+    return send(res, 200, 'text/html; charset=utf-8', pageWithData(page.template, state));
   }
   if (path === '/api/events') return openStream(req, res);
   if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(state));

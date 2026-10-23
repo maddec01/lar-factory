@@ -3,7 +3,7 @@
 
 import { act } from 'react';
 import { afterEach, beforeEach, vi } from 'vite-plus/test';
-import { renderPage } from '../../src/page.ts';
+import { pageWithData } from '../../src/page.ts';
 import type { BoardData } from '../../src/model.ts';
 import template from '../../index.html?raw';
 import sampleJson from '../sample.json' with { type: 'json' };
@@ -56,7 +56,7 @@ afterEach(() => {
 /** Serves the page with `data` at `hash`, then runs its entry until the first paint. */
 export async function mountPage(data: BoardData = sample, hash = ''): Promise<void> {
   history.replaceState(null, '', `/${hash}`);
-  const html = renderPage(template, data);
+  const html = pageWithData(template, data);
   document.documentElement.innerHTML = new DOMParser().parseFromString(html, 'text/html').documentElement.innerHTML;
   await act(async () => {
     await import('../../src/main.tsx');

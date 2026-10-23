@@ -4,7 +4,7 @@
    (tailwindcss/packages/tailwindcss/theme.css). Badges and buttons follow
    apps/web/src/components/ui/badge.tsx and button.tsx; grouped lists follow
    components/settings/SettingsGroup.tsx. */
-/* No source scanning yet: the template's own class names (such as "outline") would
+/* No source scanning yet: the page's own class names (such as "outline") would
    otherwise turn on Tailwind utilities of the same name. Add @source with the first utility. */
 @import "tailwindcss" source(none);
 

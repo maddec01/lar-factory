@@ -2,8 +2,8 @@
 // The bridge stands in for the app's preload; without it the page has no Settings.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, mountPage, settle } from './support.ts';
-import type { BoardAppBridge, ProfilesResult } from '../../src/app/board-app.ts';
+import { $, $$, mountPage, settle, stubApp } from './support.ts';
+import type { ProfilesResult } from '../../src/app/board-app.ts';
 import { INSTALL_RECHECK_MS } from '../../src/app/settings-store.ts';
 
 const listed: ProfilesResult = {
@@ -15,13 +15,10 @@ const listed: ProfilesResult = {
 const bothTicked: ProfilesResult = { ...listed, profiles: [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: true }] };
 
 function stubBridge(setResult: ProfilesResult = listed) {
-  const bridge = {
-    platform: 'darwin',
+  return stubApp({
     listProfiles: vi.fn(async () => listed),
     setProfileTick: vi.fn(async (_name: string, _ticked: boolean) => setResult),
-  } satisfies Pick<BoardAppBridge, 'platform' | 'listProfiles' | 'setProfileTick'>;
-  vi.stubGlobal('boardApp', bridge);
-  return bridge;
+  });
 }
 
 const settingsButton = () => $<HTMLButtonElement>('.open-settings');

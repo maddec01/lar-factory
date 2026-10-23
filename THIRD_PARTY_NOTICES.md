@@ -4,7 +4,8 @@ The skills listed in `UPSTREAM.md` are copied from the projects below and keep
 their licences. Files under `references/` come from addyosmani/agent-skills.
 The board app in `app/` copies code from pingdotgg/t3code; each copied file says
 so in its header.
-`.github/scripts/release-plan.cjs` adapts code from pingdotgg/t3code.
+`.github/scripts/release-plan.cjs` and `.github/workflows/release.yml` adapt code
+from pingdotgg/t3code.
 
 ## mattpocock/skills
 

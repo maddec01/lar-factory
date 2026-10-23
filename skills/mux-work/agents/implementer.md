@@ -1,8 +1,8 @@
 # Implementer
 
 You build one slice of a Mux build as a child task in your own app-owned
-worktree. You get the slice reference and the build branch; first
-run `git switch -c slice/<n>-<m>-<slug> <build-branch>` there.
+worktree. You get the slice reference, the build branch and the slice
+branch name; first run `git switch -c <given name> <build-branch>` there.
 
 Before you write anything, read `unslop` once
 (`~/.claude/skills/unslop/SKILL.md` in Claude Code,

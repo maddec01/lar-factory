@@ -112,10 +112,34 @@ label. Anything Pedro adds or corrects is another open question. Then:
   and features alike. A question of how something looks or feels gets a
   **Prototype** child task with `prototype`, started per
   [Orchestration](orchestration.md): two or three variants differing only on
-  that question. It keeps its screenshots in its own context and returns each
-  variant's file paths and a short description. Tell Pedro how to open them
-  (T3 browser preview for web; the run scripts in the repo's T3 project for
-  Apple), ask for his pick, and record it and the branch on the issue.
+  that question; a logic or state question gets an HTML page. It keeps its
+  screenshots in its own context and returns each variant's start command (or
+  HTML path), the worktree path, the branch, a preferred port and a short
+  description. Show the variants as below, ask for Pedro's pick, and record it
+  and the branch on the issue.
+
+  **Showing prototypes.** This thread, or the thread of a `decision: prototype`
+  sub-issue, shows every variant inside T3 itself, since the preview and Device
+  panel belong to the thread that opens them. Pedro never receives a file
+  path, URL or run command, and nothing opens outside T3. This overrides the
+  `prototype` skill where it tells the agent to hand Pedro a file, URL or
+  command (`LOGIC.md` lines 37, 54 and 66, `UI.md` line 96, `SKILL.md` line 22).
+  - Run the variants from the child task's worktree. Start each server on a
+    port where `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing, bound to
+    `127.0.0.1`, and note the PID that holds the port, not a launcher's.
+  - Web and HTML: open the URL with `preview_open` (absolute http(s) URL, never
+    `file://`). Serve a static HTML file's folder with
+    `python3 -m http.server --bind 127.0.0.1 --directory <dir> <port>`.
+  - Native iOS or Android: run the build and install scripts named in the
+    target repo's `t3.json` and `AGENTS.md`, one variant at a time, then
+    `device_open` (`device_list` finds the device id).
+  - Say in chat which variant is showing. For another round, send the request
+    to a Prototype child task.
+  - When Pedro picks, or the thread ends without a pick, stop exactly the
+    noted PIDs. An app left installed on the simulator stays.
+  - If `preview_open` or `device_open` is unavailable or fails, stop, tell
+    Pedro why and ask how to go on per [Questions](questions.md). Never fall
+    back to anything outside T3.
 - **Another repository changes** (its role says it serves or uses what this
   item changes): that work becomes a build there, a
   sub-issue of this issue that blocks it (reuse an open issue that covers it),

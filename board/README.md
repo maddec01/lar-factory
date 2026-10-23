@@ -6,7 +6,10 @@ every 45 seconds (`config.json`) and serves it on the first free port from
 usually gets 4317. `BOARD_CONFIG_FILE`, an absolute path, makes it read that file in
 place of the checkout's `config.json`; the board app sets it to its own copy.
 `BOARD_APP_SECRET`, which the board app sets on each launch, makes every write
-except `/api/read` answer 403 unless the request carries it in `X-Board-Secret`. Open it in a browser or in T3's browser preview.
+except `/api/read` answer 403 unless the request carries it in `X-Board-Secret`.
+Before it installs an update, the app posts that secret to `/api/drain`: the board
+refuses new writes with 503 and answers once the running ones finish. Without
+`BOARD_APP_SECRET` the board refuses every drain. Open it in a browser or in T3's browser preview.
 
 ```sh
 cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes

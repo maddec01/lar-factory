@@ -66,7 +66,11 @@ const submissions = new Map<string, {
 type Start = StartResult & { refused?: true };
 /** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
 const starts = new Map<string, Promise<Start>>();
-let runningStarts = 0;
+/** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
+let draining = false;
+/** Guarded writes being answered, and the drain calls waiting for them to finish. */
+let runningWrites = 0;
+const drained: Array<() => void> = [];
 /** Status changes in flight by item id; Start and Abandon wait out a move, and a move waits out Abandon. */
 const moving = new Set<string>();
 /** Deletes in flight by item id, so a second press waits for the first. */
@@ -429,7 +433,6 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
     const message = workMessage(item);
     if (!message || !item.repo) return json(res, 409, { error: 'This item needs an issue before it can start.' });
     // Only a refusal or a failure t3 reported may run again; a started or unconfirmed thread is kept.
-    runningStarts++;
     pending = currentRepositoryProject(item.repo).then((project): Promise<Start> | Start =>
       project.error === undefined ? startThread(project.projectId, message, choice) : { thread: null, error: project.error, refused: true },
     ).then((result) => {
@@ -439,7 +442,7 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
       }
       else if (!result.uncertain) starts.delete(itemId);
       return result;
-    }).finally(() => { runningStarts--; });
+    });
     starts.set(itemId, pending);
   }
   const { refused, ...result } = await pending;
@@ -498,6 +501,29 @@ async function recheckRequest(req: IncomingMessage, res: ServerResponse): Promis
   json(res, 200, { error: null, board: state });
 }
 
+/** Refuses new guarded writes and answers once the running ones finish, so the app can stop the server. */
+async function drainRequest(res: ServerResponse): Promise<void> {
+  draining = true;
+  if (runningWrites > 0) await new Promise<void>((resolve) => drained.push(resolve));
+  log('drained writes for an update');
+  json(res, 200, {});
+}
+
+/** Answers a guarded write and counts it as running until then. */
+async function guardedWrite(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
+  runningWrites++;
+  try {
+    if (path === '/api/items') return await captureItem(req, res);
+    if (path === '/api/queue') return await moveItem(req, res, QUEUE);
+    if (path === '/api/back-to-list') return await moveItem(req, res, BACK_TO_LIST);
+    if (path === '/api/start') return await startItem(req, res);
+    if (path === '/api/abandon') return await abandonItemRequest(req, res);
+    if (path === '/api/recheck') return await recheckRequest(req, res);
+  } finally {
+    if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
+  }
+}
+
 /** Starts a read of GitHub for status.sh, so a moved item reaches the board before the next interval read. */
 async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!await readJson(req, res, 'the read request')) return;
@@ -517,13 +543,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (req.method === 'POST' && appSecret && GUARDED_WRITES.has(path) && !hasAppSecret(req, appSecret)) {
     return json(res, 403, { error: 'Submit from the board app.' });
   }
-  if (req.method === 'POST' && path === '/api/items') return captureItem(req, res);
-  if (req.method === 'POST' && path === '/api/queue') return moveItem(req, res, QUEUE);
-  if (req.method === 'POST' && path === '/api/back-to-list') return moveItem(req, res, BACK_TO_LIST);
-  if (req.method === 'POST' && path === '/api/start') return startItem(req, res);
-  if (req.method === 'POST' && path === '/api/abandon') return abandonItemRequest(req, res);
+  if (req.method === 'POST' && path === '/api/drain') {
+    if (!appSecret || !hasAppSecret(req, appSecret)) return json(res, 403, { error: 'Only the board app can drain the board.' });
+    return drainRequest(res);
+  }
+  if (req.method === 'POST' && GUARDED_WRITES.has(path)) {
+    if (draining) return json(res, 503, { error: 'The board is installing an update. Try again once Mux Factory restarts.' });
+    return guardedWrite(req, res, path);
+  }
   if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
-  if (req.method === 'POST' && path === '/api/recheck') return recheckRequest(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }

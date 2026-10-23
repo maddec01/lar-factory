@@ -30,9 +30,10 @@ export function closeKeepingFocus(el: Element | null, close: () => void, next: s
 }
 
 /** One toast. `onClose` runs when it's closed or, for a success, when its time is up. */
-export function ToastView({ what, failed = false, focusAfter, onClose, children }: {
+export function ToastView({ what, failed = false, tone, focusAfter, onClose, children }: {
   what: string;
   failed?: boolean;
+  tone?: 'error';
   focusAfter?: string[];
   onClose: () => void;
   children: ReactNode;
@@ -53,7 +54,7 @@ export function ToastView({ what, failed = false, focusAfter, onClose, children 
     return () => clearTimeout(timer);
   }, [failed]);
   return (
-    <div className="banner toast" role={failed ? 'alert' : 'status'} ref={ref}>
+    <div className="banner toast" role={failed ? 'alert' : 'status'} data-tone={tone} ref={ref}>
       <DismissButton what={`: ${what}`} onClick={() => closeKeepingFocus(ref.current, onClose, focusAfter)} />
       {children}
     </div>
@@ -84,7 +85,7 @@ export function Toasts() {
   return (
     <div className="toasts">
       {toasts.map((t: Toast) => (
-        <ToastView key={t.key} what={t.what} failed={t.failed} focusAfter={t.focusAfter} onClose={() => dismiss(t.key)}>{t.body}</ToastView>
+        <ToastView key={t.key} what={t.what} failed={t.failed} tone={t.tone} focusAfter={t.focusAfter} onClose={() => dismiss(t.key)}>{t.body}</ToastView>
       ))}
     </div>
   );

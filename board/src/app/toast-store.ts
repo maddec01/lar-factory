@@ -11,6 +11,8 @@ export interface Toast {
   slot: string;
   /** A failure is an alert that stays until it's closed; a success clears itself after 5 s. */
   failed?: boolean;
+  /** `error`, as T3's error toast: its dot is red rather than green. */
+  tone?: 'error';
   /** Names the toast for its close button, such as "Moved #61". */
   what: string;
   body: ReactNode;

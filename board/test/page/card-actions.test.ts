@@ -109,6 +109,7 @@ test('a failed card action shows as a toast naming the item, which stays until c
   await settle(() => button('back-to-list', 'PVTI_sample05').click());
   await answer({ error: 'Could not set List. GitHub is down.' }, 502);
   expect(toast()!.getAttribute('role')).toBe('alert');
+  expect(toast()!.dataset.tone, 'the board\'s own failure toasts keep their look').toBeUndefined();
   expect(text(toast())).toMatch(/^×Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
   expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
   expect($('[data-anchor="PVTI_sample05"] .action-error'), 'the card shows no inline error').toBeNull();

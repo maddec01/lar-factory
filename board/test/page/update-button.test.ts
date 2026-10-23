@@ -2,7 +2,7 @@
 // every update state. The bridge stands in for the app's preload and pushes each new update state, as the app does.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, addStylesheet, mountPage, settle, stubApp, titleBarHeight, updatesOff } from './support.ts';
+import { $, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight, updatesOff } from './support.ts';
 import type { UpdateState } from '../../src/app/board-app.ts';
 
 const idle: UpdateState = {
@@ -19,7 +19,7 @@ const checkFailed: UpdateState = { ...idle, status: 'error', errorContext: 'chec
 const downloadFailed: UpdateState = { ...available, errorContext: 'download', canRetry: true, message: 'net::ERR_TIMED_OUT' };
 const installFailed: UpdateState = { ...downloaded, errorContext: 'install', message: 'quit refused' };
 
-function stubBridge(start: UpdateState) {
+function stubBridge(start: UpdateState, restart = true) {
   let push: (state: UpdateState) => void = () => {};
   const action = (state: UpdateState) => vi.fn(async () => ({ accepted: true, completed: false, state }));
   const bridge = stubApp({
@@ -28,6 +28,7 @@ function stubBridge(start: UpdateState) {
     checkForUpdate: vi.fn(async () => ({ checked: true, state: idle })),
     downloadUpdate: action(downloading),
     installUpdate: action(downloaded),
+    confirmRestart: answerRestart(restart),
   });
   return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
 }
@@ -37,6 +38,8 @@ const label = () => button()!.getAttribute('aria-label');
 const disabled = () => button()!.getAttribute('aria-disabled') === 'true';
 const icon = (name: string) => button()!.querySelector(`svg.lucide-${name}`);
 const click = () => settle(() => button()!.click());
+const toast = () => $('.toasts .toast');
+const toastText = () => toast()?.textContent?.replace(/^×/, '');
 // The spin's turn ends. jsdom runs no animation and has no AnimationEvent, so React listens for the prefixed name.
 const turnEnds = () => settle(() => icon('refresh-cw')!.dispatchEvent(new Event('webkitAnimationIteration', { bubbles: true })));
 
@@ -144,13 +147,38 @@ describe('available', () => {
     expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
   });
 
-  test('a download call that fails keeps the update to download', async () => {
+  test('a download call that fails keeps the update to download, and T3\'s toast says so', async () => {
     const { bridge } = stubBridge(available);
     bridge.downloadUpdate.mockRejectedValueOnce(new Error('bridge gone'));
     await mountPage();
     await click();
     expect(icon('download')).not.toBeNull();
     expect(disabled()).toBe(false);
+    expect(toastText()).toBe('Could not start update download bridge gone');
+    expect(toast()!.getAttribute('role')).toBe('alert');
+    expect(toast()!.dataset.tone, 'T3\'s error toast: a red dot').toBe('error');
+  });
+
+  test('a download that fails returns to available, and T3\'s toast gives the reason', async () => {
+    const { bridge, push } = stubBridge(available);
+    bridge.downloadUpdate.mockResolvedValueOnce({ accepted: true, completed: false, state: downloadFailed });
+    await mountPage();
+    await click();
+    await push(downloadFailed);
+    expect(icon('download')).not.toBeNull();
+    expect(label()).toBe('Update 1.1.0 ready to download');
+    expect(disabled()).toBe(false);
+    expect(toastText()).toBe('Could not download update net::ERR_TIMED_OUT');
+  });
+
+  test('a download that completes shows T3\'s downloaded toast', async () => {
+    const { bridge } = stubBridge(available);
+    bridge.downloadUpdate.mockResolvedValueOnce({ accepted: true, completed: true, state: downloaded });
+    await mountPage();
+    await click();
+    expect(toastText()).toBe('Update downloaded Restart the app from the update button to install it.');
+    expect(toast()!.getAttribute('role')).toBe('status');
+    expect(toast()!.dataset.tone).toBeUndefined();
   });
 });
 
@@ -169,14 +197,37 @@ test('downloading fills a ring with the percent and disables the button', async 
 });
 
 describe('downloaded', () => {
-  test('shows the restart icon with a check, and clicking it installs', async () => {
+  test('shows the restart icon with a check, and clicking it asks to restart, then installs on Restart', async () => {
     const { bridge } = stubBridge(downloaded);
     await mountPage();
     expect(icon('rotate-cw')).not.toBeNull();
     expect(button()!.querySelector('svg.lucide-check')).not.toBeNull();
     expect(label()).toBe('Update 1.1.0 downloaded. Click to restart and install.');
     await click();
+    expect(bridge.confirmRestart).toHaveBeenCalledExactlyOnceWith('The board app will restart to install 1.1.0.');
     expect(bridge.installUpdate).toHaveBeenCalledOnce();
+  });
+
+  test('Cancel leaves the update downloaded, to install later', async () => {
+    const { bridge } = stubBridge(downloaded, false);
+    await mountPage();
+    await click();
+    expect(bridge.confirmRestart).toHaveBeenCalledOnce();
+    expect(bridge.installUpdate).not.toHaveBeenCalled();
+    expect(icon('rotate-cw')).not.toBeNull();
+    expect(label()).toBe('Update 1.1.0 downloaded. Click to restart and install.');
+    expect(disabled()).toBe(false);
+    expect(toast()).toBeNull();
+  });
+
+  test('a question the app can\'t ask shows T3\'s toast and installs nothing', async () => {
+    const { bridge } = stubBridge(downloaded);
+    bridge.confirmRestart.mockRejectedValueOnce(new Error('no window'));
+    await mountPage();
+    await click();
+    expect(bridge.installUpdate).not.toHaveBeenCalled();
+    expect(toastText()).toBe('Could not confirm update no window');
+    expect(disabled()).toBe(false);
   });
 
   test('a failed install looks downloaded again and retries the install', async () => {
@@ -185,6 +236,45 @@ describe('downloaded', () => {
     expect(icon('rotate-cw')).not.toBeNull();
     await click();
     expect(bridge.installUpdate).toHaveBeenCalledOnce();
+  });
+
+  test('an install that fails returns to downloaded, and T3\'s toast gives the reason', async () => {
+    const { bridge } = stubBridge(downloaded);
+    bridge.installUpdate.mockResolvedValueOnce({ accepted: true, completed: false, state: installFailed });
+    await mountPage();
+    await click();
+    expect(icon('rotate-cw')).not.toBeNull();
+    expect(label()).toBe('Update 1.1.0 downloaded. Click to restart and install.');
+    expect(disabled()).toBe(false);
+    expect(toastText()).toBe('Could not install update quit refused');
+    expect(toast()!.getAttribute('role')).toBe('alert');
+  });
+
+  test('an install call that fails shows T3\'s toast', async () => {
+    const { bridge } = stubBridge(downloaded);
+    bridge.installUpdate.mockRejectedValueOnce(new Error('bridge gone'));
+    await mountPage();
+    await click();
+    expect(label()).toBe('Update 1.1.0 downloaded. Click to restart and install.');
+    expect(toastText()).toBe('Could not install update bridge gone');
+  });
+});
+
+describe('a check the page starts', () => {
+  test('that the app doesn\'t run shows T3\'s toast with the reason', async () => {
+    const { bridge } = stubBridge(idle);
+    bridge.checkForUpdate.mockResolvedValueOnce({ checked: false, state: { ...idle, message: 'A download is running.' } });
+    await mountPage();
+    await click();
+    expect(toastText()).toBe('Could not check for updates A download is running.');
+  });
+
+  test('whose call fails shows T3\'s toast', async () => {
+    const { bridge } = stubBridge(idle);
+    bridge.checkForUpdate.mockRejectedValueOnce(new Error('bridge gone'));
+    await mountPage();
+    await click();
+    expect(toastText()).toBe('Could not check for updates bridge gone');
   });
 });
 
@@ -225,27 +315,24 @@ describe('installing', () => {
 });
 
 describe('an action the app refuses, as a check runs', () => {
-  const busy = 'The updater is busy. Try again in a moment.';
-
-  test('an install says so, until the next state', async () => {
-    const { bridge, push } = stubBridge(downloaded);
+  test('an install shows T3\'s not-accepted toast and stays downloaded', async () => {
+    const { bridge } = stubBridge(downloaded);
     bridge.installUpdate.mockResolvedValueOnce({ accepted: false, completed: false, state: downloaded });
     await mountPage();
     await click();
-    expect(label()).toBe(busy);
-    await push(downloaded);
+    expect(toastText()).toBe('Update downloaded Restart the app from the update button to install it.');
     expect(label()).toBe('Update 1.1.0 downloaded. Click to restart and install.');
+    expect(disabled()).toBe(false);
   });
 
-  test('a download says so, until the next click', async () => {
+  test('a download shows the not-accepted toast and stays available', async () => {
     const { bridge } = stubBridge(available);
     bridge.downloadUpdate.mockResolvedValueOnce({ accepted: false, completed: false, state: available });
     await mountPage();
     await click();
-    expect(label()).toBe(busy);
-    bridge.downloadUpdate.mockImplementationOnce(() => new Promise(() => {}));
-    await click();
+    expect(toastText()).toBe('Update not downloaded Download it from the update button once the updater is free.');
     expect(label()).toBe('Update 1.1.0 ready to download');
+    expect(disabled()).toBe(false);
   });
 });
 

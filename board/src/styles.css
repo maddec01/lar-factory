@@ -285,6 +285,7 @@ button:disabled[title] { cursor: not-allowed; }
 .toast { margin: 0; background: var(--surface); border-color: var(--bd); box-shadow: var(--shadow), 0 1px 3px rgb(0 0 0 / 8%); animation: toast-in 0.18s cubic-bezier(0.32, 0.72, 0, 1); }
 .toast.seen { animation: none; }
 .toast::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 8px; }
+.toast[data-tone="error"]::before { background: var(--error); }
 .toast strong { color: var(--fg); }
 .view-item { margin-left: 4px; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }

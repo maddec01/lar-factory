@@ -211,9 +211,10 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 /* The Add item, Abandon and Settings dialogs are Base UI's: a fixed popup over a backdrop element, not a native <dialog>. */
 #add-item-dialog, #abandon-dialog, #settings-dialog { position: fixed; inset: 0; z-index: 50; height: fit-content; }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 40%); }
-/* The dialogs open below the 52 px title bar, and in the Mac app neither they nor the backdrop drag the window. */
-:root:has(.title-bar) :is(#add-item-dialog, #abandon-dialog) { top: 52px; max-height: calc(100dvh - 52px - 32px); }
-#add-item-dialog, #abandon-dialog, .dialog-backdrop { -webkit-app-region: no-drag; }
+/* The dialogs open below the 52 px title bar, in the Mac app and in a browser. In the Mac app neither they nor the
+   backdrop drag the window, so a control over the bar's height still takes clicks. */
+#add-item-dialog, #abandon-dialog, #settings-dialog { top: 52px; max-height: calc(100dvh - 52px - 32px); }
+#add-item-dialog, #abandon-dialog, #settings-dialog, .dialog-backdrop { -webkit-app-region: no-drag; }
 #abandon-dialog { width: min(420px, calc(100% - 34px)); }
 #abandon-heading { overflow-wrap: anywhere; }
 #abandon-dialog .form-actions { justify-content: flex-end; }

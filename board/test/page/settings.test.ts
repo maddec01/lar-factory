@@ -1,6 +1,7 @@
 // The app's Settings dialog: the Claude profiles with their ticks, what a tick change did, and the update channel.
 // The bridge stands in for the app's preload; without it the page has no Settings.
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, mountPage, settle, stubApp } from './support.ts';
 import type { ProfilesResult, UpdateChannel, UpdateState } from '../../src/app/board-app.ts';
@@ -49,6 +50,22 @@ test('Settings lists every Claude profile with its tick', async () => {
   expect(boxes().map((box) => [box.closest('label')!.textContent!.trim(), box.checked])).toEqual([
     ['~/.claude', true], ['~/.claude-work', false]]);
   expect(result().getAttribute('role')).toBe('status');
+});
+
+test('the dialog opens below the title bar and drags nothing', async () => {
+  stubBridge();
+  await open();
+  // jsdom has no layout, but it applies the page's own stylesheet. It can't apply Tailwind's classes, so the bar's
+  // height comes from its class, and it drops -webkit-app-region, so no-drag comes from the stylesheet's text.
+  const css = readFileSync('src/styles.css', 'utf8');
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.append(style);
+  const barBottom = Number(/\bh-\[(\d+)px\]/.exec($('.title-bar')!.className)![1]);
+  const dialog = $('#settings-dialog')!;
+  expect(parseFloat(getComputedStyle(dialog).top)).toBeGreaterThanOrEqual(barBottom);
+  const noDrag = [...css.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) => rule[1]!.replace(/\/\*[^]*?\*\//g, ''));
+  expect(noDrag.some((selector) => dialog.matches(selector))).toBe(true);
 });
 
 test('ticking a profile installs it and shows the new ticks', async () => {

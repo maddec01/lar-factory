@@ -12,19 +12,20 @@ LOG="$HOME/Library/Logs/mux-board.log"
 DOMAIN="gui/$(id -u)"
 
 NODE="$(command -v node || true)"
-# Run from the board's Update button, PATH is launchd's short one: keep the board's paths.
-GH="$(command -v gh || printf '%s' "${GH_PATH:-}")"
-T3="$(command -v t3 || printf '%s' "${T3_PATH:-}")"
 [[ -n "$NODE" ]] || { echo "node not found on PATH" >&2; exit 1; }
-[[ -n "$GH" ]] || { echo "gh not found on PATH" >&2; exit 1; }
-[[ -n "$T3" ]] || echo "warning: t3 not found on PATH; Start will fail until the T3 Code CLI is installed and this is rerun" >&2
 "$NODE" -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=18)?0:1)' \
   || { echo "node $("$NODE" --version) is too old; the board needs 22.18 or newer" >&2; exit 1; }
-"$GH" auth status >/dev/null 2>&1 || echo "warning: gh is not logged in; the board will show a stale banner until it is" >&2
+# The board looks gh and t3 up itself and finds them once installed; only warn here.
+if ! command -v gh >/dev/null; then
+  echo "warning: gh not found on PATH; the board shows how to install it" >&2
+elif ! gh auth status >/dev/null 2>&1; then
+  echo "warning: gh is not logged in; the board shows how to log in" >&2
+fi
+command -v t3 >/dev/null || echo "warning: t3 not found on PATH; the board shows a notice until the T3 Code CLI is installed" >&2
 LAUNCH_TOKEN="${BOARD_LAUNCH_TOKEN:-$("$NODE" -p 'crypto.randomUUID()')}"
 
-# launchd starts with a bare PATH; give it the directories of node and gh.
-AGENT_PATH="$(dirname "$NODE"):$(dirname "$GH"):/usr/bin:/bin:/usr/sbin:/sbin"
+# launchd starts with a bare PATH. The updater runs node, and pnpm and gh from Homebrew.
+AGENT_PATH="$(dirname "$NODE"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 # XML-escape a value, then escape it for the sed replacement below.
 escape() {
@@ -35,8 +36,6 @@ render() {
   sed -e "s|@LABEL@|$(escape "$LABEL")|g" \
       -e "s|@NODE@|$(escape "$NODE")|g" \
       -e "s|@BOARD_DIR@|$(escape "$BOARD_DIR")|g" \
-      -e "s|@GH@|$(escape "$GH")|g" \
-      -e "s|@T3@|$(escape "$T3")|g" \
       -e "s|@PATH@|$(escape "$AGENT_PATH")|g" \
       -e "s|@HOME@|$(escape "$HOME")|g" \
       -e "s|@LOG@|$(escape "$LOG")|g" \

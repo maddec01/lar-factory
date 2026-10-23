@@ -15,7 +15,8 @@ import { validateDraft } from './add-item.ts';
 import { startThread } from './t3.ts';
 import { repositoryProject } from './repository-project.ts';
 import type { RepositoryProject } from './repository-project.ts';
-import { loadItemStats, statsDbPath, t3SettingsPath, usageRatesPath } from './item-stats.ts';
+import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './item-stats.ts';
+import { findModelChoice, loadModelChoices } from './model-choices.ts';
 import type { StatsSources } from './item-stats.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './pr-stats.ts';
 import type { StartResult } from './t3.ts';
@@ -25,7 +26,7 @@ import { DEFAULT_UI } from './render.ts';
 import { canAbandon, workMessage } from './model.ts';
 import { revisionCheck } from './revision.ts';
 import { lockHolder, readProgress, updatePaths } from './update-state.ts';
-import type { BoardData, ContentType, Item, Status } from './model.ts';
+import type { BoardData, ContentType, Item, ModelChoice, ModelGroup, Status } from './model.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
@@ -50,6 +51,8 @@ const state: BoardData = {
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
 let statsUnavailable = false;
+const modelManifest = modelManifestPath();
+let modelsUnavailable = false;
 let pricingUnavailable = false;
 let projectNumber = config.number;
 let refreshing = false;
@@ -131,11 +134,22 @@ async function editPrStats(items: Item[]): Promise<void> {
   }
 }
 
+/** Reads the model choices T3 offers now into the board data. */
+function offerModelChoices(): ModelGroup[] {
+  const groups = loadModelChoices(statsSources.settings, modelManifest);
+  if (!groups.length !== modelsUnavailable) {
+    modelsUnavailable = !modelsUnavailable;
+    log(modelsUnavailable ? `only T3 default offered: no models read from ${statsSources.settings} and ${modelManifest}` : 'model choices readable again');
+  }
+  return state.modelChoices = groups;
+}
+
 async function refresh(): Promise<void> {
   if (refreshing) return;
   refreshing = true;
   let read = false;
   const readRevision = revision;
+  offerModelChoices();
   try {
     projectNumber ??= await findProjectNumber(config.owner, config.title);
     const snapshot = await fetchProject(config.owner, projectNumber);
@@ -308,6 +322,13 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
   }
   const { itemId } = input;
   if (typeof itemId !== 'string') return json(res, 400, { error: 'Name the item to start.' });
+  // Only a choice the board offers right now reaches t3 as arguments.
+  let choice: ModelChoice | undefined;
+  if (input.model !== undefined) {
+    const found = findModelChoice(offerModelChoices(), input.model);
+    if (!found) return json(res, 422, { error: "That model choice isn't offered. Pick another one.", board: state });
+    choice = found;
+  }
   let pending = starts.get(itemId);
   if (!pending && updating()) {
     return json(res, 409, { error: 'The board is updating and will restart. Press Start when the update finishes.', board: state });
@@ -323,7 +344,7 @@ async function startItem(req: IncomingMessage, res: ServerResponse): Promise<voi
     // Only a refusal or a failure t3 reported may run again; a started or unconfirmed thread is kept.
     runningStarts++;
     pending = currentRepositoryProject(item.repo).then((project): Promise<Start> | Start =>
-      project.error === undefined ? startThread(project.projectId, message) : { thread: null, error: project.error, refused: true },
+      project.error === undefined ? startThread(project.projectId, message, choice) : { thread: null, error: project.error, refused: true },
     ).then((result) => {
       if (result.thread) state.started = { ...state.started, [itemId]: result.thread };
       else if (!result.uncertain) starts.delete(itemId);
@@ -470,6 +491,7 @@ if (fixture) {
   state.repos = config.repos;
   state.capture = capture;
   state.codeUpdate = code.status;
+  offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
 } else await refresh();
 const timer = setInterval(() => {

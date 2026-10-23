@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { rawIssue, startBoard } from './server-support.ts';
+import { rawIssue, SAMPLE_MODELS, startBoard } from './server-support.ts';
 import { checkouts, factoryRepo } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
@@ -61,9 +61,9 @@ async function ready(board: Board, count: number): Promise<BoardData> {
   throw new Error('The board never read its items');
 }
 
-async function start(board: Board, itemId: string, origin = board.url) {
+async function start(board: Board, itemId: string, origin = board.url, model?: unknown) {
   const { capture } = await board.board() as BoardData;
-  return board.post({ session: capture!.session, itemId }, origin, '/api/start');
+  return board.post({ session: capture!.session, itemId, model }, origin, '/api/start');
 }
 
 test('expands ~ from HOME so the public config never holds a username', () => {
@@ -85,6 +85,39 @@ test("Start begins one mux-work thread in the card's repository project and leav
   ]);
   assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
 });
+
+test('Start runs the thread on the picked model choice, still in the repository project', async (t) => {
+  const board = await factoryBoard(t, [rawIssue(12, 'Queued')], {}, SAMPLE_MODELS);
+  const response = await start(board, 'PVTI_12', board.url, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await board.t3Calls(), [
+    ['thread', 'start', 'project-factory', MESSAGE, '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5', '--json'],
+  ]);
+});
+
+test('the board data offers the model choices', async (t) => {
+  const board = await factoryBoard(t, [rawIssue(12, 'Queued')], {}, SAMPLE_MODELS);
+  const groups = (await board.board() as BoardData).modelChoices;
+  assert.deepEqual(groups?.map((g) => g.name), ['Personal', 'VI', 'Codex']);
+});
+
+for (const [name, model] of [
+  ['an unknown instance', { instanceId: 'claudeAgent_work', model: 'claude-opus-5-5' }],
+  ['a disabled instance', { instanceId: 'cursor', model: 'cursor-agent' }],
+  ['an unknown model', { instanceId: 'codex', model: 'claude-opus-5-5' }],
+  ['an instance alone', { instanceId: 'codex' }],
+  ['a model alone', { model: 'gpt-6-astra' }],
+  ['a flag in place of a model', { instanceId: 'codex', model: '--help' }],
+  ['no object', 'codex/gpt-6-astra'],
+] as const) {
+  test(`Start refuses ${name} as the model choice and runs no t3`, async (t) => {
+    const board = await factoryBoard(t, [rawIssue(12, 'Queued')], {}, SAMPLE_MODELS);
+    const response = await start(board, 'PVTI_12', board.url, model);
+    assert.equal(response.status, 422);
+    assert.match((await response.json()).error, /isn't offered/);
+    assert.deepEqual(await board.t3Calls(), []);
+  });
+}
 
 const refusals: { name: string; repo?: string; origins?: Record<string, string | null>;
   projects?: (home: string) => FixtureProject[]; db?: (home: string) => string; error: (home: string) => string }[] = [

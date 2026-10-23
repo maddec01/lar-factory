@@ -13,6 +13,12 @@ async function readCalls(file: string): Promise<string[][]> {
   return (await readFile(file, 'utf8')).trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
 }
 
+/** Sample mode's T3 settings and model list, so the Start menu can be tried without T3. */
+export const SAMPLE_MODELS = {
+  T3_SETTINGS: new URL('./t3-settings.sample.json', import.meta.url).pathname,
+  T3_MODEL_MANIFEST: new URL('./model-manifest.sample.json', import.meta.url).pathname,
+};
+
 /** A raw GraphQL project item, as the fake gh returns it. */
 export function rawIssue(number: number, status: string, repo = 'maddec01/mux-factory', labels: string[] = []) {
   return {
@@ -50,7 +56,8 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     cwd: directory ?? new URL('../', import.meta.url),
     env: { ...testEnv(), BOARD_PORT: String(port), GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname,
-      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '', ...env },
+      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '',
+      ...(fixture ? SAMPLE_MODELS : {}), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logs = '';

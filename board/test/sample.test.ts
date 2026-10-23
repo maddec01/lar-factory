@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { startBoard } from './server-support.ts';
+import type { BoardData } from '../src/model.ts';
 
 /** Every `owner/repo#n` the data names, with each distinct way it is named (issue or PR, and title). */
 function refUses(data: unknown): Map<string, Set<string>> {
@@ -39,4 +41,14 @@ test('the clash check catches one number naming two things', () => {
 test('sample data never gives one issue or PR number to two things', async () => {
   const data = JSON.parse(await readFile(new URL('./sample.json', import.meta.url), 'utf8'));
   assert.deepEqual(clashes(data), []);
+});
+
+test('sample mode offers the fixture model choices', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const groups = (await board.board() as BoardData).modelChoices;
+  assert.deepEqual(groups?.map((g) => [g.instanceId, g.models.map((m) => m.label)]), [
+    ['claudeAgent_personal', ['Claude Fable 5.1', 'Claude Opus 5.5', 'Claude Sonnet 5.5', 'Claude Haiku 5.5']],
+    ['claudeAgent', ['Claude Fable 5.1', 'Claude Opus 5.5', 'Claude Sonnet 5.5', 'Claude Haiku 5.5', 'claude-opus-5-5[1m]']],
+    ['codex', ['GPT-6 Astra', 'GPT-6.1 Sol', 'gpt-daybreak-blue-latest']],
+  ]);
 });

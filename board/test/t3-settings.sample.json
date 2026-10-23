@@ -1,0 +1,7 @@
+{
+  "providerInstances": {
+    "claudeAgent_personal": { "driver": "claudeAgent", "displayName": "Personal", "enabled": true, "config": {} },
+    "claudeAgent": { "driver": "claudeAgent", "displayName": "VI", "enabled": true, "config": { "customModels": ["claude-opus-5-5[1m]"] } },
+    "cursor": { "driver": "cursor", "displayName": "Cursor", "enabled": false, "config": {} }
+  }
+}

@@ -39,6 +39,8 @@ export async function factoryRepo(t: TestContext) {
     await cp(new URL(`../${folder}`, import.meta.url), join(repo, 'board', folder), { recursive: true });
   }
   await cp(new URL('../.gitignore', import.meta.url), join(repo, 'board/.gitignore'));
+  // The built page, which .gitignore keeps out of the fixture's commits as it does in the real repo.
+  await cp(new URL('../dist', import.meta.url), join(repo, 'board/dist'), { recursive: true });
   await cp(new URL('../../scripts/install.sh', import.meta.url), join(repo, 'scripts/install.sh'));
   await cp(new URL('../../config.json', import.meta.url), join(repo, 'config.json'));
   await cp(new URL('../../UPSTREAM.md', import.meta.url), join(repo, 'UPSTREAM.md'));

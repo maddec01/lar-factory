@@ -4,6 +4,10 @@
    (tailwindcss/packages/tailwindcss/theme.css). Badges and buttons follow
    apps/web/src/components/ui/badge.tsx and button.tsx; grouped lists follow
    components/settings/SettingsGroup.tsx. */
+/* No source scanning yet: the template's own class names (such as "outline") would
+   otherwise turn on Tailwind utilities of the same name. Add @source with the first utility. */
+@import "tailwindcss" source(none);
+
 :root {
   color-scheme: light dark;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -73,7 +77,8 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); }
 body { font: 14px/1.43 var(--font-sans); -webkit-font-smoothing: antialiased; }
 /* Full browser width, with T3's workspace gutter. */
 #app { padding: 14px 20px 48px; }
-a { color: inherit; }
+/* Tailwind's base styles take links' underline, headings' weight, the checkboxes' margin, a legend's padding and a dialog's centring; these put back the browser's. */
+a { color: inherit; text-decoration: underline; }
 a:hover { text-decoration-thickness: 2px; }
 code { font: 12px var(--font-mono); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
@@ -221,25 +226,26 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .update-log { margin: 6px 0 0; max-height: 14em; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .update-hint { margin: 6px 0 0; }
 .update-hint code { overflow-wrap: anywhere; }
-#add-item-dialog, #abandon-dialog { width: min(520px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); color: var(--fg); overflow: auto; }
+#add-item-dialog, #abandon-dialog { width: min(520px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); color: var(--fg); overflow: auto; margin: auto; }
 #add-item-dialog::backdrop, #abandon-dialog::backdrop { background: rgb(0 0 0 / 40%); }
 #abandon-dialog { width: min(420px, calc(100% - 24px)); }
 #abandon-heading { overflow-wrap: anywhere; }
 #abandon-dialog .form-actions { justify-content: flex-end; }
 .form-heading, .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.form-heading h2 { margin: 0; font-size: 16px; }
+.form-heading h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .form-hint { color: var(--muted); margin: 6px 0 12px; font-size: 12px; }
 .item-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-field { display: grid; gap: 4px; margin-bottom: 12px; }
 .form-field > label, .applicability legend { font-weight: 600; }
+.applicability legend { padding: 0 2px; }
 .required-note { color: var(--muted); font-weight: 400; font-size: 12px; }
 .form-field input, .form-field select, .form-field textarea { width: 100%; min-width: 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--input); border-radius: var(--r-control); padding: 6px 8px; }
 .form-field textarea { resize: vertical; min-height: 80px; }
 .applicability { margin: 0 0 10px; padding: 8px 10px 0; border: 1px solid var(--bd); border-radius: 6px; min-width: 0; }
 .choices { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .choices label { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; }
-.choices input { accent-color: var(--focus); }
+.choices input { accent-color: var(--focus); margin: 3px 3px 3px 4px; }
 .submit-item { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); min-height: 32px; padding: 0 11px; }
 button:disabled { opacity: 0.6; cursor: wait; }
 button:disabled[title] { cursor: not-allowed; }

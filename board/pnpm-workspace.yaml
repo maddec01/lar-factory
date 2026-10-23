@@ -1,0 +1,5 @@
+# Vite+ ships Vite as @voidzero-dev/vite-plus-core, which plugins don't recognise as vite;
+# T3 Code allows it the same way.
+peerDependencyRules:
+  allowAny:
+    - vite

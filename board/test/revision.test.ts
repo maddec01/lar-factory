@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { factoryRepo } from './repo-support.ts';
 import { startBoard } from './server-support.ts';
 import type { BoardData } from '../src/model.ts';
@@ -19,12 +19,18 @@ test('remote commits stay visible after checkout advancement, with startup asset
   const running = f.git('rev-parse', 'HEAD');
   const board = await startBoard(t, {}, true, true, { BOARD_DATA_FILE: join(f.repo, 'sample.json'), BOARD_LAUNCH_TOKEN: 'launch-7' }, join(f.repo, 'board'));
   await eventually(async () => (await board.board()).codeUpdate?.behind === 0);
-  const assets = await Promise.all(['client.ts', 'render.ts', 'model.ts', 'add-item.ts', 'anchor.ts', 'slice-popover.ts'].map(async (name) => {
+  const names = [...(await fetch(board.url).then((r) => r.text())).matchAll(/"\/assets\/([^"]+)"/g)].map((m) => m[1]!);
+  assert.deepEqual(names.map((name) => extname(name)).sort(), ['.css', '.js'], 'the page loads the built script and stylesheet');
+  const assets = await Promise.all(names.map(async (name) => {
     return [name, await fetch(`${board.url}/assets/${name}`).then((r) => r.text())] as const;
   }));
+  assert.ok(assets.every(([, content]) => content.length > 0));
   f.git('switch', '-c', 'merged');
   await writeFile(join(f.repo, 'board/src/model.ts'), 'throw new Error("new checkout must not be served");');
   await writeFile(join(f.repo, 'board/src/styles.css'), 'body { display: none; }');
+  // A new build of the checkout replaces the built page the board started with.
+  await writeFile(join(f.repo, 'board/dist/index.html'), '<body style="display: none"></body>');
+  for (const [name] of assets) await writeFile(join(f.repo, 'board/dist/assets', name), 'body { display: none; }');
   f.git('add', '.');
   f.git('commit', '-m', 'feat(board): incompatible next version');
   f.git('push', 'origin', 'HEAD:main');

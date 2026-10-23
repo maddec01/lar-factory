@@ -9,6 +9,11 @@ runs on 4317. Open it in a browser or in T3's browser preview.
 cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
 ```
 
+`pnpm start`, `dev`, `sample` and `test` first build the page with Vite+
+(`pnpm run build`) into `dist/`, which git ignores; the server reads it at startup.
+`dev` then rebuilds the page when a file changes and restarts the server on each
+new build or `src/` change.
+
 - **Board** shows what needs you first (Needs you, Verify, Ready to merge), then
   what's in flight, concepts with their sub-issues, Queued items, List counts per
   platform, and the last 7 days of Done. Every card has a step bar showing where
@@ -104,9 +109,12 @@ The board checks remote `main` every refresh cycle and shows **Board update
 available** when it contains commits absent from this process: with the Update
 button on the launch-agent board, and with a copyable command on dev and sample
 runs, which can't update themselves. Pulling the checkout does not clear the notice: restart the board to
-run that revision. A running process keeps its own browser modules and styling
-so a new browser load still works after checkout changes. Failed revision
+run that revision. A running process keeps the built page it started with,
+so a new browser load still works after checkout changes or a rebuild. Failed revision
 checks show their own warning, separate from stale GitHub project data.
 
-`pnpm test` renders the sample and compares it with the saved copies in
+`pnpm test` runs the server tests with Node's test runner, then the page tests in
+`test/page/` with Vitest in a DOM. It renders the sample and compares it with the saved copies in
 `test/expected/`; `pnpm run test:update` rewrites them after a deliberate change.
+That DOM, jsdom, needs Node 22.22.2+, 24.15+ or 26+;
+the board itself runs on 22.18+.

@@ -1,0 +1,17 @@
+# Settings for this package alone; it is not a workspace of several packages.
+
+# Electron 44 has no install script; scripts/ensure-electron-runtime.mjs fetches
+# the binary when the dev command runs. The key stays so pnpm asks nothing.
+allowBuilds:
+  electron: false
+  esbuild: true
+
+# Vite+ ships its own Vite. Point every dependent at that copy, as T3 Code does,
+# and keep Effect's packages on the version T3 Code pins.
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  "@effect/platform-node-shared": 4.0.5
+
+peerDependencyRules:
+  allowedVersions:
+    vite: "*"

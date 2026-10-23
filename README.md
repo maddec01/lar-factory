@@ -182,11 +182,24 @@ flight, concepts and their progress, and where every item sits in the flow. It
 reads GitHub through your local `gh` login and refreshes itself. See
 [`board/README.md`](board/README.md).
 
+`app/` is the board app: a Mac window that runs the board, copied from
+[T3 Code](https://github.com/pingdotgg/t3code)'s desktop app. It starts
+`board/src/server.ts` as a child under Electron's own Node and shows its page.
+Quitting the app stops the server. To open it from a checkout:
+
+```bash
+cd app && pnpm install && pnpm run dev
+```
+
+The first run downloads Electron's binary. The launch-agent board keeps running
+beside it.
+
 ## Repo layout
 
 ```
 skills/            copies (original names), mux-work (with agents/), skill-sync
 board/             the local board app
+app/               the board app: the board in a Mac window (Electron)
 references/        checklists Addy's skills link to
 scripts/install.sh installs or updates the skills and checklists
 scripts/setup-worktree.sh installs board/ in a new worktree (.githooks, t3.json)
@@ -198,6 +211,6 @@ docs/plan.md       how this was set up
 ## Credits and licence
 
 MIT, see [LICENSE](LICENSE). The copied skills are by Matt Pocock and Addy
-Osmani, both MIT; their notices are in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The factory idea draws on
+Osmani, both MIT, and the board app copies code from T3 Code by T3 Tools Inc.,
+also MIT; their notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The factory idea draws on
 ZazenCodes' [Build Your Own AI Software Factory](https://www.youtube.com/watch?v=ctoaIC4LHmI).

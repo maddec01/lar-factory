@@ -19,6 +19,7 @@ import * as ExternalLink from "./ExternalLink.ts";
 import * as LaunchSecret from "./LaunchSecret.ts";
 import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
 import * as StartingPage from "./StartingPage.ts";
+import * as WindowTitleBar from "./WindowTitleBar.ts";
 
 /** Resolves once the user quits the app or closes its last window. */
 const quitRequested = Effect.callback<void>((resume) => {
@@ -49,6 +50,7 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
     minWidth: 840,
     minHeight: 620,
     title: "Mux Factory",
+    ...WindowTitleBar.options(process.platform),
     webPreferences: {
       preload: NodePath.join(import.meta.dirname, "preload.cjs"),
       contextIsolation: true,

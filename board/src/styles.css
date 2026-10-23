@@ -37,6 +37,7 @@
   --you-soft: var(--warning-surface);
   --thread: var(--primary);
   --sub: oklch(60.6% 0.25 292.717);             /* violet-500 */
+  --sub-text: oklch(54.1% 0.281 293.009);       /* violet-600: AA on white */
   --build: var(--success);
   --danger-text: var(--error-fg);
   --line: color-mix(in srgb, var(--fg) 14%, transparent);
@@ -63,6 +64,7 @@
     --info-fg: oklch(70.7% 0.165 254.624);      /* blue-400 */
     --shadow: 0 14px 32px -18px rgb(0 0 0 / 75%);
     --sub: oklch(70.2% 0.183 293.541);          /* violet-400 */
+    --sub-text: var(--sub);
   }
 }
 
@@ -137,7 +139,7 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .checks.failed { --k: var(--error); color: var(--danger-text); border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); }
 .checks.slow { --k: var(--you); color: var(--you-text); font-weight: 600; border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: var(--you-soft); }
 
-.plat, .kind, .label, .blocked, .subs { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--r-sm); padding: 0 6px; min-height: 18px; border: 1px solid var(--input); white-space: nowrap; font-size: 11px; font-weight: 500; }
+.plat, .kind, .label, .blocked-by, .subs { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--r-sm); padding: 0 6px; min-height: 18px; border: 1px solid var(--input); white-space: nowrap; font-size: 11px; font-weight: 500; }
 .plat { font-weight: 600; }
 .plat::before, .kind::before, .label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k, var(--muted)); }
 .plat-server { --k: oklch(68.5% 0.169 237.323); }
@@ -149,7 +151,7 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .kind-improvement { --k: oklch(70.4% 0.14 182.503); }
 .kind-concept, .kind-decision, [class*="kind-decision-"] { --k: var(--sub); }
 .kind-build { --k: var(--build); }
-.blocked { color: var(--danger-text); border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); }
+.blocked-by { color: var(--danger-text); border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); }
 .subs { color: var(--muted); }
 
 /* segmented bars: every card's status bar, and a build's slice bar under it.
@@ -166,10 +168,15 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .step-label.amber { color: var(--you-text); font-weight: 600; }
 .slice-bar li.done { background: var(--build); }
 .slice-bar li.active { background: var(--thread); animation: slice-pulse 1.6s ease-in-out infinite; }
+/* A blocked slice waits for a re-slice: a calm violet, not an alarm. */
+.slice-bar li.blocked { background: color-mix(in srgb, var(--sub) 50%, transparent); }
 @keyframes slice-pulse { 50% { opacity: 0.45; } }
 .slices-now { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slices-active { color: var(--thread); font-weight: 600; margin-right: 2px; }
+.slices-blocked { color: var(--sub-text); font-weight: 600; margin-right: 2px; }
 .slices-now .sep { color: var(--muted); }
+/* the separator brings its own spaces, so a count before it drops its margin */
+.slices-now :has(+ .sep) { margin-right: 0; }
 
 /* a build's slice popover: the bars are its trigger; it floats over the board, so the card's height never changes */
 .slices { position: relative; }
@@ -188,6 +195,7 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .slice-mark { flex: none; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); box-sizing: border-box; }
 .slice-row.done .slice-mark { background: var(--build); border-color: var(--build); }
 .slice-row.active .slice-mark { background: var(--thread); border-color: var(--thread); box-shadow: 0 0 0 3px color-mix(in srgb, var(--thread) 20%, transparent); }
+.slice-row.blocked .slice-mark { background: color-mix(in srgb, var(--sub) 50%, transparent); border-color: var(--sub); }
 .slice-row.done .row-title { color: var(--muted); text-decoration: line-through; }
 .slice-row.active .row-title { font-weight: 600; }
 
@@ -337,7 +345,7 @@ a.o-title:hover { text-decoration: underline; }
 .o-link { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 22px; }
 .o-more { color: var(--muted); }
 .o-rel { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.blocked-by .o-rel { color: var(--danger-text); }
+.o-blocked-by .o-rel { color: var(--danger-text); }
 .o-ref { text-decoration: none; color: var(--fg); overflow-wrap: anywhere; }
 .o-ref:hover { text-decoration: underline; }
 .o-ref.off { border: 1px dashed var(--input); border-radius: var(--r-sm); padding: 0 6px; color: var(--muted); }

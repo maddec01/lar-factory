@@ -15,7 +15,9 @@ import {
   workMessage,
   workTitle,
 } from './model.ts';
-import type { BoardData, ToolMissing, ToolProblem, Item, LinkedPr, ModelChoice, StartedThread, Status, UpdateStep } from './model.ts';
+import type { BoardData, ToolMissing, ToolProblem, Item, LinkedPr, ModelChoice, StartedThread, Status } from './model.ts';
+import { UPDATE_HINTS, UPDATE_RESULT_MS } from './update-view.ts';
+import type { UpdateView } from './update-view.ts';
 import { highlightedChoice } from './start-menu.ts';
 import { ago, clock, day, esc, plural, slug } from './format.ts';
 import type { UiState, View } from './ui-state.ts';
@@ -50,22 +52,6 @@ export type Notice = { key: string } & (
   | { verb: 'Failed'; item: Item; to?: Status; message: string }
   | { verb: 'Started'; item: Item; thread: StartedThread }
 );
-
-export type UpdateView = { phase: 'starting' } | { phase: 'refused'; message: string } | { phase: 'lost' };
-
-/** How long after it finished a successful update still shows its toast on a new page. */
-export const UPDATE_RESULT_MS = 15 * 60 * 1000;
-
-const UPDATE_HINTS: Record<UpdateStep, string> = {
-  check: 'Put the checkout back on a clean main, then press Update.',
-  fetch: 'Check GitHub access and reconcile local main with origin/main, then press Update.',
-  install: 'pnpm install failed; fix what the message or log shows, then press Update.',
-  restart: 'The launch agent could not be reinstalled; fix what the log shows, then press Update.',
-  health: 'The new board did not answer in time; check the board log, then press Update.',
-  skills: 'The skills install failed; check the gh login and the log, then press Update.',
-  profiles: 'Resolve the conflicting skill links in the log, then press Update.',
-  done: 'Press Update to retry.',
-};
 
 /** An action this page started for an item: in flight, failed, or (for Start) done. */
 export interface ItemAction {

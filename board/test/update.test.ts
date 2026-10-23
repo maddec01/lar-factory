@@ -251,7 +251,9 @@ test('updater fast-forwards, reinstalls, waits for the new revision, installs sk
     ['check', 'fetch', 'skills', 'profiles', 'done'],
   ]);
   const calls = await f.calls();
-  assert.deepEqual(calls.filter((c) => c[0] === 'pnpm'), [['pnpm', 'install', '--frozen-lockfile']]);
+  assert.deepEqual(calls.filter((c) => c[0] === 'pnpm'), [['pnpm', 'install', '--frozen-lockfile'], ['pnpm', 'run', 'build']]);
+  const order = calls.map((c) => c.slice(0, 2).join(' '));
+  assert.ok(order.indexOf('pnpm run') < order.indexOf('launchctl bootout'), 'the restart builds the page before it stops the board');
   assert.equal(calls.filter((c) => c[0] === 'launchctl' && c[1] === 'bootstrap').length, 1);
   assert.equal(calls.filter((c) => c[0] === 'npx' && c[2] === 'skills' && c[3] === 'add').length, 2);
 });

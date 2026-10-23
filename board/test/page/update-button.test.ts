@@ -1,4 +1,4 @@
-// The header's update button, shown only in the packaged app once its updater finds a newer Release.
+// The title bar's update button, shown only in the packaged app once its updater finds a newer Release.
 // The bridge stands in for the app's preload and pushes each new update state, as the app does.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
@@ -48,10 +48,10 @@ test('an unpackaged dev app, whose updater is disabled, has no button', async ()
   expect(button()).toBeNull();
 });
 
-test('an available update shows the button in the header, and clicking it downloads', async () => {
+test('an available update shows the button in the title bar, before Add item, and clicking it downloads', async () => {
   const { bridge } = stubBridge(available);
   await mountPage();
-  expect(button()!.closest('header.top')).not.toBeNull();
+  expect([...$('.title-bar-actions')!.children].map((el) => el.textContent)).toEqual(['Refreshed 20m ago', 'Update to 1.1.0', 'Add item', 'Settings']);
   expect(button()!.textContent).toBe('Update to 1.1.0');
   await settle(() => button()!.click());
   expect(bridge.downloadUpdate).toHaveBeenCalledOnce();

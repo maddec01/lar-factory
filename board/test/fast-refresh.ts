@@ -2,4 +2,4 @@
 import { setInterval as realSetInterval } from 'node:timers';
 
 globalThis.setInterval = ((callback: (...args: unknown[]) => void, delay?: number, ...args: unknown[]) =>
-  realSetInterval(callback, Math.min(delay ?? 0, 100), ...args)) as typeof globalThis.setInterval;
+  realSetInterval(callback, Math.min(delay ?? 0, Number(process.env.FAST_REFRESH_MS) || 100), ...args)) as typeof globalThis.setInterval;

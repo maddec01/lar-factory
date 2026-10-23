@@ -56,6 +56,8 @@ let modelsUnavailable = false;
 let pricingUnavailable = false;
 let projectNumber = config.number;
 let refreshing = false;
+/** Set when a read is asked for during a running one, so exactly one more starts after it. */
+let readAgain = false;
 let syncingPrStats = false;
 let revision = 0;
 /** Items this board just created or moved, shown as changed until GitHub reports the change. */
@@ -144,9 +146,11 @@ function offerModelChoices(): ModelGroup[] {
   return state.modelChoices = groups;
 }
 
+/** Reads GitHub now; while a read runs this one is skipped, so two reads never run together. */
 async function refresh(): Promise<void> {
   if (refreshing) return;
   refreshing = true;
+  readAgain = false;
   let read = false;
   const readRevision = revision;
   offerModelChoices();
@@ -174,6 +178,13 @@ async function refresh(): Promise<void> {
   }
   // PR edits take a gh call or two each; the board doesn't wait for them.
   if (read) void syncPrStats(state.items);
+  if (readAgain) void refresh();
+}
+
+/** Reads GitHub now, or once more after the running read, so a change made during that read is read too. */
+function readSoon(): void {
+  if (refreshing) readAgain = true;
+  else void refresh();
 }
 
 // Browser modules: the shared template is served as JS by stripping its types.
@@ -442,6 +453,14 @@ async function abandonItemRequest(req: IncomingMessage, res: ServerResponse): Pr
   json(res, error ? 502 : 200, { error, board: state });
 }
 
+/** Starts a read of GitHub for status.sh, so a moved item reaches the board before the next interval read. */
+async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!await readJson(req, res, 'the read request')) return;
+  if (fixture) return json(res, 200, {});
+  readSoon();
+  json(res, 202, {});
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
   const path = new URL(req.url ?? '/', 'http://localhost').pathname;
@@ -455,6 +474,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (req.method === 'POST' && path === '/api/start') return startItem(req, res);
   if (req.method === 'POST' && path === '/api/update') return updateBoard(res);
   if (req.method === 'POST' && path === '/api/abandon') return abandonItemRequest(req, res);
+  if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }

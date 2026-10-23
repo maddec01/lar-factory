@@ -51,7 +51,8 @@ verifies visible changes and merges every PR; the rest is yours.
     sub-issues carry the rest. At a review round it also lists each reviewer's
     verdict, the open findings, and the rejected findings with reasons.
 - Never merge or push to `main`. Commit and PR rules are in each repo's
-  `AGENTS.md`.
+  `AGENTS.md`, except citing another repository's work, which follows
+  [Cross-repository citations](cross-repo-citations.md).
 
 ## Grilling with docs
 

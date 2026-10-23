@@ -21,11 +21,13 @@ async function open(data: BoardData = withFactory): Promise<void> {
   await settle(() => vi.advanceTimersByTime(50));
 }
 
-/** Sets a field's value the way typing or picking does, so React hears it. */
+/** Sets a field's value the way typing or picking does, so React hears it. A pick in a select fires
+ * `input`, then `change` in a later task, so a re-render between them shows. */
 async function enter(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, value: string): Promise<void> {
   const proto = Object.getPrototypeOf(el) as object;
   Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value);
-  await settle(() => el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true })));
+  await settle(() => el.dispatchEvent(new Event('input', { bubbles: true })));
+  if (el instanceof HTMLSelectElement) await settle(() => el.dispatchEvent(new Event('change', { bubbles: true })));
 }
 
 async function fillDraft(): Promise<void> {
@@ -62,13 +64,19 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
 test('changing the repo shows its applicability, unchecked, and a repo with none shows no group', async () => {
   await open();
   await settle(() => $<HTMLInputElement>('input[value="area: web"]')!.click());
+  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-apple');
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-apple');
+  expect(field<HTMLSelectElement>('item-kind').value, 'the kind stays').toBe('bug');
   expect(labels()).toEqual(['app: music', 'app: video', 'app: photos', 'app: books', 'os: ios', 'os: macos', 'os: tvos', 'os: watchos']);
   expect(dialog()!.textContent).toContain('No apps selected means all apps.');
   expect(dialog()!.textContent).toContain('No OSes selected means all OSes.');
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-factory');
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-factory');
   expect($('.applicability')).toBeNull();
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-server');
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-server');
+  expect(field<HTMLSelectElement>('item-kind').value, 'the kind stays').toBe('bug');
   expect($$<HTMLInputElement>('input[name="labels"]').some((input) => input.checked), 'a repo shown again starts unchecked').toBe(false);
 });
 
@@ -80,6 +88,18 @@ test('a draft without a kind is not sent and says why', async () => {
   expect(result().textContent).toBe('Choose bug, feature or improvement.');
   await enter(field('item-title'), 'Playback stalls on seek');
   expect(result().textContent, 'editing clears the message').toBe('');
+});
+
+test('a repo picked while a message shows is the one posted', async () => {
+  await open();
+  await settle(() => submit().click());
+  expect(result().textContent).toBe('Choose bug, feature or improvement.');
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-apple');
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-apple');
+  await fillDraft();
+  respond({ item: null, issueUrl: null, error: null }, 500);
+  await settle(() => submit().click());
+  expect((posted().draft as Record<string, unknown>).repo).toBe('maddec01/mux-apple');
 });
 
 test('submitting posts the draft, shows it sending, then closes and announces the new item', async () => {

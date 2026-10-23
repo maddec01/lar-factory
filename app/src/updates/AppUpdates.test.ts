@@ -270,17 +270,24 @@ describe("AppUpdates", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("keeps a found update available through a failed check or a background error", () =>
+  it.effect("turns a found update into an error when a check fails, as T3 Code does", () =>
     Effect.gen(function* () {
       const { fake, updates } = yield* setup();
       fake.onCheck = Effect.sync(() => fake.emit("update-available", { version: "0.3.0" }));
       yield* updates.check;
       fake.onCheck = failure("check", "net::ERR_INTERNET_DISCONNECTED");
       const failed = yield* updates.check;
-      assert.strictEqual(failed.state.status, "available");
-      assert.strictEqual(failed.state.availableVersion, "0.3.0");
-      assert.isNull(failed.state.errorContext);
+      assert.strictEqual(failed.state.status, "error");
+      assert.strictEqual(failed.state.errorContext, "check");
+      assert.isTrue(failed.state.canRetry);
+    }).pipe(Effect.scoped),
+  );
 
+  it.effect("keeps a found update available through a background error", () =>
+    Effect.gen(function* () {
+      const { fake, updates } = yield* setup();
+      fake.onCheck = Effect.sync(() => fake.emit("update-available", { version: "0.3.0" }));
+      yield* updates.check;
       fake.emit("error", new Error("feed unreadable"));
       const state = yield* updates.getState;
       assert.strictEqual(state.status, "available");

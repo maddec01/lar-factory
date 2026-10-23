@@ -44,32 +44,22 @@ export function createBaseUpdateState(
   };
 }
 
-/**
- * A failed download's error, kept on an update still available until a new download starts, or
- * the cleared error otherwise.
- */
-const keptDownloadError = (state: UpdateState): Pick<UpdateState, "message" | "errorContext" | "canRetry"> =>
-  state.errorContext === "download" && state.availableVersion !== null
-    ? { message: state.message, errorContext: "download", canRetry: true }
-    : { message: null, errorContext: null, canRetry: false };
-
 export function reduceOnCheckStart(state: UpdateState, checkedAt: string): UpdateState {
   const hasDownloadedUpdate = state.downloadedVersion !== null;
-  // Unlike T3 Code, an update found but not yet downloaded keeps its notes through a check too, as its button stays.
-  const hasFoundUpdate = hasDownloadedUpdate || state.availableVersion !== null;
   return {
     ...state,
     status: "checking",
     checkedAt,
-    releaseNotes: hasFoundUpdate ? state.releaseNotes : [],
-    omittedReleaseCount: hasFoundUpdate ? state.omittedReleaseCount : 0,
+    releaseNotes: hasDownloadedUpdate ? state.releaseNotes : [],
+    omittedReleaseCount: hasDownloadedUpdate ? state.omittedReleaseCount : 0,
+    message: null,
     downloadPercent: hasDownloadedUpdate ? 100 : null,
-    ...keptDownloadError(state),
+    errorContext: null,
+    canRetry: false,
   };
 }
 
-/** The state that keeps a found update showing through a failed check or a background error, or null without one. */
-function keepFoundUpdate(state: UpdateState, checkedAt: string): UpdateState | null {
+export function reduceOnCheckFailure(state: UpdateState, message: string, checkedAt: string): UpdateState {
   if (state.downloadedVersion !== null) {
     return {
       ...state,
@@ -81,23 +71,6 @@ function keepFoundUpdate(state: UpdateState, checkedAt: string): UpdateState | n
       canRetry: true,
     };
   }
-  // Unlike T3 Code, an update found but not yet downloaded stays available too, so its button stays.
-  if (state.availableVersion !== null) {
-    return {
-      ...state,
-      status: "available",
-      checkedAt,
-      downloadPercent: null,
-      ...keptDownloadError(state),
-      canRetry: true,
-    };
-  }
-  return null;
-}
-
-export function reduceOnCheckFailure(state: UpdateState, message: string, checkedAt: string): UpdateState {
-  const kept = keepFoundUpdate(state, checkedAt);
-  if (kept) return kept;
 
   return {
     ...state,
@@ -119,9 +92,6 @@ export function reduceOnUpdateAvailable(
 ): UpdateState {
   const isDownloadedVersion = state.downloadedVersion === version;
   const preserveReleaseNotes = isDownloadedVersion && releaseNotes.length === 0;
-  // The same version found again keeps a failed download's error until a new download starts.
-  const sameAvailable = !isDownloadedVersion && state.availableVersion === version;
-  const error = sameAvailable ? keptDownloadError(state) : { message: null, errorContext: null, canRetry: false };
   return {
     ...state,
     status: isDownloadedVersion ? "downloaded" : "available",
@@ -131,8 +101,9 @@ export function reduceOnUpdateAvailable(
     omittedReleaseCount: preserveReleaseNotes ? state.omittedReleaseCount : omittedReleaseCount,
     downloadPercent: isDownloadedVersion ? 100 : null,
     checkedAt,
-    ...error,
-    canRetry: isDownloadedVersion || error.canRetry,
+    message: null,
+    errorContext: null,
+    canRetry: isDownloadedVersion,
   };
 }
 
@@ -226,18 +197,33 @@ export function reduceOnInstallFailure(state: UpdateState, message: string): Upd
   };
 }
 
-/** An error the updater reports outside a check, download or install. */
+/**
+ * An error the updater reports outside a check, download or install: an available or downloaded
+ * update stays, with any failed download's error, and anything else goes to error.
+ */
 export function reduceOnBackgroundError(state: UpdateState, message: string, checkedAt: string): UpdateState {
-  return (
-    keepFoundUpdate(state, checkedAt) ?? {
+  if (state.downloadedVersion !== null) {
+    return {
       ...state,
-      status: "error",
-      message,
+      status: "downloaded",
+      message: null,
       checkedAt,
-      downloadPercent: null,
-      canRetry: false,
-    }
-  );
+      downloadPercent: 100,
+      errorContext: null,
+      canRetry: true,
+    };
+  }
+  if (state.status === "available") {
+    return { ...state, checkedAt, downloadPercent: null, canRetry: true };
+  }
+  return {
+    ...state,
+    status: "error",
+    message,
+    checkedAt,
+    downloadPercent: null,
+    canRetry: false,
+  };
 }
 
 /** Whether a download at `nextPercent` is worth sending to the page: each 10 % step and the end. */

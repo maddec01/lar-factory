@@ -11,38 +11,49 @@ const available = Machine.reduceOnUpdateAvailable(
   notes,
   2,
 );
+const downloaded = Machine.reduceOnDownloadComplete(available, "0.3.0");
 const downloadFailed = Machine.reduceOnDownloadFailure(Machine.reduceOnDownloadStart(available), "net::ERR_TIMED_OUT");
 
-describe("a check with an update already found", () => {
-  it("keeps the update's notes", () => {
+describe("a check with an update found but not downloaded", () => {
+  it("drops the update's notes, as T3 Code does", () => {
     const checking = Machine.reduceOnCheckStart(available, at);
     assert.strictEqual(checking.status, "checking");
-    assert.deepStrictEqual(checking.releaseNotes, notes);
-    assert.strictEqual(checking.omittedReleaseCount, 2);
+    assert.deepStrictEqual(checking.releaseNotes, []);
+    assert.strictEqual(checking.omittedReleaseCount, 0);
   });
 
-  it("keeps a failed download's error through the check, until a new download starts", () => {
+  it("goes to error when it fails, as T3 Code does", () => {
+    const failed = Machine.reduceOnCheckFailure(Machine.reduceOnCheckStart(available, at), "offline", at);
+    assert.strictEqual(failed.status, "error");
+    assert.strictEqual(failed.errorContext, "check");
+    assert.strictEqual(failed.message, "offline");
+    assert.isTrue(failed.canRetry);
+  });
+
+  it("clears a failed download's error, as T3 Code does", () => {
     const checking = Machine.reduceOnCheckStart(downloadFailed, at);
-    assert.strictEqual(checking.errorContext, "download");
-    assert.strictEqual(checking.message, "net::ERR_TIMED_OUT");
-    assert.isTrue(checking.canRetry);
+    assert.isNull(checking.errorContext);
+    assert.isNull(checking.message);
+    assert.isFalse(checking.canRetry);
 
-    const foundAgain = Machine.reduceOnUpdateAvailable(checking, "0.3.0", at, notes);
+    const foundAgain = Machine.reduceOnUpdateAvailable(downloadFailed, "0.3.0", at, notes);
     assert.strictEqual(foundAgain.status, "available");
-    assert.strictEqual(foundAgain.errorContext, "download");
-    assert.strictEqual(foundAgain.message, "net::ERR_TIMED_OUT");
+    assert.isNull(foundAgain.errorContext);
+    assert.isNull(foundAgain.message);
+    assert.isFalse(foundAgain.canRetry);
+  });
+});
 
-    const failedCheck = Machine.reduceOnCheckFailure(checking, "offline", at);
-    assert.strictEqual(failedCheck.status, "available");
-    assert.strictEqual(failedCheck.message, "net::ERR_TIMED_OUT");
+describe("a check with an update downloaded", () => {
+  it("keeps the notes, and stays downloaded when it fails", () => {
+    const checking = Machine.reduceOnCheckStart(downloaded, at);
+    assert.deepStrictEqual(checking.releaseNotes, notes);
+    assert.strictEqual(checking.downloadPercent, 100);
 
-    const newer = Machine.reduceOnUpdateAvailable(checking, "0.4.0", at, notes);
-    assert.isNull(newer.errorContext);
-    assert.isNull(newer.message);
-
-    const retried = Machine.reduceOnDownloadStart(foundAgain);
-    assert.isNull(retried.errorContext);
-    assert.isNull(retried.message);
+    const failed = Machine.reduceOnCheckFailure(checking, "offline", at);
+    assert.strictEqual(failed.status, "downloaded");
+    assert.isNull(failed.errorContext);
+    assert.isTrue(failed.canRetry);
   });
 });
 
@@ -56,9 +67,32 @@ describe("a check with nothing found", () => {
   });
 });
 
+describe("a background error", () => {
+  it("keeps an available update, with a failed download's error", () => {
+    const state = Machine.reduceOnBackgroundError(downloadFailed, "feed unreadable", at);
+    assert.strictEqual(state.status, "available");
+    assert.strictEqual(state.errorContext, "download");
+    assert.strictEqual(state.message, "net::ERR_TIMED_OUT");
+    assert.isTrue(state.canRetry);
+  });
+
+  it("keeps a downloaded update", () => {
+    const state = Machine.reduceOnBackgroundError(downloaded, "feed unreadable", at);
+    assert.strictEqual(state.status, "downloaded");
+    assert.isNull(state.message);
+  });
+
+  it("goes to error without a found update", () => {
+    const idle = Machine.createBaseUpdateState("0.2.0", "latest", null);
+    const state = Machine.reduceOnBackgroundError(idle, "feed unreadable", at);
+    assert.strictEqual(state.status, "error");
+    assert.strictEqual(state.message, "feed unreadable");
+    assert.isFalse(state.canRetry);
+  });
+});
+
 describe("an install", () => {
   it("clears a failed install's error as a retry starts", () => {
-    const downloaded = Machine.reduceOnDownloadComplete(available, "0.3.0");
     const started = Machine.reduceOnInstallStart(Machine.reduceOnInstallFailure(downloaded, "quit refused"));
     assert.strictEqual(started.status, "downloaded");
     assert.isNull(started.errorContext);

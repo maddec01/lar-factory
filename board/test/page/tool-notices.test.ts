@@ -37,7 +37,7 @@ test('a missing t3 replaces the board with a notice and Recheck', async () => {
   expect(notice.querySelector('p')!.textContent).toBe("The board starts threads through T3 Code's t3 command and didn't find it on the login shell's PATH, "
     + 'in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck. The board also looks again every 10 seconds.');
   expect(recheckButton().textContent).toBe('Recheck');
-  expect($$('[role="tab"]'), 'the notice replaces the board').toEqual([]);
+  expect($('#panel-board'), 'the notice replaces the board').toBeNull();
   expect($('header.top')).toBeNull();
 });
 
@@ -87,7 +87,7 @@ test('Recheck posts, shows Checking…, then the board once the tool is found, a
   await settle(() => recheckButton().click());
   await answer(board(withTools({})));
   expect($('.tool-missing')).toBeNull();
-  expect($$('[role="tab"]').length).toBe(2);
+  expect($('#panel-board')).not.toBeNull();
 });
 
 test("after Recheck a gh banner says it's still logged out, or why Recheck failed, until the server answers again", async () => {

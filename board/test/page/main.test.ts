@@ -1,4 +1,4 @@
-// The page shell: first paint, header, view tabs, live data, and what a re-render keeps.
+// The page shell: first paint, header, the Board view, live data, and what a re-render keeps.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, fetchMock, mountPage, sample, settle, stream } from './support.ts';
@@ -6,14 +6,11 @@ import { BRAND_MARK_PATH } from '../../src/brand-mark.ts';
 import type { BoardData } from '../../src/model.ts';
 
 const fresh: BoardData = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
-const tab = (view: string) => $<HTMLButtonElement>(`#tab-${view}`)!;
-const shows = (view: string) => !$(`#panel-${view}`)!.hidden && tab(view).getAttribute('aria-selected') === 'true';
-const key = (el: Element, k: string) => settle(() => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })));
 
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
   await mountPage(fresh);
   expect($('.totals')!.textContent).toBe('4 need you8 in flight3 queued4 in List25 items');
-  expect($$('.o-node').length).toBeGreaterThan(0);
+  expect($$('#panel-board article').length).toBeGreaterThan(0);
   expect(fetchMock).not.toHaveBeenCalled();
   expect($('#board-data')).not.toBeNull();
 });
@@ -52,51 +49,20 @@ test('stale data and a failed read show a banner', async () => {
   expect(banner.querySelector('code.err')).not.toBeNull();
 });
 
-test('the tabs switch the view, and #flow names Flow', async () => {
+test('the page shows the Board view with no tabs', async () => {
   await mountPage();
-  expect(shows('board')).toBe(true);
-  expect(shows('flow')).toBe(false);
-  expect(tab('board').tabIndex).toBe(0);
-  expect(tab('flow').tabIndex).toBe(-1);
-
-  await settle(() => tab('flow').click());
-  expect(location.hash).toBe('#flow');
-  expect(shows('flow')).toBe(true);
-  expect($('#panel-board')!.hidden).toBe(true);
-
-  await settle(() => tab('board').click());
-  expect(location.hash).toBe('');
-  expect(shows('board')).toBe(true);
+  const panel = $('#panel-board')!;
+  expect(panel.hidden).toBe(false);
+  expect(panel.getAttribute('role')).toBeNull();
+  expect($('#needs-you')!.closest('#panel-board')).toBe(panel);
+  expect($$('[role="tablist"], [role="tab"], [role="tabpanel"]')).toEqual([]);
 });
 
-test('arrow keys move to the other tab, Home and End to the first and last, and focus follows', async () => {
-  await mountPage();
-  tab('board').focus();
-  await key(tab('board'), 'ArrowRight');
-  expect(shows('flow')).toBe(true);
-  expect(document.activeElement).toBe(tab('flow'));
-  await key(tab('flow'), 'ArrowLeft');
-  expect(shows('board')).toBe(true);
-  expect(document.activeElement).toBe(tab('board'));
-  await key(tab('board'), 'End');
-  expect(shows('flow')).toBe(true);
-  await key(tab('flow'), 'End');
-  expect(shows('flow')).toBe(true);
-  await key(tab('flow'), 'Home');
-  expect(shows('board')).toBe(true);
-  expect(document.activeElement).toBe(tab('board'));
-});
-
-test('a page opened at #flow shows Flow, and following a #flow link switches to it', async () => {
+test('a page opened at #flow shows the Board view and keeps the hash', async () => {
   await mountPage(sample, '#flow');
-  expect(shows('flow')).toBe(true);
-
-  await settle(() => tab('board').click());
-  await settle(() => {
-    location.hash = '#flow';
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  });
-  expect(shows('flow')).toBe(true);
+  expect($('#panel-board')!.hidden).toBe(false);
+  expect($$('#panel-board article').length).toBeGreaterThan(0);
+  expect(location.hash).toBe('#flow');
 });
 
 test('data pushed over /api/events replaces the board, and the open stream stops the polling', async () => {
@@ -160,22 +126,22 @@ test("the lost server's banner closes, and the next failure after the server ans
 const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));
 
 test('new data keeps focus and the <details> the user opened', async () => {
-  await mountPage(fresh, '#flow');
-  const loose = $<HTMLDetailsElement>('#flow-loose')!;
-  expect(loose.open).toBe(false);
+  await mountPage(fresh);
+  const done = $<HTMLDetailsElement>('#done-list')!;
+  expect(done.open).toBe(false);
   await settle(() => {
-    loose.open = true;
-    loose.dispatchEvent(new Event('toggle'));
+    done.open = true;
+    done.dispatchEvent(new Event('toggle'));
   });
-  tab('flow').focus();
+  $('.add-item')!.focus();
 
   await push({ ...fresh, items: [...fresh.items].reverse() });
-  expect($<HTMLDetailsElement>('#flow-loose')!.open).toBe(true);
-  expect(document.activeElement).toBe(tab('flow'));
+  expect($<HTMLDetailsElement>('#done-list')!.open).toBe(true);
+  expect(document.activeElement).toBe($('.add-item'));
 });
 
 test('new data keeps the item at the top of the window where it was', async () => {
-  await mountPage(fresh, '#flow');
+  await mountPage(fresh);
   // A layout of 40px rows, scrolled 400px down, so row 10 tops the window; a banner above adds 120px.
   vi.spyOn(Element.prototype, 'getClientRects').mockImplementation(() => [{}] as unknown as DOMRectList);
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {

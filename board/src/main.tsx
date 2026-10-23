@@ -5,8 +5,7 @@ import './styles.css';
 import { StrictMode } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { RouterProvider } from '@tanstack/react-router';
-import { router } from './app/router.tsx';
+import { App } from './app/App.tsx';
 import { startLiveData } from './app/live-data.ts';
 
 // The script holds the first paint (vite.config.ts), so render now, not in a later task: the first
@@ -15,7 +14,7 @@ const root = createRoot(document.getElementById('app')!);
 flushSync(() =>
   root.render(
     <StrictMode>
-      <RouterProvider router={router} />
+      <App />
     </StrictMode>,
   ),
 );

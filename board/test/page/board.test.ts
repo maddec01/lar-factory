@@ -78,7 +78,7 @@ test('List and Done rows show one pill per label instead of the kind pill', asyn
 
 test("a build's slices show no Status of their own", async () => {
   await mountPage();
-  expect(card('PVTI_sample13').querySelector('.o-status, .sub-status, [data-anchor^="PVTI_slice"]')).toBeNull();
+  expect(card('PVTI_sample13').querySelector('.sub-status, [data-anchor^="PVTI_slice"]')).toBeNull();
 });
 
 const builtIssue = rawIssue('PVTI_build', 59, 'In progress', ['improvement', 'build'], {

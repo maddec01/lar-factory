@@ -64,15 +64,13 @@ test('a new notice replaces the last, and its close button closes it', async () 
 });
 
 test('View item shows the item on the Board, opens its List group, moves focus to it and closes the toast', async () => {
-  await mountPage(sample, '#flow');
+  await mountPage();
   await settle(() => $<HTMLDetailsElement>('#list-server')!.querySelector('summary')!.click());
   // jsdom fires the toggle event on a timer.
   await settle(() => vi.advanceTimersByTime(0));
   expect($<HTMLDetailsElement>('#list-server')!.open).toBe(false);
   await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
   await settle(() => toast()!.querySelector<HTMLButtonElement>('.view-item')!.click());
-  expect(location.hash).toBe('');
-  expect($('#panel-board')!.hidden).toBe(false);
   expect($<HTMLDetailsElement>('#list-server')!.open).toBe(true);
   const row = $('#list [data-anchor="PVTI_sample01"]')!;
   expect(row.scrollIntoView).toHaveBeenCalled();

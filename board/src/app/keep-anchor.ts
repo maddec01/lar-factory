@@ -7,7 +7,7 @@ type Anchor = { keys: string[]; index: number; tops: number[] };
 
 let held: Anchor | null = null;
 
-/** The items on screen in page order: hidden panels and closed groups have no boxes. */
+/** The items on screen in page order: items in closed groups have no boxes. */
 function anchorElements(): { keys: string[]; els: HTMLElement[] } {
   const els = [...document.querySelectorAll<HTMLElement>('[data-anchor]')].filter((el) => el.getClientRects().length > 0);
   return { keys: anchorKeys(els.map((el) => el.dataset.anchor!)), els };

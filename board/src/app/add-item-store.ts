@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { validateDraft } from '../add-item.ts';
 import type { CreationResult, ItemDraft } from '../add-item.ts';
 import type { BoardData } from '../model.ts';
+import { writeHeaders } from './board-app.ts';
 import { useBoardStore } from './board-store.ts';
 import { notify } from './notices.tsx';
 
@@ -71,7 +72,7 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
     // A poll that started before this write would bring older data than its answer.
     useBoardStore.getState().beginWrite();
     try {
-      const response = await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const response = await fetch('/api/items', { method: 'POST', headers: writeHeaders(),
         body: JSON.stringify(attempt) });
       const result = await response.json() as CreationResult & { board?: BoardData };
       if (result.item && result.board) {

@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { renderPage } from '../src/page.ts';
 import { DEFAULT_UI } from '../src/ui-state.ts';
 import { formatTokens, formatUsd } from '../src/format.ts';
-import { abandonPrompt, answeredRecheck, recheckAnswer, renderAbandonDialog, renderAddItemForm, renderApp, renderBoardView, renderHeader } from '../src/render.ts';
+import { abandonPrompt, answeredRecheck, recheckAnswer, renderAbandonDialog, renderApp, renderBoardView, renderHeader } from '../src/render.ts';
 import type { ItemAction, RenderOptions } from '../src/render.ts';
 import type { BoardData, ModelGroup } from '../src/model.ts';
 import { normalizeItems } from '../src/github.ts';
@@ -155,20 +155,6 @@ test("a build's popover stays open across a re-render", () => {
   assert.match(card('PVTI_build'), /<div class="slices open" data-slices="PVTI_build">/);
   assert.match(slicePopover(card('PVTI_other')).trigger, /aria-expanded="false"/);
   assert.match(card(), /<div class="slices" data-slices="PVTI_build">/);
-});
-
-test('capture form uses configured repositories and explains empty applicability selections', () => {
-  const html = renderAddItemForm({ ...sample, repos: [
-    ...sample.repos, { repo: 'maddec01/mux-factory', platform: 'Factory', role: 'The factory' },
-  ] });
-  for (const text of ['Server', 'Apple', 'Factory', 'bug', 'feature', 'improvement', 'app: books', 'os: watchos',
-    'area: server', 'area: web', 'No apps selected means all apps.', 'No OSes selected means all OSes.',
-    'Selecting neither means both server and web.']) assert.ok(html.includes(text), text);
-  assert.match(html, /<label for="item-title">Title/);
-  assert.match(html, /id="item-title"[^>]*required/);
-  assert.match(html, /<label for="item-description">Description/);
-  assert.match(html, /role="status"/);
-  assert.ok(!html.includes('data-applicability="maddec01/mux-factory"'));
 });
 
 test('entered titles round-trip through bootstrap JSON without closing its script element', () => {

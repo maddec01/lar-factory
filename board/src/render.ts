@@ -17,7 +17,6 @@ import {
 } from './model.ts';
 import type { BoardData, ToolMissing, ToolProblem, Item, LinkedPr, ModelChoice, StartedThread, Status, UpdateStep } from './model.ts';
 import { highlightedChoice } from './start-menu.ts';
-import { applicability, ITEM_KINDS } from './add-item.ts';
 import { ago, clock, day, esc, plural, slug } from './format.ts';
 import type { UiState, View } from './ui-state.ts';
 import { BRAND_MARK } from './brand-mark.ts';
@@ -507,33 +506,6 @@ export function renderAbandonDialog(): string {
 <div class="form-heading"><h2 id="abandon-heading"></h2></div>
 <p class="form-hint" id="abandon-detail"></p>
 <div class="form-actions"><button type="button" class="copy" data-abandon-cancel autofocus>Cancel</button><button type="button" class="copy abandon" data-abandon-confirm></button></div>
-</dialog>`;
-}
-
-/** A stable dialog outside the board's polling render area. */
-export function renderAddItemForm(data: BoardData): string {
-  const groups = data.repos.map((repo, index) => {
-    const choices = applicability(repo.platform);
-    if (!choices.length) return '';
-    return `<div data-applicability="${esc(repo.repo)}"${index ? ' hidden' : ''}>${choices.map((group, g) =>
-      `<fieldset class="applicability" aria-describedby="item-hint-${index}-${g}"><legend>${esc(group.title)}</legend>
-<div class="choices">${group.labels.map((label) => `<label><input type="checkbox" name="labels" value="${esc(label)}"${index ? ' disabled' : ''}> ${esc(label)}</label>`).join('')}</div>
-<p class="form-hint" id="item-hint-${index}-${g}">${esc(group.hint)}</p></fieldset>`).join('')}</div>`;
-  }).join('');
-  return `<dialog id="add-item-dialog" aria-labelledby="add-item-heading">
-<form id="add-item-form" novalidate>
-<div class="form-heading"><h2 id="add-item-heading">Add item</h2><button type="button" class="copy" data-close-item>Close</button></div>
-<p class="form-hint">Create an issue in ${esc(data.project.title)} and add it to List.</p>
-<fieldset id="item-fields" class="item-fields">
-<div class="form-pair"><div class="form-field"><label for="item-repo">Repository</label><select id="item-repo" name="repo" required>${data.repos.map((r) => `<option value="${esc(r.repo)}">${esc(r.platform)}</option>`).join('')}</select></div>
-<div class="form-field"><label for="item-kind">Kind</label><select id="item-kind" name="kind" required><option value="">Choose a kind</option>${ITEM_KINDS.map((kind) => `<option value="${kind}">${kind}</option>`).join('')}</select></div></div>
-${groups}
-<div class="form-field"><label for="item-title">Title <span class="required-note">(required)</span></label><input id="item-title" name="title" required maxlength="256" autocomplete="off"></div>
-<div class="form-field"><label for="item-description">Description <span class="required-note">(optional)</span></label><textarea id="item-description" name="description" rows="4" maxlength="65536"></textarea></div>
-</fieldset>
-<div id="item-result" role="status" aria-live="polite" aria-atomic="true"></div>
-<div class="form-actions"><button type="submit" class="copy submit-item" id="item-submit">Add to List</button><button type="button" class="copy" id="item-new" hidden>Start a new item</button></div>
-</form>
 </dialog>`;
 }
 

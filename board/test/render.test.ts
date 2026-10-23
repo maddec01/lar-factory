@@ -531,6 +531,22 @@ test('Back to List, Abandon and Start each show only their own pending state', (
   assert.ok(!otherError.includes('<p class="start">') && !otherError.includes('action-error'), 'a card shows no inline error');
 });
 
+test('item stats sit in their own last row on a card; on a Queued card the actions row comes after it', () => {
+  const stats = { agentMs: 20 * 60_000, wallMs: 30 * 60_000, tokens: 1_200 };
+  const html = renderBoardView({ ...sample, items: sample.items.map((i) => (i.id === 'PVTI_sample05' || i.status === 'In progress' ? { ...i, stats } : i)) }, base);
+  const queued = cardOf(html, 'PVTI_sample05');
+  assert.match(queued, /<p class="card-stats"><span class="stats"[^>]*>.*<\/span><\/p><div class="card-actions">.*<\/div>\n<\/article>/s, 'stats row first, actions row last');
+  assert.ok(!/<p class="foot">[^]*class="stats"/.test(queued.replace(/<p class="card-stats">[^]*/, '')), 'no stats on the foot line');
+  const statsCards = html.split('<article').filter((c) => c.includes('class="card') && c.includes('class="stats"') && !c.includes('card-actions'));
+  assert.ok(statsCards.length > 0);
+  for (const c of statsCards) {
+    assert.match(c, /<p class="card-stats">.*<\/p>\n<\/article>/s, 'the stats row is the card\'s last element');
+    assert.ok(!/<p class="foot">(?:(?!<\/p>).)*class="stats"/s.test(c), 'the foot line holds no stats');
+  }
+  const unavailable = renderBoardView({ ...sample, items: sample.items.map((i) => (i.status === 'In progress' ? { ...i, stats: 'unavailable' as const } : i)) }, base);
+  assert.match(unavailable, /<p class="card-stats"><span class="stats"[^>]*>stats unavailable<\/span><\/p>\n<\/article>/);
+});
+
 test('a Queued card whose Start is pending, uncertain or done shows no footer actions', () => {
   const card = (data: typeof sample, action?: ItemAction) =>
     cardOf(renderBoardView(data, { ...base, actions: action ? { PVTI_sample05: action } : {} }), 'PVTI_sample05');

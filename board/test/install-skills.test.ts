@@ -354,7 +354,7 @@ function entries(home: string, name: string): Record<string, string> {
   }));
 }
 
-/** Mirrors install.sh's check_references: every `../` path in a profile's skills, taken literally, names a file. */
+/** Every `../` path in a profile's skills, taken literally, names a file. */
 function assertChecklistsResolve(home: string, name: string): void {
   const skills = join(home, name, 'skills');
   let count = 0;
@@ -452,7 +452,7 @@ test('a first install adopts links to the right skill folder and replaces the pr
   mkdirSync(join(home, '.claude/skills'), { recursive: true });
   symlinkSync(join(home, '.agents/skills/tdd'), join(home, '.claude/skills/tdd'));
   mkdirSync(join(home, '.claude/references'));
-  writeFileSync(join(home, '.claude/references/old.md'), 'from install.sh');
+  writeFileSync(join(home, '.claude/references/old.md'), 'from an older install');
 
   const result = installSkills(home, bundle(t, linked), '1.0.0');
 
@@ -503,7 +503,7 @@ test('a link to the right skill folder is adopted whenever a profile is linked',
   const home = temporary(t);
   profile(home, '.claude');
   installSkills(home, bundle(t, linked), '1.0.0');
-  // As sync-claude-skills.ts links skills into a profile made after the first install.
+  // A profile made after the first install.
   mkdirSync(join(home, '.claude-later/skills'), { recursive: true });
   symlinkSync(join(home, '.agents/skills/tdd'), join(home, '.claude-later/skills/tdd'));
 

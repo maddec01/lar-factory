@@ -178,7 +178,7 @@ export function isProfileName(name: string): boolean {
  * Gives a profile a relative link per skill and a fresh checklist copy, and removes its links to skills no
  * longer installed. A link that already points at the right skill folder is adopted. Any other path the engine
  * didn't make is a conflict and stays, except `references/`: with `adopt`, the engine replaces whatever is there
- * with its checklist copy, as scripts/install.sh does.
+ * with its checklist copy.
  */
 function linkProfile(home: string, name: string, state: ProfileState, skills: string[], adopt: boolean, conflicts: string[]): ProfileState {
   const folder = join(home, name, 'skills');

@@ -56,10 +56,6 @@ jobs:
         working-directory: board
         run: pnpm run typecheck
 
-      - name: Install script tests
-        if: ${{ !cancelled() }}
-        run: bash scripts/install.test.sh
-
       - name: Worktree setup tests
         if: ${{ !cancelled() }}
         run: bash scripts/setup-worktree.test.sh

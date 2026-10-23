@@ -10,10 +10,10 @@ import * as Scope from "effect/Scope";
 import * as BoardServer from "./BoardServer.ts";
 
 const fakeBoard = NodePath.resolve(import.meta.dirname, "../../test/fake-board.mjs");
-const boardDir = NodePath.resolve(import.meta.dirname, "../../../board");
+const appDir = NodePath.resolve(import.meta.dirname, "../..");
 
 const fakeConfig = (env: Record<string, string>): BoardServer.StartConfig => ({
-  ...BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env: { ...process.env, ...env }, secret: "test-secret" }),
+  ...BoardServer.makeStartConfig({ ...BoardServer.locate(appDir), executablePath: process.execPath, env: { ...process.env, ...env }, secret: "test-secret" }),
   args: [fakeBoard],
 });
 
@@ -26,11 +26,28 @@ const isRunning = (pid: number) => {
   }
 };
 
+describe("locate", () => {
+  it("finds board/ and config.json beside the app/ checkout in development", () => {
+    assert.deepStrictEqual(BoardServer.locate("/repo/app"), {
+      boardDir: "/repo/board",
+      configFile: "/repo/config.json",
+    });
+  });
+
+  it("finds the bundled board/ and config.json in the packaged app's Resources", () => {
+    assert.deepStrictEqual(BoardServer.locate("/Applications/Board.app/Contents/Resources/app.asar"), {
+      boardDir: "/Applications/Board.app/Contents/Resources/board",
+      configFile: "/Applications/Board.app/Contents/Resources/config.json",
+    });
+  });
+});
+
 describe("makeStartConfig", () => {
-  it("runs board/src/server.ts with the given executable in Node mode and the launch secret", () => {
+  it("runs board/src/server.ts with the given executable in Node mode, the config file and the launch secret", () => {
     const config = BoardServer.makeStartConfig({
       executablePath: "/Applications/Board.app/Contents/MacOS/Board",
       boardDir: "/repo/board",
+      configFile: "/repo/config.json",
       env: { PATH: "/usr/bin", ELECTRON_RUN_AS_NODE: "0" },
       secret: "launch-secret",
     });
@@ -38,7 +55,12 @@ describe("makeStartConfig", () => {
       executablePath: "/Applications/Board.app/Contents/MacOS/Board",
       args: ["--disable-warning=ExperimentalWarning", "/repo/board/src/server.ts"],
       cwd: "/repo/board",
-      env: { PATH: "/usr/bin", ELECTRON_RUN_AS_NODE: "1", BOARD_APP_SECRET: "launch-secret" },
+      env: {
+        PATH: "/usr/bin",
+        ELECTRON_RUN_AS_NODE: "1",
+        BOARD_CONFIG_FILE: "/repo/config.json",
+        BOARD_APP_SECRET: "launch-secret",
+      },
     });
   });
 });
@@ -91,8 +113,8 @@ describe("start", () => {
   it.live("starts the real board in sample mode, guarding writes with the launch secret", () =>
     Effect.gen(function* () {
       const config = BoardServer.makeStartConfig({
+        ...BoardServer.locate(appDir),
         executablePath: process.execPath,
-        boardDir,
         env: {
           ...process.env,
           BOARD_DATA_FILE: "test/sample.json",

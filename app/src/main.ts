@@ -114,10 +114,14 @@ const program = Effect.gen(function* () {
     board.window.focus();
   });
   yield* board.showStarting;
-  const boardDir = NodePath.resolve(Electron.app.getAppPath(), "../board");
   // Read once: a restarted server keeps the PATH the first one got.
   const env = yield* ShellEnvironment.childEnvironment(process.env);
-  const config = BoardServer.makeStartConfig({ executablePath: process.execPath, boardDir, env, secret });
+  const config = BoardServer.makeStartConfig({
+    ...BoardServer.locate(Electron.app.getAppPath()),
+    executablePath: process.execPath,
+    env,
+    secret,
+  });
   // Quitting closes the scope, which stops the server or cancels a pending restart.
   yield* BoardSupervisor.supervise(BoardServer.start(config), board.events).pipe(Effect.forkScoped);
   yield* quitRequested;

@@ -43,21 +43,36 @@ export class BoardServerError extends Data.TaggedError("BoardServerError")<{
   readonly message: string;
 }> {}
 
+/** Where the board's files sit beside the app: in the checkout, or in the packaged app's Resources. */
+export interface BoardLocation {
+  readonly boardDir: string;
+  readonly configFile: string;
+}
+
+/**
+ * Finds `board/` and `config.json` next to `appPath`, Electron's app path. In
+ * development that is `app/` in the checkout; packaged, it is `Resources/app.asar`,
+ * and the package puts the board's files and `config.json` in `Resources/`.
+ */
+export const locate = (appPath: string): BoardLocation => ({
+  boardDir: NodePath.resolve(appPath, "../board"),
+  configFile: NodePath.resolve(appPath, "../config.json"),
+});
+
 /**
  * Runs `boardDir/src/server.ts` with `executablePath` in Node mode. In the app that
  * is the Electron binary, whose Node strips the types, so the server runs as source.
- * The server refuses guarded writes that don't carry `secret`.
+ * The server reads `configFile` and refuses guarded writes that don't carry `secret`.
  */
-export const makeStartConfig = (input: {
+export const makeStartConfig = (input: BoardLocation & {
   readonly executablePath: string;
-  readonly boardDir: string;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly secret: string;
 }): StartConfig => ({
   executablePath: input.executablePath,
   args: ["--disable-warning=ExperimentalWarning", NodePath.join(input.boardDir, "src/server.ts")],
   cwd: input.boardDir,
-  env: { ...input.env, ELECTRON_RUN_AS_NODE: "1", BOARD_APP_SECRET: input.secret },
+  env: { ...input.env, ELECTRON_RUN_AS_NODE: "1", BOARD_CONFIG_FILE: input.configFile, BOARD_APP_SECRET: input.secret },
 });
 
 /**

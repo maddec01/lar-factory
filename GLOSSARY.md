@@ -229,3 +229,17 @@ _Avoid_: reference, reference file
 **Claude profile**:
 One Claude Code config folder (`~/.claude` or a `~/.claude-*` folder) with its own login and its own skills.
 _Avoid_: Claude instance, config dir
+
+### Releases
+
+**Release**:
+A published version of the board app, made by CI from a commit on main whose checks passed.
+_Avoid_: build, version
+
+**Nightly**:
+A Release marked as a prerelease, published for every merge to main whose checks pass; the name comes from T3 Code.
+_Avoid_: nightly build, preview
+
+**Stable Release**:
+A Release Pedro publishes by hand from the latest Nightly's commit, which the app's latest channel follows.
+_Avoid_: production release

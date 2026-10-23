@@ -225,9 +225,9 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .update-log { margin: 6px 0 0; max-height: 14em; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .update-hint { margin: 6px 0 0; }
 .update-hint code { overflow-wrap: anywhere; }
-#add-item-dialog, #abandon-dialog { width: min(520px, calc(100% - 34px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); color: var(--fg); overflow: auto; margin: auto; }
-/* The Add item and Abandon dialogs are Base UI's: a fixed popup over a backdrop element, not a native <dialog>. */
-#add-item-dialog, #abandon-dialog { position: fixed; inset: 0; z-index: 50; height: fit-content; }
+#add-item-dialog, #abandon-dialog, #settings-dialog { width: min(520px, calc(100% - 34px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--bd); border-radius: var(--r); background: var(--surface); color: var(--fg); overflow: auto; margin: auto; }
+/* The Add item, Abandon and Settings dialogs are Base UI's: a fixed popup over a backdrop element, not a native <dialog>. */
+#add-item-dialog, #abandon-dialog, #settings-dialog { position: fixed; inset: 0; z-index: 50; height: fit-content; }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 40%); }
 /* In the Mac app the dialogs open below its 52 px title bar, and neither they nor the backdrop drag the window. */
 :root:has(.title-bar) :is(#add-item-dialog, #abandon-dialog) { top: 52px; max-height: calc(100dvh - 52px - 32px); }
@@ -241,20 +241,24 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .item-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-field { display: grid; gap: 4px; margin-bottom: 12px; }
-.form-field > label, .applicability legend { font-weight: 600; }
-.applicability legend { padding: 0 2px; }
+.form-field > label, .applicability legend, .profiles legend { font-weight: 600; }
+.applicability legend, .profiles legend { padding: 0 2px; }
 .required-note { color: var(--muted); font-weight: 400; font-size: 12px; }
 .form-field input, .form-field select, .form-field textarea { width: 100%; min-width: 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--input); border-radius: var(--r-control); padding: 6px 8px; }
 .form-field textarea { resize: vertical; min-height: 80px; }
-.applicability { margin: 0 0 10px; padding: 8px 10px 0; border: 1px solid var(--bd); border-radius: 6px; min-width: 0; }
+.applicability, .profiles { margin: 0 0 10px; padding: 8px 10px 0; border: 1px solid var(--bd); border-radius: 6px; min-width: 0; }
 .choices { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .choices label { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; }
 .choices input { accent-color: var(--focus); margin: 3px 3px 3px 4px; }
 .submit-item { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); min-height: 32px; padding: 0 11px; }
 button:disabled { opacity: 0.6; cursor: wait; }
 button:disabled[title] { cursor: not-allowed; }
-#item-result:not(:empty) { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--you); border-radius: 6px; background: var(--you-soft); overflow-wrap: anywhere; white-space: pre-line; }
+#item-result:not(:empty), #settings-result:not(:empty) { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--you); border-radius: 6px; background: var(--you-soft); overflow-wrap: anywhere; white-space: pre-line; }
 #item-result a { display: block; margin-top: 4px; }
+#settings-result ul { margin: 4px 0 0; padding-left: 18px; white-space: normal; }
+#settings-result[data-tone="warning"] { border-color: color-mix(in srgb, var(--warning) 32%, transparent); }
+#settings-result[data-tone="success"] { border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
+#settings-result[data-tone="error"] { border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); color: var(--danger-text); }
 
 /* notices: a close button on every failure, and successes as toasts that clear themselves */
 .dismiss { float: right; margin: -3px -6px 0 8px; width: 24px; height: 24px; border: 0; border-radius: var(--r-control); background: none; color: var(--muted); font: 16px/1 var(--font-sans); cursor: pointer; }
@@ -303,6 +307,7 @@ button:disabled[title] { cursor: not-allowed; }
 .abandon { color: var(--danger-text); }
 .abandon:hover { border-color: var(--danger-text); }
 .copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
+.profiles input[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .start { margin: 0; font-size: 12px; }
 p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
 .started-tag { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-fg); font-weight: 500; }

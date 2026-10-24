@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { apiCost, createOverrideRateTable, lookupRate, parseRateTable, priceUsage, resolveModelAliases } from './usage-pricing.ts';
 import type { Pricing } from './usage-pricing.ts';
-import type { UsageRecord, UsageSpeed } from './transcript-usage.ts';
+import type { UsageRecord, UsageSpeed } from './usage-record.ts';
 
 const rate = (input: number, cacheRead?: number) => ({
   input_cost_per_token: input,

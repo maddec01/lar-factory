@@ -18,7 +18,8 @@ import { readT3Settings } from '../t3/t3-settings.ts';
 import type { InstanceHome, T3Settings, TranscriptDriver } from '../t3/t3-settings.ts';
 import { agentTime } from './agent-time.ts';
 import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens } from './transcript-usage.ts';
-import type { SessionRecordsReader, UsageRecord, UsageSpeed } from './transcript-usage.ts';
+import type { SessionRecordsReader } from './transcript-usage.ts';
+import type { UsageRecord, UsageSpeed } from './usage-record.ts';
 import { apiCost, createOverrideRateTable, parseRateTable, resolveModelAliases } from './usage-pricing.ts';
 import type { Pricing } from './usage-pricing.ts';
 

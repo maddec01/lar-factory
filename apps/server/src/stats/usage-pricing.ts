@@ -7,7 +7,7 @@
 //   `#mapModel`), applied before a record is priced.
 // Pure: item-stats.ts reads the rate table, and t3/t3-settings.ts T3's settings.
 
-import type { UsageRecord, UsageSpeed, UsageTokenTotals } from './transcript-usage.ts';
+import type { UsageRecord, UsageSpeed, UsageTokenTotals } from './usage-record.ts';
 
 interface TokenRates {
   inputCostPerToken: number;

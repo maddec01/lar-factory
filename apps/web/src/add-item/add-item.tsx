@@ -3,10 +3,11 @@
 
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Dialog } from '@base-ui/react/dialog';
 import { applicability, ITEM_KINDS } from '@mux-factory/shared';
 import type { RepoConfig } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle, DialogTrigger } from '@mux-factory/ui/dialog';
+import { KeptMountedDialogPopup } from '@mux-factory/ui/kept-mounted-dialog-popup';
 import { FormResult } from '../notices/form-result.tsx';
 import { useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
@@ -51,49 +52,50 @@ function AddItemForm() {
     });
   };
   return (
-    <form id="add-item-form" noValidate aria-busy={phase === 'pending'} onSubmit={onSubmit} onInput={edit}>
-      <div className="form-heading">
-        <Dialog.Title id="add-item-heading">Add item</Dialog.Title>
-        <Dialog.Close render={<Button variant="outline" size="xs" />} data-close-item>Close</Dialog.Close>
-      </div>
-      <p className="form-hint">Create an issue in {data.project.title} and add it to List.</p>
-      <fieldset id="item-fields" className="item-fields" disabled={locked}>
-        <div className="form-pair">
+    <form id="add-item-form" className="flex min-h-0 flex-col" noValidate aria-busy={phase === 'pending'} onSubmit={onSubmit} onInput={edit}>
+      <DialogHeader>
+        <DialogTitle id="add-item-heading">Add item</DialogTitle>
+        <DialogDescription>Create an issue in {data.project.title} and add it to List.</DialogDescription>
+      </DialogHeader>
+      <DialogPanel>
+        <fieldset id="item-fields" className="item-fields" disabled={locked}>
+          <div className="form-pair">
+            <div className="form-field">
+              <label htmlFor="item-repo">Repository</label>
+              {/* Uncontrolled and read on input: the form's onInput re-renders before the select's change
+                  event, and a controlled select would be set back to the old repo. */}
+              <select id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}>
+                {data.repos.map((r) => <option value={r.repo} key={r.repo}>{r.platform}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label htmlFor="item-kind">Kind</label>
+              <select id="item-kind" name="kind" required defaultValue="">
+                <option value="">Choose a kind</option>
+                {ITEM_KINDS.map((kind) => <option value={kind} key={kind}>{kind}</option>)}
+              </select>
+            </div>
+          </div>
+          {/* Keyed by repo, so another repo's groups start unchecked. */}
+          {selected && <Applicability repo={selected} key={selected.repo} />}
           <div className="form-field">
-            <label htmlFor="item-repo">Repository</label>
-            {/* Uncontrolled and read on input: the form's onInput re-renders before the select's change
-                event, and a controlled select would be set back to the old repo. */}
-            <select id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}>
-              {data.repos.map((r) => <option value={r.repo} key={r.repo}>{r.platform}</option>)}
-            </select>
+            <label htmlFor="item-title">Title <span className="required-note">(required)</span></label>
+            <input id="item-title" name="title" required maxLength={256} autoComplete="off" />
           </div>
           <div className="form-field">
-            <label htmlFor="item-kind">Kind</label>
-            <select id="item-kind" name="kind" required defaultValue="">
-              <option value="">Choose a kind</option>
-              {ITEM_KINDS.map((kind) => <option value={kind} key={kind}>{kind}</option>)}
-            </select>
+            <label htmlFor="item-description">Description <span className="required-note">(optional)</span></label>
+            <textarea id="item-description" name="description" rows={4} maxLength={65536} />
           </div>
-        </div>
-        {/* Keyed by repo, so another repo's groups start unchecked. */}
-        {selected && <Applicability repo={selected} key={selected.repo} />}
-        <div className="form-field">
-          <label htmlFor="item-title">Title <span className="required-note">(required)</span></label>
-          <input id="item-title" name="title" required maxLength={256} autoComplete="off" />
-        </div>
-        <div className="form-field">
-          <label htmlFor="item-description">Description <span className="required-note">(optional)</span></label>
-          <textarea id="item-description" name="description" rows={4} maxLength={65536} />
-        </div>
-      </fieldset>
-      <Result message={message} />
-      <div className="form-actions">
+        </fieldset>
+        <Result message={message} />
+      </DialogPanel>
+      <DialogFooter>
         <Button type="submit" id="item-submit"
           disabled={phase === 'pending' || phase === 'uncertain' || data.capture?.enabled === false}>
           {phase === 'pending' ? 'Adding…' : phase === 'retry' ? 'Retry this submission' : 'Add to List'}
         </Button>
         <Button variant="outline" size="xs" id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>New item</Button>
-      </div>
+      </DialogFooter>
     </form>
   );
 }
@@ -101,15 +103,12 @@ function AddItemForm() {
 export function AddItem() {
   const { draft, open, setOpen } = useAddItemStore();
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger className="add-item" render={<Button variant="outline" size="xs" />}>Add item</Dialog.Trigger>
-      <Dialog.Portal keepMounted>
-        <Dialog.Backdrop className="dialog-backdrop" />
-        <Dialog.Popup id="add-item-dialog" initialFocus={() => document.getElementById('item-repo')}>
-          {/* A new draft remounts the form, which clears its fields. */}
-          <AddItemForm key={draft} />
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger className="add-item" render={<Button variant="outline" size="xs" />}>Add item</DialogTrigger>
+      <KeptMountedDialogPopup id="add-item-dialog" initialFocus={() => document.getElementById('item-repo')}>
+        {/* A new draft remounts the form, which clears its fields. */}
+        <AddItemForm key={draft} />
+      </KeptMountedDialogPopup>
+    </Dialog>
   );
 }

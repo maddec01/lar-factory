@@ -2,7 +2,7 @@
 // The bridge stands in for the app's preload; without it the page has no Settings.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight } from '../../test/support.ts';
+import { $, $$, addStylesheet, answerRestart, mountPage, settle, stubApp } from '../../test/support.ts';
 import type { ProfilesResult, UpdateChannel, UpdateState } from '@mux-factory/shared';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
@@ -31,7 +31,7 @@ async function open(): Promise<void> {
   await settle(() => vi.advanceTimersByTime(50));
 }
 
-const closeButton = () => [...document.querySelectorAll<HTMLButtonElement>('#settings-dialog button')].find((button) => button.textContent === 'Close')!;
+const closeButton = () => $<HTMLButtonElement>('#settings-dialog button[aria-label="Close"]')!;
 const dialogText = () => $('#settings-dialog')!.textContent!;
 
 test('a browser without the app has no Settings', async () => {
@@ -51,13 +51,19 @@ test('Settings lists every Claude profile with its tick', async () => {
   expect([result().getAttribute('role'), result().dataset.slot]).toEqual(['status', 'alert']);
 });
 
-test('the dialog opens below the title bar and drags nothing', async () => {
+test('the dialog opens centred on T3\'s backdrop and glass panel, and nothing over the title bar drags', async () => {
   stubBridge();
   await open();
   const { noDrag } = addStylesheet();
   const dialog = $('#settings-dialog')!;
-  expect(parseFloat(getComputedStyle(dialog).top)).toBeGreaterThanOrEqual(titleBarHeight());
-  expect(noDrag(dialog)).toBe(true);
+  const viewport = dialog.closest('[data-slot="dialog-viewport"]')!;
+  const backdrop = $('[data-slot="dialog-backdrop"]')!;
+  // jsdom has no layout: the viewport's middle grid row centres the popup.
+  expect(viewport.className).toContain('grid-rows-[1fr_auto_1fr]');
+  expect(dialog.classList).toContain('row-start-2');
+  expect(dialog.classList).toContain('dialog-glass');
+  expect(backdrop.classList).toContain('dialog-backdrop');
+  expect([dialog, viewport, backdrop].map(noDrag)).toEqual([true, true, true]);
 });
 
 test('ticking a profile installs it and shows the new ticks', async () => {

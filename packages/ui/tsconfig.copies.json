@@ -1,5 +1,6 @@
 // The Copies keep T3's imports, extensionless and through `~` for src/, which need Bundler resolution
-// (as in T3's apps/web/tsconfig.json). The board's own files stay on tsconfig.json. The other options
+// (as in T3's apps/web/tsconfig.json). So do the board's components built from them, in src/dialog, which
+// load the Copies. The board's other files stay on tsconfig.json. The other options
 // match apps/web's, which type-checks the Copies it imports the same way (docs/adr/0016).
 {
   "compilerOptions": {
@@ -19,5 +20,5 @@
     "skipLibCheck": true,
     "paths": { "~/*": ["./src/*"] }
   },
-  "include": ["src/components/ui"]
+  "include": ["src/components/ui", "src/dialog"]
 }

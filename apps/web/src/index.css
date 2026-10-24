@@ -3,6 +3,7 @@
 @import "@mux-factory/ui/styles.css";
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
+@source "./add-item/add-item.tsx";
 @source "./notices/banner.tsx";
 @source "./notices/form-result.tsx";
 @source "./title-bar/TitleBar.tsx";
@@ -12,7 +13,7 @@
 
 /* Full browser width, with T3's workspace gutter. */
 #app { padding: 14px 20px 48px; }
-/* Tailwind's base styles take links' underline, headings' weight, the checkboxes' margin, a legend's padding and a dialog's centring; these put back the browser's. */
+/* Tailwind's base styles take links' underline, headings' weight, the checkboxes' margin and a legend's padding; these put back the browser's. */
 a { color: inherit; text-decoration: underline; }
 a:hover { text-decoration-thickness: 2px; }
 code { font: 12px var(--font-mono); }
@@ -127,19 +128,6 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 
 
 /* Capture form: stays mounted while the board refreshes. */
-#add-item-dialog, #abandon-dialog, #settings-dialog { width: min(520px, calc(100% - 34px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--popover); color: var(--foreground); overflow: auto; margin: auto; }
-/* The Add item, Abandon and Settings dialogs are Base UI's: a fixed popup over a backdrop element, not a native <dialog>. */
-#add-item-dialog, #abandon-dialog, #settings-dialog { position: fixed; inset: 0; z-index: 50; height: fit-content; }
-.dialog-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 40%); }
-/* The dialogs open below the 52 px title bar, in the Mac app and in a browser. In the Mac app neither they nor the
-   backdrop drag the window, so a control over the bar's height still takes clicks. */
-#add-item-dialog, #abandon-dialog, #settings-dialog { top: 52px; max-height: calc(100dvh - 52px - 32px); }
-#add-item-dialog, #abandon-dialog, #settings-dialog, .dialog-backdrop { -webkit-app-region: no-drag; }
-#abandon-dialog { width: min(420px, calc(100% - 34px)); }
-#abandon-heading { overflow-wrap: anywhere; }
-#abandon-dialog .form-actions { justify-content: flex-end; }
-.form-heading, .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.form-heading h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .form-hint { color: var(--muted-foreground); margin: 6px 0 12px; font-size: 12px; }
 .item-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

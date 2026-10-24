@@ -1,7 +1,7 @@
 // The Add item dialog: the form, its repo-dependent fields, and each phase of a submission.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
+import { $, $$, addStylesheet, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
 import type { BoardData } from '@mux-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [
@@ -183,10 +183,23 @@ test('sample mode disables adding and says so', async () => {
   expect(result().textContent).toBe('Adding items is disabled in sample mode.');
 });
 
+test('the dialog opens centred on T3\'s backdrop and glass panel, and nothing over the title bar drags', async () => {
+  await open();
+  const { noDrag } = addStylesheet();
+  const popup = dialog()!;
+  const viewport = popup.closest('[data-slot="dialog-viewport"]')!;
+  const backdrop = $('[data-slot="dialog-backdrop"]')!;
+  expect(viewport.className).toContain('grid-rows-[1fr_auto_1fr]');
+  expect(popup.classList).toContain('row-start-2');
+  expect(popup.classList).toContain('dialog-glass');
+  expect(backdrop.classList).toContain('dialog-backdrop');
+  expect([popup, viewport, backdrop].map(noDrag)).toEqual([true, true, true]);
+});
+
 test('Close returns focus to Add item, and reopening keeps a draft but not a finished item', async () => {
   await open();
   await enter(field('item-title'), 'Half written');
-  await settle(() => $<HTMLButtonElement>('[data-close-item]')!.click());
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(dialog()!.hidden).toBe(true);
   expect(document.activeElement).toBe(addButton());

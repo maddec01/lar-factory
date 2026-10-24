@@ -2,9 +2,9 @@
 // profile, which links the app's skills and checklists into it or removes them at once, and the
 // update channel with what the updater last found on it.
 
-import { Dialog } from '@base-ui/react/dialog';
 import { boardApp, type UpdateChannel, type UpdateState } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
+import { Dialog, DialogDescription, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '@mux-factory/ui/dialog';
 import { profilePath, useSettingsStore } from './settings-store.ts';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { FormResult } from '../notices/form-result.tsx';
@@ -96,21 +96,19 @@ export function Settings() {
   const { open, setOpen } = useSettingsStore();
   if (!boardApp()) return null;
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger className="open-settings" render={<Button variant="outline" size="xs" />}>Settings</Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="dialog-backdrop" />
-        <Dialog.Popup id="settings-dialog">
-          <div className="form-heading">
-            <Dialog.Title id="settings-heading">Settings</Dialog.Title>
-            <Dialog.Close render={<Button variant="outline" size="xs" />}>Close</Dialog.Close>
-          </div>
-          <p className="form-hint">Mux Factory links its skills and copies its checklists into each ticked profile.</p>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger className="open-settings" render={<Button variant="outline" size="xs" />}>Settings</DialogTrigger>
+      <DialogPopup id="settings-dialog">
+        <DialogHeader>
+          <DialogTitle id="settings-heading">Settings</DialogTitle>
+          <DialogDescription>Mux Factory links its skills and copies its checklists into each ticked profile.</DialogDescription>
+        </DialogHeader>
+        <DialogPanel>
           <Profiles />
           <UpdateChannelChoice />
           <Result />
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </DialogPanel>
+      </DialogPopup>
+    </Dialog>
   );
 }

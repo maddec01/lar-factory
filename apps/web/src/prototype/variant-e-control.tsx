@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowRight, ChevronDown, ChevronRight, Search, Settings, SquarePen, X } from 'lucide-react';
+import { ArrowRight, Search, Settings, SquarePen, X } from 'lucide-react';
 import { boardApp, boardSections, platformOf, shortAgo } from '@mux-factory/shared';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@mux-factory/ui/dialog';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
@@ -17,45 +17,13 @@ import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, STATUS_COLOR, WindowControls, drag, noDrag, platformColor } from './chrome.tsx';
 import { ActionButtons, PrList, SliceBar, SliceList, ItemTitle, StatsGrid, StepTrack, hint, refText } from './item-bits.tsx';
 import { ToolbarStats } from './toolbar-stats.tsx';
+import { SidebarItems } from './sidebar/sidebar-switcher.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
 const STATIONS: Status[] = ['Queued', 'Shaping', 'Ready', 'In progress', 'Review', 'Verify', 'Ready to merge'];
-const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
 const picked = (on: boolean) => (on ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : '');
 
-type Pick = { id: string | null; set: (id: string) => void };
-
-function Repo({ platform, repo, items, now, scoped, onScope, pick }: { platform: string; repo: string; items: Item[]; now: number; scoped: boolean; onScope: () => void; pick: Pick }) {
-  const [open, setOpen] = useState(true);
-  const live = items.filter((i) => i.status !== 'List' && i.status !== 'Done');
-  const you = items.filter((i) => YOURS.includes(i.status)).length;
-  return (
-    <div className="mb-1">
-      <div className={`flex h-8 items-center gap-1.5 rounded-md px-1.5 hover:bg-(--row-hover) ${scoped ? 'bg-(--row-active)' : ''}`}>
-        <button type="button" onClick={() => setOpen(!open)} className="grid size-4 place-items-center text-(--muted-foreground)">{open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}</button>
-        <button type="button" onClick={onScope} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <span className="grid size-5 place-items-center rounded-md text-[10px] font-bold text-white" style={{ background: platformColor(platform) }}>{platform[0]}</span>
-          <span className="truncate font-medium">{platform}</span>
-          <span className="truncate text-[11px] text-(--muted-foreground)">{repo.split('/')[1]}</span>
-        </button>
-        {you > 0 && <span className="rounded-full bg-(--warning) px-1.5 text-[10px] font-semibold text-black">{you}</span>}
-      </div>
-      {open && (
-        <div className="flex flex-col gap-px">
-          {live.map((i) => (
-            <button key={i.id} type="button" onClick={() => pick.set(i.id)}
-              className={`flex h-7 w-full items-center gap-2 rounded-md pl-8 pr-2 text-left hover:bg-(--row-hover) ${pick.id === i.id ? 'bg-(--row-active) font-medium' : ''}`}>
-              <StatusGlyph status={i.status} className="size-3" />
-              <span className={`min-w-0 flex-1 truncate ${pick.id === i.id ? '' : 'text-(--muted-foreground)'}`}><ItemTitle item={i} /></span>
-              <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-(--muted-foreground)">{shortAgo(i.updatedAt, now)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
+import type { Pick } from './sidebar/sidebar-data.ts';
 
 function DeskCard({ item, data, now, pick }: { item: Item; data: BoardData; now: number; pick: Pick }) {
   return (
@@ -184,8 +152,6 @@ function Update() {
   );
 }
 
-const matches = (item: Item, q: string) => !q || `${item.title} ${refText(item)}`.toLowerCase().includes(q);
-
 export function VariantE() {
   const { data, now } = useBoardStore();
   const [platform, setPlatform] = useState<string | null>(null);
@@ -225,14 +191,7 @@ export function VariantE() {
           ) : (
             <>
               <div className="px-2 pb-2"><SearchRow query={query} onQuery={setQuery} /></div>
-              <nav className="min-h-0 flex-1 overflow-y-auto px-2">
-                {data.repos.map((r) => {
-                  const items = data.items.filter((i) => platformOf(i, data.repos) === r.platform && matches(i, q));
-                  if (q && !items.some((i) => i.status !== 'List' && i.status !== 'Done')) return null;
-                  return <Repo key={r.repo} platform={r.platform} repo={r.repo} now={now} pick={pick} scoped={platform === r.platform}
-                    items={items} onScope={() => setPlatform(platform === r.platform ? null : r.platform)} />;
-                })}
-              </nav>
+              <SidebarItems data={data} now={now} query={q} platform={platform} onScope={setPlatform} pick={pick} />
               <div className="flex items-center justify-between px-2 py-2">
                 <SidebarIconButton label="Settings" onClick={() => setSettings(true)}><Settings /></SidebarIconButton>
                 <Update />

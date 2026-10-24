@@ -120,18 +120,21 @@ here makes this repo its source, and updates come from here from then on.
 
 ## Board
 
-`board/` is a local app that shows the Mux project: what needs you, what's in
+The board is a local app that shows the Mux project: what needs you, what's in
 flight, concepts and their progress, and where every item sits in the flow. It
-reads GitHub through your local `gh` login and refreshes itself. See
-[`board/README.md`](board/README.md).
+reads GitHub through your local `gh` login and refreshes itself. The repo is one
+pnpm workspace laid out like T3 Code's monorepo: `apps/server` is the board server,
+`apps/web` its page, `apps/desktop` the board app and `packages/shared` the code
+they share. See [`apps/server/README.md`](apps/server/README.md).
 
-`app/` is the board app: a Mac window that runs the board, copied from
+`apps/desktop` is the board app: a Mac window that runs the board, copied from
 [T3 Code](https://github.com/pingdotgg/t3code)'s desktop app. It starts
-`board/src/server.ts` as a child under Electron's own Node and shows its page.
-Quitting the app stops the server. To open it from a checkout:
+`apps/server/src/server.ts` as a child under Electron's own Node and shows its page.
+Quitting the app stops the server. To open it from a checkout, install the
+workspace at the repo root and start the window:
 
 ```bash
-cd app && pnpm install && pnpm run dev
+pnpm install && pnpm run dev
 ```
 
 The first run downloads Electron's binary.
@@ -139,11 +142,11 @@ The first run downloads Electron's binary.
 To build a Mac app that runs without the checkout:
 
 ```bash
-cd app && pnpm run build --unsigned
+cd apps/desktop && pnpm run build --unsigned
 ```
 
-It writes an unsigned Apple Silicon app to `app/release/mac-arm64/Mux Factory.app`,
-with the board's server source, its built page and a copy of `config.json`
+It writes an unsigned Apple Silicon app to `apps/desktop/release/mac-arm64/Mux Factory.app`,
+with the board server bundled into one file, its built page and a copy of `config.json`
 inside. Rebuild it after changing `config.json`. If macOS refuses to open it,
 right-click it in Finder and choose Open. Beside it go a dmg, a zip and the update
 feed, `latest-mac.yml`.
@@ -154,13 +157,13 @@ the build signs and notarizes, and fails unless `CSC_LINK`, `CSC_KEY_PASSWORD`,
 `APPLE_API_KEY` (the `.p8` file's path), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` and
 `APPLE_TEAM_ID` are set. The Release workflow builds that way.
 
-The app's build copies `skills/` and `references/` into `app/dist-electron/bundle`,
+The app's build copies `skills/` and `references/` into `apps/desktop/dist-electron/bundle`,
 which packaging puts in the app's `Resources/bundle`.
 A packaged app installs them into `~/.agents` and the ticked Claude profiles on the
 first launch of each new version, after its window opens, and shows a dialog for
 an error or a conflict. A run from a checkout installs only with `--install-skills`,
 and `MUX_FACTORY_INSTALL_ROOT` puts the install in another folder instead of your
-home:
+home. From the repo root:
 
 ```bash
 MUX_FACTORY_INSTALL_ROOT="$(mktemp -d)" pnpm run dev --install-skills
@@ -188,7 +191,7 @@ and pick a channel, `nightly` (the default) or `stable`. Tick `dry_run` to build
 sign and notarize without publishing.
 
 A Nightly builds main's head as a prerelease tagged like
-`v0.1.0-nightly.20261023.57`. Its version comes from `app/package.json` at that
+`v0.1.0-nightly.20261023.57`. Its version comes from `apps/desktop/package.json` at that
 commit. It publishes only if CI's run for that commit on a push to main passed. It
 fails when that run failed or hasn't finished, and publishes nothing when the commit
 already has a Nightly.
@@ -197,7 +200,7 @@ A Stable Release rebuilds the latest Nightly's commit as `v<version>` and marks 
 the latest Release. It fails if that tag exists or main doesn't contain the commit.
 To ship one:
 
-1. Bump `version` in `app/package.json` and merge it.
+1. Bump `version` in `apps/desktop/package.json` and merge it.
 2. Start a Nightly and wait for it to publish.
 3. Start a Stable Release.
 
@@ -209,10 +212,12 @@ the waiting one. If a run shows as canceled, run it again.
 
 ```
 skills/            copies (original names), mux-work (with agents/), skill-sync
-board/             the local board app
-app/               the board app: the board in a Mac window (Electron)
+apps/server/       the board server: reads GitHub, serves the page and the API
+apps/web/          the board page (React, built with Vite+)
+apps/desktop/      the board app: the board in a Mac window (Electron)
+packages/shared/   types and logic the apps share; apps import it, never each other
 references/        checklists Addy's skills link to
-scripts/setup-worktree.sh installs board/ in a new worktree (.githooks, t3.json)
+scripts/setup-worktree.sh installs the workspace in a new worktree (.githooks, t3.json)
 scripts/release-secrets.sh stores the Release signing secrets on GitHub
 config.json        Mux repos (platform, role), board refresh, pickup limits
 UPSTREAM.md        source and commit of every copy

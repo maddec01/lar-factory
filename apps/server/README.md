@@ -12,11 +12,12 @@ refuses new writes with 503 and answers once the running ones finish. Without
 `BOARD_APP_SECRET` the board refuses every drain. Open it in a browser or in T3's browser preview.
 
 ```sh
-cd board && pnpm install && pnpm start   # pnpm run dev restarts on changes
+pnpm install                        # once, at the repo root
+cd apps/server && pnpm start        # pnpm run dev restarts on changes
 ```
 
-`pnpm start`, `dev`, `sample` and `test` first build the page with Vite+
-(`pnpm run build`) into `dist/`, which git ignores; the server reads it at startup.
+`pnpm start`, `dev`, `sample` and `test` first build the page in `apps/web` with Vite+
+into `apps/web/dist/`, which git ignores; the server reads it at startup.
 `dev` then rebuilds the page when a file changes and restarts the server on each
 new build or `src/` change.
 

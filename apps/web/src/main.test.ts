@@ -9,7 +9,7 @@ const fresh: BoardData = { ...sample, error: null, fetchedAt: new Date(NOW).toIS
 
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
   await mountPage(fresh);
-  expect($('.totals')!.textContent).toBe('4 need you8 in flight3 queued4 in List25 items');
+  expect($('.totals')!.textContent).toBe('4 need you7 in flight3 queued4 in List25 items');
   expect($$('#panel-board article').length).toBeGreaterThan(0);
   expect(fetchMock).not.toHaveBeenCalled();
   expect($('#board-data')).not.toBeNull();

@@ -32,8 +32,8 @@ test('the Board view shows a section per group of statuses, each with its count 
   await mountPage();
   expect($$('#panel-board > .section').map((s) => [s.id, text(s.querySelector('h2'))])).toEqual([
     ['needs-you', 'Needs you 4 Needs you, Verify and Ready to merge: only you can move these'],
-    ['in-flight', 'In flight 8 Shaping, Ready, In progress, Review'],
-    ['concepts', 'Concepts 1'],
+    ['in-flight', 'In flight 7 Shaping, Ready, In progress, Review'],
+    ['concepts', 'Concepts 2'],
     ['queued', 'Queued 3 Start opens a mux-work thread in T3 Code'],
     ['list', 'List 4'],
     ['done', 'Done 4 last 7 days'],

@@ -178,7 +178,7 @@ function CheckNode({ check, width, after }: { check: Concept['endToEnd']; width:
   );
 }
 
-function WorkMap({ tasks, mock, data, now, pick }: { tasks: Task[]; mock: Concept | undefined; data: BoardData; now: number; pick: Pick }) {
+export function WorkMap({ tasks, mock, data, now, pick }: { tasks: Task[]; mock: Concept | undefined; data: BoardData; now: number; pick: Pick }) {
   const { ref, width } = useWidth();
   const [hover, setHover] = useState<string | null>(null);
   const [armed, setArmed] = useState<Set<number>>(new Set());

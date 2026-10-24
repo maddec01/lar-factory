@@ -58,7 +58,6 @@ export const CONCEPTS: Record<number, MockConcept> = {
       { issue: 201, kind: 'grill', waitsOn: [203], repo: 'maddec01/mux-server' },
       { issue: 202, kind: 'prototype', waitsOn: [], repo: 'maddec01/mux-server' },
       { issue: 140, kind: 'build', waitsOn: [202], repo: 'maddec01/mux-server' },
-      { issue: 150, kind: 'build', waitsOn: [201], repo: 'maddec01/mux-server' },
     ],
     threads: [
       { title: 'Research: hosting cost of the relay', state: 'done', issue: 203, updated: '2026-10-19T10:00:00Z' },

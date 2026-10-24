@@ -8,15 +8,17 @@ import { LineCurrent, NAME as NAME_CURRENT } from './line-current.tsx';
 import { LineA, NAME as NAME_A } from './line-a.tsx';
 import { LineB, NAME as NAME_B } from './line-b.tsx';
 import { LineC, NAME as NAME_C } from './line-c.tsx';
+import { LineD, NAME as NAME_D } from './line-d.tsx';
 
 const VARIANTS = [
   { key: 'current', name: NAME_CURRENT, View: LineCurrent },
   { key: 'A', name: NAME_A, View: LineA },
   { key: 'B', name: NAME_B, View: LineB },
   { key: 'C', name: NAME_C, View: LineC },
+  { key: 'D', name: NAME_D, View: LineD },
 ];
 const listeners = new Set<() => void>();
-const read = () => new URLSearchParams(location.search).get('line') ?? 'A';
+const read = () => new URLSearchParams(location.search).get('line') ?? 'D';
 function step(by: number) {
   const at = Math.max(0, VARIANTS.findIndex((v) => v.key === read()));
   const url = new URL(location.href);
@@ -28,7 +30,7 @@ function step(by: number) {
 /** The line for the picked variant, and the switcher bar. */
 export function LineSection(props: LineProps) {
   const key = useSyncExternalStore((l) => (listeners.add(l), () => listeners.delete(l)), read);
-  const variant = VARIANTS.find((v) => v.key === key) ?? VARIANTS[1]!;
+  const variant = VARIANTS.find((v) => v.key === key) ?? VARIANTS[4]!;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') || event.metaKey || event.ctrlKey || event.altKey) return;

@@ -115,7 +115,6 @@ test('a refused repository project writes nothing to GitHub and runs no t3', asy
 
 test('Start build is refused while an issue the build is blocked by is open, and runs once it closes', async (t) => {
   const blocked = (state: 'OPEN' | 'CLOSED') => rawIssue('PVTI_12', 12, 'Ready', ['build'], {
-    issueDependenciesSummary: { blockedBy: state === 'OPEN' ? 1 : 0 },
     blockedBy: { nodes: [{ number: 5, state, repository: { nameWithOwner: 'maddec01/mux-factory' } }] },
   });
   const { board } = await buildBoard(t, [blocked('OPEN')]);

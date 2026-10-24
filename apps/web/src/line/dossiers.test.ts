@@ -26,13 +26,13 @@ const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): 
 const writable = (data: BoardData = sample): BoardData =>
   ({ ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 /** #140 with its blocker #202 closed, on a board whose writes are on. */
-const unblocked = () => writable(withItem('PVTI_sample13', { blockedBy: 0, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }] }));
+const unblocked = () => writable(withItem('PVTI_sample13', { blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }] }));
 const c200 = sample.items.find((i) => i.id === C200)!;
 /** A Queued grill under #200, blocked by `blockers`. */
 const decision = (blockers: Item['blockers'] = []): Item => ({
   ...sample.items.find((i) => i.id === 'PVTI_sample05')!, id: 'PVTI_d204', number: 204, title: 'Pick the relay host', labels: ['decision: grill'],
   repo: c200.repo, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'OPEN' },
-  blockers, blockedBy: blockers.filter((b) => b.state === 'OPEN').length,
+  blockers,
 });
 const withDecision = (blockers?: Item['blockers']) => writable({ ...sample, items: [...sample.items, decision(blockers)] });
 const receive = (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
@@ -40,10 +40,10 @@ const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, ti
 
 beforeEach(() => localStorage.clear());
 
-test('each open concept is a dossier, in board order, between the Queue and the rest of the line', async () => {
+test('each open concept and item with sub-issues on the board is a dossier, in board order, between the Queue and the rest of the line', async () => {
   await mountPage();
   expect([...$('.line > div')!.children].map((el) => el.getAttribute('data-dossier') ?? el.className.split(' ')[0])).toEqual(['queue', C200, C180, 'overflow-hidden']);
-  await receive({ ...sample, items: sample.items.filter((i) => !i.labels.includes('concept')) });
+  await receive({ ...sample, items: sample.items.filter((i) => !i.labels.includes('concept') && i.parent?.number !== 180) });
   expect($$('[data-dossier]'), 'none without a concept or a parent').toEqual([]);
 });
 
@@ -51,13 +51,13 @@ test('the header shows the kind, status, parts done and repositories, the title,
   await mountPage();
   const [title, track, agent, side] = header();
   expect([...title!.children].map(text)).toEqual([
-    'ConceptShaping · 1/4 parts done · Server', '#200 Mux cloud: website sign-in and relay', '3 T3 threads · 1 running · 1 need you',
+    'ConceptShaping · 1/4 parts done · Server', '#200 Mux cloud: website sign-in and relay', '4 T3 threads · 1 running · 1 need you',
   ]);
   expect(title!.className.split(' '), 'one column as wide as the cell, so the lines truncate at 840 px, not overflow').toContain('grid-cols-[minmax(0,1fr)]');
   expect(track!.getAttribute('title')).toBe('Shaping');
   expect([...agent!.children].map(text), "#200's parts' figures").toEqual(['1h 31m', '6.23M · $9.11']);
   expect(text(side)).toBe('#202 waits on you');
-  expect(text(header(C180)[0]!.firstElementChild)).toBe('ConceptIn progress · 2/2 parts done · Server + Apple');
+  expect(text(header(C180)[0]!.firstElementChild)).toBe('Coupled workIn progress · 2/2 parts done · Server + Apple');
   expect([text(header(C180)[0]!.lastElementChild), text(header(C180)[3])]).toEqual(['3 T3 threads · 1 running · 0 need you', 'Nothing waits on you']);
 });
 
@@ -107,12 +107,17 @@ test('each step shows its kind, what it waits on, its figures and its own thread
   const lines = (id: string) => [...step(id).children].map(text);
   expect(lines('PVTI_sample10')).toEqual(['#201 Relay: broker only or full TURN?grillOpen thread', 'Shaping28m · 1.87M · $2.71waits on #203', 'T3 · Grill: relay broker only or full TURN· running']);
   expect(lines('PVTI_sample12')).toEqual(['#202 Sign-in screenprototypeon your desk', 'Needs you41m · 2.95M · $4.35', 'T3 · Prototype: sign-in screen· needs you']);
-  expect(lines('PVTI_sample13')).toEqual(['#140 Owner accountsbuildStart build', 'Ready1/3 sliceswaits on #202', '', 'Thread starts when #202 is done']);
+  expect(lines('PVTI_sample13')).toEqual(['#140 Owner accountsbuildStart buildStart after #202 ▾', 'Ready1/3 sliceswaits on #202', '', 'T3 · Shape: owner accounts· done']);
   const chip = button(step('PVTI_sample13'), '#202');
   expect(chip.className, 'an open blocker').toContain('text-(--warning-foreground)');
   expect(button(step('PVTI_sample10'), '#203').querySelector('.lucide-check'), 'a closed one is ticked').not.toBeNull();
   await press(chip);
   expect(dialogTitle()).toBe('#202 Sign-in screen');
+});
+
+test('a step with no thread yet says when its thread starts', async () => {
+  await mountPage(withItem('PVTI_sample13', { threads: [] }));
+  expect(text(step('PVTI_sample13').lastElementChild)).toBe('Thread starts when #202 is done');
 });
 
 test('the progress rows sit on the stage track, done parts folded, each side saying what it waits on', async () => {
@@ -127,10 +132,11 @@ test('the progress rows sit on the stage track, done parts folded, each side say
   expect(button(dossier(C180), 'Hide 2 done')).toBeDefined();
 });
 
-test('Start build on a blocked build is disabled, its title naming the blocker', async () => {
+test('Start build on a blocked build is disabled, its title naming the blocker, and Start after joins it', async () => {
   await mountPage();
   const start = startIn(step('PVTI_sample13'))!;
   expect([text(start), start.disabled, start.title]).toEqual(['Start build', true, 'Blocked by #202 until it closes']);
+  expect(text(step('PVTI_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
   expect(text(header()[3]), 'the header offers no start while a part waits on you').toBe('#202 waits on you');
 });
 
@@ -155,10 +161,34 @@ test("Start on a Queued decision is today's Start", async () => {
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'PVTI_d204' }]]);
 });
 
-test('Start on a Queued decision is disabled while a blocker is open, its title naming it', async () => {
-  await mountPage(withDecision([{ number: 201, repo: 'maddec01/mux-server', state: 'OPEN' }]));
+test('Start on a Queued decision is disabled while a blocker is open, its title naming it, and Start after names the last open one', async () => {
+  const data = withDecision([{ number: 201, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' },
+    { number: 140, repo: 'maddec01/mux-server', state: 'OPEN' }]);
+  holdPosts(data);
+  await mountPage(data);
   const start = startIn(step('PVTI_d204'))!;
-  expect([text(start), start.disabled, start.title]).toEqual(['Start', true, 'Blocked by #201 until it closes']);
+  expect([text(start), start.disabled, start.title]).toEqual(['Start', true, 'Blocked by #201, #140 until they close']);
+  const after = step('PVTI_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Starts by itself once #201, #140 close']);
+  await press(after);
+  await press(entries()[0]!);
+  expect(posted(), 'T3 default arms it with no model').toEqual([['/api/arm', { session: 's1', itemId: 'PVTI_d204' }]]);
+  await answer({ error: null, board: { ...data, armed: { PVTI_d204: {} } } });
+  expect(text(step('PVTI_d204').querySelector('[data-start-after]'))).toBe('Starts after #140 ✓');
+});
+
+test('in the map, a part waiting on something that is neither Ready nor Queued starts by itself after it', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  await mountPage(withItem('PVTI_sample10', { blockers: [{ number: 203, repo: 'maddec01/mux-server', state: 'OPEN' }] }));
+  await press(button(dossier(), 'Map'));
+  expect(text(dossier().querySelector('[data-map-part="PVTI_sample10"]'))).toContain('starts by itself after #203');
+});
+
+test("in the map, a part waiting on another repository's issue names it without its owner", async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  await mountPage(withItem('PVTI_sample10', { blockers: [{ number: 12, repo: 'maddec01/mux-apple', state: 'OPEN' }] }));
+  await press(button(dossier(), 'Map'));
+  expect(text(dossier().querySelector('[data-map-part="PVTI_sample10"]'))).toContain('starts by itself after mux-apple#12');
 });
 
 test('Open thread takes Start\'s place while a part has a live thread', async () => {
@@ -207,7 +237,8 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   ]);
   expect(text(map.querySelector('[data-map-check]'))).toBe('end-to-end checkSign in on the website, then stream from a phone off Wi-Fiwaiting · 3 stepsagents run it once #140 land');
   const node = (id: string) => map.querySelector(`[data-map-part="${id}"]`)!;
-  expect([text(startIn(node('PVTI_sample13'))), startIn(node('PVTI_sample13'))!.disabled]).toEqual(['Start', true]);
+  expect(startIn(node('PVTI_sample13')), 'a blocked part offers Start after alone').toBeNull();
+  expect(text(node('PVTI_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
   expect(text(node('PVTI_sample12').querySelector('[data-open-thread]'))).toBe('Answer in T3');
   await press(node('PVTI_sample10').querySelector('button')!);
   expect(dialogTitle()).toBe('#201 Relay: broker only or full TURN?');

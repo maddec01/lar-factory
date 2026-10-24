@@ -37,7 +37,7 @@ test('parts run decisions first, research, grill, prototype, then builds, each w
 test("each part carries its blocked-by issues and its newest thread", () => {
   const [research, grill, prototype, build] = partsOf(byNumber(200), items);
   expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' }]);
-  expect([research!.thread?.title, grill!.thread?.state, prototype!.thread?.state, build!.thread]).toEqual(['Research: hosting cost of the relay', 'running', 'needs you', undefined]);
+  expect([research!.thread?.title, grill!.thread?.state, prototype!.thread?.state, build!.thread?.state]).toEqual(['Research: hosting cost of the relay', 'running', 'needs you', 'done']);
 });
 
 test('a part waits on its open blockers until a thread takes it on', () => {

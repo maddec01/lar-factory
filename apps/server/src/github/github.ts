@@ -40,7 +40,6 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               parent { number title url state repository { nameWithOwner } }
               subIssuesSummary { total completed }
               subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state stateReason repository { nameWithOwner } } }
-              issueDependenciesSummary { blockedBy }
               blockedBy(first: ${BLOCKER_LIMIT}) { nodes { number state repository { nameWithOwner } } }
               closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
                 nodes {
@@ -362,7 +361,7 @@ export async function addProjectItem(
     progress.item = {
       id: progress.itemId, status: 'List', type: 'Issue', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'OPEN',
-      parent: null, subIssues: { total: 0, completed: 0 }, blockedBy: 0, blockers: [],
+      parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
       updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],
     };
     return { item: progress.item, issueUrl: issue.html_url, error: null };

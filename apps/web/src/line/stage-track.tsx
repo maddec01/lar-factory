@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { duration, formatTokens, formatUsd, platformOf, ref, shortAgo, slug } from '@mux-factory/shared';
+import { duration, formatTokens, formatUsd, openBlockers, platformOf, ref, shortAgo, slug } from '@mux-factory/shared';
 import type { BoardData, Item, ItemStats, Status } from '@mux-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, SliceBar, SliceList } from '../items/item-parts.tsx';
@@ -120,6 +120,7 @@ export function Row({ item, data, now, side, waiting, nested, children }: {
   const [slices, setSlices] = useState(false);
   const isPicked = useItemDialogStore((state) => state.itemId === item.id);
   const platform = platformOf(item, data.repos);
+  const blocked = openBlockers(item).length;
   return (
     <div className="border-b border-(--border) last:border-b-0">
       <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id} className={`${GRID} cursor-pointer py-2 hover:bg-(--accent) ${picked(isPicked)}`}>
@@ -130,7 +131,7 @@ export function Row({ item, data, now, side, waiting, nested, children }: {
             <span className="truncate text-[13px]"><ItemTitle item={item} /></span>
             <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-(--muted-foreground)">
               <span className="truncate">{item.status} · {platform} · {shortAgo(item.updatedAt, now)}</span>
-              {item.blockedBy > 0 && <span className="shrink-0 rounded bg-(--error-surface) px-1 text-(--error-foreground)">blocked by {item.blockedBy}</span>}
+              {blocked > 0 && <span className="shrink-0 rounded bg-(--error-surface) px-1 text-(--error-foreground)">blocked by {blocked}</span>}
             </span>
             {item.slices.length > 0 && <SliceSummary item={item} open={slices} onToggle={() => setSlices(!slices)} />}
           </span>

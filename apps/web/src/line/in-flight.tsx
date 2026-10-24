@@ -3,17 +3,19 @@
 // next action. Items waiting on you show where they are but take no action here: you act on them from the desk.
 
 import type { ReactNode } from 'react';
+import { openBlockers } from '@mux-factory/shared';
 import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartBuild } from '../items/start-build.tsx';
+import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { dossiersOf, inDossiers } from './dossier-parts.ts';
 import { OnYourDesk, Row, StageHeader, THREAD_TEXT, YOURS, stageOf } from './stage-track.tsx';
 
-/** A button that doesn't open the item underneath it, nor do clicks in the menu it opens. */
+/** A button that doesn't open the item underneath it, nor do clicks in the menu it opens. It wraps to its own line, inside the cell. */
 function Act({ children }: { children: ReactNode }) {
-  return <span className="shrink-0" onClick={(e) => e.stopPropagation()}>{children}</span>;
+  return <span className="min-w-0 max-w-full" onClick={(e) => e.stopPropagation()}>{children}</span>;
 }
 
 /** The one thing a status asks next. */
@@ -28,8 +30,8 @@ function NextAction({ item, data }: { item: Item; data: BoardData }) {
 /** The side cell for an item: its thread, its action, or where to act on it when it waits on you. */
 function Side({ item, data }: { item: Item; data: BoardData }) {
   if (YOURS.includes(item.status)) return <OnYourDesk status={item.status} />;
-  const blocked = item.status === 'Ready' && item.blockedBy > 0;
-  return <><span className="min-w-0 truncate">{blocked ? `blocked by ${item.blockedBy}` : THREAD_TEXT[item.status]}</span><NextAction item={item} data={data} /></>;
+  const blocked = item.status === 'Ready' ? openBlockers(item).length : 0;
+  return <><span className="min-w-0 truncate">{blocked ? `blocked by ${blocked}` : THREAD_TEXT[item.status]}</span><NextAction item={item} data={data} /></>;
 }
 
 /** `items` are the line's items in the main area's scope; those a dossier shows are left out. */
@@ -41,8 +43,8 @@ export function InFlight({ items }: { items: Item[] }) {
     <div className="overflow-hidden rounded-xl border border-(--border) bg-(--card)" data-in-flight>
       <StageHeader label={`Everything else in flight · ${rows.length}`} side="Thread · next" />
       {rows.length ? rows.map((i) => (
-        <Row key={i.id} item={i} data={data} now={now} waiting={i.blockedBy > 0} side={<Side item={i} data={data} />}>
-          {i.status === 'Ready' && <div className="px-3 pb-2 pl-7 empty:hidden" onClick={(e) => e.stopPropagation()}><StartMessage item={i} kind="build" /></div>}
+        <Row key={i.id} item={i} data={data} now={now} waiting={openBlockers(i).length > 0} side={<Side item={i} data={data} />}>
+          {i.status === 'Ready' && <div className="px-3 pb-2 pl-7 empty:hidden" onClick={(e) => e.stopPropagation()}><StartMessage item={i} kind="build" /><StartAfterError item={i} data={data} /></div>}
         </Row>
       )) : <p className="m-0 p-6 text-center text-(--muted-foreground)">Nothing else in flight.</p>}
     </div>

@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, buildBranch, buildMessage, canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -19,7 +19,6 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
     state: 'OPEN',
     parent: null,
     subIssues: { total: 0, completed: 0 },
-    blockedBy: 0,
     blockers: [],
     updatedAt: '2026-10-21T09:00:00Z',
     closedAt: null,
@@ -63,10 +62,9 @@ test('the build label makes a build whatever the kind, except on a concept', () 
   assert.equal(isBuild(item('List', ['build', 'concept'])), false, "a concept's sub-issues are board items, not slices");
 });
 
-test("an item's open blockers are the blocked-by issues still open, whatever GitHub's summary count says", () => {
+test("an item's open blockers are the blocked-by issues still open", () => {
   const blockers = [{ number: 3, repo: 'maddec01/mux-server', state: 'CLOSED' as const }, { number: 4, repo: 'maddec01/mux-apple', state: 'OPEN' as const }];
-  assert.deepEqual(openBlockers(item('Ready', [], { blockedBy: 2, blockers })), [blockers[1]]);
-  assert.deepEqual(openBlockers(item('Ready', [], { blockedBy: 1, blockers: [] })), [], 'a count with no open issue listed blocks nothing');
+  assert.deepEqual(openBlockers(item('Ready', [], { blockers })), [blockers[1]]);
 });
 
 test('the blocked text names the open blockers, with the repository when it is another', () => {
@@ -75,6 +73,13 @@ test('the blocked text names the open blockers, with the repository when it is a
   assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'OPEN'), blocker(4, 'maddec01/mux-apple', 'OPEN')] })),
     'Blocked by #3, maddec01/mux-apple#4 until they close');
   assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'CLOSED')] })), null);
+});
+
+test("a blocker's ref is #n for the item's repository, and names another repository in full, or without its owner when short", () => {
+  const own = item('Ready', []);
+  assert.deepEqual([blockerRef(own, { number: 3, repo: own.repo! }), blockerRef(own, { number: 3, repo: own.repo! }, true)], ['#3', '#3']);
+  assert.deepEqual([blockerRef(own, { number: 4, repo: 'maddec01/mux-apple' }), blockerRef(own, { number: 4, repo: 'maddec01/mux-apple' }, true)],
+    ['maddec01/mux-apple#4', 'mux-apple#4']);
 });
 
 test("a repository's project hint is found whatever the case, and is null once T3 has its project or before any read", () => {
@@ -175,7 +180,7 @@ test('sample covers every status and both platforms', () => {
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/mux-server') && repos.has('maddec01/mux-apple'));
   const { needsYou, inFlight, queued, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
-  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [25, 4, 7, 3, 4]);
+  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [25, 4, 8, 3, 4]);
 });
 
 test('token counts are compact as on T3 Code\'s usage page', () => {

@@ -40,8 +40,7 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
   const coupled = projectIssue(3, 'In progress', 'maddec01/mux-server', ['feature']);
   const part = projectIssue(4, 'Ready', 'maddec01/mux-apple', ['build']);
   Object.assign(concept.content!, { id: 'I_1', body });
-  Object.assign(feature.content!, { id: 'I_2', body, issueDependenciesSummary: { blockedBy: 1 },
-    blockedBy: { nodes: [{ number: 1, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } }] } });
+  Object.assign(feature.content!, { id: 'I_2', body, blockedBy: { nodes: [{ number: 1, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } }] } });
   Object.assign(coupled.content!, { id: 'I_3', body });
   Object.assign(part.content!, { id: 'I_4', body,
     parent: { number: 3, title: 'Issue 3', url: 'https://github.com/maddec01/mux-server/issues/3', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } } });

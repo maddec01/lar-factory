@@ -64,9 +64,13 @@ export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'>;
 /** The issues the item is blocked by that are still open: what holds its start, its badge and Start after. */
 export const openBlockers = (item: Pick<Item, 'blockers'>): Blocker[] => item.blockers.filter((b) => b.state === 'OPEN');
 
-/** The item's open blockers as `#n`, or as `owner/repo#n` when another repository's. */
-export const openBlockerRefs = (item: Pick<Item, 'blockers' | 'repo'>): string[] =>
-  openBlockers(item).map((b) => (b.repo === item.repo ? `#${b.number}` : `${b.repo}#${b.number}`));
+/** A blocker as `#n`, or as `owner/repo#n` when another repository's; `short` drops the owner, to fit on a button. */
+export const blockerRef = (item: Pick<Item, 'repo'>, b: Pick<Blocker, 'number' | 'repo'>, short = false): string =>
+  b.repo === item.repo ? `#${b.number}` : `${short ? b.repo.slice(b.repo.indexOf('/') + 1) : b.repo}#${b.number}`;
+
+/** The item's open blockers, each as blockerRef gives it. */
+export const openBlockerRefs = (item: Pick<Item, 'blockers' | 'repo'>, short = false): string[] =>
+  openBlockers(item).map((b) => blockerRef(item, b, short));
 
 /** Why the item can't start while an issue it's blocked by is open, naming the open ones; null once none is. */
 export function blockedText(item: Pick<Item, 'blockers' | 'repo'>): string | null {
@@ -187,8 +191,6 @@ export interface Item {
   parent: IssueRef | null;
   /** GitHub's sub-issue counts; a build counts only its `build` sub-issues, not its slices. */
   subIssues: { total: number; completed: number };
-  /** Open blockers, for the card's badge. */
-  blockedBy: number;
   /** Every issue blocking this one, open or closed; empty for drafts and PRs. */
   blockers: Blocker[];
   updatedAt: string;

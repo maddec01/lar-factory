@@ -13,7 +13,6 @@ const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 /** A mux-factory issue in `status`, blocked by issues 5 and 6 in the given states. */
 const blockedIssue = (number: number, status: string, labels: string[], states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED']): RawItem =>
   rawIssue(`PVTI_${number}`, number, status, labels, {
-    issueDependenciesSummary: { blockedBy: states.filter((s) => s === 'OPEN').length },
     blockedBy: { nodes: states.map((state, n) => ({ number: 5 + n, state, repository: { nameWithOwner: 'maddec01/mux-factory' } })) },
   });
 
@@ -100,7 +99,6 @@ test('a failed start disarms the part and shows its error on it, until it is arm
 test("a part whose repository has no T3 project can't be armed, as its start would fail", async (t) => {
   const server = rawIssue('PVTI_30', 30, 'Ready', ['build'], {
     url: 'https://github.com/maddec01/mux-server/issues/30', repository: { nameWithOwner: 'maddec01/mux-server' },
-    issueDependenciesSummary: { blockedBy: 1 },
     blockedBy: { nodes: [{ number: 5, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-factory' } }] },
   });
   const { board } = await armableBoard(t, [server]);

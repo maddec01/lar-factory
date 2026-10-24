@@ -41,7 +41,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T08:09:14Z",
       "closedAt": null,
@@ -66,7 +65,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T08:09:19Z",
       "closedAt": null,
@@ -93,7 +91,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-20T15:00:00Z",
       "closedAt": null,
@@ -115,7 +112,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-19T10:00:00Z",
       "closedAt": null,
@@ -139,7 +135,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T07:30:00Z",
       "closedAt": null,
@@ -163,7 +158,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T06:00:00Z",
       "closedAt": null,
@@ -185,7 +179,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-20T10:00:00Z",
       "closedAt": null,
@@ -209,7 +202,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T09:10:00Z",
       "closedAt": null,
@@ -220,7 +212,15 @@
         "wallMs": 720000,
         "tokens": 1204000,
         "costUsd": 1.92
-      }
+      },
+      "threads": [
+        {
+          "id": "sample-thread-130",
+          "title": "Shape: cold bitmap subtitles within 3 s",
+          "state": "running",
+          "updated": "2026-10-21T09:10:00.000Z"
+        }
+      ]
     },
     {
       "id": "PVTI_sample08",
@@ -245,7 +245,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T09:00:00Z",
       "closedAt": null,
@@ -256,7 +255,15 @@
         "wallMs": 1380000,
         "tokens": 2501400,
         "costUsd": 3.87
-      }
+      },
+      "threads": [
+        {
+          "id": "sample-thread-22",
+          "title": "Shape: continue watching row",
+          "state": "running",
+          "updated": "2026-10-21T09:00:00.000Z"
+        }
+      ]
     },
     {
       "id": "PVTI_sample09",
@@ -275,7 +282,6 @@
         "total": 6,
         "completed": 2
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T08:00:00Z",
       "closedAt": null,
@@ -325,7 +331,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [
         {
           "number": 203,
@@ -375,7 +380,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T09:30:00Z",
       "closedAt": null,
@@ -411,7 +415,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T09:25:00Z",
       "closedAt": null,
@@ -455,7 +458,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 1,
       "blockers": [
         {
           "number": 202,
@@ -491,6 +493,14 @@
           "state": "OPEN",
           "progress": "waiting"
         }
+      ],
+      "threads": [
+        {
+          "id": "sample-thread-140",
+          "title": "Shape: owner accounts",
+          "state": "done",
+          "updated": "2026-10-21T08:30:00.000Z"
+        }
       ]
     },
     {
@@ -511,7 +521,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T09:40:00Z",
       "closedAt": null,
@@ -635,7 +644,15 @@
         "wallMs": 11400000,
         "tokens": 31400000,
         "costUsd": 46.9
-      }
+      },
+      "threads": [
+        {
+          "id": "sample-thread-150",
+          "title": "Build: relay for streaming away from home",
+          "state": "running",
+          "updated": "2026-10-21T09:40:00.000Z"
+        }
+      ]
     },
     {
       "id": "PVTI_sample14",
@@ -654,7 +671,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T09:35:00Z",
       "closedAt": null,
@@ -679,7 +695,15 @@
         "wallMs": 4800000,
         "tokens": 16632500,
         "costUsd": 24.18
-      }
+      },
+      "threads": [
+        {
+          "id": "sample-thread-30",
+          "title": "Build: chapter markers in the scrubber",
+          "state": "running",
+          "updated": "2026-10-21T09:35:00.000Z"
+        }
+      ]
     },
     {
       "id": "PVTI_sample23",
@@ -690,7 +714,7 @@
       "url": "https://github.com/maddec01/mux-server/issues/180",
       "repo": "maddec01/mux-server",
       "labels": [
-        "concept"
+        "feature"
       ],
       "state": "OPEN",
       "parent": null,
@@ -698,7 +722,6 @@
         "total": 2,
         "completed": 2
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-20T14:00:00Z",
       "closedAt": null,
@@ -767,7 +790,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T09:05:00Z",
       "closedAt": null,
@@ -792,7 +814,15 @@
         "wallMs": 2340000,
         "tokens": 7414800,
         "costUsd": 11.05
-      }
+      },
+      "threads": [
+        {
+          "id": "sample-thread-141",
+          "title": "Build: transcoder file handle leak on cancel",
+          "state": "running",
+          "updated": "2026-10-21T09:05:00.000Z"
+        }
+      ]
     },
     {
       "id": "PVTI_sample16",
@@ -811,7 +841,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T08:45:00Z",
       "closedAt": null,
@@ -850,7 +879,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-21T08:50:00Z",
       "closedAt": null,
@@ -899,7 +927,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-19T12:00:00Z",
       "closedAt": "2026-10-19T12:00:00Z",
@@ -938,7 +965,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-20T16:00:00Z",
       "closedAt": "2026-10-20T16:00:00Z",
@@ -987,7 +1013,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-10-18T11:00:00Z",
       "closedAt": "2026-10-18T11:00:00Z",
@@ -1047,7 +1072,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [
         {
           "number": 181,
@@ -1107,7 +1131,6 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 0,
       "blockers": [],
       "updatedAt": "2026-09-30T10:00:00Z",
       "closedAt": "2026-09-30T10:00:00Z",

@@ -4,7 +4,7 @@
 
 import { useEffect, useRef } from 'react';
 import { ExternalLink, Play } from 'lucide-react';
-import { HINTS, platformOf, shortAgo, workMessage } from '@mux-factory/shared';
+import { HINTS, openBlockers, platformOf, shortAgo, workMessage } from '@mux-factory/shared';
 import type { BoardData, Item } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@mux-factory/ui/dialog';
@@ -12,8 +12,9 @@ import { useBoardStore } from '../board/board-store.ts';
 import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { ItemTitle, PlatformTag, PrList, SliceList, StatsGrid, StepTrack } from '../items/item-parts.tsx';
+import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
-import { StartControl, StartMessage, useStartHolds } from '../items/start-control.tsx';
+import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
 
@@ -31,7 +32,8 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
     case 'List': return <QueueButton item={item} data={data} />;
     case 'Queued':
       if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-      return workMessage(item) ? <StartControl item={item} data={data} label="Start refining" size="sm" icon={<Play />} /> : null;
+      if (!workMessage(item)) return null;
+      return <StartOrAfter item={item} data={data} label="Start refining" size="sm" icon={<Play />} />;
     case 'Ready': return <StartBuild item={item} data={data} size="sm" icon={<Play />} />;
     case 'Shaping': case 'In progress': case 'Review': return <OpenThread item={item} data={data} />;
     case 'Needs you': return <OpenThread item={item} data={data} label="Answer in T3" />;
@@ -57,7 +59,7 @@ function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now:
         <div className="flex flex-wrap items-center gap-2 pr-8 text-xs text-(--muted-foreground)">
           <PlatformTag platform={platformOf(item, data.repos)} />
           <StatusGlyph status={item.status} /> <span className="font-medium text-(--foreground)">{item.status}</span> · updated {shortAgo(item.updatedAt, now)}
-          {item.blockedBy > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {item.blockedBy}</span>}
+          {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {openBlockers(item).length}</span>}
         </div>
         <DialogTitle className="text-lg leading-snug tracking-tight"><ItemTitle item={item} /></DialogTitle>
         {item.parent && <DialogDescription>Part of <a href={item.parent.url} target="_blank" rel="noopener" className="underline">#{item.parent.number} {item.parent.title}</a></DialogDescription>}
@@ -81,6 +83,7 @@ function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now:
         {item.labels.length > 0 && <p className="m-0 flex flex-wrap gap-1">{item.labels.map((l) => <span key={l} className="rounded-(--radius-sm) border border-(--input) px-1.5 text-[11px] text-(--muted-foreground)">{l}</span>)}</p>}
         <ActionError item={item} />
         <StartMessage item={item} kind={item.status === 'Ready' ? 'build' : 'refine'} />
+        <StartAfterError item={item} data={data} />
       </DialogPanel>
       <DialogFooter>
         <span className="mr-auto inline-flex items-center gap-3 text-xs"><MoveActions item={item} data={data} /></span>

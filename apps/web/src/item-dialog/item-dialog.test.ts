@@ -64,7 +64,7 @@ test.each([
   ['a Queued draft', 'PVTI_sample21', ['← Back to List', 'Abandon']],
   ['Shaping', 'PVTI_sample07', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
   ['Needs you', 'PVTI_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
-  ['Ready', 'PVTI_sample13', ['GitHub', "Start build (disabled: Start build isn't built yet)"]],
+  ['blocked Ready', 'PVTI_sample13', ['GitHub', 'Start build (disabled: Blocked by #202 until it closes)']],
   ['In progress', 'PVTI_sample14', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
   ['Review', 'PVTI_sample15', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
   ['Verify', 'PVTI_sample16', ['GitHub', 'Verify build']],
@@ -74,6 +74,15 @@ test.each([
   await mountPage();
   await openItem(itemId);
   expect(footerControls()).toEqual(controls);
+});
+
+test.each([
+  ['Verify', 'Verify build', 'PVTI_sample16'],
+  ['Ready to merge', 'Merge PR', 'PVTI_sample17'],
+])('a %s item with no linked pull request has %s disabled, its title saying why', async (_status, label, itemId) => {
+  await mountPage({ ...sample, items: sample.items.map((i) => (i.id === itemId ? { ...i, linkedPrs: [] } : i)) });
+  await openItem(itemId);
+  expect(footerControls().at(-1)).toBe(`${label} (disabled: No pull request is linked to this item yet)`);
 });
 
 test('GitHub opens the item, and Verify build and Merge PR open its pull request, in a new tab', async () => {
@@ -182,6 +191,58 @@ test('a failed Start shows in the dialog and offers Retry start', async () => {
   await answer({ error: 'T3 is not running.' }, 502);
   expect(text(inDialog('p.start [role="alert"]'))).toBe('T3 is not running.');
   expect(text(button('start', 'PVTI_sample05'))).toBe('Retry start ▾');
+});
+
+/** The sample with #140's blocker closed, so its Start build runs, and writes on. */
+const readyBuild: BoardData = {
+  ...withThreads('PVTI_sample13', undefined), capture: { session: 's1', enabled: true },
+  items: sample.items.map((i) => (i.id === 'PVTI_sample13' ? { ...i, blockedBy: 0, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }] } : i)),
+};
+
+test('Start build in a Ready item’s footer sends the build, then tags it Started', async () => {
+  holdPosts(readyBuild);
+  await mountPage(readyBuild);
+  await openItem('PVTI_sample13');
+  expect(footerControls()).toEqual(['GitHub', 'Start build ▾']);
+  await press(button('start', 'PVTI_sample13'));
+  await settle(() => vi.advanceTimersByTime(20));
+  await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
+  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'PVTI_sample13' }]]);
+  await answer({ thread: { threadId: 'thread-1', title: 'Build maddec01/mux-server#140' }, error: null });
+  expect(text(inDialog('[data-start-result="PVTI_sample13"]'))).toBe('Started');
+});
+
+test('a build the board started, through Start after or from another page, shows Started at once', async () => {
+  await mountPage({ ...readyBuild, startedBuilds: { PVTI_sample13: { threadId: 'build-1', title: 'Build maddec01/mux-server#140' } } });
+  await openItem('PVTI_sample13');
+  const tag = inDialog('[data-start-result="PVTI_sample13"]')!;
+  expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread build-1']);
+  expect(footerControls()).toEqual(['GitHub']);
+});
+
+test('a failed Start build shows in the dialog and offers Retry start', async () => {
+  holdPosts(readyBuild);
+  await mountPage(readyBuild);
+  await openItem('PVTI_sample13');
+  await press(button('start', 'PVTI_sample13'));
+  await settle(() => vi.advanceTimersByTime(20));
+  await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
+  await answer({ thread: null, error: 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code' }, 409);
+  expect(text(inDialog('p.start [role="alert"]'))).toBe('No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code');
+  expect(text(button('start', 'PVTI_sample13'))).toBe('Retry start ▾');
+});
+
+test('Start build is disabled with the hint while T3 has no project for the repository', async () => {
+  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
+  await mountPage({ ...readyBuild, repositoryProjects: { 'maddec01/mux-server': hint } });
+  await openItem('PVTI_sample13');
+  expect(footerControls()).toEqual(['GitHub', `Start build (disabled: ${hint})`]);
+});
+
+test.each([['running'], ['needs you']] as const)('a Ready item with a %s thread offers Open thread instead of Start build', async (state) => {
+  await mountPage(withThreads('PVTI_sample13', [thread('live', state)], readyBuild));
+  await openItem('PVTI_sample13');
+  expect(footerControls()).toEqual(['GitHub', 'Open thread']);
 });
 
 test('Back to List in the dialog shows the item in List, says so, and moves focus to Queue', async () => {

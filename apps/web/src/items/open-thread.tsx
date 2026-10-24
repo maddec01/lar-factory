@@ -20,9 +20,12 @@ export const hasLiveThread = (item: Item): boolean =>
   Array.isArray(item.threads) && item.threads.some((t) => t.state !== 'done');
 
 /** Opens the latest thread in T3 Code: the board app hands the link to T3, a browser asks to open it. */
-export function OpenThread({ item, data, label = 'Open thread', size = 'sm' }: { item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm' }) {
+export function OpenThread({ item, data, label = 'Open thread', size = 'sm', variant }: {
+  item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; variant?: 'outline';
+}) {
   const thread = latestThread(item, data);
+  // Pointer events stay on while it's disabled, so its title says why.
   return 'link' in thread
-    ? <Button size={size} data-open-thread={item.id} render={<a href={thread.link} />}>{label}</Button>
-    : <Button size={size} data-open-thread={item.id} disabled title={thread.reason}>{label}</Button>;
+    ? <Button size={size} variant={variant} data-open-thread={item.id} render={<a href={thread.link} />}>{label}</Button>
+    : <Button size={size} variant={variant} className="disabled:pointer-events-auto" data-open-thread={item.id} disabled title={thread.reason}>{label}</Button>;
 }

@@ -1,5 +1,6 @@
-// Start on a Queued card: posts the picked model choice to /api/start, shows the thread it
-// started or why it didn't, and remembers the choice once a thread starts or may have.
+// Start on a Queued item, or Start build on a Ready one: posts the picked model choice to
+// /api/start or /api/start-build, shows the thread it started or why it didn't, and remembers the
+// choice once a thread starts or may have.
 
 import { flushSync } from 'react-dom';
 import { remembersChoice, startRequest } from '@mux-factory/shared';
@@ -9,17 +10,20 @@ import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from './card-actions.ts';
 import { refocus } from '../notices/toasts.tsx';
 import { notify } from '../notices/notices.tsx';
-import { useStartStore } from './start-store.ts';
+import { startOf, useStartStore } from './start-store.ts';
+import type { StartKind } from './start-store.ts';
 
-export async function startItem(itemId: string, choice?: ModelChoice): Promise<void> {
+const PATH: Record<StartKind, string> = { refine: '/api/start', build: '/api/start-build' };
+
+export async function startItem(itemId: string, choice?: ModelChoice, kind: StartKind = 'refine'): Promise<void> {
   const starts = useStartStore.getState();
-  if (starts.starts[itemId]?.phase === 'pending' || useActionStore.getState().actions[itemId]?.phase === 'pending') return;
-  starts.set(itemId, { phase: 'pending' });
-  const result = await postAction<StartResult>('/api/start', startRequest(useBoardStore.getState().data.capture?.session, itemId, choice));
+  if (startOf(starts, itemId, kind)?.phase === 'pending' || useActionStore.getState().actions[itemId]?.phase === 'pending') return;
+  starts.set(itemId, { phase: 'pending' }, kind);
+  const result = await postAction<StartResult>(PATH[kind], startRequest(useBoardStore.getState().data.capture?.session, itemId, choice));
   flushSync(() => {
     receive(result);
     starts.set(itemId, result.thread ? { phase: 'started', thread: result.thread }
-      : { phase: result.uncertain ? 'uncertain' : 'error', message: result.error ?? 'The thread did not start.' });
+      : { phase: result.uncertain ? 'uncertain' : 'error', message: result.error ?? 'The thread did not start.' }, kind);
     // A refused or failed start keeps the previous choice.
     if (remembersChoice(result)) starts.remember(choice);
     const item = useBoardStore.getState().data.items.find((i) => i.id === itemId);

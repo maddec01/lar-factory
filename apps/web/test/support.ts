@@ -14,7 +14,7 @@ export const sample = sampleJson as unknown as BoardData;
 export const NOW = Date.parse('2026-10-21T10:00:00Z');
 
 /** The page's event stream, which a test opens, pushes data on or drops. */
-export class FakeEventSource extends EventTarget {
+class FakeEventSource extends EventTarget {
   static readonly CLOSED = 2;
   static current: FakeEventSource | null = null;
   readyState = 0;

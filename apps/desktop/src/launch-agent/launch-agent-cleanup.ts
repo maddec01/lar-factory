@@ -10,7 +10,7 @@ import * as Effect from "effect/Effect";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
-export const LABEL = "nl.mux.factory-board";
+const LABEL = "nl.mux.factory-board";
 
 export interface LaunchInput {
   readonly isPackaged: boolean;

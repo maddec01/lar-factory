@@ -10,7 +10,7 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
 };
 
-export interface Asset {
+interface Asset {
   type: string;
   body: Buffer;
 }

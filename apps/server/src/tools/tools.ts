@@ -16,7 +16,7 @@ const START = '__MUX_BOARD_PATH_START__';
 const END = '__MUX_BOARD_PATH_END__';
 
 /** A found tool's path, or null with the override that pointed nowhere, if one did. */
-export type ToolLookup = { path: string } | { path: null; override?: string };
+type ToolLookup = { path: string } | { path: null; override?: string };
 
 export interface Tools extends Record<ToolName, ToolLookup> {
   /** The PATH the lookup searched; tools run with it. */

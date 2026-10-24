@@ -85,6 +85,10 @@ jobs:
         working-directory: apps/desktop
         run: pnpm run typecheck
 
+      - name: Knip
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm run knip
+
       - name: Worktree setup tests
         if: ${{ !cancelled() }}
         run: bash scripts/setup-worktree.test.sh

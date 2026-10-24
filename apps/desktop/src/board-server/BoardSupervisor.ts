@@ -19,7 +19,7 @@ export interface RestartDelays {
 const DEFAULT_DELAYS: RestartDelays = { initialDelay: Duration.millis(500), maxDelay: Duration.seconds(10) };
 
 /** The wait before restart number `attempt + 1`: `initialDelay` doubled per attempt, capped at `maxDelay`. */
-export const restartDelay = (attempt: number, delays: RestartDelays = DEFAULT_DELAYS): Duration.Duration =>
+const restartDelay = (attempt: number, delays: RestartDelays = DEFAULT_DELAYS): Duration.Duration =>
   Duration.min(
     Duration.times(Duration.fromInputUnsafe(delays.initialDelay), 2 ** attempt),
     Duration.fromInputUnsafe(delays.maxDelay),

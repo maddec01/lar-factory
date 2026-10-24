@@ -21,7 +21,7 @@ export type Notice =
 const SLOT = 'notice';
 
 /** Shows an item where it is in the latest data: on the Board, with its List group open. Does nothing once it's gone. */
-export function viewItem(itemId: string): void {
+function viewItem(itemId: string): void {
   const { data } = useBoardStore.getState();
   const item = data.items.find((i) => i.id === itemId);
   if (!item) return;

@@ -50,7 +50,7 @@ async function checkPullRequest({ github, context, core }) {
     if (problems.length) core.setFailed('Use conventional commits for the PR title and every commit. See AGENTS.md.');
 }
 
-module.exports = { TYPES, headerProblem, findProblems, commitMessageProblem, checkPullRequest };
+module.exports = { headerProblem, findProblems, commitMessageProblem, checkPullRequest };
 
 if (require.main === module) {
     const problem = commitMessageProblem(require('node:fs').readFileSync(process.argv[2], 'utf8'));

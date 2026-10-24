@@ -13,6 +13,10 @@
     "test:desktop": "pnpm --filter @mux-factory/desktop test",
     "typecheck": "pnpm -r run typecheck",
     "sample": "pnpm --filter @mux-factory/server sample",
-    "dev": "pnpm --filter @mux-factory/desktop dev"
+    "dev": "pnpm --filter @mux-factory/desktop dev",
+    "knip": "knip"
+  },
+  "devDependencies": {
+    "knip": "6.42.1"
   }
 }

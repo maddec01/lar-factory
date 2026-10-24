@@ -7,7 +7,7 @@ import type { ClaudeProfile } from '@mux-factory/shared/install-skills';
 import { boardApp, type ProfilesResult, type UpdateChannel } from '@mux-factory/shared';
 import { useUpdateStore } from '../updates/update-store.ts';
 
-export interface SettingsResult { text: string; tone?: 'success' | 'warning' | 'error'; paths?: string[] }
+interface SettingsResult { text: string; tone?: 'success' | 'warning' | 'error'; paths?: string[] }
 
 interface SettingsState {
   open: boolean;

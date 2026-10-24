@@ -10,7 +10,7 @@ import { notify } from '../notices/notices.tsx';
 
 interface Attempt { requestId: string; session: string | undefined; draft: ItemDraft }
 
-export type Submission =
+type Submission =
   | { phase: 'editing' | 'complete' }
   | { phase: 'pending' | 'retry' | 'uncertain'; attempt: Attempt };
 

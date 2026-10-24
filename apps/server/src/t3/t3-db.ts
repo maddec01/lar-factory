@@ -52,7 +52,7 @@ const ACTIVE = `
 SELECT provider_thread_id AS id FROM orchestration_v2_projection_provider_threads WHERE status = 'active'`;
 
 /** A thread: its root and direct parent when it is a child, and its first user message when it is a root. */
-export interface ThreadRow {
+interface ThreadRow {
   id: string;
   root: unknown;
   parent: unknown;
@@ -68,21 +68,21 @@ export interface TurnRow {
 }
 
 /** A child thread's subagent run. */
-export interface RunRow {
+interface RunRow {
   thread: string;
   startedAt: string | null;
   completedAt: string | null;
 }
 
 /** A turn's wait on a runtime request. */
-export interface WaitRow {
+interface WaitRow {
   turn: string;
   createdAt: string | null;
   resolvedAt: string | null;
 }
 
 /** A thread's latest message time. */
-export interface LastMessageRow {
+interface LastMessageRow {
   thread: string;
   at: string | null;
 }

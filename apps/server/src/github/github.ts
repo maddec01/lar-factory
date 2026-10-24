@@ -84,11 +84,11 @@ interface PageInfo {
   endCursor: string | null;
 }
 
-export interface RawIssueSearch {
+interface RawIssueSearch {
   data: { search: { pageInfo: PageInfo; nodes: { number?: number; repository?: { nameWithOwner: string } }[] } };
 }
 
-export interface RawItemsPage {
+interface RawItemsPage {
   data: {
     user: {
       projectV2: {

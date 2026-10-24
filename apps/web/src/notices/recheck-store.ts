@@ -9,7 +9,7 @@ import { postAction, receive } from '../items/card-actions.ts';
 import { refocus } from './toasts.tsx';
 
 /** A Recheck's answer: the error when it failed, else null, and the tool problems it left, serialised. */
-export interface RecheckAnswer {
+interface RecheckAnswer {
   error: string | null;
   tools: string;
 }

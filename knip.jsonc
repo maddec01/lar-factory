@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      // The commit-msg hook and the conventional commits workflow run these.
+      "entry": [".github/scripts/*.cjs"]
+    },
+    "apps/desktop": {
+      // vp pack builds main.ts and preload.ts, which knip's Vite plugin doesn't read;
+      // electron-builder runs sign-macos.ts as its sign hook, and the tests spawn fake-board.mjs.
+      // Knip's Vitest plugin finds vite.config.ts and the tests.
+      "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/fake-board.mjs"]
+    }
+  },
+  // ensure-electron-runtime.mjs, copied unchanged from T3 Code, runs macOS's `file`.
+  "ignoreBinaries": ["file"],
+  // Files copied from T3 Code keep T3's exports, so later T3 fixes port line for line (docs/adr/0011).
+  "ignoreIssues": {
+    "apps/desktop/src/updates/AppUpdates.ts": ["exports", "types"],
+    "apps/desktop/src/updates/updateMachine.ts": ["exports"],
+    "apps/web/src/updates/update-button-logic.ts": ["exports"]
+  }
+}

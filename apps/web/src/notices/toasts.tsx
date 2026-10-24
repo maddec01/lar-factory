@@ -8,7 +8,7 @@ import { useToastStore } from './toast-store.ts';
 import type { Toast } from './toast-store.ts';
 
 /** How long a success toast stays. */
-export const TOAST_MS = 5_000;
+const TOAST_MS = 5_000;
 /** How often a toast that's being read or used checks whether it was left. */
 const RECHECK_MS = 1_000;
 /** Where focus goes when a closed toast had it and names nowhere of its own. */
@@ -34,7 +34,7 @@ export function closeKeepingFocus(el: Element | null, close: () => void, next: s
 }
 
 /** One toast. `onClose` runs when it's closed or, for a success, when its time is up. */
-export function ToastView({ what, failed = false, tone, focusAfter, onClose, children }: {
+function ToastView({ what, failed = false, tone, focusAfter, onClose, children }: {
   what: string;
   failed?: boolean;
   tone?: 'error';

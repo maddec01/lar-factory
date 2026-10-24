@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 /** The folder of board records, one `<pid>.json` holding `{ "port": n }` per live board. */
-export function boardRecordsDir(home = process.env.HOME || homedir()): string {
+function boardRecordsDir(home = process.env.HOME || homedir()): string {
   return join(home, 'Library/Application Support/Mux Factory/boards');
 }
 

@@ -6,7 +6,7 @@ import { length, merged, minus } from './intervals.ts';
 import type { Interval } from './intervals.ts';
 
 /** An item's time in milliseconds, and the threads that worked on it. */
-export interface AgentTime {
+interface AgentTime {
   agentMs: number;
   wallMs: number;
   threads: string[];

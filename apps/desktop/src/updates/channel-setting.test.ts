@@ -1,14 +1,13 @@
 import * as NodeFS from "node:fs";
-import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
+import { tempDir } from "../../test/support.ts";
 import * as ChannelSetting from "./channel-setting.ts";
 
-const tempFile = () =>
-  NodePath.join(NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "update-channel-")), "settings", "update-channel.json");
+const tempFile = () => NodePath.join(tempDir("update-channel-"), "settings", "update-channel.json");
 
 describe("ChannelSetting", () => {
   it.effect("reads nothing before a choice, then the channel last written", () =>

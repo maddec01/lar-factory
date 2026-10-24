@@ -6,6 +6,7 @@ import { AbandonDialog } from './items/abandon-dialog.tsx';
 import { useBoardStore } from './board/board-store.ts';
 import { BoardView } from './board/board-view.tsx';
 import { CopyStatus } from './copy/copy-button.tsx';
+import { ItemDialog } from './item-dialog/item-dialog.tsx';
 import { Header } from './board/header.tsx';
 import { restoreAnchor } from './board/keep-anchor.ts';
 import { Toasts } from './notices/toasts.tsx';
@@ -29,6 +30,7 @@ export function App() {
       {/* Outside main, so the announcement sits apart from the Board view. */}
       <CopyStatus />
       <Toasts />
+      <ItemDialog />
       <AbandonDialog />
     </>
   );

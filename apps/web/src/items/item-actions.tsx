@@ -1,5 +1,5 @@
 // The buttons that move an item: Queue on a List row, Back to List on a Queued card, and Abandon
-// on both, each with its pending label, plus a List row's error.
+// on both, each also in the item dialog, each with its pending label, plus a List row's error.
 
 import { useRef } from 'react';
 import { canAbandon, ref } from '@mux-factory/shared';
@@ -10,10 +10,11 @@ import { askAbandon, backToList, queueItem } from './card-actions.ts';
 import { writeState } from './card.tsx';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 
-export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
+/** Queue as a List row's button, or as the item dialog's `primary` action. */
+export function QueueButton({ item, data, primary = false }: { item: Item; data: BoardData; primary?: boolean }) {
   const action = useItemAction(item.id);
   const verb = action?.phase === 'pending' && action.kind === 'queue' ? 'Queuing…' : 'Queue';
-  return <Button variant="outline" size="xs" className="row-action" data-queue={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
+  return <Button variant={primary ? 'default' : 'outline'} size={primary ? 'sm' : 'xs'} className="row-action" data-queue={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
     {...writeState(data, action)} onClick={() => void queueItem(item.id)}>{verb}</Button>;
 }
 

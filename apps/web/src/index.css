@@ -10,8 +10,11 @@
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item/add-item.tsx";
+@source "./item-dialog";
+@source "./items/item-parts.tsx";
 @source "./items/slice-popover.tsx";
 @source "./items/start-control.tsx";
+@source "./items/status-glyph.tsx";
 @source "./notices/banner.tsx";
 @source "./notices/form-result.tsx";
 @source "./notices/toasts.tsx";
@@ -27,6 +30,7 @@
 }
 /* Tailwind's base styles take links' underline and headings' weight; these put back the browser's. */
 a { color: inherit; text-decoration: underline; }
+a[data-slot="button"] { text-decoration: none; }
 a:hover { text-decoration-thickness: --spacing(0.5); }
 code { font: var(--text-xs) var(--font-mono); }
 /* In the base layer, so a T3 control's outline-none wins and its own focus ring is the only one. */

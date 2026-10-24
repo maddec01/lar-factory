@@ -1,5 +1,5 @@
 // Queue, Back to List and Abandon: each posts to the board server, shows the result, and keeps
-// keyboard focus on the page when the item leaves its list.
+// keyboard focus on the page when the item leaves its list, or in the item dialog when it ran there.
 
 import { flushSync } from 'react-dom';
 import { writeHeaders } from '@mux-factory/shared';
@@ -9,6 +9,7 @@ import { useActionStore } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { holdAnchor } from '../board/keep-anchor.ts';
+import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 import { notify } from '../notices/notices.tsx';
 import { refocus } from '../notices/toasts.tsx';
 
@@ -39,7 +40,12 @@ export function receive(result: ActionResult): void {
 }
 
 const by = (attr: string, value: string) => `[${attr}="${CSS.escape(value)}"]`;
-const buttonOf = (attr: string, itemId: string) => document.querySelector<HTMLElement>(`#panel-board ${by(attr, itemId)}`);
+/** The item's `attr` button where it was pressed: in the item dialog while that's open, else on the board. */
+const buttonOf = (attr: string, itemId: string) =>
+  document.querySelector<HTMLElement>(`${document.querySelector(OPEN_ITEM_DIALOG) ? OPEN_ITEM_DIALOG : '#panel-board'} ${by(attr, itemId)}`);
+
+/** Where an action's button sits: on a List row, on a Queued card, or in the item dialog, which acts as a card does. */
+const placeOf = (button: HTMLElement) => (button.closest(OPEN_ITEM_DIALOG) ? 'dialog' : button.closest('article') ? 'card' : 'row');
 
 /** When a List row leaves, keep keyboard focus in the list: the same button on the next row, else its group. */
 function focusAfterRowLeaving(button: HTMLElement, attr: string): string[] {
@@ -91,7 +97,8 @@ async function runAction(itemId: string, kind: ItemAction['kind'], body: object,
 export async function queueItem(itemId: string): Promise<void> {
   const button = readyButton(itemId, 'data-queue');
   if (!button) return;
-  const next = focusAfterRowLeaving(button, 'data-queue');
+  // In the item dialog the item stays on show, Queued, so focus goes to its Start.
+  const next = placeOf(button) === 'dialog' ? [by('data-start', itemId), by('data-back-to-list', itemId)] : focusAfterRowLeaving(button, 'data-queue');
   const result = await runAction(itemId, 'queue', { itemId }, (result) => {
     const item = itemOf(itemId);
     if (result.error || !item) return result.error ?? 'The item left the board.';
@@ -104,7 +111,7 @@ export async function backToList(itemId: string): Promise<void> {
   const button = readyButton(itemId, 'data-back-to-list');
   const item = itemOf(itemId);
   if (!button || !item) return;
-  const next = focusAfterCardLeaving(button);
+  const next = placeOf(button) === 'dialog' ? [by('data-queue', itemId)] : focusAfterCardLeaving(button);
   // A failure is a toast only: the card's footer goes back to its links.
   const result = await runAction(itemId, 'back-to-list', { itemId }, (result) => {
     notify(result.error ? { verb: 'Failed', item, to: 'List', message: result.error } : { verb: 'Moved', item, to: 'List' });
@@ -122,10 +129,12 @@ export async function abandonItem(itemId: string): Promise<void> {
   const button = readyButton(itemId, 'data-abandon');
   const item = itemOf(itemId);
   if (!button || !item) return;
-  const onCard = Boolean(button.closest('article'));
-  const next = onCard ? focusAfterCardLeaving(button) : focusAfterRowLeaving(button, 'data-abandon');
+  const place = placeOf(button);
+  const onCard = place !== 'row';
+  // An abandoned item leaves the item dialog, which closes and hands focus back itself.
+  const next = place === 'dialog' ? [] : onCard ? focusAfterCardLeaving(button) : focusAfterRowLeaving(button, 'data-abandon');
   const result = await runAction(itemId, 'abandon', { session: useBoardStore.getState().data.capture?.session, itemId }, (result) => {
-    // A List row keeps its error inline; a Queued card's is a toast only, and its footer goes back to its links.
+    // A List row keeps its error inline; a Queued card's or the dialog's is a toast only, and its footer goes back to its links.
     if (result.error && !onCard) return result.error;
     notify(result.error ? { verb: 'Failed', item, message: result.error } : { verb: 'Abandoned', item });
   });

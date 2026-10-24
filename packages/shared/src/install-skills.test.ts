@@ -5,7 +5,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { INSTALL_MANIFEST, installSkills, listClaudeProfiles, setProfileTick } from '../src/install-skills.ts';
+import { INSTALL_MANIFEST, installSkills, listClaudeProfiles, setProfileTick } from './install-skills.ts';
 
 function temporary(t: TestContext): string {
   const path = mkdtempSync(join(tmpdir(), 'install-skills-'));

@@ -98,6 +98,8 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
       { from: "../web/dist", to: "web/dist" },
       { from: "dist-electron/bundle", to: "bundle" },
       { from: "../../config.json", to: "config.json" },
+      // InfoPlist.strings: with LSHasLocalizedDisplayName, the Dock and Finder show its name.
+      { from: "resources/en.lproj", to: "en.lproj" },
       // T3 Code's MIT licence: the main process, preload and scripts copy its code.
       { from: "LICENSE", to: "LICENSE.t3code.txt" },
     ],
@@ -109,6 +111,14 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
         { target: "zip", arch: ["arm64"] },
       ],
       category: "public.app-category.developer-tools",
+      // The menu bar title reads CFBundleName; productName keeps the file Mux Factory.app.
+      // The Dock and Finder show en.lproj's display name only while this one matches
+      // the file's name, so a user's rename wins.
+      extendInfo: {
+        CFBundleName: "µx Factory",
+        CFBundleDisplayName: "Mux Factory",
+        LSHasLocalizedDisplayName: true,
+      },
       notarize: signed,
       ...(signed
         ? { hardenedRuntime: true, sign: NodePath.join(APP_DIR, "scripts/sign-macos.ts") }

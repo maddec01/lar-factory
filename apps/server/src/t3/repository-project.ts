@@ -2,10 +2,10 @@
 // folder is a main checkout with the repository as its git origin. Each failure is a
 // hint that names the fix; the board never adds or changes T3 projects.
 
-import { execFile } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { liveProjects, statsDbPath } from '../stats/item-stats.ts';
+import { runTool } from '../tools/run-tool.ts';
 import type { RepoConfig } from '@mux-factory/shared';
 
 export type RepositoryProject = { projectId: string; error?: undefined } | { error: string };
@@ -35,11 +35,9 @@ function mainCheckout(folder: string): boolean {
 }
 
 /** The checkout's `origin` URL, or null when it has none. */
-function originUrl(folder: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    execFile('git', ['-C', folder, 'remote', 'get-url', 'origin'], { timeout: 10_000 },
-      (err, stdout) => resolve(err ? null : stdout.trim()));
-  });
+async function originUrl(folder: string): Promise<string | null> {
+  const { code, stdout } = await runTool('git', ['-C', folder, 'remote', 'get-url', 'origin'], { timeout: 10_000 });
+  return code === 0 ? stdout.trim() : null;
 }
 
 /** `owner/repo` from an https or ssh GitHub URL, with or without `.git`. */

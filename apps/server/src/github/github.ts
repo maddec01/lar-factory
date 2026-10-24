@@ -1,9 +1,9 @@
 // Reads the Mux project through the local `gh` CLI (`gh api graphql`).
 
-import { execFile } from 'node:child_process';
 import { buildSubIssueSearch, normalizeItems, projectBuilds, refKey, sliceLabelSearch, validateDraft } from '@mux-factory/shared';
 import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@mux-factory/shared';
 import type { BoardConfig } from '../config/config.ts';
+import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 
 const PAGE_SIZE = 100;
@@ -96,17 +96,12 @@ export interface RawItemsPage {
 
 // ---------- gh ----------
 
-function gh(args: string[]): Promise<string> {
+async function gh(args: string[]): Promise<string> {
   const command = toolCommand('gh');
-  if (!command) return Promise.reject(new Error(`${missingTool('gh')}. Install it with \`brew install gh\` or set GH_PATH.`));
-  return new Promise((resolve, reject) => {
-    execFile(command.file, args, { env: command.env, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) {
-        const detail = (stderr || stdout || err.message).trim().split('\n').slice(0, 4).join('\n');
-        reject(new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${detail}`));
-      } else resolve(stdout);
-    });
-  });
+  if (!command) throw new Error(`${missingTool('gh')}. Install it with \`brew install gh\` or set GH_PATH.`);
+  const result = await runTool(command.file, args, { env: command.env, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
+  if (result.code !== 0) throw new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${result.detail}`);
+  return result.stdout;
 }
 
 async function graphql<T>(query: string, vars: Record<string, string | number | null>): Promise<T> {

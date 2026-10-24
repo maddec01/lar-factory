@@ -7,13 +7,12 @@
 // and apps/server/src/codexModelOptions.ts; the rates loading from
 // apps/server/src/usage/UsageService.ts.
 
-import { existsSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 import { isRecord } from '@mux-factory/shared';
 import type { ItemStats } from '@mux-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
-import { threadRows, codexTurnSelections, readT3Db, threadSessions } from '../t3/t3-db.ts';
-import type { CodexTurnSelection } from '../t3/t3-db.ts';
+import { codexTurnSelections, threadSessions } from '../t3/t3-db.ts';
+import type { CodexTurnSelection, ThreadRows } from '../t3/t3-db.ts';
 import { readT3Settings } from '../t3/t3-settings.ts';
 import type { InstanceHome, T3Settings, TranscriptDriver } from '../t3/t3-settings.ts';
 import { agentTime } from './agent-time.ts';
@@ -151,27 +150,19 @@ function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Ma
 }
 
 /**
- * Reads the database once and returns a lookup over it, with each item's tokens
- * from its threads' transcripts. Null when there is no database; 'unavailable'
- * when it can't be read, e.g. T3 changed its schema.
+ * An item's stats over the rows T3's database `db` gave, with each item's tokens from its threads' transcripts.
+ * Throws when the database can't be read; t3/t3-reads.ts opens it.
  */
-export function loadItemStats(sources: StatsSources, now: number): ItemStatsReader | 'unavailable' | null {
-  if (!existsSync(sources.db)) return null;
-  try {
-    return readT3Db(sources.db, (db) => {
-      const time = agentTime(threadRows(db), now);
-      const settings = readT3Settings(sources.settings, sources.home);
-      const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(db, settings.instanceHomes)));
-      const pricing = loadPricing(sources.rates, settings);
-      return Object.assign((repo: string, number: number): ItemStats | null => {
-        const found = time(repo, number);
-        if (!found) return null;
-        const own = found.threads.flatMap((thread) => records.get(thread) ?? []);
-        const costUsd = pricing ? apiCost(own, pricing) : null;
-        return { agentMs: found.agentMs, wallMs: found.wallMs, tokens: totalTokens(own), ...(costUsd === null ? {} : { costUsd }) };
-      }, { priced: pricing !== null });
-    });
-  } catch {
-    return 'unavailable';
-  }
+export function itemStats(db: DatabaseSync, rows: ThreadRows, sources: StatsSources, now: number): ItemStatsReader {
+  const time = agentTime(rows, now);
+  const settings = readT3Settings(sources.settings, sources.home);
+  const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(db, settings.instanceHomes)));
+  const pricing = loadPricing(sources.rates, settings);
+  return Object.assign((repo: string, number: number): ItemStats | null => {
+    const found = time(repo, number);
+    if (!found) return null;
+    const own = found.threads.flatMap((thread) => records.get(thread) ?? []);
+    const costUsd = pricing ? apiCost(own, pricing) : null;
+    return { agentMs: found.agentMs, wallMs: found.wallMs, tokens: totalTokens(own), ...(costUsd === null ? {} : { costUsd }) };
+  }, { priced: pricing !== null });
 }

@@ -1,9 +1,9 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { loadItemStats } from './item-stats.ts';
+import { readT3Db, threadRows } from '../t3/t3-db.ts';
+import { itemStats } from './item-stats.ts';
 import type { ItemStatsReader, StatsSources } from './item-stats.ts';
 import { assistant, claudeHome, codexHome, codexSession, codexTokens, statsDb, t3Settings, tempDir, usageRates } from '../../test/stats-db.ts';
 import type { FixtureThread } from '../../test/stats-db.ts';
@@ -25,9 +25,7 @@ function turn(id: string) {
 }
 
 function reader(db: string, sources: Partial<StatsSources> = {}): ItemStatsReader {
-  const stats = loadItemStats({ db, ...NOWHERE, ...sources }, NOW);
-  assert.equal(typeof stats, 'function', `expected a reader, got ${String(stats)}`);
-  return stats as ItemStatsReader;
+  return readT3Db(db, (open) => itemStats(open, threadRows(open), { db, ...NOWHERE, ...sources }, NOW));
 }
 
 test('an item\'s threads are the roots whose first user message names it, in any of the three forms', (t) => {
@@ -209,15 +207,6 @@ test('a stale open turn on an active provider thread stops at the next turn\'s s
     ] },
   ]));
   assert.equal(stats(REPO, 9)?.agentMs, 60 * MIN + 10 * MIN + 30 * MIN, 'r1 runs 09:00-10:00, not to now');
-});
-
-test('a missing database gives no stats, and an unexpected schema gives unavailable', (t) => {
-  assert.equal(loadItemStats({ db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite'), ...NOWHERE }, NOW), null);
-  const changed = statsDb(t, [{ id: 'a', messages: [`$mux-work ${REPO}#1`] }]);
-  const db = new DatabaseSync(changed);
-  db.exec('ALTER TABLE orchestration_v2_projection_provider_turns RENAME COLUMN started_at TO began_at');
-  db.close();
-  assert.equal(loadItemStats({ db: changed, ...NOWHERE }, NOW), 'unavailable');
 });
 
 test('tokens are T3\'s totals over each session\'s own and subagent transcripts, each message once', (t) => {

@@ -1,20 +1,16 @@
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { loadItemThreads } from './item-threads.ts';
+import { itemThreads } from './item-threads.ts';
+import { readT3Db, threadRows } from '../t3/t3-db.ts';
 import type { ItemThreadsReader } from './item-threads.ts';
-import { statsDb, tempDir } from '../../test/stats-db.ts';
+import { statsDb } from '../../test/stats-db.ts';
 import type { FixtureRequest, FixtureThread } from '../../test/stats-db.ts';
 
 const REPO = 'maddec01/mux-factory';
 
 function reader(t: TestContext, threads: FixtureThread[], requests: FixtureRequest[] = []): ItemThreadsReader {
-  const threadsOf = loadItemThreads(statsDb(t, threads, requests));
-  assert.equal(typeof threadsOf, 'function', `expected a reader, got ${String(threadsOf)}`);
-  return threadsOf as ItemThreadsReader;
+  return readT3Db(statsDb(t, threads, requests), (db) => itemThreads(threadRows(db)));
 }
 
 test('an item thread is running with a turn in flight, needs you with a runtime request open, else done', (t) => {
@@ -50,13 +46,4 @@ test('a thread belongs only to the issue its first message names first, and chil
   assert.deepEqual(threadsOf(REPO, 4), []);
   assert.deepEqual(threadsOf(REPO, 5), []);
   assert.deepEqual(threadsOf(REPO, 6), [], 'an item no thread names has none');
-});
-
-test('no T3 database means no threads, and one that can\'t be read is unavailable', (t) => {
-  assert.equal(loadItemThreads(join(tmpdir(), 'no-such-dir', 'statev2.sqlite')), null);
-  const changed = join(tempDir(t, 'mux-threads-'), 'statev2.sqlite');
-  const db = new DatabaseSync(changed);
-  db.exec('CREATE TABLE something_else (id TEXT)');
-  db.close();
-  assert.equal(loadItemThreads(changed), 'unavailable');
 });

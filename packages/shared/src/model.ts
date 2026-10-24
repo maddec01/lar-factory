@@ -254,6 +254,12 @@ export interface ModelChoice {
   model: string;
 }
 
+/** A blocked part's start, armed by Start after: the board starts it on this model choice once every issue it's blocked by closes. */
+export interface ArmedStart {
+  /** None leaves it to T3 ("T3 default"). */
+  model?: ModelChoice;
+}
+
 /** Whether `groups` offer `choice`: its instance is there with that model. */
 export function offers(groups: readonly ModelGroup[], choice: ModelChoice): boolean {
   return groups.some((g) => g.instanceId === choice.instanceId && g.models.some((m) => m.slug === choice.model));
@@ -284,6 +290,10 @@ export interface BoardData {
   startedBuilds?: Record<string, StartedThread>;
   /** Threads this board run started, by item id, so every page shows them. */
   started?: Record<string, StartedThread>;
+  /** Starts armed by Start after, by item id, kept in the board server's data folder. Absent in sample mode. */
+  armed?: Record<string, ArmedStart>;
+  /** Why a start the board ran by itself failed, by item id; the part was disarmed. Arming or disarming it clears this. */
+  armedErrors?: Record<string, string>;
   /** What's wrong with t3 and gh, from the latest lookup; a tool that works has no entry. Absent in sample mode. */
   tools?: ToolProblems;
   /** T3 Code's environment id, which thread links need; absent when T3 hasn't written one. */

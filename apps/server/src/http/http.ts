@@ -9,11 +9,13 @@ import { pageWithData } from '@mux-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { BuiltPage } from '../page/page.ts';
+import type { StartAfter } from '../start-after/start-after.ts';
 import { log } from '../log.ts';
 
 export interface HttpDeps {
   board: BoardState;
   commands: ItemCommands;
+  startAfter: Pick<StartAfter, 'arm' | 'disarm'>;
   page: BuiltPage;
   /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
   appSecret: string | null;
@@ -99,7 +101,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, page, appSecret, sample, recheck, readSoon, ready }: HttpDeps): BoardServer {
+export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -134,6 +136,15 @@ export function createBoardServer({ board, commands, page, appSecret, sample, re
       what: 'the build to start', disabled: 'Starting builds is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),
       run: forItem('Name the build to start.', (itemId, input) => commands.startBuild(itemId, input.model)),
+    },
+    '/api/arm': {
+      what: 'the item to start after its blockers', disabled: 'Start after is disabled in sample mode.',
+      restarted: () => withBoard({ error: 'The board restarted. Press Start after again.' }),
+      run: forItem('Name the item to start after its blockers.', async (itemId, input) => startAfter.arm(itemId, input.model)),
+    },
+    '/api/disarm': {
+      what: 'the item to disarm', disabled: 'Start after is disabled in sample mode.',
+      run: forItem('Name the item to disarm.', async (itemId) => startAfter.disarm(itemId)),
     },
     '/api/abandon': {
       what: 'the item to abandon', disabled: 'Abandoning is disabled in sample mode.',

@@ -307,5 +307,5 @@ diff them against T3.
 5. Cards, progress bar and fieldsets. Take coss's `card.tsx`, `progress.tsx` and `fieldset.tsx`,
    or keep the board's CSS?
 6. Changelog. Follow T3's move to a Popover, or keep the PreviewCard the board copied at 9a391eb?
-7. Token names. Rename the board's tokens to T3's (`--bg` to `--background` and so on, about 150
+7. Token names. Rename the board's tokens to T3's (`--bg` to `--background` and so on, about 170
    references), or alias T3's names to the board's?

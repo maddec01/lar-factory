@@ -101,5 +101,5 @@ commands and their locks, and `src/http/` the routes.
 `pnpm test` runs the server tests with Vitest: unit tests sit next to the
 files they test in `src/`, and the tests that start the whole board, with their fixtures,
 in `test/`. The page tests sit next to their files in `apps/web/src/`; `pnpm test` in
-`apps/web` runs them with Vitest in a DOM. That DOM, jsdom, needs Node 22.22.2+, 24.15+ or 26+;
-the board itself runs on 22.18+.
+`apps/web` runs them with Vitest in a DOM. The board and its tests need Node 24.15+ (jsdom's
+minimum on the 24 line); the root `.node-version` pins 24.

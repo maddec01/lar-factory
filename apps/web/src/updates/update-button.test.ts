@@ -1,8 +1,8 @@
-// The title bar's update button, T3 Code's update pill: in the board app it always shows, as an icon, in
+// The sidebar's update button, T3 Code's update pill: in the board app it always shows, as an icon, in
 // every update state. The bridge stands in for the app's preload and pushes each new update state, as the app does.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight, toast, updatesOff } from '../../test/support.ts';
+import { $, addStylesheet, answerRestart, mountPage, settle, stubApp, text, toast, updatesOff } from '../../test/support.ts';
 import type { UpdateState } from '@mux-factory/shared';
 
 const idle: UpdateState = {
@@ -47,11 +47,11 @@ test('a browser without the app has no update button', async () => {
   expect(button()).toBeNull();
 });
 
-test('the button is a round icon in the title bar, before Add item, with no text', async () => {
+test('the button is a round icon at the sidebar\'s foot, after Settings, with no text', async () => {
   stubBridge(idle);
   await mountPage();
-  expect([...$('.title-bar-actions')!.children].map((el) => el.textContent)).toEqual(['Refreshed 20m ago', '', 'Add item', 'Settings']);
-  expect(button()!.closest('.title-bar')).not.toBeNull();
+  expect([...$('.sidebar-foot')!.children].map((el) => el.getAttribute('aria-label') ?? text(el))).toEqual(['Settings', '']);
+  expect(button()!.closest('.sidebar-foot')).not.toBeNull();
   expect(button()!.classList).toContain('rounded-full');
   expect(button()!.textContent).toBe('');
 });
@@ -357,18 +357,12 @@ describe('the tooltip', () => {
     expect(tooltip()!.textContent).toBe('Updates unavailableUpdates work only in the packaged app.');
   });
 
-  test('opens below the title bar', async () => {
+  test('opens above the button, at the sidebar\'s foot', async () => {
     stubBridge(available);
     await mountPage();
-    // jsdom has no layout: the bar is 52 px tall, and the 32 px button sits in its middle, 10 px to 42 px down.
-    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1000);
-    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(800);
-    vi.spyOn($('.title-bar')!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, titleBarHeight()));
-    vi.spyOn(button()!, 'getBoundingClientRect').mockReturnValue(new DOMRect(900, 10, 32, 32));
     await settle(() => button()!.focus());
     await settle(() => vi.advanceTimersByTime(1000));
-    const positioner = tooltip()!.parentElement!;
-    expect(positioner.style.top).toBe(`${titleBarHeight() + 4}px`);
+    expect(tooltip()!.parentElement!.getAttribute('data-side')).toBe('top');
   });
 });
 
@@ -447,11 +441,11 @@ describe('the changelog', () => {
     expect(notes()).not.toBeNull();
   });
 
-  test('opens below the button', async () => {
+  test('opens above the button', async () => {
     stubBridge(withNotes);
     await mountPage();
     await hover(button()!);
-    expect(notes()!.closest('[data-side]')!.getAttribute('data-side')).toBe('bottom');
+    expect(notes()!.closest('[data-side]')!.getAttribute('data-side')).toBe('top');
   });
 
   test('opens on keyboard focus, which stays on the button', async () => {
@@ -502,19 +496,13 @@ describe('the changelog', () => {
     expect(notes()).toBeNull();
   });
 
-  test('opens below the title bar, and drags nothing', async () => {
+  test('drags nothing', async () => {
     stubBridge(withNotes);
     await mountPage();
     const { noDrag } = addStylesheet();
-    // jsdom has no layout: the bar is 52 px tall, and the button sits in its middle, 14 px to 38 px down.
-    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1000);
-    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(800);
-    vi.spyOn($('.title-bar')!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, titleBarHeight()));
-    vi.spyOn(button()!, 'getBoundingClientRect').mockReturnValue(new DOMRect(900, 14, 80, 24));
     await hover(button()!);
     await settle(() => vi.advanceTimersByTime(50));
-    const positioner = notes()!.closest<HTMLElement>('[data-slot="popover-positioner"]')!;
-    expect(positioner.style.top).toBe(`${titleBarHeight() + 4}px`);
     expect(noDrag(notes()!)).toBe(true);
   });
+
 });

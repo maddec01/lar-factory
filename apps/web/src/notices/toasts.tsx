@@ -1,6 +1,6 @@
 // Toasts, drawn by coss's toast: a success clears itself after 5 s, later while it's hovered or has focus;
 // a failure stays until it's closed. One toast per slot, so a new one replaces the last. They sit top right,
-// below the header while it's on screen and below the app's title bar.
+// below the banners while they're on screen and below the title bar.
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
@@ -91,7 +91,7 @@ export function clearToast(slot: string): void {
 function ToastBody({ what, failed = false, body, onClose }: Toast & { onClose: () => void }) {
   const ref = useRef<HTMLSpanElement>(null);
   const toast = () => ref.current?.closest('[data-toast]') ?? null;
-  // The header's height changes with its banners, so place toasts again as each one shows.
+  // The banners come and go, so place toasts again as each one shows.
   useLayoutEffect(placeToasts, []);
   useEffect(() => {
     if (failed) return;
@@ -114,11 +114,11 @@ function ToastBody({ what, failed = false, body, onClose }: Toast & { onClose: (
   );
 }
 
-/** Keeps --toast-anchor at the bottom of the header while it's on screen, and never above the title bar's,
- * so toasts (placed below it in notices.css) never cover the header's buttons or banners nor sit in the bar
+/** Keeps --toast-anchor at the bottom of the banners while they're on screen, and never above the title bar's,
+ * so toasts (placed below it in notices.css) never cover the banners' buttons nor sit in the bar
  * that drags the window. */
 function placeToasts(): void {
-  const bottom = Math.max(...['header.top', '.title-bar'].map((sel) => document.querySelector(sel)?.getBoundingClientRect().bottom ?? 0));
+  const bottom = Math.max(...['.banners', '.title-bar'].map((sel) => document.querySelector(sel)?.getBoundingClientRect().bottom ?? 0));
   document.documentElement.style.setProperty('--toast-anchor', `${Math.round(bottom)}px`);
 }
 
@@ -126,10 +126,11 @@ function placeToasts(): void {
 export function Toasts() {
   useEffect(() => {
     placeToasts();
-    addEventListener('scroll', placeToasts, { passive: true });
+    // The main area scrolls, not the window: capture hears its scroll.
+    addEventListener('scroll', placeToasts, { passive: true, capture: true });
     addEventListener('resize', placeToasts);
     return () => {
-      removeEventListener('scroll', placeToasts);
+      removeEventListener('scroll', placeToasts, { capture: true });
       removeEventListener('resize', placeToasts);
     };
   }, []);

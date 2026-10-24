@@ -1,13 +1,21 @@
-// The notices for a tool the board can't use: a missing t3 replaces the whole page, and a missing
+// The notices for a tool the board can't use: a missing t3 replaces the main area, and a missing
 // or logged-out gh, which stops the board reading GitHub, shows a banner in place of Stale.
 
 import type { ReactNode } from 'react';
+import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@mux-factory/shared';
 import type { ToolMissing, ToolProblem } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
-import { BrandMark } from '../board/header.tsx';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { Banner } from './banner.tsx';
 import { useRecheckStore } from './recheck-store.ts';
+
+function BrandMark() {
+  return (
+    <svg className="brand-mark" role="img" aria-label="Mux" viewBox={BRAND_MARK_VIEWBOX} fill="none">
+      <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';
 
@@ -34,10 +42,10 @@ function Fix({ problem, tool, what, children }: { problem: ToolProblem; tool: st
   return <>No runnable <code>{tool}</code> is at <code>{problem.override}</code>. Point {variable} at {what} or unset it, then press Recheck.</>;
 }
 
-/** The full-window notice that replaces the board while no t3 is found. */
+/** The notice that fills the main area while no t3 is found. */
 export function T3Missing({ problem }: { problem: ToolMissing }) {
   return (
-    <main className="tool-missing">
+    <div className="tool-missing">
       <div className="tool-missing-box" role="alert">
         <h1><BrandMark /><span>T3 Code not found</span></h1>
         <p>
@@ -48,7 +56,7 @@ export function T3Missing({ problem }: { problem: ToolMissing }) {
         </p>
         <p><Recheck problem={problem} /></p>
       </div>
-    </main>
+    </div>
   );
 }
 

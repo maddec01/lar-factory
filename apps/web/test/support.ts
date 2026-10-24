@@ -78,12 +78,6 @@ export const $$ = <T extends Element = HTMLElement>(selector: string) => [...doc
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';
 /** A banner's title and description. */
 export const bannerText = (el: Element) => ['title', 'description'].map((slot) => text(el.querySelector(`[data-slot="alert-${slot}"]`)));
-/** Which of T3's Badge variants `el` takes, read from the background class each variant sets. */
-export const variantOf = (el: Element | null) => {
-  if (el?.getAttribute('data-slot') !== 'badge') return undefined;
-  const variants = { error: 'bg-destructive/8', warning: 'bg-warning/8', success: 'bg-success/8', outline: 'bg-background', secondary: 'bg-secondary' };
-  return Object.entries(variants).find(([, bg]) => el.classList.contains(bg))?.[0];
-};
 /** The toast on screen. */
 export const toast = () => $('[data-slot="toast-viewport"] [data-toast]');
 
@@ -154,9 +148,6 @@ export function addStylesheet(): { noDrag: (el: Element) => boolean } {
   const selectors = [...all.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) => rule[1]!.replace(/\/\*[^]*?\*\//g, ''));
   return { noDrag: (el) => el.classList.contains('[-webkit-app-region:no-drag]') || selectors.some((selector) => el.matches(selector)) };
 }
-
-/** The title bar's height, from its h-* class, at 4 px a spacing step. */
-export const titleBarHeight = () => Number(/\bh-(\d+)\b/.exec($('.title-bar')!.className)![1]) * 4;
 
 /** A fake `confirmRestart` for `stubApp`: it records each question and answers `answer`, true for Restart. */
 export const answerRestart = (answer: boolean) => vi.fn(async (_message: string) => answer);

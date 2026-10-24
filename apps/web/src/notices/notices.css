@@ -2,8 +2,13 @@
 
 .banner .err { white-space: pre-wrap; word-break: break-word; }
 .banner code { overflow-wrap: anywhere; }
-/* Fills the window below the title bar and the page's top padding. */
-.tool-missing { min-height: calc(100vh - --spacing(15.5)); display: grid; place-items: center; }
+/* Fills the main area below the title bar. */
+.tool-missing { flex: 1; display: grid; place-items: center; padding: --spacing(5); }
+.tool-missing-box h1 { font-size: var(--text-base); font-weight: 600; margin: 0; letter-spacing: -0.01em; display: inline-flex; align-items: baseline; gap: --spacing(2); }
+/* Baseline alignment puts the logo's bottom edge on the text's baseline. The x's strokes end 8.75 of the
+   viewBox's 32 units above that edge, so drop the logo by that much: the x sits on the baseline and the
+   µ's tail hangs below like a descender. */
+.brand-mark { width: --spacing(7); height: --spacing(4); flex: none; position: relative; top: calc(--spacing(4) * 8.75 / 32); }
 .tool-missing-box { max-width: --spacing(130); @apply border; background: var(--card); border-radius: var(--radius); padding: --spacing(5) --spacing(6); }
 .tool-missing-box p { margin: --spacing(3) 0 0; color: var(--muted-foreground); }
 .tool-missing-box code { color: var(--foreground); overflow-wrap: anywhere; }
@@ -11,7 +16,7 @@
 /* a close button on every failure, and successes as toasts that clear themselves */
 .dismiss { float: right; margin: --spacing(-0.75) --spacing(-1.5) 0 --spacing(2); }
 .action-error .dismiss { float: none; margin: --spacing(-1) 0 --spacing(-1) --spacing(0.5); vertical-align: middle; }
-/* notices/toasts.tsx keeps --toast-anchor at the bottom of the header while it's on screen, or of the title bar.
+/* notices/toasts.tsx keeps --toast-anchor at the bottom of the banners while they're on screen, or of the title bar.
    A toast never drags the app's window, even where it overlaps the title bar. */
 [data-slot="toast-viewport"] {
   top: max(--spacing(3), calc(var(--toast-anchor, --spacing(0)) + --spacing(2)));

@@ -1,4 +1,4 @@
-// The title bar's update button: T3 Code's update pill, copied from
+// The sidebar's update button: T3 Code's update pill, copied from
 // apps/web/src/components/sidebar/SidebarUpdatePill.tsx at d53873b. One round icon button that the board app
 // always shows: click to check, download or install, with the tooltip saying which, and T3's toasts from the
 // store. Installing asks first in the app's native dialog, as T3 does. Without T3's "update everything" run and
@@ -6,8 +6,8 @@
 // the downloaded look, disabled.
 // An update with release notes shows them in T3's changelog popover in place of the tooltip, on both channels
 // where T3 shows it on nightly only, as T3 Code's SidebarUpdateReleaseNotes. It opens on hover and on keyboard
-// focus, closes 150 ms after the pointer leaves, a forward Tab moves into it, and a click runs the update. The
-// title bar sits at the top, so both open below the button, where T3's open above it.
+// focus, closes 150 ms after the pointer leaves, a forward Tab moves into it, and a click runs the update. Both
+// open above the button, at the sidebar's foot, as T3's do.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
 
@@ -89,14 +89,6 @@ function ReleaseNotes({ state }: { state: UpdateState }) {
   );
 }
 
-/** The space between the button and its changelog or tooltip, so either starts 4 px below the title bar the button sits in.
- *  Base UI measures again whenever it places them, as when the window resizes. */
-function gapBelowTitleBar(button: HTMLElement | null): number {
-  const bar = button?.closest('.title-bar');
-  if (!button || !bar) return 4;
-  return Math.max(4, bar.getBoundingClientRect().bottom + 4 - button.getBoundingClientRect().bottom);
-}
-
 export function UpdateButton() {
   const { state, installing, follow, check, download, install } = useUpdateStore();
   useEffect(follow, [follow]);
@@ -106,7 +98,6 @@ export function UpdateButton() {
   const suppressReleaseNotesFocusOpen = useRef(false);
   const releaseNotesPopupRef = useRef<HTMLDivElement>(null);
   const releaseNotesTriggerId = useId();
-  const anchor = useRef<HTMLButtonElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   // The spin finishes its turn before the icon shows the check's outcome.
@@ -209,14 +200,11 @@ export function UpdateButton() {
     );
   };
 
-  const sideOffset = () => gapBelowTitleBar(anchor.current);
-
   if (!boardApp()) return null;
 
   const updateButton = (
     <button
       type="button"
-      ref={anchor}
       aria-label={idleTooltip?.detail ? `${tooltip}: ${idleTooltip.detail}` : tooltip}
       aria-disabled={isInteractionDisabled || undefined}
       className={[
@@ -254,7 +242,7 @@ export function UpdateButton() {
     </button>
   );
 
-  // One title bar item, as T3's SidebarMenuItem, so the popover's focus guards beside the button take no gap.
+  // One sidebar item, as T3's SidebarMenuItem, so the popover's focus guards beside the button take no gap.
   return (
     <span className="flex shrink-0">
       <Popover
@@ -289,8 +277,7 @@ export function UpdateButton() {
           {!showReleaseNotesPopover ? (
             <TooltipPopup
               align="center"
-              side="bottom"
-              sideOffset={sideOffset}
+              side="top"
               variant={showUpdateDetails ? 'glass' : 'default'}
             >
               {idleTooltip?.detail ? (
@@ -320,8 +307,7 @@ export function UpdateButton() {
               }
             }}
             ref={releaseNotesPopupRef}
-            side="bottom"
-            sideOffset={sideOffset}
+            side="top"
             tooltipStyle
           >
             <div className="flex max-h-[calc(var(--available-height)-0.5rem)] min-h-0 w-fit max-w-[min(24rem,calc(100vw-2rem))] flex-col text-left">

@@ -1,9 +1,9 @@
-// The header's Settings button and its dialog, shown only in the board app: a tick box per Claude
+// The sidebar's Settings button and its dialog, shown only in the board app: a tick box per Claude
 // profile, which links the app's skills and checklists into it or removes them at once, and the
 // update channel with what the updater last found on it.
 
+import { Settings as SettingsIcon } from 'lucide-react';
 import { boardApp, type UpdateChannel, type UpdateState } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
 import { Checkbox } from '@mux-factory/ui/checkbox';
 import { Dialog, DialogDescription, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '@mux-factory/ui/dialog';
 import { Fieldset, FieldsetLegend } from '@mux-factory/ui/fieldset';
@@ -12,6 +12,7 @@ import { Radio, RadioGroup } from '@mux-factory/ui/radio-group';
 import { profilePath, useSettingsStore } from './settings-store.ts';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { FormResult } from '../notices/form-result.tsx';
+import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 
 const CHANNELS: { channel: UpdateChannel; label: string }[] = [
   { channel: 'nightly', label: 'Nightly' },
@@ -101,7 +102,7 @@ export function Settings() {
   if (!boardApp()) return null;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="open-settings" render={<Button variant="outline" size="xs" />}>Settings</DialogTrigger>
+      <SidebarIconButton label="Settings" className="open-settings" render={<DialogTrigger />}><SettingsIcon /></SidebarIconButton>
       <DialogPopup id="settings-dialog">
         <DialogHeader>
           <DialogTitle id="settings-heading">Settings</DialogTitle>

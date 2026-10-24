@@ -1,7 +1,8 @@
-// The header's Add item button and its dialog: a form that creates an issue in a configured repo
-// and adds it to List. The dialog stays mounted while closed, so a half-written draft survives.
+// The sidebar's Add item button and its dialog: a form that creates an issue in a configured repo
+// and adds it to List. ⌘N opens it too. The dialog stays mounted while closed, so a half-written draft survives.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { SquarePen } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { applicability, ITEM_KINDS } from '@mux-factory/shared';
 import type { RepoConfig } from '@mux-factory/shared';
@@ -18,6 +19,7 @@ import { FormResult } from '../notices/form-result.tsx';
 import { useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
+import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 
 /** The applicability checkboxes of one repo, each group with the hint for choosing none. Base UI's checkboxes
  * don't follow a native fieldset's disabled, so they take it themselves. */
@@ -109,9 +111,19 @@ function AddItemForm() {
 
 export function AddItem() {
   const { draft, open, setOpen } = useAddItemStore();
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        useAddItemStore.getState().setOpen(true);
+      }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, []);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="add-item" render={<Button variant="outline" size="xs" />}>Add item</DialogTrigger>
+      <SidebarIconButton label="Add item" tooltip="Add item (⌘N)" className="add-item" render={<DialogTrigger aria-keyshortcuts="Meta+N" />}><SquarePen /></SidebarIconButton>
       <KeptMountedDialogPopup id="add-item-dialog" initialFocus={() => document.getElementById('item-repo')}>
         {/* A new draft remounts the form, which clears its fields. */}
         <AddItemForm key={draft} />

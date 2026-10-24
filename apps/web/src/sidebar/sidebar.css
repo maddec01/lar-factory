@@ -1,0 +1,28 @@
+/* The sidebar's T3 chrome: T3's [data-app-sidebar] surface, a zinc-50 bar with a zinc-25 hover and a white selected
+   row, black in dark mode; and the traffic-light stand-ins' grey. */
+:root {
+  --traffic-stand-in: var(--color-zinc-300);
+
+  @variant dark {
+    --traffic-stand-in: var(--color-zinc-700);
+  }
+}
+.sidebar {
+  --sidebar: var(--color-zinc-50);
+  --sidebar-foreground: var(--color-zinc-800);
+  --sidebar-muted-foreground: var(--color-zinc-500);
+  --sidebar-row-hover: var(--color-zinc-25);
+  --sidebar-row-selected: var(--color-white);
+  --sidebar-border: var(--color-zinc-200);
+  --sidebar-icon-color: color-mix(in srgb, var(--sidebar-muted-foreground) 60%, var(--sidebar));
+  font-size: var(--text-sm);
+
+  @variant dark {
+    --sidebar: var(--color-black);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-muted-foreground: var(--muted-foreground);
+    --sidebar-row-hover: color-mix(in srgb, var(--foreground) 8%, transparent);
+    --sidebar-row-selected: color-mix(in srgb, var(--foreground) 7%, transparent);
+    --sidebar-border: var(--border);
+  }
+}

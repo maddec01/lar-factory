@@ -1,4 +1,4 @@
-// Start on a Queued card, as a menu button: Start opens a menu on the highlighted entry, arrow
+// Start on a Queued item, as a menu button: Start opens a menu on the highlighted entry, arrow
 // keys move, Enter or a click picks and starts, and Escape, Tab or a click outside closes it.
 // Once a thread starts or may have started, a tag takes Start's place.
 
@@ -11,7 +11,7 @@ import { Badge } from '@mux-factory/ui/badge';
 import { Button } from '@mux-factory/ui/button';
 import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuTrigger } from '@mux-factory/ui/menu';
 import { useItemAction } from './action-store.ts';
-import { writeState } from './card.tsx';
+import { writeState } from './item-actions.tsx';
 import { startItem } from './start-item.ts';
 import { useStart, useStartStore } from './start-store.ts';
 import type { StartState } from './start-store.ts';
@@ -62,13 +62,13 @@ function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onP
   );
 }
 
-/** Start in the card's top-right corner, or the tag that took its place; the item dialog names it `label` and sizes it up. */
+/** Start, or the tag that took its place; the item dialog names it `label` and sizes it up. */
 export function StartControl({ item, data, label = 'Start', size = 'xs', icon }: { item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; icon?: ReactNode }) {
   const start = useStart(item.id);
   const action = useItemAction(item.id);
   const [open, setOpen] = useState(false);
   const thread = startedThread(item, data, start);
-  // The toast announces a start; the card only keeps Start from running twice.
+  // The toast announces a start; the tag only keeps Start from running twice.
   if (thread) return <span className="start-group"><Badge variant="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
   if (start?.phase === 'uncertain') {
     // Once its message is closed, a tag still says why Start is gone.
@@ -97,7 +97,7 @@ export function StartControl({ item, data, label = 'Start', size = 'xs', icon }:
   );
 }
 
-/** Under the card: why Start failed, or that it may have run. Closing it keeps an unconfirmed start's tag. */
+/** Why Start failed, or that it may have run. Closing it keeps an unconfirmed start's tag. */
 export function StartMessage({ item }: { item: Item }) {
   const start = useStart(item.id);
   const el = useRef<HTMLParagraphElement>(null);

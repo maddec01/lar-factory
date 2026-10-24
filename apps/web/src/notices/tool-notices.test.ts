@@ -23,17 +23,18 @@ function holdRecheck(): void {
 }
 const board = (data: BoardData) => new Response(JSON.stringify({ error: null, board: data }));
 
-test('a missing t3 replaces the board with a notice and Recheck', async () => {
+test('a missing t3 replaces the main area with a notice and Recheck', async () => {
   await mountPage(withTools({ t3: { problem: 'missing' } }));
-  const notice = $('main.tool-missing .tool-missing-box')!;
+  const notice = $('main .tool-missing .tool-missing-box')!;
   expect(notice.getAttribute('role')).toBe('alert');
   expect(notice.querySelector('h1')!.textContent).toBe('T3 Code not found');
   expect(notice.querySelector('h1 svg.brand-mark')).not.toBeNull();
   expect(notice.querySelector('p')!.textContent).toBe("The board starts threads through T3 Code's t3 command and didn't find it on the login shell's PATH, "
     + 'in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck. The board also looks again every 10 seconds.');
   expect(recheckButton().textContent).toBe('Recheck');
-  expect($('#panel-board'), 'the notice replaces the board').toBeNull();
-  expect($('header.top')).toBeNull();
+  expect($('.desk'), 'the notice replaces the desk and the line').toBeNull();
+  expect($('.line')).toBeNull();
+  expect($('.banners')).toBeNull();
 });
 
 test('a t3 override that points nowhere is named', async () => {
@@ -45,7 +46,7 @@ test('a t3 override that points nowhere is named', async () => {
 
 test('a missing or logged-out gh shows its own notice instead of Stale', async () => {
   await mountPage(withTools({ gh: { problem: 'missing' } }, failed));
-  const banners = () => $$('header .banner');
+  const banners = () => $$('.banners .banner');
   expect(banners().length).toBe(1);
   expect(banners()[0]!.getAttribute('role')).toBe('alert');
   expect(bannerText(banners()[0]!)).toEqual(['GitHub CLI not found.', 'The board reads the project through gh. Install it with brew install gh Copy, '
@@ -83,7 +84,7 @@ test('Recheck posts, shows Checking…, then the board once the tool is found, a
   await settle(() => recheckButton().click());
   await answer(board(withTools({})));
   expect($('.tool-missing')).toBeNull();
-  expect($('#panel-board')).not.toBeNull();
+  expect($('.desk')).not.toBeNull();
 });
 
 test("after Recheck a gh banner says it's still logged out, or why Recheck failed, until the server answers again", async () => {

@@ -1,37 +1,53 @@
-// The page: the title bar, then the header and the Board view; or, while no t3 is found, the title bar above the
-// notice that replaces the rest.
+// The page, the control room: the window controls, the sidebar with the List, and the main area with the title bar,
+// the banners, Your desk and the line, scoped to the repository the sidebar picked. While no t3 is found, the notice
+// replaces the main area's content and the sidebar shows only its brand and Settings.
 
-import { useLayoutEffect } from 'react';
-import { AbandonDialog } from './items/abandon-dialog.tsx';
+import { boardSections, platformOf } from '@mux-factory/shared';
 import { useBoardStore } from './board/board-store.ts';
-import { BoardView } from './board/board-view.tsx';
 import { CopyStatus } from './copy/copy-button.tsx';
+import { Desk } from './desk/desk.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
-import { Header } from './board/header.tsx';
-import { restoreAnchor } from './board/keep-anchor.ts';
+import { AbandonDialog } from './items/abandon-dialog.tsx';
+import { Line } from './line/line.tsx';
+import { Banners } from './notices/banners.tsx';
 import { Toasts } from './notices/toasts.tsx';
-import { TitleBar } from './title-bar/TitleBar.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
+import { Sidebar } from './sidebar/sidebar.tsx';
+import { useSidebarStore } from './sidebar/sidebar-store.ts';
+import { WindowControls } from './sidebar/window-controls.tsx';
+import { TitleBar } from './title-bar/title-bar.tsx';
+
+function Content() {
+  const { data, now } = useBoardStore();
+  const scope = useSidebarStore((state) => state.scope);
+  const items = scope ? data.items.filter((i) => platformOf(i, data.repos) === scope) : data.items;
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="grid gap-7 px-6 py-5">
+        <Banners />
+        <Desk items={boardSections({ ...data, items }, now).needsYou} />
+        <Line items={items} />
+      </div>
+    </div>
+  );
+}
 
 export function App() {
-  const data = useBoardStore((state) => state.data);
-  // New data may change what's above the reading position; put it back before the browser paints.
-  useLayoutEffect(restoreAnchor, [data]);
-  if (data.tools?.t3) return <><TitleBar /><T3Missing problem={data.tools.t3} /></>;
+  const t3 = useBoardStore((state) => state.data.tools?.t3);
+  const sidebar = useSidebarStore((state) => state.open);
   return (
-    <>
-      <TitleBar />
-      <Header />
-      <main>
-        <div id="panel-board">
-          <BoardView />
-        </div>
+    <div className="fixed inset-0 flex bg-(--background) text-(--foreground)">
+      <WindowControls />
+      <Sidebar board={!t3} open={sidebar} />
+      <main className="flex min-w-0 flex-1 flex-col">
+        <TitleBar />
+        {t3 ? <T3Missing problem={t3} /> : <Content />}
       </main>
-      {/* Outside main, so the announcement sits apart from the Board view. */}
+      {/* Outside main, so the announcement sits apart from the page. */}
       <CopyStatus />
       <Toasts />
       <ItemDialog />
       <AbandonDialog />
-    </>
+    </div>
   );
 }

@@ -258,6 +258,12 @@ const program = Effect.gen(function* () {
   Effect.ensuring(Effect.sync(() => Electron.app.exit(0))),
 );
 
+// The app menu's About, Hide and Quit items read app.name. Electron derives userData
+// from the name, so pin it first: update-channel.json, .updaterId and the
+// single-instance lock stay in the folder the app has always used.
+Electron.app.setPath("userData", NodePath.join(Electron.app.getPath("appData"), "@mux-factory/desktop"));
+Electron.app.setName("µx Factory");
+
 // One app at a time: a second launch hands over to the first (see "second-instance") and quits.
 if (Electron.app.requestSingleInstanceLock()) NodeRuntime.runMain(program);
 else Electron.app.quit();

@@ -61,7 +61,7 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
     height: 860,
     minWidth: 840,
     minHeight: 620,
-    title: "Mux Factory",
+    title: "µx Factory",
     ...WindowTitleBar.options(process.platform),
     webPreferences: {
       preload: NodePath.join(import.meta.dirname, "preload.cjs"),

@@ -7,7 +7,7 @@ import { TestClock } from "effect/testing";
 
 import type { UpdateChannel, UpdateState } from "@mux-factory/shared";
 import * as AppUpdates from "./AppUpdates.ts";
-import type { ChannelSetting } from "./ChannelSetting.ts";
+import type { ChannelSetting } from "./channel-setting.ts";
 import { ElectronUpdaterError, type ElectronUpdater, type UpdaterEvent } from "./ElectronUpdater.ts";
 import * as Machine from "./updateMachine.ts";
 

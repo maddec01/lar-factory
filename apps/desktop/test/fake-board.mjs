@@ -1,4 +1,4 @@
-// Stands in for board/src/server.ts. FAKE_BOARD sets what it does:
+// Stands in for apps/server/src/server.ts. FAKE_BOARD sets what it does:
 // - "ready": reports its port; /healthz answers 503 to the first FAKE_BOARD_BUSY
 //   requests, then 200. /hits returns how many /healthz requests it has had.
 // - "silent": listens but never reports a port.

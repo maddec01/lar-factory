@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import * as StartingPage from "./StartingPage.ts";
+import * as StartingPage from "./starting-page.ts";
 
 const html = (url: string) => decodeURIComponent(url.slice(url.indexOf(",") + 1));
 

@@ -1,5 +1,5 @@
 // The window's title bar on a Mac: hidden, with the traffic lights inset into the 52 px bar the
-// page draws (board/src/app/TitleBar.tsx). From T3 Code's getWindowTitleBarOptions in
+// page draws (apps/web/src/title-bar/TitleBar.tsx). From T3 Code's getWindowTitleBarOptions in
 // apps/desktop/src/window/DesktopWindow.ts. On other systems the window keeps the system's title bar,
 // and the page's bar sits below it.
 //

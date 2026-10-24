@@ -5,7 +5,7 @@ import * as NodePath from "node:path";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
-import * as SkillInstall from "./SkillInstall.ts";
+import * as SkillInstall from "./skill-install.ts";
 
 const tempDir = (prefix: string) => NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), prefix));
 

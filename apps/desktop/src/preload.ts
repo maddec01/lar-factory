@@ -9,8 +9,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 import type { BoardAppBridge } from "@mux-factory/shared";
-import * as IpcChannels from "./ipcChannels.ts";
-import * as LaunchSecret from "./LaunchSecret.ts";
+import * as IpcChannels from "./ipc-channels.ts";
+import * as LaunchSecret from "./board-server/launch-secret.ts";
 
 // The main process answers only the board's pages; any other page gets no secret.
 const secret: unknown = ipcRenderer.sendSync(LaunchSecret.CHANNEL);

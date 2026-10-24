@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import * as LaunchSecret from "./LaunchSecret.ts";
+import * as LaunchSecret from "./launch-secret.ts";
 
 describe("LaunchSecret", () => {
   it("makes a new secret each launch", () => {

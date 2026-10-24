@@ -17,21 +17,21 @@ import * as Effect from "effect/Effect";
 import { HttpClient } from "effect/http";
 import * as Electron from "electron";
 
-import * as BoardServer from "./backend/BoardServer.ts";
-import * as BoardSupervisor from "./backend/BoardSupervisor.ts";
-import * as ClaudeProfiles from "./backend/ClaudeProfiles.ts";
-import * as LaunchAgentCleanup from "./backend/LaunchAgentCleanup.ts";
-import * as SkillInstall from "./backend/SkillInstall.ts";
-import * as ExternalLink from "./ExternalLink.ts";
-import * as IpcChannels from "./ipcChannels.ts";
-import * as LaunchSecret from "./LaunchSecret.ts";
-import * as RestartDialog from "./RestartDialog.ts";
-import * as ShellEnvironment from "./shell/ShellEnvironment.ts";
-import * as StartingPage from "./StartingPage.ts";
+import * as BoardServer from "./board-server/BoardServer.ts";
+import * as BoardSupervisor from "./board-server/BoardSupervisor.ts";
+import * as ClaudeProfiles from "./skills/claude-profiles.ts";
+import * as LaunchAgentCleanup from "./launch-agent/launch-agent-cleanup.ts";
+import * as SkillInstall from "./skills/skill-install.ts";
+import * as ExternalLink from "./window/external-link.ts";
+import * as IpcChannels from "./ipc-channels.ts";
+import * as LaunchSecret from "./board-server/launch-secret.ts";
+import * as RestartDialog from "./updates/restart-dialog.ts";
+import * as ShellEnvironment from "./shell-environment/ShellEnvironment.ts";
+import * as StartingPage from "./window/starting-page.ts";
 import * as AppUpdates from "./updates/AppUpdates.ts";
-import * as ChannelSetting from "./updates/ChannelSetting.ts";
+import * as ChannelSetting from "./updates/channel-setting.ts";
 import * as ElectronUpdater from "./updates/ElectronUpdater.ts";
-import * as WindowTitleBar from "./WindowTitleBar.ts";
+import * as WindowTitleBar from "./window/WindowTitleBar.ts";
 
 /** Resolves once the user quits the app or closes its last window. */
 const quitRequested = Effect.callback<void>((resume) => {

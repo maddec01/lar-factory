@@ -16,5 +16,5 @@
     "skipLibCheck": true
   },
   "include": ["src"],
-  "exclude": ["src/components/ui", "src/dialog"]
+  "exclude": ["src/components/ui", "src/dialog", "src/form"]
 }

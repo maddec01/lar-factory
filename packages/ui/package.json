@@ -16,6 +16,8 @@
     "./radio-group": "./src/components/ui/radio-group.tsx",
     "./textarea": "./src/components/ui/textarea.tsx",
     "./kept-mounted-dialog-popup": "./src/dialog/kept-mounted-dialog-popup.tsx",
+    "./fieldset": "./src/form/fieldset.tsx",
+    "./native-select": "./src/form/native-select.tsx",
     "./styles.css": "./src/styles.css",
     "./compiled-css": "./src/compiled-css/compiled-css.ts"
   },

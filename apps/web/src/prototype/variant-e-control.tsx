@@ -1,14 +1,14 @@
 // PROTOTYPE, throwaway. Variant E, "Control room": C's overview with A's detail. The window stays a
 // dashboard (KPI tiles, your desk, the line as stations, repos in the sidebar), and clicking any item, in
-// the sidebar, on the desk or on the line, opens A's full detail in the right panel without leaving the
+// the sidebar, on the desk or on the line, opens A's full detail in a dialog over the
 // overview. The left sidebar copies T3 Code's: its toggle beside the traffic lights, search with Add item,
-// Settings and the update button at its foot. The right panel toggles as T3's does and reopens on the last
-// item viewed. ⌘B toggles the sidebar, ⌘⌥B the panel, Esc closes the panel.
+// Settings and the update button at its foot. ⌘B toggles the sidebar.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowRight, ChevronDown, ChevronRight, PanelRight, Search, Settings, SquarePen, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronRight, Search, Settings, SquarePen, X } from 'lucide-react';
 import { boardApp, boardSections, formatUsd, platformOf, shortAgo } from '@mux-factory/shared';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@mux-factory/ui/dialog';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import type { BoardData, Item, Status } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -119,55 +119,51 @@ function Line({ items, data, pick }: { items: Item[]; data: BoardData; pick: Pic
   );
 }
 
-/** The right panel before any item was viewed. */
-function EmptyPanel() {
+/** A's item detail in T3's dialog: the same sections, the actions in its footer. Esc or a click outside closes it. */
+function ItemDialog({ item: opened, data, now, onClose }: { item: Item | undefined; data: BoardData; now: number; onClose: () => void }) {
+  // The last item stays in the dialog while it animates closed.
+  const kept = useRef(opened);
+  if (opened) kept.current = opened;
+  const item = kept.current;
+  const h = item && hint(item);
   return (
-    <aside className="flex w-[440px] shrink-0 flex-col border-l border-(--border) bg-(--background)">
-      <header className={`h-[52px] shrink-0 border-b border-(--border) ${drag}`} />
-      <p className="m-0 grid flex-1 place-items-center px-8 text-center text-(--muted-foreground)">Click an item on the board to see its details here.</p>
-    </aside>
-  );
-}
-
-/** A's item detail, narrowed to an inspector: the same sections, the actions pinned at its foot. */
-function Inspector({ item, data, now }: { item: Item; data: BoardData; now: number }) {
-  const h = hint(item);
-  return (
-    <aside className="flex w-[440px] shrink-0 flex-col border-l border-(--border) bg-(--background)">
-      <header className={`flex h-[52px] shrink-0 items-center gap-2 border-b border-(--border) px-4 ${drag}`}>
-        <PlatformTag platform={platformOf(item, data.repos)} />
-        <span className="text-(--muted-foreground) tabular-nums">{refText(item)}</span>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid gap-5 px-5 py-5">
-          <div className="grid gap-2">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-(--muted-foreground)">
-              <StatusGlyph status={item.status} /> <span className="font-medium text-(--foreground)">{item.status}</span> · updated {shortAgo(item.updatedAt, now)}
-              {item.blockedBy > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {item.blockedBy}</span>}
-            </div>
-            <h1 className="m-0 text-lg font-semibold leading-snug tracking-tight">{item.title}</h1>
-            {item.parent && <p className="m-0 text-(--muted-foreground)">Part of <a href={item.parent.url} className="underline">#{item.parent.number} {item.parent.title}</a></p>}
-          </div>
-          <StepTrack status={item.status} labels />
-          {h && (
-            <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
-              <StatusGlyph status={item.status} className="size-4" />
-              <span className="flex-1 font-medium text-(--warning-foreground)">{h}</span>
-            </div>
-          )}
-          {item.slices.length > 0 && (
-            <section className="grid gap-2">
-              <h2 className="m-0 text-[13px] font-medium">Slices <span className="text-(--muted-foreground)">{item.slices.filter((s) => s.progress === 'done').length}/{item.slices.length} done</span></h2>
-              <SliceList item={item} />
-            </section>
-          )}
-          {item.linkedPrs.length > 0 && <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Pull requests</h2><PrList item={item} /></section>}
-          <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Agent work</h2><StatsGrid item={item} /></section>
-          {item.labels.length > 0 && <p className="m-0 flex flex-wrap gap-1">{item.labels.map((l) => <span key={l} className="rounded-(--radius-sm) border border-(--input) px-1.5 text-[11px] text-(--muted-foreground)">{l}</span>)}</p>}
-        </div>
-      </div>
-      <footer className="flex shrink-0 justify-end border-t border-(--border) px-4 py-3"><ActionButtons item={item} /></footer>
-    </aside>
+    <Dialog open={!!opened} onOpenChange={(open) => !open && onClose()}>
+      <DialogPopup className="max-w-2xl">
+        {item && (
+          <>
+            <DialogHeader>
+              <div className="flex flex-wrap items-center gap-2 pr-8 text-xs text-(--muted-foreground)">
+                <PlatformTag platform={platformOf(item, data.repos)} />
+                <span className="tabular-nums">{refText(item)}</span>
+                <StatusGlyph status={item.status} /> <span className="font-medium text-(--foreground)">{item.status}</span> · updated {shortAgo(item.updatedAt, now)}
+                {item.blockedBy > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {item.blockedBy}</span>}
+              </div>
+              <DialogTitle className="text-lg leading-snug tracking-tight">{item.title}</DialogTitle>
+              {item.parent && <DialogDescription>Part of <a href={item.parent.url} className="underline">#{item.parent.number} {item.parent.title}</a></DialogDescription>}
+            </DialogHeader>
+            <DialogPanel className="grid gap-5 space-y-0">
+              <StepTrack status={item.status} labels />
+              {h && (
+                <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
+                  <StatusGlyph status={item.status} className="size-4" />
+                  <span className="flex-1 font-medium text-(--warning-foreground)">{h}</span>
+                </div>
+              )}
+              {item.slices.length > 0 && (
+                <section className="grid gap-2">
+                  <h2 className="m-0 text-[13px] font-medium">Slices <span className="text-(--muted-foreground)">{item.slices.filter((s) => s.progress === 'done').length}/{item.slices.length} done</span></h2>
+                  <SliceList item={item} />
+                </section>
+              )}
+              {item.linkedPrs.length > 0 && <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Pull requests</h2><PrList item={item} /></section>}
+              <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Agent work</h2><StatsGrid item={item} /></section>
+              {item.labels.length > 0 && <p className="m-0 flex flex-wrap gap-1">{item.labels.map((l) => <span key={l} className="rounded-(--radius-sm) border border-(--input) px-1.5 text-[11px] text-(--muted-foreground)">{l}</span>)}</p>}
+            </DialogPanel>
+            <DialogFooter><ActionButtons item={item} /></DialogFooter>
+          </>
+        )}
+      </DialogPopup>
+    </Dialog>
   );
 }
 
@@ -212,20 +208,6 @@ function Update() {
   );
 }
 
-/** T3's right-panel toggle at the end of the main header: a ghost toggle, filled while the panel is open. */
-function PanelToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={
-        <button type="button" aria-label="Toggle right panel" aria-pressed={open} onClick={onToggle}
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-(--foreground) hover:bg-(--accent) aria-pressed:bg-(--accent) [&_svg]:size-4 [&_svg]:opacity-80" />
-      }><PanelRight /></TooltipTrigger>
-      <TooltipPopup side="bottom">Toggle right panel (⌘⌥B)</TooltipPopup>
-    </Tooltip>
-  );
-}
-
-const LAST = 'prototype.lastItem';
 const matches = (item: Item, q: string) => !q || `${item.title} ${refText(item)}`.toLowerCase().includes(q);
 
 export function VariantE() {
@@ -235,17 +217,14 @@ export function VariantE() {
   const all = pages(data);
   const [page, setPage] = useState('general');
   const [sidebar, setSidebar] = useState(true);
-  const [panel, setPanel] = useState(false);
-  const [last, setLast] = useState<string | null>(() => localStorage.getItem(LAST));
+  const [opened, setOpened] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const view = (id: string) => { setLast(id); localStorage.setItem(LAST, id); setPanel(true); };
-  const pick: Pick = { id: panel ? last : null, set: view };
+  const pick: Pick = { id: opened, set: setOpened };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPanel(false);
-      if (event.metaKey && event.key.toLowerCase() === 'b') {
+      if (event.metaKey && !event.altKey && event.key.toLowerCase() === 'b') {
         event.preventDefault();
-        if (event.altKey) setPanel((p) => !p); else setSidebar((s) => !s);
+        setSidebar((s) => !s);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -255,7 +234,7 @@ export function VariantE() {
   const s = boardSections(scoped, now);
   const building = scoped.items.filter((i) => i.status === 'In progress').length;
   const spend = scoped.items.reduce((t, i) => t + (statsOf(i)?.costUsd ?? 0), 0);
-  const item = data.items.find((i) => i.id === last);
+  const item = data.items.find((i) => i.id === opened);
   const current = all.find((p) => p.id === page)!;
   const q = query.trim().toLowerCase();
   return (
@@ -302,7 +281,6 @@ export function VariantE() {
               <span className="text-xs text-(--muted-foreground)">{data.fetchedAt ? `refreshed ${shortAgo(data.fetchedAt, now)}` : ''}</span>
               <span className={`ml-auto flex items-center gap-1.5 ${noDrag}`}>
                 <Button small>This week</Button>
-                <PanelToggle open={panel} onToggle={() => setPanel(!panel)} />
               </span>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -331,7 +309,7 @@ export function VariantE() {
           </>
         )}
       </main>
-      {!settings && panel && (item ? <Inspector item={item} data={data} now={now} /> : <EmptyPanel />)}
+      <ItemDialog item={item} data={data} now={now} onClose={() => setOpened(null)} />
     </div>
   );
 }

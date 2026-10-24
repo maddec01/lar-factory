@@ -51,7 +51,6 @@ interface RawContent {
   parent?: RawIssueRef | null;
   subIssuesSummary?: { total: number; completed: number };
   subIssues?: { nodes: RawIssueRef[] };
-  issueDependenciesSummary?: { blockedBy: number };
   blockedBy?: { nodes: RawBlocker[] };
   closedByPullRequestsReferences?: { nodes: RawLinkedPr[] };
 }
@@ -193,7 +192,6 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     state: c.state ?? null,
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
     subIssues: subIssueCounts(raw, builds),
-    blockedBy: c.issueDependenciesSummary?.blockedBy ?? 0,
     blockers: c.blockedBy?.nodes.map((b) => ({ number: b.number, repo: b.repository.nameWithOwner, state: b.state })) ?? [],
     updatedAt: updated,
     closedAt: c.closedAt ?? null,

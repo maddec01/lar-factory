@@ -80,16 +80,50 @@ test('while the slots are full, the row Start next starts waits for one, not a d
 test('the header shows the build slots; while they are full the first row waits for one, and Start still works', async () => {
   await mountPage(withChoices);
   const slots = queue().querySelector('.build-slots')!;
-  expect(text(slots), 'two builds in progress; a concept takes no slot').toBe('2/2 building');
-  expect(slots.querySelectorAll('.slot')).toHaveLength(2);
+  expect(text(slots), 'three builds in progress, past the limit').toBe('3/2 building');
+  expect(slots.querySelectorAll('.slot'), 'a bar per build past the limit').toHaveLength(3);
   expect(text(row('PVTI_sample05')), 'the first row').toContain('next when a build slot frees');
   expect(text(row('PVTI_sample06'))).not.toContain('next when a build slot frees');
   expect(start().getAttribute('aria-disabled')).toBeNull();
   expect(startNext().getAttribute('aria-disabled')).toBeNull();
 });
 
+test('a Queued item blocked by an open issue has its Start refining disabled, with Start after, and Start next passes over it', async () => {
+  const blocked = { ...withChoices, items: sample.items.map((i) => (i.id === 'PVTI_sample05'
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'OPEN' as const }] } : i)) };
+  await mountPage(blocked);
+  expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, 'Blocked by #202 until it closes']);
+  expect(text(row('PVTI_sample05').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
+  expect(startNext().getAttribute('data-start')).toBe('PVTI_sample06');
+  expect(start('PVTI_sample06').className, 'the primary Start follows Start next').toContain('bg-primary');
+  expect(start().className).not.toContain('bg-primary');
+});
+
+test("a Queued item whose repository has no T3 project has its Start refining disabled with the project's hint, and Start next passes over it", async () => {
+  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
+  await mountPage({ ...withChoices, repositoryProjects: { 'maddec01/mux-server': hint } });
+  expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, hint]);
+  expect(row('PVTI_sample05').querySelector('[data-start-after]'), 'nothing blocks it, so no Start after').toBeNull();
+  expect(startNext().getAttribute('data-start')).toBe('PVTI_sample06');
+});
+
+test('when no queued item can start, Start next shows disabled and says why', async () => {
+  const held = { ...withChoices, items: sample.items.map((i) => (['PVTI_sample05', 'PVTI_sample06'].includes(i.id)
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'OPEN' as const }] } : i)) };
+  await mountPage(held);
+  const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
+  expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs an issue or a T3 project, or has a thread at work.']);
+  expect(next.className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
+  expect(text(queue()), 'no row waits for a slot').not.toContain('next when a build slot frees');
+});
+
+test('a concept in progress takes no build slot', async () => {
+  await mountPage(moved('PVTI_sample09', 'In progress'));
+  expect(text(queue().querySelector('.build-slots'))).toBe('3/2 building');
+});
+
 test('with a build slot free, nothing waits', async () => {
-  await mountPage(moved('PVTI_sample14', 'Review'));
+  await mountPage({ ...sample, items: sample.items.map((i) => (['PVTI_sample14', 'PVTI_sample23'].includes(i.id) ? { ...i, status: 'Review' as const } : i)) });
   expect(text(queue().querySelector('.build-slots'))).toBe('1/2 building');
   expect(text(queue())).not.toContain('next when a build slot frees');
 });

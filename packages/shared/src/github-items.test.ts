@@ -31,7 +31,6 @@ test('normalizes an issue item from the GraphQL response', () => {
       labels: { nodes: [{ name: 'feature' }] },
       parent: { number: 60, title: 'P', url: 'u', state: 'CLOSED', repository: { nameWithOwner: 'maddec01/mux-server' } },
       subIssuesSummary: { total: 3, completed: 1 },
-      issueDependenciesSummary: { blockedBy: 2 },
       blockedBy: { nodes: [
         { number: 7, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } },
         { number: 8, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-apple' } },
@@ -44,7 +43,7 @@ test('normalizes an issue item from the GraphQL response', () => {
   assert.equal(item?.status, 'Needs you');
   assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
   assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/mux-server', state: 'CLOSED' });
-  assert.equal(item?.blockedBy, 2, 'the badge keeps the open count from the summary');
+  assert.equal(item && 'blockedBy' in item, false, 'the open count comes from the blockers, not a field of its own');
   assert.deepEqual(item?.blockers, [
     { number: 7, repo: 'maddec01/mux-server', state: 'OPEN' },
     { number: 8, repo: 'maddec01/mux-apple', state: 'OPEN' },

@@ -274,7 +274,6 @@ test('Start only runs for Queued issues from this board page and session', async
 
 test('Start is refused while an issue the item is blocked by is open', async (t) => {
   const blocked = rawIssue('PVTI_12', 12, 'Queued', ['decision: grill'], {
-    issueDependenciesSummary: { blockedBy: 2 },
     blockedBy: { nodes: [5, 6].map((number) => ({ number, state: 'OPEN', repository: { nameWithOwner: number === 5 ? 'maddec01/mux-factory' : 'maddec01/mux-server' } })) },
   });
   const board = await factoryBoard(t, [blocked]);

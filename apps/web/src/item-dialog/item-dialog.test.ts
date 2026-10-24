@@ -62,11 +62,11 @@ test.each([
   ['List', 'PVTI_sample01', ['Abandon', 'GitHub', 'Queue']],
   ['Queued', 'PVTI_sample05', ['← Back to List', 'Abandon', 'GitHub', 'Start refining ▾']],
   ['a Queued draft', 'PVTI_sample21', ['← Back to List', 'Abandon']],
-  ['Shaping', 'PVTI_sample07', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
+  ['Shaping', 'PVTI_sample07', ['GitHub', 'Open thread']],
   ['Needs you', 'PVTI_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
-  ['blocked Ready', 'PVTI_sample13', ['GitHub', 'Start build (disabled: Blocked by #202 until it closes)']],
-  ['In progress', 'PVTI_sample14', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
-  ['Review', 'PVTI_sample15', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
+  ['blocked Ready', 'PVTI_sample13', ['GitHub', 'Start build (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']],
+  ['In progress', 'PVTI_sample14', ['GitHub', 'Open thread']],
+  ['Review', 'PVTI_sample15', ['GitHub', 'Open thread']],
   ['Verify', 'PVTI_sample16', ['GitHub', 'Verify build']],
   ['Ready to merge', 'PVTI_sample17', ['GitHub', 'Merge PR']],
   ['Done', 'PVTI_sample19', ['GitHub']],
@@ -92,6 +92,13 @@ test('GitHub opens the item, and Verify build and Merge PR open its pull request
   expect(links).toEqual([['GitHub', 'https://github.com/maddec01/mux-apple/issues/31', '_blank'], ['Verify build', 'https://github.com/maddec01/mux-apple/pull/32', '_blank']]);
   await openItem('PVTI_sample17');
   expect(footer().querySelector('a:last-child')!.getAttribute('href')).toMatch(/\/pull\/\d+$/);
+});
+
+test('a Queued item blocked by an open issue has Start refining disabled in the footer, with Start after', async () => {
+  await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'PVTI_sample05'
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'OPEN' as const }] } : i)) });
+  await openItem('PVTI_sample05');
+  expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', 'Start refining (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']);
 });
 
 /** The sample with `itemId`'s threads replaced. */
@@ -196,7 +203,7 @@ test('a failed Start shows in the dialog and offers Retry start', async () => {
 /** The sample with #140's blocker closed, so its Start build runs, and writes on. */
 const readyBuild: BoardData = {
   ...withThreads('PVTI_sample13', undefined), capture: { session: 's1', enabled: true },
-  items: sample.items.map((i) => (i.id === 'PVTI_sample13' ? { ...i, blockedBy: 0, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }] } : i)),
+  items: sample.items.map((i) => (i.id === 'PVTI_sample13' ? { ...i, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }] } : i)),
 };
 
 test('Start build in a Ready item’s footer sends the build, then tags it Started', async () => {

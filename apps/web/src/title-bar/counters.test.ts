@@ -20,10 +20,10 @@ async function openCounter(label: string): Promise<HTMLElement> {
 
 test('the counters show need you, building over the limit of 2, queued, shipped this week and spend', async () => {
   await mountPage();
-  expect(counters().map(text)).toEqual(['4need you', '2/2building', '3queued', '4shipped', '$190.25spend']);
+  expect(counters().map(text)).toEqual(['4need you', '3/2building', '3queued', '4shipped', '$190.25spend']);
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
     'need you: 4 items only you can move',
-    'building: At the in-flight limit',
+    'building: 1 over the in-flight limit',
     'queued: 3 items ready to build, 4 more in List',
     'shipped: Done in the last 7 days',
     'spend: Agent cost on open and recent items, an API estimate',
@@ -65,17 +65,17 @@ test('need you lists its items by status, each with its status glyph in its colo
 test('building lists the items in progress, its slots and what the limit means', async () => {
   await mountPage();
   const pop = await openCounter('building');
-  expect(head(pop)).toBe('Building2/2');
-  expect(rows().map((r) => r.split(' ')[0]), 'concept #180 takes no slot').toEqual(['#150', '#30']);
+  expect(head(pop)).toBe('Building3/2');
+  expect(rows().map((r) => r.split(' ')[0])).toEqual(['#150', '#30', '#180']);
   expect(foot(pop)).toBe('No free slot: queued items wait for one.');
 });
 
 test('a concept in progress takes no build slot', async () => {
   await mountPage(moved('PVTI_sample09', 'In progress'));
-  expect(text(counter('building'))).toBe('2/2building');
+  expect(text(counter('building'))).toBe('3/2building');
   const pop = await openCounter('building');
   expect(rows().map((r) => r.split(' ')[0])).not.toContain('#200');
-  expect(head(pop)).toBe('Building2/2');
+  expect(head(pop)).toBe('Building3/2');
 });
 
 test('queued lists the queued items and how many wait in List', async () => {

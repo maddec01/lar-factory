@@ -2,7 +2,7 @@
 // in the order they run. Each part's kind comes from its labels, what it waits on from its blocked-by issues, and its
 // thread is its newest item thread.
 
-import { decisionType, kindOf } from '@mux-factory/shared';
+import { blockerRef, decisionType, kindOf, openBlockers } from '@mux-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@mux-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'build'] as const;
@@ -48,10 +48,10 @@ export function partsOf(parent: Item, all: readonly Item[]): Part[] {
 }
 
 /** What still holds a part back: the issues it's blocked by that are open, while no thread has taken it on. */
-export const openWaits = (part: Part): Blocker[] => (started(part.item) ? [] : part.waitsOn.filter((b) => b.state === 'OPEN'));
+export const openWaits = (part: Part): Blocker[] => (started(part.item) ? [] : openBlockers(part.item));
 
-/** The issues a part waits on, as one list of numbers. */
-export const waitText = (blockers: readonly Blocker[]) => blockers.map((b) => `#${b.number}`).join(', ');
+/** The issues `item` waits on, as one list of refs, another repository's without its owner. */
+export const waitText = (item: Item, blockers: readonly Blocker[]) => blockers.map((b) => blockerRef(item, b, true)).join(', ');
 
 /** Every open concept and open item with sub-issues on the board, as a dossier, where it or a part is in `items`, the main area's scope. */
 export function dossiersOf(items: readonly Item[], all: readonly Item[]): DossierItems[] {

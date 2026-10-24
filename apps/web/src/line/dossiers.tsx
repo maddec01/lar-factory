@@ -13,6 +13,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, PlatformTag, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
+import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { THREAD_GLYPH, dossiersOf, isDone, openWaits, started, threadsOf } from './dossier-parts.ts';
@@ -86,11 +87,12 @@ function Step({ part, data }: { part: Part; data: BoardData }) {
   const yours = YOURS.includes(item.status);
   return (
     <li onClick={() => open(item)} data-part={item.id} className={`grid cursor-pointer gap-1 rounded-md px-2 py-1.5 hover:bg-(--accent) ${picked(isPicked)}`}>
-      <span className="flex min-w-0 items-center gap-2">
+      {/* With no room for the action beside a readable title, it wraps under it, at the right. */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <StatusGlyph status={item.status} />
-        <span className="min-w-0 flex-1 truncate text-[13px]"><ItemTitle item={item} /></span>
+        <span className="min-w-40 flex-1 truncate text-[13px]"><ItemTitle item={item} /></span>
         <span className="shrink-0 rounded border border-(--border) px-1 text-[10px] text-(--muted-foreground)">{part.kind}</span>
-        {!yours && <span className="shrink-0 empty:hidden" onClick={stop}><PartAction part={part} data={data} /></span>}
+        {!yours && <span className="ml-auto min-w-0 max-w-full empty:hidden" onClick={stop}><PartAction part={part} data={data} /></span>}
         {yours && <span className="shrink-0 text-[11px] text-(--warning-foreground)">on your desk</span>}
       </span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5.5 text-[11px] text-(--muted-foreground)">
@@ -305,7 +307,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
         {rows.map((p) => (
           <Row key={p.item.id} item={p.item} data={data} now={now} nested waiting={openWaits(p).length > 0} side={<PartSide part={p} data={data} />}>
             {(p.item.status === 'Ready' || p.item.status === 'Queued') && (
-              <div className="px-3 pb-2 pl-12 empty:hidden" onClick={stop}><StartMessage item={p.item} kind={p.item.status === 'Ready' ? 'build' : 'refine'} /></div>
+              <div className="px-3 pb-2 pl-12 empty:hidden" onClick={stop}><StartMessage item={p.item} kind={p.item.status === 'Ready' ? 'build' : 'refine'} /><StartAfterError item={p.item} data={data} /></div>
             )}
           </Row>
         ))}

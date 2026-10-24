@@ -94,8 +94,8 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
     : isDone(item) ? 'border-(--border) bg-(--muted)' : open.length ? 'border-dashed border-(--input)' : 'border-(--border)';
   let action: ReactNode = null;
   if (item.status === 'Needs you') action = <OpenThread item={item} data={data} label="Answer in T3" size="xs" />;
-  else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} build="Start" />;
-  else if (open.length) action = <span className="text-[11px] text-(--muted-foreground)">waits on {waitText(open)}</span>;
+  else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} build="Start" afterOnly />;
+  else if (open.length) action = <span className="text-[11px] text-(--muted-foreground)">starts by itself after {waitText(item, open)}</span>;
   else if (thread?.state === 'running') action = <span className="text-[11px] text-(--muted-foreground)">thread working · {shortAgo(thread.updated, now)}</span>;
   return (
     <div style={{ width, height: NODE_H }} data-map-part={item.id}
@@ -113,7 +113,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
         <StatusGlyph status={item.status} className="size-3" />{item.status}
         {thread && <span className="truncate text-(--muted-foreground)">· {thread.state}</span>}
       </span>
-      {action && <span className="relative flex min-h-6 items-center">{action}</span>}
+      {action && <span className="relative flex min-h-6 min-w-0 items-center">{action}</span>}
     </div>
   );
 }

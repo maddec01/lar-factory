@@ -29,7 +29,7 @@ const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): 
 const loose = withItem('PVTI_sample13', { parent: null });
 /** #140 with its blocker closed, so its Start build runs, on a board whose writes are on. */
 const unblocked = (data: BoardData = loose): BoardData => withItem('PVTI_sample13', {
-  blockedBy: 0, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }],
+  blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }],
 }, { ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 
@@ -74,6 +74,17 @@ test('a row shows its numbered title, status, repository and age, and a red badg
   expect(cells('PVTI_sample14')[0]!.textContent).not.toContain('blocked by');
 });
 
+test('the badge counts the blocked-by issues still open', async () => {
+  await mountPage(withItem('PVTI_sample13', { blockers: [
+    { number: 202, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' },
+  ] }, loose));
+  expect(text(cells('PVTI_sample13')[0]!)).toContain('blocked by 1');
+  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
+    .receive(withItem('PVTI_sample13', { blockers: [] }, loose)));
+  expect(cells('PVTI_sample13')[0]!.textContent, 'with no open issue listed, nothing blocks').not.toContain('blocked by');
+  expect(text(startBuild())).toBe('Start build ▾');
+});
+
 test('the track fills the stages behind, marks the current one with its glyph, and dashes it while blocked', async () => {
   await mountPage(loose);
   const track = (id: string) => cells(id)[1]!;
@@ -116,11 +127,69 @@ test('the side says where the item waits on you, or shows its thread and its nex
   expect(say('PVTI_sample07')).toEqual(['shaping thread running', ['Open thread']]);
   expect(say('PVTI_sample14')).toEqual(['build thread running', ['Open thread']]);
   expect(say('PVTI_sample15')).toEqual(['reviewers running', ['Open thread']]);
-  expect(say('PVTI_sample13')).toEqual(['blocked by 1', ['Start build']]);
+  expect(say('PVTI_sample13')).toEqual(['blocked by 1', ['Start build', 'Start after #202 ▾']]);
+});
+
+test('Start after on a blocked Ready row arms its start on the picked model, then reads Starts after until pressed again', async () => {
+  const blocked = { ...loose, capture: { session: 's1', enabled: true }, modelChoices: unblocked().modelChoices };
+  holdPosts(blocked);
+  await mountPage(blocked);
+  const after = () => side('PVTI_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  await press(after());
+  expect(dialog(), 'the menu opens without the dialog').toBeNull();
+  await press(entries()[1]!);
+  expect(posted()).toEqual([['/api/arm', { session: 's1', itemId: 'PVTI_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+  await answer({ error: null, board: { ...blocked, armed: { PVTI_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } } });
+  expect([text(after()), after().getAttribute('aria-pressed')]).toEqual(['Starts after #202 ✓', 'true']);
+  await press(after());
+  expect(posted().at(-1)).toEqual(['/api/disarm', { session: 's1', itemId: 'PVTI_sample13' }]);
+  await answer({ error: null, board: { ...blocked, armed: {} } });
+  expect(text(after())).toBe('Start after #202 ▾');
+});
+
+test("Start after names the last open blocker, another repository's without its owner, and its title and label name it in full", async () => {
+  await mountPage(withItem('PVTI_sample13', { blockers: [
+    { number: 202, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 12, repo: 'maddec01/mux-apple', state: 'OPEN' },
+  ] }, loose));
+  const after = side('PVTI_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  expect([text(after), after.title]).toEqual(['Start after mux-apple#12 ▾', 'Starts by itself once #202, maddec01/mux-apple#12 close']);
+  expect(after.getAttribute('aria-label')).toBe('Start #140 Owner accounts after maddec01/mux-apple#12');
+});
+
+test("a blocked build whose repository has no T3 project offers no Start after: Start build shows the project's hint", async () => {
+  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
+  await mountPage({ ...loose, repositoryProjects: { 'maddec01/mux-server': hint } });
+  expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
+  expect(side('PVTI_sample13').querySelector('[data-start-after]')).toBeNull();
+});
+
+test('a start armed before its repository lost its T3 project still shows Starts after, so it can be disarmed', async () => {
+  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
+  const armed = { ...loose, capture: { session: 's1', enabled: true }, repositoryProjects: { 'maddec01/mux-server': hint },
+    armed: { PVTI_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } };
+  holdPosts(armed);
+  await mountPage(armed);
+  expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
+  const after = side('PVTI_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  expect([text(after), after.getAttribute('aria-pressed')]).toEqual(['Starts after #202 ✓', 'true']);
+  await press(after);
+  expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'PVTI_sample13' }]]);
+  await answer({ error: null, board: { ...armed, armed: {} } });
+  expect(side('PVTI_sample13').querySelector('[data-start-after]'), 'once disarmed, none can be armed again').toBeNull();
+});
+
+test("a start the board ran by itself and that failed shows its error under the row, and dismissing it clears it", async () => {
+  const failed = { ...unblocked(), armedErrors: { PVTI_sample13: 'T3 is down.' } };
+  holdPosts(failed);
+  await mountPage(failed);
+  const error = table().querySelector('[data-start-after-error="PVTI_sample13"]')!;
+  expect(text(error.querySelector('[role="alert"]'))).toBe('Start after failed: T3 is down.');
+  await press(error.querySelector('button')!);
+  expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'PVTI_sample13' }]]);
 });
 
 test('Open thread on a row opens the latest thread, as an outline button, without opening the dialog', async () => {
-  await mountPage(withItem('PVTI_sample14', { threads: [thread('t1', 'running')] }));
+  await mountPage(withItem('PVTI_sample14', { threads: [thread('t1', 'running')] }, withItem('PVTI_sample15', { threads: [] })));
   const open = side('PVTI_sample14').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
   expect([open.getAttribute('href'), open.className.includes('border-input')]).toEqual(['t3code://threads/sample-environment/t1', true]);
   await press(open);
@@ -134,7 +203,7 @@ test('Start build is disabled while a blocker is open, its title naming it, and 
   expect([text(startBuild()), startBuild().disabled, startBuild().title]).toEqual(['Start build', true, 'Blocked by #202 until it closes']);
   expect(startBuild().className).toContain('disabled:pointer-events-auto');
   expect(startBuild().className, 'an outline button, as the line draws a held action').toContain('border-input');
-  const many = withItem('PVTI_sample13', { blockedBy: 2, blockers: [
+  const many = withItem('PVTI_sample13', { blockers: [
     { number: 202, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' },
     { number: 12, repo: 'maddec01/mux-apple', state: 'OPEN' },
   ] }, loose);

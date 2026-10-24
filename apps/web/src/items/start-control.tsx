@@ -33,7 +33,7 @@ export function useStartHolds(item: Item, data: BoardData): boolean {
 }
 
 /** "T3 default", then each provider instance's models, with the remembered choice checked. Sample mode shows them but starts nothing. */
-function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onPick: (choice: ModelChoice | undefined) => void }) {
+export function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onPick: (choice: ModelChoice | undefined) => void }) {
   const lastChoice = useStartStore((state) => state.lastChoice);
   const checkedEntry = useRef<HTMLDivElement>(null);
   // The menu opens on its checked entry. After Base UI has registered the entries, so arrow keys move on from it.

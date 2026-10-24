@@ -196,7 +196,7 @@ export function VariantE() {
                 <section className="grid gap-3">
                   <h2 className="m-0 text-[13px] font-medium">Your desk <span className="text-(--muted-foreground)">{s.needsYou.length}</span></h2>
                   {s.needsYou.length
-                    ? <div className="flex gap-3 overflow-x-auto p-1">{s.needsYou.map((i) => <DeskCard key={i.id} item={i} data={data} now={now} pick={pick} />)}</div>
+                    ? <div className="-mx-6 flex gap-3 overflow-x-auto px-6 py-1">{s.needsYou.map((i) => <DeskCard key={i.id} item={i} data={data} now={now} pick={pick} />)}</div>
                     : <p className="m-0 rounded-xl border border-dashed border-(--input) p-6 text-center text-(--muted-foreground)">Desk clear. The line runs without you.</p>}
                 </section>
                 <section className="grid gap-3">

@@ -1,0 +1,261 @@
+// The board's HTTP side: serves the page and the board data on this machine only,
+// streams changes over /api/events, and routes the page's writes to the item commands.
+
+import { createServer } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { pageWithData } from '@mux-factory/shared';
+import type { BoardState } from '../board/board-state.ts';
+import type { ItemCommands, Reply } from '../items/item-commands.ts';
+import type { BuiltPage } from '../page/page.ts';
+import { log } from '../log.ts';
+
+export interface HttpDeps {
+  board: BoardState;
+  commands: ItemCommands;
+  page: BuiltPage;
+  /** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
+  appSecret: string | null;
+  /** Sample mode serves a fixed file: it writes nothing and runs no tools. */
+  sample: boolean;
+  /** Looks the tools up again. */
+  recheck(): Promise<void>;
+  /** Reads GitHub now, or once more after the running read. */
+  readSoon(): void;
+  /** The startup tool check; requests other than /healthz and assets wait for it. */
+  ready(): Promise<void> | undefined;
+}
+
+export interface BoardServer {
+  server: Server;
+  /** Ends every page's event stream, so the server can close. */
+  endStreams(): void;
+}
+
+/** A write only the board app's page may make. */
+interface Write {
+  /** What the body holds, for the errors about it. */
+  what: string;
+  /** The refusal in sample mode, before the body is read. */
+  disabled?: string;
+  /** The answer when the page's session is from an earlier board run; a write without one skips the check. */
+  restarted?: () => object;
+  run(input: Record<string, unknown>): Promise<Reply>;
+}
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy':
+    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'",
+};
+
+function send(res: ServerResponse, status: number, type: string, body: string | Buffer): void {
+  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+  res.end(body);
+}
+
+function json(res: ServerResponse, status: number, value: unknown): void {
+  send(res, status, 'application/json; charset=utf-8', JSON.stringify(value));
+}
+
+/** Whether the request carries the app secret, compared in constant time. Hashing first evens out the lengths. */
+function hasAppSecret(req: IncomingMessage, secret: string): boolean {
+  const given = req.headers['x-board-secret'];
+  if (typeof given !== 'string') return false;
+  const digest = (value: string) => createHash('sha256').update(value).digest();
+  return timingSafeEqual(digest(given), digest(secret));
+}
+
+/** Reads a small JSON object body, or answers the request with the problem and returns null. */
+async function readJson(req: IncomingMessage, res: ServerResponse, what: string): Promise<Record<string, unknown> | null> {
+  if (req.headers['content-type']?.split(';')[0]?.trim() !== 'application/json') {
+    json(res, 415, { error: `Send ${what} as JSON.` });
+    return null;
+  }
+  try {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      size += (chunk as Buffer).length;
+      if (size > 100_000) {
+        json(res, 413, { error: `${what[0]!.toUpperCase()}${what.slice(1)} are too large.` });
+        return null;
+      }
+      chunks.push(chunk as Buffer);
+    }
+    const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+    if (!input || typeof input !== 'object') throw new Error('Invalid JSON.');
+    return input as Record<string, unknown>;
+  } catch {
+    json(res, 400, { error: `Send valid ${what} as JSON.` });
+    return null;
+  }
+}
+
+/** Runs an item command on the body's itemId, or refuses a body that names none. */
+function forItem(unnamed: string, run: (itemId: string, input: Record<string, unknown>) => Promise<Reply>): Write['run'] {
+  return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
+}
+
+export function createBoardServer({ board, commands, page, appSecret, sample, recheck, readSoon, ready }: HttpDeps): BoardServer {
+  /** Open /api/events responses, one per page. */
+  const streams = new Set<ServerResponse>();
+  /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
+  let draining = false;
+  /** Guarded writes being answered, and the drain calls waiting for them to finish. */
+  let runningWrites = 0;
+  const drained: Array<() => void> = [];
+
+  const withBoard = (body: object) => ({ ...body, board: board.snapshot() });
+
+  /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
+  const WRITES: Record<string, Write> = {
+    '/api/items': {
+      what: 'item details', disabled: 'Adding items is disabled in sample mode.',
+      restarted: () => ({ uncertain: true, error: 'The board restarted. Check the repository issues before starting a new item.' }),
+      run: (input) => commands.capture(input),
+    },
+    '/api/queue': {
+      what: 'the item to queue', disabled: 'Queuing is disabled in sample mode.',
+      run: forItem('Name the item to queue.', (itemId) => commands.queue(itemId)),
+    },
+    '/api/back-to-list': {
+      what: 'the item to move back to List', disabled: 'Moving items back to List is disabled in sample mode.',
+      run: forItem('Name the item to move back to List.', (itemId) => commands.backToList(itemId)),
+    },
+    '/api/start': {
+      what: 'the item to start', disabled: 'Starting threads is disabled in sample mode.',
+      restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),
+      run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model)),
+    },
+    '/api/abandon': {
+      what: 'the item to abandon', disabled: 'Abandoning is disabled in sample mode.',
+      restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),
+      run: forItem('Name the item to abandon.', (itemId) => commands.abandon(itemId)),
+    },
+    // Looks the tools up again for the notices' Recheck button.
+    '/api/recheck': {
+      what: 'the recheck request',
+      async run() {
+        if (sample) return { status: 403, body: { error: 'Sample mode looks no tools up.' } };
+        await recheck();
+        return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+  };
+
+  /** Opens a write: refuses it in sample mode, reads its body and checks its session. Answers and returns null on a problem. */
+  async function writeInput(req: IncomingMessage, res: ServerResponse, write: Write): Promise<Record<string, unknown> | null> {
+    if (sample && write.disabled) {
+      json(res, 403, { error: write.disabled });
+      return null;
+    }
+    const input = await readJson(req, res, write.what);
+    if (input && write.restarted && input.session !== board.snapshot().capture?.session) {
+      json(res, 409, write.restarted());
+      return null;
+    }
+    return input;
+  }
+
+  /** Answers a guarded write and counts it as running until then. */
+  async function guardedWrite(req: IncomingMessage, res: ServerResponse, write: Write): Promise<void> {
+    runningWrites++;
+    try {
+      const input = await writeInput(req, res, write);
+      if (!input) return;
+      const { status, body } = await write.run(input);
+      json(res, status, body);
+    } finally {
+      if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
+    }
+  }
+
+  /** Refuses new guarded writes and answers once the running ones finish, so the app can stop the server. */
+  async function drainRequest(res: ServerResponse): Promise<void> {
+    draining = true;
+    if (runningWrites > 0) await new Promise<void>((resolve) => drained.push(resolve));
+    log('drained writes for an update');
+    json(res, 200, {});
+  }
+
+  /** Starts a read of GitHub for status.sh, so a moved item reaches the board before the next interval read. */
+  async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!await readJson(req, res, 'the read request')) return;
+    if (sample) return json(res, 200, {});
+    readSoon();
+    json(res, 202, {});
+  }
+
+  /** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
+  function openStream(req: IncomingMessage, res: ServerResponse): void {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+    if (req.method === 'HEAD') return void res.end();
+    const sendBoard = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+    streams.add(res);
+    const unsubscribe = board.subscribe(sendBoard);
+    res.on('close', () => {
+      streams.delete(res);
+      unsubscribe();
+    });
+    sendBoard(board.snapshot());
+  }
+
+  /** Only answer requests addressed to this machine, to block DNS rebinding. */
+  function allowedHost(req: IncomingMessage): boolean {
+    const host = (req.headers.host ?? '').toLowerCase();
+    const { port } = server.address() as AddressInfo;
+    return [`127.0.0.1:${port}`, `localhost:${port}`].includes(host);
+  }
+
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
+    const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+    // The health check must answer at once; everything else runs tools or shows what the lookup found.
+    if (path !== '/healthz' && !path.startsWith('/assets/')) await ready();
+    if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
+      return json(res, 403, { error: 'Submit from this board page.' });
+    }
+    const write = req.method === 'POST' && Object.hasOwn(WRITES, path) ? WRITES[path] : undefined;
+    if (write && appSecret && !hasAppSecret(req, appSecret)) {
+      return json(res, 403, { error: 'Submit from the board app.' });
+    }
+    if (req.method === 'POST' && path === '/api/drain') {
+      if (!appSecret || !hasAppSecret(req, appSecret)) return json(res, 403, { error: 'Only the board app can drain the board.' });
+      return drainRequest(res);
+    }
+    if (write) {
+      if (draining) return json(res, 503, { error: 'The board is installing an update. Try again once Mux Factory restarts.' });
+      return guardedWrite(req, res, write);
+    }
+    if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
+    }
+    if (path === '/') {
+      return send(res, 200, 'text/html; charset=utf-8', pageWithData(page.template, board.snapshot()));
+    }
+    if (path === '/api/events') return openStream(req, res);
+    if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));
+    if (path === '/healthz') return json(res, 200, {});
+    const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
+    if (asset) return send(res, 200, asset.type, asset.body);
+    send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
+  }
+
+  const server = createServer((req, res) => {
+    handle(req, res).catch((err: unknown) => {
+      log(`request ${req.url} failed: ${err instanceof Error ? err.stack : String(err)}`);
+      if (!res.headersSent) send(res, 500, 'text/plain; charset=utf-8', 'Internal error\n');
+    });
+  });
+
+  return {
+    server,
+    endStreams() {
+      for (const res of streams) res.end();
+    },
+  };
+}

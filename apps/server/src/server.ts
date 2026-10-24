@@ -2,37 +2,31 @@
 // keeps the last good copy in memory, serves it on 127.0.0.1 and pushes each
 // change to open pages over /api/events.
 
-import { createServer } from 'node:http';
-import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import type { BoardData, Item, ModelGroup } from '@mux-factory/shared';
+import { createBoardState } from './board/board-state.ts';
 import { loadConfig } from './config/config.ts';
-import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
-import { recordBoard } from './port/board-record.ts';
-import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github/github.ts';
-import { validateDraft, canAbandon, pageWithData, workMessage } from '@mux-factory/shared';
-import type { CreationProgress, CreationResult, ItemDraft, BoardData, ContentType, Item, ModelChoice, ModelGroup, StartResult, Status } from '@mux-factory/shared';
-import { startThread } from './t3/t3.ts';
-import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools/tools.ts';
-import { repositoryProject } from './t3/repository-project.ts';
-import type { RepositoryProject } from './t3/repository-project.ts';
-import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './stats/item-stats.ts';
-import { findModelChoice, loadModelChoices } from './t3/model-choices.ts';
-import type { StatsSources } from './stats/item-stats.ts';
+import { editPrBody, fetchProject, findProjectNumber, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
+import { createBoardServer } from './http/http.ts';
+import { createItemCommands } from './items/item-commands.ts';
+import { log } from './log.ts';
 import { loadBuild } from './page/page.ts';
+import { recordBoard } from './port/board-record.ts';
+import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
+import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './stats/item-stats.ts';
+import type { StatsSources } from './stats/item-stats.ts';
+import { loadModelChoices } from './t3/model-choices.ts';
+import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools/tools.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
 const fixture = process.env.BOARD_DATA_FILE;
 const capture = { session: randomUUID(), enabled: !fixture };
-/** Set by the board app on each launch; while set, guarded writes must carry it in X-Board-Secret. */
-const appSecret = process.env.BOARD_APP_SECRET || null;
-/** Writes only the board app's page may make. /api/read stays open for status.sh, since it only starts a read. */
-const GUARDED_WRITES = new Set(['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/recheck']);
 
-const state: BoardData = {
+const board = createBoardState({
   capture,
   project: { title: config.title },
   repos: config.repos,
@@ -41,42 +35,15 @@ const state: BoardData = {
   error: null,
   items: [],
   modelChoices: [],
-};
+});
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
-let statsUnavailable = false;
 const modelManifest = modelManifestPath();
-let modelsUnavailable = false;
-let pricingUnavailable = false;
 let projectNumber = config.number;
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;
 let syncingPrStats = false;
-let revision = 0;
-/** Items this board just created or moved, shown as changed until GitHub reports the change. */
-const recentItems = new Map<string, { item: Item; revision: number; unconfirmedReads: number }>();
-const submissions = new Map<string, {
-  draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
-}>();
-/** A refused Start ran no t3: one of the repository project's checks failed. */
-type Start = StartResult & { refused?: true };
-/** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
-const starts = new Map<string, Promise<Start>>();
-/** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
-let draining = false;
-/** Guarded writes being answered, and the drain calls waiting for them to finish. */
-let runningWrites = 0;
-const drained: Array<() => void> = [];
-/** Status changes in flight by item id; Start and Abandon wait out a move, and a move waits out Abandon. */
-const moving = new Set<string>();
-/** Deletes in flight by item id, so a second press waits for the first. */
-const abandoning = new Map<string, Promise<string | null>>();
-/** Item ids this board deleted. GitHub can still list them for a while, so reads drop them. */
-const abandoned = new Set<string>();
-const REQUEST_ID = /^[a-f0-9-]{36}$/;
-/** Open /api/events responses, one per page. */
-const streams = new Set<ServerResponse>();
 /** The running tool check, so Recheck and the retry never run two at once. */
 let checkingTools: Promise<void> | null = null;
 /** The startup tool check, which runs once the board listens; requests other than /healthz and assets wait for it. */
@@ -86,9 +53,18 @@ let toolLog = '';
 /** How often the board looks again for a missing t3 or gh, or a logged-out gh. Tests shorten it with BOARD_TOOL_RETRY_MS. */
 const TOOL_RETRY_MS = Number(process.env.BOARD_TOOL_RETRY_MS) || 10_000;
 
-function log(message: string): void {
-  console.log(`${new Date().toISOString()} ${message}`);
+/** Logs `whenSet` or `whenCleared` each time the condition it's given flips; it starts cleared. */
+function flipLog(whenSet: string, whenCleared: string): (set: boolean) => void {
+  let last = false;
+  return (set) => {
+    if (set !== last) log(set ? whenSet : whenCleared);
+    last = set;
+  };
 }
+
+const statsUnavailable = flipLog(`item stats unavailable: can't read ${statsSources.db}`, `item stats readable again from ${statsSources.db}`);
+const pricingUnavailable = flipLog(`API cost unavailable: can't read rates from ${statsSources.rates}`, `API cost readable again from ${statsSources.rates}`);
+const modelsUnavailable = flipLog(`only T3 default offered: no models read from ${statsSources.settings} and ${modelManifest}`, 'model choices readable again');
 
 /**
  * Attaches each item's stats: those frozen in its latest merged linked PR's block once
@@ -97,14 +73,8 @@ function log(message: string): void {
  */
 function withStats(items: Item[]): Item[] {
   const stats = loadItemStats(statsSources, Date.now());
-  if ((stats === 'unavailable') !== statsUnavailable) {
-    statsUnavailable = !statsUnavailable;
-    log(statsUnavailable ? `item stats unavailable: can't read ${statsSources.db}` : `item stats readable again from ${statsSources.db}`);
-  }
-  if (typeof stats === 'function' && !stats.priced !== pricingUnavailable) {
-    pricingUnavailable = !pricingUnavailable;
-    log(pricingUnavailable ? `API cost unavailable: can't read rates from ${statsSources.rates}` : `API cost readable again from ${statsSources.rates}`);
-  }
+  statsUnavailable(stats === 'unavailable');
+  if (typeof stats === 'function') pricingUnavailable(!stats.priced);
   return items.map((item) => {
     const frozen = mergedStats(item);
     if (frozen) return { ...item, stats: frozen };
@@ -122,34 +92,28 @@ async function syncPrStats(items: Item[]): Promise<void> {
   if (syncingPrStats) return;
   syncingPrStats = true;
   try {
-    await editPrStats(items);
+    for (const edit of prStatsEdits(items)) {
+      try {
+        // The board read the body a while ago; apply the block to the body as it is now, so no one's edit is lost.
+        const body = updatedBody(await readPrBody(edit.url), edit.block);
+        if (body === null) continue;
+        await editPrBody(edit.url, body);
+        log(`updated item stats in ${edit.url}`);
+      } catch (err) {
+        log(`could not update item stats in ${edit.url}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
   } finally {
     syncingPrStats = false;
-  }
-}
-
-async function editPrStats(items: Item[]): Promise<void> {
-  for (const edit of prStatsEdits(items)) {
-    try {
-      // The board read the body a while ago; apply the block to the body as it is now, so no one's edit is lost.
-      const body = updatedBody(await readPrBody(edit.url), edit.block);
-      if (body === null) continue;
-      await editPrBody(edit.url, body);
-      log(`updated item stats in ${edit.url}`);
-    } catch (err) {
-      log(`could not update item stats in ${edit.url}: ${err instanceof Error ? err.message : String(err)}`);
-    }
   }
 }
 
 /** Reads the model choices T3 offers now into the board data. */
 function offerModelChoices(): ModelGroup[] {
   const groups = loadModelChoices(statsSources.settings, modelManifest);
-  if (!groups.length !== modelsUnavailable) {
-    modelsUnavailable = !modelsUnavailable;
-    log(modelsUnavailable ? `only T3 default offered: no models read from ${statsSources.settings} and ${modelManifest}` : 'model choices readable again');
-  }
-  return state.modelChoices = groups;
+  modelsUnavailable(!groups.length);
+  board.update({ modelChoices: groups });
+  return groups;
 }
 
 /** Logs where each tool is, or why it's missing, when that changes. */
@@ -158,7 +122,7 @@ function logTools(): void {
     const path = tools()?.[name].path;
     return path ? `${name} at ${path}` : missingTool(name);
   });
-  if (state.tools?.gh?.problem === 'logged-out') lines.push('gh is logged out');
+  if (board.snapshot().tools?.gh?.problem === 'logged-out') lines.push('gh is logged out');
   const message = lines.join('; ');
   if (message !== toolLog) log(message);
   toolLog = message;
@@ -166,7 +130,7 @@ function logTools(): void {
 
 /** Shows a gh problem in place of reading GitHub, and looks again in TOOL_RETRY_MS. */
 function showToolProblems(problems: BoardData['tools']): void {
-  state.tools = problems;
+  board.update({ tools: problems });
   logTools();
   clearTimeout(toolRetry);
   if (problems?.t3 || problems?.gh) toolRetry = setTimeout(() => void recheckTools(false), TOOL_RETRY_MS);
@@ -179,7 +143,8 @@ function showToolProblems(problems: BoardData['tools']): void {
  */
 async function recheckTools(rereadLoginPath = true): Promise<void> {
   while (checkingTools) await checkingTools;
-  const ghBroken = !state.tools || Boolean(state.tools.gh);
+  const { tools: before } = board.snapshot();
+  const ghBroken = !before || Boolean(before.gh);
   checkingTools = (async () => {
     await lookUpTools(process.env, rereadLoginPath);
     const gh = await probeGh();
@@ -188,8 +153,8 @@ async function recheckTools(rereadLoginPath = true): Promise<void> {
     if (gh.error) log(`gh probe failed: ${gh.error}`);
   })().finally(() => { checkingTools = null; });
   await checkingTools;
-  push();
-  if (ghBroken && !state.tools?.gh) readSoon();
+  board.push();
+  if (ghBroken && !board.snapshot().tools?.gh) readSoon();
 }
 
 /** Reads GitHub now; while a read runs this one is skipped, so two reads never run together. */
@@ -197,40 +162,35 @@ async function refresh(): Promise<void> {
   if (refreshing) return;
   // Before the first tool check there's no gh to read with; that check starts the first read.
   // A missing or logged-out gh has its own notice and retries; reading would only fail.
-  if (!state.tools || state.tools.gh) return;
+  const { tools: found } = board.snapshot();
+  if (!found || found.gh) return;
   refreshing = true;
   readAgain = false;
   let read = false;
-  const readRevision = revision;
+  const readRevision = board.revision();
   offerModelChoices();
   try {
     projectNumber ??= await findProjectNumber(config.owner, config.title);
     const snapshot = await fetchProject(config.owner, projectNumber);
-    const recovered = state.error !== null || state.fetchedAt === null;
-    state.project = { title: snapshot.title };
-    for (const [id, recent] of recentItems) {
-      if (readRevision < recent.revision) continue;
-      // Give GitHub three successful reads to expose the change, then trust what it reports.
-      const reported = snapshot.items.some((i) => i.id === id && i.status === recent.item.status);
-      if (reported || ++recent.unconfirmedReads >= 3) recentItems.delete(id);
-    }
-    state.items = withStats([...snapshot.items.filter((i) => !recentItems.has(i.id) && !abandoned.has(i.id)), ...[...recentItems.values()].map((r) => r.item)]);
-    state.fetchedAt = new Date().toISOString();
-    state.error = null;
+    const { error, fetchedAt } = board.snapshot();
+    const recovered = error !== null || fetchedAt === null;
+    board.applyRead(snapshot.items, readRevision, withStats);
+    board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: null });
     if (recovered) log(`read ${snapshot.items.length} items from the ${snapshot.title} project`);
     read = true;
   } catch (err) {
     // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale.
     const gh = await probeGh();
-    if (gh.problem) showToolProblems({ ...state.tools, gh: gh.problem });
-    state.error = gh.problem ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
-    if (state.error) log(`refresh failed, serving data from ${state.fetchedAt ?? 'never'}: ${state.error}`);
+    if (gh.problem) showToolProblems({ ...board.snapshot().tools, gh: gh.problem });
+    const error = gh.problem ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
+    board.update({ error });
+    if (error) log(`refresh failed, serving data from ${board.snapshot().fetchedAt ?? 'never'}: ${error}`);
   } finally {
     refreshing = false;
   }
-  push();
+  board.push();
   // PR edits take a gh call or two each; the board doesn't wait for them.
-  if (read) void syncPrStats(state.items);
+  if (read) void syncPrStats(board.snapshot().items);
   if (readAgain) void refresh();
 }
 
@@ -245,331 +205,10 @@ function readSoon(): void {
 // Resources/server/dist/, beside Resources/web/dist/.
 const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy':
-    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'",
-};
-
-function send(res: ServerResponse, status: number, type: string, body: string | Buffer): void {
-  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
-  res.end(body);
-}
-
-/** Sends the board data as one server-sent event. */
-function sendBoard(res: ServerResponse): void {
-  res.write(`data: ${JSON.stringify(state)}\n\n`);
-}
-
-/** Pushes the board data to every open page, after a read or a change made through the board. */
-function push(): void {
-  for (const res of streams) sendBoard(res);
-}
-
-/** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
-function openStream(req: IncomingMessage, res: ServerResponse): void {
-  res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
-  if (req.method === 'HEAD') return void res.end();
-  streams.add(res);
-  res.on('close', () => streams.delete(res));
-  sendBoard(res);
-}
-
-/** Only answer requests addressed to this machine, to block DNS rebinding. */
-function allowedHost(req: IncomingMessage): boolean {
-  const host = (req.headers.host ?? '').toLowerCase();
-  return [`127.0.0.1:${port}`, `localhost:${port}`].includes(host);
-}
-
-/** Whether the request carries the app secret, compared in constant time. Hashing first evens out the lengths. */
-function hasAppSecret(req: IncomingMessage, secret: string): boolean {
-  const given = req.headers['x-board-secret'];
-  if (typeof given !== 'string') return false;
-  const digest = (value: string) => createHash('sha256').update(value).digest();
-  return timingSafeEqual(digest(given), digest(secret));
-}
-
-function json(res: ServerResponse, status: number, value: unknown): void {
-  send(res, status, 'application/json; charset=utf-8', JSON.stringify(value));
-}
-
-/** Reads a small JSON object body, or answers the request with the problem and returns null. */
-async function readJson(req: IncomingMessage, res: ServerResponse, what: string): Promise<Record<string, unknown> | null> {
-  if (req.headers['content-type']?.split(';')[0]?.trim() !== 'application/json') {
-    json(res, 415, { error: `Send ${what} as JSON.` });
-    return null;
-  }
-  try {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      size += (chunk as Buffer).length;
-      if (size > 100_000) {
-        json(res, 413, { error: `${what[0]!.toUpperCase()}${what.slice(1)} are too large.` });
-        return null;
-      }
-      chunks.push(chunk as Buffer);
-    }
-    const input = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
-    if (!input || typeof input !== 'object') throw new Error('Invalid JSON.');
-    return input as Record<string, unknown>;
-  } catch {
-    json(res, 400, { error: `Send valid ${what} as JSON.` });
-    return null;
-  }
-}
-
-/** Shows a change at once and keeps it through refreshes until GitHub reports it. */
-function showChanged(item: Item): void {
-  if (abandoned.has(item.id)) return;
-  recentItems.set(item.id, { item, revision: ++revision, unconfirmedReads: 0 });
-  state.items = [...state.items.filter((i) => i.id !== item.id), item];
-  push();
-}
-
-async function captureItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!capture.enabled) return json(res, 403, { error: 'Adding items is disabled in sample mode.' });
-  const input = await readJson(req, res, 'item details');
-  if (!input) return;
-  if (input.session !== capture.session) {
-    return json(res, 409, { uncertain: true, error: 'The board restarted. Check the repository issues before starting a new item.' });
-  }
-  if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) {
-    return json(res, 400, { error: 'The submission needs a valid request ID.' });
-  }
-  let draft: ItemDraft;
-  try { draft = validateDraft(input.draft, config.repos); }
-  catch (err) { return json(res, 422, { error: (err as Error).message }); }
-  let entry = submissions.get(input.requestId);
-  if (entry && JSON.stringify(entry.draft) !== JSON.stringify(draft)) {
-    return json(res, 409, { error: 'This submission already belongs to another item. Finish it before starting a new one.' });
-  }
-  if (!entry) {
-    if (submissions.size >= 1000) return json(res, 503, { error: 'The board has reached its submission limit. Finish pending items and restart the board.' });
-    entry = { draft, progress: {} };
-    submissions.set(input.requestId, entry);
-  }
-  entry.pending ??= addProjectItem({ ...config, number: projectNumber }, draft, entry.progress);
-  const result = await entry.pending;
-  entry.pending = undefined;
-  if (result.item && !entry.published) {
-    showChanged(result.item);
-    entry.published = true;
-  }
-  json(res, result.error ? 502 : 200, { ...result, board: state });
-}
-
-/** A status change the board's buttons make: Queue moves List to Queued, Back to List the reverse. */
-interface Move {
-  from: Status;
-  to: Status;
-  disabled: string;
-  what: string;
-  unnamed: string;
-  refused: (status: Status) => string;
-  /** The refusal for an item Start holds, when the move would pull it from under a T3 thread. */
-  started?: string;
-}
-
-const QUEUE: Move = {
-  from: 'List', to: 'Queued', disabled: 'Queuing is disabled in sample mode.', what: 'the item to queue',
-  unnamed: 'Name the item to queue.', refused: (status) => `Only List items can be queued; this one is in ${status}.`,
-};
-
-const BACK_TO_LIST: Move = {
-  from: 'Queued', to: 'List', disabled: 'Moving items back to List is disabled in sample mode.', what: 'the item to move back to List',
-  unnamed: 'Name the item to move back to List.', refused: (status) => `Only Queued items can be moved back to List; this one is in ${status}.`,
-  started: 'Start is running or has run for this item. Check its T3 thread before moving it back to List.',
-};
-
-/** Whether a Start for the item is in flight, uncertain or done this board run. */
-function startHolds(itemId: string): boolean {
-  return starts.has(itemId) || !!state.started?.[itemId];
-}
-
-async function moveItem(req: IncomingMessage, res: ServerResponse, move: Move): Promise<void> {
-  if (!capture.enabled) return json(res, 403, { error: move.disabled });
-  const input = await readJson(req, res, move.what);
-  if (!input) return;
-  if (typeof input.itemId !== 'string') return json(res, 400, { error: move.unnamed });
-  const item = state.items.find((i) => i.id === input.itemId);
-  if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
-  if (item.status === move.to) return json(res, 200, { error: null, board: state });
-  if (item.status !== move.from) return json(res, 409, { error: move.refused(item.status) });
-  if (move.started && startHolds(item.id)) return json(res, 409, { error: move.started, board: state });
-  if (abandoning.has(item.id)) return json(res, 409, { error: 'This item is being abandoned, so it can\'t move.', board: state });
-  moving.add(item.id);
-  const error = await setItemStatus({ ...config, number: projectNumber }, item.id, move.to).finally(() => moving.delete(item.id));
-  if (error) return json(res, 502, { error, board: state });
-  showChanged({ ...item, status: move.to });
-  json(res, 200, { error: null, board: state });
-}
-
-async function startItem(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!capture.enabled) return json(res, 403, { error: 'Starting threads is disabled in sample mode.' });
-  const input = await readJson(req, res, 'the item to start');
-  if (!input) return;
-  if (input.session !== capture.session) {
-    return json(res, 409, { error: 'The board restarted. Press Start again.', board: state });
-  }
-  const { itemId } = input;
-  if (typeof itemId !== 'string') return json(res, 400, { error: 'Name the item to start.' });
-  // Only a choice the board offers right now reaches t3 as arguments.
-  let choice: ModelChoice | undefined;
-  if (input.model !== undefined) {
-    const found = findModelChoice(offerModelChoices(), input.model);
-    if (!found) return json(res, 422, { error: "That model choice isn't offered. Pick another one.", board: state });
-    choice = found;
-  }
-  let pending = starts.get(itemId);
-  if (!pending) {
-    const item = state.items.find((i) => i.id === itemId);
-    if (!item) return json(res, 404, { error: 'That item is no longer on the board.' });
-    if (item.status !== 'Queued') return json(res, 409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
-    if (moving.has(itemId)) return json(res, 409, { error: 'This item is moving back to List, so it can\'t start.', board: state });
-    if (abandoning.has(itemId)) return json(res, 409, { error: 'This item is being abandoned, so it can\'t start.', board: state });
-    const message = workMessage(item);
-    if (!message || !item.repo) return json(res, 409, { error: 'This item needs an issue before it can start.' });
-    // Only a refusal or a failure t3 reported may run again; a started or unconfirmed thread is kept.
-    pending = currentRepositoryProject(item.repo).then((project): Promise<Start> | Start =>
-      project.error === undefined ? startThread(project.projectId, message, choice) : { thread: null, error: project.error, refused: true },
-    ).then((result) => {
-      if (result.thread) {
-        state.started = { ...state.started, [itemId]: result.thread };
-        push();
-      }
-      else if (!result.uncertain) starts.delete(itemId);
-      return result;
-    });
-    starts.set(itemId, pending);
-  }
-  const { refused, ...result } = await pending;
-  json(res, refused ? 409 : result.error ? 502 : 200, { ...result, board: state });
-}
-
-/** The repository project from config.json as it is now, so a path fixed after a refusal works on the next Start. */
-async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
-  let repos;
-  try { repos = loadConfig().repos; }
-  catch (err) { return { error: `Can't read config.json: ${(err as Error).message}` }; }
-  return repositoryProject(repo, repos);
-}
-
-const A_TYPE: Record<ContentType, string> = { Issue: 'an issue', PullRequest: 'a pull request', DraftIssue: 'a draft' };
-
-async function abandonItemRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!capture.enabled) return json(res, 403, { error: 'Abandoning is disabled in sample mode.' });
-  const input = await readJson(req, res, 'the item to abandon');
-  if (!input) return;
-  if (input.session !== capture.session) {
-    return json(res, 409, { error: 'The board restarted. Press Abandon again.', board: state });
-  }
-  const { itemId } = input;
-  if (typeof itemId !== 'string') return json(res, 400, { error: 'Name the item to abandon.' });
-  let pending = abandoning.get(itemId);
-  if (!pending) {
-    const item = state.items.find((i) => i.id === itemId);
-    // A second press after the delete finished has nothing left to do.
-    if (!item && abandoned.has(itemId)) return json(res, 200, { error: null, board: state });
-    if (!item) return json(res, 404, { error: 'That item is no longer on the board.', board: state });
-    if (!canAbandon(item)) return json(res, 409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${A_TYPE[item.type]} in ${item.status}.` });
-    if (startHolds(itemId)) return json(res, 409, { error: 'Start is running or has run for this item. Check its T3 thread before abandoning it.', board: state });
-    if (moving.has(itemId)) return json(res, 409, { error: 'This item is being moved, so it can\'t be abandoned.', board: state });
-    pending = abandonItem({ ...config, number: projectNumber }, item).then((error) => {
-      abandoning.delete(itemId);
-      if (!error) {
-        abandoned.add(itemId);
-        recentItems.delete(itemId);
-        state.items = state.items.filter((i) => i.id !== itemId);
-        push();
-      }
-      return error;
-    });
-    abandoning.set(itemId, pending);
-  }
-  const error = await pending;
-  json(res, error ? 502 : 200, { error, board: state });
-}
-
-/** Looks the tools up again for the notices' Recheck button and answers with the board data. */
-async function recheckRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!await readJson(req, res, 'the recheck request')) return;
-  if (fixture) return json(res, 403, { error: 'Sample mode looks no tools up.' });
-  await recheckTools();
-  json(res, 200, { error: null, board: state });
-}
-
-/** Refuses new guarded writes and answers once the running ones finish, so the app can stop the server. */
-async function drainRequest(res: ServerResponse): Promise<void> {
-  draining = true;
-  if (runningWrites > 0) await new Promise<void>((resolve) => drained.push(resolve));
-  log('drained writes for an update');
-  json(res, 200, {});
-}
-
-/** Answers a guarded write and counts it as running until then. */
-async function guardedWrite(req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
-  runningWrites++;
-  try {
-    if (path === '/api/items') return await captureItem(req, res);
-    if (path === '/api/queue') return await moveItem(req, res, QUEUE);
-    if (path === '/api/back-to-list') return await moveItem(req, res, BACK_TO_LIST);
-    if (path === '/api/start') return await startItem(req, res);
-    if (path === '/api/abandon') return await abandonItemRequest(req, res);
-    if (path === '/api/recheck') return await recheckRequest(req, res);
-  } finally {
-    if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
-  }
-}
-
-/** Starts a read of GitHub for status.sh, so a moved item reaches the board before the next interval read. */
-async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!await readJson(req, res, 'the read request')) return;
-  if (fixture) return json(res, 200, {});
-  readSoon();
-  json(res, 202, {});
-}
-
-async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
-  const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-  // The health check must answer at once; everything else runs tools or shows what the lookup found.
-  if (path !== '/healthz' && !path.startsWith('/assets/')) await firstToolCheck;
-  if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
-    return json(res, 403, { error: 'Submit from this board page.' });
-  }
-  if (req.method === 'POST' && appSecret && GUARDED_WRITES.has(path) && !hasAppSecret(req, appSecret)) {
-    return json(res, 403, { error: 'Submit from the board app.' });
-  }
-  if (req.method === 'POST' && path === '/api/drain') {
-    if (!appSecret || !hasAppSecret(req, appSecret)) return json(res, 403, { error: 'Only the board app can drain the board.' });
-    return drainRequest(res);
-  }
-  if (req.method === 'POST' && GUARDED_WRITES.has(path)) {
-    if (draining) return json(res, 503, { error: 'The board is installing an update. Try again once Mux Factory restarts.' });
-    return guardedWrite(req, res, path);
-  }
-  if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    return send(res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
-  }
-  if (path === '/') {
-    return send(res, 200, 'text/html; charset=utf-8', pageWithData(page.template, state));
-  }
-  if (path === '/api/events') return openStream(req, res);
-  if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(state));
-  if (path === '/healthz') return json(res, 200, {});
-  const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;
-  if (asset) return send(res, 200, asset.type, asset.body);
-  send(res, 404, 'text/plain; charset=utf-8', 'Not found\n');
-}
-
-const server = createServer((req, res) => {
-  handle(req, res).catch((err: unknown) => {
-    log(`request ${req.url} failed: ${err instanceof Error ? err.stack : String(err)}`);
-    if (!res.headersSent) send(res, 500, 'text/plain; charset=utf-8', 'Internal error\n');
-  });
+const commands = createItemCommands({ board, project: () => ({ ...config, number: projectNumber }), offerModelChoices });
+const { server, endStreams } = createBoardServer({
+  board, commands, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  recheck: recheckTools, readSoon, ready: () => firstToolCheck,
 });
 
 /** Logs why the board can't start and exits. */
@@ -599,9 +238,7 @@ if (!fixture) firstToolCheck = recheckTools();
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).
 if (fixture) {
-  Object.assign(state, JSON.parse(readFileSync(fixture, 'utf8')) as BoardData);
-  state.repos = config.repos;
-  state.capture = capture;
+  board.update({ ...JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, repos: config.repos, capture });
   offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
 }
@@ -613,7 +250,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     clearInterval(timer);
     clearTimeout(toolRetry);
-    for (const res of streams) res.end();
+    endStreams();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref();
   });

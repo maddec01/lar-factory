@@ -4,9 +4,9 @@
 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
-import { liveProjects } from '../stats/item-stats.ts';
-import { statsDbPath } from './t3-settings.ts';
 import { runTool } from '../tools/run-tool.ts';
+import { liveProjects } from './t3-db.ts';
+import { statsDbPath } from './t3-settings.ts';
 import type { RepoConfig } from '@mux-factory/shared';
 
 export type RepositoryProject = { projectId: string; error?: undefined } | { error: string };

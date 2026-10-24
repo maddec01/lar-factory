@@ -1,20 +1,22 @@
 // Item stats from T3 Code's local database, read-only (docs/adr/0005, 0007), with
 // tokens from the provider transcripts of each item's threads, priced with T3's
-// cached rate table. T3's settings and the paths to its files are in
-// t3/t3-settings.ts. The Codex speed-tier read is ported from pingdotgg/t3code main
-// at f054d1b8018721bd997d99cbb918a7b17bf098a4: apps/server/src/usage/CodexUsageHistory.ts
+// cached rate table. T3's queries are in t3/t3-db.ts, its settings and the paths to
+// its files in t3/t3-settings.ts, and agent time in agent-time.ts. The Codex
+// speed-tier read is ported from pingdotgg/t3code main at
+// f054d1b8018721bd997d99cbb918a7b17bf098a4: apps/server/src/usage/CodexUsageHistory.ts
 // and apps/server/src/codexModelOptions.ts; the rates loading from
 // apps/server/src/usage/UsageService.ts.
 
 import { existsSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync } from 'node:sqlite';
 import { isRecord } from '@mux-factory/shared';
 import type { ItemStats } from '@mux-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
-import { expandHome, readT3Settings } from '../t3/t3-settings.ts';
+import { agentTimeRows, codexTurnSelections, readT3Db, threadSessions } from '../t3/t3-db.ts';
+import type { CodexTurnSelection } from '../t3/t3-db.ts';
+import { readT3Settings } from '../t3/t3-settings.ts';
 import type { InstanceHome, T3Settings, TranscriptDriver } from '../t3/t3-settings.ts';
-import { length, merged, minus } from './intervals.ts';
-import type { Interval } from './intervals.ts';
+import { agentTime } from './agent-time.ts';
 import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens } from './transcript-usage.ts';
 import type { SessionRecordsReader, UsageRecord, UsageSpeed } from './transcript-usage.ts';
 import { apiCost, createOverrideRateTable, parseRateTable, resolveModelAliases } from './usage-pricing.ts';
@@ -32,97 +34,6 @@ export interface StatsSources {
   settings: string;
   rates: string;
   home: string;
-}
-
-// A root thread with its first user message.
-const ROOTS = `
-SELECT t.thread_id AS id, (
-  SELECT json_extract(m.payload_json, '$.text') FROM orchestration_v2_projection_messages m
-  WHERE m.thread_id = t.thread_id AND m.role = 'user' ORDER BY m.created_at LIMIT 1
-) AS text
-FROM orchestration_v2_projection_threads t
-WHERE json_extract(t.payload_json, '$.lineage.relationshipToParent') IS NULL`;
-
-const LINEAGE = `
-SELECT thread_id AS id, json_extract(payload_json, '$.lineage.rootThreadId') AS root,
-  json_extract(payload_json, '$.lineage.parentThreadId') AS parent
-FROM orchestration_v2_projection_threads`;
-
-// Each child thread's subagent runs. Claude's native subagents have no turns, so
-// their run is their work; a child can have several rows (Codex app_owned).
-// Never read updated_at, which T3 bulk-updates.
-const RUNS = `
-SELECT child_thread_id AS thread, started_at AS startedAt, completed_at AS completedAt
-FROM orchestration_v2_projection_subagents WHERE child_thread_id IS NOT NULL`;
-
-const TURNS = `
-SELECT provider_turn_id AS id, thread_id AS thread, provider_thread_id AS providerThread,
-  started_at AS startedAt, completed_at AS completedAt
-FROM orchestration_v2_projection_provider_turns`;
-
-const WAITS = `
-SELECT provider_turn_id AS turn, created_at AS createdAt, resolved_at AS resolvedAt
-FROM orchestration_v2_projection_runtime_requests`;
-
-// Each thread's latest message, for capping a turn T3 never closed.
-const LAST_MESSAGES = `
-SELECT thread_id AS thread, max(created_at) AS at FROM orchestration_v2_projection_messages GROUP BY thread_id`;
-
-// Provider threads with a turn in flight. A turn whose run failed can stay open
-// for good, its provider thread back to idle.
-const ACTIVE = `
-SELECT provider_thread_id AS id FROM orchestration_v2_projection_provider_threads WHERE status = 'active'`;
-
-// Each provider thread's native session and provider instance, earliest first: a
-// record forked threads share counts for the thread that produced it first. Never
-// map through a turn's nativeTurnRef, which can hold a placeholder. Claude's
-// provider_native child threads have no provider threads: their records are in
-// their parent session's subagent transcripts. A Codex child thread has its own
-// provider thread and rollout, whose copy of its parent's history isn't counted.
-const SESSIONS = `
-SELECT thread_id AS thread, json_extract(payload_json, '$.driver') AS driver,
-  json_extract(payload_json, '$.providerInstanceId') AS instance,
-  json_extract(payload_json, '$.nativeThreadRef.nativeId') AS session
-FROM orchestration_v2_projection_provider_threads
-ORDER BY json_extract(payload_json, '$.createdAt'), rowid`;
-
-interface Turn {
-  id: string;
-  thread: string;
-  providerThread: string;
-  startedAt: string | null;
-  completedAt: string | null;
-}
-
-// `$mux-work <ref>` or `/mux-work <ref>` on any line, or a message starting `Build <ref>`.
-const WORK_REF = /(?:^|\s)[$/]mux-work ([\w.-]+\/[\w.-]+)#(\d+)/;
-const BUILD_REF = /^Build ([\w.-]+\/[\w.-]+)#(\d+)/;
-
-/** The issue a thread's first user message names first, as lowercase `owner/repo#n`. */
-function namedIssue(text: string): string | null {
-  // `Build <ref>` can only start the message, so it always comes first.
-  const ref = BUILD_REF.exec(text) ?? WORK_REF.exec(text);
-  return ref ? issueKey(ref[1]!, ref[2]!) : null;
-}
-
-/** GitHub owner and repo names ignore case. */
-function issueKey(repo: string, number: string | number): string {
-  return `${repo.toLowerCase()}#${number}`;
-}
-
-function add<V>(map: Map<string, V[]>, key: string, value: V): void {
-  const list = map.get(key);
-  if (list) list.push(value);
-  else map.set(key, [value]);
-}
-
-/** The provider threads running a turn now; none when T3 doesn't say, so open turns are capped. */
-function activeProviderThreads(db: DatabaseSync): Set<string> {
-  try {
-    return new Set((db.prepare(ACTIVE).all() as { id: unknown }[]).flatMap(({ id }) => (typeof id === 'string' ? [id] : [])));
-  } catch {
-    return new Set();
-  }
 }
 
 // The transcript reader for each provider driver whose sessions count.
@@ -146,32 +57,6 @@ function loadPricing(ratesPath: string, settings: T3Settings): Pricing | null {
     aliases: resolveModelAliases(settings.modelAliases),
   };
 }
-
-// Each Codex turn's model selection when its attempt started running, before any
-// steering changed it, as T3's CodexUsageHistory.ts reads it.
-const CODEX_TURN_SELECTIONS = `
-SELECT json_extract(attempt.payload_json, '$.nativeThreadId') AS nativeThread,
-  json_extract(turn.payload_json, '$.nativeTurnRef.nativeId') AS nativeTurn,
-  (
-    SELECT json_extract(event.payload_json, '$.modelSelection')
-    FROM orchestration_events AS event
-    WHERE event.aggregate_kind = 'thread'
-      AND event.application_event_version = 2
-      AND event.stream_id = attempt.thread_id
-      AND event.event_type = 'run.updated'
-      AND json_extract(event.payload_json, '$.id') = attempt.run_id
-      AND json_extract(event.payload_json, '$.activeAttemptId') = attempt.attempt_id
-      AND json_extract(event.payload_json, '$.status') = 'running'
-    ORDER BY event.sequence
-    LIMIT 1
-  ) AS selection
-FROM orchestration_v2_projection_provider_turns AS turn
-LEFT JOIN orchestration_v2_projection_run_attempts AS attempt
-  ON attempt.attempt_id = turn.run_attempt_id
-  AND attempt.thread_id = turn.thread_id
-  AND attempt.provider_thread_id = turn.provider_thread_id
-WHERE json_extract(turn.payload_json, '$.nativeTurnRef.driver') = 'codex'
-  AND json_extract(turn.payload_json, '$.nativeTurnRef.nativeId') IN (SELECT value FROM json_each(?))`;
 
 /** A model selection's model and its string or boolean option values, when it decodes as T3's `ModelSelection`. */
 function modelSelection(json: unknown): { model: string; options: Map<string, unknown> } | null {
@@ -198,7 +83,7 @@ function modelSelection(json: unknown): { model: string; options: Map<string, un
  * CodexUsageHistory.ts resolves it: the turn's selection when its attempt started,
  * on the record's own session and model. Undefined when that can't be told.
  */
-function historicalTier(match: { nativeThread: unknown; selection: unknown } | null | undefined, record: UsageRecord): UsageSpeed | undefined {
+function historicalTier(match: CodexTurnSelection | null | undefined, record: UsageRecord): UsageSpeed | undefined {
   if (!match || match.nativeThread !== record.sessionId) return undefined;
   const selection = modelSelection(match.selection);
   if (!selection || selection.model !== record.model) return undefined;
@@ -220,15 +105,14 @@ function historicalTier(match: { nativeThread: unknown; selection: unknown } | n
 function withCodexServiceTiers(db: DatabaseSync, records: Map<string, UsageRecord[]>): Map<string, UsageRecord[]> {
   const pending = [...records.values()].flat().filter((record) => record.unresolvedServiceTierTurnId !== undefined);
   if (pending.length === 0) return records;
-  let rows: { nativeThread: unknown; nativeTurn: unknown; selection: unknown }[];
+  let rows: CodexTurnSelection[];
   try {
-    const turnIds = JSON.stringify([...new Set(pending.map((record) => record.unresolvedServiceTierTurnId))]);
-    rows = db.prepare(CODEX_TURN_SELECTIONS).all(turnIds) as typeof rows;
+    rows = codexTurnSelections(db, new Set(pending.map((record) => record.unresolvedServiceTierTurnId!)));
   } catch {
     return records;
   }
   // A turn ID on several rows is ambiguous.
-  const byTurn = new Map<unknown, (typeof rows)[number] | null>();
+  const byTurn = new Map<unknown, CodexTurnSelection | null>();
   for (const row of rows) byTurn.set(row.nativeTurn, byTurn.has(row.nativeTurn) ? null : row);
   const resolve = (record: UsageRecord): UsageRecord => {
     if (record.unresolvedServiceTierTurnId === undefined) return record;
@@ -250,9 +134,7 @@ function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Ma
   const keep = firstCopies();
   const read = new Set<string>();
   const records = new Map<string, UsageRecord[]>();
-  for (const row of db.prepare(SESSIONS).all() as { thread: unknown; driver: unknown; instance: unknown; session: unknown }[]) {
-    const { thread, driver, instance, session } = row;
-    if (typeof thread !== 'string' || typeof session !== 'string' || typeof instance !== 'string') continue;
+  for (const { thread, driver, instance, session } of threadSessions(db)) {
     const source = homes.get(instance);
     if (!source || source.driver !== driver) continue;
     const at = `${source.driver}\0${source.home}`;
@@ -260,33 +142,14 @@ function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Ma
     read.add(`${at}\0${session}`);
     let reader = readers.get(at);
     if (!reader) readers.set(at, (reader = READERS[source.driver](source.home)));
-    for (const record of reader(session)) if (keep(record)) add(records, thread, record);
+    for (const record of reader(session)) {
+      if (!keep(record)) continue;
+      let list = records.get(thread);
+      if (!list) records.set(thread, (list = []));
+      list.push(record);
+    }
   }
   return records;
-}
-
-// T3's live projects and their folders.
-const PROJECTS = `SELECT project_id AS id, workspace_root AS root FROM projection_projects WHERE deleted_at IS NULL`;
-
-/**
- * T3's live projects, each folder with `~` expanded and no trailing slash. Unlike
- * stats, this doesn't fail soft: it throws when the database is missing or can't
- * be read, e.g. T3 changed its schema.
- */
-export function liveProjects(db: string, home: string): { id: string; folder: string }[] {
-  const open = new DatabaseSync(db, { readOnly: true });
-  try {
-    const projects = open.prepare(PROJECTS).all() as { id: unknown; root: unknown }[];
-    return projects.flatMap(({ id, root }) =>
-      typeof id === 'string' && typeof root === 'string' ? [{ id, folder: normalPath(root, home) }] : []);
-  } finally {
-    open.close();
-  }
-}
-
-/** A folder with `~` expanded and no trailing slash. */
-function normalPath(path: string, home: string): string {
-  return expandHome(path, home).replace(/(?<=.)\/+$/, '');
 }
 
 /**
@@ -296,125 +159,21 @@ function normalPath(path: string, home: string): string {
  */
 export function loadItemStats(sources: StatsSources, now: number): ItemStatsReader | 'unavailable' | null {
   if (!existsSync(sources.db)) return null;
-  let db: DatabaseSync | undefined;
   try {
-    const open = (db = new DatabaseSync(sources.db, { readOnly: true }));
-    const roots = db.prepare(ROOTS).all() as { id: string; text: unknown }[];
-    const lineage = db.prepare(LINEAGE).all() as { id: string; root: unknown; parent: unknown }[];
-    const turns = db.prepare(TURNS).all() as unknown as Turn[];
-    const runs = db.prepare(RUNS).all() as { thread: string; startedAt: string | null; completedAt: string | null }[];
-    const waits = db.prepare(WAITS).all() as { turn: string; createdAt: string | null; resolvedAt: string | null }[];
-    const lastMessages = db.prepare(LAST_MESSAGES).all() as { thread: string; at: string | null }[];
-    const activity = { lastMessages, active: activeProviderThreads(db) };
-    const settings = readT3Settings(sources.settings, sources.home);
-    const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(open, settings.instanceHomes)));
-    return reader(roots, lineage, turns, runs, waits, activity, records, loadPricing(sources.rates, settings), now);
+    return readT3Db(sources.db, (db) => {
+      const time = agentTime(agentTimeRows(db), now);
+      const settings = readT3Settings(sources.settings, sources.home);
+      const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(db, settings.instanceHomes)));
+      const pricing = loadPricing(sources.rates, settings);
+      return Object.assign((repo: string, number: number): ItemStats | null => {
+        const found = time(repo, number);
+        if (!found) return null;
+        const own = found.threads.flatMap((thread) => records.get(thread) ?? []);
+        const costUsd = pricing ? apiCost(own, pricing) : null;
+        return { agentMs: found.agentMs, wallMs: found.wallMs, tokens: totalTokens(own), ...(costUsd === null ? {} : { costUsd }) };
+      }, { priced: pricing !== null });
+    });
   } catch {
     return 'unavailable';
-  } finally {
-    db?.close();
   }
-}
-
-function reader(
-  roots: { id: string; text: unknown }[],
-  lineage: { id: string; root: unknown; parent: unknown }[],
-  turns: Turn[],
-  runs: { thread: string; startedAt: string | null; completedAt: string | null }[],
-  waits: { turn: string; createdAt: string | null; resolvedAt: string | null }[],
-  activity: { lastMessages: { thread: string; at: string | null }[]; active: Set<string> },
-  records: Map<string, UsageRecord[]>,
-  pricing: Pricing | null,
-  now: number,
-): ItemStatsReader {
-  const rootsByIssue = new Map<string, string[]>();
-  for (const root of roots) {
-    if (typeof root.text !== 'string') continue;
-    const issue = namedIssue(root.text);
-    if (issue) add(rootsByIssue, issue, root.id);
-  }
-  const threadsByRoot = new Map<string, string[]>();
-  const parentOf = new Map<string, string>();
-  for (const { id, root, parent } of lineage) {
-    add(threadsByRoot, typeof root === 'string' ? root : id, id);
-    if (typeof parent === 'string') parentOf.set(id, parent);
-  }
-  const turnsByThread = new Map<string, Turn[]>();
-  for (const turn of turns) add(turnsByThread, turn.thread, turn);
-  const threadOfTurn = new Map(turns.map((turn) => [turn.id, turn.thread]));
-  // Each thread's latest activity: its latest message, turn or wait time.
-  const lastActivity = new Map<string, number>();
-  const seen = (thread: string | undefined, at: string | null) => {
-    const ms = Date.parse(at ?? '');
-    if (thread && Number.isFinite(ms) && ms > (lastActivity.get(thread) ?? -Infinity)) lastActivity.set(thread, ms);
-  };
-  const lastMessage = new Map<string, number>();
-  for (const { thread, at } of activity.lastMessages) {
-    seen(thread, at);
-    const ms = Date.parse(at ?? '');
-    if (Number.isFinite(ms)) lastMessage.set(thread, ms);
-  }
-  for (const turn of turns) [turn.startedAt, turn.completedAt].forEach((at) => seen(turn.thread, at));
-  const waitsByTurn = new Map<string, [number, number][]>();
-  for (const wait of waits) {
-    [wait.createdAt, wait.resolvedAt].forEach((at) => seen(threadOfTurn.get(wait.turn), at));
-    const start = Date.parse(wait.createdAt ?? '');
-    const end = wait.resolvedAt ? Date.parse(wait.resolvedAt) : now;
-    if (Number.isFinite(start) && Number.isFinite(end)) add(waitsByTurn, wait.turn, [start, end]);
-  }
-  // Each turn's next start on its provider thread, which ends an earlier turn T3 never closed.
-  const nextStart = new Map<string, number>();
-  const turnsByProviderThread = new Map<string, Turn[]>();
-  for (const turn of turns) add(turnsByProviderThread, turn.providerThread, turn);
-  for (const group of turnsByProviderThread.values()) {
-    const starts = group.map((turn) => Date.parse(turn.startedAt ?? '')).filter(Number.isFinite);
-    for (const turn of group) {
-      const start = Date.parse(turn.startedAt ?? '');
-      const later = starts.filter((at) => at > start);
-      if (later.length) nextStart.set(turn.id, Math.min(...later));
-    }
-  }
-  // An open turn runs up to now while it is its active provider thread's latest; one
-  // T3 never closed (its run failed or was abandoned) stops at the next turn's start
-  // on its provider thread, or else at the thread's latest activity.
-  const turnEnd = (turn: Turn): number => {
-    if (turn.completedAt) return Date.parse(turn.completedAt);
-    const next = nextStart.get(turn.id);
-    if (next !== undefined) return next;
-    return activity.active.has(turn.providerThread) ? now : (lastActivity.get(turn.thread) ?? -Infinity);
-  };
-
-  // A running subagent counts up to its latest message, or not at all before one.
-  const runsByThread = new Map<string, Interval[]>();
-  for (const run of runs) {
-    const start = Date.parse(run.startedAt ?? '');
-    const end = run.completedAt ? Date.parse(run.completedAt) : (lastMessage.get(run.thread) ?? start);
-    if (Number.isFinite(start) && Number.isFinite(end)) add(runsByThread, run.thread, [start, end]);
-  }
-  // A thread's work: its turns less waits on Pedro, or, with no turns, its subagent runs.
-  const work = (thread: string): Interval[] => {
-    const own = turnsByThread.get(thread);
-    if (!own) return merged(runsByThread.get(thread) ?? []);
-    return own.flatMap((turn): Interval[] => {
-      const start = Date.parse(turn.startedAt ?? '');
-      return Number.isFinite(start) ? minus([[start, turnEnd(turn)]], waitsByTurn.get(turn.id) ?? []) : [];
-    });
-  };
-
-  return Object.assign((repo: string, number: number): ItemStats | null => {
-    const matched = rootsByIssue.get(issueKey(repo, number));
-    if (!matched) return null;
-    const threads = new Set(matched.flatMap((root) => [root, ...(threadsByRoot.get(root) ?? [])]));
-    // A root adds all its work; a child only its work outside its direct parent's.
-    let agentMs = 0;
-    for (const thread of threads) {
-      const parent = parentOf.get(thread);
-      agentMs += length(parent ? minus(work(thread), work(parent)) : work(thread));
-    }
-    // Wall time: the union of every thread's work, so parallel work counts once.
-    const wallMs = length(merged([...threads].flatMap(work)));
-    const own = [...threads].flatMap((thread) => records.get(thread) ?? []);
-    const costUsd = pricing ? apiCost(own, pricing) : null;
-    return { agentMs, wallMs, tokens: totalTokens(own), ...(costUsd === null ? {} : { costUsd }) };
-  }, { priced: pricing !== null });
 }

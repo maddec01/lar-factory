@@ -166,3 +166,13 @@ test('Start build only runs for Ready issues from this board page and session', 
   assert.equal((await startBuild(sample, 'PVTI_sample05')).status, 403);
   assert.deepEqual([...await writes(board), ...await board.t3Calls(), ...await sample.t3Calls()], []);
 });
+
+test('the board data says, per repository, whether Start build finds its repository project', async (t) => {
+  const { board } = await buildBoard(t, [projectIssue(12, 'Ready')]);
+  const data = await until(board, (d) => !!d.repositoryProjects) as BoardData;
+  assert.deepEqual(data.repositoryProjects, {
+    'maddec01/mux-server': 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code',
+    'maddec01/mux-apple': 'No T3 project is a checkout of maddec01/mux-apple; add the checkout in T3 Code',
+    'maddec01/mux-factory': null,
+  });
+});

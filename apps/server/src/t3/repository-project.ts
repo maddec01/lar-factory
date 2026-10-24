@@ -17,17 +17,31 @@ export async function repositoryProject(repo: string, repos: readonly RepoConfig
   if (!repos.some((r) => r.repo.toLowerCase() === repo.toLowerCase())) {
     return { error: `${repo} isn't in config.json; add it with a role` };
   }
+  return (await projectFinder(env))(repo);
+}
+
+/** Each configured repository's project hint: null when Start finds its repository project, else why not. */
+export async function repositoryProjectHints(repos: readonly RepoConfig[],
+  env: NodeJS.ProcessEnv = process.env): Promise<Record<string, string | null>> {
+  const find = await projectFinder(env);
+  return Object.fromEntries(repos.map(({ repo }) => [repo, find(repo).error ?? null]));
+}
+
+/** Reads T3's live projects and their checkouts' origins once, and finds a repository's project among them. */
+async function projectFinder(env: NodeJS.ProcessEnv): Promise<(repo: string) => RepositoryProject> {
   const db = statsDbPath(env);
   const home = env.HOME ?? '';
   let projects;
   try { projects = liveProjects(db, home); }
-  catch { return { error: `Can't read T3 Code's projects at ${db}` }; }
+  catch { return () => ({ error: `Can't read T3 Code's projects at ${db}` }); }
   const origins = await Promise.all(projects.map((p) => mainCheckout(p.folder) ? originUrl(p.folder) : null));
-  const matches = projects.filter((_, i) => githubRepo(origins[i] ?? null)?.toLowerCase() === repo.toLowerCase());
-  if (matches.length === 1) return { projectId: matches[0]!.id };
-  if (!matches.length) return { error: `No T3 project is a checkout of ${repo}; add the checkout in T3 Code` };
-  const folders = matches.map((p) => tilde(p.folder, home)).sort().join(', ');
-  return { error: `Several T3 projects are checkouts of ${repo}: ${folders}; remove all but one in T3 Code` };
+  return (repo) => {
+    const matches = projects.filter((_, i) => githubRepo(origins[i] ?? null)?.toLowerCase() === repo.toLowerCase());
+    if (matches.length === 1) return { projectId: matches[0]!.id };
+    if (!matches.length) return { error: `No T3 project is a checkout of ${repo}; add the checkout in T3 Code` };
+    const folders = matches.map((p) => tilde(p.folder, home)).sort().join(', ');
+    return { error: `Several T3 projects are checkouts of ${repo}: ${folders}; remove all but one in T3 Code` };
+  };
 }
 
 /** Whether `folder` is a main checkout: its `.git` is a directory, not a worktree's `.git` file. */

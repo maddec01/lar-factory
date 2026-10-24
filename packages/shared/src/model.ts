@@ -287,6 +287,17 @@ export interface BoardData {
   tools?: ToolProblems;
   /** T3 Code's environment id, which thread links need; absent when T3 hasn't written one. */
   t3EnvironmentId?: string;
+  /**
+   * Per configured repository, null when Start build finds its repository project, else
+   * the hint that says how to add it in T3. Absent until the first read, and in sample mode.
+   */
+  repositoryProjects?: Record<string, string | null>;
+}
+
+/** The hint for adding the repository's T3 project when a start can't find it, whatever the case; null when it can, or before the first read. */
+export function repositoryProjectHint(data: Pick<BoardData, 'repositoryProjects'>, repo: string | null): string | null {
+  const key = repo?.toLowerCase();
+  return Object.entries(data.repositoryProjects ?? {}).find(([r]) => r.toLowerCase() === key)?.[1] ?? null;
 }
 
 /** A tool the lookup didn't find, naming the override that pointed nowhere, if one did. */

@@ -19,6 +19,7 @@ import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { loadItemStats } from './stats/item-stats.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
+import { repositoryProjectHints } from './t3/repository-project.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
 import { loadItemThreads } from './threads/item-threads.ts';
 import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools/tools.ts';
@@ -193,7 +194,7 @@ async function refresh(): Promise<void> {
     const recovered = error !== null || fetchedAt === null;
     board.applyRead(snapshot.items, readRevision, (items) => withThreads(withStats(items)));
     board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: null,
-      t3EnvironmentId: readEnvironmentId(environmentIdFile) });
+      t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(config.repos) });
     if (recovered) log(`read ${snapshot.items.length} items from the ${snapshot.title} project`);
     read = true;
   } catch (err) {

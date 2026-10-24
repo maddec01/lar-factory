@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, buildBranch, buildMessage, canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, buildBranch, buildMessage, canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -75,6 +75,13 @@ test('the blocked text names the open blockers, with the repository when it is a
   assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'OPEN'), blocker(4, 'maddec01/mux-apple', 'OPEN')] })),
     'Blocked by #3, maddec01/mux-apple#4 until they close');
   assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'CLOSED')] })), null);
+});
+
+test("a repository's project hint is found whatever the case, and is null once T3 has its project or before any read", () => {
+  const repositoryProjects = { 'maddec01/mux-server': 'Add the checkout in T3 Code', 'maddec01/mux-factory': null };
+  assert.equal(repositoryProjectHint({ repositoryProjects }, 'MADDEC01/Mux-Server'), 'Add the checkout in T3 Code');
+  assert.equal(repositoryProjectHint({ repositoryProjects }, 'maddec01/mux-factory'), null);
+  assert.equal(repositoryProjectHint({}, 'maddec01/mux-server'), null);
 });
 
 test('Done counts for 7 days after closing', () => {

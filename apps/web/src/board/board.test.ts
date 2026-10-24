@@ -39,7 +39,9 @@ test('the Board view shows a section per group of statuses, each with its count 
     ['done', 'Done 4 last 7 days'],
   ]);
   expect($('#needs-you')!.getAttribute('aria-labelledby')).toBe('needs-you-h');
-  expect($$('#needs-you article').map((a) => a.className)).toEqual(['card amber', 'card amber', 'card amber', 'card']);
+  const cards = $$('#needs-you article');
+  expect(cards.map((a) => a.getAttribute('data-slot'))).toEqual(['card', 'card', 'card', 'card']);
+  expect(cards.map((a) => a.hasAttribute('data-accent')), 'amber while only you can move it').toEqual([true, true, true, false]);
 });
 
 test('a concept block shows its sub-issues done and its open sub-issues grouped by status', async () => {
@@ -47,8 +49,9 @@ test('a concept block shows its sub-issues done and its open sub-issues grouped 
   const concept = card('PVTI_sample09');
   expect(concept.closest('.cards.wide')).not.toBeNull();
   const bar = concept.querySelector('[role="progressbar"]')!;
-  expect([bar.getAttribute('aria-valuenow'), bar.getAttribute('aria-valuemax'), bar.querySelector('span')!.style.width]).toEqual(['2', '6', '33%']);
-  expect(text(concept.querySelector('.progress-label'))).toBe('2/6 sub-issues done');
+  const fill = bar.querySelector<HTMLElement>('[data-slot="progress-indicator"]')!;
+  expect([bar.getAttribute('data-slot'), bar.getAttribute('aria-valuenow'), bar.getAttribute('aria-valuemax'), Math.round(parseFloat(fill.style.width))]).toEqual(['progress-bar', '2', '6', 33]);
+  expect(text(concept.querySelector('[data-slot="progress-caption"]'))).toBe('2/6 sub-issues done');
   expect($$('#concepts .sub-group').map((g) => [text(g.querySelector('.sub-status')), [...g.querySelectorAll('li[data-anchor]')].map((li) => li.getAttribute('data-anchor'))]))
     .toEqual([['Shaping', ['PVTI_sample10']], ['Needs you', ['PVTI_sample12']], ['Ready', ['PVTI_sample13']]]);
   expect(concept.querySelector('.sub-group li .kind'), 'sub-issue rows keep the kind pill').not.toBeNull();
@@ -354,7 +357,7 @@ test('item stats sit in their own last row on a card; on a Queued card the actio
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'PVTI_sample05' || i.status === 'In progress' ? { ...i, stats } : i)) });
   const queued = card('PVTI_sample05');
   expect([...queued.children].slice(-2).map((c) => c.className), 'stats row first, actions row last').toEqual(['card-stats', 'card-actions']);
-  const withStats = $$('article.card').filter((c) => c.querySelector('.stats') && !c.querySelector('.card-actions'));
+  const withStats = $$('article[data-slot="card"]').filter((c) => c.querySelector('.stats') && !c.querySelector('.card-actions'));
   expect(withStats.length).toBeGreaterThan(0);
   for (const c of withStats) expect(c.lastElementChild!.className, "the stats row is the card's last element").toBe('card-stats');
   expect($('.foot .stats'), 'the foot line holds no stats').toBeNull();

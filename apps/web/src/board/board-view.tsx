@@ -8,6 +8,7 @@ import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from './board-store.ts';
 import { Card } from '../items/card.tsx';
 import { Disclosure } from './disclosure.tsx';
+import { Progress } from '@mux-factory/ui/progress';
 import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../items/item-actions.tsx';
 import { jumpTo } from './jump.ts';
 import { useJumpStore } from './jump-store.ts';
@@ -55,14 +56,10 @@ function Row({ item, data, trailing, withPlatform = true, pills = 'labels' }: {
 function ConceptBlock({ concept, data }: { concept: Item; data: BoardData }) {
   const children = conceptChildren(concept, data.items);
   const { total, completed } = concept.subIssues;
-  const pct = total ? Math.round((completed / total) * 100) : 0;
   const statuses = STATUSES.filter((s) => children.some((c) => c.status === s));
   const extra = (
     <>
-      <div className="progress">
-        <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={completed} aria-label="Sub-issues done"><span style={{ width: `${pct}%` }} /></div>
-        <span className="progress-label">{completed}/{total} sub-issues done</span>
-      </div>
+      <Progress value={completed} max={total} aria-label="Sub-issues done" caption={`${completed}/${total} sub-issues done`} />
       {children.length ? (
         <ul className="sub-groups" aria-label="Open sub-issues by status">
           {statuses.map((s) => (

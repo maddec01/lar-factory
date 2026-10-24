@@ -48,8 +48,6 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 10px; }
 .cards.wide { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
 
-.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.card.amber { border-color: color-mix(in srgb, var(--you) 55%, var(--border)); box-shadow: inset 4px 0 0 var(--you); padding-left: 14px; }
 .meta { display: flex; gap: 5px; align-items: flex-start; font-size: 11px; }
 /* The badges wrap onto more lines; the action group keeps the top-right corner. */
 .meta .badges { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
@@ -157,10 +155,6 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 }
 
 /* concepts */
-.progress { display: flex; align-items: center; gap: 8px; }
-.progress .bar { flex: 1; height: 8px; border-radius: 999px; background: var(--soft); overflow: hidden; max-width: 260px; }
-.progress .bar span { display: block; height: 100%; background: var(--sub); border-radius: inherit; }
-.progress-label { font-size: 12px; color: var(--muted-foreground); }
 .sub-groups { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .sub-status { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-foreground); }
 .sub-status.amber { color: var(--you-text); font-weight: 600; }
@@ -209,7 +203,7 @@ p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px
 .start-pick[aria-disabled="true"] { cursor: not-allowed; }
 /* A Queued card's quiet footer row: Back to List on the left, Abandon on the right. */
 /* margin-top: auto keeps the stats or actions row on the card's bottom edge across a row of cards; the 8px above it moves to the item before. */
-.card > :has(+ .card-actions), .card > :has(+ .card-stats) { margin-bottom: 8px; }
+[data-slot="card"] > :has(+ .card-actions), [data-slot="card"] > :has(+ .card-stats) { margin-bottom: 8px; }
 /* The stats row takes the bottom edge; an actions row after it sits right below. */
 .card-stats { margin-top: auto; padding-top: 6px; border-top: 1px solid var(--border); }
 .card-stats + .card-actions { margin-top: 0; }

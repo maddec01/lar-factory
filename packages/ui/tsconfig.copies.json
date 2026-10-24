@@ -1,7 +1,7 @@
 // The Copies keep T3's imports, extensionless and through `~` for src/, which need Bundler resolution
 // (as in T3's apps/web/tsconfig.json). The board's own components sit here too, in src/dialog, which loads
-// the Copies, and src/form, so that each JSX file uses the same settings. The board's other files stay on tsconfig.json. The other options
-// match apps/web's, which type-checks the Copies it imports the same way (docs/adr/0016).
+// the Copies, and in src/card, src/form and src/progress, so that each JSX file uses the same settings. The
+// board's other files stay on tsconfig.json. The other options match apps/web's, which type-checks the Copies it imports the same way (docs/adr/0016).
 {
   "compilerOptions": {
     "target": "es2023",
@@ -20,5 +20,5 @@
     "skipLibCheck": true,
     "paths": { "~/*": ["./src/*"] }
   },
-  "include": ["src/components/ui", "src/dialog", "src/form"]
+  "include": ["src/card", "src/components/ui", "src/dialog", "src/form", "src/progress"]
 }

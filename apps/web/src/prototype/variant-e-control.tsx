@@ -1,5 +1,5 @@
 // PROTOTYPE, throwaway. Variant E, "Control room": C's overview with A's detail. The window stays a
-// dashboard (stats in the header, your desk, the line as stations, repos in the sidebar), and clicking any item, in
+// dashboard (stats in the header, your desk, the line as stations, the List by repo in the sidebar), and clicking any item, in
 // the sidebar, on the desk or on the line, opens A's full detail in a dialog over the
 // overview. The left sidebar copies T3 Code's: its toggle beside the traffic lights, search with Add item,
 // Settings and the update button at its foot. ⌘B toggles the sidebar.
@@ -17,13 +17,12 @@ import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, STATUS_COLOR, WindowControls, drag, noDrag, platformColor } from './chrome.tsx';
 import { ActionButtons, PrList, SliceBar, SliceList, ItemTitle, StatsGrid, StepTrack, hint, refText } from './item-bits.tsx';
 import { ToolbarStats } from './toolbar-stats.tsx';
-import { SidebarItems } from './sidebar/sidebar-switcher.tsx';
+import { ListSidebar } from './list-sidebar.tsx';
+import type { Pick } from './list-sidebar.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
 const STATIONS: Status[] = ['Queued', 'Shaping', 'Ready', 'In progress', 'Review', 'Verify', 'Ready to merge'];
 const picked = (on: boolean) => (on ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : '');
-
-import type { Pick } from './sidebar/sidebar-data.ts';
 
 function DeskCard({ item, data, now, pick }: { item: Item; data: BoardData; now: number; pick: Pick }) {
   return (
@@ -130,7 +129,7 @@ function SearchRow({ query, onQuery }: { query: string; onQuery: (q: string) => 
     <div className="flex items-center gap-1">
       <label className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-(--control-radius) px-2 py-1.5 text-sm font-medium text-(--sidebar-muted-foreground) hover:bg-(--sidebar-row-hover) hover:text-(--sidebar-foreground)">
         <Search className="size-4 shrink-0 text-(--sidebar-icon-color)" />
-        <input type="search" value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Search" aria-label="Search items"
+        <input type="search" value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Search List" aria-label="Search List items"
           className="min-w-0 flex-1 bg-transparent font-medium text-(--sidebar-foreground) outline-none placeholder:text-(--sidebar-muted-foreground) [&::-webkit-search-cancel-button]:hidden" />
         {query && <button type="button" aria-label="Clear search" onClick={() => onQuery('')} className="grid size-5 place-items-center rounded-sm text-(--muted-foreground) hover:bg-(--accent)"><X className="size-3" /></button>}
       </label>
@@ -191,7 +190,7 @@ export function VariantE() {
           ) : (
             <>
               <div className="px-2 pb-2"><SearchRow query={query} onQuery={setQuery} /></div>
-              <SidebarItems data={data} now={now} query={q} platform={platform} onScope={setPlatform} pick={pick} />
+              <ListSidebar data={data} now={now} query={q} platform={platform} onScope={setPlatform} pick={pick} />
               <div className="flex items-center justify-between px-2 py-2">
                 <SidebarIconButton label="Settings" onClick={() => setSettings(true)}><Settings /></SidebarIconButton>
                 <Update />

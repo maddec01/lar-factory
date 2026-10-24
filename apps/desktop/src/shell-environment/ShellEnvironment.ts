@@ -3,7 +3,7 @@
 // few more variables the way T3 Code does. Copied from T3 Code's
 // apps/desktop/src/shell/DesktopShellEnvironment.ts and packages/shared/src/shell.ts,
 // keeping macOS only, returning a new environment instead of changing process.env,
-// and adding the Homebrew folders board/src/tools.ts adds.
+// and adding the Homebrew folders apps/server/src/tools/tools.ts adds.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 

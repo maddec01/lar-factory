@@ -8,7 +8,7 @@
 // channels where T3 shows it on nightly only, as T3 Code's SidebarUpdateReleaseNotes. It is a PreviewCard, not
 // a Popover, as a Popover's focus guards would take the Tab after the button and close it.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PreviewCard } from '@base-ui/react/preview-card';

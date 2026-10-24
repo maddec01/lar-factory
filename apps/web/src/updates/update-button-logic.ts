@@ -2,7 +2,7 @@
 // apps/web/src/components/desktopUpdate.logic.ts at 9a391eb, without the release URLs, the Intel build
 // warning and the not-applied update, which the board app's state doesn't have.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
 
 import type { UpdateActionResult, UpdateState } from '@mux-factory/shared';
 

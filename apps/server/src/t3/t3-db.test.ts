@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { agentTimeRows, liveProjects, readT3Db, threadSessions } from './t3-db.ts';
 import { projectsDb, statsDb } from '../../test/stats-db.ts';

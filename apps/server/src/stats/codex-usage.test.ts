@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { initialCodexScanState, parseCodexLine } from './codex-usage.ts';
 import { totalTokens } from './transcript-usage.ts';

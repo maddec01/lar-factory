@@ -1,5 +1,5 @@
-import { test } from 'node:test';
-import type { TestContext } from 'node:test';
+import { test } from 'vite-plus/test';
+import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import type { IncomingMessage } from 'node:http';
@@ -12,7 +12,7 @@ import type { BoardData } from '@mux-factory/shared';
 /** An open event stream: its response and a wait for the next pushed board that passes a check. */
 async function openStream(t: TestContext, board: Board) {
   const abort = new AbortController();
-  t.after(() => abort.abort());
+  t.onTestFinished(() => abort.abort());
   const response = await fetch(`${board.url}/api/events`, { signal: abort.signal });
   const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
   let buffered = '';

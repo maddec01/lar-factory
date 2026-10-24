@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vite-plus/test';
 
 /** The test process's environment without inherited Git variables, so a run inside a Git hook
  * or `git rebase --exec` (which set GIT_DIR and friends) never reads or writes the real repo. */
@@ -26,7 +26,7 @@ export function checkouts(home: string, origins: Record<string, string | null>, 
 export async function factoryRepo(t: TestContext) {
   const dir = await mkdtemp(join(tmpdir(), 'mux factory test '));
   // Runs before a board started later is killed, so its git fetch may still be writing: retry.
-  t.after(() => rm(dir, { recursive: true, force: true, maxRetries: 10 }));
+  t.onTestFinished(() => rm(dir, { recursive: true, force: true, maxRetries: 10 }));
   const repo = join(dir, 'factory');
   const origin = join(dir, 'origin.git');
   const env = { ...testEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,7 +13,7 @@ const afterRead = (board: Board) => until(board, (d) => Boolean(d.fetchedAt || d
 
 test('the board listens before a slow login shell answers, and its data waits for that first lookup', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'mux-slow-shell-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const shell = join(dir, 'slow-shell');
   writeFileSync(shell, '#!/bin/sh\nsleep 1\nexec /bin/sh -c "$2"\n', { mode: 0o755 });
   const board = await startBoard(t, {}, false, false, { SHELL: shell, GH_PATH: '/nowhere/gh' });
@@ -24,7 +24,7 @@ test('the board listens before a slow login shell answers, and its data waits fo
 
 test('Recheck finds a t3 that appeared after startup', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'mux-t3-later-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const t3 = join(dir, 't3');
   const board = await startBoard(t, {}, false, false, { T3_PATH: t3 });
   assert.deepEqual((await board.board()).tools, { t3: { problem: 'missing', override: `T3_PATH=${t3}` } });
@@ -52,7 +52,7 @@ test('a logged-out gh shows its notice and reads nothing until Recheck finds it 
 
 test('a logged-out gh that logs in is found by the timed retry, which keeps the login PATH it read', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'mux-shell-log-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const shellLog = join(dir, 'runs');
   const shellRuns = () => existsSync(shellLog) ? readFileSync(shellLog, 'utf8').trim().split('\n').length : 0;
   const board = await startBoard(t, { ghAuth: 'logged-out' }, false, false, { FAKE_SHELL_LOG: shellLog, BOARD_TOOL_RETRY_MS: '100' });

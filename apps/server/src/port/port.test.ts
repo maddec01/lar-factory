@@ -1,4 +1,4 @@
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:net';
 import { once } from 'node:events';
@@ -9,7 +9,7 @@ async function hold(t: TestContext, port: number): Promise<Server> {
   const server = createServer();
   server.listen(port, '127.0.0.1');
   await once(server, 'listening');
-  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  t.onTestFinished(() => new Promise<void>((resolve) => server.close(() => resolve())));
   return server;
 }
 
@@ -41,7 +41,7 @@ test('a taken port is skipped for the next one', async (t) => {
   const first = await freePair();
   await hold(t, first);
   const server = createServer();
-  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  t.onTestFinished(() => new Promise<void>((resolve) => server.close(() => resolve())));
   assert.equal(await listenOnFreePort(server, '127.0.0.1', [first, first + 1]), first + 1);
   assert.equal((server.address() as { port: number }).port, first + 1);
 });

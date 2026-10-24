@@ -1,15 +1,15 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vite-plus/test';
 import { findTools, mergePaths, readLoginPath } from './tools.ts';
 
 /** A temp folder with `bin` holding runnable files of the given names, and a login shell whose PATH starts with `bin`. */
 async function machine(t: TestContext, names: string[]) {
   const dir = await mkdtemp(join(tmpdir(), 'mux-tools-test-'));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   const bin = join(dir, 'bin');
   await mkdir(bin);
   for (const name of names) {

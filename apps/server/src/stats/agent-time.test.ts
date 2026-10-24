@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { agentTime } from './agent-time.ts';
 import type { AgentTimeRows } from '../t3/t3-db.ts';

@@ -5,9 +5,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vite-plus/test';
 
-export interface FixtureTurn {
+interface FixtureTurn {
   id: string;
   startedAt: string;
   completedAt?: string | null;
@@ -20,7 +20,7 @@ export interface FixtureTurn {
 }
 
 /** A provider thread on a native session: a Claude or Codex session ID, on instance `claudeAgent` unless named. */
-export interface FixtureSession {
+interface FixtureSession {
   session: string;
   instance?: string;
   driver?: string;
@@ -47,7 +47,7 @@ export interface FixtureThread {
 }
 
 /** A subagent run; a running one has no completion time. */
-export interface FixtureRun {
+interface FixtureRun {
   startedAt: string;
   completedAt?: string | null;
 }
@@ -152,7 +152,7 @@ export interface FixtureTranscripts {
 /** A temporary folder removed after the test. */
 export function tempDir(t: TestContext, prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   return dir;
 }
 

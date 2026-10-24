@@ -1,4 +1,4 @@
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { once } from 'node:events';
@@ -16,7 +16,7 @@ async function reportedPorts(t: TestContext, env: Record<string, string>): Promi
     cwd: new URL('../', import.meta.url), execArgv: ['--disable-warning=ExperimentalWarning'], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { ...testEnv(), ...SAMPLE_MODELS, HOME: home, BOARD_DATA_FILE: SAMPLE_DATA, ...env },
   });
-  t.after(async () => {
+  t.onTestFinished(async () => {
     if (child.exitCode === null && child.signalCode === null) {
       const exited = once(child, 'exit');
       child.kill();

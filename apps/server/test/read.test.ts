@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import type { IncomingMessage } from 'node:http';

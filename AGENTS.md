@@ -21,8 +21,9 @@ the flow and `docs/plan.md` for how it was set up.
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   Pedro merges every PR.
 - Board changes: run `pnpm test` in each of `apps/server`, `apps/web`,
-  `apps/desktop` and `packages/shared` that changed, then `pnpm run typecheck` and
-  `pnpm run knip` at the root. `pnpm run dev` at the root opens the board app's window.
+  `apps/desktop` and `packages/shared` that changed (`pnpm test` at the root runs
+  them all), then `pnpm run typecheck` and `pnpm run knip` at the root.
+  `pnpm run dev` at the root opens the board app's window.
 - Sample board: `BOARD_PORT=<port> pnpm run sample` in `apps/server`, on a port where
   `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing (the board app's board
   usually holds 4317). Stop it with that command `| xargs kill`; never `pkill` by pattern.

@@ -9,6 +9,7 @@
   "scripts": {
     "test": "pnpm -r test",
     "test:shared": "pnpm --filter @mux-factory/shared test",
+    "test:ui": "pnpm --filter @mux-factory/ui test",
     "test:server": "pnpm --filter @mux-factory/server test",
     "test:web": "pnpm --filter @mux-factory/web test",
     "test:desktop": "pnpm --filter @mux-factory/desktop test",

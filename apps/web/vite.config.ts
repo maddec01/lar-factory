@@ -1,6 +1,8 @@
 // Vite+ builds the page into dist/, which the board server (apps/server) reads at startup.
 // Vitest runs the page tests, which sit next to the files they test, in a DOM.
+// `~` is the design system's src/: the components copied from T3 import through it (docs/adr/0016).
 
+import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite-plus';
 import type { Plugin } from 'vite-plus';
@@ -15,6 +17,7 @@ const renderBlockingEntry: Plugin = {
 
 export default defineConfig({
   plugins: [tailwindcss(), renderBlockingEntry],
+  resolve: { alias: { '~': fileURLToPath(new URL('../../packages/ui/src', import.meta.url)) } },
   build: {
     outDir: 'dist',
     rolldownOptions: {

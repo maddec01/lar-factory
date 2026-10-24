@@ -58,6 +58,16 @@ jobs:
         working-directory: packages/shared
         run: pnpm run typecheck
 
+      - name: UI tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: packages/ui
+        run: pnpm test
+
+      - name: UI typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: packages/ui
+        run: pnpm run typecheck
+
       - name: Server tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: apps/server

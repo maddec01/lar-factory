@@ -189,11 +189,11 @@ export function UpdateButton() {
       aria-disabled={isInteractionDisabled || undefined}
       aria-describedby={notesOpen ? 'update-notes' : undefined}
       className={[
-        'update-button inline-flex size-8 items-center justify-center rounded-full outline-hidden ring-(--focus) transition-colors focus-visible:ring-2 focus-visible:ring-inset',
+        'update-button inline-flex size-8 items-center justify-center rounded-full outline-hidden ring-(--ring) transition-colors focus-visible:ring-2 focus-visible:ring-inset',
         isInteractionDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         showUpdateIconState
-          ? ['bg-(--update-surface) text-(--fg)', !isInteractionDisabled && 'hover:bg-(--update-hover)']
-          : ['text-(--update-icon)', !isInteractionDisabled && 'hover:bg-(--update-hover) hover:text-(--fg)'],
+          ? ['bg-(--sidebar-control-surface) text-(--foreground)', !isInteractionDisabled && 'hover:bg-(--update-hover)']
+          : ['text-(--sidebar-icon-color)', !isInteractionDisabled && 'hover:bg-(--update-hover) hover:text-(--foreground)'],
         disabled && !showUpdateIconState && 'opacity-60',
       ].flat().filter(Boolean).join(' ')}
       onClick={() => void handleAction()}
@@ -223,17 +223,17 @@ export function UpdateButton() {
               className="pointer-events-none z-[140] h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
               collisionPadding={5} align="center" side="bottom" sideOffset={() => gapBelowTitleBar(anchor.current)}>
               <Tooltip.Popup className={[
-                'update-tooltip relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-balance rounded-md text-(--fg) text-xs transition-[width,height,scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-md)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]',
+                'update-tooltip relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-balance rounded-md text-(--foreground) text-xs transition-[width,height,scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-md)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]',
                 showUpdateDetails
                   ? 'dropdown-glass shadow-xl shadow-black/25 before:hidden'
-                  : 'border border-(--bd) bg-(--surface) not-dark:bg-clip-padding shadow-md/5',
+                  : 'border border-(--border) bg-(--popover) not-dark:bg-clip-padding shadow-md/5',
                 'max-w-80 wrap-anywhere whitespace-normal leading-snug',
               ].join(' ')}>
                 <div className="relative size-full overflow-clip px-2 py-1">
                   {idleTooltip?.detail ? (
                     <div className="text-left">
                       <div className="font-medium">{idleTooltip.title}</div>
-                      <div className="text-(--muted)">{idleTooltip.detail}</div>
+                      <div className="text-(--muted-foreground)">{idleTooltip.detail}</div>
                     </div>
                   ) : (
                     <span className="whitespace-pre-line">{tooltip}</span>

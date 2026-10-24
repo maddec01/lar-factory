@@ -12,7 +12,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { isRecord } from '@mux-factory/shared';
 import type { ItemStats } from '@mux-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
-import { agentTimeRows, codexTurnSelections, readT3Db, threadSessions } from '../t3/t3-db.ts';
+import { threadRows, codexTurnSelections, readT3Db, threadSessions } from '../t3/t3-db.ts';
 import type { CodexTurnSelection } from '../t3/t3-db.ts';
 import { readT3Settings } from '../t3/t3-settings.ts';
 import type { InstanceHome, T3Settings, TranscriptDriver } from '../t3/t3-settings.ts';
@@ -159,7 +159,7 @@ export function loadItemStats(sources: StatsSources, now: number): ItemStatsRead
   if (!existsSync(sources.db)) return null;
   try {
     return readT3Db(sources.db, (db) => {
-      const time = agentTime(agentTimeRows(db), now);
+      const time = agentTime(threadRows(db), now);
       const settings = readT3Settings(sources.settings, sources.home);
       const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(db, settings.instanceHomes)));
       const pricing = loadPricing(sources.rates, settings);

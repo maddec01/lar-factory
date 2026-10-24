@@ -155,6 +155,24 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
   assert.equal(without?.stats, undefined);
 });
 
+test('each refresh attaches item threads and T3\'s environment id, and leaves them out without T3\'s files', async (t) => {
+  const db = statsDb(t, [{ id: 'build', title: 'Build: owner accounts', messages: ['Build maddec01/mux-factory#12'],
+    turns: [{ id: 't', startedAt: '2026-10-20T09:00:00Z' }] }]);
+  const environment = join(mkdtempSync(join(tmpdir(), 'mux-t3-env-')), 'environment-id');
+  t.onTestFinished(() => rmSync(join(environment, '..'), { recursive: true, force: true }));
+  writeFileSync(environment, 'env-1\n');
+  const board = await startBoard(t, { items: [projectIssue(12, 'In progress'), projectIssue(13, 'Review')] }, false, false,
+    { T3_STATE_DB: db, T3_ENVIRONMENT_ID: environment });
+  const data = await until(board, (d) => d.items.length > 0);
+  assert.equal(data.t3EnvironmentId, 'env-1');
+  assert.deepEqual(data.items.find((i) => i.number === 12)?.threads,
+    [{ id: 'build', title: 'Build: owner accounts', state: 'running', updated: '2026-10-20T09:00:00.000Z' }]);
+  assert.equal(data.items.find((i) => i.number === 13)?.threads, undefined);
+  const without = await until(await startBoard(t, { items: [projectIssue(12, 'In progress')] }), (d) => d.items.length > 0);
+  assert.equal(without.t3EnvironmentId, undefined);
+  assert.equal(without.items[0]?.threads, undefined);
+});
+
 test('refreshes keep a stats block in open linked PRs, edit only when it changes, and never in sample mode', async (t) => {
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },

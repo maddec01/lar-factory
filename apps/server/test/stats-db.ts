@@ -33,6 +33,8 @@ export interface FixtureThread {
   /** User messages, earliest first; each a minute apart. */
   messages?: string[];
   title?: string;
+  /** When T3 deleted the thread, if it did. */
+  deletedAt?: string;
   /** The root thread's id for a child thread; omitted for a root. */
   rootThreadId?: string;
   /** The direct parent of a child thread nested under another child; the root by default. */
@@ -59,7 +61,7 @@ export interface FixtureRequest {
 }
 
 const SCHEMA = `
-CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, title TEXT, payload_json TEXT);
+CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, title TEXT, deleted_at TEXT, payload_json TEXT);
 CREATE TABLE orchestration_v2_projection_messages (message_id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, created_at TEXT, payload_json TEXT);
 CREATE TABLE orchestration_v2_projection_provider_turns (provider_turn_id TEXT PRIMARY KEY, thread_id TEXT, provider_thread_id TEXT, run_attempt_id TEXT, status TEXT, started_at TEXT, completed_at TEXT, payload_json TEXT);
 CREATE TABLE orchestration_v2_projection_runtime_requests (runtime_request_id TEXT PRIMARY KEY, thread_id TEXT, provider_turn_id TEXT, created_at TEXT, resolved_at TEXT);
@@ -74,7 +76,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
   const path = join(tempDir(t, 'mux-stats-'), 'statev2.sqlite');
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
-  const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?)');
+  const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?, ?)');
   const message = db.prepare('INSERT INTO orchestration_v2_projection_messages VALUES (?, ?, ?, ?, ?)');
   const turn = db.prepare(`INSERT INTO orchestration_v2_projection_provider_turns
     (provider_turn_id, thread_id, provider_thread_id, run_attempt_id, status, started_at, completed_at, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -88,7 +90,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
     const lineage = th.rootThreadId
       ? { parentThreadId: th.parentThreadId ?? th.rootThreadId, relationshipToParent: 'subagent', rootThreadId: th.rootThreadId }
       : { parentThreadId: null, relationshipToParent: null, rootThreadId: th.id };
-    thread.run(th.id, th.title ?? th.id, JSON.stringify({ id: th.id, title: th.title ?? th.id, lineage }));
+    thread.run(th.id, th.title ?? th.id, th.deletedAt ?? null, JSON.stringify({ id: th.id, title: th.title ?? th.id, lineage }));
     // Inserted latest first, so the reader has to order by time.
     [...(th.messages ?? [])].reverse().forEach((text, i, all) => {
       const at = new Date(Date.parse('2026-10-20T08:00:00Z') + (all.length - 1 - i) * 60_000).toISOString();

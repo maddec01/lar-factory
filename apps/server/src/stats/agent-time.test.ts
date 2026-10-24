@@ -1,21 +1,21 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { agentTime } from './agent-time.ts';
-import type { AgentTimeRows } from '../t3/t3-db.ts';
+import type { ThreadRows } from '../t3/t3-db.ts';
 
 const MIN = 60_000;
 const at = (minute: number) => new Date(Date.parse('2026-10-20T09:00:00Z') + minute * MIN).toISOString();
 
-function rows(partial: Partial<AgentTimeRows>): AgentTimeRows {
+function rows(partial: Partial<ThreadRows>): ThreadRows {
   return { threads: [], turns: [], runs: [], waits: [], lastMessages: [], active: new Set(), ...partial };
 }
 
 test('an item\'s time comes from plain rows: its root\'s turns less waits, and a child\'s work outside its parent\'s', () => {
   const time = agentTime(rows({
     threads: [
-      { id: 'root', root: 'root', parent: null, text: 'Build maddec01/Mux-Factory#7' },
-      { id: 'child', root: 'root', parent: 'root', text: null },
-      { id: 'other', root: 'other', parent: null, text: 'hello' },
+      { id: 'root', title: 'root', deletedAt: null, root: 'root', parent: null, text: 'Build maddec01/Mux-Factory#7' },
+      { id: 'child', title: 'child', deletedAt: null, root: 'root', parent: 'root', text: null },
+      { id: 'other', title: 'other', deletedAt: null, root: 'other', parent: null, text: 'hello' },
     ],
     turns: [
       { id: 't1', thread: 'root', providerThread: 'p1', startedAt: at(0), completedAt: at(10) },
@@ -30,7 +30,7 @@ test('an item\'s time comes from plain rows: its root\'s turns less waits, and a
 
 test('an open turn on an active provider thread runs up to now; on an idle one it stops at the thread\'s last activity', () => {
   const now = Date.parse(at(30));
-  const threads = [{ id: 'root', root: 'root', parent: null, text: 'Build x/y#1' }];
+  const threads = [{ id: 'root', title: 'root', deletedAt: null, root: 'root', parent: null, text: 'Build x/y#1' }];
   const turns = [{ id: 't', thread: 'root', providerThread: 'p', startedAt: at(0), completedAt: null }];
   const lastMessages = [{ thread: 'root', at: at(12) }];
   assert.equal(agentTime(rows({ threads, turns, lastMessages, active: new Set(['p']) }), now)('x/y', 1)?.agentMs, 30 * MIN);

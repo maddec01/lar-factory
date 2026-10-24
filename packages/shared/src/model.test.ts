@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from './model.ts';
+import { canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -167,4 +167,9 @@ test('canAbandon takes List and Queued issues and drafts, never pull requests or
     assert.ok(!canAbandon(item(status, [], { type: 'PullRequest' })), `${status} pull request`);
   }
   for (const status of ['Shaping', 'In progress', 'Done'] as const) assert.ok(!canAbandon(item(status)), status);
+});
+
+test('a thread link is T3 Code\'s threads deep link, each id one path segment', () => {
+  assert.equal(threadLink('5e-8c5a', 'thread-1'), 't3code://threads/5e-8c5a/thread-1');
+  assert.equal(threadLink('env', 'a/b c'), 't3code://threads/env/a%2Fb%20c');
 });

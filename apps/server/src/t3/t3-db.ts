@@ -16,9 +16,9 @@ export function readT3Db<T>(path: string, read: (db: DatabaseSync) => T): T {
   }
 }
 
-// Each thread with its lineage, and a root thread's first user message.
+// Each thread with its title, lineage and deletion time, and a root thread's first user message.
 const THREADS = `
-SELECT t.thread_id AS id, json_extract(t.payload_json, '$.lineage.rootThreadId') AS root,
+SELECT t.thread_id AS id, t.title, t.deleted_at AS deletedAt, json_extract(t.payload_json, '$.lineage.rootThreadId') AS root,
   json_extract(t.payload_json, '$.lineage.parentThreadId') AS parent,
   CASE WHEN json_extract(t.payload_json, '$.lineage.relationshipToParent') IS NULL THEN (
     SELECT json_extract(m.payload_json, '$.text') FROM orchestration_v2_projection_messages m
@@ -54,6 +54,9 @@ SELECT provider_thread_id AS id FROM orchestration_v2_projection_provider_thread
 /** A thread: its root and direct parent when it is a child, and its first user message when it is a root. */
 interface ThreadRow {
   id: string;
+  title: unknown;
+  /** When T3 deleted the thread; null while it is live. */
+  deletedAt: unknown;
   root: unknown;
   parent: unknown;
   text: unknown;
@@ -87,8 +90,8 @@ interface LastMessageRow {
   at: string | null;
 }
 
-/** Everything agent time is counted from. */
-export interface AgentTimeRows {
+/** Everything agent time and item threads are read from. */
+export interface ThreadRows {
   threads: ThreadRow[];
   turns: TurnRow[];
   runs: RunRow[];
@@ -98,7 +101,7 @@ export interface AgentTimeRows {
   active: Set<string>;
 }
 
-export function agentTimeRows(db: DatabaseSync): AgentTimeRows {
+export function threadRows(db: DatabaseSync): ThreadRows {
   return {
     threads: db.prepare(THREADS).all() as unknown as ThreadRow[],
     turns: db.prepare(TURNS).all() as unknown as TurnRow[],

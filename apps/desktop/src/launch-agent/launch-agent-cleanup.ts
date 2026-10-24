@@ -1,5 +1,5 @@
-// Removes the launch agent that ran the board before the app, which
-// board/scripts/install-launch-agent.sh installed. It stops the agent and deletes its
+// Removes the launch agent that ran the board before the app, which the removed
+// install-launch-agent.sh script installed. It stops the agent and deletes its
 // plist; the checkout the plist ran from stays. With the plist gone, later launches
 // find nothing to do.
 

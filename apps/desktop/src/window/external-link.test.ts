@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import * as ExternalLink from "./ExternalLink.ts";
+import * as ExternalLink from "./external-link.ts";
 
 describe("ExternalLink", () => {
   it("opens web links in the browser", () => {

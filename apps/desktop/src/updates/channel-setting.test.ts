@@ -5,7 +5,7 @@ import * as NodePath from "node:path";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
-import * as ChannelSetting from "./ChannelSetting.ts";
+import * as ChannelSetting from "./channel-setting.ts";
 
 const tempFile = () =>
   NodePath.join(NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "update-channel-")), "settings", "update-channel.json");

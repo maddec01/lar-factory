@@ -1,5 +1,5 @@
 // The secret the app makes on each launch. The board server refuses guarded writes
-// without it (board/src/server.ts); the page gets it through the preload bridge and
+// without it (apps/server/src/server.ts); the page gets it through the preload bridge and
 // sends it back in X-Board-Secret (packages/shared/src/board-app.ts). The preload asks the
 // main process for it over IPC, so it never shows in a process's arguments.
 

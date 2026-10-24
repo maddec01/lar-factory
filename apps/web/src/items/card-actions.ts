@@ -45,7 +45,7 @@ const buttonOf = (attr: string, itemId: string) => document.querySelector<HTMLEl
 function focusAfterRowLeaving(button: HTMLElement, attr: string): string[] {
   const row = button.closest('li');
   const neighbour = (row?.nextElementSibling ?? row?.previousElementSibling)?.querySelector(`[${attr}]`);
-  return [neighbour ? by(attr, neighbour.getAttribute(attr)!) : `#${CSS.escape(button.closest('details')?.id ?? '')} > summary`];
+  return [neighbour ? by(attr, neighbour.getAttribute(attr)!) : `#${CSS.escape(button.closest('[data-slot="collapsible"]')?.id ?? '')} > [data-slot="collapsible-trigger"]`];
 }
 
 const CARD_ACTIONS = ['data-start', 'data-back-to-list', 'data-abandon'];

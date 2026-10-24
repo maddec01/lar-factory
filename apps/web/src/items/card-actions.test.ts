@@ -29,6 +29,15 @@ test('Queue shows the action in flight, then moves the row to Queued, says so, a
   expect(document.activeElement, 'the next row’s Queue').toBe(button('queue', 'PVTI_sample02'));
 });
 
+test('the last row in a List group leaving hands focus to the group\'s trigger', async () => {
+  holdPosts();
+  await mountPage();
+  button('queue', 'PVTI_sample03').focus();
+  await settle(() => button('queue', 'PVTI_sample03').click());
+  await answer({ error: null, board: moved('PVTI_sample03', 'Queued') });
+  expect(document.activeElement).toBe($('#list-apple > [data-slot="collapsible-trigger"]'));
+});
+
 test('a failed Queue stays on its row with a close button, which hands focus back to Queue', async () => {
   holdPosts();
   await mountPage();

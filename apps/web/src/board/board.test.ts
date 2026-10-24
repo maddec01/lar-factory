@@ -25,7 +25,8 @@ async function show(data: BoardData): Promise<void> {
   const { useBoardStore } = await import('./board-store.ts');
   await settle(() => useBoardStore.getState().receive(data));
 }
-const openGroups = () => $$<HTMLDetailsElement>('details.platform').filter((d) => d.open).map((d) => d.id);
+const openGroups = () => $$('.platform').filter((group) => group.hasAttribute('data-open')).map((group) => group.id);
+const trigger = (id: string) => $(`#${id} > [data-slot="collapsible-trigger"]`)!;
 
 test('the Board view shows a section per group of statuses, each with its count and note', async () => {
   await mountPage();
@@ -56,11 +57,11 @@ test('a concept block shows its sub-issues done and its open sub-issues grouped 
 test('List groups open by default, Done stays closed, and a Hide closes one group', async () => {
   await mountPage();
   expect(openGroups()).toEqual(['list-server', 'list-apple', 'list-draft']);
-  expect(text($('#list-draft > summary'))).toBe('Draft 1 in List');
-  expect(text($('#done-list > summary'))).toBe('Show 4 items closed in the last 7 days');
-  await settle(() => $('#list-apple > summary')!.click());
+  expect(text(trigger('list-draft'))).toBe('Draft 1 in List');
+  expect(text(trigger('done-list'))).toBe('Show 4 items closed in the last 7 days');
+  await settle(() => trigger('list-apple').click());
   expect(openGroups()).toEqual(['list-server', 'list-draft']);
-  await settle(() => $('#done-list > summary')!.click());
+  await settle(() => trigger('done-list').click());
   expect(openGroups()).toEqual(['list-server', 'list-draft', 'done-list']);
 });
 

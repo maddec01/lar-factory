@@ -223,12 +223,11 @@ p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px
 .action-error { order: 1; flex: 1 1 100%; min-width: 0; color: var(--danger-text); font-weight: 600; overflow-wrap: anywhere; }
 .when { color: var(--muted-foreground); font-size: 11px; white-space: nowrap; }
 .platforms { display: grid; gap: 10px; }
-details.platform { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; min-width: 0; }
-details.platform summary { cursor: pointer; display: flex; align-items: center; gap: 8px; list-style: none; }
-details.platform summary::-webkit-details-marker { display: none; }
-details.platform summary::after { content: "Show"; margin-left: auto; color: var(--muted-foreground); font-size: 12px; }
-details.platform[open] summary::after { content: "Hide"; }
-details.platform summary b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.platform { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; min-width: 0; }
+.disclosure-trigger { display: flex; align-items: center; gap: 8px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; }
+.disclosure-trigger::after { content: "Show"; margin-left: auto; color: var(--muted-foreground); font-size: 12px; }
+.disclosure-trigger[data-panel-open]::after { content: "Hide"; }
+.disclosure-trigger b { font-size: 15px; font-variant-numeric: tabular-nums; }
 
 /* Where a jump landed. */
 .anchor-flash { animation: anchor-flash 1.6s ease-out; }

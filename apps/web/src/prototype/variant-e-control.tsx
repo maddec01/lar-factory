@@ -14,12 +14,11 @@ import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
-import { BRAND_LEFT, Button, PlatformTag, StatusGlyph, WindowControls, drag, noDrag } from './chrome.tsx';
+import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, WindowControls, drag, noDrag } from './chrome.tsx';
 import { ActionButtons, PrList, SliceList, ItemTitle, StatsGrid, StepTrack, hint } from './item-bits.tsx';
 import { ToolbarStats } from './toolbar-stats.tsx';
 import { ListSidebar } from './list-sidebar.tsx';
 import { Line } from './line/line.tsx';
-import { BrandSlot } from './brand/brand-switcher.tsx';
 import type { Pick } from './list-sidebar.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
@@ -156,8 +155,8 @@ export function VariantE() {
     <div className="proto fixed inset-0 flex bg-(--background) text-(--foreground)">
       <WindowControls open={sidebar} onToggle={() => setSidebar(!sidebar)} />
       {sidebar && (
-        <aside className="relative flex w-64 shrink-0 flex-col border-r border-(--sidebar-border) bg-(--sidebar) text-(--sidebar-foreground)">
-          <div className={`flex h-[52px] shrink-0 items-center pr-3 ${BRAND_LEFT} ${drag}`}><BrandSlot /></div>
+        <aside className="relative flex w-75 shrink-0 flex-col border-r border-(--sidebar-border) bg-(--sidebar) text-(--sidebar-foreground)">
+          <div className={`flex h-[52px] shrink-0 items-center pr-3 ${BRAND_LEFT} ${drag}`}><Brand /></div>
           {settings ? (
             <>
               <SettingsNav all={all} current={page} onPick={setPage} onBack={() => setSettings(false)} />

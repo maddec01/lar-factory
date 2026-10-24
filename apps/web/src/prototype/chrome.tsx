@@ -8,6 +8,7 @@ import type { Status } from '@mux-factory/shared';
 import { Badge } from '@mux-factory/ui/badge';
 import { Button as UiButton } from '@mux-factory/ui/button';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
+import { T3Wordmark } from './t3-wordmark.tsx';
 
 export const drag = '[-webkit-app-region:drag]';
 export const noDrag = '[-webkit-app-region:no-drag]';
@@ -23,20 +24,20 @@ function TrafficLights() {
   );
 }
 
-function Logo({ className = 'h-[12.5px] w-[22px]' }: { className?: string }) {
-  return (
-    <svg className={`shrink-0 ${className}`} viewBox={BRAND_MARK_VIEWBOX} fill="none" aria-label="Mux">
-      <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** T3's brand, "T3 Code" with the product name muted: here the Mux mark and "Factory". */
+/** The board app's title-bar brand: the Mux mark on the baseline with the µ's tail hanging below, a grey "Factory",
+ *  and its "for T3 Code" pill, here with T3's own wordmark in place of "T3". */
 export function Brand() {
   return (
-    <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
-      <Logo />
-      <span className="truncate text-(--muted-foreground)">Factory</span>
+    <span className="inline-flex items-center gap-2">
+      <span className="inline-flex items-baseline gap-1 text-sm font-medium tracking-tight">
+        <svg className="relative top-[calc(--spacing(3.125)*8.75/32)] h-[--spacing(3.125)] w-5.5 shrink-0" role="img" aria-label="Mux" viewBox={BRAND_MARK_VIEWBOX} fill="none">
+          <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="text-(--muted-foreground)">Factory</span>
+      </span>
+      <Badge variant="secondary" size="sm" className="ml-1 gap-1 bg-accent" aria-label="for T3 Code">
+        for<T3Wordmark aria-hidden="true" className="h-[1cap] w-auto shrink-0" />Code
+      </Badge>
     </span>
   );
 }

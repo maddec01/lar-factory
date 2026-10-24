@@ -47,9 +47,11 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['PVTI_sample06']);
 });
 
-test("a concept's decisions are left out; other Queued decisions stay", async () => {
-  await mountPage({ ...sample, items: [...sample.items, decision('PVTI_d200', 200), decision('PVTI_d129', 129)] });
-  expect(rows().map((r) => r.dataset.item)).toEqual(['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21', 'PVTI_d129']);
+test("a dossier's parts are left out and show in the dossier; a Queued parent stays, and an item whose parent isn't on the board stays", async () => {
+  await mountPage({ ...sample, items: [...sample.items, decision('PVTI_d200', 200), decision('PVTI_d129', 129), decision('PVTI_d999', 999)] });
+  expect(rows().map((r) => r.dataset.item)).toEqual(['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21', 'PVTI_d999']);
+  expect($('[data-dossier="PVTI_sample05"] [data-part="PVTI_d129"]'), "#129's sub-issue, in its dossier").not.toBeNull();
+  expect($('[data-dossier="PVTI_sample09"] [data-part="PVTI_d200"]'), "concept #200's decision, in its dossier").not.toBeNull();
 });
 
 test('an empty Queue says where items come from, and has no Start next', async () => {

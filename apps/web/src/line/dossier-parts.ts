@@ -65,3 +65,7 @@ export function dossiersOf(items: readonly Item[], all: readonly Item[]): Dossie
 /** The ids of every item the dossiers show, parents and parts. */
 export const inDossiers = (dossiers: readonly DossierItems[]) =>
   new Set(dossiers.flatMap(({ parent, parts }) => [parent.id, ...parts.map((p) => p.item.id)]));
+
+/** The ids of every item the dossiers show as a part, leaving out their parents. */
+export const partsInDossiers = (dossiers: readonly DossierItems[]) =>
+  new Set(dossiers.flatMap(({ parts }) => parts.map((p) => p.item.id)));

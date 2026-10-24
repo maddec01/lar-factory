@@ -3,7 +3,7 @@
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight } from './support.ts';
-import type { ProfilesResult, UpdateChannel, UpdateState } from '../src/app/board-app.ts';
+import type { ProfilesResult, UpdateChannel, UpdateState } from '@mux-factory/shared';
 import { INSTALL_RECHECK_MS } from '../src/app/settings-store.ts';
 
 const listed: ProfilesResult = {

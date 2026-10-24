@@ -2,8 +2,8 @@
 // It lives outside the cards, so new data re-rendering them keeps it open.
 
 import { create } from 'zustand';
-import { NO_POPOVER, nextPopover, openPopover } from '../../../server/src/slice-popover.ts';
-import type { PopoverEvent, PopoverState } from '../../../server/src/slice-popover.ts';
+import { NO_POPOVER, nextPopover, openPopover } from '@mux-factory/shared';
+import type { PopoverEvent, PopoverState } from '@mux-factory/shared';
 
 interface SlicePopoverStore {
   state: PopoverState;

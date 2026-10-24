@@ -2,8 +2,7 @@
 // item. Pure: the server reads the bodies with the board query, reads each PR to
 // edit again, and sends the edits.
 
-import { isBuild, type Item, type ItemStats } from './model.ts';
-import { duration, formatTokens, wholeUsd } from './format.ts';
+import { isBuild, type Item, type ItemStats, duration, formatTokens, wholeUsd } from '@mux-factory/shared';
 
 const START = '<!-- mux-stats -->';
 const END = '<!-- /mux-stats -->';

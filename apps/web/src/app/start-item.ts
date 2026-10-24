@@ -2,9 +2,8 @@
 // started or why it didn't, and remembers the choice once a thread starts or may have.
 
 import { flushSync } from 'react-dom';
-import type { ModelChoice } from '../../../server/src/model.ts';
-import { remembersChoice, startRequest } from '../../../server/src/start-menu.ts';
-import type { StartResult } from '../../../server/src/t3.ts';
+import { remembersChoice, startRequest } from '@mux-factory/shared';
+import type { ModelChoice, StartResult } from '@mux-factory/shared';
 import { useActionStore } from './action-store.ts';
 import { useBoardStore } from './board-store.ts';
 import { postAction, receive, refocus } from './card-actions.ts';

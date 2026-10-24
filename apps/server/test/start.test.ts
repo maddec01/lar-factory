@@ -9,7 +9,7 @@ import { rawIssue, SAMPLE_MODELS, startBoard } from './server-support.ts';
 import { checkouts, factoryRepo } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
-import type { BoardData } from '../src/model.ts';
+import type { BoardData } from '@mux-factory/shared';
 
 type Board = Awaited<ReturnType<typeof startBoard>>;
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mergedStats, prStatsEdits, statsBlock, updatedBody, withStatsBlock } from '../src/pr-stats.ts';
-import type { Item, ItemStats, LinkedPr } from '../src/model.ts';
+import type { Item, ItemStats, LinkedPr } from '@mux-factory/shared';
 
 const stats: ItemStats = { agentMs: 65 * 60_000, wallMs: 47 * 60_000, tokens: 12_436_000, costUsd: 41.2 };
 const block = statsBlock(stats);

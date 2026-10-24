@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import { TestClock } from "effect/testing";
 
-import type { UpdateChannel, UpdateState } from "../../../web/src/app/board-app.ts";
+import type { UpdateChannel, UpdateState } from "@mux-factory/shared";
 import * as AppUpdates from "./AppUpdates.ts";
 import type { ChannelSetting } from "./ChannelSetting.ts";
 import { ElectronUpdaterError, type ElectronUpdater, type UpdaterEvent } from "./ElectronUpdater.ts";

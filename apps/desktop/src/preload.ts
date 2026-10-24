@@ -2,13 +2,13 @@
 // apps/desktop/src/preload.ts. The page can tell from it that it runs in the app,
 // sends its secret with each write, the settings screen lists and ticks Claude
 // profiles through it, it follows and drives the app's updates,
-// and asks before restarting to install one (board/src/app/board-app.ts reads the bridge).
+// and asks before restarting to install one (packages/shared/src/board-app.ts holds the bridge contract).
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
 import { contextBridge, ipcRenderer } from "electron";
 
-import type { BoardAppBridge } from "../../web/src/app/board-app.ts";
+import type { BoardAppBridge } from "@mux-factory/shared";
 import * as IpcChannels from "./ipcChannels.ts";
 import * as LaunchSecret from "./LaunchSecret.ts";
 

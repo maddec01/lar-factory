@@ -6,10 +6,8 @@
 // never drag the window; the rest of the bar, Refreshed and the gaps between the buttons included, does.
 
 import { useEffect, useState } from 'react';
-import { shortAgo } from '../../../server/src/format.ts';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../../../server/src/brand-mark.ts';
+import { shortAgo, BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, inMacApp } from '@mux-factory/shared';
 import { AddItem } from './AddItem.tsx';
-import { inMacApp } from './board-app.ts';
 import { useBoardStore } from './board-store.ts';
 import { Settings } from './Settings.tsx';
 import { UpdateButton } from './UpdateButton.tsx';

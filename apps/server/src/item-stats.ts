@@ -9,7 +9,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { ItemStats } from './model.ts';
+import type { ItemStats } from '@mux-factory/shared';
 import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens } from './transcript-usage.ts';
 import type { SessionRecordsReader, UsageRecord, UsageSpeed } from './transcript-usage.ts';
 import { apiCost, createOverrideRateTable, parseRateTable, resolveModelAliases } from './usage-pricing.ts';

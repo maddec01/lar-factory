@@ -1,13 +1,13 @@
 // What the settings screen's IPC calls do: list the Claude profiles in the install home with their
-// ticks, and tick or untick one by name through the engine in board/src/install-skills.ts. The page
+// ticks, and tick or untick one by name through the engine in packages/shared/src/install-skills.ts. The page
 // is untrusted input, so a call must come from the board's page, a name must look like a profile
 // folder and a tick must be a boolean.
 
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
-import { INSTALL_MANIFEST, isProfileName, listClaudeProfiles, setProfileTick } from "../../../server/src/install-skills.ts";
-import type { ProfilesResult } from "../../../web/src/app/board-app.ts";
+import { INSTALL_MANIFEST, isProfileName, listClaudeProfiles, setProfileTick } from "@mux-factory/shared/install-skills";
+import type { ProfilesResult } from "@mux-factory/shared";
 
 const message = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
 

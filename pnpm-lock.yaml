@@ -188,6 +188,9 @@ importers:
       '@electron/osx-sign':
         specifier: 2.7.0
         version: 2.7.0(supports-color@7.2.0)
+      '@mux-factory/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@types/node':
         specifier: ^22.20.5
         version: 22.20.5
@@ -205,6 +208,10 @@ importers:
         version: 1.3.0(@types/node@22.20.5)(@vitest/ui@5.0.5)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(typescript@7.0.2)
 
   apps/server:
+    dependencies:
+      '@mux-factory/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
     devDependencies:
       '@types/node':
         specifier: ^22.20.5
@@ -218,6 +225,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.4.1
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@mux-factory/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       lucide-react:
         specifier: ^1.61.0
         version: 1.61.0(@types/react@19.3.0)(react@19.3.0)
@@ -258,6 +268,15 @@ importers:
       vite-plus:
         specifier: 1.3.0
         version: 1.3.0(@types/node@22.20.5)(@vitest/ui@5.0.5)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(typescript@7.0.2)
+
+  packages/shared:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
 packages:
 

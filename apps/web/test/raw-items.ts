@@ -1,6 +1,6 @@
 // Raw project items as GitHub returns them, so the step that attaches slices runs.
 
-import type { RawItem } from '../src/github.ts';
+import type { RawItem } from '@mux-factory/shared';
 
 export const rawIssue = (id: string, number: number, status: string, labels: string[], extra: Partial<NonNullable<RawItem['content']>> = {}): RawItem => ({
   id, updatedAt: '2026-10-21T08:00:00Z', status: { name: status },

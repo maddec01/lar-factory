@@ -2,8 +2,8 @@
 // browser last started with.
 
 import { create } from 'zustand';
-import type { ModelChoice, StartedThread } from '../../../server/src/model.ts';
-import { readChoice, storedChoice } from '../../../server/src/start-menu.ts';
+import { readChoice, storedChoice } from '@mux-factory/shared';
+import type { ModelChoice, StartedThread } from '@mux-factory/shared';
 
 /** Where this browser keeps the last model choice Start started with. */
 const CHOICE_KEY = 'mux-board:model-choice';

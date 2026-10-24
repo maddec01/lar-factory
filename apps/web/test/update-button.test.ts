@@ -3,7 +3,7 @@
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight, updatesOff } from './support.ts';
-import type { UpdateState } from '../src/app/board-app.ts';
+import type { UpdateState } from '@mux-factory/shared';
 
 const idle: UpdateState = {
   enabled: true, status: 'up-to-date', channel: 'latest', currentVersion: '1.0.0', availableVersion: null,

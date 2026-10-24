@@ -3,10 +3,9 @@
 
 import { beforeEach, expect, test } from 'vite-plus/test';
 import { $, $$, NOW, mountPage, sample, settle } from './support.ts';
-import { normalizeItems } from '../../server/src/github.ts';
-import type { RawItem } from '../../server/src/github.ts';
-import type { BoardData, Item } from '../../server/src/model.ts';
-import { rawIssue, sliceRef } from '../../server/test/raw-items.ts';
+import { normalizeItems } from '@mux-factory/shared';
+import type { BoardData, Item, RawItem } from '@mux-factory/shared';
+import { rawIssue, sliceRef } from './raw-items.ts';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const card = (id: string) => $(`article[data-anchor="${id}"]`)!;

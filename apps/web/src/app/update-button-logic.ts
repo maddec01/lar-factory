@@ -4,7 +4,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
 
-import type { UpdateActionResult, UpdateState } from './board-app.ts';
+import type { UpdateActionResult, UpdateState } from '@mux-factory/shared';
 
 export type UpdateButtonAction = 'download' | 'install' | 'none';
 

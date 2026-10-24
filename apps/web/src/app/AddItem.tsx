@@ -4,8 +4,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
-import { applicability, ITEM_KINDS } from '../../../server/src/add-item.ts';
-import type { RepoConfig } from '../../../server/src/model.ts';
+import { applicability, ITEM_KINDS } from '@mux-factory/shared';
+import type { RepoConfig } from '@mux-factory/shared';
 import { useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from './board-store.ts';

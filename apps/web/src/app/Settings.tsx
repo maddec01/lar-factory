@@ -3,7 +3,7 @@
 // update channel with what the updater last found on it.
 
 import { Dialog } from '@base-ui/react/dialog';
-import { boardApp, type UpdateChannel, type UpdateState } from './board-app.ts';
+import { boardApp, type UpdateChannel, type UpdateState } from '@mux-factory/shared';
 import { profilePath, useSettingsStore } from './settings-store.ts';
 import { useUpdateStore } from './update-store.ts';
 

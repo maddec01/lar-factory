@@ -1,7 +1,7 @@
 // Keeps the item at the top of the window where it is when new data changes what's above it.
 // anchor.ts picks the item; this measures the page's [data-anchor] elements.
 
-import { anchorKeys, survivingAnchor } from '../../../server/src/anchor.ts';
+import { anchorKeys, survivingAnchor } from '@mux-factory/shared';
 
 type Anchor = { keys: string[]; index: number; tops: number[] };
 

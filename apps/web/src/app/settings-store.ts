@@ -3,8 +3,8 @@
 // profiles again, and keeps reading them until the app has installed its skills.
 
 import { create } from 'zustand';
-import type { ClaudeProfile } from '../../../server/src/install-skills.ts';
-import { boardApp, type ProfilesResult, type UpdateChannel } from './board-app.ts';
+import type { ClaudeProfile } from '@mux-factory/shared/install-skills';
+import { boardApp, type ProfilesResult, type UpdateChannel } from '@mux-factory/shared';
 import { useUpdateStore } from './update-store.ts';
 
 export interface SettingsResult { text: string; tone?: 'success' | 'warning' | 'error'; paths?: string[] }

@@ -17,6 +17,7 @@
     "electron-updater": "6.8.9"
   },
   "devDependencies": {
+    "@mux-factory/shared": "workspace:*",
     "@effect/vitest": "4.0.5",
     "@electron/osx-sign": "2.7.0",
     "@types/node": "^22.20.5",

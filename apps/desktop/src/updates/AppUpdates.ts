@@ -9,12 +9,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
 
-import type {
-  UpdateActionResult,
-  UpdateChannel,
-  UpdateCheckResult,
-  UpdateState,
-} from "../../../web/src/app/board-app.ts";
+import type { UpdateActionResult, UpdateChannel, UpdateCheckResult, UpdateState } from "@mux-factory/shared";
 import type { ChannelSetting } from "./ChannelSetting.ts";
 import type { ElectronUpdater, ElectronUpdaterError } from "./ElectronUpdater.ts";
 import { normalizeReleaseNotes } from "./releaseNotes.ts";

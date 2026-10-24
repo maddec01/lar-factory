@@ -5,7 +5,7 @@ import { request } from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { once } from 'node:events';
 import { rawIssue, startBoard } from './server-support.ts';
-import type { BoardData } from '../src/model.ts';
+import type { BoardData } from '@mux-factory/shared';
 
 type Board = Awaited<ReturnType<typeof startBoard>>;
 

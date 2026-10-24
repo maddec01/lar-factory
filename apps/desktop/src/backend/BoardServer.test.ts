@@ -117,7 +117,7 @@ describe("start", () => {
         executablePath: process.execPath,
         env: {
           ...process.env,
-          BOARD_DATA_FILE: "test/sample.json",
+          BOARD_DATA_FILE: "../../packages/shared/test/sample.json",
           T3_SETTINGS: "test/t3-settings.sample.json",
           T3_MODEL_MANIFEST: "test/model-manifest.sample.json",
         },

@@ -1,15 +1,8 @@
 // Starts T3 Code threads through the local `t3` CLI.
 
 import { execFile } from 'node:child_process';
-import type { ModelChoice, StartedThread } from './model.ts';
+import type { ModelChoice, StartResult } from '@mux-factory/shared';
 import { missingTool, toolCommand } from './tools.ts';
-
-export interface StartResult {
-  thread: StartedThread | null;
-  error: string | null;
-  /** The thread may have started; starting again could make a second one. */
-  uncertain?: boolean;
-}
 
 const UNCERTAIN: StartResult = { thread: null, uncertain: true,
   error: "The thread's start could not be confirmed. Check the repository's project in T3 Code before starting it again." };

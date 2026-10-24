@@ -13,10 +13,11 @@ export const drag = '[-webkit-app-region:drag]';
 export const noDrag = '[-webkit-app-region:no-drag]';
 
 /** Room for the Mac window's traffic lights; in a browser, grey stand-ins so the layout reads like the app. */
+/** A stand-in for macOS's traffic lights where the window has none, drawn where macOS puts them: 16 px in, centred. */
 function TrafficLights() {
-  if (inMacApp()) return <span className="w-[73px] shrink-0" />;
+  if (inMacApp()) return null;
   return (
-    <span className="flex w-[73px] shrink-0 gap-2 pl-1" aria-hidden="true">
+    <span className="absolute left-4 flex gap-2" aria-hidden="true">
       {['#ff5f57', '#febc2e', '#28c840'].map((c) => <span key={c} className="size-3 rounded-full opacity-80" style={{ background: c }} />)}
     </span>
   );
@@ -40,16 +41,16 @@ export function Brand() {
   );
 }
 
-/** Where T3 puts the window's controls: the traffic lights, then its sidebar toggle, fixed to the window's top left
- *  so the toggle stays put while the sidebar slides away. */
+/** Where T3 puts the window's controls: its sidebar toggle 1 px past the traffic lights' 90 px inset, fixed to the
+ *  window's top left so the toggle stays put while the sidebar slides away. */
 export function WindowControls({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
-    <div className="pointer-events-none fixed left-4 top-0 z-50 flex h-[52px] items-center gap-[3px]">
+    <div className="pointer-events-none fixed left-0 top-0 z-50 flex h-[52px] items-center">
       <TrafficLights />
       <Tooltip>
         <TooltipTrigger render={
           <UiButton variant="ghost" size="icon" aria-label="Toggle main sidebar" aria-pressed={open} onClick={onToggle}
-            className={`pointer-events-auto size-7! ${noDrag}`} />
+            className={`pointer-events-auto absolute left-[91px] size-7! ${noDrag}`} />
         }>
           {open ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
         </TooltipTrigger>
@@ -59,8 +60,8 @@ export function WindowControls({ open, onToggle }: { open: boolean; onToggle: ()
   );
 }
 
-/** Left of the brand: the traffic lights, the toggle and T3's 0.75 rem gap. */
-export const BRAND_LEFT = 'pl-[132px]';
+/** T3's --workspace-titlebar-content-left: the 90 px inset, the 28 px toggle and a 12 px gap. */
+export const BRAND_LEFT = 'pl-[130px]';
 
 export function SidebarButton({ icon, label, onClick, trailing, active }: { icon: ReactNode; label: ReactNode; onClick?: () => void; trailing?: ReactNode; active?: boolean }) {
   return (

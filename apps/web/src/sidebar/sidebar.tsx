@@ -1,13 +1,15 @@
 // The left sidebar, copied in layout from T3 Code's: the brand beside the window controls, search with Add item, the
 // List by repository, and Settings and the update button at its foot. Above the missing-t3 notice there's no List to
-// search or add to, so only the brand and Settings show.
+// search or add to, so only the brand and Settings show. In Settings the section list takes the List's place, hiding
+// the List rather than closing it, so Back finds it as it was.
 
 import { useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { boardApp } from '@mux-factory/shared';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { AddItem } from '../add-item/add-item.tsx';
-import { Settings } from '../settings/settings.tsx';
+import { SettingsButton, SettingsNav } from '../settings/settings.tsx';
+import { useSettingsStore } from '../settings/settings-store.ts';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { ListGroups } from './list-groups.tsx';
@@ -45,19 +47,29 @@ function Update() {
  *  groups' collapse survive. */
 export function Sidebar({ board = true, open = true }: { board?: boolean; open?: boolean }) {
   const [query, setQuery] = useState('');
+  const settings = useSettingsStore((state) => state.open);
   return (
     <aside hidden={!open} className="sidebar relative flex w-75 shrink-0 flex-col border-r border-(--sidebar-border) bg-(--sidebar) text-(--sidebar-foreground)">
       <div className={`flex h-13 shrink-0 items-center pr-3 ${BRAND_LEFT} [-webkit-app-region:drag]`}><Brand /></div>
-      {board ? (
-        <>
-          <div className="px-2 pb-2"><SearchRow query={query} onQuery={setQuery} /></div>
-          <ListGroups query={query.trim().toLowerCase()} />
-        </>
-      ) : <div className="flex-1" />}
-      <div className="sidebar-foot flex items-center justify-between px-2 py-2">
-        <Settings />
-        {board && <Update />}
+      <div className="contents" hidden={settings}>
+        {board ? (
+          <>
+            <div className="px-2 pb-2"><SearchRow query={query} onQuery={setQuery} /></div>
+            <ListGroups query={query.trim().toLowerCase()} />
+          </>
+        ) : <div className="flex-1" />}
       </div>
+      {settings ? (
+        <>
+          <SettingsNav />
+          {board && <span className="absolute bottom-2 right-2"><Update /></span>}
+        </>
+      ) : (
+        <div className="sidebar-foot flex items-center justify-between px-2 py-2">
+          <SettingsButton />
+          {board && <Update />}
+        </div>
+      )}
     </aside>
   );
 }

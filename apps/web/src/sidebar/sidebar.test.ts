@@ -150,9 +150,9 @@ test('in the app the foot holds Settings and the update button', async () => {
   expect($('.sidebar-foot .update-button')).not.toBeNull();
 });
 
-test('in a browser the foot holds a still stand-in for the update button', async () => {
+test('in a browser the foot holds Settings and a still stand-in for the update button', async () => {
   await mountPage();
-  expect($('.sidebar-foot .open-settings')).toBeNull();
+  expect($('.sidebar-foot .open-settings')!.getAttribute('aria-label')).toBe('Settings');
   const standIn = $('.sidebar-foot .update-stand-in')!;
   expect([standIn.getAttribute('aria-label'), standIn.getAttribute('aria-disabled')]).toEqual(['Check for updates', 'true']);
 });

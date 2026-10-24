@@ -1,119 +1,130 @@
-// The sidebar's Settings button and its dialog, shown only in the board app: a tick box per Claude
-// profile, which links the app's skills and checklists into it or removes them at once, and the
-// update channel with what the updater last found on it.
+// The Settings page, laid out as T3 Code's, from the control room prototype: the sidebar's Settings button opens it,
+// the sidebar turns into a searchable section list with Back at its foot, where Settings sat, and the main area shows
+// a "Settings › Section" breadcrumb over the section's grouped rows. Back returns to the board as it was.
 
-import { Settings as SettingsIcon } from 'lucide-react';
-import { boardApp, type UpdateChannel, type UpdateState } from '@mux-factory/shared';
-import { Checkbox } from '@mux-factory/ui/checkbox';
-import { Dialog, DialogDescription, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '@mux-factory/ui/dialog';
-import { Fieldset, FieldsetLegend } from '@mux-factory/ui/fieldset';
-import { Label } from '@mux-factory/ui/label';
-import { Radio, RadioGroup } from '@mux-factory/ui/radio-group';
-import { profilePath, useSettingsStore } from './settings-store.ts';
-import { useUpdateStore } from '../updates/update-store.ts';
-import { FormResult } from '../notices/form-result.tsx';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ArrowLeft, RotateCcw, Search, Settings as SettingsIcon } from 'lucide-react';
+import { boardApp } from '@mux-factory/shared';
+import { useBoardStore } from '../board/board-store.ts';
 import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
+import { useSidebarStore } from '../sidebar/sidebar-store.ts';
+import { BRAND_LEFT } from '../sidebar/window-controls.tsx';
+import { useUpdateStore } from '../updates/update-store.ts';
+import { Kbd, ShownControl, SmallButton, notBuilt } from './controls.tsx';
+import { type Group, type Page, pages } from './settings-pages.tsx';
+import { useSettingsStore } from './settings-store.ts';
 
-const CHANNELS: { channel: UpdateChannel; label: string }[] = [
-  { channel: 'nightly', label: 'Nightly' },
-  { channel: 'latest', label: 'Latest' },
-];
-
-/** What the updater last found, in words. */
-function updateStatusText(state: UpdateState): string {
-  // A failed download or install keeps its update available or downloaded, with the error.
-  if ((state.errorContext === 'download' || state.errorContext === 'install') && state.message !== null) {
-    const verb = state.errorContext === 'install' ? 'install' : 'download';
-    return `Couldn't ${verb} ${state.downloadedVersion ?? state.availableVersion}: ${state.message}`;
-  }
-  switch (state.status) {
-    case 'disabled': case 'error': return state.message ?? '';
-    case 'idle': return '';
-    case 'checking': return 'Checking for updates…';
-    case 'up-to-date': return `Up to date on ${state.currentVersion}.`;
-    case 'available': return `${state.availableVersion} is available.`;
-    case 'downloading': return `Downloading ${state.availableVersion}…`;
-    case 'downloaded': return `${state.downloadedVersion} is ready to install.`;
-  }
+function usePages(): Page[] {
+  const data = useBoardStore((state) => state.data);
+  const profiles = useSettingsStore((state) => state.profiles);
+  const version = useUpdateStore((state) => state.state?.currentVersion ?? null);
+  return pages({ data, app: !!boardApp(), profiles, version });
 }
 
-function Profiles() {
-  const { profiles, installed, pending, result, setTick } = useSettingsStore();
-  // Busy rather than disabled while a tick changes, so focus stays on the box just pressed;
-  // the store ignores a change that comes in meanwhile.
-  const busy = pending !== null;
+function useSection(all: Page[]): Page {
+  const section = useSettingsStore((state) => state.section);
+  return all.find((p) => p.id === section) ?? all[0]!;
+}
+
+/** The sidebar's foot button that opens Settings. */
+export function SettingsButton() {
+  return <SidebarIconButton label="Settings" className="open-settings" onClick={() => useSettingsStore.getState().setOpen(true)}><SettingsIcon /></SidebarIconButton>;
+}
+
+/** The prototype's sidebar row: an icon and a label, the selected one on the sidebar's selected colour. */
+function SidebarButton({ icon, label, onClick, active }: { icon: ReactNode; label: string; onClick: () => void; active?: boolean }) {
   return (
-    <Fieldset className="profiles" aria-busy={busy || profiles === null}>
-      <FieldsetLegend>Claude profiles that get the skills</FieldsetLegend>
-      {!installed && (
-        <p className="form-hint">Mux Factory hasn't installed its skills in ~/.agents yet, so you can't tick or untick a profile. It installs them when it starts and ticks every profile it finds on that first install. If the install failed, restart Mux Factory to try again.</p>
-      )}
-      {profiles === null && <p className="form-hint">Loading…</p>}
-      {profiles?.length === 0 && result.tone !== 'error' && <p className="form-hint">No Claude profiles found in ~.</p>}
-      <div className="choices">
-        {profiles?.map(({ name, ticked }) => (
-          <Label key={name}>
-            <Checkbox checked={ticked} disabled={!installed} aria-disabled={busy} onCheckedChange={(checked) => void setTick(name, checked)} />
-            {profilePath(name)}
-          </Label>
-        ))}
+    <button type="button" onClick={onClick} aria-current={active ? 'page' : undefined}
+      className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] text-(--sidebar-foreground) hover:bg-(--sidebar-row-hover) [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-(--sidebar-muted-foreground) ${active ? 'bg-(--sidebar-row-selected) font-medium' : ''}`}>
+      {icon}<span className="min-w-0 flex-1 truncate">{label}</span>
+    </button>
+  );
+}
+
+/** The section list that takes the sidebar's place: search on top, which / focuses, and Back at the foot. */
+export function SettingsNav() {
+  const all = usePages();
+  const current = useSection(all);
+  const { setSection, setOpen } = useSettingsStore();
+  const [query, setQuery] = useState('');
+  const search = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const typing = event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable]');
+      if (event.key !== '/' || typing || event.metaKey || event.ctrlKey || event.altKey) return;
+      event.preventDefault();
+      search.current?.focus();
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, []);
+  const q = query.trim().toLowerCase();
+  const shown = q ? all.filter((p) => p.label.toLowerCase().includes(q) || p.groups.some((g) => g.rows.some((r) => r.title.toLowerCase().includes(q)))) : all;
+  return (
+    <>
+      <div className="px-2 pb-2">
+        <label className="flex h-8 items-center gap-2 rounded-md border border-(--border) bg-(--background) px-2 text-(--muted-foreground) [&_svg]:size-3.5">
+          <Search /><input ref={search} className="min-w-0 flex-1 bg-transparent text-[13px] text-(--foreground) outline-none placeholder:text-(--muted-foreground)" placeholder="Search settings" aria-label="Search settings" value={query} onChange={(e) => setQuery(e.target.value)} /><Kbd>/</Kbd>
+        </label>
       </div>
-    </Fieldset>
+      <nav className="settings-nav min-h-0 flex-1 overflow-y-auto px-2" aria-label="Settings">
+        {shown.map((p) => <SidebarButton key={p.id} icon={p.icon} label={p.label} active={p.id === current.id} onClick={() => setSection(p.id)} />)}
+      </nav>
+      <div className="settings-foot border-t border-(--sidebar-border) p-2">
+        <SidebarButton icon={<ArrowLeft />} label="Back" onClick={() => setOpen(false)} />
+      </div>
+    </>
   );
 }
 
-function UpdateChannelChoice() {
-  const { state, installing } = useUpdateStore();
-  const { switchingTo, setChannel } = useSettingsStore();
-  if (!state) return null;
-  // Busy rather than disabled while the app switches, as the profile ticks, and while it downloads or
-  // installs, when it would refuse a switch.
-  const busy = switchingTo !== null || installing || state.status === 'downloading';
-  const shown = switchingTo ?? state.channel;
+/** T3's SettingsGroup: a title over a bordered list of rows, label left and control right. */
+function GroupView({ group }: { group: Group }) {
   return (
-    <Fieldset className="update-channel" aria-busy={busy}>
-      <FieldsetLegend>Update channel</FieldsetLegend>
-      <p className="form-hint">Nightly offers each Nightly Release, even one older than this version. Latest offers only Stable Releases.</p>
-      <RadioGroup className="choices" name="update-channel" value={shown}
-        onValueChange={(channel) => busy || void setChannel(channel as UpdateChannel)}>
-        {CHANNELS.map(({ channel, label }) => (
-          <Label key={channel}>
-            <Radio value={channel} aria-disabled={busy} />
-            {label}
-          </Label>
+    <section className="settings-group grid gap-2">
+      <div className="px-1">
+        <h3 className="m-0 text-[13px] font-medium">{group.title}</h3>
+        {group.description && <p className="m-0 text-xs text-(--muted-foreground)">{group.description}</p>}
+      </div>
+      <div className="divide-y divide-(--border) overflow-hidden rounded-xl border border-(--border) bg-(--card)">
+        {group.rows.map((row) => (
+          <div key={row.id} className="settings-row flex items-center gap-x-4 gap-y-2 px-4 py-3" data-row={row.id}>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-medium">{row.title}</div>
+              {row.description && <div className="text-xs text-(--muted-foreground)">{row.description}</div>}
+            </div>
+            {row.control.type === 'custom'
+              ? row.control.render()
+              : <ShownControl control={row.control} label={row.title} reason={row.reason ?? notBuilt(row.title)} />}
+          </div>
         ))}
-      </RadioGroup>
-      <p className="form-hint" id="update-channel-status" role="status" aria-live="polite">{updateStatusText(state)}</p>
-    </Fieldset>
+        {group.footer && <div className="bg-(--muted) px-4 py-2">{group.footer}</div>}
+      </div>
+      {group.note}
+    </section>
   );
 }
 
-function Result() {
-  const result = useSettingsStore((state) => state.result);
+/** The main area in Settings: T3's breadcrumb with Restore defaults on the right, over the section's groups. */
+export function SettingsMain() {
+  const page = useSection(usePages());
+  const sidebar = useSidebarStore((state) => state.open);
+  // The sidebar's update button follows the updater too, but it isn't there above the missing-t3 notice.
+  const follow = useUpdateStore((state) => state.follow);
+  useEffect(follow, [follow]);
   return (
-    <FormResult id="settings-result" text={result.text} tone={result.tone}>
-      {result.paths && <ul>{result.paths.map((path) => <li key={path}><code>{path}</code></li>)}</ul>}
-    </FormResult>
-  );
-}
-
-export function Settings() {
-  const { open, setOpen } = useSettingsStore();
-  if (!boardApp()) return null;
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <SidebarIconButton label="Settings" className="open-settings" render={<DialogTrigger />}><SettingsIcon /></SidebarIconButton>
-      <DialogPopup id="settings-dialog">
-        <DialogHeader>
-          <DialogTitle id="settings-heading">Settings</DialogTitle>
-          <DialogDescription>Mux Factory links its skills and copies its checklists into each ticked profile.</DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
-          <Profiles />
-          <UpdateChannelChoice />
-          <Result />
-        </DialogPanel>
-      </DialogPopup>
-    </Dialog>
+    <>
+      <header className={`settings-header flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-4 ${sidebar ? 'pl-4' : BRAND_LEFT} [-webkit-app-region:drag]`}>
+        <span className="text-[13px] text-(--muted-foreground)">Settings</span><span className="text-(--muted-foreground)" aria-hidden="true">›</span>
+        <h1 className="m-0 text-[13px] font-medium">{page.label}</h1>
+        <span className="ml-auto [-webkit-app-region:no-drag]">
+          <SmallButton reason={notBuilt('Restore defaults')}><RotateCcw /> Restore defaults</SmallButton>
+        </span>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="settings-body mx-auto grid max-w-2xl gap-6 px-8 py-8">
+          {page.groups.map((g) => <GroupView group={g} key={g.title} />)}
+        </div>
+      </div>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 // The page, the control room: the window controls, the sidebar with the List, and the main area with the title bar,
 // the banners, Your desk and the line, scoped to the repository the sidebar picked. While no t3 is found, the notice
-// replaces the main area's content and the sidebar shows only its brand and Settings.
+// replaces the main area's content and the sidebar shows only its brand and Settings. Settings takes the main area's
+// place, hiding the board rather than closing it, so Back finds it as it was.
 
 import { boardSections, platformOf } from '@mux-factory/shared';
 import { useBoardStore } from './board/board-store.ts';
@@ -12,6 +13,8 @@ import { Line } from './line/line.tsx';
 import { Banners } from './notices/banners.tsx';
 import { Toasts } from './notices/toasts.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
+import { SettingsMain } from './settings/settings.tsx';
+import { useSettingsStore } from './settings/settings-store.ts';
 import { Sidebar } from './sidebar/sidebar.tsx';
 import { useSidebarStore } from './sidebar/sidebar-store.ts';
 import { WindowControls } from './sidebar/window-controls.tsx';
@@ -35,13 +38,17 @@ function Content() {
 export function App() {
   const t3 = useBoardStore((state) => state.data.tools?.t3);
   const sidebar = useSidebarStore((state) => state.open);
+  const settings = useSettingsStore((state) => state.open);
   return (
     <div className="fixed inset-0 flex bg-(--background) text-(--foreground)">
       <WindowControls />
       <Sidebar board={!t3} open={sidebar} />
       <main className="flex min-w-0 flex-1 flex-col">
-        <TitleBar />
-        {t3 ? <T3Missing problem={t3} /> : <Content />}
+        <div className="contents" hidden={settings}>
+          <TitleBar />
+          {t3 ? <T3Missing problem={t3} /> : <Content />}
+        </div>
+        {settings && <SettingsMain />}
       </main>
       {/* Outside main, so the announcement sits apart from the page. */}
       <CopyStatus />

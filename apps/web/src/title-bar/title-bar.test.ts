@@ -73,11 +73,13 @@ test('above the missing-t3 notice the bar is empty, and the sidebar keeps the br
   expect($('.sidebar .add-item')).toBeNull();
   expect($$('.sidebar-foot button').map((b) => b.getAttribute('aria-label'))).toEqual(['Settings']);
   await settle(() => $<HTMLButtonElement>('.sidebar .open-settings')!.click());
+  await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Skills')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect($('#settings-dialog')!.textContent).toContain('.claude');
+  expect($('.tool-missing')!.closest('[hidden]'), 'Settings takes the notice\'s place').not.toBeNull();
+  expect($('.settings-body')!.textContent).toContain('~/.claude');
 });
 
-test('in a browser, the missing-t3 notice\'s sidebar foot is empty', async () => {
+test('in a browser, the missing-t3 notice\'s sidebar foot holds only Settings', async () => {
   await mountPage({ ...sample, tools: { t3: { problem: 'missing' } } });
-  expect($('.sidebar-foot')!.children).toHaveLength(0);
+  expect($$('.sidebar-foot button').map((b) => b.getAttribute('aria-label'))).toEqual(['Settings']);
 });

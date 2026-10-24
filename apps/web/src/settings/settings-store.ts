@@ -1,17 +1,21 @@
-// The app's Settings dialog: whether it's open, the Claude profiles the app's bridge lists, the tick
-// being changed, the update channel being switched to, and what the last call did. Opening reads the
-// profiles again, and keeps reading them until the app has installed its skills.
+// The Settings page: whether it's open and on which section, the Claude profiles the app's bridge lists, the tick
+// being changed, the update channel being switched to, and what the last call did. Opening in the board app reads
+// the profiles again, and keeps reading them until the app has installed its skills.
 
 import { create } from 'zustand';
 import type { ClaudeProfile } from '@mux-factory/shared/install-skills';
 import { boardApp, type ProfilesResult, type UpdateChannel } from '@mux-factory/shared';
 import { useUpdateStore } from '../updates/update-store.ts';
 
-interface SettingsResult { text: string; tone?: 'success' | 'warning' | 'error'; paths?: string[] }
+/** What the last call did, and the group it came from: the Claude profiles or the updates. */
+export interface SettingsResult { text: string; tone?: 'success' | 'warning' | 'error'; paths?: string[]; from?: 'profiles' | 'updates' }
 
 interface SettingsState {
   open: boolean;
   setOpen: (open: boolean) => void;
+  /** The section shown. */
+  section: string;
+  setSection: (section: string) => void;
   /** Null while the list loads. */
   profiles: ClaudeProfile[] | null;
   /** False until the app first installs its skills; until then no tick can change. */
@@ -43,11 +47,12 @@ function untickText(where: string, removed: ProfilesResult['removed']): string {
 /** Counts list calls, so only the latest one's answer shows. */
 let listing = 0;
 
-/** How often an open dialog reads the profiles again while the launch install hasn't finished. */
+/** How often open Settings read the profiles again while the launch install hasn't finished. */
 export const INSTALL_RECHECK_MS = 2000;
 
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
   open: false,
+  section: 'general',
   profiles: null,
   installed: true,
   pending: null,
@@ -56,20 +61,21 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   setOpen: (open) => {
     const call = ++listing;
     set({ open, profiles: null, result: { text: '' } });
-    if (!open) return;
+    if (!open || !boardApp()) return;
     const latest = () => call === listing;
     const load = () => boardApp()!.listProfiles().then(
       ({ profiles, installed, error }) => {
         if (!latest()) return;
         set({ profiles, installed });
-        if (error) set({ result: { text: `Couldn't read the Claude profiles: ${error}`, tone: 'error' } });
-        // Until the launch install finishes, so the boxes turn on without reopening the dialog.
+        if (error) set({ result: { text: `Couldn't read the Claude profiles: ${error}`, tone: 'error', from: 'profiles' } });
+        // Until the launch install finishes, so the switches turn on without reopening Settings.
         else if (!installed) setTimeout(() => latest() && void load(), INSTALL_RECHECK_MS);
       },
-      (error) => latest() && set({ profiles: [], result: { text: `Couldn't read the Claude profiles: ${failure(error)}`, tone: 'error' } }),
+      (error) => latest() && set({ profiles: [], result: { text: `Couldn't read the Claude profiles: ${failure(error)}`, tone: 'error', from: 'profiles' } }),
     );
     void load();
   },
+  setSection: (section) => set({ section }),
   setTick: async (name, ticked) => {
     if (get().pending || !get().installed) return;
     set({ pending: name, result: { text: '' } });
@@ -77,11 +83,11 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     try {
       const { profiles, installed, conflicts, removed, error } = await boardApp()!.setProfileTick(name, ticked);
       set({ profiles, installed });
-      if (error) set({ result: { text: `Couldn't change ${where}: ${error}`, tone: 'error' } });
-      else if (conflicts.length) set({ result: { text: `Linked ${where}, but left these alone because Mux Factory didn't make them:`, tone: 'warning', paths: conflicts } });
-      else set({ result: { text: ticked ? `Linked the skills and checklists into ${where}.` : untickText(where, removed), tone: 'success' } });
+      if (error) set({ result: { text: `Couldn't change ${where}: ${error}`, tone: 'error', from: 'profiles' } });
+      else if (conflicts.length) set({ result: { text: `Linked ${where}, but left these alone because Mux Factory didn't make them:`, tone: 'warning', paths: conflicts, from: 'profiles' } });
+      else set({ result: { text: ticked ? `Linked the skills and checklists into ${where}.` : untickText(where, removed), tone: 'success', from: 'profiles' } });
     } catch (error) {
-      set({ result: { text: `Couldn't change ${where}: ${failure(error)}`, tone: 'error' } });
+      set({ result: { text: `Couldn't change ${where}: ${failure(error)}`, tone: 'error', from: 'profiles' } });
     } finally {
       set({ pending: null });
     }
@@ -92,7 +98,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     try {
       useUpdateStore.setState({ state: await boardApp()!.setUpdateChannel(channel) });
     } catch (error) {
-      set({ result: { text: `Couldn't switch to ${channel}: ${failure(error)}`, tone: 'error' } });
+      set({ result: { text: `Couldn't switch to ${channel}: ${failure(error)}`, tone: 'error', from: 'updates' } });
     } finally {
       set({ switchingTo: null });
     }

@@ -4,13 +4,23 @@ import * as ExternalLink from "./external-link.ts";
 
 describe("ExternalLink", () => {
   it("opens web links in the browser", () => {
-    assert.strictEqual(ExternalLink.browserUrl("https://github.com/maddec01/mux-factory/issues/203"), "https://github.com/maddec01/mux-factory/issues/203");
-    assert.strictEqual(ExternalLink.browserUrl("http://example.com"), "http://example.com/");
+    assert.strictEqual(ExternalLink.outsideUrl("https://github.com/maddec01/mux-factory/issues/203"), "https://github.com/maddec01/mux-factory/issues/203");
+    assert.strictEqual(ExternalLink.outsideUrl("http://example.com"), "http://example.com/");
+  });
+
+  it("opens T3 Code thread links in T3 Code", () => {
+    assert.strictEqual(ExternalLink.outsideUrl("t3code://threads/env-1/thread-1"), "t3code://threads/env-1/thread-1");
+  });
+
+  it("opens no other T3 Code link: only threads", () => {
+    for (const target of ["t3code://settings", "t3code://projects/add?path=/etc", "t3code:threads/env-1/thread-1", "t3code://threads.evil/env-1/thread-1", "t3code://user@threads/env-1/thread-1"]) {
+      assert.isUndefined(ExternalLink.outsideUrl(target), target);
+    }
   });
 
   it("opens nothing for other schemes or a URL that doesn't parse", () => {
     for (const target of ["file:///etc/passwd", "javascript:alert(1)", "smb://host/share", "x-apple.systempreferences:", "not a url", ""]) {
-      assert.isUndefined(ExternalLink.browserUrl(target), target);
+      assert.isUndefined(ExternalLink.outsideUrl(target), target);
     }
   });
 

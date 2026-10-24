@@ -171,18 +171,6 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 .labels { flex: 1 1 auto; display: flex; gap: 4px; min-width: 0; overflow: hidden; mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); }
 .labels .label { flex: none; }
 .row-action { flex: none; }
-/* The update button's changelog: below the title bar, lined up with the button's right edge. In the Mac app it
-   doesn't drag the window, so its links take clicks. */
-.update-notes-positioner { z-index: 50; }
-.update-notes, .update-notes::before { -webkit-app-region: no-drag; }
-.update-notes { width: min(24rem, calc(100vw - 2rem)); max-height: min(28rem, calc(100vh - 6rem)); overflow-y: auto; padding: 8px 12px; background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-composer), 0 1px 3px rgb(0 0 0 / 8%); font-size: 12px; line-height: 1.45; outline: none; }
-/* Bridges the gap so the pointer can cross from the button into the changelog. */
-.update-notes::before { content: ""; position: absolute; left: 0; right: 0; top: calc(-2px - var(--update-notes-gap, 4px)); height: calc(2px + var(--update-notes-gap, 4px)); }
-.update-notes-title { margin: 0 0 8px; font-weight: 500; }
-.update-notes section + section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-.update-notes h3 { margin: 0; font-size: 12px; font-weight: 600; }
-.update-notes ul { margin: 6px 0 0; padding-left: 16px; list-style: disc; display: grid; gap: 4px; overflow-wrap: anywhere; }
-.update-notes-more { margin: 6px 0 0; color: var(--muted-foreground); }
 .profiles [aria-disabled="true"], .update-channel [aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .start { margin: 0; font-size: 12px; }
 p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }

@@ -49,9 +49,9 @@ const quitRequested = Effect.callback<void>((resume) => {
   });
 });
 
-/** Opens a web link in the browser; any other link opens nothing. */
-const openInBrowser = (target: string) => {
-  const url = ExternalLink.browserUrl(target);
+/** Opens a web link in the browser and a T3 Code link in T3 Code; any other link opens nothing. */
+const openOutside = (target: string) => {
+  const url = ExternalLink.outsideUrl(target);
   if (url) void Electron.shell.openExternal(url);
 };
 
@@ -73,15 +73,15 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
   window.webContents.ipc.on(LaunchSecret.CHANNEL, (event) => {
     event.returnValue = LaunchSecret.forFrame(event.senderFrame?.url ?? "", boardOrigin(), secret);
   });
-  // Links to GitHub and elsewhere open in the browser; only the board stays in the window.
+  // Links to GitHub and elsewhere open in the browser, and thread links in T3 Code; only the board stays in the window.
   window.webContents.setWindowOpenHandler(({ url: target }) => {
-    openInBrowser(target);
+    openOutside(target);
     return { action: "deny" };
   });
   window.webContents.on("will-navigate", (event, target) => {
     if (ExternalLink.isOn(target, boardOrigin())) return;
     event.preventDefault();
-    openInBrowser(target);
+    openOutside(target);
   });
   return window;
 };

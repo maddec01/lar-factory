@@ -20,7 +20,10 @@
 a { color: inherit; text-decoration: underline; }
 a:hover { text-decoration-thickness: 2px; }
 code { font: 12px var(--font-mono); }
-:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--radius-sm); }
+/* In the base layer, so a T3 control's outline-none wins and its own focus ring is the only one. */
+@layer base {
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--radius-sm); }
+}
 [hidden] { display: none !important; }
 
 /* header */

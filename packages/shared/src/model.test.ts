@@ -127,7 +127,7 @@ test('sample covers every status and both platforms', () => {
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/mux-server') && repos.has('maddec01/mux-apple'));
   const { needsYou, inFlight, queued, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
-  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [25, 4, 8, 3, 4]);
+  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [25, 4, 7, 3, 4]);
 });
 
 test('token counts are compact as on T3 Code\'s usage page', () => {

@@ -41,6 +41,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T08:09:14Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -65,6 +66,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T08:09:19Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -91,6 +93,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-20T15:00:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -112,6 +115,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-19T10:00:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -134,7 +138,8 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 1,
+      "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T07:30:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -158,6 +163,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T06:00:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -179,6 +185,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-20T10:00:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -202,6 +209,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T09:10:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -231,6 +239,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T09:00:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -260,10 +269,31 @@
         "completed": 2
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T08:00:00Z",
       "closedAt": null,
       "linkedPrs": [],
-      "slices": []
+      "slices": [],
+      "map": {
+        "destination": "Anyone with a Mux server signs in on mux.app with an owner account and streams their library away from home through a relay, with no port forwarding. The server registers with the cloud once; clients find it by account.",
+        "decisions": [
+          "Owner accounts live in the cloud, not on each server (#203 research).",
+          "Hosting the relay costs about $40 a month for the first 500 owners (#203).",
+          "Sign-in uses passkeys first, email links as fallback."
+        ],
+        "fog": [
+          "Does the relay only broker connections, or carry the stream too (full TURN)? (#201)",
+          "What does the sign-in screen look like on the website and in the apps? (#202)"
+        ],
+        "check": {
+          "title": "Sign in on the website, then stream from a phone off Wi-Fi",
+          "steps": [
+            "Create an owner account on mux.app",
+            "Register a server with the account",
+            "Open the app on cellular and play a 4K title"
+          ]
+        }
+      }
     },
     {
       "id": "PVTI_sample10",
@@ -289,6 +319,13 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [
+        {
+          "number": 203,
+          "repo": "maddec01/mux-server",
+          "state": "CLOSED"
+        }
+      ],
       "updatedAt": "2026-10-21T09:20:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -318,6 +355,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T09:30:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -352,7 +390,8 @@
         "total": 0,
         "completed": 0
       },
-      "blockedBy": 1,
+      "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T09:25:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -382,6 +421,13 @@
         "completed": 0
       },
       "blockedBy": 1,
+      "blockers": [
+        {
+          "number": 202,
+          "repo": "maddec01/mux-server",
+          "state": "OPEN"
+        }
+      ],
       "updatedAt": "2026-10-21T08:30:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -431,6 +477,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T09:40:00Z",
       "closedAt": null,
       "linkedPrs": [],
@@ -567,6 +614,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T09:35:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -601,7 +649,7 @@
       "url": "https://github.com/maddec01/mux-server/issues/180",
       "repo": "maddec01/mux-server",
       "labels": [
-        "feature"
+        "concept"
       ],
       "state": "OPEN",
       "parent": null,
@@ -610,6 +658,7 @@
         "completed": 2
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-20T14:00:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -629,6 +678,22 @@
         }
       ],
       "slices": [],
+      "map": {
+        "destination": "Stop watching on one device and resume on another at the same second. The server stores each position per device and profile; the Apple apps read it on open.",
+        "decisions": [
+          "Positions are stored per profile, not per device (#181).",
+          "Apps poll on foreground; no push for now."
+        ],
+        "fog": [],
+        "check": {
+          "title": "Pause on iPhone, resume on Apple TV",
+          "steps": [
+            "Play a title on iPhone, pause at 12:34",
+            "Open the same title on Apple TV",
+            "Playback starts within a second of 12:34"
+          ]
+        }
+      },
       "stats": {
         "agentMs": 2700000,
         "wallMs": 1800000,
@@ -654,6 +719,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T09:05:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -697,6 +763,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T08:45:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -735,6 +802,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-21T08:50:00Z",
       "closedAt": null,
       "linkedPrs": [
@@ -783,6 +851,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-19T12:00:00Z",
       "closedAt": "2026-10-19T12:00:00Z",
       "linkedPrs": [],
@@ -807,6 +876,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-20T16:00:00Z",
       "closedAt": "2026-10-20T16:00:00Z",
       "linkedPrs": [
@@ -855,6 +925,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-10-18T11:00:00Z",
       "closedAt": "2026-10-18T11:00:00Z",
       "linkedPrs": [
@@ -906,6 +977,13 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [
+        {
+          "number": 181,
+          "repo": "maddec01/mux-server",
+          "state": "CLOSED"
+        }
+      ],
       "updatedAt": "2026-10-20T14:00:00Z",
       "closedAt": "2026-10-20T14:00:00Z",
       "linkedPrs": [
@@ -951,6 +1029,7 @@
         "completed": 0
       },
       "blockedBy": 0,
+      "blockers": [],
       "updatedAt": "2026-09-30T10:00:00Z",
       "closedAt": "2026-09-30T10:00:00Z",
       "linkedPrs": [],

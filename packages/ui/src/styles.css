@@ -1,8 +1,8 @@
 /* The design system's tokens and base styles: T3 Code's default theme, following the system's light or dark
    setting. Token names and values from pingdotgg/t3code apps/web/src/index.css at d53873b (@theme fonts, the
    @theme inline colour map, radius scale and --text-2xs to --text-5xs, :root and its dark variant, the
-   dropdown-glass and visible-animate-spin utilities and the base border rule). T3 routes some colours through
-   --contrast-* tokens for its contrast setting; at the default setting they equal the plain token, so the
+   dropdown-glass, dialog-glass, dialog-backdrop and visible-animate-spin utilities and the base border rule).
+   T3 routes some colours through --contrast-* tokens for its contrast setting; at the default setting they equal the plain token, so the
    colour map points straight at it. The board's own roles, which T3 has no name for, follow T3's tokens. */
 /* Tailwind scans only the sources listed, here and in each app's CSS: the page's own class names would
    otherwise turn on Tailwind utilities of the same name. */
@@ -70,6 +70,8 @@
 :root {
   color-scheme: light;
   --control-radius: 0.5rem;
+  --app-scrollbar-thumb: rgb(217 217 217);
+  --app-scrollbar-thumb-hover: rgb(191 191 191);
   --glass-blur: 12px;
   --glass-opacity: 80%;
   --glass-saturation: 1.14;
@@ -131,6 +133,8 @@
 
   @variant dark {
     color-scheme: dark;
+    --app-scrollbar-thumb: rgb(255 255 255 / 8%);
+    --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
     --glass-blur: 16px;
     --glass-saturation: 1.08;
     --shadow-composer: var(--shadow-composer-dark);
@@ -198,5 +202,34 @@
 
   @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
     background: var(--popover) !important;
+  }
+}
+
+@utility dialog-glass {
+  background: color-mix(in srgb, var(--background) var(--glass-opacity), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  border-color: color-mix(in srgb, var(--contrast-foreground) 10%, transparent);
+  box-shadow: 0 24px 64px -24px rgb(0 0 0 / 65%);
+
+  @variant dark {
+    border-color: color-mix(in srgb, var(--color-white) 8%, transparent);
+    box-shadow:
+      inset 0 1px rgb(255 255 255 / 4%),
+      0 24px 72px -20px rgb(0 0 0 / 90%);
+  }
+
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    background: var(--popover) !important;
+  }
+}
+
+@utility dialog-backdrop {
+  background: color-mix(in srgb, var(--background) 60%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+
+  @variant dark {
+    background: color-mix(in srgb, var(--background) 64%, transparent);
   }
 }

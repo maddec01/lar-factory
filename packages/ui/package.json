@@ -6,8 +6,10 @@
   "type": "module",
   "exports": {
     "./alert": "./src/components/ui/alert.tsx",
+    "./alert-dialog": "./src/components/ui/alert-dialog.tsx",
     "./badge": "./src/components/ui/badge.tsx",
     "./button": "./src/components/ui/button.tsx",
+    "./dialog": "./src/components/ui/dialog.tsx",
     "./styles.css": "./src/styles.css",
     "./compiled-css": "./src/compiled-css/compiled-css.ts"
   },
@@ -25,6 +27,7 @@
     "@base-ui/react": "^1.4.1",
     "@tailwindcss/node": "4.3.3",
     "class-variance-authority": "^0.7.1",
+    "lucide-react": "^1.61.0",
     "react": "19.3.0",
     "tailwind-merge": "^3.4.0"
   }

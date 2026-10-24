@@ -317,10 +317,6 @@ export function isRecentlyDone(item: Item, now: number): boolean {
 }
 
 /** Shown on the Board: anything not Done, and Done items closed in the last 7 days. */
-export function isOnBoard(item: Item, now: number): boolean {
-  return item.status !== 'Done' || isRecentlyDone(item, now);
-}
-
 export function platformOf(item: Item, repos: readonly RepoConfig[]): string {
   if (!item.repo) return 'Draft';
   return repos.find((r) => r.repo === item.repo)?.platform ?? item.repo.split('/')[1] ?? item.repo;

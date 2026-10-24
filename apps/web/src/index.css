@@ -13,7 +13,7 @@
 
 /* Full browser width, with T3's workspace gutter. */
 #app { padding: 14px 20px 48px; }
-/* Tailwind's base styles take links' underline, headings' weight, the checkboxes' margin and a legend's padding; these put back the browser's. */
+/* Tailwind's base styles take links' underline and headings' weight; these put back the browser's. */
 a { color: inherit; text-decoration: underline; }
 a:hover { text-decoration-thickness: 2px; }
 code { font: 12px var(--font-mono); }
@@ -129,18 +129,10 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 
 /* Capture form: stays mounted while the board refreshes. */
 .form-hint { color: var(--muted-foreground); margin: 6px 0 12px; font-size: 12px; }
-.item-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-field { display: grid; gap: 4px; margin-bottom: 12px; }
-.form-field > label, .applicability legend, .profiles legend, .update-channel legend { font-weight: 600; }
-.applicability legend, .profiles legend, .update-channel legend { padding: 0 2px; }
 .required-note { color: var(--muted-foreground); font-weight: 400; font-size: 12px; }
-.form-field input, .form-field select, .form-field textarea { width: 100%; min-width: 0; font: inherit; color: var(--foreground); background: var(--background); border: 1px solid var(--input); border-radius: var(--control-radius); padding: 6px 8px; }
-.form-field textarea { resize: vertical; min-height: 80px; }
-.applicability, .profiles, .update-channel { margin: 0 0 10px; padding: 8px 10px 0; border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
-.choices { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-.choices label { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; }
-.choices input { accent-color: var(--ring); margin: 3px 3px 3px 4px; }
+.choices { display: flex; flex-flow: row wrap; gap: --spacing(2.5) --spacing(3.5); }
 /* T3's Button takes no pointer events while disabled; one that says why keeps them, so its title shows. */
 button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 #settings-result ul { padding-left: --spacing(4.5); white-space: normal; }
@@ -201,7 +193,7 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 .update-notes h3 { margin: 0; font-size: 12px; font-weight: 600; }
 .update-notes ul { margin: 6px 0 0; padding-left: 16px; list-style: disc; display: grid; gap: 4px; overflow-wrap: anywhere; }
 .update-notes-more { margin: 6px 0 0; color: var(--muted-foreground); }
-.profiles input[aria-disabled="true"], .update-channel input[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
+.profiles [aria-disabled="true"], .update-channel [aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .start { margin: 0; font-size: 12px; }
 p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
 .start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; position: relative; }

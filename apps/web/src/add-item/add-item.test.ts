@@ -13,6 +13,7 @@ const field = <T extends HTMLElement = HTMLInputElement>(id: string) => $<T>(`#$
 const submit = () => field<HTMLButtonElement>('item-submit');
 const result = () => field('item-result');
 const labels = () => $$<HTMLInputElement>('input[name="labels"]').map((input) => input.value);
+const box = (label: string) => $$('[role="checkbox"]').find((each) => each.closest('label')!.textContent === label)!;
 
 async function open(data: BoardData = withFactory): Promise<void> {
   await mountPage(data);
@@ -63,7 +64,7 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
 
 test('changing the repo shows its applicability, unchecked, and a repo with none shows no group', async () => {
   await open();
-  await settle(() => $<HTMLInputElement>('input[value="area: web"]')!.click());
+  await settle(() => box('area: web').click());
   await enter(field<HTMLSelectElement>('item-kind'), 'bug');
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-apple');
   expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-apple');
@@ -90,6 +91,15 @@ test('a draft without a kind is not sent and says why', async () => {
   expect(result().textContent, 'editing clears the message').toBe('');
 });
 
+test('ticking a box counts as editing and clears the message', async () => {
+  await open();
+  await settle(() => submit().click());
+  expect(result().textContent).toBe('Choose bug, feature or improvement.');
+  await settle(() => box('area: web').click());
+  expect(box('area: web').getAttribute('aria-checked')).toBe('true');
+  expect(result().textContent).toBe('');
+});
+
 test('a repo picked while a message shows is the one posted', async () => {
   await open();
   await settle(() => submit().click());
@@ -104,7 +114,7 @@ test('a repo picked while a message shows is the one posted', async () => {
 
 test('submitting posts the draft, shows it sending, then closes and announces the new item', async () => {
   await open();
-  await settle(() => $<HTMLInputElement>('input[value="area: web"]')!.click());
+  await settle(() => box('area: web').click());
   await fillDraft();
   let finish!: (response: Response) => void;
   fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (finish = resolve)));
@@ -117,6 +127,9 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   expect(submit().textContent).toBe('Adding…');
   expect(submit().disabled).toBe(true);
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
+  expect(box('area: server').hasAttribute('data-disabled'), 'the boxes lock with the fields').toBe(true);
+  await settle(() => box('area: server').click());
+  expect(box('area: server').getAttribute('aria-checked')).toBe('false');
   expect($('#add-item-form')!.getAttribute('aria-busy')).toBe('true');
   expect(result().textContent).toBe('Creating the issue and adding it to List…');
 
@@ -141,6 +154,9 @@ test('a created issue the server could not add offers a retry of the same reques
   expect(result().textContent).toBe('Issue created. Could not add it to List. Retry to finish this issue.View created issue');
   expect(submit().textContent).toBe('Retry this submission');
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
+  expect(box('area: server').hasAttribute('data-disabled'), 'the boxes lock with the fields').toBe(true);
+  await settle(() => box('area: server').click());
+  expect(box('area: server').getAttribute('aria-checked')).toBe('false');
 
   respond({ item: null, issueUrl: null, error: 'Still failing.' }, 502);
   await settle(() => submit().click());

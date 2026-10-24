@@ -6,23 +6,30 @@ import type { FormEvent } from 'react';
 import { applicability, ITEM_KINDS } from '@mux-factory/shared';
 import type { RepoConfig } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
+import { Checkbox } from '@mux-factory/ui/checkbox';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle, DialogTrigger } from '@mux-factory/ui/dialog';
+import { Fieldset, FieldsetLegend } from '@mux-factory/ui/fieldset';
+import { Input } from '@mux-factory/ui/input';
 import { KeptMountedDialogPopup } from '@mux-factory/ui/kept-mounted-dialog-popup';
+import { Label } from '@mux-factory/ui/label';
+import { NativeSelect } from '@mux-factory/ui/native-select';
+import { Textarea } from '@mux-factory/ui/textarea';
 import { FormResult } from '../notices/form-result.tsx';
 import { useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 
-/** The applicability checkboxes of one repo, each group with the hint for choosing none. */
-function Applicability({ repo }: { repo: RepoConfig }) {
+/** The applicability checkboxes of one repo, each group with the hint for choosing none. Base UI's checkboxes
+ * don't follow a native fieldset's disabled, so they take it themselves. */
+function Applicability({ repo, disabled }: { repo: RepoConfig; disabled: boolean }) {
   return applicability(repo.platform).map((group, g) => (
-    <fieldset className="applicability" aria-describedby={`item-hint-${g}`} key={group.title}>
-      <legend>{group.title}</legend>
+    <Fieldset className="applicability" aria-describedby={`item-hint-${g}`} key={group.title}>
+      <FieldsetLegend>{group.title}</FieldsetLegend>
       <div className="choices">
-        {group.labels.map((label) => <label key={label}><input type="checkbox" name="labels" value={label} /> {label}</label>)}
+        {group.labels.map((label) => <Label key={label}><Checkbox name="labels" value={label} disabled={disabled} />{label}</Label>)}
       </div>
       <p className="form-hint" id={`item-hint-${g}`}>{group.hint}</p>
-    </fieldset>
+    </Fieldset>
   ));
 }
 
@@ -58,35 +65,35 @@ function AddItemForm() {
         <DialogDescription>Create an issue in {data.project.title} and add it to List.</DialogDescription>
       </DialogHeader>
       <DialogPanel>
-        <fieldset id="item-fields" className="item-fields" disabled={locked}>
+        <Fieldset id="item-fields" unstyled disabled={locked}>
           <div className="form-pair">
             <div className="form-field">
-              <label htmlFor="item-repo">Repository</label>
+              <Label htmlFor="item-repo">Repository</Label>
               {/* Uncontrolled and read on input: the form's onInput re-renders before the select's change
                   event, and a controlled select would be set back to the old repo. */}
-              <select id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}>
+              <NativeSelect id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}>
                 {data.repos.map((r) => <option value={r.repo} key={r.repo}>{r.platform}</option>)}
-              </select>
+              </NativeSelect>
             </div>
             <div className="form-field">
-              <label htmlFor="item-kind">Kind</label>
-              <select id="item-kind" name="kind" required defaultValue="">
+              <Label htmlFor="item-kind">Kind</Label>
+              <NativeSelect id="item-kind" name="kind" required defaultValue="">
                 <option value="">Choose a kind</option>
                 {ITEM_KINDS.map((kind) => <option value={kind} key={kind}>{kind}</option>)}
-              </select>
+              </NativeSelect>
             </div>
           </div>
           {/* Keyed by repo, so another repo's groups start unchecked. */}
-          {selected && <Applicability repo={selected} key={selected.repo} />}
+          {selected && <Applicability repo={selected} disabled={locked} key={selected.repo} />}
           <div className="form-field">
-            <label htmlFor="item-title">Title <span className="required-note">(required)</span></label>
-            <input id="item-title" name="title" required maxLength={256} autoComplete="off" />
+            <Label htmlFor="item-title">Title <span className="required-note">(required)</span></Label>
+            <Input id="item-title" name="title" required maxLength={256} autoComplete="off" nativeInput />
           </div>
           <div className="form-field">
-            <label htmlFor="item-description">Description <span className="required-note">(optional)</span></label>
-            <textarea id="item-description" name="description" rows={4} maxLength={65536} />
+            <Label htmlFor="item-description">Description <span className="required-note">(optional)</span></Label>
+            <Textarea id="item-description" name="description" rows={4} maxLength={65536} />
           </div>
-        </fieldset>
+        </Fieldset>
         <Result message={message} />
       </DialogPanel>
       <DialogFooter>

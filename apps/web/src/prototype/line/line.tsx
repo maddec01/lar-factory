@@ -1,4 +1,4 @@
-// PROTOTYPE, throwaway. Line variant D, "Table + dossiers + queue": C's progress table with B's map folded into each
+// PROTOTYPE, throwaway. The line, "Table + dossiers + queue": a progress table with a map folded into each
 // dossier. The queue sits on top as its own list, started by hand (auto-start comes later, against the build
 // slots). Concepts and coupled work follow as dossiers: a checklist of their parts in order, or the map of what waits
 // on what, with their done parts folded away. Then everything else in flight on the same aligned stage track.
@@ -15,11 +15,9 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { PlatformTag, STATUS_COLOR, StatusGlyph, platformColor } from '../chrome.tsx';
 import type { Pick } from '../list-sidebar.tsx';
 import { ItemTitle, SliceBar, SliceList, refText, statsOf } from '../item-bits.tsx';
-import { WorkMap, workOf } from './line-b-map.tsx';
+import { WorkMap, workOf } from './line-map.tsx';
 import { CONCEPTS } from './line-data.ts';
 import type { LineProps } from './line-data.ts';
-
-export const NAME = 'Table + dossiers + queue';
 
 const BUILD_LIMIT = 2;
 const STAGES: { name: string; short: string; statuses: Status[] }[] = [
@@ -493,7 +491,7 @@ function Queue({ items, building, data, now, pick }: { items: Item[]; building: 
   );
 }
 
-export function LineD({ items, data, now, pick }: LineProps) {
+export function Line({ items, data, now, pick }: LineProps) {
   const parents = data.items.filter((p) => p.number !== null && p.status !== 'List' && p.status !== 'Done'
     && (CONCEPTS[p.number] !== undefined || p.labels.includes('concept') || data.items.some((c) => childOf(c, p))));
   const shown = new Set(items.map((i) => i.id));

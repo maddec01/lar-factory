@@ -18,7 +18,7 @@ import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, WindowControls, dr
 import { ActionButtons, PrList, SliceList, ItemTitle, StatsGrid, StepTrack, hint } from './item-bits.tsx';
 import { ToolbarStats } from './toolbar-stats.tsx';
 import { ListSidebar } from './list-sidebar.tsx';
-import { LineSection } from './line/line-switcher.tsx';
+import { Line } from './line/line.tsx';
 import type { Pick } from './list-sidebar.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
@@ -201,7 +201,7 @@ export function VariantE() {
                 </section>
                 <section className="grid gap-3">
                   <h2 className="m-0 text-[13px] font-medium">The line</h2>
-                  <LineSection items={scoped.items} data={data} now={now} pick={pick} />
+                  <Line items={scoped.items} data={data} now={now} pick={pick} />
                 </section>
               </div>
             </div>

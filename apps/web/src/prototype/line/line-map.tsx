@@ -1,16 +1,13 @@
-// PROTOTYPE, throwaway. Line variant B's big panel: a concept, or coupled work across repos, opened in full. Its
-// destination and progress on top; then the map, one lane per repo plus a Decisions lane, tasks placed left to
-// right by what they wait on, arrows between them, ending in the end-to-end check; then decisions, open questions,
-// threads and pull requests.
+// PROTOTYPE, throwaway. A dossier's map: one lane per repo plus a Decisions lane, tasks placed left to right by
+// what they wait on, arrows between them, ending in the end-to-end check.
 
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { BookOpen, ChevronRight, CircleQuestionMark, CircleX, FlaskConical, Hammer, Lightbulb, MessagesSquare, Shapes, Target, Workflow } from 'lucide-react';
-import { decisionType, kindOf, platformOf, plural, shortAgo } from '@mux-factory/shared';
+import { BookOpen, CircleX, FlaskConical, Hammer, Lightbulb, MessagesSquare, Shapes, Target } from 'lucide-react';
+import { decisionType, platformOf, shortAgo } from '@mux-factory/shared';
 import type { BoardData, Item, Status } from '@mux-factory/shared';
-import { Badge } from '@mux-factory/ui/badge';
-import { Button, PlatformTag, STATUS_COLOR, StatusGlyph, platformColor } from '../chrome.tsx';
-import { ActionButtons, ItemTitle, PrList, SliceBar } from '../item-bits.tsx';
+import { Button, StatusGlyph, platformColor } from '../chrome.tsx';
+import { ItemTitle, SliceBar } from '../item-bits.tsx';
 import type { Pick } from '../list-sidebar.tsx';
 import { CONCEPTS } from './line-data.ts';
 
@@ -32,8 +29,6 @@ const isDone = (i: Item | undefined) => !!i && (i.status === 'Done' || i.state =
 const started = (i: Item | undefined) => !!i && ['In progress', 'Review', 'Verify', 'Ready to merge', 'Done'].includes(i.status);
 const picked = (on: boolean) => (on ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--card)' : '');
 
-/** Big work: a concept, or a parent the mock maps (coupled work across repos). */
-export const isBig = (item: Item) => kindOf(item) === 'concept' || (item.number !== null && item.number in CONCEPTS);
 
 /** A big item's tasks, from the mock where there is one, else its sub-issues with no known order; and every item it holds. */
 export function workOf(head: Item, data: BoardData) {
@@ -47,16 +42,6 @@ export function workOf(head: Item, data: BoardData) {
     });
   const members = [...new Set([...children, ...tasks.flatMap((t) => (t.item ? [t.item] : []))])];
   return { mock, tasks, members };
-}
-
-/** "#203" in mock text becomes a button that opens that item. */
-function WithRefs({ text, find, pick }: { text: string; find: (n: number) => Item | undefined; pick: Pick }) {
-  return <>{text.split(/(#\d+)/).map((part, n) => {
-    const item = /^#\d+$/.test(part) ? find(Number(part.slice(1))) : undefined;
-    return item
-      ? <button key={n} type="button" onClick={() => pick.set(item.id)} className="rounded px-0.5 font-medium text-(--primary) tabular-nums hover:bg-(--accent)">{part}</button>
-      : <span key={n}>{part}</span>;
-  })}</>;
 }
 
 function CheckGlyph({ state, className = 'size-3.5' }: { state: Concept['endToEnd']['state']; className?: string }) {
@@ -246,146 +231,5 @@ export function WorkMap({ tasks, mock, data, now, pick }: { tasks: Task[]; mock:
         ))}
       </div>
     </div>
-  );
-}
-
-// ---------- the panel ----------
-
-function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
-  return (
-    <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2">
-      <h3 className="m-0 text-xs font-medium">{title} {count !== undefined && <span className="text-(--muted-foreground)">{count}</span>}</h3>
-      {children}
-    </section>
-  );
-}
-
-/** Who to look at: what runs now, what waits on Pedro, what waits on other tasks. */
-function AtAGlance({ tasks, pick }: { tasks: Task[]; pick: Pick }) {
-  const open = (t: Task) => (started(t.item) ? [] : tasks.filter((u) => t.waitsOn.includes(u.issue) && !isDone(u.item)));
-  const live = tasks.filter((t) => t.item && !isDone(t.item));
-  const yours = (t: Task) => t.item!.status === 'Needs you' || t.item!.status === 'Verify';
-  const groups = [
-    { label: 'Needs you', list: live.filter(yours) },
-    { label: 'Running', list: live.filter((t) => !yours(t) && !open(t).length && t.item!.status !== 'Ready' && t.item!.status !== 'Queued') },
-    { label: 'Ready to start', list: live.filter((t) => !yours(t) && !open(t).length && (t.item!.status === 'Ready' || t.item!.status === 'Queued')) },
-    { label: 'Waiting', list: live.filter((t) => !yours(t) && open(t).length) },
-  ].filter((g) => g.list.length);
-  return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
-      {groups.map((g) => (
-        <span key={g.label} className="flex flex-wrap items-center gap-1.5">
-          <span className="text-(--muted-foreground)">{g.label}</span>
-          {g.list.map((t) => (
-            <button key={t.issue} type="button" onClick={() => pick.set(t.item!.id)} className="inline-flex items-center gap-1 rounded-md border border-(--border) bg-(--card) px-1.5 py-0.5 hover:bg-(--accent)">
-              <StatusGlyph status={t.item!.status} className="size-3" /><span className="tabular-nums">#{t.issue}</span>{t.kind}
-              {g.label === 'Waiting' && <span className="text-(--muted-foreground)">on {open(t).map((u) => `#${u.issue}`).join(', ')}</span>}
-            </button>
-          ))}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-export function ConceptPanel({ head, data, now, pick, open, onToggle }: { head: Item; data: BoardData; now: number; pick: Pick; open: boolean; onToggle: () => void }) {
-  const { mock, tasks, members } = workOf(head, data);
-  const find = (n: number) => members.find((i) => i.number === n) ?? (head.number === n ? head : undefined);
-  const concept = kindOf(head) === 'concept';
-  const platforms = [...new Set([head, ...members].map((i) => platformOf(i, data.repos)))];
-  const done = tasks.filter((t) => isDone(t.item)).length;
-  const withPrs = [head, ...members].filter((i) => i.linkedPrs.length);
-  return (
-    <article className={`grid gap-4 rounded-xl border border-(--border) bg-(--card) p-4 ${pick.id === head.id ? 'ring-2 ring-(--primary)' : ''}`}>
-      <header className="grid gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" aria-label={open ? 'Collapse' : 'Expand'} aria-expanded={open} onClick={onToggle} className="grid size-6 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--accent)">
-            <ChevronRight className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} />
-          </button>
-          <Badge variant={concept ? 'info' : 'secondary'} className="gap-1"><Workflow />{concept ? 'Concept' : `Coupled work · ${platforms.length} repos`}</Badge>
-          <span className="flex items-center gap-1.5 text-xs"><StatusGlyph status={head.status} />{head.status}</span>
-          <span className="text-xs text-(--muted-foreground)">· updated {shortAgo(head.updatedAt, now)}</span>
-          <span className="ml-auto flex flex-wrap items-center gap-1.5">{platforms.map((p) => <PlatformTag key={p} platform={p} />)}<ActionButtons item={head} small /></span>
-        </div>
-        <button type="button" onClick={() => pick.set(head.id)} className="m-0 justify-self-start rounded-md text-left text-lg font-semibold leading-snug tracking-tight hover:underline"><ItemTitle item={head} /></button>
-        {mock && open && (
-          <p className="m-0 flex max-w-3xl gap-2 text-[13px] leading-relaxed"><Target className="mt-0.5 size-4 shrink-0 text-(--muted-foreground)" /><span><span className="font-medium">Destination. </span>{mock.destination}</span></p>
-        )}
-        <div className="grid gap-1.5">
-          <ol className="m-0 flex list-none gap-[3px] p-0">
-            {tasks.map((t) => <li key={t.issue} title={`#${t.issue} ${t.kind}: ${t.item?.status ?? 'not on the board'}`} className="h-1.5 flex-1 rounded-full" style={{ background: t.item ? STATUS_COLOR[t.item.status] : 'var(--soft)', opacity: t.item && !isDone(t.item) && t.item.status !== 'Needs you' ? 0.55 : 1 }} />)}
-            {mock && <li title={`End-to-end: ${mock.endToEnd.state}`} className="h-1.5 flex-1 rounded-full" style={{ background: mock.endToEnd.state === 'passed' ? 'var(--st-done)' : mock.endToEnd.state === 'running' ? 'var(--st-now)' : 'var(--soft)' }} />}
-          </ol>
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-(--muted-foreground)">
-            <span><span className="font-medium text-(--foreground)">{done} of {tasks.length}</span> tasks done</span>
-            {mock && <span className="inline-flex items-center gap-1"><CheckGlyph state={mock.endToEnd.state} className="size-3" />end-to-end {mock.endToEnd.state}</span>}
-            {mock && <span>{plural(mock.open.length, 'open question')}</span>}
-            {mock && <span>{plural(mock.threads.filter((t) => t.state === 'running').length, 'thread')} running</span>}
-          </span>
-        </div>
-        {open && <AtAGlance tasks={tasks} pick={pick} />}
-      </header>
-      {open && (
-        <>
-          <WorkMap tasks={tasks} mock={mock} data={data} now={now} pick={pick} />
-          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            {mock && (
-              <div className="grid content-start gap-5">
-                <Section title="Decisions so far" count={mock.decisions.length}>
-                  <ul className="m-0 grid list-none gap-1.5 p-0 text-[13px]">
-                    {mock.decisions.map((d) => <li key={d} className="flex gap-2"><StatusGlyph status="Done" className="mt-0.5 size-3.5" /><span><WithRefs text={d} find={find} pick={pick} /></span></li>)}
-                  </ul>
-                </Section>
-                <Section title="Open questions" count={mock.open.length}>
-                  {mock.open.length ? (
-                    <ul className="m-0 grid list-none gap-1.5 p-0 text-[13px]">
-                      {mock.open.map((q) => <li key={q} className="flex gap-2"><CircleQuestionMark className="mt-0.5 size-3.5 shrink-0 text-(--st-amber)" /><span><WithRefs text={q} find={find} pick={pick} /></span></li>)}
-                    </ul>
-                  ) : <p className="m-0 text-xs text-(--muted-foreground)">None left: the map is settled.</p>}
-                </Section>
-                <Section title="End-to-end check">
-                  <div className="grid gap-2 rounded-lg border border-(--border) p-3">
-                    <span className="flex items-center gap-1.5 text-[13px] font-medium"><CheckGlyph state={mock.endToEnd.state} />{mock.endToEnd.title}</span>
-                    <ol className="m-0 grid gap-1 pl-5 text-xs text-(--muted-foreground)">{mock.endToEnd.steps.map((s) => <li key={s}>{s}</li>)}</ol>
-                  </div>
-                </Section>
-              </div>
-            )}
-            <div className="grid content-start gap-5">
-              {mock && (
-                <Section title="T3 threads" count={mock.threads.length}>
-                  <ul className="m-0 grid list-none gap-0.5 p-0">
-                    {mock.threads.map((t) => {
-                      const item = find(t.issue);
-                      return (
-                        <li key={t.title} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-[13px] hover:bg-(--row-hover)">
-                          <StatusGlyph status={THREAD_STATUS[t.state]} />
-                          <span className="min-w-0 flex-1 truncate">{t.title}</span>
-                          {item && <button type="button" onClick={() => pick.set(item.id)} className="rounded px-1 text-xs text-(--muted-foreground) tabular-nums hover:bg-(--accent)">#{t.issue}</button>}
-                          <span className="w-20 shrink-0 text-right text-xs text-(--muted-foreground)">{t.state === 'not started' ? 'not started' : shortAgo(t.updated, now)}</span>
-                          {t.state !== 'not started' && <Button small>Open in T3</Button>}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <p className="m-0 text-[11px] text-(--muted-foreground)">Threads start only when their task can run; none waits to be told to continue.</p>
-                </Section>
-              )}
-              {withPrs.length > 0 && (
-                <Section title="Pull requests" count={withPrs.reduce((n, i) => n + i.linkedPrs.length, 0)}>
-                  {withPrs.map((i) => (
-                    <div key={i.id} className="grid gap-1">
-                      <span className="flex items-center gap-1.5 text-xs"><span className="size-2 rounded-full" style={{ background: platformColor(platformOf(i, data.repos)) }} /><ItemTitle item={i} /></span>
-                      <PrList item={i} />
-                    </div>
-                  ))}
-                </Section>
-              )}
-              {!mock && <p className="m-0 text-xs text-(--muted-foreground)">No map yet: its destination, decisions and the order of its tasks come once shaping writes them.</p>}
-            </div>
-          </div>
-        </>
-      )}
-    </article>
   );
 }

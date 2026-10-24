@@ -1,4 +1,4 @@
-// PROTOTYPE, throwaway. Small item pieces the variants arrange differently: the status track, slices,
+// PROTOTYPE, throwaway. Small item pieces the control room arranges: the status track, slices,
 // pull requests with checks, stats, and the one action each status asks of you.
 
 import { Check, ExternalLink, GitPullRequest, Play } from 'lucide-react';

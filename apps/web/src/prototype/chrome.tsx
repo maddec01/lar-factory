@@ -1,10 +1,10 @@
-// PROTOTYPE, throwaway. The T3 Code chrome every variant borrows: the brand row beside the traffic lights,
+// PROTOTYPE, throwaway. The T3 Code chrome the control room borrows: the brand row beside the traffic lights,
 // sidebar rows and footer buttons, status glyphs, and the window drag rules.
 
 import type { ReactNode } from 'react';
 import { Check, Circle, CircleDashed, CircleDot, Clock3, Eye, GitMerge, LoaderCircle } from 'lucide-react';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, inMacApp, platformOf, slug } from '@mux-factory/shared';
-import type { BoardData, Item, Status } from '@mux-factory/shared';
+import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, inMacApp, slug } from '@mux-factory/shared';
+import type { Status } from '@mux-factory/shared';
 import { Badge } from '@mux-factory/ui/badge';
 import { Button as UiButton } from '@mux-factory/ui/button';
 
@@ -96,11 +96,6 @@ const PLATFORM_COLOR: Record<string, string> = {
   server: 'oklch(68.5% 0.169 237.323)', apple: 'oklch(65.6% 0.241 354.308)', factory: 'oklch(70.4% 0.14 182.503)',
 };
 export const platformColor = (platform: string) => PLATFORM_COLOR[slug(platform)] ?? 'var(--muted-foreground)';
-
-export function PlatformDot({ item, data }: { item: Item; data: BoardData }) {
-  const p = platformOf(item, data.repos);
-  return <span className="size-2 shrink-0 rounded-full" style={{ background: platformColor(p) }} title={p} />;
-}
 
 export function PlatformTag({ platform }: { platform: string }) {
   return (

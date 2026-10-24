@@ -14,8 +14,8 @@ fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
 # A fake pnpm that logs "<dir> <args>" and lays out node_modules like pnpm does.
-# A package that depends on electron gets a fake electron/install.js that logs
-# "<dir> electron install.js" instead of downloading.
+# A package that depends on electron, or a workspace app that does, gets a fake
+# electron/install.js that logs "<dir> electron install.js" instead of downloading.
 bin=$(mktemp -d)
 calls="$bin/calls"
 cat >"$bin/pnpm" <<'EOF'
@@ -23,11 +23,15 @@ cat >"$bin/pnpm" <<'EOF'
 printf '%s %s\n' "$PWD" "$*" >>"$FAKE_PNPM_CALLS"
 [[ -z "${FAKE_PNPM_FAIL:-}" ]] || exit 1
 [[ -f node_modules/.modules.yaml ]] || { mkdir -p node_modules; echo 'layoutVersion: 5' >node_modules/.modules.yaml; }
-if grep -q electron package.json; then
-  mkdir -p node_modules/electron
-  echo 'require("fs").appendFileSync(process.env.FAKE_PNPM_CALLS, process.cwd() + " electron install.js\n")' \
-    >node_modules/electron/install.js
-fi
+packages=.
+[[ ! -f pnpm-workspace.yaml ]] || packages=$(echo . apps/*)
+for dir in $packages; do
+  if grep -q electron "$dir/package.json"; then
+    mkdir -p "$dir/node_modules/electron"
+    echo 'require("fs").appendFileSync(process.env.FAKE_PNPM_CALLS, process.cwd() + " electron install.js\n")' \
+      >"$dir/node_modules/electron/install.js"
+  fi
+done
 EOF
 chmod +x "$bin/pnpm"
 export FAKE_PNPM_CALLS="$calls" PATH="$bin:$PATH"
@@ -56,6 +60,25 @@ add_app() {
   printf 'node_modules/\n' >"$1/app/.gitignore"
   git -C "$1" add app
   git -C "$1" commit -qm 'feat(board): add the app package'
+}
+
+# A repo laid out as one root workspace, as after #269: apps/desktop depends on electron.
+make_workspace_repo() {
+  local repo
+  repo=$(cd "$(mktemp -d)" && pwd -P)/repo
+  git init -q -b main "$repo"
+  git -C "$repo" config user.name Test
+  git -C "$repo" config user.email test@example.invalid
+  mkdir -p "$repo/apps/server" "$repo/apps/desktop"
+  printf '{"private":true}\n' >"$repo/package.json"
+  printf "packages:\n  - apps/*\n" >"$repo/pnpm-workspace.yaml"
+  printf "lockfileVersion: '9.0'\n" >"$repo/pnpm-lock.yaml"
+  printf 'node_modules/\n' >"$repo/.gitignore"
+  printf '{}\n' >"$repo/apps/server/package.json"
+  printf '{"devDependencies":{"electron":"44.9.3"}}\n' >"$repo/apps/desktop/package.json"
+  git -C "$repo" add .
+  git -C "$repo" commit -qm 'build: workspace fixture'
+  printf '%s' "$repo"
 }
 
 state() { find "$1/board" -exec stat -f '%N %m %z' {} + | sort; }
@@ -142,6 +165,38 @@ elif [[ $output == *"brew install pnpm"* ]]; then
   pass "fails without pnpm and names brew install pnpm"
 else
   fail "names brew install pnpm: $output"
+fi
+
+repo=$(make_workspace_repo)
+: >"$calls"
+expected="$repo install --frozen-lockfile --prefer-offline --ignore-scripts
+$repo/apps/desktop electron install.js"
+if output=$(bash "$setup" "$repo" 2>&1) && [[ $(cat "$calls") == "$expected" ]] &&
+  [[ -z $(git -C "$repo" status --porcelain) ]]; then
+  pass "a workspace installs once at the root and fetches apps/desktop's Electron binary"
+else
+  fail "a workspace installs once at the root and fetches apps/desktop's Electron binary: $output / $(cat "$calls")"
+fi
+
+repo=$(make_workspace_repo)
+mkdir "$repo/node_modules"
+: >"$calls"
+if output=$(bash "$setup" "$repo" 2>&1) && [[ ! -s $calls ]] &&
+  [[ $output == *"$repo/node_modules"*npm* ]] && [[ ! -e $repo/node_modules/.modules.yaml ]]; then
+  pass "an npm-made workspace node_modules is left alone"
+else
+  fail "an npm-made workspace node_modules is left alone: $output / $(cat "$calls")"
+fi
+
+repo=$(make_workspace_repo)
+git -C "$repo" config core.hooksPath "$hooks"
+: >"$calls"
+expected="$(dirname "$repo")/w install --frozen-lockfile --prefer-offline --ignore-scripts
+$(dirname "$repo")/w/apps/desktop electron install.js"
+if output=$(git -C "$repo" worktree add -q ../w -b test 2>&1) && [[ $(cat "$calls") == "$expected" ]]; then
+  pass "the hook installs a new workspace worktree"
+else
+  fail "the hook installs a new workspace worktree: $output / $(cat "$calls")"
 fi
 
 repo=$(make_repo)

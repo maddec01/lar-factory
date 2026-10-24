@@ -1,24 +1,18 @@
 import * as NodeFS from "node:fs";
-import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 
 import { installSkills } from "@mux-factory/shared/install-skills";
+import { makeBundle, tempDir } from "../../test/support.ts";
 import * as ClaudeProfiles from "./claude-profiles.ts";
-
-const tempDir = (prefix: string) => NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), prefix));
 
 /** A throwaway home with two Claude profiles and the bundle's skill installed. */
 const makeHome = (install = true) => {
   const home = tempDir("profiles-home-");
   NodeFS.mkdirSync(NodePath.join(home, ".claude"));
   NodeFS.mkdirSync(NodePath.join(home, ".claude-work"));
-  const bundle = tempDir("profiles-bundle-");
-  NodeFS.mkdirSync(NodePath.join(bundle, "skills/mux-work"), { recursive: true });
-  NodeFS.writeFileSync(NodePath.join(bundle, "skills/mux-work/SKILL.md"), "# mux-work\n");
-  NodeFS.mkdirSync(NodePath.join(bundle, "references"));
-  if (install) installSkills(home, bundle, "1.0.0");
+  if (install) installSkills(home, makeBundle(), "1.0.0");
   return home;
 };
 

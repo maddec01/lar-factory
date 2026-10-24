@@ -1,23 +1,11 @@
 import * as NodeFS from "node:fs";
-import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
+import { makeBundle, tempDir } from "../../test/support.ts";
 import * as SkillInstall from "./skill-install.ts";
-
-const tempDir = (prefix: string) => NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), prefix));
-
-/** A bundle with one skill and one checklist, as the app's build copies them. */
-const makeBundle = () => {
-  const bundle = tempDir("skill-bundle-");
-  NodeFS.mkdirSync(NodePath.join(bundle, "skills/mux-work"), { recursive: true });
-  NodeFS.writeFileSync(NodePath.join(bundle, "skills/mux-work/SKILL.md"), "# mux-work\n");
-  NodeFS.mkdirSync(NodePath.join(bundle, "references"));
-  NodeFS.writeFileSync(NodePath.join(bundle, "references/checklist.md"), "- [ ] check\n");
-  return bundle;
-};
 
 const launch = (overrides: Partial<SkillInstall.LaunchInput> = {}): SkillInstall.LaunchInput => ({
   isPackaged: true,

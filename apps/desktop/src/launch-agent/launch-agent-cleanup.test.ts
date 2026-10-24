@@ -1,14 +1,12 @@
 import * as NodeFS from "node:fs";
-import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
+import { tempDir } from "../../test/support.ts";
 import * as LaunchAgentCleanup from "./launch-agent-cleanup.ts";
-
-const tempDir = (prefix: string) => NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), prefix));
 
 /** A home with the old agent's plist, pointing at a checkout that must stay. */
 const makeHome = (withAgent: boolean) => {

@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { liveProjects, statsDbPath } from './item-stats.ts';
-import type { RepoConfig } from './model.ts';
+import type { RepoConfig } from '@mux-factory/shared';
 
 export type RepositoryProject = { projectId: string; error?: undefined } | { error: string };
 

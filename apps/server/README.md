@@ -83,7 +83,7 @@ without a restart, and the board also looks again every 10 seconds while one
 shows. A broken override is named in its notice. A missing `az` shows nothing.
 
 If `gh` can't reach GitHub for another reason, the board keeps the last data it
-read and shows a stale warning. `pnpm run sample` serves `test/sample.json` instead of GitHub;
+read and shows a stale warning. `pnpm run sample` serves `packages/shared/test/sample.json` instead of GitHub;
 adding, queuing and starting are disabled in sample mode.
 
 To use the board every day, install the board app from

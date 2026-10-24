@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { freePort, SAMPLE_MODELS } from './server-support.ts';
+import { freePort, SAMPLE_DATA, SAMPLE_MODELS } from './server-support.ts';
 import { testEnv } from './repo-support.ts';
 import type { ParentMessage } from '../src/port.ts';
 
@@ -14,7 +14,7 @@ async function reportedPorts(t: TestContext, env: Record<string, string>): Promi
   const home = mkdtempSync(join(tmpdir(), 'mux-board-parent-'));
   const child = fork('src/server.ts', [], {
     cwd: new URL('../', import.meta.url), execArgv: ['--disable-warning=ExperimentalWarning'], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-    env: { ...testEnv(), ...SAMPLE_MODELS, HOME: home, BOARD_DATA_FILE: 'test/sample.json', ...env },
+    env: { ...testEnv(), ...SAMPLE_MODELS, HOME: home, BOARD_DATA_FILE: SAMPLE_DATA, ...env },
   });
   t.after(async () => {
     if (child.exitCode === null && child.signalCode === null) {

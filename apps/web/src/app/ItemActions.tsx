@@ -2,8 +2,8 @@
 // on both, each with its pending label, plus a List row's error.
 
 import { useRef } from 'react';
-import { canAbandon, ref } from '../../../server/src/model.ts';
-import type { BoardData, Item } from '../../../server/src/model.ts';
+import { canAbandon, ref } from '@mux-factory/shared';
+import type { BoardData, Item } from '@mux-factory/shared';
 import { useActionStore, useItemAction } from './action-store.ts';
 import { askAbandon, backToList, queueItem } from './card-actions.ts';
 import { writeState } from './Card.tsx';

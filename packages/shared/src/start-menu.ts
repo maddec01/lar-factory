@@ -1,8 +1,7 @@
 // Start ▾'s menu on a Queued card: what picking an entry posts, and how keys move through it.
 
 import { offers } from './model.ts';
-import type { ModelChoice, ModelGroup } from './model.ts';
-import type { StartResult } from './t3.ts';
+import type { ModelChoice, ModelGroup, StartResult } from './model.ts';
 
 /** The model choice an entry names by its data attributes; "T3 default" names none. */
 export function choiceOf(entry: { instanceId?: string; model?: string }): ModelChoice | undefined {

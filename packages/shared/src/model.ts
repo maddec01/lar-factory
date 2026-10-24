@@ -171,6 +171,14 @@ export interface StartedThread {
   title: string;
 }
 
+/** What starting a thread answered: the thread, or why it did not start. */
+export interface StartResult {
+  thread: StartedThread | null;
+  error: string | null;
+  /** The thread may have started; starting again could make a second one. */
+  uncertain?: boolean;
+}
+
 /** A model Start offers: T3's name for it, else its slug. */
 export interface ModelOption {
   slug: string;

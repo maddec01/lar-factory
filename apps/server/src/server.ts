@@ -11,7 +11,8 @@ import { loadConfig } from './config.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port.ts';
 import { recordBoard } from './board-record.ts';
 import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
-import { validateDraft } from './add-item.ts';
+import { validateDraft, canAbandon, pageWithData, workMessage } from '@mux-factory/shared';
+import type { CreationProgress, CreationResult, ItemDraft, BoardData, ContentType, Item, ModelChoice, ModelGroup, StartResult, Status } from '@mux-factory/shared';
 import { startThread } from './t3.ts';
 import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools.ts';
 import { repositoryProject } from './repository-project.ts';
@@ -20,11 +21,7 @@ import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRat
 import { findModelChoice, loadModelChoices } from './model-choices.ts';
 import type { StatsSources } from './item-stats.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './pr-stats.ts';
-import type { StartResult } from './t3.ts';
-import type { CreationProgress, CreationResult, ItemDraft } from './add-item.ts';
-import { loadBuild, pageWithData } from './page.ts';
-import { canAbandon, workMessage } from './model.ts';
-import type { BoardData, ContentType, Item, ModelChoice, ModelGroup, Status } from './model.ts';
+import { loadBuild } from './page.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
@@ -598,7 +595,7 @@ if (!fixture) process.on('exit', recordBoard(port));
 if (!fixture) firstToolCheck = recheckTools();
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
-// trying the layout, e.g. with test/sample.json).
+// trying the layout, e.g. with packages/shared/test/sample.json).
 if (fixture) {
   Object.assign(state, JSON.parse(readFileSync(fixture, 'utf8')) as BoardData);
   state.repos = config.repos;

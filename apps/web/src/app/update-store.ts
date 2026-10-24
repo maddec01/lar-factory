@@ -4,7 +4,7 @@
 // shows T3 Code's toasts, as SidebarUpdatePill's downloadLocalUpdate and installLocalUpdate do.
 
 import { create } from 'zustand';
-import { boardApp, type UpdateState } from './board-app.ts';
+import { boardApp, type UpdateState } from '@mux-factory/shared';
 import { getUpdateActionError } from './update-button-logic.ts';
 import { errorMessage, showUpdateDownloadedToast, showUpdateNotDownloadedToast, toastUpdateError } from './update-toasts.tsx';
 

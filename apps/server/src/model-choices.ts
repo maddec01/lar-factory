@@ -8,8 +8,8 @@
 
 import { readFileSync } from 'node:fs';
 import { isRecord, readSettings } from './item-stats.ts';
-import { offers } from './model.ts';
-import type { ModelChoice, ModelGroup, ModelOption } from './model.ts';
+import { offers } from '@mux-factory/shared';
+import type { ModelChoice, ModelGroup, ModelOption } from '@mux-factory/shared';
 
 /** Each driver's name in T3 (PROVIDER_DISPLAY_NAMES). */
 const DRIVER_NAMES: Record<string, string> = {

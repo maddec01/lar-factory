@@ -1,5 +1,5 @@
 // Installs the skills and checklists bundled in the app on launch, with the engine in
-// board/src/install-skills.ts. A packaged app installs once per version; a dev run
+// packages/shared/src/install-skills.ts. A packaged app installs once per version; a dev run
 // installs only when started with INSTALL_FLAG.
 
 import * as NodePath from "node:path";
@@ -7,7 +7,7 @@ import * as NodePath from "node:path";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 
-import { InstallError, installSkills, type InstallResult } from "../../../server/src/install-skills.ts";
+import { InstallError, installSkills, type InstallResult } from "@mux-factory/shared/install-skills";
 
 /** Starts a dev run's install. A packaged app ignores it and installs each new version. */
 export const INSTALL_FLAG = "--install-skills";

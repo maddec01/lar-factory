@@ -8,8 +8,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { itemTotal } from '../src/model.ts';
-import type { Item } from '../src/model.ts';
+import { itemTotal } from '@mux-factory/shared';
+import type { Item } from '@mux-factory/shared';
 
 const draft = { repo: 'maddec01/mux-factory', kind: 'feature', title: 'Capture an item', description: '', labels: [] };
 

@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import type { TestContext } from 'node:test';
 import { checkouts, testEnv } from './repo-support.ts';
@@ -12,6 +13,9 @@ import { projectsDb } from './stats-db.ts';
 async function readCalls(file: string): Promise<string[][]> {
   return (await readFile(file, 'utf8')).trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
 }
+
+/** The board data sample mode serves. */
+export const SAMPLE_DATA = fileURLToPath(import.meta.resolve('@mux-factory/shared/test/sample.json'));
 
 /** Sample mode's T3 settings and model list, so the Start menu can be tried without T3. */
 export const SAMPLE_MODELS = {
@@ -58,7 +62,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     // A home of its own keeps a live board's record out of the real one.
     env: { ...testEnv(), HOME: dir, BOARD_PORT: port, GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname, SHELL: new URL('./fake-shell.sh', import.meta.url).pathname,
-      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? 'test/sample.json' : '',
+      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? SAMPLE_DATA : '',
       ...(fixture ? SAMPLE_MODELS : {}), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { BoardData } from '../src/model.ts';
+import type { BoardData } from '@mux-factory/shared';
 import { rawIssue, startableEnv, startBoard } from './server-support.ts';
 
 type Board = Awaited<ReturnType<typeof startBoard>>;

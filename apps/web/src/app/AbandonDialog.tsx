@@ -2,7 +2,7 @@
 // outside closes it and focus goes back to Abandon; the confirm button abandons the item.
 
 import { AlertDialog } from '@base-ui/react/alert-dialog';
-import { abandonPrompt } from '../../../server/src/board-view.ts';
+import { abandonPrompt } from '@mux-factory/shared';
 import { useAbandonStore } from './abandon-store.ts';
 import { abandonItem } from './card-actions.ts';
 

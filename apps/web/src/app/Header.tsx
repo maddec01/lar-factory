@@ -1,10 +1,8 @@
 // The page's header, below the title bar: the page's heading for screen readers, the counts, and the banners for a gh
 // the board can't use, stale data and an unreachable server, which closes.
 
-import { countsOf, isStale } from '../../../server/src/model.ts';
-import type { BoardData } from '../../../server/src/model.ts';
-import { ago, clock } from '../../../server/src/format.ts';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../../../server/src/brand-mark.ts';
+import { countsOf, isStale, ago, clock, BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@mux-factory/shared';
+import type { BoardData } from '@mux-factory/shared';
 import { useBoardStore } from './board-store.ts';
 import { ClosableBanner } from './ClosableBanner.tsx';
 import { CLIENT_ERROR } from './live-data.ts';

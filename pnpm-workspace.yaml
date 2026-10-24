@@ -1,5 +1,6 @@
 packages:
   - apps/*
+  - packages/*
 
 # electron's package.json declares no install script for pnpm to run here, so
 # the repo's scripts/setup-worktree.sh runs node_modules/electron/install.js to fetch the

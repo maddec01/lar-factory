@@ -6,8 +6,8 @@
 import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Popover } from '@base-ui/react/popover';
-import { popoverOrder } from '../../../server/src/board-view.ts';
-import type { Item, Slice } from '../../../server/src/model.ts';
+import { popoverOrder } from '@mux-factory/shared';
+import type { Item, Slice } from '@mux-factory/shared';
 import { useSlicePopoverOpen, useSlicePopoverStore } from './slice-popover-store.ts';
 
 export const sliceKey = (s: Slice) => `${s.repo}#${s.number}`;

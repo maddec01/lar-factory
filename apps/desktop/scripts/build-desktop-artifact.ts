@@ -20,7 +20,7 @@ import * as NodeUtil from "node:util";
 
 import type { Configuration } from "electron-builder";
 
-import type { UpdateChannel } from "../../web/src/app/board-app.ts";
+import type { UpdateChannel } from "@mux-factory/shared";
 import { defaultChannel as updateChannel } from "../src/updates/updateMachine.ts";
 
 const APP_DIR = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "..");

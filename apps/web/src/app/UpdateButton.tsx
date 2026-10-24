@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PreviewCard } from '@base-ui/react/preview-card';
 import { Tooltip } from '@base-ui/react/tooltip';
-import { boardApp, type UpdateState } from './board-app.ts';
+import { boardApp, type UpdateState } from '@mux-factory/shared';
 import { useUpdateStore } from './update-store.ts';
 import {
   canCheckForUpdate,

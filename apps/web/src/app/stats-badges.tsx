@@ -1,8 +1,7 @@
 // An item's own stats and, when sub-issues on the board add figures, its total: on cards and Done rows.
 
-import { itemTotal } from '../../../server/src/model.ts';
-import type { BoardData, Item, ItemStats } from '../../../server/src/model.ts';
-import { UNREADABLE, figures, statsTitle, totalTitle } from '../../../server/src/board-view.ts';
+import { itemTotal, UNREADABLE, figures, statsTitle, totalTitle } from '@mux-factory/shared';
+import type { BoardData, Item, ItemStats } from '@mux-factory/shared';
 
 /**
  * Agent time, wall time, total tokens and API cost, `Σ 3h 20m · wall 1h 10m · 12.4M · $41.20`;

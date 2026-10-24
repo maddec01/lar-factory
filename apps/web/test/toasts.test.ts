@@ -3,7 +3,7 @@
 
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { $, fetchMock, mountPage, sample, settle } from './support.ts';
-import type { BoardData } from '../../server/src/model.ts';
+import type { BoardData } from '@mux-factory/shared';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const toast = () => $('.toasts .toast');

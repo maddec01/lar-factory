@@ -2,10 +2,10 @@
 // keyboard focus on the page when the item leaves its list.
 
 import { flushSync } from 'react-dom';
-import type { BoardData } from '../../../server/src/model.ts';
+import { writeHeaders } from '@mux-factory/shared';
+import type { BoardData } from '@mux-factory/shared';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
-import { writeHeaders } from './board-app.ts';
 import { useBoardStore } from './board-store.ts';
 import { holdAnchor } from './keep-anchor.ts';
 import { notify } from './notices.tsx';

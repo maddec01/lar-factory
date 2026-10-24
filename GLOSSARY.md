@@ -205,7 +205,7 @@ _Avoid_: cost, spend, price
 ### Board processes
 
 **Sample board**:
-A board process started with `pnpm run sample` on a spare port, reading `board/test/sample.json` instead of GitHub.
+A board process started with `pnpm run sample` on a spare port, reading `packages/shared/test/sample.json` instead of GitHub.
 _Avoid_: test board, dev board
 
 **Board app**:

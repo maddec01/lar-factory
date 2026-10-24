@@ -3,10 +3,8 @@
 
 import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
-import { AMBER_STATUSES, STATUSES, workMessage } from '../../../server/src/model.ts';
-import type { BoardData, Item } from '../../../server/src/model.ts';
-import { boardSections, conceptChildren } from '../../../server/src/board-view.ts';
-import { day, plural, slug } from '../../../server/src/format.ts';
+import { AMBER_STATUSES, STATUSES, workMessage, boardSections, conceptChildren, day, plural, slug } from '@mux-factory/shared';
+import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from './board-store.ts';
 import { Card } from './Card.tsx';
 import { Disclosure } from './Disclosure.tsx';

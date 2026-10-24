@@ -3,10 +3,8 @@
 
 import { Fragment } from 'react';
 import type { ReactNode } from 'react';
-import { AMBER_STATUSES, STATUSES } from '../../../server/src/model.ts';
-import type { BoardData, Item, LinkedPr, Status } from '../../../server/src/model.ts';
-import { HINTS, checksBadge, namedSlices, prLabel, statusTone } from '../../../server/src/board-view.ts';
-import { plural } from '../../../server/src/format.ts';
+import { AMBER_STATUSES, STATUSES, HINTS, checksBadge, namedSlices, prLabel, statusTone, plural } from '@mux-factory/shared';
+import type { BoardData, Item, LinkedPr, Status } from '@mux-factory/shared';
 import type { ItemAction } from './action-store.ts';
 import { useBoardStore } from './board-store.ts';
 import { SlicePopover, sliceKey } from './SlicePopover.tsx';

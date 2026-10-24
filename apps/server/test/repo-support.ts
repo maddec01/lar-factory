@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
@@ -41,8 +41,13 @@ export async function factoryRepo(t: TestContext) {
   // The built page, which .gitignore keeps out of the fixture's commits as it does in the real repo.
   await cp(new URL('../../web/dist', import.meta.url), join(repo, 'apps/web/dist'), { recursive: true });
   await cp(new URL('../../../config.json', import.meta.url), join(repo, 'config.json'));
-  await cp(new URL('./sample.json', import.meta.url), join(repo, 'sample.json'));
+  await cp(new URL(import.meta.resolve('@mux-factory/shared/test/sample.json')), join(repo, 'sample.json'));
   await writeFile(join(repo, 'apps/server/package.json'), '{"type":"module"}');
+  // The shared package the server imports, linked into its node_modules as pnpm links it.
+  const shared = new URL('../../../packages/shared/', import.meta.url);
+  for (const file of ['src', 'package.json', '.gitignore']) await cp(new URL(file, shared), join(repo, 'packages/shared', file), { recursive: true });
+  await mkdir(join(repo, 'apps/server/node_modules/@mux-factory'), { recursive: true });
+  await symlink('../../../../packages/shared', join(repo, 'apps/server/node_modules/@mux-factory/shared'));
   git('add', '.');
   git('commit', '-m', 'feat(board): initial fixture');
   git('clone', '--bare', repo, origin);

@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
-import type { ToolMissing, ToolProblem } from './model.ts';
+import type { ToolMissing, ToolProblem } from '@mux-factory/shared';
 
 export const TOOL_NAMES = ['t3', 'gh', 'az'] as const;
 export type ToolName = typeof TOOL_NAMES[number];

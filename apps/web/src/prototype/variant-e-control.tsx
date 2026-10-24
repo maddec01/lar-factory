@@ -16,7 +16,7 @@ import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, STATUS_COLOR, WindowControls, drag, noDrag, platformColor } from './chrome.tsx';
 import { ActionButtons, PrList, SliceBar, SliceList, StatsGrid, StepTrack, hint, refText, statsOf } from './item-bits.tsx';
-import { Stats } from './stats/stats-switcher.tsx';
+import { Stats, StatsHeader } from './stats/stats-switcher.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
 const STATIONS: Status[] = ['Queued', 'Shaping', 'Ready', 'In progress', 'Review', 'Verify', 'Ready to merge'];
@@ -213,6 +213,7 @@ export function VariantE() {
   const building = scoped.items.filter((i) => i.status === 'In progress').length;
   const spend = scoped.items.reduce((t, i) => t + (statsOf(i)?.costUsd ?? 0), 0);
   const item = data.items.find((i) => i.id === opened);
+  const stats = { data: scoped, now, needsYou: s.needsYou, building, buildLimit: 2, queued: s.queued, list: s.list, done: s.done, spend };
   const current = all.find((p) => p.id === page)!;
   const q = query.trim().toLowerCase();
   return (
@@ -257,13 +258,14 @@ export function VariantE() {
               <span className="font-medium">{platform ?? 'Whole factory'}</span>
               {platform && <button type="button" aria-label="Show the whole factory" onClick={() => setPlatform(null)} className={`grid size-5 place-items-center rounded-sm text-(--muted-foreground) hover:bg-(--accent) ${noDrag}`}><X className="size-3" /></button>}
               <span className="text-xs text-(--muted-foreground)">{data.fetchedAt ? `refreshed ${shortAgo(data.fetchedAt, now)}` : ''}</span>
-              <span className={`ml-auto flex items-center gap-1.5 ${noDrag}`}>
+              <div className="flex min-w-0 flex-1 items-center justify-center"><StatsHeader stats={stats} /></div>
+              <span className={`flex items-center gap-1.5 ${noDrag}`}>
                 <Button small>This week</Button>
               </span>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="grid gap-7 px-6 py-5">
-                <Stats stats={{ data: scoped, now, needsYou: s.needsYou, building, buildLimit: 2, queued: s.queued, list: s.list, done: s.done, spend }} />
+                <Stats stats={stats} />
                 <section className="grid gap-3">
                   <h2 className="m-0 text-[13px] font-medium">Your desk <span className="text-(--muted-foreground)">{s.needsYou.length}</span></h2>
                   {s.needsYou.length

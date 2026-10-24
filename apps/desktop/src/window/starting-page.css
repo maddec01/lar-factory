@@ -1,0 +1,16 @@
+/* The starting page's styles, compiled with the design system's tokens and base styles at build time
+   (packages/ui's compiledCss), since the page is a data: URL that loads nothing. */
+@import "@mux-factory/ui/styles.css";
+
+html, body { @apply h-full; }
+/* The whole page drags the window, as the board's title bar does; the top padding is the title bar's height. */
+body {
+  @apply grid place-content-center gap-2 px-6 pt-13 pb-6 text-center select-none;
+  -webkit-app-region: drag;
+}
+p { @apply max-w-xl; }
+/* The error stays selectable, so it can be copied. */
+.error {
+  @apply text-muted-foreground wrap-anywhere select-text;
+  -webkit-app-region: no-drag;
+}

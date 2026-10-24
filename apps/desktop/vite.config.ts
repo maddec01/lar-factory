@@ -2,6 +2,7 @@
 // apps/desktop/vite.config.ts does, and bundles the board server into
 // dist-electron/server/server.mjs for the packaged app, which has no node_modules.
 // The dev window runs apps/server/src/server.ts as source.
+import { compiledCss } from "@mux-factory/ui/compiled-css";
 import { defineConfig } from "vite-plus";
 import { sharedTest } from "../../vitest.shared.ts";
 
@@ -18,6 +19,7 @@ export default defineConfig({
       outputOptions: { codeSplitting: false },
       entry: ["src/main.ts"],
       clean: true,
+      plugins: [compiledCss()],
       // The skills and checklists of the commit being built, which the app installs on launch.
       copy: [
         { from: "../../skills", to: "dist-electron/bundle" },
@@ -57,6 +59,7 @@ export default defineConfig({
       },
     },
   ],
+  plugins: [compiledCss()],
   test: {
     ...sharedTest,
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],

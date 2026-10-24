@@ -30,12 +30,6 @@ A brief that has passed the shaping gate and can be handed to a build thread.
 The check before a brief becomes Ready, combining a fresh-context doubt review
 with Pedro's answers to remaining assumptions or findings.
 
-**Launch check**:
-The pause before a shaping or decision thread starts new threads, listing
-exactly which threads it will launch and where the flow goes, until Pedro says
-Go.
-_Avoid_: Launch confirmation, go/no-go
-
 **Concept**:
 Work too broad or unclear for a single brief, represented by a map issue with
 decision and build sub-issues. Spanning several repositories doesn't by itself
@@ -71,7 +65,7 @@ slices that aren't active.
 _Avoid_: re-plan
 
 **Work message**:
-The two-line text Start sends to a new thread: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.
+The two-line text the board sends to a new shaping or decision thread: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.
 _Avoid_: work command, `/mux-work` command
 
 **Model choice**:
@@ -95,16 +89,21 @@ _Avoid_: Source of truth (for the overlay)
 
 **Shaping thread**:
 The conversation in the issue's repository project that resolves an issue's open
-decisions and produces a passing brief before handing off to a build thread.
+decisions and produces a passing brief, then stops at Ready.
 
 **Decision thread**:
-A top-level thread running `/mux-work` on one `decision: *` sub-issue of a map,
+A top-level thread, started from the board, running `/mux-work` on one `decision: *` sub-issue of a map,
 in the repo's main checkout, writing only to issues.
 _Avoid_: Decision session
 
 **Build thread**:
-The separate conversation that takes a passing brief through implementation,
-review and PR checks in its build's repository project, in its own worktree.
+The conversation Start build opens in its build's repository project, in its
+own worktree, that takes a passing brief through implementation, review and PR
+checks.
+
+**Item thread**:
+A T3 thread whose first message names the item, before any other issue. Its
+state is running, needs you or done.
 
 **Planner**:
 The agent a build thread starts to split its build into slices or to re-slice a
@@ -140,7 +139,8 @@ Captured work that has not yet been selected to start.
 _Avoid_: Queued (for unselected work)
 
 **Queued**:
-Work Pedro has selected for pickup by mux-work, awaiting an explicit start.
+Work selected for pickup by mux-work, by Pedro or by its concept's shaping,
+awaiting a start from the board.
 _Avoid_: In progress (for work awaiting pickup)
 
 **Shaping**:
@@ -200,7 +200,7 @@ _Avoid_: report total, aggregate, rollup
 
 **API cost**:
 What an item's tokens would cost at API list prices, as T3 Code estimates it, rather than the subscription bill.
-_Avoid_: cost, spend, price
+_Avoid_: cost, price
 
 ### Board server and page
 
@@ -230,6 +230,22 @@ _Avoid_: inbox, queue
 
 **Line**:
 The board's view of the work moving through the factory: the Queue, the dossiers, and everything else in flight on one stage track.
+
+**Dossier**:
+A concept, or an item with sub-issues, shown whole on the line: its destination, decisions, parts, what waits on what, and its threads.
+_Avoid_: concept card
+
+**Refining**:
+The line's first stage, covering Shaping and Needs you. Start refining starts an item's shaping thread.
+_Avoid_: shaping (for the stage)
+
+**Start build**:
+The board action that starts a Ready build's thread in its own worktree.
+_Avoid_: launch
+
+**Start after**:
+Arming a blocked part's start, so the board starts it once every issue it's blocked by closes.
+_Avoid_: auto-start (for this)
 
 **Design system**:
 The package that holds every token, style and base component of the board page and the board app's starting page; nothing outside it sets its own colours or spacing.

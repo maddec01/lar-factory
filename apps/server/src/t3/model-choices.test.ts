@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { findModelChoice, loadModelChoices } from './model-choices.ts';
-import { modelManifestPath } from '../stats/item-stats.ts';
+import { modelManifestPath } from './t3-settings.ts';
 import { tempDir } from '../../test/stats-db.ts';
 
 const MANIFEST = {

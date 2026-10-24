@@ -2,8 +2,9 @@
 
 The skills listed in `UPSTREAM.md` are copied from the projects below and keep
 their licences. Files under `references/` come from addyosmani/agent-skills.
-`apps/desktop` and `apps/web` copy code from pingdotgg/t3code; each copied file says
-so in its header.
+`apps/desktop` and `apps/web` port code from pingdotgg/t3code; each Port says so in
+its header. `packages/ui` copies T3's base components unchanged and lists each one,
+with its upstream commit, in `packages/ui/UPSTREAM.md`.
 `.github/scripts/release-plan.cjs` and `.github/workflows/release.yml` adapt code
 from pingdotgg/t3code.
 

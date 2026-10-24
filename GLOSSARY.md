@@ -224,11 +224,21 @@ _Avoid_: Electron app, desktop board
 The bar at the top of the board page, in the board app and in a browser. It holds the brand on the left, and the Refreshed time and the board's actions on the right.
 _Avoid_: toolbar, top bar
 
-### Skills
+**Design system**:
+The package that holds every token, style and base component of the board page and the board app's starting page; nothing outside it sets its own colours or spacing.
+_Avoid_: UI kit, component library, theme
+
+### Upstream files
 
 **Copy**:
-A skill or checklist taken unchanged from an upstream source and recorded in UPSTREAM.md; it changes only through skill-sync.
-_Avoid_: vendored skill, dependency
+A file taken unchanged from an upstream source and recorded in its folder's record (UPSTREAM.md for skills and checklists, the copy record for design system components); it changes only through a fresh copy from upstream.
+_Avoid_: vendored file, dependency
+
+**Port**:
+A file adapted from upstream code that names its source and commit in its header; we edit it freely.
+_Avoid_: copy, vendored file
+
+### Skills
 
 **Checklist**:
 A shared reference file that several skills link to, installed next to the skills.

@@ -6,11 +6,12 @@
 // apps/server/src/usage/CodexUsageHistory.ts and apps/server/src/codexModelOptions.ts;
 // the rates and settings loading from apps/server/src/usage/UsageService.ts.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { isRecord } from '@mux-factory/shared';
 import type { ItemStats } from '@mux-factory/shared';
+import { readJsonRecord } from '../json-file.ts';
 import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens } from './transcript-usage.ts';
 import type { SessionRecordsReader, UsageRecord, UsageSpeed } from './transcript-usage.ts';
 import { apiCost, createOverrideRateTable, parseRateTable, resolveModelAliases } from './usage-pricing.ts';
@@ -193,16 +194,6 @@ interface InstanceHome {
   home: string;
 }
 
-/** T3's settings, or null when they can't be read. */
-export function readSettings(path: string): Record<string, unknown> | null {
-  try {
-    const settings: unknown = JSON.parse(readFileSync(path, 'utf8'));
-    return isRecord(settings) ? settings : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Each Claude and Codex provider instance's home, as T3's claudeUsageReader and
  * codexUsageReader (with CodexHomeLayout's shared home) resolve it: the
@@ -255,13 +246,7 @@ function modelAliases(value: unknown): Record<string, string> {
  * unreadable or empty: the board fetches no prices itself, so it shows no cost.
  */
 function loadPricing(ratesPath: string, settings: Record<string, unknown> | null): Pricing | null {
-  let rates;
-  try {
-    const cached: unknown = JSON.parse(readFileSync(ratesPath, 'utf8'));
-    rates = parseRateTable(isRecord(cached) ? cached.document : null);
-  } catch {
-    return null;
-  }
+  const rates = parseRateTable(readJsonRecord(ratesPath)?.document ?? null);
   if (rates.size === 0) return null;
   return {
     rates,
@@ -429,7 +414,7 @@ export function loadItemStats(sources: StatsSources, now: number): ItemStatsRead
     const waits = db.prepare(WAITS).all() as { turn: string; createdAt: string | null; resolvedAt: string | null }[];
     const lastMessages = db.prepare(LAST_MESSAGES).all() as { thread: string; at: string | null }[];
     const activity = { lastMessages, active: activeProviderThreads(db) };
-    const settings = readSettings(sources.settings);
+    const settings = readJsonRecord(sources.settings);
     const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(open, instanceHomes(settings, sources.home))));
     return reader(roots, lineage, turns, runs, waits, activity, records, loadPricing(sources.rates, settings), now);
   } catch {

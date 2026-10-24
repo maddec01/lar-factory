@@ -34,7 +34,7 @@ concurrency:
 permissions: {}
 
 env:
-  APP_PACKAGE_JSON: app/package.json
+  APP_PACKAGE_JSON: apps/desktop/package.json
 
 jobs:
   # Runs main's copy of the planning script and holds no secrets. It reads the
@@ -138,21 +138,19 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
-          package_json_file: board/package.json
+          package_json_file: package.json
 
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: board/package.json
+          node-version-file: package.json
 
       - name: Install dependencies
-        run: |
-          pnpm --dir board install --frozen-lockfile
-          pnpm --dir app install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       # Builds, signs and notarizes the Apple Silicon dmg and zip as the planned
       # version, with their blockmaps and the planned feed, into release-assets/.
-      # app/scripts/build-desktop-artifact.ts fails without every signing variable
+      # apps/desktop/scripts/build-desktop-artifact.ts fails without every signing variable
       # or when electron-builder writes no feed.
       - name: Build, sign and notarize the board app
         env:
@@ -169,7 +167,7 @@ jobs:
           printf '%s' "$APPLE_API_KEY" > "$key_path"
           export APPLE_API_KEY="$key_path"
 
-          pnpm --dir app run build --build-version "$VERSION" --output-dir "$GITHUB_WORKSPACE/release-assets"
+          pnpm --dir apps/desktop run build --build-version "$VERSION" --output-dir "$GITHUB_WORKSPACE/release-assets"
 
       - name: Delete the App Store Connect key file
         if: always()

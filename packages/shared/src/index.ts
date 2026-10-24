@@ -3,11 +3,9 @@
 
 export * from './model.ts';
 export * from './format.ts';
-export * from './anchor.ts';
 export * from './brand-mark.ts';
 export * from './board-view.ts';
 export * from './start-menu.ts';
-export * from './slice-popover.ts';
 export * from './add-item.ts';
 export * from './concept-map.ts';
 export * from './github-items.ts';

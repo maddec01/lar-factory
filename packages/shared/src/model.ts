@@ -269,7 +269,8 @@ export interface RepoConfig {
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
-  project: { title: string };
+  /** The GitHub Project: its owner, absent from older boards, and its title. */
+  project: { owner?: string; title: string };
   repos: RepoConfig[];
   refreshSeconds: number;
   /** Time of the last successful read, or null if there has never been one. */

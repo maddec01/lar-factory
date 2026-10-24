@@ -31,7 +31,7 @@ const capture = { session: randomUUID(), enabled: !fixture };
 
 const board = createBoardState({
   capture,
-  project: { title: config.title },
+  project: { owner: config.owner, title: config.title },
   repos: config.repos,
   refreshSeconds: config.refreshSeconds,
   fetchedAt: null,
@@ -193,7 +193,7 @@ async function refresh(): Promise<void> {
     const { error, fetchedAt } = board.snapshot();
     const recovered = error !== null || fetchedAt === null;
     board.applyRead(snapshot.items, readRevision, (items) => withThreads(withStats(items)));
-    board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: null,
+    board.update({ project: { owner: config.owner, title: snapshot.title }, fetchedAt: new Date().toISOString(), error: null,
       t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(config.repos) });
     if (recovered) log(`read ${snapshot.items.length} items from the ${snapshot.title} project`);
     read = true;

@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { canAbandon, checkState, countsOf, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from '../src/model.ts';
-import type { BoardData, Checks, Item, Status } from '../src/model.ts';
-import { formatTokens, formatUsd, shortAgo } from '../src/format.ts';
+import { canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, workMessage, workTitle } from './model.ts';
+import type { BoardData, Checks, Item, Status } from './model.ts';
+import { boardSections } from './board-view.ts';
+import { formatTokens, formatUsd, shortAgo } from './format.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
   return {
@@ -108,7 +109,7 @@ test('an item total adds each sub-issue on the board once, at any depth, and is 
   assert.equal(itemTotal({ ...parent, stats: 'unavailable' }, [build]), 'unavailable');
 });
 
-const sample = JSON.parse(readFileSync(new URL('./sample.json', import.meta.url), 'utf8')) as BoardData;
+const sample = JSON.parse(readFileSync(new URL('../test/sample.json', import.meta.url), 'utf8')) as BoardData;
 
 test('stale when the last read failed or is too old', () => {
   const fresh = { ...sample, error: null, fetchedAt: '2026-10-21T09:59:00Z' };
@@ -124,7 +125,8 @@ test('sample covers every status and both platforms', () => {
   assert.equal(statuses.size, 10);
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/mux-server') && repos.has('maddec01/mux-apple'));
-  assert.deepEqual(countsOf(sample), { total: 25, needsYou: 4, inFlight: 8, queued: 3, list: 4 });
+  const { needsYou, inFlight, queued, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
+  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [25, 4, 8, 3, 4]);
 });
 
 test('token counts are compact as on T3 Code\'s usage page', () => {

@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildBranch, buildMessage, canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, buildBranch, buildMessage, canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -61,6 +61,20 @@ test('the build label makes a build whatever the kind, except on a concept', () 
   assert.equal(isBuild(item('List', ['build', 'feature'])), true);
   assert.equal(isBuild(item('List', ['feature'])), false);
   assert.equal(isBuild(item('List', ['build', 'concept'])), false, "a concept's sub-issues are board items, not slices");
+});
+
+test("an item's open blockers are the blocked-by issues still open, whatever GitHub's summary count says", () => {
+  const blockers = [{ number: 3, repo: 'maddec01/mux-server', state: 'CLOSED' as const }, { number: 4, repo: 'maddec01/mux-apple', state: 'OPEN' as const }];
+  assert.deepEqual(openBlockers(item('Ready', [], { blockedBy: 2, blockers })), [blockers[1]]);
+  assert.deepEqual(openBlockers(item('Ready', [], { blockedBy: 1, blockers: [] })), [], 'a count with no open issue listed blocks nothing');
+});
+
+test('the blocked text names the open blockers, with the repository when it is another', () => {
+  const blocker = (number: number, repo: string, state: 'OPEN' | 'CLOSED') => ({ number, repo, state });
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'OPEN')] })), 'Blocked by #3 until it closes');
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'OPEN'), blocker(4, 'maddec01/mux-apple', 'OPEN')] })),
+    'Blocked by #3, maddec01/mux-apple#4 until they close');
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'CLOSED')] })), null);
 });
 
 test('Done counts for 7 days after closing', () => {

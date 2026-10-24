@@ -1,13 +1,15 @@
-// The commands the board's buttons send: add, queue, back to List, start and abandon.
+// The commands the board's buttons send: add, queue, back to List, start, start build and abandon.
 // The maps of commands in flight are private here, so every rule about which command
 // blocks which lives in this file.
 
-import { canAbandon, validateDraft, workMessage } from '@mux-factory/shared';
-import type { ContentType, CreationProgress, CreationResult, ItemDraft, ModelChoice, ModelGroup, StartResult, Status } from '@mux-factory/shared';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { blockedText, buildBranch, buildMessage, canAbandon, isBuild, validateDraft, workMessage } from '@mux-factory/shared';
+import type { BoardData, ContentType, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, StartResult, Status } from '@mux-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { loadConfig } from '../config/config.ts';
 import type { BoardConfig } from '../config/config.ts';
-import { abandonItem, addProjectItem, setItemStatus } from '../github/github.ts';
+import { abandonItem, addIssueLabel, addProjectItem, issueLabels, setIssueStatus, setItemStatus } from '../github/github.ts';
 import { repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
@@ -24,8 +26,13 @@ export interface ItemCommands {
   capture(input: Record<string, unknown>): Promise<Reply>;
   queue(itemId: string): Promise<Reply>;
   backToList(itemId: string): Promise<Reply>;
-  /** Starts a T3 thread for a Queued item, at most once per board run. */
+  /** Starts a T3 thread for a Queued item that nothing open blocks, at most once per board run. */
   start(itemId: string, model: unknown): Promise<Reply>;
+  /**
+   * Starts a Ready build's thread in a new worktree, at most once per board run, once nothing open blocks it, as
+   * mux-work's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
+   */
+  startBuild(itemId: string, model: unknown): Promise<Reply>;
   abandon(itemId: string): Promise<Reply>;
 }
 
@@ -74,6 +81,9 @@ function track<T>(inFlight: Map<string, Promise<T>>, key: string, work: Promise<
   return tracked;
 }
 
+/** Where mux-work is installed, for the build message. */
+const MUX_WORK = join(homedir(), '.agents/skills/mux-work');
+
 /** The repository project from config.json as it is now, so a path fixed after a refusal works on the next Start. */
 async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
   let repos;
@@ -88,6 +98,8 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
   }>();
   /** Starts by item id. A kept result is reused, so one item starts at most one thread per board run. */
   const starts = new Map<string, Promise<Start>>();
+  /** Start builds by item id, kept like Starts, so an item started while Queued can still start its build. */
+  const buildStarts = new Map<string, Promise<Start>>();
   /** Status changes in flight by item id; Start and Abandon wait out a move, and a move waits out Abandon. */
   const moving = new Set<string>();
   /** Deletes in flight by item id, so a second press waits for the first. */
@@ -121,6 +133,61 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
     return withBoard(200, { error: null });
   }
 
+  /** Refuses a start while an issue the item is blocked by is open; Start after starts it once they close. */
+  function blockedReply(item: Item): Reply | null {
+    const blocked = blockedText(item);
+    return blocked ? withBoard(409, { error: `${blocked}; use Start after to start it then.` }) : null;
+  }
+
+  /**
+   * Runs a start at most once per item per board run, keyed in `runs`, on the model choice the
+   * board offers now, and records the thread it opened in the board data's `record`. `begin`
+   * refuses the item, or returns the work that starts its thread.
+   */
+  async function startOnce(runs: Map<string, Promise<Start>>, record: 'started' | 'startedBuilds', itemId: string, model: unknown,
+    begin: (item: Item, choice: ModelChoice | undefined) => Reply | (() => Promise<Start>)): Promise<Reply> {
+    // Only a choice the board offers right now reaches t3 as arguments.
+    let choice: ModelChoice | undefined;
+    if (model !== undefined) {
+      const found = findModelChoice(offerModelChoices(), model);
+      if (!found) return withBoard(422, { error: "That model choice isn't offered. Pick another one." });
+      choice = found;
+    }
+    let pending = runs.get(itemId);
+    if (!pending) {
+      const item = board.find(itemId);
+      if (!item) return reply(404, { error: GONE });
+      const work = begin(item, choice);
+      if (typeof work !== 'function') return work;
+      // Only a refusal or a failure reported before or by t3 may run again; a started or unconfirmed thread is kept.
+      pending = track(runs, itemId, work().then((result) => {
+        if (result.thread) board.update({ [record]: { ...board.snapshot()[record], [itemId]: result.thread } } satisfies Partial<BoardData>);
+        board.push();
+        return result;
+      }), (result) => !!result.thread || !!result.uncertain);
+    }
+    const { refused, ...result } = await pending;
+    return withBoard(refused ? 409 : result.error ? 502 : 200, result);
+  }
+
+  /** Moves the item's parent to In progress, unless it's a build or there already; returns the error, or null. */
+  async function parentInProgress({ parent }: Item): Promise<string | null> {
+    if (!parent) return null;
+    const onBoard = board.snapshot().items.find((i) => i.type === 'Issue' && i.number === parent.number &&
+      i.repo?.toLowerCase() === parent.repo.toLowerCase());
+    if (onBoard) {
+      if (isBuild(onBoard) || onBoard.status === 'In progress') return null;
+      const error = await setItemStatus(project(), onBoard.id, 'In progress');
+      if (!error) board.showChanged({ ...onBoard, status: 'In progress' });
+      return error;
+    }
+    // A parent off the board has no labels here, so GitHub says whether it's a build.
+    let labels: string[];
+    try { labels = await issueLabels(parent.repo, parent.number); }
+    catch (err) { return `Could not read the labels of ${parent.repo}#${parent.number}. ${(err as Error).message}`; }
+    return isBuild({ labels }) ? null : setIssueStatus(project(), parent.url, 'In progress');
+  }
+
   return {
     async capture(input) {
       if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) {
@@ -151,38 +218,44 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
     queue: (itemId) => move(itemId, QUEUE),
     backToList: (itemId) => move(itemId, BACK_TO_LIST),
 
-    async start(itemId, model) {
-      // Only a choice the board offers right now reaches t3 as arguments.
-      let choice: ModelChoice | undefined;
-      if (model !== undefined) {
-        const found = findModelChoice(offerModelChoices(), model);
-        if (!found) return withBoard(422, { error: "That model choice isn't offered. Pick another one." });
-        choice = found;
-      }
-      let pending = starts.get(itemId);
-      if (!pending) {
-        const item = board.find(itemId);
-        if (!item) return reply(404, { error: GONE });
-        if (item.status !== 'Queued') return reply(409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
-        const busy = busyReason(itemId, 'start');
-        if (busy) return withBoard(409, { error: busy });
-        const message = workMessage(item);
-        if (!message || !item.repo) return reply(409, { error: 'This item needs an issue before it can start.' });
-        const work = currentRepositoryProject(item.repo).then((repoProject): Promise<Start> | Start =>
-          repoProject.error === undefined ? startThread(repoProject.projectId, message, choice) : { thread: null, error: repoProject.error, refused: true },
-        ).then((result) => {
-          if (result.thread) {
-            board.update({ started: { ...board.snapshot().started, [itemId]: result.thread } });
-            board.push();
-          }
-          return result;
-        });
-        // Only a refusal or a failure t3 reported may run again; a started or unconfirmed thread is kept.
-        pending = track(starts, itemId, work, (result) => !!result.thread || !!result.uncertain);
-      }
-      const { refused, ...result } = await pending;
-      return withBoard(refused ? 409 : result.error ? 502 : 200, result);
-    },
+    start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {
+      if (item.status !== 'Queued') return reply(409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
+      const busy = busyReason(itemId, 'start');
+      if (busy) return withBoard(409, { error: busy });
+      const blocked = blockedReply(item);
+      if (blocked) return blocked;
+      const message = workMessage(item);
+      if (!message || !item.repo) return reply(409, { error: 'This item needs an issue before it can start.' });
+      return async () => {
+        const repoProject = await currentRepositoryProject(item.repo!);
+        return repoProject.error === undefined ? startThread(repoProject.projectId, message, choice) : { thread: null, error: repoProject.error, refused: true };
+      };
+    }),
+
+    startBuild: (itemId, model) => startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
+      if (item.status !== 'Ready') return reply(409, { error: `Only Ready items can start a build; this one is in ${item.status}.` });
+      const busy = busyReason(itemId, 'start');
+      if (busy) return withBoard(409, { error: busy });
+      const blocked = blockedReply(item);
+      if (blocked) return blocked;
+      const message = buildMessage(item, MUX_WORK);
+      const branch = buildBranch(item);
+      if (!message || !branch || !item.repo || item.number === null) return reply(409, { error: 'This item needs an issue before it can start.' });
+      const { repo, number } = item;
+      return async () => {
+        // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
+        const repoProject = await currentRepositoryProject(repo);
+        if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
+        if (!item.labels.includes('build')) {
+          const error = await addIssueLabel(repo, number, 'build');
+          if (error) return { thread: null, error };
+          board.showChanged({ ...item, labels: [...item.labels, 'build'] });
+        }
+        const error = await parentInProgress(item);
+        if (error) return { thread: null, error };
+        return startThread(repoProject.projectId, message, choice, { base: 'main', branch });
+      };
+    }),
 
     async abandon(itemId) {
       let pending = abandoning.get(itemId);

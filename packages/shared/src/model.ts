@@ -61,6 +61,19 @@ export interface IssueRef {
 /** An issue blocking an item, by GitHub's blocked-by link. */
 export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'>;
 
+/** The issues the item is blocked by that are still open: what holds its start, its badge and Start after. */
+export const openBlockers = (item: Pick<Item, 'blockers'>): Blocker[] => item.blockers.filter((b) => b.state === 'OPEN');
+
+/** The item's open blockers as `#n`, or as `owner/repo#n` when another repository's. */
+export const openBlockerRefs = (item: Pick<Item, 'blockers' | 'repo'>): string[] =>
+  openBlockers(item).map((b) => (b.repo === item.repo ? `#${b.number}` : `${b.repo}#${b.number}`));
+
+/** Why the item can't start while an issue it's blocked by is open, naming the open ones; null once none is. */
+export function blockedText(item: Pick<Item, 'blockers' | 'repo'>): string | null {
+  const open = openBlockerRefs(item);
+  return open.length ? `Blocked by ${open.join(', ')} until ${open.length > 1 ? 'they close' : 'it closes'}` : null;
+}
+
 /** The run that shows a concept works once every build lands: a title line, then numbered steps. */
 export interface EndToEndCheck {
   title: string;
@@ -266,6 +279,8 @@ export interface BoardData {
   items: Item[];
   /** The model choices Start offers besides "T3 default"; empty when T3's settings or model list can't be read. */
   modelChoices: ModelGroup[];
+  /** Build threads this board run started, by hand or through Start after, by item id; kept apart from `started`'s refining threads. */
+  startedBuilds?: Record<string, StartedThread>;
   /** Threads this board run started, by item id, so every page shows them. */
   started?: Record<string, StartedThread>;
   /** What's wrong with t3 and gh, from the latest lookup; a tool that works has no entry. Absent in sample mode. */

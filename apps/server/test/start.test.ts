@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { draftItem, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
+import { projectIssue, rawIssue } from '@mux-factory/shared/test/raw-items';
 import { checkouts, factoryRepo } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
@@ -270,6 +270,18 @@ test('Start only runs for Queued issues from this board page and session', async
   const sample = await startBoard(t, {}, true);
   assert.equal((await start(sample, 'PVTI_sample05')).status, 403);
   assert.deepEqual([...await board.t3Calls(), ...await sample.t3Calls()], []);
+});
+
+test('Start is refused while an issue the item is blocked by is open', async (t) => {
+  const blocked = rawIssue('PVTI_12', 12, 'Queued', ['decision: grill'], {
+    issueDependenciesSummary: { blockedBy: 2 },
+    blockedBy: { nodes: [5, 6].map((number) => ({ number, state: 'OPEN', repository: { nameWithOwner: number === 5 ? 'maddec01/mux-factory' : 'maddec01/mux-server' } })) },
+  });
+  const board = await factoryBoard(t, [blocked]);
+  const refused = await start(board, 'PVTI_12');
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, 'Blocked by #5, maddec01/mux-server#6 until they close; use Start after to start it then.');
+  assert.deepEqual(await board.t3Calls(), []);
 });
 
 test('Start is refused while Back to List or Abandon is pending for the item', async (t) => {

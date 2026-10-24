@@ -130,6 +130,11 @@ export function createBoardServer({ board, commands, page, appSecret, sample, re
       restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),
       run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model)),
     },
+    '/api/start-build': {
+      what: 'the build to start', disabled: 'Starting builds is disabled in sample mode.',
+      restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),
+      run: forItem('Name the build to start.', (itemId, input) => commands.startBuild(itemId, input.model)),
+    },
     '/api/abandon': {
       what: 'the item to abandon', disabled: 'Abandoning is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),

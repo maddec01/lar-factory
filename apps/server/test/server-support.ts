@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:net';
+import { createServer, type Socket } from 'node:net';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -54,21 +54,37 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
       FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? SAMPLE_DATA : '',
       ...(fixture ? SAMPLE_MODELS : {}), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
+    // The board leads its own process group, which the gh it runs joins.
+    detached: true,
   });
+  // A board in its own group misses the terminal's Ctrl-C, and an interrupted run skips onTestFinished. So a
+  // watchdog that ignores Ctrl-C reads this worker's pipe and, once the worker dies, stops the group and
+  // removes the home.
+  const watchdog = child.pid ? spawn('/bin/sh', ['-c', 'trap "" INT HUP; read _; kill -TERM -"$1" 2>/dev/null; sleep 1; rm -rf "$2"',
+    'watchdog', String(child.pid), dir], { stdio: ['pipe', 'ignore', 'ignore'] }) : undefined;
+  watchdog?.unref();
+  (watchdog?.stdin as Socket | undefined)?.unref();
   let logs = '';
   child.stdout.on('data', (data: Buffer) => { logs += data.toString(); });
   child.stderr.on('data', (data: Buffer) => { logs += data.toString(); });
   const stop = async () => {
-    // A board that failed to start has already exited.
-    if (child.exitCode === null && child.signalCode === null) {
+    // A board that failed to start has already exited, or never got a pid.
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
       const exited = once(child, 'exit');
-      child.kill();
+      // Stopping the whole group stops a gh still running, so none writes into the home as it is removed.
+      process.kill(-child.pid, 'SIGTERM');
       await exited;
     }
   };
   t.onTestFinished(async () => {
-    await stop();
-    await rm(dir, { recursive: true, force: true });
+    // The watchdog stays up through cleanup, so an interrupt during it is still covered, and goes even if cleanup
+    // throws, so it never signals a group id the system may have reused.
+    try {
+      await stop();
+      await rm(dir, { recursive: true, force: true, maxRetries: 5 });
+    } finally {
+      watchdog?.kill();
+    }
   });
   const board = () => fetch(`${url}/api/board`).then((r) => r.json());
   const post = (body: unknown, origin = url, path = '/api/items') => fetch(`${url}${path}`, { method: 'POST',
@@ -120,7 +136,7 @@ export const draftItem = (status: string) => ({ id: 'PVTI_draft', updatedAt: '20
  * checkout, and a T3 database with a live project there. */
 export function startableEnv(t: TestContext): Record<string, string> {
   const home = mkdtempSync(join(tmpdir(), 'mux-start-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
   checkouts(home, { 'mux-factory': 'git@github.com:maddec01/mux-factory.git' });
   return { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/Mux/mux-factory` }]) };
 }

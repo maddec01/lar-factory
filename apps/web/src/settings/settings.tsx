@@ -4,7 +4,11 @@
 
 import { boardApp, type UpdateChannel, type UpdateState } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
+import { Checkbox } from '@mux-factory/ui/checkbox';
 import { Dialog, DialogDescription, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '@mux-factory/ui/dialog';
+import { Fieldset, FieldsetLegend } from '@mux-factory/ui/fieldset';
+import { Label } from '@mux-factory/ui/label';
+import { Radio, RadioGroup } from '@mux-factory/ui/radio-group';
 import { profilePath, useSettingsStore } from './settings-store.ts';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { FormResult } from '../notices/form-result.tsx';
@@ -38,8 +42,8 @@ function Profiles() {
   // the store ignores a change that comes in meanwhile.
   const busy = pending !== null;
   return (
-    <fieldset className="profiles" aria-busy={busy || profiles === null}>
-      <legend>Claude profiles that get the skills</legend>
+    <Fieldset className="profiles" aria-busy={busy || profiles === null}>
+      <FieldsetLegend>Claude profiles that get the skills</FieldsetLegend>
       {!installed && (
         <p className="form-hint">Mux Factory hasn't installed its skills in ~/.agents yet, so you can't tick or untick a profile. It installs them when it starts and ticks every profile it finds on that first install. If the install failed, restart Mux Factory to try again.</p>
       )}
@@ -47,13 +51,13 @@ function Profiles() {
       {profiles?.length === 0 && result.tone !== 'error' && <p className="form-hint">No Claude profiles found in ~.</p>}
       <div className="choices">
         {profiles?.map(({ name, ticked }) => (
-          <label key={name}>
-            <input type="checkbox" checked={ticked} disabled={!installed} aria-disabled={busy} onChange={(event) => void setTick(name, event.target.checked)} />
-            {' '}{profilePath(name)}
-          </label>
+          <Label key={name}>
+            <Checkbox checked={ticked} disabled={!installed} aria-disabled={busy} onCheckedChange={(checked) => void setTick(name, checked)} />
+            {profilePath(name)}
+          </Label>
         ))}
       </div>
-    </fieldset>
+    </Fieldset>
   );
 }
 
@@ -66,20 +70,20 @@ function UpdateChannelChoice() {
   const busy = switchingTo !== null || installing || state.status === 'downloading';
   const shown = switchingTo ?? state.channel;
   return (
-    <fieldset className="update-channel" aria-busy={busy}>
-      <legend>Update channel</legend>
+    <Fieldset className="update-channel" aria-busy={busy}>
+      <FieldsetLegend>Update channel</FieldsetLegend>
       <p className="form-hint">Nightly offers each Nightly Release, even one older than this version. Latest offers only Stable Releases.</p>
-      <div className="choices">
+      <RadioGroup className="choices" name="update-channel" value={shown}
+        onValueChange={(channel) => busy || void setChannel(channel as UpdateChannel)}>
         {CHANNELS.map(({ channel, label }) => (
-          <label key={channel}>
-            <input type="radio" name="update-channel" value={channel} checked={shown === channel} aria-disabled={busy}
-              onChange={() => busy || void setChannel(channel)} />
-            {' '}{label}
-          </label>
+          <Label key={channel}>
+            <Radio value={channel} aria-disabled={busy} />
+            {label}
+          </Label>
         ))}
-      </div>
+      </RadioGroup>
       <p className="form-hint" id="update-channel-status" role="status" aria-live="polite">{updateStatusText(state)}</p>
-    </fieldset>
+    </Fieldset>
   );
 }
 

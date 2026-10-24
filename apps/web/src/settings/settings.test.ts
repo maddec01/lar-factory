@@ -22,7 +22,8 @@ function stubBridge(setResult: ProfilesResult = listed) {
 }
 
 const settingsButton = () => $<HTMLButtonElement>('.open-settings');
-const boxes = () => $$<HTMLInputElement>('#settings-dialog input[type="checkbox"]');
+const boxes = () => $$('#settings-dialog [role="checkbox"]');
+const ticked = (box: Element) => box.getAttribute('aria-checked') === 'true';
 const result = () => $('#settings-result')!;
 
 async function open(): Promise<void> {
@@ -46,7 +47,7 @@ test('Settings lists every Claude profile with its tick', async () => {
   expect(popup.getAttribute('role')).toBe('dialog');
   expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Settings');
   expect(bridge.listProfiles).toHaveBeenCalledOnce();
-  expect(boxes().map((box) => [box.closest('label')!.textContent!.trim(), box.checked])).toEqual([
+  expect(boxes().map((box) => [box.closest('label')!.textContent!.trim(), ticked(box)])).toEqual([
     ['~/.claude', true], ['~/.claude-work', false]]);
   expect([result().getAttribute('role'), result().dataset.slot]).toEqual(['status', 'alert']);
 });
@@ -71,7 +72,7 @@ test('ticking a profile installs it and shows the new ticks', async () => {
   await open();
   await settle(() => boxes()[1]!.click());
   expect(bridge.setProfileTick).toHaveBeenCalledWith('.claude-work', true);
-  expect(boxes().map((box) => box.checked)).toEqual([true, true]);
+  expect(boxes().map(ticked)).toEqual([true, true]);
   expect(result().textContent).toBe('Linked the skills and checklists into ~/.claude-work.');
   expect(result().dataset.variant).toBe('success');
 });
@@ -85,7 +86,7 @@ test('focus stays on a ticked box while its change runs and after', async () => 
   box.focus();
   await settle(() => box.click());
   // A browser blurs a box that turns disabled; jsdom doesn't, so check it stays enabled too.
-  expect(box.matches(':disabled')).toBe(false);
+  expect(box.hasAttribute('data-disabled')).toBe(false);
   expect(document.activeElement).toBe(box);
   expect(box.getAttribute('aria-disabled')).toBe('true');
   await settle(() => boxes()[0]!.click());
@@ -93,7 +94,7 @@ test('focus stays on a ticked box while its change runs and after', async () => 
   await settle(() => finish(bothTicked));
   expect(document.activeElement).toBe(boxes()[1]);
   expect(boxes()[1]!.getAttribute('aria-disabled')).toBe('false');
-  expect(boxes().map((each) => each.checked)).toEqual([true, true]);
+  expect(boxes().map(ticked)).toEqual([true, true]);
 });
 
 test('unticking a profile removes its links', async () => {
@@ -102,7 +103,7 @@ test('unticking a profile removes its links', async () => {
   await open();
   await settle(() => boxes()[0]!.click());
   expect(bridge.setProfileTick).toHaveBeenCalledWith('.claude', false);
-  expect(boxes()[0]!.checked).toBe(false);
+  expect(ticked(boxes()[0]!)).toBe(false);
   expect(result().textContent).toBe('Removed the skill links and checklists from ~/.claude.');
 });
 
@@ -134,7 +135,7 @@ test('a failed tick shows its error and keeps the old ticks', async () => {
   stubBridge({ ...listed, error: 'No skills are installed in /Users/me/.agents yet' });
   await open();
   await settle(() => boxes()[1]!.click());
-  expect(boxes().map((box) => box.checked)).toEqual([true, false]);
+  expect(boxes().map(ticked)).toEqual([true, false]);
   expect(result().textContent).toBe('Couldn\'t change ~/.claude-work: No skills are installed in /Users/me/.agents yet');
   expect(result().dataset.variant).toBe('error');
 });
@@ -174,7 +175,7 @@ test('the dialog says Loading until the list arrives, also when opened again', a
   expect(dialogText()).toContain('Loading…');
   expect(boxes()).toEqual([]);
   await settle(() => finish(bothTicked));
-  expect(boxes().map((box) => box.checked)).toEqual([true, true]);
+  expect(boxes().map(ticked)).toEqual([true, true]);
 });
 
 test('a home without Claude profiles says so', async () => {
@@ -189,7 +190,7 @@ test('before the first install the boxes show disabled with the reason', async (
   bridge.listProfiles.mockResolvedValueOnce({ ...listed, installed: false });
   await open();
   expect(dialogText()).toContain('Mux Factory hasn\'t installed its skills in ~/.agents yet');
-  expect(boxes().map((box) => box.disabled)).toEqual([true, true]);
+  expect(boxes().map((box) => box.hasAttribute('data-disabled'))).toEqual([true, true]);
   await settle(() => boxes()[1]!.click());
   expect(bridge.setProfileTick).not.toHaveBeenCalled();
 });
@@ -200,11 +201,11 @@ test('an open dialog turns the boxes on once the launch install finishes', async
   await open();
   expect(dialogText()).toContain('ticks every profile it finds on that first install');
   await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS));
-  expect(boxes().map((box) => box.disabled)).toEqual([true, true]);
+  expect(boxes().map((box) => box.hasAttribute('data-disabled'))).toEqual([true, true]);
   await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS));
   expect(bridge.listProfiles).toHaveBeenCalledTimes(3);
   expect(dialogText()).not.toContain('hasn\'t installed');
-  expect(boxes().map((box) => box.disabled)).toEqual([false, false]);
+  expect(boxes().map((box) => box.hasAttribute('data-disabled'))).toEqual([false, false]);
   await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS * 2));
   expect(bridge.listProfiles).toHaveBeenCalledTimes(3);
 });
@@ -236,16 +237,17 @@ describe('update channel', () => {
     return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
   }
 
-  const radios = () => $$<HTMLInputElement>('#settings-dialog input[name="update-channel"]');
-  const checked = () => radios().find((radio) => radio.checked)?.value;
-  const radio = (channel: UpdateChannel) => radios().find((each) => each.value === channel)!;
+  const radios = () => $$('#settings-dialog [role="radio"]');
+  const channelOf = (radio: Element) => radio.closest('label')!.textContent!.trim().toLowerCase();
+  const checked = () => radios().map((each) => each.getAttribute('aria-checked') === 'true' && channelOf(each)).find(Boolean);
+  const radio = (channel: UpdateChannel) => radios().find((each) => channelOf(each) === channel)!;
   const status = () => $('#update-channel-status')!.textContent;
 
   test('shows the channel the app is on, nightly and latest to choose from', async () => {
     stubChannel();
     await open();
-    expect($('.update-channel legend')!.textContent).toBe('Update channel');
-    expect(radios().map((each) => [each.value, each.closest('label')!.textContent!.trim()])).toEqual([
+    expect($('.update-channel [data-slot="fieldset-legend"]')!.textContent).toBe('Update channel');
+    expect($$<HTMLInputElement>('#settings-dialog input[name="update-channel"]').map((each) => [each.value, each.closest('label')!.textContent!.trim()])).toEqual([
       ['nightly', 'Nightly'], ['latest', 'Latest']]);
     expect(checked()).toBe('nightly');
     expect(status()).toBe('Up to date on 0.2.0-nightly.20261023.41.');

@@ -89,11 +89,15 @@ function isForkedSessionMeta(payload: Record<string, unknown>): boolean {
   return isObject(spawn) && typeof spawn.parent_thread_id === 'string';
 }
 
-// Codex omits the tier when none was requested, which bills as standard; `fast` is an alias of `priority`.
-function codexSpeed(serviceTier: unknown): UsageSpeed {
+/**
+ * A Codex service tier's speed: `fast` is an alias of `priority`, and no tier,
+ * `default` or `standard` bills as standard. Undefined for any other tier.
+ */
+export function codexServiceTier(serviceTier: unknown): UsageSpeed | undefined {
   if (serviceTier === 'priority' || serviceTier === 'fast') return 'fast';
   if (serviceTier === 'ultrafast') return 'ultrafast';
-  return 'standard';
+  if (serviceTier === undefined || serviceTier === 'default' || serviceTier === 'standard') return 'standard';
+  return undefined;
 }
 
 /**
@@ -136,7 +140,8 @@ export function parseCodexLine(line: string, state: CodexScanState): UsageRecord
 
   if (payload.type === 'thread_settings_applied') {
     state.sawThreadSettings = true;
-    if (isObject(payload.thread_settings)) state.speed = codexSpeed(payload.thread_settings.service_tier);
+    // Codex omits the tier when none was requested; any tier it doesn't name bills as standard.
+    if (isObject(payload.thread_settings)) state.speed = codexServiceTier(payload.thread_settings.service_tier) ?? 'standard';
     return null;
   }
 

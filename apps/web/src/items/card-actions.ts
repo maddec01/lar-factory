@@ -6,9 +6,9 @@ import { writeHeaders } from '@mux-factory/shared';
 import type { BoardData } from '@mux-factory/shared';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
-import { useBoardStore } from './board-store.ts';
-import { holdAnchor } from './keep-anchor.ts';
-import { notify } from './notices.tsx';
+import { useBoardStore } from '../board/board-store.ts';
+import { holdAnchor } from '../board/keep-anchor.ts';
+import { notify } from '../notices/notices.tsx';
 
 export interface ActionResult {
   error: string | null;

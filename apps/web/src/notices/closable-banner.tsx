@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useDismissed, useDismissStore } from './dismiss-store.ts';
-import { DismissButton, closeKeepingFocus } from './Toasts.tsx';
+import { DismissButton, closeKeepingFocus } from './toasts.tsx';
 
 export function ClosableBanner({ dismissKey, what, className = 'banner', children }: {
   dismissKey: string;

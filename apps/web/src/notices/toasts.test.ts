@@ -2,7 +2,7 @@
 // and their place below the header. Ported from the toast cases of test/render.test.ts.
 
 import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { $, fetchMock, mountPage, sample, settle } from './support.ts';
+import { $, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
 import type { BoardData } from '@mux-factory/shared';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';
@@ -20,8 +20,8 @@ async function queue(id: string, board = queued(id)): Promise<void> {
 }
 
 /** Shows a toast straight from the store, as the Add item form will. */
-async function notify(notice: Parameters<typeof import('../src/app/notices.tsx').notify>[0]): Promise<void> {
-  const { notify } = await import('../src/app/notices.tsx');
+async function notify(notice: Parameters<typeof import('./notices.tsx').notify>[0]): Promise<void> {
+  const { notify } = await import('./notices.tsx');
   await settle(() => notify(notice));
 }
 

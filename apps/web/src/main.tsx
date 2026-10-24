@@ -5,8 +5,8 @@ import './index.css';
 import { StrictMode } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { App } from './app/App.tsx';
-import { startLiveData } from './app/live-data.ts';
+import { App } from './app.tsx';
+import { startLiveData } from './board/live-data.ts';
 
 // The script holds the first paint (vite.config.ts), so render now, not in a later task: the first
 // frame then shows the board.

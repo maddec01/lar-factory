@@ -8,7 +8,7 @@ import { applicability, ITEM_KINDS } from '@mux-factory/shared';
 import type { RepoConfig } from '@mux-factory/shared';
 import { useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
-import { useBoardStore } from './board-store.ts';
+import { useBoardStore } from '../board/board-store.ts';
 
 /** The applicability checkboxes of one repo, each group with the hint for choosing none. */
 function Applicability({ repo }: { repo: RepoConfig }) {

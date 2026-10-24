@@ -2,7 +2,7 @@
 // down the page fetches /api/board every 15 s.
 
 import { useBoardStore } from './board-store.ts';
-import { useDismissStore } from './dismiss-store.ts';
+import { useDismissStore } from '../notices/dismiss-store.ts';
 import { holdAnchor } from './keep-anchor.ts';
 import type { BoardData } from '@mux-factory/shared';
 

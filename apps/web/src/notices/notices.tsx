@@ -3,10 +3,10 @@
 
 import { platformOf, ref, workTitle, abandonPrompt, listGroupId } from '@mux-factory/shared';
 import type { Item, StartedThread, Status } from '@mux-factory/shared';
-import { useBoardStore } from './board-store.ts';
-import { useDetailsStore } from './details-store.ts';
-import { useJumpStore } from './jump-store.ts';
-import { TitleLink } from './item-parts.tsx';
+import { useBoardStore } from '../board/board-store.ts';
+import { useDetailsStore } from '../board/details-store.ts';
+import { useJumpStore } from '../board/jump-store.ts';
+import { TitleLink } from '../items/item-parts.tsx';
 import { useToastStore } from './toast-store.ts';
 import type { Toast } from './toast-store.ts';
 

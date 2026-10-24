@@ -2,7 +2,7 @@
 // "for T3 Code" pill on the left, and the Refreshed time and the board's actions at its right end.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, mountPage, sample, settle, stubApp } from './support.ts';
+import { $, $$, mountPage, sample, settle, stubApp } from '../../test/support.ts';
 
 const titleBar = () => $<HTMLElement>('.title-bar');
 const actions = () => $<HTMLElement>('.title-bar-actions');

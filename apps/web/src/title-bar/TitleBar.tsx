@@ -7,10 +7,10 @@
 
 import { useEffect, useState } from 'react';
 import { shortAgo, BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, inMacApp } from '@mux-factory/shared';
-import { AddItem } from './AddItem.tsx';
-import { useBoardStore } from './board-store.ts';
-import { Settings } from './Settings.tsx';
-import { UpdateButton } from './UpdateButton.tsx';
+import { AddItem } from '../add-item/add-item.tsx';
+import { useBoardStore } from '../board/board-store.ts';
+import { Settings } from '../settings/settings.tsx';
+import { UpdateButton } from '../updates/UpdateButton.tsx';
 
 /** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. */
 function Refreshed({ fetchedAt }: { fetchedAt: string | null }) {

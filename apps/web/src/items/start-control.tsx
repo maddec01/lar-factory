@@ -8,11 +8,11 @@ import { Menu } from '@base-ui/react/menu';
 import { ref, highlightedChoice, storedChoice } from '@mux-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@mux-factory/shared';
 import { useItemAction } from './action-store.ts';
-import { writeState } from './Card.tsx';
+import { writeState } from './card.tsx';
 import { startItem } from './start-item.ts';
 import { useStart, useStartStore } from './start-store.ts';
 import type { StartState } from './start-store.ts';
-import { DismissButton, closeKeepingFocus } from './Toasts.tsx';
+import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 
 /** The T3 thread Start opened for the item, from this page or another. */
 function startedThread(item: Item, data: BoardData, start: StartState | undefined) {

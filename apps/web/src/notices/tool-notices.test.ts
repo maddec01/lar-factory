@@ -2,7 +2,7 @@
 // Ported from the tool notice cases of test/render.test.ts and its saved copies.
 
 import { afterEach, expect, test } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle, stream } from './support.ts';
+import { $, $$, fetchMock, mountPage, sample, settle, stream } from '../../test/support.ts';
 import type { BoardData, ToolProblems } from '@mux-factory/shared';
 
 const withTools = (tools: ToolProblems, fields: Partial<BoardData> = {}): BoardData => ({ ...sample, tools, ...fields });

@@ -3,7 +3,7 @@
 // case of test/render.test.ts; the state machine itself is tested in test/slice-popover.test.ts.
 
 import { expect, test } from 'vite-plus/test';
-import { $, mountPage, sample, settle } from './support.ts';
+import { $, mountPage, sample, settle } from '../../test/support.ts';
 
 // Owner accounts (#140), a build with three slices.
 const ID = 'PVTI_sample13';
@@ -167,7 +167,7 @@ test('new data keeps it open, with focus where it was', async () => {
   await tap(trigger(), 'touch');
   await focus(pop()!.querySelector('a')!);
   const link = document.activeElement;
-  const { useBoardStore } = await import('../src/app/board-store.ts');
+  const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...sample, fetchedAt: '2026-10-21T09:59:00.000Z' }));
   expect(isOpen()).toBe(true);
   expect(document.activeElement).toBe(link);

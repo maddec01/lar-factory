@@ -4,7 +4,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
 
-import { useToastStore } from './toast-store.ts';
+import { useToastStore } from '../notices/toast-store.ts';
 
 /** The update toasts share one toast: a new one replaces the last. */
 const SLOT = 'update';

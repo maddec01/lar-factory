@@ -5,8 +5,8 @@
 import { create } from 'zustand';
 import { validateDraft, writeHeaders } from '@mux-factory/shared';
 import type { CreationResult, ItemDraft, BoardData } from '@mux-factory/shared';
-import { useBoardStore } from './board-store.ts';
-import { notify } from './notices.tsx';
+import { useBoardStore } from '../board/board-store.ts';
+import { notify } from '../notices/notices.tsx';
 
 interface Attempt { requestId: string; session: string | undefined; draft: ItemDraft }
 

@@ -1,7 +1,7 @@
 // The Add item dialog: the form, its repo-dependent fields, and each phase of a submission.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle } from './support.ts';
+import { $, $$, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
 import type { BoardData } from '@mux-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [

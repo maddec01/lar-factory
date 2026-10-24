@@ -2,7 +2,7 @@
 // the question doesn't change under the closing animation.
 
 import { create } from 'zustand';
-import type { Item } from '../model.ts';
+import type { Item } from '../../../server/src/model.ts';
 
 interface AbandonState {
   open: boolean;

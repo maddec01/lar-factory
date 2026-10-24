@@ -2,7 +2,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle } from './support.ts';
-import type { BoardData } from '../../src/model.ts';
+import type { BoardData } from '../../server/src/model.ts';
 
 const withFactory: BoardData = { ...sample, repos: [
   ...sample.repos, { repo: 'maddec01/mux-factory', platform: 'Factory', role: 'The factory' },

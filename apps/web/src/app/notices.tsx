@@ -1,9 +1,9 @@
 // What this page just did to an item, announced in a toast: added or moved with View item,
 // abandoned, started in T3, or a Queued card's action that failed.
 
-import { platformOf, ref, workTitle } from '../model.ts';
-import type { Item, StartedThread, Status } from '../model.ts';
-import { abandonPrompt, listGroupId } from '../board-view.ts';
+import { platformOf, ref, workTitle } from '../../../server/src/model.ts';
+import type { Item, StartedThread, Status } from '../../../server/src/model.ts';
+import { abandonPrompt, listGroupId } from '../../../server/src/board-view.ts';
 import { useBoardStore } from './board-store.ts';
 import { useDetailsStore } from './details-store.ts';
 import { useJumpStore } from './jump-store.ts';

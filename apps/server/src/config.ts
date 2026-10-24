@@ -1,4 +1,4 @@
-// Reads ../config.json (the factory's shared config) relative to board/, or the file
+// Reads the repo root's config.json (the factory's shared config), or the file
 // BOARD_CONFIG_FILE names (the board app ships its own copy).
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ export interface BoardConfig {
   refreshSeconds: number;
 }
 
-export const CONFIG_URL = new URL('../../config.json', import.meta.url);
+export const CONFIG_URL = new URL('../../../config.json', import.meta.url);
 
 /** BOARD_CONFIG_FILE's absolute path when set, else the checkout's config.json. */
 export function configUrl(env: NodeJS.ProcessEnv = process.env): URL {

@@ -3,10 +3,10 @@
 
 import { beforeEach, expect, test } from 'vite-plus/test';
 import { $, $$, NOW, mountPage, sample, settle } from './support.ts';
-import { normalizeItems } from '../../src/github.ts';
-import type { RawItem } from '../../src/github.ts';
-import type { BoardData, Item } from '../../src/model.ts';
-import { rawIssue, sliceRef } from '../raw-items.ts';
+import { normalizeItems } from '../../server/src/github.ts';
+import type { RawItem } from '../../server/src/github.ts';
+import type { BoardData, Item } from '../../server/src/model.ts';
+import { rawIssue, sliceRef } from '../../server/test/raw-items.ts';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const card = (id: string) => $(`article[data-anchor="${id}"]`)!;
@@ -24,7 +24,7 @@ async function show(data: BoardData): Promise<void> {
     return mountPage(data);
   }
   // The store instance the mounted page uses; modules reset between tests.
-  const { useBoardStore } = await import('../../src/app/board-store.ts');
+  const { useBoardStore } = await import('../src/app/board-store.ts');
   await settle(() => useBoardStore.getState().receive(data));
 }
 const openGroups = () => $$<HTMLDetailsElement>('details.platform').filter((d) => d.open).map((d) => d.id);

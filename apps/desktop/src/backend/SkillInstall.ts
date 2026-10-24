@@ -7,7 +7,7 @@ import * as NodePath from "node:path";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 
-import { InstallError, installSkills, type InstallResult } from "../../../board/src/install-skills.ts";
+import { InstallError, installSkills, type InstallResult } from "../../../server/src/install-skills.ts";
 
 /** Starts a dev run's install. A packaged app ignores it and installs each new version. */
 export const INSTALL_FLAG = "--install-skills";

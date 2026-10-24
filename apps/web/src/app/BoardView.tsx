@@ -3,10 +3,10 @@
 
 import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
-import { AMBER_STATUSES, STATUSES, workMessage } from '../model.ts';
-import type { BoardData, Item } from '../model.ts';
-import { boardSections, conceptChildren } from '../board-view.ts';
-import { day, plural, slug } from '../format.ts';
+import { AMBER_STATUSES, STATUSES, workMessage } from '../../../server/src/model.ts';
+import type { BoardData, Item } from '../../../server/src/model.ts';
+import { boardSections, conceptChildren } from '../../../server/src/board-view.ts';
+import { day, plural, slug } from '../../../server/src/format.ts';
 import { useBoardStore } from './board-store.ts';
 import { Card } from './Card.tsx';
 import { Disclosure } from './Disclosure.tsx';

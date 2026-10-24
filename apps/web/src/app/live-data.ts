@@ -4,7 +4,7 @@
 import { useBoardStore } from './board-store.ts';
 import { useDismissStore } from './dismiss-store.ts';
 import { holdAnchor } from './keep-anchor.ts';
-import type { BoardData } from '../model.ts';
+import type { BoardData } from '../../../server/src/model.ts';
 
 const POLL_MS = 15_000;
 /** The key of the banner that says the page can't reach the server. */

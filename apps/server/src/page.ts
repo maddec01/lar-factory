@@ -23,9 +23,9 @@ export interface BuiltPage {
 }
 
 /** Reads the build once, so the board keeps serving the page it started with while the checkout moves on. */
-export function loadBuild(dir = new URL('../dist/', import.meta.url)): BuiltPage {
+export function loadBuild(dir = new URL('../../web/dist/', import.meta.url)): BuiltPage {
   const index = new URL('index.html', dir);
-  if (!existsSync(index)) throw new Error(`No built page at ${index.pathname}: run pnpm run build in board/`);
+  if (!existsSync(index)) throw new Error(`No built page at ${index.pathname}: run pnpm run build in apps/web/`);
   const assetsDir = new URL('assets/', dir);
   const assets = new Map<string, Asset>();
   for (const name of existsSync(assetsDir) ? readdirSync(assetsDir) : []) {

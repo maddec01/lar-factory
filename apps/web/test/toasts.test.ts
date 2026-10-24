@@ -3,7 +3,7 @@
 
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { $, fetchMock, mountPage, sample, settle } from './support.ts';
-import type { BoardData } from '../../src/model.ts';
+import type { BoardData } from '../../server/src/model.ts';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const toast = () => $('.toasts .toast');
@@ -20,8 +20,8 @@ async function queue(id: string, board = queued(id)): Promise<void> {
 }
 
 /** Shows a toast straight from the store, as the Add item form will. */
-async function notify(notice: Parameters<typeof import('../../src/app/notices.tsx').notify>[0]): Promise<void> {
-  const { notify } = await import('../../src/app/notices.tsx');
+async function notify(notice: Parameters<typeof import('../src/app/notices.tsx').notify>[0]): Promise<void> {
+  const { notify } = await import('../src/app/notices.tsx');
   await settle(() => notify(notice));
 }
 

@@ -4,7 +4,7 @@ import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 
-import { installSkills } from "../../../board/src/install-skills.ts";
+import { installSkills } from "../../../server/src/install-skills.ts";
 import * as ClaudeProfiles from "./ClaudeProfiles.ts";
 
 const tempDir = (prefix: string) => NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), prefix));

@@ -8,7 +8,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
-import type { BoardAppBridge } from "../../board/src/app/board-app.ts";
+import type { BoardAppBridge } from "../../web/src/app/board-app.ts";
 import * as IpcChannels from "./ipcChannels.ts";
 import * as LaunchSecret from "./LaunchSecret.ts";
 

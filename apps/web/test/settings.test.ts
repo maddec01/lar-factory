@@ -3,8 +3,8 @@
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight } from './support.ts';
-import type { ProfilesResult, UpdateChannel, UpdateState } from '../../src/app/board-app.ts';
-import { INSTALL_RECHECK_MS } from '../../src/app/settings-store.ts';
+import type { ProfilesResult, UpdateChannel, UpdateState } from '../src/app/board-app.ts';
+import { INSTALL_RECHECK_MS } from '../src/app/settings-store.ts';
 
 const listed: ProfilesResult = {
   profiles: [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: false }],

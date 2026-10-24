@@ -167,7 +167,7 @@ test('new data keeps it open, with focus where it was', async () => {
   await tap(trigger(), 'touch');
   await focus(pop()!.querySelector('a')!);
   const link = document.activeElement;
-  const { useBoardStore } = await import('../../src/app/board-store.ts');
+  const { useBoardStore } = await import('../src/app/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...sample, fetchedAt: '2026-10-21T09:59:00.000Z' }));
   expect(isOpen()).toBe(true);
   expect(document.activeElement).toBe(link);

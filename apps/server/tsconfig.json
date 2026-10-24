@@ -4,8 +4,7 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "types": ["node", "vite-plus/client"],
-    "jsx": "react-jsx",
+    "types": ["node"],
     "strict": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
@@ -16,5 +15,5 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["src", "scripts", "test", "vite.config.ts"]
+  "include": ["src", "test"]
 }

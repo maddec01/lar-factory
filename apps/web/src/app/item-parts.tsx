@@ -1,8 +1,8 @@
 // The bits every view draws for an item: its platform badge, kind pill, label pills and title link.
 
-import { kindLabel, kindOf, platformOf, ref } from '../model.ts';
-import type { BoardData, Item } from '../model.ts';
-import { slug } from '../format.ts';
+import { kindLabel, kindOf, platformOf, ref } from '../../../server/src/model.ts';
+import type { BoardData, Item } from '../../../server/src/model.ts';
+import { slug } from '../../../server/src/format.ts';
 
 export function PlatformBadge({ item, data }: { item: Item; data: BoardData }) {
   const platform = platformOf(item, data.repos);

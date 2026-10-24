@@ -2,7 +2,7 @@
 // or logged-out gh, which stops the board reading GitHub, shows a banner in place of Stale.
 
 import type { ReactNode } from 'react';
-import type { ToolMissing, ToolProblem } from '../model.ts';
+import type { ToolMissing, ToolProblem } from '../../../server/src/model.ts';
 import { BrandMark } from './Header.tsx';
 import { CopyButton } from './CopyButton.tsx';
 import { useRecheckStore } from './recheck-store.ts';

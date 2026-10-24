@@ -34,26 +34,45 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
         with:
-          package_json_file: board/package.json
+          package_json_file: package.json
 
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version-file: board/package.json
+          node-version-file: package.json
 
-      - name: Install board dependencies
+      - name: Install dependencies
         id: install
-        working-directory: board
         run: pnpm install --frozen-lockfile
 
-      - name: Board tests
+      - name: Server tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: board
+        working-directory: apps/server
         run: pnpm test
 
-      - name: Board typecheck
+      - name: Server typecheck
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        working-directory: board
+        working-directory: apps/server
+        run: pnpm run typecheck
+
+      - name: Web tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: apps/web
+        run: pnpm test
+
+      - name: Web typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: apps/web
+        run: pnpm run typecheck
+
+      - name: Desktop tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: apps/desktop
+        run: pnpm test
+
+      - name: Desktop typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: apps/desktop
         run: pnpm run typecheck
 
       - name: Worktree setup tests

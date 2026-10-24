@@ -2,8 +2,8 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, fetchMock, mountPage, sample, settle, stream } from './support.ts';
-import { BRAND_MARK_PATH } from '../../src/brand-mark.ts';
-import type { BoardData } from '../../src/model.ts';
+import { BRAND_MARK_PATH } from '../../server/src/brand-mark.ts';
+import type { BoardData } from '../../server/src/model.ts';
 
 const fresh: BoardData = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
 

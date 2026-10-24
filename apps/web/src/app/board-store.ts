@@ -2,7 +2,7 @@
 // reach the server, if it can't. It starts from the data the server put in the page.
 
 import { create } from 'zustand';
-import type { BoardData } from '../model.ts';
+import type { BoardData } from '../../../server/src/model.ts';
 
 interface BoardState {
   data: BoardData;

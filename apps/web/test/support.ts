@@ -4,11 +4,11 @@
 import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { afterEach, beforeEach, vi } from 'vite-plus/test';
-import { pageWithData } from '../../src/page.ts';
-import type { BoardData } from '../../src/model.ts';
-import type { BoardAppBridge, UpdateState } from '../../src/app/board-app.ts';
-import template from '../../index.html?raw';
-import sampleJson from '../sample.json' with { type: 'json' };
+import { pageWithData } from '../../server/src/page.ts';
+import type { BoardData } from '../../server/src/model.ts';
+import type { BoardAppBridge, UpdateState } from '../src/app/board-app.ts';
+import template from '../index.html?raw';
+import sampleJson from '../../server/test/sample.json' with { type: 'json' };
 
 export const sample = sampleJson as unknown as BoardData;
 /** The page's clock: twenty minutes after the sample was read. */
@@ -61,7 +61,7 @@ export async function mountPage(data: BoardData = sample, hash = ''): Promise<vo
   const html = pageWithData(template, data);
   document.documentElement.innerHTML = new DOMParser().parseFromString(html, 'text/html').documentElement.innerHTML;
   await act(async () => {
-    await import('../../src/main.tsx');
+    await import('../src/main.tsx');
   });
 }
 
@@ -102,10 +102,10 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
   return bridge;
 }
 
-/** Puts src/styles.css on the page. jsdom has no layout but cascades its rules into getComputedStyle; it can't apply
+/** Puts src/index.css on the page. jsdom has no layout but cascades its rules into getComputedStyle; it can't apply
  *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheet's text. */
 export function addStylesheet(): { noDrag: (el: Element) => boolean } {
-  const css = readFileSync('src/styles.css', 'utf8');
+  const css = readFileSync('src/index.css', 'utf8');
   const style = document.createElement('style');
   style.textContent = css;
   document.head.append(style);

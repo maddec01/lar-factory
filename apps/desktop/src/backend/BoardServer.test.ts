@@ -13,7 +13,7 @@ const fakeBoard = NodePath.resolve(import.meta.dirname, "../../test/fake-board.m
 const appDir = NodePath.resolve(import.meta.dirname, "../..");
 
 const fakeConfig = (env: Record<string, string>): BoardServer.StartConfig => ({
-  ...BoardServer.makeStartConfig({ ...BoardServer.locate(appDir), executablePath: process.execPath, env: { ...process.env, ...env }, secret: "test-secret" }),
+  ...BoardServer.makeStartConfig({ ...BoardServer.locate(appDir, false), executablePath: process.execPath, env: { ...process.env, ...env }, secret: "test-secret" }),
   args: [fakeBoard],
 });
 
@@ -27,15 +27,15 @@ const isRunning = (pid: number) => {
 };
 
 describe("locate", () => {
-  it("finds board/ and config.json beside the app/ checkout in development", () => {
-    assert.deepStrictEqual(BoardServer.locate("/repo/app"), {
-      boardDir: "/repo/board",
+  it("finds apps/server and the root config.json beside apps/desktop in development", () => {
+    assert.deepStrictEqual(BoardServer.locate("/repo/apps/desktop", false), {
+      boardDir: "/repo/apps/server",
       configFile: "/repo/config.json",
     });
   });
 
   it("finds the bundled board/ and config.json in the packaged app's Resources", () => {
-    assert.deepStrictEqual(BoardServer.locate("/Applications/Board.app/Contents/Resources/app.asar"), {
+    assert.deepStrictEqual(BoardServer.locate("/Applications/Board.app/Contents/Resources/app.asar", true), {
       boardDir: "/Applications/Board.app/Contents/Resources/board",
       configFile: "/Applications/Board.app/Contents/Resources/config.json",
     });
@@ -113,7 +113,7 @@ describe("start", () => {
   it.live("starts the real board in sample mode, guarding writes and drains with the launch secret", () =>
     Effect.gen(function* () {
       const config = BoardServer.makeStartConfig({
-        ...BoardServer.locate(appDir),
+        ...BoardServer.locate(appDir, false),
         executablePath: process.execPath,
         env: {
           ...process.env,

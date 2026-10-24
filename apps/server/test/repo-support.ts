@@ -35,13 +35,14 @@ export async function factoryRepo(t: TestContext) {
   git('init', '-b', 'main');
   git('config', 'user.name', 'Test');
   git('config', 'user.email', 'test@example.invalid');
-  await cp(new URL('../src', import.meta.url), join(repo, 'board/src'), { recursive: true });
-  await cp(new URL('../.gitignore', import.meta.url), join(repo, 'board/.gitignore'));
+  await cp(new URL('../src', import.meta.url), join(repo, 'apps/server/src'), { recursive: true });
+  await cp(new URL('../.gitignore', import.meta.url), join(repo, 'apps/server/.gitignore'));
+  await cp(new URL('../../web/.gitignore', import.meta.url), join(repo, 'apps/web/.gitignore'));
   // The built page, which .gitignore keeps out of the fixture's commits as it does in the real repo.
-  await cp(new URL('../dist', import.meta.url), join(repo, 'board/dist'), { recursive: true });
-  await cp(new URL('../../config.json', import.meta.url), join(repo, 'config.json'));
+  await cp(new URL('../../web/dist', import.meta.url), join(repo, 'apps/web/dist'), { recursive: true });
+  await cp(new URL('../../../config.json', import.meta.url), join(repo, 'config.json'));
   await cp(new URL('./sample.json', import.meta.url), join(repo, 'sample.json'));
-  await writeFile(join(repo, 'board/package.json'), '{"type":"module"}');
+  await writeFile(join(repo, 'apps/server/package.json'), '{"type":"module"}');
   git('add', '.');
   git('commit', '-m', 'feat(board): initial fixture');
   git('clone', '--bare', repo, origin);

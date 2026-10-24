@@ -198,7 +198,7 @@ test('Start reads config.json each time, so an added repository works without re
   writeFileSync(config, original.replace('"maddec01/mux-factory"', '"maddec01/elsewhere"'));
   const dir = home(t, ORIGINS);
   const board = await startBoard(t, { items: [rawIssue(12, 'Queued')] }, false, false,
-    { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'board'));
+    { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'apps/server'));
   await ready(board, 1);
   const refused = await start(board, 'PVTI_12');
   assert.match((await refused.json()).error, /maddec01\/mux-factory isn't in config\.json/);
@@ -212,7 +212,7 @@ test('Start refuses an unreadable config.json with a hint', async (t) => {
   const f = await factoryRepo(t);
   const dir = home(t, ORIGINS);
   const board = await startBoard(t, { items: [rawIssue(12, 'Queued')] }, false, false,
-    { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'board'));
+    { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'apps/server'));
   await ready(board, 1);
   writeFileSync(join(f.repo, 'config.json'), '{ broken');
   const response = await start(board, 'PVTI_12');

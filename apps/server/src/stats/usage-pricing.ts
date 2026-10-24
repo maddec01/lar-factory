@@ -5,7 +5,7 @@
 //   (`parseRateTable`, `createOverrideRateTable`, `lookupRate`, `priceUsage`);
 // - apps/server/src/usage/usageAggregation.ts: model aliases (`resolveModelAliases`,
 //   `#mapModel`), applied before a record is priced.
-// Pure: item-stats.ts reads the rate table and T3's settings.
+// Pure: item-stats.ts reads the rate table, and t3/t3-settings.ts T3's settings.
 
 import type { UsageRecord, UsageSpeed, UsageTokenTotals } from './transcript-usage.ts';
 

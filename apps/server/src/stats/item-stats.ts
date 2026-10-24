@@ -1,49 +1,30 @@
-// Item stats from T3 Code's local database and settings, read-only (docs/adr/0005,
-// 0007), with tokens from the provider transcripts of each item's threads, priced
-// with T3's cached rate table. Every read of T3's internal schema, settings and
-// state files lives here, so a change touches one file. The Codex speed-tier read
-// is ported from pingdotgg/t3code main at f054d1b8018721bd997d99cbb918a7b17bf098a4:
-// apps/server/src/usage/CodexUsageHistory.ts and apps/server/src/codexModelOptions.ts;
-// the rates and settings loading from apps/server/src/usage/UsageService.ts.
+// Item stats from T3 Code's local database, read-only (docs/adr/0005, 0007), with
+// tokens from the provider transcripts of each item's threads, priced with T3's
+// cached rate table. T3's settings and the paths to its files are in
+// t3/t3-settings.ts. The Codex speed-tier read is ported from pingdotgg/t3code main
+// at f054d1b8018721bd997d99cbb918a7b17bf098a4: apps/server/src/usage/CodexUsageHistory.ts
+// and apps/server/src/codexModelOptions.ts; the rates loading from
+// apps/server/src/usage/UsageService.ts.
 
 import { existsSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { isRecord } from '@mux-factory/shared';
 import type { ItemStats } from '@mux-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
+import { expandHome, readT3Settings } from '../t3/t3-settings.ts';
+import type { InstanceHome, T3Settings, TranscriptDriver } from '../t3/t3-settings.ts';
 import { length, merged, minus } from './intervals.ts';
 import type { Interval } from './intervals.ts';
 import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens } from './transcript-usage.ts';
 import type { SessionRecordsReader, UsageRecord, UsageSpeed } from './transcript-usage.ts';
 import { apiCost, createOverrideRateTable, parseRateTable, resolveModelAliases } from './usage-pricing.ts';
-import type { PriceOverride, Pricing } from './usage-pricing.ts';
+import type { Pricing } from './usage-pricing.ts';
 
 /**
  * An item's stats by repo and issue number, or null when no thread worked on it;
  * `priced` is false when the rate table couldn't be read, so no stats carry a cost.
  */
 export type ItemStatsReader = ((repo: string, number: number) => ItemStats | null) & { priced: boolean };
-
-/** T3's database: `T3_STATE_DB`, or its usual place under the home folder. */
-export function statsDbPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.T3_STATE_DB || `${env.HOME ?? ''}/.t3/userdata/statev2.sqlite`;
-}
-
-/** T3's settings: `T3_SETTINGS`, or their usual place under the home folder. */
-export function t3SettingsPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.T3_SETTINGS || `${env.HOME ?? ''}/.t3/userdata/settings.json`;
-}
-
-/** T3's model list: `T3_MODEL_MANIFEST`, or `model-manifest.json` beside T3's settings. */
-export function modelManifestPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.T3_MODEL_MANIFEST || join(dirname(t3SettingsPath(env)), 'model-manifest.json');
-}
-
-/** T3's cached price table: `T3_USAGE_RATES`, or `usage-model-rates.json` beside T3's database, in T3's state dir. */
-export function usageRatesPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.T3_USAGE_RATES || join(dirname(statsDbPath(env)), 'usage-model-rates.json');
-}
 
 /** Where item stats read from: T3's database, settings and price table, and the home folder `~` stands for. */
 export interface StatsSources {
@@ -144,70 +125,11 @@ function activeProviderThreads(db: DatabaseSync): Set<string> {
   }
 }
 
-// The transcript reader for each provider driver whose sessions count, and the
-// home its built-in instance and any instance without a `homePath` use.
-const DRIVERS: Record<string, { read: (home: string) => SessionRecordsReader; home: string }> = {
-  claudeAgent: { read: claudeSessionRecords, home: '.claude' },
-  codex: { read: codexSessionRecords, home: '.codex' },
+// The transcript reader for each provider driver whose sessions count.
+const READERS: Record<TranscriptDriver, (home: string) => SessionRecordsReader> = {
+  claudeAgent: claudeSessionRecords,
+  codex: codexSessionRecords,
 };
-
-/** `~` and `~/…` under `home`, as T3's expandHomePath reads a configured path. */
-function expandHome(path: string, home: string): string {
-  if (path === '~') return home;
-  if (path.startsWith('~/')) return join(home, path.slice(2));
-  return isAbsolute(path) ? path : resolve(home, path);
-}
-
-/** A provider instance's transcripts: its driver and transcript home. */
-interface InstanceHome {
-  driver: string;
-  home: string;
-}
-
-/**
- * Each Claude and Codex provider instance's home, as T3's claudeUsageReader and
- * codexUsageReader (with CodexHomeLayout's shared home) resolve it: the
- * instance's `homePath`, else `~/.claude` or `~/.codex`. The built-in
- * `claudeAgent` and `codex` instances are there even when the settings don't
- * list them or can't be read.
- */
-function instanceHomes(settings: Record<string, unknown> | null, home: string): Map<string, InstanceHome> {
-  const homes = new Map(Object.entries(DRIVERS).map(([driver, built]) => [driver, { driver, home: join(home, built.home) }]));
-  const instances = settings?.providerInstances;
-  if (!isRecord(instances)) return homes;
-  for (const [id, instance] of Object.entries(instances as Record<string, { driver?: unknown; config?: { homePath?: unknown } } | null>)) {
-    const driver = instance?.driver;
-    if (typeof driver !== 'string' || !Object.hasOwn(DRIVERS, driver)) continue;
-    const configured = typeof instance?.config?.homePath === 'string' ? instance.config.homePath.trim() : '';
-    homes.set(id, { driver, home: configured ? expandHome(configured, home) : join(home, DRIVERS[driver]!.home) });
-  }
-  return homes;
-}
-
-const isPrice = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
-
-/** The settings' `usagePriceOverrides`, keeping each entry T3's settings schema accepts. */
-function priceOverrides(value: unknown): Record<string, PriceOverride> {
-  if (!isRecord(value)) return {};
-  return Object.fromEntries(Object.entries(value).flatMap(([model, price]): [string, PriceOverride][] => {
-    if (!model.trim() || !isRecord(price) || !isPrice(price.inputCostPerMillionTokens) || !isPrice(price.outputCostPerMillionTokens)) return [];
-    const { cacheReadCostPerMillionTokens: read, cacheWriteCostPerMillionTokens: write } = price;
-    if ((read !== undefined && !isPrice(read)) || (write !== undefined && !isPrice(write))) return [];
-    return [[model.trim(), {
-      inputCostPerMillionTokens: price.inputCostPerMillionTokens,
-      outputCostPerMillionTokens: price.outputCostPerMillionTokens,
-      ...(read === undefined ? {} : { cacheReadCostPerMillionTokens: read }),
-      ...(write === undefined ? {} : { cacheWriteCostPerMillionTokens: write }),
-    }]];
-  }));
-}
-
-/** The settings' `usageModelAliases`, trimmed, keeping the non-empty ones. */
-function modelAliases(value: unknown): Record<string, string> {
-  if (!isRecord(value)) return {};
-  return Object.fromEntries(Object.entries(value).flatMap(([model, target]): [string, string][] =>
-    typeof target === 'string' && model.trim() && target.trim() ? [[model.trim(), target.trim()]] : []));
-}
 
 /**
  * T3's pricing, as UsageService.ts loads it: the LiteLLM document T3 cached in
@@ -215,13 +137,13 @@ function modelAliases(value: unknown): Record<string, string> {
  * overrides and model aliases from T3's settings. Null when the table is missing,
  * unreadable or empty: the board fetches no prices itself, so it shows no cost.
  */
-function loadPricing(ratesPath: string, settings: Record<string, unknown> | null): Pricing | null {
+function loadPricing(ratesPath: string, settings: T3Settings): Pricing | null {
   const rates = parseRateTable(readJsonRecord(ratesPath)?.document ?? null);
   if (rates.size === 0) return null;
   return {
     rates,
-    overrides: createOverrideRateTable(priceOverrides(settings?.usagePriceOverrides)),
-    aliases: resolveModelAliases(modelAliases(settings?.usageModelAliases)),
+    overrides: createOverrideRateTable(settings.priceOverrides),
+    aliases: resolveModelAliases(settings.modelAliases),
   };
 }
 
@@ -337,7 +259,7 @@ function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Ma
     if (read.has(`${at}\0${session}`)) continue;
     read.add(`${at}\0${session}`);
     let reader = readers.get(at);
-    if (!reader) readers.set(at, (reader = DRIVERS[source.driver]!.read(source.home)));
+    if (!reader) readers.set(at, (reader = READERS[source.driver](source.home)));
     for (const record of reader(session)) if (keep(record)) add(records, thread, record);
   }
   return records;
@@ -384,8 +306,8 @@ export function loadItemStats(sources: StatsSources, now: number): ItemStatsRead
     const waits = db.prepare(WAITS).all() as { turn: string; createdAt: string | null; resolvedAt: string | null }[];
     const lastMessages = db.prepare(LAST_MESSAGES).all() as { thread: string; at: string | null }[];
     const activity = { lastMessages, active: activeProviderThreads(db) };
-    const settings = readJsonRecord(sources.settings);
-    const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(open, instanceHomes(settings, sources.home))));
+    const settings = readT3Settings(sources.settings, sources.home);
+    const records = withCodexServiceTiers(db, scanTranscripts(() => recordsByThread(open, settings.instanceHomes)));
     return reader(roots, lineage, turns, runs, waits, activity, records, loadPricing(sources.rates, settings), now);
   } catch {
     return 'unavailable';

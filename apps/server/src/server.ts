@@ -16,9 +16,10 @@ import { log } from './log.ts';
 import { loadBuild } from './page/page.ts';
 import { recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
-import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './stats/item-stats.ts';
+import { loadItemStats } from './stats/item-stats.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
+import { modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
 import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools/tools.ts';
 
 const HOST = '127.0.0.1';

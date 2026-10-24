@@ -9,6 +9,7 @@ export * from './board-view.ts';
 export * from './start-menu.ts';
 export * from './slice-popover.ts';
 export * from './add-item.ts';
+export * from './concept-map.ts';
 export * from './github-items.ts';
 export * from './page-data.ts';
 export * from './board-app.ts';

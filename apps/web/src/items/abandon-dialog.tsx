@@ -1,8 +1,10 @@
-// Abandon's confirmation: it names the item it deletes or removes. Cancel, Escape or a click
-// outside closes it and focus goes back to Abandon; the confirm button abandons the item.
+// Abandon's confirmation: it names the item it deletes or removes. Cancel or Escape closes it and
+// focus goes back to Abandon; a click outside leaves it open. The confirm button abandons the item.
 
-import { AlertDialog } from '@base-ui/react/alert-dialog';
 import { abandonPrompt } from '@mux-factory/shared';
+import {
+  AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
+} from '@mux-factory/ui/alert-dialog';
 import { Button } from '@mux-factory/ui/button';
 import { useAbandonStore } from './abandon-store.ts';
 import { abandonItem } from './card-actions.ts';
@@ -15,18 +17,17 @@ export function AbandonDialog() {
     if (item) void abandonItem(item.id);
   };
   return (
-    <AlertDialog.Root open={open} onOpenChange={(next) => !next && close()}>
-      <AlertDialog.Portal>
-        <AlertDialog.Backdrop className="dialog-backdrop" />
-        <AlertDialog.Popup id="abandon-dialog">
-          <div className="form-heading"><AlertDialog.Title id="abandon-heading">{prompt?.question}</AlertDialog.Title></div>
-          <AlertDialog.Description className="form-hint" id="abandon-detail">{prompt?.detail}</AlertDialog.Description>
-          <div className="form-actions">
-            <AlertDialog.Close render={<Button variant="outline" size="xs" />}>Cancel</AlertDialog.Close>
-            <Button variant="destructive" size="xs" onClick={confirm}>{prompt?.confirm}</Button>
-          </div>
-        </AlertDialog.Popup>
-      </AlertDialog.Portal>
-    </AlertDialog.Root>
+    <AlertDialog open={open} onOpenChange={(next) => !next && close()}>
+      <AlertDialogPopup id="abandon-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle id="abandon-heading">{prompt?.question}</AlertDialogTitle>
+          <AlertDialogDescription id="abandon-detail">{prompt?.detail}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogClose render={<Button variant="outline" size="xs" />}>Cancel</AlertDialogClose>
+          <Button variant="destructive" size="xs" onClick={confirm}>{prompt?.confirm}</Button>
+        </AlertDialogFooter>
+      </AlertDialogPopup>
+    </AlertDialog>
   );
 }

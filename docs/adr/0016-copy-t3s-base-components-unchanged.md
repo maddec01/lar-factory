@@ -4,7 +4,7 @@ Settled in issue #267.
 
 The design system copies the base components the board uses from T3 Code's `apps/web/src/components/ui` and from coss byte for byte, and records each file's upstream path and commit in a copy record. The build adapts to the copies instead: `~` and `@/registry/default` aliases, a separate Bundler-resolution tsconfig for the copied files, and the board's own `cn` and `env` modules. An update from upstream is then a fresh copy and a diff. This sits beside ADR 0011, which stays.
 
-`apps/web` type-checks the copies it imports in its own program, so it uses Bundler resolution too, with `~` mapped to `packages/ui/src` in its tsconfig and its Vite config. Its other compiler options stay as they were, and the copies pass them. The board's own files keep their `.ts` import extensions; `~` is for the copies only.
+`apps/web` type-checks the copies it imports in its own program, so it uses Bundler resolution too, with `~` mapped to `packages/ui/src` in its tsconfig and its Vite config. Its other compiler options stay as they were, and the copies pass them. The board's own files keep their `.ts` import extensions; `~` is for the copies only. A board-written component in `packages/ui` that builds on the copies, such as `src/dialog`, loads them, so it type-checks with the copies' tsconfig while keeping its own imports' extensions.
 
 ## Considered options
 

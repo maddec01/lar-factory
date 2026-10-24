@@ -8,6 +8,7 @@
    otherwise turn on Tailwind utilities of the same name. */
 @import "tailwindcss" source(none);
 @source "./components/ui";
+@source "./dialog";
 
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -232,4 +233,13 @@
   @variant dark {
     background: color-mix(in srgb, var(--background) 64%, transparent);
   }
+}
+
+/* The board's own: T3's dialog popups don't drag the window, but their viewports and backdrops, which cover the
+   title bar, do in the board app. Neither may, so a click over the bar while a dialog is open reaches the page. */
+[data-slot="dialog-viewport"],
+[data-slot="dialog-backdrop"],
+[data-slot="alert-dialog-viewport"],
+[data-slot="alert-dialog-backdrop"] {
+  -webkit-app-region: no-drag;
 }

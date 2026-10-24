@@ -10,6 +10,7 @@
     "./badge": "./src/components/ui/badge.tsx",
     "./button": "./src/components/ui/button.tsx",
     "./dialog": "./src/components/ui/dialog.tsx",
+    "./kept-mounted-dialog-popup": "./src/dialog/kept-mounted-dialog-popup.tsx",
     "./styles.css": "./src/styles.css",
     "./compiled-css": "./src/compiled-css/compiled-css.ts"
   },

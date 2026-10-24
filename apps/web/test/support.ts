@@ -137,14 +137,16 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
 }
 
 /** Puts src/index.css on the page. jsdom has no layout but cascades its rules into getComputedStyle; it can't apply
- *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheet's text. */
+ *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheets' text, the page's
+ *  and the design system's, and from Tailwind's arbitrary no-drag class. */
 export function addStylesheet(): { noDrag: (el: Element) => boolean } {
   const css = readFileSync(join(import.meta.dirname, '../src/index.css'), 'utf8');
   const style = document.createElement('style');
   style.textContent = css;
   document.head.append(style);
-  const selectors = [...css.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) => rule[1]!.replace(/\/\*[^]*?\*\//g, ''));
-  return { noDrag: (el) => selectors.some((selector) => el.matches(selector)) };
+  const all = css + readFileSync('../../packages/ui/src/styles.css', 'utf8');
+  const selectors = [...all.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) => rule[1]!.replace(/\/\*[^]*?\*\//g, ''));
+  return { noDrag: (el) => el.classList.contains('[-webkit-app-region:no-drag]') || selectors.some((selector) => el.matches(selector)) };
 }
 
 /** The title bar's height, from its h-[…px] class. */

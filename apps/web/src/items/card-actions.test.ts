@@ -3,7 +3,7 @@
 // Ported from the card action cases of test/render.test.ts.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, fetchMock, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, addStylesheet, answer, fetchMock, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
 import type { BoardData } from '@mux-factory/shared';
 
 const button = (attr: string, id: string) => $<HTMLButtonElement>(`[data-${attr}="${id}"]`)!;
@@ -126,6 +126,25 @@ test('Abandon asks first, naming the issue it deletes or the draft it removes; C
   expect($$('#abandon-dialog button').map(text)).toEqual(['Cancel', 'Remove draft']);
   await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect($('#abandon-dialog'), 'Escape cancels').toBeNull();
+});
+
+test('Abandon opens centred on T3\'s backdrop and glass panel, nothing over the title bar drags, and a click outside leaves it open', async () => {
+  await mountPage();
+  await settle(() => button('abandon', 'PVTI_sample01').click());
+  const { noDrag } = addStylesheet();
+  const dialog = $('#abandon-dialog')!;
+  const viewport = dialog.closest('[data-slot="alert-dialog-viewport"]')!;
+  const backdrop = $('[data-slot="alert-dialog-backdrop"]')!;
+  expect(viewport.className).toContain('grid-rows-[1fr_auto_1fr]');
+  expect(dialog.classList).toContain('row-start-2');
+  expect(dialog.classList).toContain('dialog-glass');
+  expect(backdrop.classList).toContain('dialog-backdrop');
+  expect([dialog, viewport, backdrop].map(noDrag)).toEqual([true, true, true]);
+  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+    await settle(() => viewport.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 })));
+  }
+  await settle(() => vi.advanceTimersByTime(100));
+  expect($('#abandon-dialog'), 'still open').not.toBeNull();
 });
 
 test('confirming Abandon deletes the item, shows it in flight, and announces it without a link', async () => {

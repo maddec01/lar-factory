@@ -212,16 +212,17 @@ test('Queue and Abandon sit on List rows; Abandon also on Queued cards', async (
   expect(ids('[data-queue]', 'data-queue')).toEqual(statusIds('List').sort());
   expect(ids('[data-abandon]', 'data-abandon')).toEqual([...statusIds('List'), 'PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21'].sort());
   const buttons = [...listRow('PVTI_sample01').querySelectorAll('button')];
-  expect(buttons.map((b) => [b.className, b.getAttribute('aria-label'), text(b)])).toEqual([
-    ['copy row-action', 'Queue #61 Arr instances, catalog bindings and content requests', 'Queue'],
-    ['copy row-action abandon', 'Abandon #61 Arr instances, catalog bindings and content requests', 'Abandon'],
+  // T3's outline Button for Queue, its destructive-outline one for Abandon.
+  expect(buttons.map((b) => [b.dataset.slot, b.classList.contains('text-destructive-foreground'), b.getAttribute('aria-label'), text(b)])).toEqual([
+    ['button', false, 'Queue #61 Arr instances, catalog bindings and content requests', 'Queue'],
+    ['button', true, 'Abandon #61 Arr instances, catalog bindings and content requests', 'Abandon'],
   ]);
 });
 
 test('Start appears only on Queued issues, alone in the top-right group; a queued draft asks for an issue first', async () => {
   await mountPage();
   expect(ids('[data-start]', 'data-start')).toEqual(sample.items.filter((i) => i.status === 'Queued' && i.number !== null).map((i) => i.id).sort());
-  const start = card('PVTI_sample05').querySelector('.meta > .start-group > button.copy.start-item')!;
+  const start = card('PVTI_sample05').querySelector('.meta > .start-group > button[data-slot="button"].bg-primary')!;
   expect(['aria-label', 'aria-haspopup', 'aria-expanded'].map((a) => start.getAttribute(a))).toEqual(['Start #129 Run more than one 4K HDR to 1080p stream at a time', 'menu', 'false']);
   expect(text(start)).toBe('Start ▾');
   expect(card('PVTI_sample05').querySelector('.cmd, [data-copy], svg'), 'no command box or copy icon').toBeNull();
@@ -237,9 +238,10 @@ test('Queued issues and drafts get a footer row with Back to List and Abandon; p
   expect(ids('[data-back-to-list]', 'data-back-to-list')).toEqual(['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21']);
   const footer = card('PVTI_sample05').lastElementChild!;
   expect(footer.className).toBe('card-actions');
-  expect([...footer.children].map((b) => [b.className, b.getAttribute('aria-label'), text(b)])).toEqual([
-    ['link-action', 'Back to List #129 Run more than one 4K HDR to 1080p stream at a time', '← Back to List'],
-    ['link-action danger', 'Abandon #129 Run more than one 4K HDR to 1080p stream at a time', 'Abandon'],
+  // T3's InlineButton, muted for Back to List and destructive for Abandon.
+  expect([...footer.children].map((b) => [b.getAttribute('data-slot'), b.classList.contains('text-destructive/80'), b.getAttribute('aria-label'), text(b)])).toEqual([
+    ['inline-button', false, 'Back to List #129 Run more than one 4K HDR to 1080p stream at a time', '← Back to List'],
+    ['inline-button', true, 'Abandon #129 Run more than one 4K HDR to 1080p stream at a time', 'Abandon'],
   ]);
   expect(card('PVTI_sample21').querySelector('[data-back-to-list]')!.getAttribute('aria-label')).toBe('Back to List draft Offline downloads on watchOS');
   expect(card('PVTI_pr').querySelector('.card-actions, [data-abandon]')).toBeNull();

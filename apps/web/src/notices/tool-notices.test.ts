@@ -50,7 +50,7 @@ test('a missing or logged-out gh shows its own notice instead of Stale', async (
   expect(banners()[0]!.getAttribute('role')).toBe('alert');
   expect(banners()[0]!.textContent).toBe('GitHub CLI not found. The board reads the project through gh. Install it with brew install gh Copy, '
     + 'then press Recheck. The board also looks again every 10 seconds. Recheck');
-  expect(banners()[0]!.querySelector('button.copy:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install gh');
+  expect(banners()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install gh');
 
   await push(withTools({ gh: { problem: 'logged-out' } }, failed));
   expect(banners().length).toBe(1);

@@ -134,9 +134,6 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .slice-row.done .row-title { color: var(--muted-foreground); text-decoration: line-through; }
 .slice-row.active .row-title { font-weight: 600; }
 
-/* queued */
-.copy { font: inherit; font-size: 12px; font-weight: 500; min-height: 24px; border: 1px solid var(--input); background: var(--card); color: var(--foreground); border-radius: var(--control-radius); padding: 0 7px; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
-.copy:hover { background: var(--accent); }
 
 /* Capture form: stays mounted while the board refreshes. */
 #add-item-dialog, #abandon-dialog, #settings-dialog { width: min(520px, calc(100% - 34px)); max-height: calc(100dvh - 32px); padding: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--popover); color: var(--foreground); overflow: auto; margin: auto; }
@@ -165,9 +162,8 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .choices { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .choices label { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; }
 .choices input { accent-color: var(--ring); margin: 3px 3px 3px 4px; }
-.submit-item { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); min-height: 32px; padding: 0 11px; }
-button:disabled { opacity: 0.6; cursor: wait; }
-button:disabled[title] { cursor: not-allowed; }
+/* T3's Button takes no pointer events while disabled; one that says why keeps them, so its title shows. */
+button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 #item-result:not(:empty), #settings-result:not(:empty) { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--you); border-radius: 6px; background: var(--you-soft); overflow-wrap: anywhere; white-space: pre-line; }
 #item-result a { display: block; margin-top: 4px; }
 #settings-result ul { margin: 4px 0 0; padding-left: 18px; white-space: normal; }
@@ -176,9 +172,8 @@ button:disabled[title] { cursor: not-allowed; }
 #settings-result[data-tone="error"] { border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); color: var(--danger-text); }
 
 /* notices: a close button on every failure, and successes as toasts that clear themselves */
-.dismiss { float: right; margin: -3px -6px 0 8px; width: 24px; height: 24px; border: 0; border-radius: var(--control-radius); background: none; color: var(--muted-foreground); font: 16px/1 var(--font-sans); cursor: pointer; }
-.dismiss:hover { background: var(--accent); color: var(--foreground); }
-.action-error .dismiss { float: none; margin: -4px 0 -4px 2px; vertical-align: middle; font-weight: 400; }
+.dismiss { float: right; margin: -3px -6px 0 8px; }
+.action-error .dismiss { float: none; margin: -4px 0 -4px 2px; vertical-align: middle; }
 /* notices/toasts.tsx keeps --toast-top below the header while it's on screen and below the title bar. */
 .toasts { position: fixed; top: var(--toast-top, 12px); right: 12px; z-index: 60; display: grid; gap: 8px; width: min(400px, calc(100vw - 24px)); }
 /* A toast never drags the app's window, even where it overlaps the title bar. */
@@ -220,9 +215,6 @@ button:disabled[title] { cursor: not-allowed; }
 .labels { flex: 1 1 auto; display: flex; gap: 4px; min-width: 0; overflow: hidden; mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); }
 .labels .label { flex: none; }
 .row-action { flex: none; }
-.abandon { color: var(--danger-text); }
-.abandon:hover { border-color: var(--danger-text); }
-.copy[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 /* The update button's changelog: below the title bar, lined up with the button's right edge. In the Mac app it
    doesn't drag the window, so its links take clicks. */
 .update-notes-positioner { z-index: 50; }
@@ -240,8 +232,6 @@ button:disabled[title] { cursor: not-allowed; }
 p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
 .started-tag { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-foreground); font-weight: 500; }
 .started-tag.unsure { background: var(--you-soft); color: var(--you-text); }
-.start-item { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); padding: 0 10px; }
-.start-item:hover { background: color-mix(in srgb, var(--primary) 90%, var(--background)); }
 .start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; position: relative; }
 /* Start's menu: under Start (over it when only above has room), lined up with its right edge, grouped by provider instance. */
 .start-menu-positioner { z-index: 50; }
@@ -261,10 +251,8 @@ p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px
 .card-stats + .card-actions { margin-top: 0; }
 .card-actions { display: flex; align-items: center; gap: 12px; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--border); font-size: 11px; }
 /* The padding gives a 24px target (WCAG 2.5.8); the matching negative margin keeps the row's height. */
-.link-action { background: none; border: 0; padding: 5px 0; margin-block: -5px; font: inherit; color: var(--muted-foreground); cursor: pointer; }
-.link-action:not([disabled], [aria-disabled="true"]):hover { color: var(--foreground); text-decoration: underline; }
+.link-action { padding: 5px 0; margin-block: -5px; }
 .link-action.danger { margin-left: auto; }
-.link-action.danger:not([disabled], [aria-disabled="true"]):hover { color: var(--danger-text); }
 .link-action[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .thread-id { font-size: 11px; color: var(--muted-foreground); overflow-wrap: anywhere; }
 .row-item:has(.action-error) { flex-wrap: wrap; }

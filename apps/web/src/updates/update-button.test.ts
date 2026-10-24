@@ -38,7 +38,7 @@ const label = () => button()!.getAttribute('aria-label');
 const disabled = () => button()!.getAttribute('aria-disabled') === 'true';
 const icon = (name: string) => button()!.querySelector(`svg.lucide-${name}`);
 const click = () => settle(() => button()!.click());
-const toastText = () => toast()?.textContent?.replace(/^×/, '');
+const toastText = () => toast()?.textContent;
 // The spin's turn ends. jsdom runs no animation and has no AnimationEvent, so React listens for the prefixed name.
 const turnEnds = () => settle(() => icon('refresh-cw')!.dispatchEvent(new Event('webkitAnimationIteration', { bubbles: true })));
 

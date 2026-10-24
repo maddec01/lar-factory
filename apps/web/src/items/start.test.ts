@@ -134,7 +134,7 @@ test('picking an entry starts the item with that model, shows the thread, and re
   expect(card().querySelector('[data-start]'), 'the card keeps only a quiet tag').toBeNull();
   expect(card().querySelector('.card-actions')).toBeNull();
   expect(document.activeElement, 'focus moves to the tag').toBe(tag);
-  expect(text(toast()), 'the toast does not repeat a title that is the work message title').toBe(`×Started T3 thread thread-1 for ${thread.title}.`);
+  expect(text(toast()), 'the toast does not repeat a title that is the work message title').toBe(`Started T3 thread thread-1 for ${thread.title}.`);
   expect(toast()!.querySelector('code.thread-id')).not.toBeNull();
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({ instanceId: 'claudeAgent', model: 'claude-opus-5-5' });
   await open('PVTI_sample06');

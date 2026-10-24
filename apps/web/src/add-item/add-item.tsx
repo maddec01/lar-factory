@@ -6,6 +6,7 @@ import type { FormEvent } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { applicability, ITEM_KINDS } from '@mux-factory/shared';
 import type { RepoConfig } from '@mux-factory/shared';
+import { Button } from '@mux-factory/ui/button';
 import { useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
@@ -53,7 +54,7 @@ function AddItemForm() {
     <form id="add-item-form" noValidate aria-busy={phase === 'pending'} onSubmit={onSubmit} onInput={edit}>
       <div className="form-heading">
         <Dialog.Title id="add-item-heading">Add item</Dialog.Title>
-        <Dialog.Close className="copy" data-close-item>Close</Dialog.Close>
+        <Dialog.Close render={<Button variant="outline" size="xs" />} data-close-item>Close</Dialog.Close>
       </div>
       <p className="form-hint">Create an issue in {data.project.title} and add it to List.</p>
       <fieldset id="item-fields" className="item-fields" disabled={locked}>
@@ -87,11 +88,11 @@ function AddItemForm() {
       </fieldset>
       <Result message={message} />
       <div className="form-actions">
-        <button type="submit" className="copy submit-item" id="item-submit"
+        <Button type="submit" id="item-submit"
           disabled={phase === 'pending' || phase === 'uncertain' || data.capture?.enabled === false}>
           {phase === 'pending' ? 'Adding…' : phase === 'retry' ? 'Retry this submission' : 'Add to List'}
-        </button>
-        <button type="button" className="copy" id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>New item</button>
+        </Button>
+        <Button variant="outline" size="xs" id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>New item</Button>
       </div>
     </form>
   );
@@ -101,7 +102,7 @@ export function AddItem() {
   const { draft, open, setOpen } = useAddItemStore();
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger className="copy add-item">Add item</Dialog.Trigger>
+      <Dialog.Trigger className="add-item" render={<Button variant="outline" size="xs" />}>Add item</Dialog.Trigger>
       <Dialog.Portal keepMounted>
         <Dialog.Backdrop className="dialog-backdrop" />
         <Dialog.Popup id="add-item-dialog" initialFocus={() => document.getElementById('item-repo')}>

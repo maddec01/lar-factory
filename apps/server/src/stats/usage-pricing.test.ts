@@ -4,9 +4,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apiCost, createOverrideRateTable, lookupRate, parseRateTable, priceUsage, resolveModelAliases } from '../src/usage-pricing.ts';
-import type { Pricing } from '../src/usage-pricing.ts';
-import type { UsageRecord, UsageSpeed } from '../src/transcript-usage.ts';
+import { apiCost, createOverrideRateTable, lookupRate, parseRateTable, priceUsage, resolveModelAliases } from './usage-pricing.ts';
+import type { Pricing } from './usage-pricing.ts';
+import type { UsageRecord, UsageSpeed } from './transcript-usage.ts';
 
 const rate = (input: number, cacheRead?: number) => ({
   input_cost_per_token: input,

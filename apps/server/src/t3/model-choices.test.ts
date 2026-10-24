@@ -3,9 +3,9 @@ import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { findModelChoice, loadModelChoices } from '../src/model-choices.ts';
-import { modelManifestPath } from '../src/item-stats.ts';
-import { tempDir } from './stats-db.ts';
+import { findModelChoice, loadModelChoices } from './model-choices.ts';
+import { modelManifestPath } from '../stats/item-stats.ts';
+import { tempDir } from '../../test/stats-db.ts';
 
 const MANIFEST = {
   fetchedAtMs: 1,

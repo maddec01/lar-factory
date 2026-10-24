@@ -8,7 +8,7 @@
     "build:web": "pnpm --dir ../web run build",
     "start": "pnpm run build:web && node --disable-warning=ExperimentalWarning src/server.ts",
     "dev": "pnpm run build:web && { pnpm --dir ../web run build --watch --clearScreen false & trap 'kill $!' EXIT; node --disable-warning=ExperimentalWarning --watch --watch-path=src --watch-path=../web/dist src/server.ts; }",
-    "test": "pnpm run build:web && node --disable-warning=ExperimentalWarning --test \"test/*.test.ts\"",
+    "test": "pnpm run build:web && node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\" \"test/*.test.ts\"",
     "typecheck": "tsc --noEmit -p .",
     "sample": "pnpm run build:web && BOARD_DATA_FILE=../../packages/shared/test/sample.json T3_SETTINGS=test/t3-settings.sample.json T3_MODEL_MANIFEST=test/model-manifest.sample.json node --disable-warning=ExperimentalWarning src/server.ts"
   },

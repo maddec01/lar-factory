@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
-import { findTools, mergePaths, readLoginPath } from '../src/tools.ts';
+import { findTools, mergePaths, readLoginPath } from './tools.ts';
 
 /** A temp folder with `bin` holding runnable files of the given names, and a login shell whose PATH starts with `bin`. */
 async function machine(t: TestContext, names: string[]) {

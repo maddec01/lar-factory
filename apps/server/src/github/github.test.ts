@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ISSUE_SEARCH_QUERY, ITEMS_QUERY } from '../src/github.ts';
+import { ISSUE_SEARCH_QUERY, ITEMS_QUERY } from './github.ts';
 import { buildSubIssueSearch, sliceLabelSearch, normalizeItem, normalizeItems } from '@mux-factory/shared';
 import type { RawIssueRef, RawItem, RawLinkedPr } from '@mux-factory/shared';
 

@@ -2,7 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import type { ModelChoice, StartResult } from '@mux-factory/shared';
-import { missingTool, toolCommand } from './tools.ts';
+import { missingTool, toolCommand } from '../tools/tools.ts';
 
 const UNCERTAIN: StartResult = { thread: null, uncertain: true,
   error: "The thread's start could not be confirmed. Check the repository's project in T3 Code before starting it again." };

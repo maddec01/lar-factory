@@ -55,13 +55,13 @@ function Repo({ platform, repo, items, now, scoped, onScope, pick }: { platform:
   );
 }
 
-function Tile({ label, value, sub, tone, children }: { label: string; value: ReactNode; sub?: string; tone?: string; children?: ReactNode }) {
+/** One stat in the strip: the number, its label, an optional small chart, and the longer note on hover. */
+function Stat({ label, value, note, tone, children }: { label: string; value: ReactNode; note: string; tone?: string; children?: ReactNode }) {
   return (
-    <div className="grid content-start gap-1 rounded-xl border border-(--border) bg-(--card) px-4 py-3">
-      <span className="text-xs text-(--muted-foreground)">{label}</span>
-      <span className="text-2xl font-semibold tabular-nums" style={tone ? { color: tone } : undefined}>{value}</span>
-      {sub && <span className="text-[11px] text-(--muted-foreground)">{sub}</span>}
-      {children}
+    <div title={note} className="flex min-w-0 flex-1 items-center gap-2 px-3.5">
+      <span className="text-base font-semibold tabular-nums" style={tone ? { color: tone } : undefined}>{value}</span>
+      <span className="truncate text-xs text-(--muted-foreground)">{label}</span>
+      {children && <span className="ml-auto shrink-0">{children}</span>}
     </div>
   );
 }
@@ -73,8 +73,8 @@ function Throughput({ done, now }: { done: Item[]; now: number }) {
   });
   const max = Math.max(1, ...days);
   return (
-    <div className="flex h-6 items-end gap-1">
-      {days.map((n, i) => <div key={i} className="flex-1 rounded-sm bg-(--success)" style={{ height: `${Math.max(3, (n / max) * 24)}px`, opacity: n ? 1 : 0.2 }} title={`${n} done`} />)}
+    <div className="flex h-4 w-14 items-end gap-0.5">
+      {days.map((n, i) => <div key={i} className="flex-1 rounded-[1px] bg-(--success)" style={{ height: `${Math.max(2, (n / max) * 16)}px`, opacity: n ? 1 : 0.2 }} />)}
     </div>
   );
 }
@@ -285,14 +285,14 @@ export function VariantE() {
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="grid gap-7 px-6 py-5">
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3">
-                  <Tile label="Needs you" value={s.needsYou.length} tone={s.needsYou.length ? 'var(--warning-foreground)' : undefined} sub="only you can move these" />
-                  <Tile label="Building" value={<>{building}<span className="text-base text-(--muted-foreground)">/2</span></>} sub={building >= 2 ? 'at the in-flight limit' : 'slots free'}>
-                    <div className="flex gap-1">{[0, 1].map((n) => <span key={n} className="h-1.5 flex-1 rounded-full" style={{ background: n < building ? 'var(--primary)' : 'var(--soft)' }} />)}</div>
-                  </Tile>
-                  <Tile label="Queued" value={s.queued.length} sub={`${s.list.length} more in List`} />
-                  <Tile label="Shipped" value={s.done.length} sub="last 7 days"><Throughput done={s.done} now={now} /></Tile>
-                  <Tile label="Spend" value={formatUsd(spend)} sub="agent cost, open and recent" />
+                <div className="flex h-11 items-center divide-x divide-(--border) overflow-x-auto rounded-xl border border-(--border) bg-(--card)">
+                  <Stat label="Needs you" value={s.needsYou.length} tone={s.needsYou.length ? 'var(--warning-foreground)' : undefined} note="Only you can move these" />
+                  <Stat label="Building" value={<>{building}<span className="text-xs font-normal text-(--muted-foreground)">/2</span></>} note={building >= 2 ? 'At the in-flight limit' : 'Slots free'}>
+                    <span className="flex w-8 gap-0.5">{[0, 1].map((n) => <span key={n} className="h-1.5 flex-1 rounded-full" style={{ background: n < building ? 'var(--primary)' : 'var(--soft)' }} />)}</span>
+                  </Stat>
+                  <Stat label="Queued" value={s.queued.length} note={`${s.list.length} more in List`} />
+                  <Stat label="Shipped" value={s.done.length} note="Done in the last 7 days"><Throughput done={s.done} now={now} /></Stat>
+                  <Stat label="Spend" value={formatUsd(spend)} note="Agent cost on open and recent items" />
                 </div>
                 <section className="grid gap-3">
                   <h2 className="m-0 text-[13px] font-medium">Your desk <span className="text-(--muted-foreground)">{s.needsYou.length}</span></h2>

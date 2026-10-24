@@ -19,14 +19,18 @@ export function DismissButton({ what, onClick }: { what: string; onClick: () => 
   return <button type="button" className="dismiss" aria-label={`Dismiss${what}`} onClick={onClick}>{'×'}</button>;
 }
 
+/** Moves focus to the first of `selectors` on the page, if something took it away with the element that had it. */
+export function refocus(selectors: string[]): void {
+  if (document.activeElement !== document.body) return;
+  // querySelector returns the first in page order; take the first selector that matches.
+  selectors.map((sel) => document.querySelector<HTMLElement>(sel)).find(Boolean)?.focus({ preventScroll: true });
+}
+
 /** Closes something in `close`, then, if focus was inside `el`, moves it to the first of `next` that's on the page. */
 export function closeKeepingFocus(el: Element | null, close: () => void, next: string[] = []): void {
   const hadFocus = Boolean(el?.contains(document.activeElement));
   flushSync(close);
-  if (!hadFocus || document.activeElement !== document.body) return;
-  // querySelector returns the first in page order; take the first selector that matches.
-  const target = [...next, FALLBACK_FOCUS].map((sel) => document.querySelector<HTMLElement>(sel)).find(Boolean);
-  target?.focus({ preventScroll: true });
+  if (hadFocus) refocus([...next, FALLBACK_FOCUS]);
 }
 
 /** One toast. `onClose` runs when it's closed or, for a success, when its time is up. */

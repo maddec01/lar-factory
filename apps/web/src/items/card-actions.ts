@@ -9,6 +9,7 @@ import { useActionStore } from './action-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { holdAnchor } from '../board/keep-anchor.ts';
 import { notify } from '../notices/notices.tsx';
+import { refocus } from '../notices/toasts.tsx';
 
 export interface ActionResult {
   error: string | null;
@@ -59,12 +60,6 @@ function focusAfterCardLeaving(button: HTMLElement): string[] {
     }
   }
   return [`#${CSS.escape(button.closest('section')?.id ?? '')}-h`];
-}
-
-/** Moves focus to the first of `selectors` on the page, if the action took it away with its button. */
-export function refocus(selectors: string[]): void {
-  if (document.activeElement !== document.body) return;
-  selectors.map((sel) => document.querySelector<HTMLElement>(sel)).find(Boolean)?.focus({ preventScroll: true });
 }
 
 const pending = (itemId: string) => useActionStore.getState().actions[itemId]?.phase === 'pending';

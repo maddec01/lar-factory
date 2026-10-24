@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import type { BoardData } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
+import { refocus } from './toasts.tsx';
 
 /** A Recheck's answer: the error when it failed, else null, and the tool problems it left, serialised. */
 export interface RecheckAnswer {
@@ -35,7 +36,7 @@ export const useRecheckStore = create<RecheckState>()((set, get) => ({
       set({ checking: false, answer: { error: result.error, tools: toolsOf(useBoardStore.getState().data) } });
     });
     // The button was disabled while checking, which dropped its focus.
-    if (document.activeElement === document.body) document.querySelector<HTMLElement>('[data-recheck]')?.focus({ preventScroll: true });
+    refocus(['[data-recheck]']);
   },
 }));
 

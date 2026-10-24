@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit -p . && pnpm -r run typecheck",
     "sample": "pnpm --filter @mux-factory/server sample",
     "dev": "pnpm --filter @mux-factory/desktop dev",
-    "knip": "knip"
+    "knip": "knip",
+    "prototype": "BOARD_PORT=${BOARD_PORT:-4399} pnpm --filter @mux-factory/server sample"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

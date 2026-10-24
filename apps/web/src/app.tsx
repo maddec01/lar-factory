@@ -11,13 +11,14 @@ import { restoreAnchor } from './board/keep-anchor.ts';
 import { Toasts } from './notices/toasts.tsx';
 import { TitleBar } from './title-bar/TitleBar.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
+import { Prototype } from './prototype/prototype.tsx';
 
 export function App() {
   const data = useBoardStore((state) => state.data);
   // New data may change what's above the reading position; put it back before the browser paints.
   useLayoutEffect(restoreAnchor, [data]);
   if (data.tools?.t3) return <><TitleBar /><T3Missing problem={data.tools.t3} /></>;
-  return (
+  return <Prototype board={(
     <>
       <TitleBar />
       <Header />
@@ -31,5 +32,5 @@ export function App() {
       <Toasts />
       <AbandonDialog />
     </>
-  );
+  )} />;
 }

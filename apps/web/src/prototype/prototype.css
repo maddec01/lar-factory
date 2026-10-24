@@ -1,0 +1,17 @@
+/* PROTOTYPE, throwaway. T3 Code's sidebar and status tones, made from the design system's tokens. */
+.proto {
+  --sidebar: color-mix(in srgb, var(--foreground) 2%, var(--background));
+  --sidebar-fg: var(--foreground);
+  --sidebar-muted: color-mix(in srgb, var(--muted-foreground) 85%, var(--background));
+  --row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
+  --row-active: color-mix(in srgb, var(--foreground) 8%, transparent);
+  --st-amber: var(--warning);
+  --st-now: var(--primary);
+  --st-review: var(--sub);
+  --st-done: var(--success);
+  --st-idle: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+  font-size: var(--text-sm);
+}
+.proto a { text-decoration: none; }
+@keyframes proto-pulse { 50% { opacity: 0.35; } }
+.proto-pulse { animation: proto-pulse 1.6s ease-in-out infinite; }

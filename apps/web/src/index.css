@@ -7,6 +7,7 @@
 @import "./notices/notices.css";
 @import "./add-item/add-item.css";
 @import "./settings/settings.css";
+@import "./prototype/prototype.css";
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item/add-item.tsx";
@@ -19,6 +20,8 @@
 @source "./updates/UpdateButton.tsx";
 @source "./updates/UpdateStatusIcon.tsx";
 @source "./updates/refresh-icon.tsx";
+/* PROTOTYPE, throwaway (branch prototype/companion-app). */
+@source "./prototype";
 
 /* Full browser width, with T3's workspace gutter. */
 #app { padding: --spacing(3.5) --spacing(5) --spacing(12); }

@@ -6,8 +6,8 @@
 // never drag the window; the rest of the bar, Refreshed and the gaps between the buttons included, does.
 
 import { useEffect, useState } from 'react';
-import { shortAgo } from '../format.ts';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../brand-mark.ts';
+import { shortAgo } from '../../../server/src/format.ts';
+import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../../../server/src/brand-mark.ts';
 import { AddItem } from './AddItem.tsx';
 import { inMacApp } from './board-app.ts';
 import { useBoardStore } from './board-store.ts';
@@ -40,7 +40,7 @@ export function TitleBar() {
         {/* Screen readers skip the brand: the header's hidden h1 already names the page. */}
         <span className="title-bar-brand inline-flex items-center gap-2" aria-hidden="true">
           <span className="inline-flex items-baseline gap-1 text-sm font-medium tracking-tight">
-            {/* The logo sits on the baseline and the µ's tail hangs below, as in the page header (styles.css .brand-mark). */}
+            {/* The logo sits on the baseline and the µ's tail hangs below, as in the page header (index.css .brand-mark). */}
             <svg className="relative top-[calc(12.5px*8.75/32)] h-[12.5px] w-[22px] shrink-0" role="img" aria-label="Mux" viewBox={BRAND_MARK_VIEWBOX} fill="none">
               <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>

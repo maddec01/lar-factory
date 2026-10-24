@@ -3,9 +3,9 @@
 // issue rather than making two. A created item closes the dialog and shows the Added toast.
 
 import { create } from 'zustand';
-import { validateDraft } from '../add-item.ts';
-import type { CreationResult, ItemDraft } from '../add-item.ts';
-import type { BoardData } from '../model.ts';
+import { validateDraft } from '../../../server/src/add-item.ts';
+import type { CreationResult, ItemDraft } from '../../../server/src/add-item.ts';
+import type { BoardData } from '../../../server/src/model.ts';
 import { writeHeaders } from './board-app.ts';
 import { useBoardStore } from './board-store.ts';
 import { notify } from './notices.tsx';

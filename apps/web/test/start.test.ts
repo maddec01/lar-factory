@@ -3,7 +3,7 @@
 
 import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle } from './support.ts';
-import type { BoardData, ModelGroup } from '../../src/model.ts';
+import type { BoardData, ModelGroup } from '../../server/src/model.ts';
 
 const MODEL_CHOICES: ModelGroup[] = [
   { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },

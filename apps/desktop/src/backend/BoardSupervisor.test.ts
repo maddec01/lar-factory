@@ -167,7 +167,7 @@ describe("supervise with a real server", () => {
     Effect.gen(function* () {
       const config = {
         ...BoardServer.makeStartConfig({
-          ...BoardServer.locate(NodePath.resolve(import.meta.dirname, "../..")),
+          ...BoardServer.locate(NodePath.resolve(import.meta.dirname, "../.."), false),
           executablePath: process.execPath,
           env: process.env,
           secret: "test-secret",

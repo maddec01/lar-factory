@@ -4,7 +4,7 @@
 
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle } from './support.ts';
-import type { BoardData, Status } from '../../src/model.ts';
+import type { BoardData, Status } from '../../server/src/model.ts';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const button = (attr: string, id: string) => $<HTMLButtonElement>(`[data-${attr}="${id}"]`)!;

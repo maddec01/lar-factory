@@ -3,7 +3,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
-import type { UpdateChannel, UpdateReleaseNote, UpdateState } from "../../../board/src/app/board-app.ts";
+import type { UpdateChannel, UpdateReleaseNote, UpdateState } from "../../../web/src/app/board-app.ts";
 
 const NIGHTLY_VERSION_PATTERN = /^[^-+]+-nightly\.\d{8}\.\d+$/;
 

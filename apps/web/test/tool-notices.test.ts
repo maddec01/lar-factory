@@ -3,7 +3,7 @@
 
 import { afterEach, expect, test } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle, stream } from './support.ts';
-import type { BoardData, ToolProblems } from '../../src/model.ts';
+import type { BoardData, ToolProblems } from '../../server/src/model.ts';
 
 const withTools = (tools: ToolProblems, fields: Partial<BoardData> = {}): BoardData => ({ ...sample, tools, ...fields });
 const failed = { error: 'gh api graphql failed: HTTP 401' };

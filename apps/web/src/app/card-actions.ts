@@ -2,7 +2,7 @@
 // keyboard focus on the page when the item leaves its list.
 
 import { flushSync } from 'react-dom';
-import type { BoardData } from '../model.ts';
+import type { BoardData } from '../../../server/src/model.ts';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
 import { writeHeaders } from './board-app.ts';

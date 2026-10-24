@@ -3,7 +3,7 @@
 
 import { flushSync } from 'react-dom';
 import { create } from 'zustand';
-import type { BoardData } from '../model.ts';
+import type { BoardData } from '../../../server/src/model.ts';
 import { useBoardStore } from './board-store.ts';
 import { postAction, receive } from './card-actions.ts';
 

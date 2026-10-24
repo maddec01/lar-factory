@@ -6,8 +6,8 @@
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
-import { INSTALL_MANIFEST, isProfileName, listClaudeProfiles, setProfileTick } from "../../../board/src/install-skills.ts";
-import type { ProfilesResult } from "../../../board/src/app/board-app.ts";
+import { INSTALL_MANIFEST, isProfileName, listClaudeProfiles, setProfileTick } from "../../../server/src/install-skills.ts";
+import type { ProfilesResult } from "../../../web/src/app/board-app.ts";
 
 const message = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
 

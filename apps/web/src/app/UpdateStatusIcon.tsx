@@ -1,6 +1,6 @@
 // The update button's icon in each state, copied from T3 Code's
 // apps/web/src/components/sidebar/DesktopUpdateStatusIcon.tsx at 9a391eb, without the "update everything"
-// icon. T3's sidebar colours are the board's --update-* colours (styles.css).
+// icon. T3's sidebar colours are the board's --update-* colours (index.css).
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
 

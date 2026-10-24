@@ -4,7 +4,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
-import type { UpdateChannel, UpdateReleaseNote } from "../../../board/src/app/board-app.ts";
+import type { UpdateChannel, UpdateReleaseNote } from "../../../web/src/app/board-app.ts";
 import { defaultChannel } from "./updateMachine.ts";
 
 interface ElectronReleaseNoteInfo {

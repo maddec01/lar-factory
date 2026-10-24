@@ -1,14 +1,14 @@
 {
-  "name": "mux-factory-board-app",
+  "name": "@mux-factory/desktop",
   "private": true,
   "version": "0.1.0",
   "description": "The board app: an Electron window that runs the Mux factory board, copied from T3 Code's desktop app.",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "pnpm --dir ../board run build && vp pack && node scripts/start-electron.mjs",
-    "build": "pnpm --dir ../board run build && vp pack && node scripts/build-desktop-artifact.ts",
-    "test": "pnpm --dir ../board run build && vp test run",
+    "dev": "pnpm --dir ../web run build && vp pack && node scripts/start-electron.mjs",
+    "build": "pnpm --dir ../web run build && vp pack && node scripts/build-desktop-artifact.ts",
+    "test": "pnpm --dir ../web run build && vp test run",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {

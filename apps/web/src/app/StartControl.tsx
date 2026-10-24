@@ -5,9 +5,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Menu } from '@base-ui/react/menu';
-import { ref } from '../model.ts';
-import type { BoardData, Item, ModelChoice } from '../model.ts';
-import { highlightedChoice, storedChoice } from '../start-menu.ts';
+import { ref } from '../../../server/src/model.ts';
+import type { BoardData, Item, ModelChoice } from '../../../server/src/model.ts';
+import { highlightedChoice, storedChoice } from '../../../server/src/start-menu.ts';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './Card.tsx';
 import { startItem } from './start-item.ts';

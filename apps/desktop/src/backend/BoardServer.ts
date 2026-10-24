@@ -52,14 +52,15 @@ export interface BoardLocation {
 }
 
 /**
- * Finds `board/` and `config.json` next to `appPath`, Electron's app path. In
- * development that is `app/` in the checkout; packaged, it is `Resources/app.asar`,
- * and the package puts the board's files and `config.json` in `Resources/`.
+ * Finds the board server and `config.json` from `appPath`, Electron's app path. In
+ * development that is `apps/desktop` in the checkout, beside `apps/server`, with
+ * `config.json` at the repo root; packaged, it is `Resources/app.asar`, and the
+ * package puts the board's files in `Resources/board` and `config.json` in `Resources/`.
  */
-export const locate = (appPath: string): BoardLocation => ({
-  boardDir: NodePath.resolve(appPath, "../board"),
-  configFile: NodePath.resolve(appPath, "../config.json"),
-});
+export const locate = (appPath: string, isPackaged: boolean): BoardLocation =>
+  isPackaged
+    ? { boardDir: NodePath.resolve(appPath, "../board"), configFile: NodePath.resolve(appPath, "../config.json") }
+    : { boardDir: NodePath.resolve(appPath, "../server"), configFile: NodePath.resolve(appPath, "../../config.json") };
 
 /**
  * Runs `boardDir/src/server.ts` with `executablePath` in Node mode. In the app that

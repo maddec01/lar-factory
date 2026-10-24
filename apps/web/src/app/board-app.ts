@@ -1,7 +1,7 @@
 // What the board app's preload bridge (app/src/preload.ts) hands the page. Outside the app,
 // in a browser or `pnpm run sample`, there is no bridge, so whatever needs it doesn't show there.
 
-import type { ClaudeProfile, TickResult } from '../install-skills.ts';
+import type { ClaudeProfile, TickResult } from '../../../server/src/install-skills.ts';
 
 /** The Claude profiles after a call, with what the last tick left alone and removed, or why it failed. */
 export interface ProfilesResult {

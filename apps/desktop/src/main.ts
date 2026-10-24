@@ -216,7 +216,7 @@ const program = Effect.gen(function* () {
   // Read once: a restarted server keeps the PATH the first one got.
   const env = yield* ShellEnvironment.childEnvironment(process.env);
   const config = BoardServer.makeStartConfig({
-    ...BoardServer.locate(Electron.app.getAppPath()),
+    ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
     executablePath: process.execPath,
     env,
     secret,

@@ -3,7 +3,7 @@
 // profiles again, and keeps reading them until the app has installed its skills.
 
 import { create } from 'zustand';
-import type { ClaudeProfile } from '../install-skills.ts';
+import type { ClaudeProfile } from '../../../server/src/install-skills.ts';
 import { boardApp, type ProfilesResult, type UpdateChannel } from './board-app.ts';
 import { useUpdateStore } from './update-store.ts';
 

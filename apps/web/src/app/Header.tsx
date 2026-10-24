@@ -1,10 +1,10 @@
 // The page's header, below the title bar: the page's heading for screen readers, the counts, and the banners for a gh
 // the board can't use, stale data and an unreachable server, which closes.
 
-import { countsOf, isStale } from '../model.ts';
-import type { BoardData } from '../model.ts';
-import { ago, clock } from '../format.ts';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../brand-mark.ts';
+import { countsOf, isStale } from '../../../server/src/model.ts';
+import type { BoardData } from '../../../server/src/model.ts';
+import { ago, clock } from '../../../server/src/format.ts';
+import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '../../../server/src/brand-mark.ts';
 import { useBoardStore } from './board-store.ts';
 import { ClosableBanner } from './ClosableBanner.tsx';
 import { CLIENT_ERROR } from './live-data.ts';

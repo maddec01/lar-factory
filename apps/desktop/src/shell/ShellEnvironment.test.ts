@@ -90,6 +90,7 @@ describe("childEnvironment", () => {
     Effect.gen(function* () {
       const { env, commands } = yield* readChildEnvironment({
         env: { SHELL: "/opt/homebrew/bin/nu", PATH: "/usr/bin" },
+        userShell: "/bin/zsh",
         handler: (command) => (command === "/bin/launchctl" ? "/opt/homebrew/bin:/usr/bin\n" : ""),
       });
       assert.deepStrictEqual(commands, ["/opt/homebrew/bin/nu", "/bin/zsh", "/bin/launchctl"]);

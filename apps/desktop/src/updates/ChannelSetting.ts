@@ -6,7 +6,7 @@ import * as NodePath from "node:path";
 
 import * as Effect from "effect/Effect";
 
-import type { UpdateChannel } from "../../../board/src/app/board-app.ts";
+import type { UpdateChannel } from "../../../web/src/app/board-app.ts";
 
 export interface ChannelSetting {
   /** The chosen channel, or null before any choice or when the file can't be read. */

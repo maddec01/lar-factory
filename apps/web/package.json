@@ -1,0 +1,30 @@
+{
+  "name": "@mux-factory/web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The board's page: React, built by Vite+ into dist/, which the board server serves.",
+  "type": "module",
+  "scripts": {
+    "build": "vp build",
+    "test": "vp test run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "~19.3.0",
+    "@types/react-dom": "~19.3.0",
+    "jsdom": "^30.0.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.3.0",
+    "vite-plus": "1.3.0"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.4.1",
+    "lucide-react": "^1.61.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zustand": "^5.0.11"
+  }
+}

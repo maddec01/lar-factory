@@ -14,7 +14,7 @@ import type {
   UpdateChannel,
   UpdateCheckResult,
   UpdateState,
-} from "../../../board/src/app/board-app.ts";
+} from "../../../web/src/app/board-app.ts";
 import type { ChannelSetting } from "./ChannelSetting.ts";
 import type { ElectronUpdater, ElectronUpdaterError } from "./ElectronUpdater.ts";
 import { normalizeReleaseNotes } from "./releaseNotes.ts";

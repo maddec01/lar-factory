@@ -1,7 +1,7 @@
 // The page's entry for Vite+: the board's styles, with Tailwind, and the React app, which first
 // paints the board data the server put in the page and then keeps it live.
 
-import './styles.css';
+import './index.css';
 import { StrictMode } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';

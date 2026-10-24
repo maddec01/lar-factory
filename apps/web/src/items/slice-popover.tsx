@@ -4,11 +4,13 @@
 // presses outside and Escape.
 
 import { useRef } from 'react';
-import type { ReactNode } from 'react';
-import { Popover } from '@base-ui/react/popover';
+import type { ComponentProps, ReactNode } from 'react';
 import { popoverOrder } from '@mux-factory/shared';
 import type { Item, Slice } from '@mux-factory/shared';
+import { Popover, PopoverPopup, PopoverTrigger } from '@mux-factory/ui/popover';
 import { useSlicePopoverOpen, useSlicePopoverStore } from './slice-popover-store.ts';
+
+type PopoverChangeDetails = Parameters<NonNullable<ComponentProps<typeof Popover>['onOpenChange']>>[1];
 
 export const sliceKey = (s: Slice) => `${s.repo}#${s.number}`;
 
@@ -24,7 +26,7 @@ export function SlicePopover({ item, children }: { item: Item; children: ReactNo
   };
   const send = useSlicePopoverStore.getState().send;
   const state = () => useSlicePopoverStore.getState().state;
-  const onOpenChange = (_open: boolean, details: Popover.Root.ChangeEventDetails) => {
+  const onOpenChange = (_open: boolean, details: PopoverChangeDetails) => {
     if (details.reason === 'trigger-press') send({ type: 'tap', id });
     else if (details.reason === 'outside-press') send({ type: 'outside' });
     // Tab out of the popover: Base UI then focuses what follows the trigger, so it must close, even
@@ -44,8 +46,8 @@ export function SlicePopover({ item, children }: { item: Item; children: ReactNo
       onPointerLeave={(e) => e.pointerType !== 'touch' && state().hovered === id && send({ type: 'hover', id: null })}
       onFocus={() => send({ type: 'focus', id })}
       onBlur={(e) => !inside(e.relatedTarget) && state().focused === id && send({ type: 'focus', id: null })}>
-      <Popover.Root open={open} onOpenChange={onOpenChange}>
-        <Popover.Trigger className="slices-trigger" nativeButton={false} render={<div />} aria-controls={popId}
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger className="slices-trigger" nativeButton={false} render={<div />} aria-controls={popId}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             e.preventDefault();
@@ -55,24 +57,23 @@ export function SlicePopover({ item, children }: { item: Item; children: ReactNo
           // Base UI clicks a div trigger on Space's keyup, which would count as a tap and undo the toggle.
           onKeyUp={(e) => e.key === ' ' && e.preventBaseUIHandler()}>
           {children}
-        </Popover.Trigger>
+        </PopoverTrigger>
         {/* In <body>, so Tab leaves the last slice for what follows the card. React's events still
-            bubble from it to the block, so the pointer or focus on it count as on the card's bars. */}
-        <Popover.Portal keepMounted>
-          <Popover.Positioner className="slices-positioner" side="bottom" align="start" sideOffset={2} anchor={block}>
-            <Popover.Popup className="slices-pop" id={popId} ref={popup} initialFocus={false} finalFocus={false}>
-              <ul className="slice-rows" aria-label="Slices">
-                {popoverOrder(item.slices).map((s) => (
-                  <li className={`row-item slice-row ${s.progress}`} key={sliceKey(s)}>
-                    <span className="slice-mark" aria-hidden="true" />
-                    <a className="row-title" href={s.url} title={s.title} target="_blank" rel="noopener"><span className="ref">#{s.number}</span> {s.title}<span className="sr-only"> ({s.progress})</span></a>
-                  </li>
-                ))}
-              </ul>
-            </Popover.Popup>
-          </Popover.Positioner>
-        </Popover.Portal>
-      </Popover.Root>
+            bubble from it to the block, so the pointer or focus on it count as on the card's bars.
+            Its ::after bridges the gap, so the pointer can cross from the bars into it. */}
+        <PopoverPopup keepMounted anchor={block} side="bottom" align="start" sideOffset={2} padding="compact"
+          className="w-[max(var(--anchor-width),--spacing(75))] after:absolute after:inset-x-0 after:-top-2 after:h-2 data-[side=top]:after:top-auto data-[side=top]:after:-bottom-2"
+          id={popId} ref={popup} initialFocus={false} finalFocus={false}>
+          <ul className="slice-rows max-h-70 overflow-y-auto" aria-label="Slices">
+            {popoverOrder(item.slices).map((s) => (
+              <li className={`row-item slice-row ${s.progress}`} key={sliceKey(s)}>
+                <span className="slice-mark" aria-hidden="true" />
+                <a className="row-title" href={s.url} title={s.title} target="_blank" rel="noopener"><span className="ref">#{s.number}</span> {s.title}<span className="sr-only"> ({s.progress})</span></a>
+              </li>
+            ))}
+          </ul>
+        </PopoverPopup>
+      </Popover>
     </div>
   );
 }

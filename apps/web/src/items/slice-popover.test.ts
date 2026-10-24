@@ -34,7 +34,7 @@ test('it lists the slices behind a disclosure trigger, closed until asked', asyn
   await mountPage();
   expect(isOpen()).toBe(false);
   expect(['role', 'tabindex'].map((a) => trigger().getAttribute(a))).toEqual(['button', '0']);
-  expect(pop()!.classList.contains('slices-pop')).toBe(true);
+  expect(pop()!.dataset.slot, 'T3\'s Popover').toBe('popover-popup');
   expect(trigger().getAttribute('aria-controls')).toBe(pop()!.id);
   expect([...pop()!.querySelectorAll('li.slice-row')].map((li) => li.classList[2])).toEqual(['active', 'waiting', 'done']);
 });
@@ -53,7 +53,7 @@ test('it opens while focus is on its trigger or a slice link, and closes when fo
   expect(isOpen()).toBe(true);
   await focus(pop()!.querySelector('a')!);
   expect(isOpen(), 'focus moved into the popover').toBe(true);
-  expect(document.activeElement?.closest('.slices-pop')).toBe(pop());
+  expect(document.activeElement?.closest('[data-slot="popover-popup"]')).toBe(pop());
   await blur();
   expect(isOpen()).toBe(false);
 });

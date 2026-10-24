@@ -178,7 +178,7 @@ export function VariantE() {
       <main className="flex min-w-0 flex-1 flex-col">
         {settings ? (
           <>
-            <SettingsHeader page={current} leading={sidebar ? undefined : <span className="w-[116px] shrink-0" />} />
+            <SettingsHeader page={current} leading={sidebar ? undefined : <span className="w-[86px] shrink-0" />} />
             <div className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto max-w-2xl px-8 py-8"><SettingsBody page={current} /></div></div>
           </>
         ) : (

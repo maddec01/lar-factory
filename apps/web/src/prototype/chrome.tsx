@@ -41,8 +41,8 @@ export function Brand() {
   );
 }
 
-/** Where T3 puts the window's controls: its sidebar toggle 1 px past the traffic lights' 90 px inset, fixed to the
- *  window's top left so the toggle stays put while the sidebar slides away. */
+/** The window's controls: the sidebar toggle 8 px past the traffic lights (16 px in, 52 px wide), the same gap as
+ *  between the lights, fixed to the window's top left so the toggle stays put while the sidebar slides away. */
 export function WindowControls({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <div className="pointer-events-none fixed left-0 top-0 z-50 flex h-[52px] items-center">
@@ -50,7 +50,7 @@ export function WindowControls({ open, onToggle }: { open: boolean; onToggle: ()
       <Tooltip>
         <TooltipTrigger render={
           <UiButton variant="ghost" size="icon" aria-label="Toggle main sidebar" aria-pressed={open} onClick={onToggle}
-            className={`pointer-events-auto absolute left-[91px] size-7! ${noDrag}`} />
+            className={`pointer-events-auto absolute left-[76px] size-7! ${noDrag}`} />
         }>
           {open ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
         </TooltipTrigger>
@@ -60,8 +60,8 @@ export function WindowControls({ open, onToggle }: { open: boolean; onToggle: ()
   );
 }
 
-/** T3's --workspace-titlebar-content-left: the 90 px inset, the 28 px toggle and a 12 px gap. */
-export const BRAND_LEFT = 'pl-[130px]';
+/** Where the brand starts: the toggle at 76 px, its 28 px, and a 6 px gap. */
+export const BRAND_LEFT = 'pl-[110px]';
 
 export function SidebarButton({ icon, label, onClick, trailing, active }: { icon: ReactNode; label: ReactNode; onClick?: () => void; trailing?: ReactNode; active?: boolean }) {
   return (

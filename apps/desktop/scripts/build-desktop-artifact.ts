@@ -84,21 +84,20 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
       "!**/*.map",
       // Goes to Resources/bundle below: Electron's fs can't copy a folder out of an asar.
       "!dist-electron/bundle/**/*",
+      // Goes to Resources/server/dist below.
+      "!dist-electron/server/**/*",
       // Bundled into dist-electron/main.cjs already.
       "!node_modules/**/*",
     ],
-    // The board server runs as source with Electron's Node, which can't strip types
-    // inside an asar, so its files go to Resources/ as plain files. Packaged,
-    // Electron's app path is Resources/app.asar, and src/backend/BoardServer.ts
-    // finds board/ and config.json beside it.
+    // The board server, bundled into one file by vp pack, runs with Electron's Node
+    // from Resources/, beside the page's build: it serves ../../web/dist from its own
+    // file. Packaged, Electron's app path is Resources/app.asar, and
+    // src/backend/BoardServer.ts finds server/ and config.json beside it.
     extraResources: [
-      // The page's sources: board/dist holds their build.
-      { from: "../board/src", to: "board/src", filter: ["**/*", "!**/*.tsx", "!app/**", "!styles.css"] },
-      { from: "../board/dist", to: "board/dist" },
-      // Its "type": "module" makes Node load board/src as ES modules.
-      { from: "../board/package.json", to: "board/package.json" },
+      { from: "dist-electron/server", to: "server/dist" },
+      { from: "../web/dist", to: "web/dist" },
       { from: "dist-electron/bundle", to: "bundle" },
-      { from: "../config.json", to: "config.json" },
+      { from: "../../config.json", to: "config.json" },
       // T3 Code's MIT licence: the main process, preload and scripts copy its code.
       { from: "LICENSE", to: "LICENSE.t3code.txt" },
     ],

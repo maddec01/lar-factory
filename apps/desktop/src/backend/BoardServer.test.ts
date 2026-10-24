@@ -27,34 +27,37 @@ const isRunning = (pid: number) => {
 };
 
 describe("locate", () => {
-  it("finds apps/server and the root config.json beside apps/desktop in development", () => {
+  it("runs apps/server's source, with the root config.json, beside apps/desktop in development", () => {
     assert.deepStrictEqual(BoardServer.locate("/repo/apps/desktop", false), {
-      boardDir: "/repo/apps/server",
+      serverDir: "/repo/apps/server",
+      serverFile: "/repo/apps/server/src/server.ts",
       configFile: "/repo/config.json",
     });
   });
 
-  it("finds the bundled board/ and config.json in the packaged app's Resources", () => {
+  it("runs the bundled server, with config.json, from the packaged app's Resources", () => {
     assert.deepStrictEqual(BoardServer.locate("/Applications/Board.app/Contents/Resources/app.asar", true), {
-      boardDir: "/Applications/Board.app/Contents/Resources/board",
+      serverDir: "/Applications/Board.app/Contents/Resources/server",
+      serverFile: "/Applications/Board.app/Contents/Resources/server/dist/server.mjs",
       configFile: "/Applications/Board.app/Contents/Resources/config.json",
     });
   });
 });
 
 describe("makeStartConfig", () => {
-  it("runs board/src/server.ts with the given executable in Node mode, the config file and the launch secret", () => {
+  it("runs the server file with the given executable in Node mode, the config file and the launch secret", () => {
     const config = BoardServer.makeStartConfig({
       executablePath: "/Applications/Board.app/Contents/MacOS/Board",
-      boardDir: "/repo/board",
+      serverDir: "/repo/apps/server",
+      serverFile: "/repo/apps/server/src/server.ts",
       configFile: "/repo/config.json",
       env: { PATH: "/usr/bin", ELECTRON_RUN_AS_NODE: "0" },
       secret: "launch-secret",
     });
     assert.deepStrictEqual(config, {
       executablePath: "/Applications/Board.app/Contents/MacOS/Board",
-      args: ["--disable-warning=ExperimentalWarning", "/repo/board/src/server.ts"],
-      cwd: "/repo/board",
+      args: ["--disable-warning=ExperimentalWarning", "/repo/apps/server/src/server.ts"],
+      cwd: "/repo/apps/server",
       env: {
         PATH: "/usr/bin",
         ELECTRON_RUN_AS_NODE: "1",

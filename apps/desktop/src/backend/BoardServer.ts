@@ -1,7 +1,7 @@
 // Starts the board server as a child of the main process, modelled on T3 Code's
 // apps/desktop/src/backend/DesktopBackendConfiguration.ts and DesktopBackendManager.ts.
 // T3 Code hands its server a bootstrap fd; the board reports its port over an IPC
-// channel instead (board/src/port.ts), which Effect's ChildProcess has no option
+// channel instead (apps/server/src/port.ts), which Effect's ChildProcess has no option
 // for, so this spawns with node:child_process.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
@@ -45,26 +45,41 @@ export class BoardServerError extends Data.TaggedError("BoardServerError")<{
   readonly message: string;
 }> {}
 
-/** Where the board's files sit beside the app: in the checkout, or in the packaged app's Resources. */
+/** Where the board server sits beside the app: in the checkout, or in the packaged app's Resources. */
 export interface BoardLocation {
-  readonly boardDir: string;
+  /** The server's working directory. */
+  readonly serverDir: string;
+  /** The file Node runs. */
+  readonly serverFile: string;
   readonly configFile: string;
 }
 
 /**
  * Finds the board server and `config.json` from `appPath`, Electron's app path. In
- * development that is `apps/desktop` in the checkout, beside `apps/server`, with
- * `config.json` at the repo root; packaged, it is `Resources/app.asar`, and the
- * package puts the board's files in `Resources/board` and `config.json` in `Resources/`.
+ * development that is `apps/desktop` in the checkout: the server runs from
+ * `apps/server/src/server.ts`, with `config.json` at the repo root. Packaged, it is
+ * `Resources/app.asar`, which has no node_modules, so the server runs as one bundled
+ * file in `Resources/server/dist`, which finds the page's build in `Resources/web/dist`;
+ * `config.json` sits in `Resources/`.
  */
-export const locate = (appPath: string, isPackaged: boolean): BoardLocation =>
-  isPackaged
-    ? { boardDir: NodePath.resolve(appPath, "../board"), configFile: NodePath.resolve(appPath, "../config.json") }
-    : { boardDir: NodePath.resolve(appPath, "../server"), configFile: NodePath.resolve(appPath, "../../config.json") };
+export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
+  const serverDir = NodePath.resolve(appPath, "../server");
+  return isPackaged
+    ? {
+        serverDir,
+        serverFile: NodePath.join(serverDir, "dist/server.mjs"),
+        configFile: NodePath.resolve(appPath, "../config.json"),
+      }
+    : {
+        serverDir,
+        serverFile: NodePath.join(serverDir, "src/server.ts"),
+        configFile: NodePath.resolve(appPath, "../../config.json"),
+      };
+};
 
 /**
- * Runs `boardDir/src/server.ts` with `executablePath` in Node mode. In the app that
- * is the Electron binary, whose Node strips the types, so the server runs as source.
+ * Runs `serverFile` with `executablePath` in Node mode. In the app that is the
+ * Electron binary, whose Node strips the types when the server runs as source.
  * The server reads `configFile` and refuses guarded writes that don't carry `secret`.
  */
 export const makeStartConfig = (input: BoardLocation & {
@@ -73,8 +88,8 @@ export const makeStartConfig = (input: BoardLocation & {
   readonly secret: string;
 }): StartConfig => ({
   executablePath: input.executablePath,
-  args: ["--disable-warning=ExperimentalWarning", NodePath.join(input.boardDir, "src/server.ts")],
-  cwd: input.boardDir,
+  args: ["--disable-warning=ExperimentalWarning", input.serverFile],
+  cwd: input.serverDir,
   env: { ...input.env, ELECTRON_RUN_AS_NODE: "1", BOARD_CONFIG_FILE: input.configFile, BOARD_APP_SECRET: input.secret },
 });
 
@@ -172,7 +187,7 @@ const reportedPort = (child: NodeChildProcess.ChildProcess, timeout: Duration.In
     }),
   );
 
-/** The message board/src/port.ts sends once the server listens. */
+/** The message apps/server/src/port.ts sends once the server listens. */
 const isListening = (message: unknown): message is { type: "listening"; port: number } =>
   typeof message === "object" && message !== null &&
   (message as { type?: unknown }).type === "listening" &&

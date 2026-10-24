@@ -15,7 +15,17 @@ const renderBlockingEntry: Plugin = {
 
 export default defineConfig({
   plugins: [tailwindcss(), renderBlockingEntry],
-  build: { outDir: 'dist' },
+  build: {
+    outDir: 'dist',
+    rolldownOptions: {
+      // @base-ui marks its modules "use client", which means nothing in a page without server
+      // components, so Rolldown's warning that bundling drops the directive is noise.
+      onwarn(warning, warn) {
+        if (warning.code === 'MODULE_LEVEL_DIRECTIVE' && warning.message.includes('"use client"')) return;
+        warn(warning);
+      },
+    },
+  },
   test: {
     ...sharedTest,
     environment: 'jsdom',

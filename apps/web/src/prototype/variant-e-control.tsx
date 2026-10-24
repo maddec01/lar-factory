@@ -1,5 +1,5 @@
 // PROTOTYPE, throwaway. Variant E, "Control room": C's overview with A's detail. The window stays a
-// dashboard (KPI tiles, your desk, the line as stations, repos in the sidebar), and clicking any item, in
+// dashboard (stats in the header, your desk, the line as stations, repos in the sidebar), and clicking any item, in
 // the sidebar, on the desk or on the line, opens A's full detail in a dialog over the
 // overview. The left sidebar copies T3 Code's: its toggle beside the traffic lights, search with Add item,
 // Settings and the update button at its foot. ⌘B toggles the sidebar.
@@ -15,8 +15,8 @@ import { useBoardStore } from '../board/board-store.ts';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, STATUS_COLOR, WindowControls, drag, noDrag, platformColor } from './chrome.tsx';
-import { ActionButtons, PrList, SliceBar, SliceList, StatsGrid, StepTrack, hint, refText, statsOf } from './item-bits.tsx';
-import { Stats, StatsHeader } from './stats/stats-switcher.tsx';
+import { ActionButtons, PrList, SliceBar, SliceList, StatsGrid, StepTrack, hint, refText } from './item-bits.tsx';
+import { ToolbarStats } from './toolbar-stats.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
 const STATIONS: Status[] = ['Queued', 'Shaping', 'Ready', 'In progress', 'Review', 'Verify', 'Ready to merge'];
@@ -210,10 +210,7 @@ export function VariantE() {
   }, []);
   const scoped: BoardData = platform ? { ...data, items: data.items.filter((i) => platformOf(i, data.repos) === platform) } : data;
   const s = boardSections(scoped, now);
-  const building = scoped.items.filter((i) => i.status === 'In progress').length;
-  const spend = scoped.items.reduce((t, i) => t + (statsOf(i)?.costUsd ?? 0), 0);
   const item = data.items.find((i) => i.id === opened);
-  const stats = { data: scoped, now, needsYou: s.needsYou, building, buildLimit: 2, queued: s.queued, list: s.list, done: s.done, spend };
   const current = all.find((p) => p.id === page)!;
   const q = query.trim().toLowerCase();
   return (
@@ -258,14 +255,13 @@ export function VariantE() {
               <span className="font-medium">{platform ?? 'Whole factory'}</span>
               {platform && <button type="button" aria-label="Show the whole factory" onClick={() => setPlatform(null)} className={`grid size-5 place-items-center rounded-sm text-(--muted-foreground) hover:bg-(--accent) ${noDrag}`}><X className="size-3" /></button>}
               <span className="text-xs text-(--muted-foreground)">{data.fetchedAt ? `refreshed ${shortAgo(data.fetchedAt, now)}` : ''}</span>
-              <div className="flex min-w-0 flex-1 items-center justify-center"><StatsHeader stats={stats} /></div>
+              <div className="flex min-w-0 flex-1 items-center justify-center"><ToolbarStats data={data} now={now} open={setOpened} /></div>
               <span className={`flex items-center gap-1.5 ${noDrag}`}>
                 <Button small>This week</Button>
               </span>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="grid gap-7 px-6 py-5">
-                <Stats stats={stats} />
                 <section className="grid gap-3">
                   <h2 className="m-0 text-[13px] font-medium">Your desk <span className="text-(--muted-foreground)">{s.needsYou.length}</span></h2>
                   {s.needsYou.length

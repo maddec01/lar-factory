@@ -5,13 +5,14 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-/** The folder of board records, one `<pid>.json` holding `{ "port": n }` per live board. */
-function boardRecordsDir(home = process.env.HOME || homedir()): string {
-  return join(home, 'Library/Application Support/Mux Factory/boards');
+/** The board server's data folder, which holds its board records and its armed starts. */
+export function boardDataDir(home = process.env.HOME || homedir()): string {
+  return join(home, 'Library/Application Support/Mux Factory');
 }
 
-/** Records this process's board on `port` and returns a function that removes the record. */
-export function recordBoard(port: number, dir = boardRecordsDir()): () => void {
+/** Records this process's board on `port` and returns a function that removes the record. The folder holds one
+ * `<pid>.json`, `{ "port": n }`, per live board. */
+export function recordBoard(port: number, dir = join(boardDataDir(), 'boards')): () => void {
   const file = join(dir, `${process.pid}.json`);
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, JSON.stringify({ port }));

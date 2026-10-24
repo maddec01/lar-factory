@@ -1,10 +1,8 @@
 // An item's T3 Code threads: the root threads whose first user message names it,
-// each with where it stands (docs/adr/0005). t3/t3-db.ts reads the rows; the rest
-// is pure but for loadItemThreads, which opens the database.
+// each with where it stands (docs/adr/0005). t3/t3-db.ts reads the rows, and
+// t3/t3-reads.ts opens the database; this file is pure.
 
-import { existsSync } from 'node:fs';
 import type { ItemThread, ThreadState } from '@mux-factory/shared';
-import { readT3Db, threadRows } from '../t3/t3-db.ts';
 import type { ThreadRows, TurnRow } from '../t3/t3-db.ts';
 
 /** An item's threads by repo and issue number, newest first; empty when no thread names it. */
@@ -41,7 +39,7 @@ export function latestActivity({ turns, waits, lastMessages }: Pick<ThreadRows, 
 }
 
 /** Reads each item's threads from the rows once and returns a lookup over them. */
-function itemThreads(rows: ThreadRows): ItemThreadsReader {
+export function itemThreads(rows: ThreadRows): ItemThreadsReader {
   const { threads, turns, waits, active } = rows;
   const updated = latestActivity(rows);
   const threadOfTurn = new Map(turns.map((turn) => [turn.id, turn.thread]));
@@ -66,14 +64,4 @@ function itemThreads(rows: ThreadRows): ItemThreadsReader {
   }
   for (const list of byIssue.values()) list.sort((a, b) => b.updated.localeCompare(a.updated));
   return (repo, number) => byIssue.get(issueKey(repo, number)) ?? [];
-}
-
-/** Reads T3's database at `db` once. Null when there is none; 'unavailable' when it can't be read, e.g. T3 changed its schema. */
-export function loadItemThreads(db: string): ItemThreadsReader | 'unavailable' | null {
-  if (!existsSync(db)) return null;
-  try {
-    return readT3Db(db, (open) => itemThreads(threadRows(open)));
-  } catch {
-    return 'unavailable';
-  }
 }

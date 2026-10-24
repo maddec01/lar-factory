@@ -4,6 +4,7 @@
 
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { BoardData, Item, ModelGroup } from '@mux-factory/shared';
 import { createBoardState } from './board/board-state.ts';
@@ -14,14 +15,14 @@ import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { log } from './log.ts';
 import { loadBuild } from './page/page.ts';
-import { recordBoard } from './port/board-record.ts';
+import { boardDataDir, recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
-import { loadItemStats } from './stats/item-stats.ts';
+import { createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { repositoryProjectHints } from './t3/repository-project.ts';
+import { loadT3Reads } from './t3/t3-reads.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
-import { loadItemThreads } from './threads/item-threads.ts';
 import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools/tools.ts';
 
 const HOST = '127.0.0.1';
@@ -71,34 +72,15 @@ const pricingUnavailable = flipLog(`API cost unavailable: can't read rates from 
 const modelsUnavailable = flipLog(`only T3 default offered: no models read from ${statsSources.settings} and ${modelManifest}`, 'model choices readable again');
 
 /**
- * Attaches each item's stats: those frozen in its latest merged linked PR's block once
- * no linked PR is open, else read afresh from T3 Code's database and transcripts; the
- * board keeps working without them.
+ * Attaches each item's stats and T3 threads, from one read of T3 Code's database. Stats are those frozen in its
+ * latest merged linked PR's block once no linked PR is open, else read afresh from the database and transcripts;
+ * threads are read afresh. The board keeps working without either.
  */
-function withStats(items: Item[]): Item[] {
-  const stats = loadItemStats(statsSources, Date.now());
-  statsUnavailable(stats === 'unavailable');
-  if (typeof stats === 'function') pricingUnavailable(!stats.priced);
-  return items.map((item) => {
-    const frozen = mergedStats(item);
-    if (frozen) return { ...item, stats: frozen };
-    if (!item.repo || item.number === null || !stats) return { ...item, stats: undefined };
-    return { ...item, stats: stats === 'unavailable' ? stats : stats(item.repo, item.number) ?? undefined };
-  });
-}
-
-/**
- * Attaches each item's T3 threads, read afresh from T3 Code's database; none without
- * one, and 'unavailable' when it can't be read, as the stats log says.
- */
-function withThreads(items: Item[]): Item[] {
-  const threads = loadItemThreads(statsSources.db);
-  return items.map((item) => {
-    if (!item.repo || item.number === null || !threads) return { ...item, threads: undefined };
-    if (threads === 'unavailable') return { ...item, threads };
-    const own = threads(item.repo, item.number);
-    return { ...item, threads: own.length ? own : undefined };
-  });
+function withT3Reads(items: Item[]): Item[] {
+  const { stats, threads, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, Date.now());
+  statsUnavailable(unreadable);
+  if (priced !== null) pricingUnavailable(!priced);
+  return items.map((item) => ({ ...item, stats: mergedStats(item) ?? stats(item), threads: threads(item) }));
 }
 
 /**
@@ -192,7 +174,7 @@ async function refresh(): Promise<void> {
     const snapshot = await fetchProject(config.owner, projectNumber);
     const { error, fetchedAt } = board.snapshot();
     const recovered = error !== null || fetchedAt === null;
-    board.applyRead(snapshot.items, readRevision, (items) => withThreads(withStats(items)));
+    board.applyRead(snapshot.items, readRevision, withT3Reads);
     board.update({ project: { owner: config.owner, title: snapshot.title }, fetchedAt: new Date().toISOString(), error: null,
       t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(config.repos) });
     if (recovered) log(`read ${snapshot.items.length} items from the ${snapshot.title} project`);
@@ -208,8 +190,9 @@ async function refresh(): Promise<void> {
     refreshing = false;
   }
   board.push();
-  // PR edits take a gh call or two each; the board doesn't wait for them.
+  // PR edits take a gh call or two each, and a start runs t3; the board doesn't wait for them.
   if (read) void syncPrStats(board.snapshot().items);
+  if (read) void startAfter.startUnblocked();
   if (readAgain) void refresh();
 }
 
@@ -225,8 +208,10 @@ function readSoon(): void {
 const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
 const commands = createItemCommands({ board, project: () => ({ ...config, number: projectNumber }), offerModelChoices });
+// Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
+const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
-  board, commands, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
+  board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   recheck: recheckTools, readSoon, ready: () => firstToolCheck,
 });
 

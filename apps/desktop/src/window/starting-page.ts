@@ -8,7 +8,7 @@ const escape = (text: string) =>
 /** A data: URL for the starting page; with `error`, it shows why the last start failed. */
 export const url = (error?: string): string => {
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Mux Factory</title>
+<html lang="en"><head><meta charset="utf-8"><title>µx Factory</title>
 <style>${css}</style></head>
 <body><p><strong>Starting board…</strong></p>${
     error === undefined ? "" : `<p class="error">The board server didn't start: ${escape(error)}. Trying again.</p>`

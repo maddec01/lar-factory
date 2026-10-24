@@ -1,0 +1,77 @@
+// The board data the server serves, with the items this board just changed or
+// deleted laid over what GitHub last reported, and the pages it pushes changes to.
+
+import type { BoardData, Item } from '@mux-factory/shared';
+
+export interface BoardState {
+  /** The board data as served now. */
+  snapshot(): BoardData;
+  /** Sets fields of the board data; push sends them to the pages. */
+  update(fields: Partial<BoardData>): void;
+  /** The revision a read starting now runs against; pass it to applyRead. */
+  revision(): number;
+  /**
+   * Takes in the items a read started at `since` got from GitHub, keeping each change
+   * this board made until GitHub reports it and dropping the items this board deleted.
+   */
+  applyRead(items: Item[], since: number, enrich: (items: Item[]) => Item[]): void;
+  /** Shows a change at once and keeps it through refreshes until GitHub reports it. */
+  showChanged(item: Item): void;
+  /** Drops an item this board deleted, for good: GitHub can still list it for a while. */
+  remove(itemId: string): void;
+  /** Whether this board deleted the item. */
+  removed(itemId: string): boolean;
+  find(itemId: string): Item | undefined;
+  /** Sends the board data to every page, after a read or a change made through the board. */
+  push(): void;
+  /** Calls `send` on each push until the returned function is called. */
+  subscribe(send: (data: BoardData) => void): () => void;
+}
+
+export function createBoardState(initial: BoardData): BoardState {
+  const state = initial;
+  let revision = 0;
+  /** Items this board just created or moved, shown as changed until GitHub reports the change. */
+  const recentItems = new Map<string, { item: Item; revision: number; unconfirmedReads: number }>();
+  /** Item ids this board deleted. GitHub can still list them for a while, so reads drop them. */
+  const abandoned = new Set<string>();
+  const pages = new Set<(data: BoardData) => void>();
+
+  const push = () => {
+    for (const send of pages) send(state);
+  };
+
+  return {
+    snapshot: () => state,
+    update: (fields) => void Object.assign(state, fields),
+    revision: () => revision,
+    applyRead(items, since, enrich) {
+      for (const [id, recent] of recentItems) {
+        if (since < recent.revision) continue;
+        // Give GitHub three successful reads to expose the change, then trust what it reports.
+        const reported = items.some((i) => i.id === id && i.status === recent.item.status);
+        if (reported || ++recent.unconfirmedReads >= 3) recentItems.delete(id);
+      }
+      state.items = enrich([...items.filter((i) => !recentItems.has(i.id) && !abandoned.has(i.id)), ...[...recentItems.values()].map((r) => r.item)]);
+    },
+    showChanged(item) {
+      if (abandoned.has(item.id)) return;
+      recentItems.set(item.id, { item, revision: ++revision, unconfirmedReads: 0 });
+      state.items = [...state.items.filter((i) => i.id !== item.id), item];
+      push();
+    },
+    remove(itemId) {
+      abandoned.add(itemId);
+      recentItems.delete(itemId);
+      state.items = state.items.filter((i) => i.id !== itemId);
+      push();
+    },
+    removed: (itemId) => abandoned.has(itemId),
+    find: (itemId) => state.items.find((i) => i.id === itemId),
+    push,
+    subscribe(send) {
+      pages.add(send);
+      return () => pages.delete(send);
+    },
+  };
+}

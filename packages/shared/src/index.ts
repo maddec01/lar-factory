@@ -12,3 +12,4 @@ export * from './add-item.ts';
 export * from './github-items.ts';
 export * from './page-data.ts';
 export * from './board-app.ts';
+export * from './is-record.ts';

@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     "./button": "./src/components/ui/button.tsx",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./compiled-css": "./src/compiled-css/compiled-css.ts"
   },
   "scripts": {
     "test": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",
@@ -20,6 +21,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@tailwindcss/node": "4.3.3",
     "class-variance-authority": "^0.7.1",
     "react": "19.3.0",
     "tailwind-merge": "^3.4.0"

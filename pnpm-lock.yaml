@@ -204,6 +204,9 @@ importers:
       '@mux-factory/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@mux-factory/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -302,6 +305,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.4.1
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tailwindcss/node':
+        specifier: 4.3.3
+        version: 4.3.3
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

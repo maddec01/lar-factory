@@ -25,25 +25,29 @@ const boardOf = (raws: RawItem[], keys: { active?: number[]; blocked?: number[] 
 };
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData =>
   ({ ...data, items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)) });
+/** The sample with #140 out of its concept's dossier, so it has a row in the table. */
+const loose = withItem('PVTI_sample13', { parent: null });
 /** #140 with its blocker closed, so its Start build runs, on a board whose writes are on. */
-const unblocked = (data: BoardData = sample): BoardData => withItem('PVTI_sample13', {
+const unblocked = (data: BoardData = loose): BoardData => withItem('PVTI_sample13', {
   blockedBy: 0, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }],
 }, { ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 
 beforeEach(() => localStorage.clear());
 
-test('the table lists everything past the Queue and short of Done, furthest along first, under the stage header', async () => {
+test('the table lists everything past the Queue and short of Done that no dossier shows, furthest along first, under the stage header', async () => {
   await mountPage();
   const header = table().firstElementChild!;
-  expect(text(header.firstElementChild)).toBe('Everything else in flight · 13');
+  expect(text(header.firstElementChild)).toBe('Everything else in flight · 8');
   expect([...header.querySelectorAll('ol > li')].map((li) => [li.getAttribute('title'), text(li)])).toEqual([
     ['Shaping, Needs you', 'RefineRefining'], ['Ready', 'ReadyReady'], ['In progress', 'BuildBuilding'],
     ['Review', 'ReviewReview'], ['Verify, Ready to merge', 'VerifyVerify'], ['Done', 'DoneDone'],
   ]);
   expect([...header.children].slice(2).map(text)).toEqual(['Agent', 'Thread · next']);
-  expect(rows().map((r) => numberOf(r.dataset.item!)), 'Verify first, Refining last, in board order within a stage')
-    .toEqual([31, 142, 141, 150, 30, 180, 140, 130, 22, 200, 201, 23, 202]);
+  expect(rows().map((r) => numberOf(r.dataset.item!)), 'Verify first, Refining last, in board order within a stage; #200 and #180 and their parts sit in dossiers')
+    .toEqual([31, 142, 141, 150, 30, 130, 22, 23]);
+  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(loose));
+  expect(rows().map((r) => numberOf(r.dataset.item!)), 'a part out of its dossier is back').toEqual([31, 142, 141, 150, 30, 140, 130, 22, 23]);
 });
 
 test('with nothing in flight, the table says so', async () => {
@@ -59,7 +63,7 @@ test('the table takes the main area\'s scope', async () => {
 });
 
 test('a row shows its numbered title, status, repository and age, and a red badge while it is blocked', async () => {
-  await mountPage();
+  await mountPage(loose);
   const [title] = cells('PVTI_sample13');
   expect(title!.getAttribute('title')).toBe('#140 Owner accounts');
   const [name, meta] = [...title!.querySelectorAll('.grid > span')].map(text);
@@ -71,7 +75,7 @@ test('a row shows its numbered title, status, repository and age, and a red badg
 });
 
 test('the track fills the stages behind, marks the current one with its glyph, and dashes it while blocked', async () => {
-  await mountPage();
+  await mountPage(loose);
   const track = (id: string) => cells(id)[1]!;
   const at = (id: string) => [...track(id).children].findIndex((li) => li.querySelector('svg'));
   expect(['PVTI_sample07', 'PVTI_sample13', 'PVTI_sample22', 'PVTI_sample15', 'PVTI_sample16', 'PVTI_sample17'].map(at)).toEqual([0, 1, 2, 3, 4, 4]);
@@ -82,7 +86,7 @@ test('the track fills the stages behind, marks the current one with its glyph, a
 
 test('the Agent column shows agent time over tokens and cost, or a dash before any thread worked on it', async () => {
   const stats = { agentMs: (3 * 60 + 20) * 60_000, wallMs: 70 * 60_000, tokens: 12_436_000, costUsd: 41.197 };
-  let data = withItem('PVTI_sample14', { stats });
+  let data = withItem('PVTI_sample14', { stats }, loose);
   data = withItem('PVTI_sample15', { stats: { agentMs: 45 * 60_000, tokens: 980 } }, data);
   data = withItem('PVTI_sample16', { stats: { ...stats, costUsd: 41, frozen: true } }, data);
   data = withItem('PVTI_sample07', { stats: 'unavailable' }, data);
@@ -96,7 +100,7 @@ test('the Agent column shows agent time over tokens and cost, or a dash before a
 });
 
 test('a row opens the item dialog and stays marked while it shows', async () => {
-  await mountPage();
+  await mountPage(loose);
   await press(row('PVTI_sample14'));
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('#30 Chapter markers in the scrubber');
   expect(row('PVTI_sample14').className).toContain('ring-(--primary)');
@@ -104,7 +108,7 @@ test('a row opens the item dialog and stays marked while it shows', async () => 
 });
 
 test('the side says where the item waits on you, or shows its thread and its next action', async () => {
-  await mountPage();
+  await mountPage(loose);
   const say = (id: string) => [text(side(id).firstElementChild), [...side(id).querySelectorAll('button, a')].map((b) => text(b))];
   expect(say('PVTI_sample16')).toEqual(['on your desk', []]);
   expect(say('PVTI_sample17')).toEqual(['on your desk', []]);
@@ -126,14 +130,14 @@ test('Open thread on a row opens the latest thread, as an outline button, withou
 });
 
 test('Start build is disabled while a blocker is open, its title naming it, and pointer events stay on for the title', async () => {
-  await mountPage();
+  await mountPage(loose);
   expect([text(startBuild()), startBuild().disabled, startBuild().title]).toEqual(['Start build', true, 'Blocked by #202 until it closes']);
   expect(startBuild().className).toContain('disabled:pointer-events-auto');
   expect(startBuild().className, 'an outline button, as the line draws a held action').toContain('border-input');
   const many = withItem('PVTI_sample13', { blockedBy: 2, blockers: [
     { number: 202, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' },
     { number: 12, repo: 'maddec01/mux-apple', state: 'OPEN' },
-  ] });
+  ] }, loose);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(many));
   expect(startBuild().title, 'only the open ones, another repository\'s in full').toBe('Blocked by #202, maddec01/mux-apple#12 until they close');
 });
@@ -270,13 +274,13 @@ test('an open slice the project auto-added is no row of its own', async () => {
 });
 
 test('the count unfolds the slice list under the row and folds it again, without opening the dialog', async () => {
-  await mountPage();
+  await mountPage(loose);
   expect([count('PVTI_sample13').getAttribute('aria-expanded'), list('PVTI_sample13')]).toEqual(['false', null]);
   await press(count('PVTI_sample13'));
   expect(count('PVTI_sample13').getAttribute('aria-expanded')).toBe('true');
   expect([...list('PVTI_sample13')!.querySelectorAll('li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
   expect(dialog()).toBeNull();
-  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive({ ...sample, fetchedAt: '2026-10-21T09:59:00.000Z' }));
+  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive({ ...loose, fetchedAt: '2026-10-21T09:59:00.000Z' }));
   expect(list('PVTI_sample13'), 'new data keeps it open').not.toBeNull();
   await press(count('PVTI_sample13'));
   expect(list('PVTI_sample13')).toBeNull();

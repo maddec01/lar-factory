@@ -120,7 +120,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   expect($('#add-item-form')!.getAttribute('aria-busy')).toBe('true');
   expect(result().textContent).toBe('Creating the issue and adding it to List…');
 
-  const item = { ...sample.items[0]!, title: 'Playback stalls', number: 501 };
+  const item = { ...sample.items[0]!, id: 'PVTI_created501', title: 'Playback stalls', number: 501 };
   const board = { ...sample, items: [...sample.items, item] };
   await settle(() => finish(new Response(JSON.stringify({ item, issueUrl: created.html_url, error: null, board }))));
   await settle(() => vi.advanceTimersByTime(50));

@@ -10,6 +10,7 @@ import { Button } from '@mux-factory/ui/button';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@mux-factory/ui/dialog';
 import { useBoardStore } from '../board/board-store.ts';
 import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../items/item-actions.tsx';
+import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { ItemTitle, PlatformTag, PrList, SliceList, StatsGrid, StepTrack } from '../items/item-parts.tsx';
 import { StartControl, StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
@@ -30,10 +31,12 @@ function PrLink({ item, label }: { item: Item; label: string }) {
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {
   switch (item.status) {
     case 'List': return <QueueButton item={item} data={data} primary />;
-    case 'Queued': return workMessage(item) ? <StartControl item={item} data={data} label="Start refining" size="sm" icon={<Play />} /> : null;
+    case 'Queued':
+      if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
+      return workMessage(item) ? <StartControl item={item} data={data} label="Start refining" size="sm" icon={<Play />} /> : null;
     case 'Ready': return <NotBuilt label="Start build" />;
-    case 'Shaping': case 'In progress': case 'Review': return <NotBuilt label="Open thread" />;
-    case 'Needs you': return <NotBuilt label="Answer in T3" />;
+    case 'Shaping': case 'In progress': case 'Review': return <OpenThread item={item} data={data} />;
+    case 'Needs you': return <OpenThread item={item} data={data} label="Answer in T3" />;
     case 'Verify': return <PrLink item={item} label="Verify build" />;
     case 'Ready to merge': return <PrLink item={item} label="Merge PR" />;
     default: return null;

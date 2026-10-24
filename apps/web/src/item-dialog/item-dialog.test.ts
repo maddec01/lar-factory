@@ -3,7 +3,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData, Item, ItemThread } from '@mux-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
 const inDialog = <T extends Element = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
@@ -62,11 +62,11 @@ test.each([
   ['List', 'PVTI_sample01', ['Abandon', 'GitHub', 'Queue']],
   ['Queued', 'PVTI_sample05', ['← Back to List', 'Abandon', 'GitHub', 'Start refining ▾']],
   ['a Queued draft', 'PVTI_sample21', ['← Back to List', 'Abandon']],
-  ['Shaping', 'PVTI_sample07', ['GitHub', "Open thread (disabled: Open thread isn't built yet)"]],
-  ['Needs you', 'PVTI_sample11', ['GitHub', "Answer in T3 (disabled: Answer in T3 isn't built yet)"]],
+  ['Shaping', 'PVTI_sample07', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
+  ['Needs you', 'PVTI_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
   ['Ready', 'PVTI_sample13', ['GitHub', "Start build (disabled: Start build isn't built yet)"]],
-  ['In progress', 'PVTI_sample14', ['GitHub', "Open thread (disabled: Open thread isn't built yet)"]],
-  ['Review', 'PVTI_sample15', ['GitHub', "Open thread (disabled: Open thread isn't built yet)"]],
+  ['In progress', 'PVTI_sample14', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
+  ['Review', 'PVTI_sample15', ['GitHub', 'Open thread (disabled: No T3 thread has worked on this yet)']],
   ['Verify', 'PVTI_sample16', ['GitHub', 'Verify build']],
   ['Ready to merge', 'PVTI_sample17', ['GitHub', 'Merge PR']],
   ['Done', 'PVTI_sample19', ['GitHub']],
@@ -83,6 +83,46 @@ test('GitHub opens the item, and Verify build and Merge PR open its pull request
   expect(links).toEqual([['GitHub', 'https://github.com/maddec01/mux-apple/issues/31', '_blank'], ['Verify build', 'https://github.com/maddec01/mux-apple/pull/32', '_blank']]);
   await openItem('PVTI_sample17');
   expect(footer().querySelector('a:last-child')!.getAttribute('href')).toMatch(/\/pull\/\d+$/);
+});
+
+/** The sample with `itemId`'s threads replaced. */
+const withThreads = (itemId: string, threads: Item['threads'], data: BoardData = sample): BoardData =>
+  ({ ...data, items: data.items.map((i) => (i.id === itemId ? { ...i, threads } : i)) });
+const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
+/** The footer's last control: the item's status action. */
+const statusAction = () => footer().querySelector<HTMLElement>('span:last-child > :last-child')!;
+
+test('Open thread and Answer in T3 link to the latest thread in T3 Code, in the same tab', async () => {
+  await mountPage(withThreads('PVTI_sample10', [thread('new', 'running'), thread('old', 'done')]));
+  await openItem('PVTI_sample10');
+  const open = statusAction() as HTMLAnchorElement;
+  expect([text(open), open.getAttribute('href'), open.target]).toEqual(['Open thread', 't3code://threads/sample-environment/new', '']);
+
+  await openItem('PVTI_sample12');
+  const answerLink = statusAction() as HTMLAnchorElement;
+  expect([text(answerLink), answerLink.getAttribute('href')]).toEqual(['Answer in T3', 't3code://threads/sample-environment/sample-thread-202']);
+});
+
+test.each([
+  ['T3 Code\'s database can\'t be read', withThreads('PVTI_sample10', 'unavailable'), 'The T3 Code database could not be read'],
+  ['T3 Code\'s environment id is missing', { ...sample, t3EnvironmentId: undefined }, 'T3 Code hasn\'t written its environment id'],
+])('Open thread is disabled when %s, and its title says so', async (_case, data, reason) => {
+  await mountPage(data);
+  await openItem('PVTI_sample10');
+  expect(footerControls()).toEqual(['GitHub', `Open thread (disabled: ${reason})`]);
+});
+
+test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Start refining', async (state) => {
+  await mountPage(withThreads('PVTI_sample05', [thread('live', state)]));
+  await openItem('PVTI_sample05');
+  expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', 'Open thread']);
+  expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/live');
+});
+
+test('a Queued item whose threads are all done still offers Start refining', async () => {
+  await mountPage(withThreads('PVTI_sample05', [thread('old', 'done')]));
+  await openItem('PVTI_sample05');
+  expect(footerControls().at(-1)).toBe('Start refining ▾');
 });
 
 test('Queue in the dialog shows it in flight, then shows the item Queued, says so, and moves focus to Start refining', async () => {

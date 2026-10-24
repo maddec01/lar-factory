@@ -20,18 +20,37 @@ const STAGES: { name: string; short: string; statuses: Status[] }[] = [
 ];
 /** The status's stage on the track, or -1 for List and Queued, which sit before it. */
 export const stageOf = (s: Status) => STAGES.findIndex((st) => st.statuses.includes(s));
-/** One grid for every row, in the table and in each dossier, so the stage and agent columns line up down the page. */
-const GRID = 'grid grid-cols-[minmax(0,1fr)_13rem_6rem_8rem] items-center gap-x-4 px-3 @3xl:grid-cols-[minmax(0,1fr)_18rem_7rem_11rem]';
-const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
+/**
+ * One grid for every row, in the table and in each dossier, so the stage and agent columns line up down the page.
+ * Below the line's @2xl width, as at the app's 840 px minimum, the Agent column drops and the track narrows, so the
+ * titles keep room to read.
+ */
+export const GRID = 'grid grid-cols-[minmax(0,1fr)_11rem_8rem] items-center gap-x-4 px-3 @2xl:grid-cols-[minmax(0,1fr)_13rem_6rem_8rem] @3xl:grid-cols-[minmax(0,1fr)_18rem_7rem_11rem]';
+/** The Agent column's cells, hidden while the grid leaves it out. */
+const AGENT = 'hidden @2xl:grid';
+export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
 const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
-const statsOf = (item: Item): ItemStats | null => (item.stats && item.stats !== 'unavailable' ? item.stats : null);
+/** The statuses only you can move on, from the desk. */
+export const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
+
+/** What an item's thread is doing at each status where one is at work, or about to be. */
+export const THREAD_TEXT: Partial<Record<Status, string>> = {
+  Shaping: 'shaping thread running', Ready: 'build starts on Start', 'In progress': 'build thread running', Review: 'reviewers running',
+};
+
+/** Where to act on an item that waits on you. */
+export function OnYourDesk({ status }: { status: Status }) {
+  return <span className="inline-flex items-center gap-1 text-(--warning-foreground)"><StatusGlyph status={status} className="size-3" />on your desk</span>;
+}
+
+export const statsOf = (item: Item): ItemStats | null => (item.stats && item.stats !== 'unavailable' ? item.stats : null);
 
 /** Agent time over tokens and cost; a dash before any thread has worked on it. */
-function AgentCell({ s }: { s: ItemStats | null }) {
-  if (!s) return <span className="text-right text-[11px] text-(--muted-foreground)">–</span>;
+export function AgentCell({ s }: { s: ItemStats | null }) {
+  if (!s) return <span className={`${AGENT} text-right text-[11px] text-(--muted-foreground)`}>–</span>;
   return (
-    <span className="grid text-right text-[11px] leading-tight tabular-nums text-(--muted-foreground)" title={s.frozen ? 'As it stood at merge' : 'Agent time · tokens · cost'}>
+    <span className={`${AGENT} text-right text-[11px] leading-tight tabular-nums text-(--muted-foreground)`} title={s.frozen ? 'As it stood at merge' : 'Agent time · tokens · cost'}>
       <span className="font-medium text-(--foreground)">{duration(s.agentMs)}</span>
       <span>{formatTokens(s.tokens)} · {s.costUsd !== undefined ? formatUsd(s.costUsd) : '–'}</span>
     </span>
@@ -39,7 +58,7 @@ function AgentCell({ s }: { s: ItemStats | null }) {
 }
 
 /** Six stage cells: the stages behind filled, the current one coloured up to its glyph, the rest faint. */
-function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
+export function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
   const at = stageOf(status);
   return (
     <ol className="m-0 grid list-none grid-cols-6 gap-px p-0" title={`${status}${waiting ? ', waiting' : ''}`}>
@@ -67,7 +86,7 @@ export function StageHeader({ label, side }: { label: ReactNode; side: ReactNode
       <ol className="m-0 grid list-none grid-cols-6 gap-px p-0 text-center">
         {STAGES.map((st) => <li key={st.name} title={st.statuses.join(', ')} className="truncate"><span className="@3xl:hidden">{st.short}</span><span className="hidden @3xl:inline">{st.name}</span></li>)}
       </ol>
-      <span className="text-right">Agent</span>
+      <span className={`${AGENT} text-right`}>Agent</span>
       <span className="truncate text-right">{side}</span>
     </div>
   );

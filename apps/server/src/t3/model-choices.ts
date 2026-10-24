@@ -6,8 +6,7 @@
 // deriveProviderInstanceConfigMap in apps/server/src/provider/ProviderInstanceRegistryHydration.ts
 // and resolveProviderInstanceDisplayName in packages/client-runtime/src/state/providerInstanceDisplay.ts.
 
-import { readFileSync } from 'node:fs';
-import { readSettings } from '../stats/item-stats.ts';
+import { readJsonRecord } from '../json-file.ts';
 import { isRecord, offers } from '@mux-factory/shared';
 import type { ModelChoice, ModelGroup, ModelOption } from '@mux-factory/shared';
 
@@ -37,7 +36,7 @@ interface Instance {
  * settings or the model list can't be read.
  */
 export function loadModelChoices(settingsPath: string, manifestPath: string): ModelGroup[] {
-  const settings = readSettings(settingsPath);
+  const settings = readJsonRecord(settingsPath);
   const manifest = readManifest(manifestPath);
   if (!settings || !manifest) return [];
   return instances(settings).filter(enabled).flatMap((instance) => {
@@ -57,12 +56,8 @@ export function findModelChoice(groups: readonly ModelGroup[], input: unknown): 
 
 /** The manifest inside T3's cached model list, or null when it can't be read. */
 function readManifest(path: string): Record<string, unknown> | null {
-  try {
-    const cached: unknown = JSON.parse(readFileSync(path, 'utf8'));
-    return isRecord(cached) && isRecord(cached.manifest) ? cached.manifest : null;
-  } catch {
-    return null;
-  }
+  const manifest = readJsonRecord(path)?.manifest;
+  return isRecord(manifest) ? manifest : null;
 }
 
 /** The settings' instances, then each built-in instance they don't list. */

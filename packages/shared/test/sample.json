@@ -20,6 +20,7 @@
   "fetchedAt": "2026-10-21T09:40:00.000Z",
   "error": "gh api graphql failed: error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com",
   "modelChoices": [],
+  "t3EnvironmentId": "sample-environment",
   "items": [
     {
       "id": "PVTI_sample01",
@@ -213,7 +214,13 @@
       "updatedAt": "2026-10-21T09:10:00Z",
       "closedAt": null,
       "linkedPrs": [],
-      "slices": []
+      "slices": [],
+      "stats": {
+        "agentMs": 1140000,
+        "wallMs": 720000,
+        "tokens": 1204000,
+        "costUsd": 1.92
+      }
     },
     {
       "id": "PVTI_sample08",
@@ -329,7 +336,21 @@
       "updatedAt": "2026-10-21T09:20:00Z",
       "closedAt": null,
       "linkedPrs": [],
-      "slices": []
+      "slices": [],
+      "threads": [
+        {
+          "id": "sample-thread-201",
+          "title": "Grill: relay broker only or full TURN",
+          "state": "running",
+          "updated": "2026-10-24T08:40:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1680000,
+        "wallMs": 960000,
+        "tokens": 1870000,
+        "costUsd": 2.71
+      }
     },
     {
       "id": "PVTI_sample11",
@@ -395,7 +416,21 @@
       "updatedAt": "2026-10-21T09:25:00Z",
       "closedAt": null,
       "linkedPrs": [],
-      "slices": []
+      "slices": [],
+      "threads": [
+        {
+          "id": "sample-thread-202",
+          "title": "Prototype: sign-in screen",
+          "state": "needs you",
+          "updated": "2026-10-21T16:20:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 2460000,
+        "wallMs": 1500000,
+        "tokens": 2950000,
+        "costUsd": 4.35
+      }
     },
     {
       "id": "PVTI_sample13",
@@ -594,7 +629,13 @@
           "state": "OPEN",
           "progress": "waiting"
         }
-      ]
+      ],
+      "stats": {
+        "agentMs": 19800000,
+        "wallMs": 11400000,
+        "tokens": 31400000,
+        "costUsd": 46.9
+      }
     },
     {
       "id": "PVTI_sample14",
@@ -699,7 +740,15 @@
         "wallMs": 1800000,
         "tokens": 3120000,
         "costUsd": 6.4
-      }
+      },
+      "threads": [
+        {
+          "id": "sample-thread-180",
+          "title": "End-to-end: resume across devices",
+          "state": "running",
+          "updated": "2026-10-24T07:55:00.000Z"
+        }
+      ]
     },
     {
       "id": "PVTI_sample15",
@@ -855,7 +904,21 @@
       "updatedAt": "2026-10-19T12:00:00Z",
       "closedAt": "2026-10-19T12:00:00Z",
       "linkedPrs": [],
-      "slices": []
+      "slices": [],
+      "threads": [
+        {
+          "id": "sample-thread-203",
+          "title": "Research: hosting cost of the relay",
+          "state": "done",
+          "updated": "2026-10-19T10:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1320000,
+        "wallMs": 900000,
+        "tokens": 1410000,
+        "costUsd": 2.05
+      }
     },
     {
       "id": "PVTI_sample19",
@@ -951,7 +1014,15 @@
         "tokens": 9800000,
         "costUsd": 18,
         "frozen": true
-      }
+      },
+      "threads": [
+        {
+          "id": "sample-thread-181",
+          "title": "Build: store the playback position per device",
+          "state": "done",
+          "updated": "2026-10-18T11:00:00.000Z"
+        }
+      ]
     },
     {
       "id": "PVTI_sample25",
@@ -1009,7 +1080,15 @@
         "tokens": 14200000,
         "costUsd": 27,
         "frozen": true
-      }
+      },
+      "threads": [
+        {
+          "id": "sample-thread-40",
+          "title": "Build: resume from the stored position",
+          "state": "done",
+          "updated": "2026-10-20T14:00:00.000Z"
+        }
+      ]
     },
     {
       "id": "PVTI_sample20",

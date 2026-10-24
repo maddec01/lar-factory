@@ -15,7 +15,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, STATUS_COLOR, WindowControls, drag, noDrag, platformColor } from './chrome.tsx';
-import { ActionButtons, PrList, SliceBar, SliceList, StatsGrid, StepTrack, hint, refText } from './item-bits.tsx';
+import { ActionButtons, PrList, SliceBar, SliceList, ItemTitle, StatsGrid, StepTrack, hint, refText } from './item-bits.tsx';
 import { ToolbarStats } from './toolbar-stats.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
@@ -46,7 +46,7 @@ function Repo({ platform, repo, items, now, scoped, onScope, pick }: { platform:
             <button key={i.id} type="button" onClick={() => pick.set(i.id)}
               className={`flex h-7 w-full items-center gap-2 rounded-md pl-8 pr-2 text-left hover:bg-(--row-hover) ${pick.id === i.id ? 'bg-(--row-active) font-medium' : ''}`}>
               <StatusGlyph status={i.status} className="size-3" />
-              <span className={`min-w-0 flex-1 truncate ${pick.id === i.id ? '' : 'text-(--muted-foreground)'}`}>{i.title}</span>
+              <span className={`min-w-0 flex-1 truncate ${pick.id === i.id ? '' : 'text-(--muted-foreground)'}`}><ItemTitle item={i} /></span>
               <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-(--muted-foreground)">{shortAgo(i.updatedAt, now)}</span>
             </button>
           ))}
@@ -63,9 +63,9 @@ function DeskCard({ item, data, now, pick }: { item: Item; data: BoardData; now:
       className={`grid w-[280px] shrink-0 gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 text-left shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked(pick.id === item.id)}`}>
       <span className="flex items-center gap-2 text-xs">
         <StatusGlyph status={item.status} /><span className="font-semibold text-(--warning-foreground)">{item.status}</span>
-        <span className="truncate text-(--muted-foreground)">· {platformOf(item, data.repos)} {refText(item)} · {shortAgo(item.updatedAt, now)}</span>
+        <span className="truncate text-(--muted-foreground)">· {platformOf(item, data.repos)} · {shortAgo(item.updatedAt, now)}</span>
       </span>
-      <span className="line-clamp-2 font-medium leading-snug">{item.title}</span>
+      <span className="line-clamp-2 font-medium leading-snug"><ItemTitle item={item} /></span>
       <span className="text-xs text-(--muted-foreground)">{hint(item)}</span>
       <StepTrack status={item.status} />
     </button>
@@ -82,10 +82,9 @@ function Line({ items, data, pick }: { items: Item[]; data: BoardData; pick: Pic
             <div className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium"><StatusGlyph status={st} />{st}<span className="text-(--muted-foreground)">{here.length}</span></div>
             <div className="h-0.5 rounded-full" style={{ background: STATUS_COLOR[st], opacity: here.length ? 1 : 0.25 }} />
             {here.map((i) => (
-              <button key={i.id} type="button" onClick={() => pick.set(i.id)} title={i.title}
+              <button key={i.id} type="button" onClick={() => pick.set(i.id)} title={`${refText(i)} ${i.title}`}
                 className={`grid gap-1 rounded-md bg-(--muted) px-2 py-1.5 text-left hover:bg-(--accent) ${picked(pick.id === i.id)}`}>
-                <span className="flex items-center gap-1.5 text-[11px] text-(--muted-foreground)"><span className="size-1.5 rounded-full" style={{ background: platformColor(platformOf(i, data.repos)) }} />{refText(i)}</span>
-                <span className="line-clamp-2 text-xs leading-snug">{i.title}</span>
+                <span className="line-clamp-2 text-xs leading-snug"><span className="mr-1.5 inline-block size-1.5 rounded-full align-middle" style={{ background: platformColor(platformOf(i, data.repos)) }} /><ItemTitle item={i} /></span>
                 <SliceBar item={i} />
               </button>
             ))}
@@ -112,11 +111,10 @@ function ItemDialog({ item: opened, data, now, onClose }: { item: Item | undefin
             <DialogHeader>
               <div className="flex flex-wrap items-center gap-2 pr-8 text-xs text-(--muted-foreground)">
                 <PlatformTag platform={platformOf(item, data.repos)} />
-                <span className="tabular-nums">{refText(item)}</span>
                 <StatusGlyph status={item.status} /> <span className="font-medium text-(--foreground)">{item.status}</span> · updated {shortAgo(item.updatedAt, now)}
                 {item.blockedBy > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {item.blockedBy}</span>}
               </div>
-              <DialogTitle className="text-lg leading-snug tracking-tight">{item.title}</DialogTitle>
+              <DialogTitle className="text-lg leading-snug tracking-tight"><ItemTitle item={item} /></DialogTitle>
               {item.parent && <DialogDescription>Part of <a href={item.parent.url} className="underline">#{item.parent.number} {item.parent.title}</a></DialogDescription>}
             </DialogHeader>
             <DialogPanel className="grid gap-5 space-y-0">

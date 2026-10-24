@@ -114,3 +114,8 @@ export function ActionButtons({ item, small }: { item: Item; small?: boolean }) 
 
 export const hint = (item: Item) => HINTS[item.status];
 export const refText = (item: Item) => ref(item);
+
+/** An item's title with its issue number before it, muted, the way the board lists every item. */
+export function ItemTitle({ item }: { item: Item }) {
+  return <><span className="font-normal text-(--muted-foreground) tabular-nums">{ref(item)}</span> {item.title}</>;
+}

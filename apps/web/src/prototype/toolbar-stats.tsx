@@ -11,7 +11,7 @@ import { Button } from '@mux-factory/ui/button';
 import { Popover, PopoverClose, PopoverPopup, PopoverTrigger } from '@mux-factory/ui/popover';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { noDrag, platformColor, STATUS_COLOR, StatusGlyph } from './chrome.tsx';
-import { refText, statsOf } from './item-bits.tsx';
+import { ItemTitle, statsOf } from './item-bits.tsx';
 
 const BUILD_LIMIT = 2;
 const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
@@ -60,18 +60,18 @@ function Empty({ children }: { children: ReactNode }) {
   return <p className="m-0 px-3 py-6 text-center text-xs text-(--muted-foreground)">{children}</p>;
 }
 
-/** One item: its status glyph, title, then its repo's dot, ref and age (or a trailing figure). Picking it opens its details. */
+/** One item: its status glyph, title, its number and title, then its repo's dot and age (or a trailing figure). Picking it opens its details. */
 function Row({ item, data, now, open, trailing }: { item: Item; data: BoardData; now: number; open: Open; trailing?: ReactNode }) {
   return (
     <li>
       <PopoverClose render={<button type="button" onClick={() => open(item.id)} />}
         className="flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left text-[13px] text-(--foreground) outline-none hover:bg-(--accent) focus-visible:bg-(--accent)">
         <StatusGlyph status={item.status} />
-        <span className="min-w-0 flex-1 truncate">{item.title}</span>
+        <span className="min-w-0 flex-1 truncate"><ItemTitle item={item} /></span>
         <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums">
           {trailing ?? <>
             <span className="size-1.5 rounded-full" style={{ background: platformColor(platformOf(item, data.repos)) }} />
-            {refText(item)}<span className="w-7 text-right">{shortAgo(item.closedAt ?? item.updatedAt, now)}</span>
+            <span className="w-7 text-right">{shortAgo(item.closedAt ?? item.updatedAt, now)}</span>
           </>}
         </span>
       </PopoverClose>

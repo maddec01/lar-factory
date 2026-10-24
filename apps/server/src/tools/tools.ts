@@ -1,11 +1,11 @@
 // Finds the `t3`, `gh` and `az` binaries the way a Mac app opened from Finder must,
 // whose inherited PATH is often just /usr/bin:/bin. Copies T3 Code's lookup.
 
-import { execFile } from 'node:child_process';
 import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import type { ToolMissing, ToolProblem } from '@mux-factory/shared';
+import { runTool } from './run-tool.ts';
 
 export const TOOL_NAMES = ['t3', 'gh', 'az'] as const;
 export type ToolName = typeof TOOL_NAMES[number];
@@ -61,10 +61,9 @@ export function findTools(env: NodeJS.ProcessEnv, loginPath: string | null, fall
   return { t3: find('t3'), gh: find('gh'), az: find('az'), searchPath };
 }
 
-function output(file: string, args: string[], env: NodeJS.ProcessEnv, timeout: number): Promise<string | null> {
-  return new Promise((resolve) => {
-    execFile(file, args, { env, timeout }, (err, stdout) => resolve(err ? null : stdout));
-  });
+async function output(file: string, args: string[], env: NodeJS.ProcessEnv, timeout: number): Promise<string | null> {
+  const { code, stdout } = await runTool(file, args, { env, timeout });
+  return code === 0 ? stdout : null;
 }
 
 function accountShell(): string | undefined {
@@ -133,18 +132,6 @@ export interface GhProbe {
 
 const LOGGED_OUT = /not logged in|gh auth login/i;
 
-/** Runs gh for the probe: null when it succeeds, else its exit or spawn code and what it printed. */
-function probe(file: string, args: string[], env: NodeJS.ProcessEnv): Promise<{ code: unknown; output: string } | null> {
-  return new Promise((resolve) => {
-    execFile(file, args, { env, timeout: 5_000 }, (err, stdout, stderr) => {
-      if (!err) return resolve(null);
-      const code = (err as NodeJS.ErrnoException).code as unknown;
-      // No code means a signal, which here is the timeout.
-      resolve({ code, output: code == null ? 'timed out after 5 s' : (stderr || stdout || err.message).trim() });
-    });
-  });
-}
-
 /**
  * Probes gh as T3 Code does: `gh --version`, then `gh auth status`, 5 s each. A timeout, or
  * an auth status failure that isn't a logout, returns gh's error for the Stale banner.
@@ -153,15 +140,15 @@ export async function probeGh(): Promise<GhProbe> {
   const command = toolCommand('gh');
   if (!command) return { problem: lookupProblem('gh') ?? { problem: 'missing' } };
   for (const args of [['--version'], ['auth', 'status']]) {
-    const failure = await probe(command.file, args, command.env);
-    if (!failure) continue;
+    const { code, stdout, stderr, detail } = await runTool(command.file, args, { env: command.env, timeout: 5_000 });
+    if (code === 0) continue;
     // A string code is a spawn error: the binary went away or can't run since the lookup.
-    if (typeof failure.code === 'string') return { problem: { problem: 'missing' } };
-    if (args[0] === 'auth' && typeof failure.code === 'number' && LOGGED_OUT.test(failure.output)) {
+    if (typeof code === 'string') return { problem: { problem: 'missing' } };
+    if (args[0] === 'auth' && typeof code === 'number' && LOGGED_OUT.test(stderr || stdout)) {
       return { problem: { problem: 'logged-out' } };
     }
-    const detail = failure.output.split('\n').slice(0, 4).join('\n');
-    return { error: `gh ${args.join(' ')} failed: ${detail}` };
+    // No code means a signal, which here is the timeout.
+    return { error: `gh ${args.join(' ')} failed: ${code === null ? 'timed out after 5 s' : detail}` };
   }
   return {};
 }

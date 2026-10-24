@@ -79,8 +79,13 @@ const FIND_PROJECT_QUERY = `query($owner: String!, $title: String!) {
 
 // ---------- raw GraphQL shapes ----------
 
+interface PageInfo {
+  hasNextPage: boolean;
+  endCursor: string | null;
+}
+
 export interface RawIssueSearch {
-  data: { search: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: { number?: number; repository?: { nameWithOwner: string } }[] } };
+  data: { search: { pageInfo: PageInfo; nodes: { number?: number; repository?: { nameWithOwner: string } }[] } };
 }
 
 export interface RawItemsPage {
@@ -88,7 +93,7 @@ export interface RawItemsPage {
     user: {
       projectV2: {
         title: string;
-        items: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: RawItem[] };
+        items: { pageInfo: PageInfo; nodes: RawItem[] };
       } | null;
     } | null;
   };
@@ -122,18 +127,29 @@ export async function findProjectNumber(owner: string, title: string): Promise<n
   return match.number;
 }
 
+const projectNumber = (config: BoardConfig) => config.number ?? findProjectNumber(config.owner, config.title);
+
+/** Reads up to `maxPages` pages, each after the cursor the one before ended at; throws `tooMany` when there are more. */
+async function readPages(maxPages: number, tooMany: string, readPage: (after: string | null) => Promise<PageInfo>): Promise<void> {
+  let after: string | null = null;
+  for (let page = 0; page < maxPages; page++) {
+    const pageInfo = await readPage(after);
+    if (!pageInfo.hasNextPage) return;
+    after = pageInfo.endCursor;
+  }
+  throw new Error(tooMany);
+}
+
 /** The `repo#number` keys of the issues a search finds; none for no search. */
 async function searchIssues(q: string | null): Promise<Set<string>> {
   const keys = new Set<string>();
   if (!q) return keys;
-  let after: string | null = null;
-  for (let page = 0; page < MAX_SEARCH_PAGES; page++) {
-    const { search }: RawIssueSearch['data'] = (await graphql<RawIssueSearch>(ISSUE_SEARCH_QUERY, { q, after })).data;
+  await readPages(MAX_SEARCH_PAGES, `Issue search "${q}" has more than ${SEARCH_PAGE_SIZE * MAX_SEARCH_PAGES} results; stopped paging`, async (after) => {
+    const { search } = (await graphql<RawIssueSearch>(ISSUE_SEARCH_QUERY, { q, after })).data;
     for (const n of search.nodes) if (n.repository && n.number) keys.add(refKey(n.repository.nameWithOwner, n.number));
-    if (!search.pageInfo.hasNextPage) return keys;
-    after = search.pageInfo.endCursor;
-  }
-  throw new Error(`Issue search "${q}" has more than ${SEARCH_PAGE_SIZE * MAX_SEARCH_PAGES} results; stopped paging`);
+    return search.pageInfo;
+  });
+  return keys;
 }
 
 /** Runs the issue searches; the slice label searches need the builds found, to know which sub-issues are slices. A project item's own labels decide whether it's a build. */
@@ -153,24 +169,24 @@ export interface ProjectSnapshot {
 
 export async function fetchProject(owner: string, number: number): Promise<ProjectSnapshot> {
   const raws: RawItem[] = [];
-  let after: string | null = null;
   let title = '';
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const res: RawItemsPage = await graphql<RawItemsPage>(ITEMS_QUERY, { owner, number, after });
-    const project = res.data.user?.projectV2;
+  await readPages(MAX_PAGES, `Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`, async (after) => {
+    const project = (await graphql<RawItemsPage>(ITEMS_QUERY, { owner, number, after })).data.user?.projectV2;
     if (!project) throw new Error(`Project ${owner}/${number} not found`);
     title = project.title;
     raws.push(...project.items.nodes);
-    // A slice and its build can sit on different pages, so slices are dropped once all are read.
-    if (!project.items.pageInfo.hasNextPage) return { title, items: normalizeItems(raws, await searchLabels(raws)) };
-    after = project.items.pageInfo.endCursor;
-  }
-  throw new Error(`Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`);
+    return project.items.pageInfo;
+  });
+  // A slice and its build can sit on different pages, so slices are dropped once all are read.
+  return { title, items: normalizeItems(raws, await searchLabels(raws)) };
 }
+
+/** An error's message, for a write's error text. */
+const message = (err: unknown) => (err instanceof Error ? err.message : 'GitHub request failed.');
 
 /** Looks up the project's Status option once and returns a writer for it. */
 async function statusWriter(config: BoardConfig, name: Status, run: (args: string[]) => Promise<string>) {
-  const number = config.number ?? await findProjectNumber(config.owner, config.title);
+  const number = await projectNumber(config);
   const project = JSON.parse(await run(['project', 'view', String(number), '--owner', config.owner, '--format', 'json'])) as { id: string };
   const fields = JSON.parse(await run(['project', 'field-list', String(number), '--owner', config.owner, '--format', 'json'])) as {
     fields: { id: string; name: string; options?: { id: string; name: string }[] }[];
@@ -194,7 +210,7 @@ export async function setItemStatus(
     await (await statusWriter(config, name, run)).setStatus(itemId);
     return null;
   } catch (err) {
-    return `Could not set ${name}. ${err instanceof Error ? err.message : 'GitHub request failed.'}`;
+    return `Could not set ${name}. ${message(err)}`;
   }
 }
 
@@ -225,13 +241,13 @@ export async function abandonItem(
 ): Promise<string | null> {
   try {
     if (item.type === 'DraftIssue') {
-      const number = config.number ?? await findProjectNumber(config.owner, config.title);
+      const number = await projectNumber(config);
       await run(['project', 'item-delete', String(number), '--owner', config.owner, '--id', item.id]);
     } else await run(['issue', 'delete', String(item.number), '-R', item.repo!, '--yes']);
     return null;
   } catch (err) {
     const what = item.type === 'DraftIssue' ? `remove draft ${item.title}` : `delete #${item.number}`;
-    return `Could not ${what}. ${err instanceof Error ? err.message : 'GitHub request failed.'}`;
+    return `Could not ${what}. ${message(err)}`;
   }
 }
 
@@ -283,7 +299,7 @@ export async function addProjectItem(
     };
     return { item: progress.item, issueUrl: issue.html_url, error: null };
   } catch (err) {
-    const detail = err instanceof Error ? err.message : 'GitHub request failed.';
+    const detail = message(err);
     // A definite client rejection did not create an issue and can be corrected/retried.
     if (step === 'issue creation' && /HTTP (?:400|401|403|404|410|422)\b/.test(detail)) progress.creationUncertain = false;
     if (progress.creationUncertain) return uncertain();

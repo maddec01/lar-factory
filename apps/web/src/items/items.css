@@ -1,5 +1,20 @@
 /* An item's card and row parts: badges, bars, the slice popover, the Start control and the card's actions. */
 
+/* Each status's colour, which StatusGlyph, the item dialog's track and its slices draw in. */
+:root {
+  --st-amber: var(--you);
+  --st-now: var(--thread);
+  --st-review: var(--sub);
+  --st-done: var(--build);
+  --st-idle: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+}
+/* A status or slice that's waiting on you or working now. */
+@keyframes status-pulse { 50% { opacity: 0.35; } }
+.status-pulse { animation: status-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .status-pulse { animation: none; }
+}
+
 .meta { display: flex; gap: --spacing(1.25); align-items: flex-start; font-size: var(--text-2xs); }
 /* The badges wrap onto more lines; the action group keeps the top-right corner. */
 .meta .badges { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: --spacing(1.25); align-items: center; }
@@ -25,6 +40,7 @@
 .plat::before, .kind::before, .label::before, .checks::before { content: ""; width: --spacing(1.75); height: --spacing(1.75); border-radius: 50%; background: var(--k, var(--muted-foreground)); }
 .plat-server { --k: var(--color-sky-500); }
 .plat-apple { --k: var(--color-pink-500); }
+.plat-factory { --k: var(--color-teal-500); }
 .plat-draft { --k: var(--muted-foreground); }
 .kind-bug { --k: var(--error); }
 .kind-feature { --k: var(--thread); }

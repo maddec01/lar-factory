@@ -3,6 +3,7 @@
 // Once a thread starts or may have started, a tag takes Start's place.
 
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { ref, highlightedChoice, storedChoice } from '@mux-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@mux-factory/shared';
@@ -61,8 +62,8 @@ function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onP
   );
 }
 
-/** Start in the card's top-right corner, or the tag that took its place. */
-export function StartControl({ item, data }: { item: Item; data: BoardData }) {
+/** Start in the card's top-right corner, or the tag that took its place; the item dialog names it `label` and sizes it up. */
+export function StartControl({ item, data, label = 'Start', size = 'xs', icon }: { item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; icon?: ReactNode }) {
   const start = useStart(item.id);
   const action = useItemAction(item.id);
   const [open, setOpen] = useState(false);
@@ -73,7 +74,7 @@ export function StartControl({ item, data }: { item: Item; data: BoardData }) {
     // Once its message is closed, a tag still says why Start is gone.
     return <span className="start-group">{!start.message && <Badge variant="warning" className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</Badge>}</span>;
   }
-  const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : 'Start';
+  const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : label;
   // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
   const state = data.capture?.enabled === false ? {} : start?.phase === 'pending' ? { 'aria-disabled': true as const } : writeState(data, action);
   const held = Boolean(state['aria-disabled']);
@@ -85,8 +86,8 @@ export function StartControl({ item, data }: { item: Item; data: BoardData }) {
   return (
     <span className="start-group">
       <Menu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
-        <MenuTrigger render={<Button size="xs" />} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
-          {verb}{start?.phase !== 'pending' && ' ▾'}
+        <MenuTrigger render={<Button size={size} />} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
+          {start?.phase !== 'pending' && icon}{verb}{start?.phase !== 'pending' && ' ▾'}
         </MenuTrigger>
         <MenuPopup align="end" aria-label={`Start ${ref(item)} with`}>
           <StartEntries item={item} data={data} onPick={pick} />

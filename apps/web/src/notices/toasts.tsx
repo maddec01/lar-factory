@@ -8,6 +8,7 @@ import { flushSync } from 'react-dom';
 import { XIcon } from 'lucide-react';
 import { Button } from '@mux-factory/ui/button';
 import { ToastProvider, toastManager } from '@mux-factory/ui/toast';
+import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 
 /** How long a success toast stays. */
 const TOAST_MS = 5_000;
@@ -33,11 +34,14 @@ export function DismissButton({ what, onClick }: { what: string; onClick: () => 
   return <Button variant="ghost" size="icon-xs" className="dismiss" aria-label={`Dismiss${what}`} onClick={onClick}><XIcon /></Button>;
 }
 
-const focusFirst = (selectors: string[]) =>
+const focusFirst = (selectors: string[]) => {
+  // The item dialog holds focus while it's open, and its buttons share their data attributes with the board's.
+  const root = document.querySelector(OPEN_ITEM_DIALOG) ?? document;
   // querySelector returns the first in page order; take the first selector that matches.
-  selectors.map((sel) => document.querySelector<HTMLElement>(sel)).find(Boolean)?.focus({ preventScroll: true });
+  selectors.map((sel) => root.querySelector<HTMLElement>(sel)).find(Boolean)?.focus({ preventScroll: true });
+};
 
-/** Moves focus to the first of `selectors` on the page, if something took it away with the element that had it. */
+/** Moves focus to the first of `selectors` on the page, or in the item dialog while it's open, if something took it away with the element that had it. */
 export function refocus(selectors: string[]): void {
   if (document.activeElement === document.body) focusFirst(selectors);
 }

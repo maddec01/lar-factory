@@ -57,13 +57,6 @@ export function SliceList({ item }: { item: Item }) {
   );
 }
 
-export function ChecksDot({ item }: { item: Item }) {
-  const states = item.linkedPrs.map((p) => checkState(p.checks));
-  const color = states.includes('failed') ? 'var(--error)' : states.includes('running') ? 'var(--warning)' : states.includes('passed') ? 'var(--st-done)' : null;
-  if (!color) return null;
-  return <span className="inline-flex items-center gap-1 text-[11px] text-(--muted-foreground)"><GitPullRequest className="size-3" /><span className="size-1.5 rounded-full" style={{ background: color }} /></span>;
-}
-
 export function PrList({ item }: { item: Item }) {
   return (
     <ul className="m-0 grid list-none gap-1 p-0">
@@ -97,7 +90,7 @@ export function StatsGrid({ item }: { item: Item }) {
 }
 
 /** The one thing each status asks of you, as a button label; stubs, nothing is written. */
-export function primaryAction(item: Item): string | null {
+function primaryAction(item: Item): string | null {
   switch (item.status) {
     case 'Needs you': return 'Answer in T3';
     case 'Verify': return 'Verify build';

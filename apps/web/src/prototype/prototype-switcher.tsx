@@ -6,16 +6,15 @@ import { useEffect, useSyncExternalStore } from 'react';
 
 const VARIANTS = [
   { key: 'A', name: 'T3 twin: threads sidebar + item detail' },
-  { key: 'B', name: 'Flow lanes: rail + kanban' },
   { key: 'C', name: 'Factory floor: repos + dashboard' },
-  { key: 'D', name: 'Docked companion: narrow strip beside T3' },
+  { key: 'E', name: 'Control room: C\'s overview + A\'s detail' },
   { key: 'off', name: 'Current board' },
 ] as const;
 export type VariantKey = (typeof VARIANTS)[number]['key'];
 
 const STORAGE = 'prototype.variant';
 // The page tests drive the current board, so under Vitest the prototype stays off.
-const FALLBACK: VariantKey = import.meta.env.MODE === 'test' ? 'off' : 'A';
+const FALLBACK: VariantKey = import.meta.env.MODE === 'test' ? 'off' : 'E';
 const listeners = new Set<() => void>();
 
 function read(): VariantKey {

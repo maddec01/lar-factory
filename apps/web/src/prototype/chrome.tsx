@@ -12,7 +12,7 @@ export const drag = '[-webkit-app-region:drag]';
 export const noDrag = '[-webkit-app-region:no-drag]';
 
 /** Room for the Mac window's traffic lights; in a browser, grey stand-ins so the layout reads like the app. */
-export function TrafficLights() {
+function TrafficLights() {
   if (inMacApp()) return <span className="w-[73px] shrink-0" />;
   return (
     <span className="flex w-[73px] shrink-0 gap-2 pl-1" aria-hidden="true">
@@ -21,7 +21,7 @@ export function TrafficLights() {
   );
 }
 
-export function Logo({ className = 'h-[12.5px] w-[22px]' }: { className?: string }) {
+function Logo({ className = 'h-[12.5px] w-[22px]' }: { className?: string }) {
   return (
     <svg className={`shrink-0 ${className}`} viewBox={BRAND_MARK_VIEWBOX} fill="none" aria-label="Mux">
       <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />

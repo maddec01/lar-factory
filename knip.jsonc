@@ -23,6 +23,8 @@
   // Copies keep every export upstream has (docs/adr/0016).
   "ignoreIssues": {
     "packages/ui/src/components/ui/*": ["exports", "types"],
+    "packages/ui/src/lib/visibleAnimation.ts": ["exports", "types"],
+    "packages/ui/src/lib/windowControlsOverlay.ts": ["exports", "types"],
     "apps/desktop/src/updates/AppUpdates.ts": ["exports", "types"],
     "apps/desktop/src/updates/updateMachine.ts": ["exports"],
     "apps/web/src/updates/update-button-logic.ts": ["exports"]

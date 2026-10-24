@@ -1,6 +1,6 @@
 // The page's title bar, copied from T3 Code: a 52 px drag bar with the logo, a grey "Factory" and a "for T3 Code" pill.
-// In the Mac app it leaves room for the window's traffic lights (app/src/WindowTitleBar.ts puts them at x 16, centred in
-// the bar). Sizes from pingdotgg/t3code apps/web/src/components/sidebar/SidebarChrome.tsx (the brand row) and
+// In the Mac app it leaves room for the window's traffic lights (apps/desktop/src/window/WindowTitleBar.ts puts them
+// at x 16, centred in the bar). Sizes from pingdotgg/t3code apps/web/src/components/sidebar/SidebarChrome.tsx (the brand row) and
 // ui/badge.tsx (Badge size "sm"); the drag rule from apps/web/src/index.css.
 // The right end is the factory's own: the Refreshed time, then Update, Add item and Settings. Clicks on those buttons
 // never drag the window; the rest of the bar, Refreshed and the gaps between the buttons included, does.

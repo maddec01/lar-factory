@@ -23,19 +23,21 @@
 @source "./notices/banners.tsx";
 @source "./notices/form-result.tsx";
 @source "./notices/toasts.tsx";
+@source "./settings";
 @source "./sidebar";
 @source "./title-bar";
 @source "./updates/UpdateButton.tsx";
 @source "./updates/UpdateStatusIcon.tsx";
 @source "./updates/refresh-icon.tsx";
 
-/* Tailwind's base styles take links' underline and headings' weight; these put back the browser's. */
-a { color: inherit; text-decoration: underline; }
-a[data-slot="button"] { text-decoration: none; }
-a:hover { text-decoration-thickness: --spacing(0.5); }
 code { font: var(--text-xs) var(--font-mono); }
-/* In the base layer, so a T3 control's outline-none wins and its own focus ring is the only one. */
 @layer base {
+  /* Tailwind's base styles take links' underline; these put it back. In the base layer, so a link styled as a
+     button keeps its button's text colour. */
+  a { color: inherit; text-decoration: underline; }
+  a[data-slot="button"] { text-decoration: none; }
+  a:hover { text-decoration-thickness: --spacing(0.5); }
+  /* So a T3 control's outline-none wins and its own focus ring is the only one. */
   :focus-visible { outline: --spacing(0.5) solid var(--ring); outline-offset: --spacing(0.5); border-radius: var(--radius-sm); }
 }
 .sr-only { position: absolute; width: --spacing(0.25); height: --spacing(0.25); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

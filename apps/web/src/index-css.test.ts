@@ -12,6 +12,12 @@ test.each(sheets)('%s sets no raw colour or pixel value', (path) => {
   expect(rules(path)).not.toMatch(/#[\da-f]{3,8}\b|\b(rgba?|hsla?|oklch|oklab)\(|\d(px|pt)\b/i);
 });
 
+const baseLayer = () => rules('index.css').match(/@layer base \{([\s\S]*?)\n\}/)?.[1] ?? '';
+
 test("the board's focus outline sits in the base layer, so a T3 control's outline-none wins", () => {
-  expect(rules('index.css')).toMatch(/@layer base \{\s*:focus-visible \{/);
+  expect(baseLayer()).toMatch(/^\s*:focus-visible \{/m);
+});
+
+test("the board's link rules sit in the base layer, so a link styled as a button keeps its button's colours", () => {
+  expect(baseLayer()).toMatch(/^\s*a \{ color: inherit;/m);
 });

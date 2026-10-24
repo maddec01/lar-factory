@@ -77,7 +77,7 @@ through a long conversation, and subagents return summaries instead of files.
 
 | Skill | What it does | Source |
 | ----- | ------------ | ------ |
-| `mux-work` | Runs one item: size up, shape, brief, gate, start the build | Mux |
+| `mux-work` | Runs one item: size up, shape, brief, gate, up to Ready | Mux |
 | `mux-work/agents/` | Builder, Doubt, four reviewers, approver, CI fixer | Mux |
 | `skill-sync` | Brings upstream changes into the copies, by your choice | Mux |
 | `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff`, `to-tickets`, `implement` | Shaping and building; `code-review` is for reviewing by hand, and no `mux-work` file loads it | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |

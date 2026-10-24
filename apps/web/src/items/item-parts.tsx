@@ -1,6 +1,6 @@
-// The bits every view draws for an item: its numbered title, title link and status track, and the item dialog's
-// platform tag, slices, pull requests with checks, and agent work. The tag is T3's Badge; the board's CSS adds the
-// coloured dot.
+// The bits every view draws for an item: its numbered title, title link, status track and slice bar, and the item
+// dialog's platform tag, slices, pull requests with checks, and agent work. The tag is T3's Badge; the board's CSS
+// adds the coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
 import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, slug } from '@mux-factory/shared';
@@ -46,6 +46,19 @@ export function StepTrack({ status, labels }: { status: Status; labels?: boolean
 }
 
 const SLICE_COLOR: Record<SliceProgress, string> = { done: 'var(--st-done)', active: 'var(--st-now)', blocked: 'var(--st-review)', waiting: 'var(--input)' };
+
+/** A build's slices as one bar, a segment each, in their colours; the bar's waiting segments are faint. */
+export function SliceBar({ item }: { item: Item }) {
+  if (!item.slices.length) return null;
+  return (
+    <ol className="m-0 flex list-none gap-[2px] p-0">
+      {item.slices.map((s) => (
+        <li key={s.number} title={`#${s.number} ${s.title}`} className={`h-1 flex-1 rounded-full ${s.progress === 'active' ? 'status-pulse' : ''}`}
+          style={{ background: s.progress === 'waiting' ? 'var(--soft)' : SLICE_COLOR[s.progress] }} />
+      ))}
+    </ol>
+  );
+}
 
 export function SliceList({ item }: { item: Item }) {
   return (

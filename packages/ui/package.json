@@ -9,7 +9,12 @@
     "./alert-dialog": "./src/components/ui/alert-dialog.tsx",
     "./badge": "./src/components/ui/badge.tsx",
     "./button": "./src/components/ui/button.tsx",
+    "./checkbox": "./src/components/ui/checkbox.tsx",
     "./dialog": "./src/components/ui/dialog.tsx",
+    "./input": "./src/components/ui/input.tsx",
+    "./label": "./src/components/ui/label.tsx",
+    "./radio-group": "./src/components/ui/radio-group.tsx",
+    "./textarea": "./src/components/ui/textarea.tsx",
     "./kept-mounted-dialog-popup": "./src/dialog/kept-mounted-dialog-popup.tsx",
     "./styles.css": "./src/styles.css",
     "./compiled-css": "./src/compiled-css/compiled-css.ts"

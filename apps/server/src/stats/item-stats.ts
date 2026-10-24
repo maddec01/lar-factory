@@ -17,6 +17,7 @@ import type { CodexTurnSelection } from '../t3/t3-db.ts';
 import { readT3Settings } from '../t3/t3-settings.ts';
 import type { InstanceHome, T3Settings, TranscriptDriver } from '../t3/t3-settings.ts';
 import { agentTime } from './agent-time.ts';
+import { codexServiceTier } from './codex-usage.ts';
 import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens } from './transcript-usage.ts';
 import type { SessionRecordsReader } from './transcript-usage.ts';
 import type { UsageRecord, UsageSpeed } from './usage-record.ts';
@@ -91,11 +92,7 @@ function historicalTier(match: CodexTurnSelection | null | undefined, record: Us
   const serviceTier = selection.options.get('serviceTier');
   if (serviceTier !== undefined && typeof serviceTier !== 'string') return undefined;
   // getCodexServiceTierOptionValue: the serviceTier option, else `fast` for fastMode.
-  const tier = serviceTier ?? (selection.options.get('fastMode') === true ? 'fast' : undefined);
-  if (tier === 'fast' || tier === 'priority') return 'fast';
-  if (tier === 'ultrafast') return 'ultrafast';
-  if (tier === undefined || tier === 'default' || tier === 'standard') return 'standard';
-  return undefined;
+  return codexServiceTier(serviceTier ?? (selection.options.get('fastMode') === true ? 'fast' : undefined));
 }
 
 /**

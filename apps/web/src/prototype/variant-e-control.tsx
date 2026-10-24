@@ -1,15 +1,20 @@
 // PROTOTYPE, throwaway. Variant E, "Control room": C's overview with A's detail. The window stays a
 // dashboard (KPI tiles, your desk, the line as stations, repos in the sidebar), and clicking any item, in
-// the sidebar, on the desk or on the line, opens A's full detail in an inspector on the right without
-// leaving the overview. The picked item lights up everywhere it appears. Esc closes the inspector.
+// the sidebar, on the desk or on the line, opens A's full detail in the right panel without leaving the
+// overview. The left sidebar copies T3 Code's: its toggle beside the traffic lights, search with Add item,
+// Settings and the update button at its foot. The right panel toggles as T3's does and reopens on the last
+// item viewed. ⌘B toggles the sidebar, ⌘⌥B the panel, Esc closes the panel.
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowRight, ChartColumn, ChevronDown, ChevronRight, GitPullRequest, Plus, Search, Settings, X } from 'lucide-react';
-import { boardSections, formatUsd, platformOf, shortAgo } from '@mux-factory/shared';
+import { ArrowRight, ChevronDown, ChevronRight, PanelRight, Search, Settings, SquarePen, X } from 'lucide-react';
+import { boardApp, boardSections, formatUsd, platformOf, shortAgo } from '@mux-factory/shared';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import type { BoardData, Item, Status } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
-import { BrandRow, Button, IconButton, Kbd, PlatformTag, SidebarButton, StatusGlyph, STATUS_COLOR, drag, noDrag, platformColor } from './chrome.tsx';
+import { UpdateButton } from '../updates/UpdateButton.tsx';
+import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
+import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, STATUS_COLOR, WindowControls, drag, noDrag, platformColor } from './chrome.tsx';
 import { ActionButtons, PrList, SliceBar, SliceList, StatsGrid, StepTrack, hint, refText, statsOf } from './item-bits.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
@@ -114,15 +119,24 @@ function Line({ items, data, pick }: { items: Item[]; data: BoardData; pick: Pic
   );
 }
 
+/** The right panel before any item was viewed. */
+function EmptyPanel() {
+  return (
+    <aside className="flex w-[440px] shrink-0 flex-col border-l border-(--border) bg-(--background)">
+      <header className={`h-[52px] shrink-0 border-b border-(--border) ${drag}`} />
+      <p className="m-0 grid flex-1 place-items-center px-8 text-center text-(--muted-foreground)">Click an item on the board to see its details here.</p>
+    </aside>
+  );
+}
+
 /** A's item detail, narrowed to an inspector: the same sections, the actions pinned at its foot. */
-function Inspector({ item, data, now, onClose }: { item: Item; data: BoardData; now: number; onClose: () => void }) {
+function Inspector({ item, data, now }: { item: Item; data: BoardData; now: number }) {
   const h = hint(item);
   return (
     <aside className="flex w-[440px] shrink-0 flex-col border-l border-(--border) bg-(--background)">
       <header className={`flex h-[52px] shrink-0 items-center gap-2 border-b border-(--border) px-4 ${drag}`}>
         <PlatformTag platform={platformOf(item, data.repos)} />
         <span className="text-(--muted-foreground) tabular-nums">{refText(item)}</span>
-        <span className={`ml-auto ${noDrag}`}><IconButton label="Close (Esc)" onClick={onClose}><X /></IconButton></span>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="grid gap-5 px-5 py-5">
@@ -157,16 +171,83 @@ function Inspector({ item, data, now, onClose }: { item: Item; data: BoardData; 
   );
 }
 
+/** T3's SidebarHeaderIconButton: a 28 px icon button in the sidebar's icon colour, its label in a tooltip. */
+function SidebarIconButton({ label, children, onClick, side = 'top' }: { label: string; children: ReactNode; onClick?: () => void; side?: 'top' | 'bottom' }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={
+        <button type="button" aria-label={label} onClick={onClick}
+          className="grid size-7 shrink-0 place-items-center rounded-(--control-radius) text-(--sidebar-icon-color) hover:bg-(--sidebar-row-hover) hover:text-(--sidebar-foreground) [&_svg]:size-4" />
+      }>{children}</TooltipTrigger>
+      <TooltipPopup side={side}>{label}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/** T3's search field over the thread list, with its new-thread button, here Add item, on the right. */
+function SearchRow({ query, onQuery }: { query: string; onQuery: (q: string) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      <label className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-(--control-radius) px-2 py-1.5 text-sm font-medium text-(--sidebar-muted-foreground) hover:bg-(--sidebar-row-hover) hover:text-(--sidebar-foreground)">
+        <Search className="size-4 shrink-0 text-(--sidebar-icon-color)" />
+        <input type="search" value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Search" aria-label="Search items"
+          className="min-w-0 flex-1 bg-transparent font-medium text-(--sidebar-foreground) outline-none placeholder:text-(--sidebar-muted-foreground) [&::-webkit-search-cancel-button]:hidden" />
+        {query && <button type="button" aria-label="Clear search" onClick={() => onQuery('')} className="grid size-5 place-items-center rounded-sm text-(--muted-foreground) hover:bg-(--accent)"><X className="size-3" /></button>}
+      </label>
+      <SidebarIconButton label="Add item (⌘N)"><SquarePen /></SidebarIconButton>
+    </div>
+  );
+}
+
+/** The board app's update button, T3's update pill; in a browser, where it hides, a still stand-in. */
+function Update() {
+  if (boardApp()) return <UpdateButton />;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<button type="button" aria-label="Check for updates" className="inline-flex size-8 items-center justify-center rounded-full text-(--sidebar-icon-color) hover:bg-(--update-hover) hover:text-(--foreground)" />}>
+        <UpdateStatusIcon status="idle" />
+      </TooltipTrigger>
+      <TooltipPopup side="top">Check for updates</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/** T3's right-panel toggle at the end of the main header: a ghost toggle, filled while the panel is open. */
+function PanelToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={
+        <button type="button" aria-label="Toggle right panel" aria-pressed={open} onClick={onToggle}
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-(--foreground) hover:bg-(--accent) aria-pressed:bg-(--accent) [&_svg]:size-4 [&_svg]:opacity-80" />
+      }><PanelRight /></TooltipTrigger>
+      <TooltipPopup side="bottom">Toggle right panel (⌘⌥B)</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+const LAST = 'prototype.lastItem';
+const matches = (item: Item, q: string) => !q || `${item.title} ${refText(item)}`.toLowerCase().includes(q);
+
 export function VariantE() {
   const { data, now } = useBoardStore();
   const [platform, setPlatform] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const all = pages(data);
   const [page, setPage] = useState('general');
-  const [id, setId] = useState<string | null>(() => boardSections(data, now).needsYou[0]?.id ?? null);
-  const pick: Pick = { id, set: (next) => setId(next === id ? null : next) };
+  const [sidebar, setSidebar] = useState(true);
+  const [panel, setPanel] = useState(false);
+  const [last, setLast] = useState<string | null>(() => localStorage.getItem(LAST));
+  const [query, setQuery] = useState('');
+  const view = (id: string) => { setLast(id); localStorage.setItem(LAST, id); setPanel(true); };
+  const pick: Pick = { id: panel ? last : null, set: view };
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setId(null);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPanel(false);
+      if (event.metaKey && event.key.toLowerCase() === 'b') {
+        event.preventDefault();
+        if (event.altKey) setPanel((p) => !p); else setSidebar((s) => !s);
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
@@ -174,44 +255,55 @@ export function VariantE() {
   const s = boardSections(scoped, now);
   const building = scoped.items.filter((i) => i.status === 'In progress').length;
   const spend = scoped.items.reduce((t, i) => t + (statsOf(i)?.costUsd ?? 0), 0);
-  const prs = scoped.items.reduce((n, i) => n + i.linkedPrs.length, 0);
-  const item = data.items.find((i) => i.id === id);
+  const item = data.items.find((i) => i.id === last);
   const current = all.find((p) => p.id === page)!;
+  const q = query.trim().toLowerCase();
   return (
     <div className="proto fixed inset-0 flex bg-(--background) text-(--foreground)">
-      <aside className="flex w-[268px] shrink-0 flex-col border-r border-(--border) bg-(--sidebar)">
-        <BrandRow><IconButton label="New item"><Plus /></IconButton></BrandRow>
-        {settings ? <SettingsNav all={all} current={page} onPick={setPage} onBack={() => setSettings(false)} /> : (
-          <>
-            <div className="grid gap-1 px-2 pb-2">
-              <SidebarButton icon={<Search />} label="Search items" trailing={<Kbd>⌘K</Kbd>} />
-              <SidebarButton icon={<ChartColumn />} label="Whole factory" active={!platform} onClick={() => setPlatform(null)} />
-            </div>
-            <div className="px-4 pb-1 pt-1 text-[11px] font-medium text-(--muted-foreground)">Repositories</div>
-            <nav className="min-h-0 flex-1 overflow-y-auto px-2">
-              {data.repos.map((r) => <Repo key={r.repo} platform={r.platform} repo={r.repo} now={now} pick={pick} scoped={platform === r.platform}
-                items={data.items.filter((i) => platformOf(i, data.repos) === r.platform)} onScope={() => setPlatform(platform === r.platform ? null : r.platform)} />)}
-            </nav>
-            <div className="border-t border-(--border) p-2">
-              <SidebarButton icon={<Settings />} label="Settings" onClick={() => setSettings(true)} />
-              <SidebarButton icon={<GitPullRequest />} label="Pull requests" trailing={<span className="text-[11px] text-(--muted-foreground)">{prs}</span>} />
-              <SidebarButton icon={<ChartColumn />} label="Usage" trailing={<span className="text-[11px] text-(--muted-foreground)">{formatUsd(spend)}</span>} />
-            </div>
-          </>
-        )}
-      </aside>
+      <WindowControls open={sidebar} onToggle={() => setSidebar(!sidebar)} />
+      {sidebar && (
+        <aside className="relative flex w-64 shrink-0 flex-col border-r border-(--sidebar-border) bg-(--sidebar) text-(--sidebar-foreground)">
+          <div className={`flex h-[52px] shrink-0 items-center pr-3 ${BRAND_LEFT} ${drag}`}><Brand /></div>
+          {settings ? (
+            <>
+              <SettingsNav all={all} current={page} onPick={setPage} onBack={() => setSettings(false)} />
+              <span className="absolute bottom-2 right-2"><Update /></span>
+            </>
+          ) : (
+            <>
+              <div className="px-2 pb-2"><SearchRow query={query} onQuery={setQuery} /></div>
+              <nav className="min-h-0 flex-1 overflow-y-auto px-2">
+                {data.repos.map((r) => {
+                  const items = data.items.filter((i) => platformOf(i, data.repos) === r.platform && matches(i, q));
+                  if (q && !items.some((i) => i.status !== 'List' && i.status !== 'Done')) return null;
+                  return <Repo key={r.repo} platform={r.platform} repo={r.repo} now={now} pick={pick} scoped={platform === r.platform}
+                    items={items} onScope={() => setPlatform(platform === r.platform ? null : r.platform)} />;
+                })}
+              </nav>
+              <div className="flex items-center justify-between px-2 py-2">
+                <SidebarIconButton label="Settings" onClick={() => setSettings(true)}><Settings /></SidebarIconButton>
+                <Update />
+              </div>
+            </>
+          )}
+        </aside>
+      )}
       <main className="flex min-w-0 flex-1 flex-col">
         {settings ? (
           <>
-            <SettingsHeader page={current} />
+            <SettingsHeader page={current} leading={sidebar ? undefined : <span className="w-[116px] shrink-0" />} />
             <div className="min-h-0 flex-1 overflow-y-auto"><div className="mx-auto max-w-2xl px-8 py-8"><SettingsBody page={current} /></div></div>
           </>
         ) : (
           <>
-            <header className={`flex h-[52px] shrink-0 items-center gap-2 border-b border-(--border) px-4 ${drag}`}>
+            <header className={`flex h-[52px] shrink-0 items-center gap-2 border-b border-(--border) pr-3 ${sidebar ? 'pl-4' : BRAND_LEFT} ${drag}`}>
               <span className="font-medium">{platform ?? 'Whole factory'}</span>
+              {platform && <button type="button" aria-label="Show the whole factory" onClick={() => setPlatform(null)} className={`grid size-5 place-items-center rounded-sm text-(--muted-foreground) hover:bg-(--accent) ${noDrag}`}><X className="size-3" /></button>}
               <span className="text-xs text-(--muted-foreground)">{data.fetchedAt ? `refreshed ${shortAgo(data.fetchedAt, now)}` : ''}</span>
-              <span className={`ml-auto flex gap-1.5 ${noDrag}`}><Button small>This week</Button><Button small primary><Plus /> Add item</Button></span>
+              <span className={`ml-auto flex items-center gap-1.5 ${noDrag}`}>
+                <Button small>This week</Button>
+                <PanelToggle open={panel} onToggle={() => setPanel(!panel)} />
+              </span>
             </header>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="grid gap-7 px-6 py-5">
@@ -239,7 +331,7 @@ export function VariantE() {
           </>
         )}
       </main>
-      {!settings && item && <Inspector item={item} data={data} now={now} onClose={() => setId(null)} />}
+      {!settings && panel && (item ? <Inspector item={item} data={data} now={now} /> : <EmptyPanel />)}
     </div>
   );
 }

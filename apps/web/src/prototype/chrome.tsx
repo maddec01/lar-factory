@@ -2,11 +2,12 @@
 // sidebar rows and footer buttons, status glyphs, and the window drag rules.
 
 import type { ReactNode } from 'react';
-import { Check, Circle, CircleDashed, CircleDot, Clock3, Eye, GitMerge, LoaderCircle } from 'lucide-react';
+import { Check, Circle, CircleDashed, CircleDot, Clock3, Eye, GitMerge, LoaderCircle, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, inMacApp, slug } from '@mux-factory/shared';
 import type { Status } from '@mux-factory/shared';
 import { Badge } from '@mux-factory/ui/badge';
 import { Button as UiButton } from '@mux-factory/ui/button';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 
 export const drag = '[-webkit-app-region:drag]';
 export const noDrag = '[-webkit-app-region:no-drag]';
@@ -29,35 +30,43 @@ function Logo({ className = 'h-[12.5px] w-[22px]' }: { className?: string }) {
   );
 }
 
-/** T3's sidebar header: traffic lights, then the brand, as "T3 Code [Alpha]" sits. */
-export function BrandRow({ children }: { children?: ReactNode }) {
+/** T3's brand, "T3 Code" with the product name muted: here the Mux mark and "Factory". */
+export function Brand() {
   return (
-    <div className={`flex h-[52px] shrink-0 items-center gap-2 pl-4 pr-2 ${drag}`}>
+    <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
+      <Logo />
+      <span className="truncate text-(--muted-foreground)">Factory</span>
+    </span>
+  );
+}
+
+/** Where T3 puts the window's controls: the traffic lights, then its sidebar toggle, fixed to the window's top left
+ *  so the toggle stays put while the sidebar slides away. */
+export function WindowControls({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <div className="pointer-events-none fixed left-4 top-0 z-50 flex h-[52px] items-center gap-[3px]">
       <TrafficLights />
-      <span className="inline-flex items-baseline gap-1 text-sm font-medium tracking-tight">
-        <Logo />
-        <span className="text-(--muted-foreground)">Factory</span>
-      </span>
-      <Badge variant="secondary" size="sm" className="bg-accent">for T3 Code</Badge>
-      <span className={`ml-auto flex items-center ${noDrag}`}>{children}</span>
+      <Tooltip>
+        <TooltipTrigger render={
+          <UiButton variant="ghost" size="icon" aria-label="Toggle main sidebar" aria-pressed={open} onClick={onToggle}
+            className={`pointer-events-auto size-7! ${noDrag}`} />
+        }>
+          {open ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
+        </TooltipTrigger>
+        <TooltipPopup side="bottom">Toggle main sidebar (⌘B)</TooltipPopup>
+      </Tooltip>
     </div>
   );
 }
+
+/** Left of the brand: the traffic lights, the toggle and T3's 0.75 rem gap. */
+export const BRAND_LEFT = 'pl-[132px]';
 
 export function SidebarButton({ icon, label, onClick, trailing, active }: { icon: ReactNode; label: ReactNode; onClick?: () => void; trailing?: ReactNode; active?: boolean }) {
   return (
     <button type="button" onClick={onClick}
       className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] text-(--sidebar-fg) hover:bg-(--row-hover) [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-(--sidebar-muted) ${active ? 'bg-(--row-active) font-medium' : ''}`}>
       {icon}<span className="min-w-0 flex-1 truncate">{label}</span>{trailing}
-    </button>
-  );
-}
-
-export function IconButton({ label, children, onClick }: { label: string; children: ReactNode; onClick?: () => void }) {
-  return (
-    <button type="button" aria-label={label} title={label} onClick={onClick}
-      className="grid size-7 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--row-hover) hover:text-(--foreground) [&_svg]:size-4">
-      {children}
     </button>
   );
 }

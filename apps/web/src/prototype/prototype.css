@@ -1,16 +1,34 @@
 /* PROTOTYPE, throwaway. T3 Code's sidebar and status tones, made from the design system's tokens. */
 .proto {
-  --sidebar: color-mix(in srgb, var(--foreground) 2%, var(--background));
-  --sidebar-fg: var(--foreground);
-  --sidebar-muted: color-mix(in srgb, var(--muted-foreground) 85%, var(--background));
-  --row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
-  --row-active: color-mix(in srgb, var(--foreground) 8%, transparent);
+  /* T3's [data-app-sidebar] surface: zinc-50 bar, zinc-25 hover, white selected row; black in dark mode. */
+  --sidebar: var(--color-zinc-50);
+  --sidebar-foreground: var(--color-zinc-800);
+  --sidebar-muted-foreground: var(--color-zinc-500);
+  --sidebar-row-hover: var(--color-zinc-25);
+  --sidebar-row-active: var(--color-white);
+  --sidebar-row-selected: var(--color-white);
+  --sidebar-border: var(--color-zinc-200);
+  --sidebar-icon-color: color-mix(in srgb, var(--sidebar-muted-foreground) 60%, var(--sidebar));
+  --sidebar-fg: var(--sidebar-foreground);
+  --sidebar-muted: var(--sidebar-muted-foreground);
+  --row-hover: var(--sidebar-row-hover);
+  --row-active: var(--sidebar-row-selected);
   --st-amber: var(--warning);
   --st-now: var(--primary);
   --st-review: var(--sub);
   --st-done: var(--success);
   --st-idle: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
   font-size: var(--text-sm);
+
+  @variant dark {
+    --sidebar: var(--color-black);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-muted-foreground: var(--muted-foreground);
+    --sidebar-row-hover: color-mix(in srgb, var(--foreground) 8%, transparent);
+    --sidebar-row-active: color-mix(in srgb, var(--foreground) 11%, transparent);
+    --sidebar-row-selected: color-mix(in srgb, var(--foreground) 7%, transparent);
+    --sidebar-border: var(--border);
+  }
 }
 .proto a { text-decoration: none; }
 @keyframes proto-pulse { 50% { opacity: 0.35; } }

@@ -14,7 +14,7 @@ the flow and `docs/plan.md` for how it was set up.
   `src/items/`) with no wrapper folders such as `services/`. File names are
   kebab-case, except Copies and Ports from T3 Code, which keep T3's names. Unit
   tests sit next to the file they test.
-- `packages/ui` holds Copies of T3's base components, listed in its `UPSTREAM.md`.
+- `packages/ui` holds Copies of T3's base components and coss's toast, listed in its `UPSTREAM.md`.
   Never edit one: take a fresh copy from upstream and update its row.
 - Nothing secret goes in this public repo; the board reads GitHub through the local
   `gh` login, and `config.json` holds only repos and their roles.

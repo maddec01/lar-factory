@@ -19,7 +19,8 @@ import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { loadItemStats } from './stats/item-stats.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
-import { modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
+import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
+import { loadItemThreads } from './threads/item-threads.ts';
 import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools/tools.ts';
 
 const HOST = '127.0.0.1';
@@ -40,6 +41,7 @@ const board = createBoardState({
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
 const modelManifest = modelManifestPath();
+const environmentIdFile = environmentIdPath();
 let projectNumber = config.number;
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
@@ -81,6 +83,20 @@ function withStats(items: Item[]): Item[] {
     if (frozen) return { ...item, stats: frozen };
     if (!item.repo || item.number === null || !stats) return { ...item, stats: undefined };
     return { ...item, stats: stats === 'unavailable' ? stats : stats(item.repo, item.number) ?? undefined };
+  });
+}
+
+/**
+ * Attaches each item's T3 threads, read afresh from T3 Code's database; none without
+ * one, and 'unavailable' when it can't be read, as the stats log says.
+ */
+function withThreads(items: Item[]): Item[] {
+  const threads = loadItemThreads(statsSources.db);
+  return items.map((item) => {
+    if (!item.repo || item.number === null || !threads) return { ...item, threads: undefined };
+    if (threads === 'unavailable') return { ...item, threads };
+    const own = threads(item.repo, item.number);
+    return { ...item, threads: own.length ? own : undefined };
   });
 }
 
@@ -175,8 +191,9 @@ async function refresh(): Promise<void> {
     const snapshot = await fetchProject(config.owner, projectNumber);
     const { error, fetchedAt } = board.snapshot();
     const recovered = error !== null || fetchedAt === null;
-    board.applyRead(snapshot.items, readRevision, withStats);
-    board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: null });
+    board.applyRead(snapshot.items, readRevision, (items) => withThreads(withStats(items)));
+    board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: null,
+      t3EnvironmentId: readEnvironmentId(environmentIdFile) });
     if (recovered) log(`read ${snapshot.items.length} items from the ${snapshot.title} project`);
     read = true;
   } catch (err) {

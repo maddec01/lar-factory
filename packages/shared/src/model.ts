@@ -187,6 +187,25 @@ export interface Item {
   map?: ConceptMap;
   /** Absent when no T3 thread worked on it or there's no T3 database; 'unavailable' when the database can't be read. */
   stats?: ItemStats | 'unavailable';
+  /** Its item threads, newest first; absent when none or there's no T3 database, 'unavailable' when the database can't be read. */
+  threads?: ItemThread[] | 'unavailable';
+}
+
+/** `running` while a turn is in flight, `needs you` while a runtime request is open, else `done`. */
+export type ThreadState = 'running' | 'needs you' | 'done';
+
+/** A T3 Code thread whose first user message names the item before any other issue. */
+export interface ItemThread {
+  id: string;
+  title: string;
+  state: ThreadState;
+  /** The thread's latest message, turn or runtime request time. */
+  updated: string;
+}
+
+/** The deep link that opens a T3 thread in T3 Code, as T3's promptLinks.ts parses it (pingdotgg/t3code d53873b6). */
+export function threadLink(environmentId: string, threadId: string): string {
+  return `t3code://threads/${encodeURIComponent(environmentId)}/${encodeURIComponent(threadId)}`;
 }
 
 /** A T3 Code thread the board started. */
@@ -251,6 +270,8 @@ export interface BoardData {
   started?: Record<string, StartedThread>;
   /** What's wrong with t3 and gh, from the latest lookup; a tool that works has no entry. Absent in sample mode. */
   tools?: ToolProblems;
+  /** T3 Code's environment id, which thread links need; absent when T3 hasn't written one. */
+  t3EnvironmentId?: string;
 }
 
 /** A tool the lookup didn't find, naming the override that pointed nowhere, if one did. */

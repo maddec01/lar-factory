@@ -1,17 +1,17 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { agentTimeRows, liveProjects, readT3Db, threadSessions } from './t3-db.ts';
+import { threadRows, liveProjects, readT3Db, threadSessions } from './t3-db.ts';
 import { projectsDb, statsDb } from '../../test/stats-db.ts';
 
-test('threads come back in one query, each with its lineage and, for a root, its first user message', (t) => {
+test('threads come back in one query, each with its title, lineage and deletion time and, for a root, its first user message', (t) => {
   const db = statsDb(t, [
     { id: 'root', messages: ['Build x/y#1', 'later'] },
     { id: 'child', rootThreadId: 'root', messages: ['Build x/y#2'] },
   ]);
-  const { threads } = readT3Db(db, agentTimeRows);
+  const { threads } = readT3Db(db, threadRows);
   assert.deepEqual(threads.map((row) => ({ ...row })), [
-    { id: 'root', root: 'root', parent: null, text: 'Build x/y#1' },
-    { id: 'child', root: 'root', parent: 'root', text: null },
+    { id: 'root', title: 'root', deletedAt: null, root: 'root', parent: null, text: 'Build x/y#1' },
+    { id: 'child', title: 'child', deletedAt: null, root: 'root', parent: 'root', text: null },
   ]);
 });
 

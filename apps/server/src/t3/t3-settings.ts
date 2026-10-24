@@ -3,6 +3,7 @@
 // f054d1b8018721bd997d99cbb918a7b17bf098a4: apps/server/src/usage/UsageService.ts,
 // claudeUsageReader and codexUsageReader (with CodexHomeLayout's shared home).
 
+import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { isRecord } from '@mux-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
@@ -29,6 +30,20 @@ export function modelManifestPath(env: NodeJS.ProcessEnv = process.env): string 
 /** T3's cached price table: `T3_USAGE_RATES`, or `usage-model-rates.json` beside T3's database, in T3's state dir. */
 export function usageRatesPath(env: NodeJS.ProcessEnv = process.env): string {
   return env.T3_USAGE_RATES || join(dirname(statsDbPath(env)), 'usage-model-rates.json');
+}
+
+/** T3's environment id, which its thread links name: `T3_ENVIRONMENT_ID`, or `environment-id` in its userdata folder. */
+export function environmentIdPath(env: NodeJS.ProcessEnv = process.env): string {
+  return env.T3_ENVIRONMENT_ID || `${userdata(env)}/environment-id`;
+}
+
+/** The environment id in the file at `path`, trimmed; undefined when it is missing, blank or can't be read. */
+export function readEnvironmentId(path: string): string | undefined {
+  try {
+    return readFileSync(path, 'utf8').trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** `~` and `~/…` under `home`, as T3's expandHomePath reads a configured path. */

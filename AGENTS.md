@@ -8,11 +8,14 @@ the flow and `docs/plan.md` for how it was set up.
   through `skill-sync`, which updates `UPSTREAM.md`. Mux rules go in `mux-work` or
   in each Mux repo's `AGENTS.md`.
 - The board is a root pnpm workspace laid out like T3 Code's monorepo:
-  `apps/server`, `apps/web`, `apps/desktop` (the Electron board app) and
-  `packages/shared`. Apps import only packages, never each other. Code sits in
-  feature folders (`src/github/`, `src/items/`) with no wrapper folders such as
-  `services/`. File names are kebab-case, except files copied from T3 Code, which
-  keep T3's names. Unit tests sit next to the file they test.
+  `apps/server`, `apps/web`, `apps/desktop` (the Electron board app),
+  `packages/shared` and `packages/ui` (the design system). Apps import only
+  packages, never each other. Code sits in feature folders (`src/github/`,
+  `src/items/`) with no wrapper folders such as `services/`. File names are
+  kebab-case, except Copies and Ports from T3 Code, which keep T3's names. Unit
+  tests sit next to the file they test.
+- `packages/ui` holds Copies of T3's base components, listed in its `UPSTREAM.md`.
+  Never edit one: take a fresh copy from upstream and update its row.
 - Nothing secret goes in this public repo; the board reads GitHub through the local
   `gh` login, and `config.json` holds only repos and their roles.
 - Every commit and PR title uses conventional commits (`type(scope): description`;
@@ -21,8 +24,8 @@ the flow and `docs/plan.md` for how it was set up.
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   Pedro merges every PR.
 - Board changes: run `pnpm test` in each of `apps/server`, `apps/web`,
-  `apps/desktop` and `packages/shared` that changed (`pnpm test` at the root runs
-  them all), then `pnpm run typecheck` and `pnpm run knip` at the root.
+  `apps/desktop`, `packages/shared` and `packages/ui` that changed (`pnpm test` at
+  the root runs them all), then `pnpm run typecheck` and `pnpm run knip` at the root.
   `pnpm run dev` at the root opens the board app's window.
 - Sample board: `BOARD_PORT=<port> pnpm run sample` in `apps/server`, on a port where
   `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing (the board app's board

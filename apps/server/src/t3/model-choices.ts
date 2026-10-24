@@ -7,8 +7,8 @@
 // and resolveProviderInstanceDisplayName in packages/client-runtime/src/state/providerInstanceDisplay.ts.
 
 import { readFileSync } from 'node:fs';
-import { isRecord, readSettings } from '../stats/item-stats.ts';
-import { offers } from '@mux-factory/shared';
+import { readSettings } from '../stats/item-stats.ts';
+import { isRecord, offers } from '@mux-factory/shared';
 import type { ModelChoice, ModelGroup, ModelOption } from '@mux-factory/shared';
 
 /** Each driver's name in T3 (PROVIDER_DISPLAY_NAMES). */

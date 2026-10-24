@@ -3,6 +3,7 @@
 
 import { cpSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
+import { isRecord } from './is-record.ts';
 
 /** The manifest's file name in ~/.agents. The skills CLI owns .skill-lock.json, so this never touches it. */
 export const INSTALL_MANIFEST = '.mux-factory-install.json';
@@ -271,10 +272,6 @@ function readManifest(path: string): Manifest | null {
       references: state.references === true,
     }])) : undefined;
   return { ...manifest, skills: (Array.isArray(manifest.skills) ? manifest.skills : []).filter(isFolderName), ...(profiles && { profiles }) };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** True for one folder name: not empty, not `.` or `..`, no slash. */

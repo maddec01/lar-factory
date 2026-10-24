@@ -2,7 +2,8 @@
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
 import { STATUSES, isBuild, sliceProgress } from './model.ts';
-import type { Checks, ContentType, IssueRef, Item, LinkedPr, Slice, Status } from './model.ts';
+import type { Checks, ConceptMap, ContentType, IssueRef, Item, LinkedPr, Slice, Status } from './model.ts';
+import { parseConceptMap } from './concept-map.ts';
 
 interface RawLabelConn {
   nodes: { name: string }[];
@@ -18,6 +19,13 @@ export interface RawIssueRef {
   repository: { nameWithOwner: string };
 }
 
+/** An issue blocking an item, as the blocked-by link reads it. */
+interface RawBlocker {
+  number: number;
+  state: 'OPEN' | 'CLOSED';
+  repository: { nameWithOwner: string };
+}
+
 /** What the issue searches found, as `repo#number` keys: open issues labelled `active` or `blocked`, and issues labelled `build`. */
 export interface Searched {
   active?: ReadonlySet<string>;
@@ -27,6 +35,10 @@ export interface Searched {
 
 interface RawContent {
   __typename: ContentType;
+  /** An issue's node id, to read a concept's body by. */
+  id?: string;
+  /** Read for concepts only, in a query of its own. */
+  body?: string;
   title: string;
   updatedAt: string;
   number?: number;
@@ -40,6 +52,7 @@ interface RawContent {
   subIssuesSummary?: { total: number; completed: number };
   subIssues?: { nodes: RawIssueRef[] };
   issueDependenciesSummary?: { blockedBy: number };
+  blockedBy?: { nodes: RawBlocker[] };
   closedByPullRequestsReferences?: { nodes: RawLinkedPr[] };
 }
 
@@ -131,6 +144,9 @@ function normalizeIssueRef(raw: RawIssueRef): IssueRef {
 
 const rawLabels = (raw: RawItem): string[] => raw.content?.labels?.nodes.map((l) => l.name) ?? [];
 
+/** A project item labelled `concept`, whose body holds its map. */
+export const isRawConcept = (raw: RawItem) => rawLabels(raw).includes('concept');
+
 export const refKey = (repo: string | null, number: number | null) => `${repo}#${number}`;
 
 /** A build's sub-issues, including those closed as not planned; none for other items. A concept's sub-issues are items on the board. */
@@ -165,7 +181,7 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
   const c = raw.content;
   if (!c) return null;
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
-  return {
+  const item: Item = {
     id: raw.id,
     status: toStatus(raw.status?.name),
     type: c.__typename,
@@ -178,11 +194,14 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
     subIssues: subIssueCounts(raw, builds),
     blockedBy: c.issueDependenciesSummary?.blockedBy ?? 0,
+    blockers: c.blockedBy?.nodes.map((b) => ({ number: b.number, repo: b.repository.nameWithOwner, state: b.state })) ?? [],
     updatedAt: updated,
     closedAt: c.closedAt ?? null,
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
     slices: normalizeSlices(rawSlices(raw, builds), active, blocked),
   };
+  if (isRawConcept(raw)) item.map = parseConceptMap(c.body ?? '');
+  return item;
 }
 
 /**
@@ -192,15 +211,40 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
  */
 export function normalizeItems(raws: RawItem[], searched: Searched = {}): Item[] {
   const items: Item[] = [];
+  const bodies = new Map<string, string | undefined>();
   const slices = new Set<string>();
   for (const raw of raws) {
     const item = normalizeItem(raw, searched);
     if (!item) continue;
     items.push(item);
+    bodies.set(item.id, raw.content?.body);
     // A slice closed as not planned is hidden from its build, but it's still no board item.
     for (const s of rawSlices(raw, searched.builds ?? new Set())) slices.add(refKey(s.repository.nameWithOwner, s.number));
   }
-  return items.filter((i) => i.type === 'DraftIssue' || !slices.has(refKey(i.repo, i.number)));
+  const board = items.filter((i) => i.type === 'DraftIssue' || !slices.has(refKey(i.repo, i.number)));
+  // An item with sub-issues on the board is a dossier too, so its body's map sections show, when it has any.
+  const parents = parentKeys(board);
+  for (const item of board) {
+    const map = item.map ? undefined : parentMap(bodies.get(item.id), parents.has(refKey(item.repo, item.number)));
+    if (map) item.map = map;
+  }
+  return board;
+}
+
+/** The `repo#number` keys of the issues the items name as their parent. */
+const parentKeys = (items: readonly Item[]) => new Set(items.flatMap((i) => (i.parent ? [refKey(i.parent.repo, i.parent.number)] : [])));
+
+/** A parent's map, from its body, when the body has any of the map's sections. */
+function parentMap(body: string | undefined, isParent: boolean): ConceptMap | undefined {
+  if (!isParent || !body) return undefined;
+  const map = parseConceptMap(body);
+  return map.destination || map.decisions.length || map.fog.length || map.check ? map : undefined;
+}
+
+/** The project items the line shows as dossiers, whose bodies hold their maps: every concept, and every item with a sub-issue on the board. */
+export function rawDossiers(raws: RawItem[], searched: Searched = {}): RawItem[] {
+  const parents = parentKeys(normalizeItems(raws, searched));
+  return raws.filter((raw) => isRawConcept(raw) || parents.has(rawKey(raw)));
 }
 
 const rawKey = (raw: RawItem) => refKey(raw.content?.repository?.nameWithOwner ?? null, raw.content?.number ?? null);

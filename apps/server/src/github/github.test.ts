@@ -2,10 +2,12 @@
 
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { ISSUE_SEARCH_QUERY, ITEMS_QUERY } from './github.ts';
+import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, ITEMS_QUERY } from './github.ts';
 
-test('the board query asks only for the blocked-by count and reads linked PR bodies', () => {
-  assert.doesNotMatch(ITEMS_QUERY, /blockedBy\(|blocking\(|fragment links/, 'the query asks only for the blocked-by count');
+test('the board query reads the blocked-by issues, no issue bodies, and linked PR bodies', () => {
+  assert.match(ITEMS_QUERY, /blockedBy\(first: \d+\) \{ nodes \{ number state repository \{ nameWithOwner \} \} \}/, 'each blocked-by issue comes with its repo and state');
+  assert.doesNotMatch(ITEMS_QUERY, /blocking\(/, 'the query reads no blocking links');
+  assert.doesNotMatch(ITEMS_QUERY, /\.\.\. on Issue \{[^}]*\bbody\b/, "issue bodies are read for dossiers only, in a query of their own");
   assert.match(ITEMS_QUERY, /number url state isDraft body mergedAt\n/, 'linked PR bodies come with the board query, not a call per item');
 });
 
@@ -16,4 +18,8 @@ test("the board query reads each slice's state reason", () => {
 
 test('an issue search page reads only each issue\'s number and repo', () => {
   assert.match(ISSUE_SEARCH_QUERY, /search\(type: ISSUE, first: \d+, after: \$after, query: \$q\) \{ pageInfo \{ hasNextPage endCursor \} nodes \{ \.\.\. on Issue \{ number repository \{ nameWithOwner \} \} \} \}/);
+});
+
+test("the dossier bodies query reads only each issue's id and body", () => {
+  assert.match(DOSSIER_BODIES_QUERY, /nodes\(ids: \$ids\) \{ \.\.\. on Issue \{ id body \} \}/);
 });

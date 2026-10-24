@@ -1,6 +1,6 @@
 // Reads the Mux project through the local `gh` CLI (`gh api graphql`).
 
-import { buildSubIssueSearch, normalizeItems, projectBuilds, refKey, sliceLabelSearch, validateDraft } from '@mux-factory/shared';
+import { buildSubIssueSearch, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@mux-factory/shared';
 import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@mux-factory/shared';
 import type { BoardConfig } from '../config/config.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -10,6 +10,8 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 /** Checks read per PR for the start time; the counts always cover all of them. */
 const CHECK_SLICE = 20;
+/** Blocked-by issues read per issue; the count covers every open one. */
+const BLOCKER_LIMIT = 20;
 /** A build's slices read per build; more than this is a build to split. */
 const SLICE_LIMIT = 50;
 /** Issues read per search page; a search pages up to GitHub's 1000 results. */
@@ -32,13 +34,14 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
             __typename
             ... on DraftIssue { title updatedAt }
             ... on Issue {
-              number title url state closedAt updatedAt
+              id number title url state closedAt updatedAt
               repository { nameWithOwner }
               labels(first: 20) { nodes { name } }
               parent { number title url state repository { nameWithOwner } }
               subIssuesSummary { total completed }
               subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state stateReason repository { nameWithOwner } } }
               issueDependenciesSummary { blockedBy }
+              blockedBy(first: ${BLOCKER_LIMIT}) { nodes { number state repository { nameWithOwner } } }
               closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
                 nodes {
                   number url state isDraft body mergedAt
@@ -73,6 +76,15 @@ export const ISSUE_SEARCH_QUERY = `query($q: String!, $after: String) {
   search(type: ISSUE, first: ${SEARCH_PAGE_SIZE}, after: $after, query: $q) { pageInfo { hasNextPage endCursor } nodes { ... on Issue { number repository { nameWithOwner } } } }
 }`;
 
+/**
+ * Dossiers' bodies, by issue node id, up to PAGE_SIZE ids a call. Only the body of a concept
+ * or of an item with sub-issues on the board is read, for its map, so the board query skips
+ * every other issue's body.
+ */
+export const DOSSIER_BODIES_QUERY = `query($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on Issue { id body } }
+}`;
+
 const FIND_PROJECT_QUERY = `query($owner: String!, $title: String!) {
   user(login: $owner) { projectsV2(first: 50, query: $title) { nodes { number title } } }
 }`;
@@ -86,6 +98,10 @@ interface PageInfo {
 
 interface RawIssueSearch {
   data: { search: { pageInfo: PageInfo; nodes: { number?: number; repository?: { nameWithOwner: string } }[] } };
+}
+
+interface RawBodies {
+  data: { nodes: ({ id?: string; body?: string } | null)[] };
 }
 
 interface RawItemsPage {
@@ -109,11 +125,12 @@ async function gh(args: string[]): Promise<string> {
   return result.stdout;
 }
 
-async function graphql<T>(query: string, vars: Record<string, string | number | null>): Promise<T> {
+async function graphql<T>(query: string, vars: Record<string, string | number | string[] | null>): Promise<T> {
   const args = ['api', 'graphql', '-f', `query=${query}`];
   for (const [key, value] of Object.entries(vars)) {
     if (value === null) continue;
-    args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`);
+    if (Array.isArray(value)) args.push(...value.flatMap((v) => ['-f', `${key}[]=${v}`]));
+    else args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`);
   }
   return JSON.parse(await gh(args)) as T;
 }
@@ -162,6 +179,19 @@ async function searchLabels(raws: RawItem[]): Promise<Searched> {
   return { builds, active, blocked };
 }
 
+/** Puts each dossier's body on its raw item, for its map. */
+async function readDossierBodies(raws: RawItem[], searched: Searched): Promise<void> {
+  const dossiers = new Map(rawDossiers(raws, searched).flatMap((raw) => (raw.content?.id ? [[raw.content.id, raw.content]] : [])));
+  const ids = [...dossiers.keys()];
+  for (let start = 0; start < ids.length; start += PAGE_SIZE) {
+    const { nodes } = (await graphql<RawBodies>(DOSSIER_BODIES_QUERY, { ids: ids.slice(start, start + PAGE_SIZE) })).data;
+    for (const node of nodes) {
+      const content = node?.id ? dossiers.get(node.id) : undefined;
+      if (node && content) content.body = node.body ?? '';
+    }
+  }
+}
+
 export interface ProjectSnapshot {
   title: string;
   items: Item[];
@@ -177,8 +207,11 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
     raws.push(...project.items.nodes);
     return project.items.pageInfo;
   });
-  // A slice and its build can sit on different pages, so slices are dropped once all are read.
-  return { title, items: normalizeItems(raws, await searchLabels(raws)) };
+  // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
+  // decide which sub-issues are slices, so they run before the dossiers, items with sub-issues on the board, are known.
+  const searched = await searchLabels(raws);
+  await readDossierBodies(raws, searched);
+  return { title, items: normalizeItems(raws, searched) };
 }
 
 /** An error's message, for a write's error text. */
@@ -294,7 +327,7 @@ export async function addProjectItem(
     progress.item = {
       id: progress.itemId, status: 'List', type: 'Issue', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'OPEN',
-      parent: null, subIssues: { total: 0, completed: 0 }, blockedBy: 0,
+      parent: null, subIssues: { total: 0, completed: 0 }, blockedBy: 0, blockers: [],
       updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],
     };
     return { item: progress.item, issueUrl: issue.html_url, error: null };

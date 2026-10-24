@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { buildSubIssueSearch, normalizeItem, normalizeItems, sliceLabelSearch } from './github-items.ts';
+import { buildSubIssueSearch, normalizeItem, normalizeItems, rawDossiers, sliceLabelSearch } from './github-items.ts';
 import type { RawIssueRef, RawItem, RawLinkedPr } from './github-items.ts';
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
 
@@ -32,6 +32,11 @@ test('normalizes an issue item from the GraphQL response', () => {
       parent: { number: 60, title: 'P', url: 'u', state: 'CLOSED', repository: { nameWithOwner: 'maddec01/mux-server' } },
       subIssuesSummary: { total: 3, completed: 1 },
       issueDependenciesSummary: { blockedBy: 2 },
+      blockedBy: { nodes: [
+        { number: 7, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } },
+        { number: 8, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-apple' } },
+        { number: 5, state: 'CLOSED', repository: { nameWithOwner: 'maddec01/mux-server' } },
+      ] },
       closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false, body: 'PR body' }] },
     },
   };
@@ -40,9 +45,58 @@ test('normalizes an issue item from the GraphQL response', () => {
   assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
   assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/mux-server', state: 'CLOSED' });
   assert.equal(item?.blockedBy, 2, 'the badge keeps the open count from the summary');
-  assert.ok(!('blockers' in item!) && !('blocking' in item!), 'the board reads no blocked-by or blocking links');
+  assert.deepEqual(item?.blockers, [
+    { number: 7, repo: 'maddec01/mux-server', state: 'OPEN' },
+    { number: 8, repo: 'maddec01/mux-apple', state: 'OPEN' },
+    { number: 5, repo: 'maddec01/mux-server', state: 'CLOSED' },
+  ], 'the blocked-by issues come with their repo and state, closed ones too');
+  assert.ok(!('blocking' in item!), 'the board reads no blocking links');
+  assert.ok(!('map' in item!), 'only a concept has a map');
   assert.equal(item?.linkedPrs.length, 1);
   assert.equal(item?.linkedPrs[0]?.body, 'PR body', 'the stats block is kept from the body the board query reads');
+});
+
+test('an item blocked by nothing has no blockers, and a draft has none either', () => {
+  assert.deepEqual(normalizeItem(rawIssue('PVTI_4', 4, 'List', ['feature']))?.blockers, []);
+  assert.deepEqual(normalizeItem({ id: 'PVTI_5', updatedAt: '', status: null, content: { __typename: 'DraftIssue', title: 'Idea', updatedAt: '' } })?.blockers, []);
+});
+
+test("a concept's body becomes its map, and no other item keeps the body", () => {
+  const body = '## Destination\nThere.\n\n## Fog\n- Why?\n';
+  const concept = normalizeItem(rawIssue('PVTI_6', 6, 'Shaping', ['concept'], { body }));
+  assert.deepEqual(concept?.map, { destination: 'There.', decisions: [], fog: ['Why?'] });
+  assert.ok(!('body' in concept!), 'the page gets the parsed sections, not the raw body');
+  const feature = normalizeItem(rawIssue('PVTI_7', 7, 'Shaping', ['feature'], { body }));
+  assert.ok(!('map' in feature!) && !('body' in feature!));
+});
+
+/** Project issue `number`, a sub-issue of issue `parent`, in the same repo. */
+const childOf = (number: number, parent: number) =>
+  rawIssue(`PVTI_${number}`, number, 'Ready', ['build'], { parent: { ...sliceRef(parent, 'OPEN'), title: `Issue ${parent}` } });
+
+test('an item with sub-issues on the board takes its map from its body, as a concept does; other items, and a body with no map sections, give none', () => {
+  const body = '## Destination\nThere.\n\n## End-to-end check\nIt works\n1. Try it\n';
+  const items = normalizeItems([
+    rawIssue('PVTI_10', 10, 'In progress', ['feature'], { body }), childOf(11, 10),
+    rawIssue('PVTI_12', 12, 'In progress', ['feature'], { body: 'Just a description.' }), childOf(13, 12),
+    rawIssue('PVTI_14', 14, 'In progress', ['feature'], { body }),
+  ]);
+  const map = (id: string) => items.find((i) => i.id === id)?.map;
+  assert.deepEqual(map('PVTI_10'), { destination: 'There.', decisions: [], fog: [], check: { title: 'It works', steps: ['Try it'] } });
+  assert.equal(map('PVTI_12'), undefined, 'a parent whose body has no map sections has no map yet');
+  assert.equal(map('PVTI_14'), undefined, 'no sub-issue on the board, so no dossier and no map');
+  assert.ok(items.every((i) => !('body' in i)));
+});
+
+test("the dossiers' items, whose bodies the board reads: every concept, and every item with a sub-issue on the board, but not a build whose slices the project holds", () => {
+  const raws = [
+    rawIssue('PVTI_1', 1, 'Shaping', ['concept']),
+    rawIssue('PVTI_10', 10, 'In progress', ['feature']), childOf(11, 10),
+    withSubIssues('PVTI_20', 20, ['build'], [sliceRef(21, 'OPEN')]),
+    rawIssue('PVTI_21', 21, 'In progress', ['improvement'], { parent: { ...sliceRef(20, 'OPEN'), title: 'Issue 20' } }),
+    rawIssue('PVTI_30', 30, 'In progress', ['feature']),
+  ];
+  assert.deepEqual(rawDossiers(raws).map((r) => r.id), ['PVTI_1', 'PVTI_10']);
 });
 
 test('drafts, unknown statuses and hidden content', () => {

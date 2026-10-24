@@ -58,6 +58,26 @@ export interface IssueRef {
   state: 'OPEN' | 'CLOSED';
 }
 
+/** An issue blocking an item, by GitHub's blocked-by link. */
+export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'>;
+
+/** The run that shows a concept works once every build lands: a title line, then numbered steps. */
+export interface EndToEndCheck {
+  title: string;
+  steps: string[];
+}
+
+/** What a concept is for and where its shaping stands. */
+export interface ConceptMap {
+  /** The first paragraph under Destination. */
+  destination: string;
+  decisions: string[];
+  /** What is still unknown, shown as open questions. */
+  fog: string[];
+  /** Absent when the body has no End-to-end check section. */
+  check?: EndToEndCheck;
+}
+
 /** Where a build's slice stands; see `sliceProgress`. */
 export type SliceProgress = 'done' | 'blocked' | 'active' | 'waiting';
 
@@ -156,11 +176,15 @@ export interface Item {
   subIssues: { total: number; completed: number };
   /** Open blockers, for the card's badge. */
   blockedBy: number;
+  /** Every issue blocking this one, open or closed; empty for drafts and PRs. */
+  blockers: Blocker[];
   updatedAt: string;
   closedAt: string | null;
   linkedPrs: LinkedPr[];
   /** A build's slices, in GitHub's sub-issue order, less those closed as not planned. The project may auto-add them, but they're never board items. Empty for other issues. */
   slices: Slice[];
+  /** A dossier's map, parsed from its issue body: always on a concept, and on an item with sub-issues on the board when its body has map sections; absent on other items. */
+  map?: ConceptMap;
   /** Absent when no T3 thread worked on it or there's no T3 database; 'unavailable' when the database can't be read. */
   stats?: ItemStats | 'unavailable';
 }

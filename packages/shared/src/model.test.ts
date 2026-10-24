@@ -20,6 +20,7 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
     parent: null,
     subIssues: { total: 0, completed: 0 },
     blockedBy: 0,
+    blockers: [],
     updatedAt: '2026-10-21T09:00:00Z',
     closedAt: null,
     linkedPrs: [],

@@ -7,6 +7,8 @@ the Copies instead (`docs/adr/0016-copy-t3s-base-components-unchanged.md`).
 
 | File | Source | Path | Commit |
 | ---- | ------ | ---- | ------ |
+| `src/components/ui/alert.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/alert.tsx` | `d53873b6a479` |
+| `src/components/ui/badge.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/badge.tsx` | `d53873b6a479` |
 | `src/components/ui/button.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/button.tsx` | `d53873b6a479` |
 
 Full commits: pingdotgg/t3code `d53873b6a4799e87afd63c8d288ef0089f5a3748`.

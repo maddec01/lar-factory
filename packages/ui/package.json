@@ -5,6 +5,8 @@
   "description": "The design system: the board's tokens, base styles and base components, copied from T3 Code.",
   "type": "module",
   "exports": {
+    "./alert": "./src/components/ui/alert.tsx",
+    "./badge": "./src/components/ui/badge.tsx",
     "./button": "./src/components/ui/button.tsx",
     "./styles.css": "./src/styles.css",
     "./compiled-css": "./src/compiled-css/compiled-css.ts"

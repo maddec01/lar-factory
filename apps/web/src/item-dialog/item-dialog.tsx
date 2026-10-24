@@ -12,19 +12,17 @@ import { useBoardStore } from '../board/board-store.ts';
 import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { ItemTitle, PlatformTag, PrList, SliceList, StatsGrid, StepTrack } from '../items/item-parts.tsx';
+import { StartBuild } from '../items/start-build.tsx';
 import { StartControl, StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
 
-/** An action a later slice builds: disabled, its title saying so. */
-function NotBuilt({ label }: { label: string }) {
-  return <Button size="sm" disabled title={`${label} isn't built yet`}>{label}</Button>;
-}
-
-/** Opens the item's pull request on GitHub, where it's verified and merged. */
+/** Opens the item's pull request on GitHub, where it's verified and merged; disabled, saying why, while none is linked. */
 function PrLink({ item, label }: { item: Item; label: string }) {
-  const url = item.linkedPrs[0]?.url ?? item.url;
-  return url ? <Button size="sm" render={<a href={url} target="_blank" rel="noopener" />}>{label}</Button> : null;
+  const url = item.linkedPrs[0]?.url;
+  // Pointer events stay on while it's disabled, so its title says why.
+  if (!url) return <Button size="sm" className="disabled:pointer-events-auto" disabled title="No pull request is linked to this item yet">{label}</Button>;
+  return <Button size="sm" render={<a href={url} target="_blank" rel="noopener" />}>{label}</Button>;
 }
 
 /** The one thing the item's status asks of you. */
@@ -34,7 +32,7 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
     case 'Queued':
       if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
       return workMessage(item) ? <StartControl item={item} data={data} label="Start refining" size="sm" icon={<Play />} /> : null;
-    case 'Ready': return <NotBuilt label="Start build" />;
+    case 'Ready': return <StartBuild item={item} data={data} size="sm" icon={<Play />} />;
     case 'Shaping': case 'In progress': case 'Review': return <OpenThread item={item} data={data} />;
     case 'Needs you': return <OpenThread item={item} data={data} label="Answer in T3" />;
     case 'Verify': return <PrLink item={item} label="Verify build" />;
@@ -82,7 +80,7 @@ function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now:
         <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Agent work</h2><StatsGrid item={item} /></section>
         {item.labels.length > 0 && <p className="m-0 flex flex-wrap gap-1">{item.labels.map((l) => <span key={l} className="rounded-(--radius-sm) border border-(--input) px-1.5 text-[11px] text-(--muted-foreground)">{l}</span>)}</p>}
         <ActionError item={item} />
-        <StartMessage item={item} />
+        <StartMessage item={item} kind={item.status === 'Ready' ? 'build' : 'refine'} />
       </DialogPanel>
       <DialogFooter>
         <span className="mr-auto inline-flex items-center gap-3 text-xs"><MoveActions item={item} data={data} /></span>

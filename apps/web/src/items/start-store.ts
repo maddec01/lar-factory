@@ -1,5 +1,5 @@
-// Start on Queued cards: what each Start this page ran is doing, and the model choice this
-// browser last started with.
+// Start on Queued items and Start build on Ready ones: what each start this page ran is doing,
+// and the model choice this browser last started with.
 
 import { create } from 'zustand';
 import { readChoice, storedChoice } from '@mux-factory/shared';
@@ -8,6 +8,9 @@ import { setKey } from './action-store.ts';
 
 /** Where this browser keeps the last model choice Start started with. */
 const CHOICE_KEY = 'mux-board:model-choice';
+
+/** Which start: today's Start, which refines a Queued item, or Start build on a Ready one. */
+export type StartKind = 'refine' | 'build';
 
 /**
  * A Start in flight, refused or failed (`error`), possibly run (`uncertain`), or done. A closed
@@ -20,20 +23,28 @@ export type StartState =
 
 interface StartStoreState {
   starts: Record<string, StartState>;
+  /** Start builds, kept apart so an item refined on this page still offers its build. */
+  builds: Record<string, StartState>;
   lastChoice: ModelChoice | undefined;
-  /** Sets the item's Start, or clears it with `undefined`. */
-  set: (itemId: string, start: StartState | undefined) => void;
+  /** Sets the item's Start or Start build, or clears it with `undefined`. */
+  set: (itemId: string, start: StartState | undefined, kind?: StartKind) => void;
   remember: (choice: ModelChoice | undefined) => void;
 }
 
 export const useStartStore = create<StartStoreState>()((set) => ({
   starts: {},
+  builds: {},
   lastChoice: readChoice(localStorage.getItem(CHOICE_KEY)),
-  set: (itemId, start) => set((state) => ({ starts: setKey(state.starts, itemId, start) })),
+  set: (itemId, start, kind = 'refine') => set((state) =>
+    (kind === 'build' ? { builds: setKey(state.builds, itemId, start) } : { starts: setKey(state.starts, itemId, start) })),
   remember: (choice) => {
     localStorage.setItem(CHOICE_KEY, storedChoice(choice));
     set({ lastChoice: choice });
   },
 }));
 
-export const useStart = (itemId: string): StartState | undefined => useStartStore((state) => state.starts[itemId]);
+/** The item's Start, or its Start build. */
+export const startOf = (state: StartStoreState, itemId: string, kind: StartKind = 'refine'): StartState | undefined =>
+  (kind === 'build' ? state.builds : state.starts)[itemId];
+
+export const useStart = (itemId: string, kind?: StartKind): StartState | undefined => useStartStore((state) => startOf(state, itemId, kind));

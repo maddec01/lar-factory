@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "es2023",
     "lib": ["es2023", "dom", "dom.iterable"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "types": ["node", "vite-plus/client"],
     "jsx": "react-jsx",
     "strict": true,
@@ -14,7 +14,8 @@
     "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": { "~/*": ["../../packages/ui/src/*"] }
   },
   "include": ["src", "test", "vite.config.ts"]
 }

@@ -1,0 +1,23 @@
+// The Copies keep T3's imports, extensionless and through `~` for src/, which need Bundler resolution
+// (as in T3's apps/web/tsconfig.json). The board's own files stay on tsconfig.json. The other options
+// match apps/web's, which type-checks the Copies it imports the same way (docs/adr/0016).
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": [],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "paths": { "~/*": ["./src/*"] }
+  },
+  "include": ["src/components/ui"]
+}

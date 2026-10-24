@@ -1,21 +1,6 @@
 // A concept's map, read from the sections of its issue body that mux-work's concepts.md lays out.
 
-/** The run that shows a concept works once every build lands: a title line, then numbered steps. */
-export interface EndToEndCheck {
-  title: string;
-  steps: string[];
-}
-
-/** What a concept is for and where its shaping stands. */
-export interface ConceptMap {
-  /** The first paragraph under Destination. */
-  destination: string;
-  decisions: string[];
-  /** What is still unknown, shown as open questions. */
-  fog: string[];
-  /** Absent when the body has no End-to-end check section. */
-  check?: EndToEndCheck;
-}
+import type { ConceptMap, EndToEndCheck } from './model.ts';
 
 /** The lines under each `## ` heading, by lowercased heading; the first heading of a name wins, so an Original issue's copy can't override the map's. */
 function sections(body: string): Map<string, string[]> {

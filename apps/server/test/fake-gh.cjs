@@ -27,6 +27,12 @@ const main = async () => {
       const nodes = { build: options.builds, blocked: options.blocked, active: options.active }[label];
       return output({ data: { search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: nodes ?? [] } } });
     }
+    // Dossier bodies by node id; the project read below leaves bodies out, as the real query does.
+    if (args.some((a) => a.includes('nodes(ids:'))) {
+      const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
+      const nodes = ids.map((id) => (options.items ?? []).map((i) => i.content).find((c) => c?.id === id)).map((c) => c && { id: c.id, body: c.body ?? '' });
+      return output({ data: { nodes } });
+    }
     if (options.readDelay) {
       // Two project reads at once log an overlap, so tests can check the board never runs them together.
       const lock = process.env.FAKE_GH_STATE + '.reading';
@@ -35,7 +41,8 @@ const main = async () => {
       fs.rmSync(lock, { force: true });
     }
     return output({ data: { user: { projectV2: { title: 'Mux',
-      items: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: options.items ?? [] } } } } });
+      items: { pageInfo: { hasNextPage: false, endCursor: null },
+        nodes: (options.items ?? []).map(({ content, ...item }) => ({ ...item, content: content && { ...content, body: undefined } })) } } } } });
   }
   if (args[1] === 'view') return output({ id: 'PVT_1' });
   if (args[1] === 'field-list') return output({ fields: [{ id: 'FIELD_1', name: 'Status', options: OPTIONS }] });

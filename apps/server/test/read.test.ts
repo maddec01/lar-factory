@@ -33,6 +33,33 @@ async function askForeignHost(board: Board): Promise<number> {
 const askRead = (board: Board, headers: Record<string, string> = {}) => fetch(`${board.url}/api/read`, { method: 'POST',
   headers: { Origin: board.url, 'Content-Type': 'application/json', ...headers }, body: '{}' });
 
+test("a dossier's map and every item's blockers reach the page; only the bodies of concepts and items with sub-issues on the board are read", async (t) => {
+  const body = '## Destination\nThere.\n\n## End-to-end check\nTry it\n1. Step\n';
+  const concept = projectIssue(1, 'Shaping', 'maddec01/mux-server', ['concept']);
+  const feature = projectIssue(2, 'List', 'maddec01/mux-server', ['feature']);
+  const coupled = projectIssue(3, 'In progress', 'maddec01/mux-server', ['feature']);
+  const part = projectIssue(4, 'Ready', 'maddec01/mux-apple', ['build']);
+  Object.assign(concept.content!, { id: 'I_1', body });
+  Object.assign(feature.content!, { id: 'I_2', body, issueDependenciesSummary: { blockedBy: 1 },
+    blockedBy: { nodes: [{ number: 1, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } }] } });
+  Object.assign(coupled.content!, { id: 'I_3', body });
+  Object.assign(part.content!, { id: 'I_4', body,
+    parent: { number: 3, title: 'Issue 3', url: 'https://github.com/maddec01/mux-server/issues/3', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } } });
+  const board = await startBoard(t, { items: [concept, feature, coupled, part] });
+  await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
+  const [map, plain, parent, child] = (await board.board()).items;
+  const read = { destination: 'There.', decisions: [], fog: [], check: { title: 'Try it', steps: ['Step'] } };
+  assert.deepEqual(map?.map, read);
+  assert.deepEqual(parent?.map, read, 'an item with a sub-issue on the board is a dossier, with its map');
+  assert.deepEqual(map?.blockers, []);
+  assert.deepEqual(plain?.blockers, [{ number: 1, repo: 'maddec01/mux-server', state: 'OPEN' }]);
+  assert.ok(!('map' in plain!) && !('body' in plain!), 'a feature gets no map and no body');
+  assert.ok(!('map' in child!) && !('body' in child!), 'nor does a part');
+  const bodyReads = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:')));
+  assert.equal(bodyReads.length, 1, "one query reads the dossiers' bodies");
+  assert.deepEqual(bodyReads[0]!.filter((a) => a.startsWith('ids[]=')), ['ids[]=I_1', 'ids[]=I_3'], 'it asks for the concept and the parent only');
+});
+
 test('a read request starts a read of GitHub at once', async (t) => {
   const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');

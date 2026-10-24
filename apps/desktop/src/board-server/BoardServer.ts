@@ -1,7 +1,7 @@
 // Starts the board server as a child of the main process, modelled on T3 Code's
 // apps/desktop/src/backend/DesktopBackendConfiguration.ts and DesktopBackendManager.ts.
 // T3 Code hands its server a bootstrap fd; the board reports its port over an IPC
-// channel instead (apps/server/src/port.ts), which Effect's ChildProcess has no option
+// channel instead (apps/server/src/port/port.ts), which Effect's ChildProcess has no option
 // for, so this spawns with node:child_process.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
@@ -187,7 +187,7 @@ const reportedPort = (child: NodeChildProcess.ChildProcess, timeout: Duration.In
     }),
   );
 
-/** The message apps/server/src/port.ts sends once the server listens. */
+/** The message apps/server/src/port/port.ts sends once the server listens. */
 const isListening = (message: unknown): message is { type: "listening"; port: number } =>
   typeof message === "object" && message !== null &&
   (message as { type?: unknown }).type === "listening" &&

@@ -1,12 +1,13 @@
 // The page's title bar, copied from T3 Code: a 52 px drag bar with the logo, a grey "Factory" and a "for T3 Code" pill.
 // In the Mac app it leaves room for the window's traffic lights (apps/desktop/src/window/WindowTitleBar.ts puts them
-// at x 16, centred in the bar). Sizes from pingdotgg/t3code apps/web/src/components/sidebar/SidebarChrome.tsx (the brand row) and
-// ui/badge.tsx (Badge size "sm"); the drag rule from apps/web/src/index.css.
+// at x 16, centred in the bar). Sizes from pingdotgg/t3code apps/web/src/components/sidebar/SidebarChrome.tsx (the brand row);
+// the drag rule from apps/web/src/index.css.
 // The right end is the factory's own: the Refreshed time, then Update, Add item and Settings. Clicks on those buttons
 // never drag the window; the rest of the bar, Refreshed and the gaps between the buttons included, does.
 
 import { useEffect, useState } from 'react';
 import { shortAgo, BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, inMacApp } from '@mux-factory/shared';
+import { Badge } from '@mux-factory/ui/badge';
 import { AddItem } from '../add-item/add-item.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { Settings } from '../settings/settings.tsx';
@@ -45,9 +46,7 @@ export function TitleBar() {
             <span className="text-(--muted-foreground)">Factory</span>
           </span>
           {/* T3's secondary badge is zinc-50 on the zinc-25 page, which barely shows; zinc-100 reads. */}
-          <span className="ml-1 inline-flex h-4 items-center rounded-[.25rem] border border-transparent bg-(--accent) px-[3px] text-[.625rem] font-medium leading-none whitespace-nowrap">
-            for T3 Code
-          </span>
+          <Badge variant="secondary" size="sm" className="ml-1 bg-accent">for T3 Code</Badge>
         </span>
         <span className="title-bar-actions ml-auto flex items-center gap-2 [&_button]:[-webkit-app-region:no-drag]">
           {board && <><Refreshed fetchedAt={data.fetchedAt} /><UpdateButton /><AddItem /></>}

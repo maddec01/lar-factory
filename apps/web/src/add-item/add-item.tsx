@@ -7,6 +7,7 @@ import { Dialog } from '@base-ui/react/dialog';
 import { applicability, ITEM_KINDS } from '@mux-factory/shared';
 import type { RepoConfig } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
+import { FormResult } from '../notices/form-result.tsx';
 import { useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
@@ -26,10 +27,9 @@ function Applicability({ repo }: { repo: RepoConfig }) {
 
 function Result({ message }: { message: ResultMessage }) {
   return (
-    <div id="item-result" role="status" aria-live="polite" aria-atomic="true">
-      {message.text}
+    <FormResult id="item-result" text={message.text}>
       {message.url && <a href={message.url} target="_blank" rel="noopener">{message.label}</a>}
-    </div>
+    </FormResult>
   );
 }
 

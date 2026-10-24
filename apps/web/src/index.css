@@ -3,6 +3,8 @@
 @import "@mux-factory/ui/styles.css";
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
+@source "./notices/banner.tsx";
+@source "./notices/form-result.tsx";
 @source "./title-bar/TitleBar.tsx";
 @source "./updates/UpdateButton.tsx";
 @source "./updates/UpdateStatusIcon.tsx";
@@ -26,12 +28,6 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .brand-mark { width: 28px; height: 16px; flex: none; position: relative; top: calc(16px * 8.75 / 32); }
 .refreshed { margin: 0; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
 .totals { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 10px 0 0; }
-.totals li { border: 1px solid var(--border); background: var(--card); border-radius: var(--control-radius); padding: 1px 8px; color: var(--muted-foreground); font-size: 12px; }
-.totals b { color: var(--foreground); }
-.totals li.amber { border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: var(--you-soft); color: var(--you-text); }
-.totals li.amber b { color: var(--you-text); }
-.banner { margin-top: 10px; border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent); background: var(--warning-surface); border-radius: var(--radius); padding: 8px 12px; font-size: 13px; }
-.banner strong { color: var(--you-text); }
 .banner .err { white-space: pre-wrap; word-break: break-word; }
 
 /* tool notices */
@@ -69,27 +65,22 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .stats { flex: none; white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
 .stats.total { margin-left: 4px; }
 .linked-pr { display: inline-flex; align-items: center; gap: 6px; }
-.checks { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--radius-sm); padding: 1px 6px; border: 1px solid var(--border); white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
-.checks::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k); }
+.checks { font-variant-numeric: tabular-nums; }
 .checks.running { --k: var(--muted-foreground); }
 .checks.passed { --k: var(--build); }
-.checks.failed { --k: var(--error); color: var(--danger-text); border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); }
-.checks.slow { --k: var(--you); color: var(--you-text); font-weight: 600; border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: var(--you-soft); }
+.checks.failed { --k: var(--error); }
+.checks.slow { --k: var(--you); }
 
-.plat, .kind, .label, .blocked-by, .subs { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--radius-sm); padding: 0 6px; min-height: 18px; border: 1px solid var(--input); white-space: nowrap; font-size: 11px; font-weight: 500; }
-.plat { font-weight: 600; }
-.plat::before, .kind::before, .label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--k, var(--muted-foreground)); }
-.plat-server { --k: oklch(68.5% 0.169 237.323); }
-.plat-apple { --k: oklch(65.6% 0.241 354.308); }
+/* The dot T3's Badge doesn't draw, coloured by platform, kind or checks state. */
+.plat::before, .kind::before, .label::before, .checks::before { content: ""; width: --spacing(1.75); height: --spacing(1.75); border-radius: 50%; background: var(--k, var(--muted-foreground)); }
+.plat-server { --k: var(--color-sky-500); }
+.plat-apple { --k: var(--color-pink-500); }
 .plat-draft { --k: var(--muted-foreground); }
-.kind, .label { color: var(--muted-foreground); }
 .kind-bug { --k: var(--error); }
 .kind-feature { --k: var(--thread); }
-.kind-improvement { --k: oklch(70.4% 0.14 182.503); }
+.kind-improvement { --k: var(--color-teal-500); }
 .kind-concept, .kind-decision, [class*="kind-decision-"] { --k: var(--sub); }
 .kind-build { --k: var(--build); }
-.blocked-by { color: var(--danger-text); border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); }
-.subs { color: var(--muted-foreground); }
 
 /* segmented bars: every card's status bar, and a build's slice bar under it.
    One grid, so both bars span the same width and their captions share a column. */
@@ -164,12 +155,7 @@ h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; disp
 .choices input { accent-color: var(--ring); margin: 3px 3px 3px 4px; }
 /* T3's Button takes no pointer events while disabled; one that says why keeps them, so its title shows. */
 button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
-#item-result:not(:empty), #settings-result:not(:empty) { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--you); border-radius: 6px; background: var(--you-soft); overflow-wrap: anywhere; white-space: pre-line; }
-#item-result a { display: block; margin-top: 4px; }
-#settings-result ul { margin: 4px 0 0; padding-left: 18px; white-space: normal; }
-#settings-result[data-tone="warning"] { border-color: color-mix(in srgb, var(--warning) 32%, transparent); }
-#settings-result[data-tone="success"] { border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
-#settings-result[data-tone="error"] { border-color: color-mix(in srgb, var(--error) 32%, transparent); background: var(--error-surface); color: var(--danger-text); }
+#settings-result ul { padding-left: --spacing(4.5); white-space: normal; }
 
 /* notices: a close button on every failure, and successes as toasts that clear themselves */
 .dismiss { float: right; margin: -3px -6px 0 8px; }
@@ -230,8 +216,6 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 .profiles input[aria-disabled="true"], .update-channel input[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .start { margin: 0; font-size: 12px; }
 p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
-.started-tag { display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success-foreground); font-weight: 500; }
-.started-tag.unsure { background: var(--you-soft); color: var(--you-text); }
 .start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; position: relative; }
 /* Start's menu: under Start (over it when only above has room), lined up with its right edge, grouped by provider instance. */
 .start-menu-positioner { z-index: 50; }

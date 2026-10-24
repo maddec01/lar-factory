@@ -3,7 +3,7 @@
 
 import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
-import { AMBER_STATUSES, STATUSES, workMessage, boardSections, conceptChildren, day, plural, slug } from '@mux-factory/shared';
+import { AMBER_STATUSES, STATUSES, workMessage, boardSections, conceptChildren, day, platformOf, plural } from '@mux-factory/shared';
 import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from './board-store.ts';
 import { Card } from '../items/card.tsx';
@@ -12,7 +12,7 @@ import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../it
 import { jumpTo } from './jump.ts';
 import { useJumpStore } from './jump-store.ts';
 import { StartControl, StartMessage, useStartHolds } from '../items/start-control.tsx';
-import { KindPill, LabelPills, PlatformBadge, TitleLink } from '../items/item-parts.tsx';
+import { BlockedBy, KindPill, LabelPills, PlatformBadge, TitleLink } from '../items/item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from '../items/stats-badges.tsx';
 
 function Section({ id, title, count, note, children }: { id: string; title: string; count: number; note?: string; children: ReactNode }) {
@@ -44,7 +44,7 @@ function Row({ item, data, trailing, withPlatform = true, pills = 'labels' }: {
 }) {
   return (
     <li className="row-item" data-anchor={item.id}>
-      {withPlatform && <PlatformBadge item={item} data={data} />}
+      {withPlatform && <PlatformBadge platform={platformOf(item, data.repos)} />}
       <TitleLink item={item} className="row-title" />
       {pills === 'labels' ? <LabelPills item={item} /> : <KindPill item={item} />}
       {trailing}
@@ -71,7 +71,7 @@ function ConceptBlock({ concept, data }: { concept: Item; data: BoardData }) {
               <ul>
                 {children.filter((c) => c.status === s).map((c) => (
                   <Row item={c} data={data} pills="kind" key={c.id}
-                    trailing={c.blockedBy > 0 && <span className="blocked-by">blocked by {c.blockedBy}</span>} />
+                    trailing={c.blockedBy > 0 && <BlockedBy count={c.blockedBy} />} />
                 ))}
               </ul>
             </li>
@@ -137,7 +137,7 @@ export function BoardView() {
         <div className="platforms">
           {listGroups.map(({ platform, id, items }) => (
             <Disclosure className="platform" id={id} byDefault key={id}
-              summary={<><span className={`plat plat-${slug(platform)}`}>{platform}</span> <b>{items.length}</b> in List</>}>
+              summary={<><PlatformBadge platform={platform} /> <b>{items.length}</b> in List</>}>
               {items.length ? (
                 <ul className="rows">
                   {items.map((i) => (

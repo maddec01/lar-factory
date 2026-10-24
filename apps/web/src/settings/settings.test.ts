@@ -48,7 +48,7 @@ test('Settings lists every Claude profile with its tick', async () => {
   expect(bridge.listProfiles).toHaveBeenCalledOnce();
   expect(boxes().map((box) => [box.closest('label')!.textContent!.trim(), box.checked])).toEqual([
     ['~/.claude', true], ['~/.claude-work', false]]);
-  expect(result().getAttribute('role')).toBe('status');
+  expect([result().getAttribute('role'), result().dataset.slot]).toEqual(['status', 'alert']);
 });
 
 test('the dialog opens below the title bar and drags nothing', async () => {
@@ -67,7 +67,7 @@ test('ticking a profile installs it and shows the new ticks', async () => {
   expect(bridge.setProfileTick).toHaveBeenCalledWith('.claude-work', true);
   expect(boxes().map((box) => box.checked)).toEqual([true, true]);
   expect(result().textContent).toBe('Linked the skills and checklists into ~/.claude-work.');
-  expect(result().dataset.tone).toBe('success');
+  expect(result().dataset.variant).toBe('success');
 });
 
 test('focus stays on a ticked box while its change runs and after', async () => {
@@ -121,7 +121,7 @@ test('a tick that left paths alone names each one', async () => {
   await settle(() => boxes()[1]!.click());
   expect(result().textContent).toContain('left these alone because Mux Factory didn\'t make them');
   expect($$('#settings-result li').map((li) => li.textContent)).toEqual(['~/.claude-work/skills/mux-work']);
-  expect(result().dataset.tone).toBe('warning');
+  expect(result().dataset.variant).toBe('warning');
 });
 
 test('a failed tick shows its error and keeps the old ticks', async () => {
@@ -130,7 +130,7 @@ test('a failed tick shows its error and keeps the old ticks', async () => {
   await settle(() => boxes()[1]!.click());
   expect(boxes().map((box) => box.checked)).toEqual([true, false]);
   expect(result().textContent).toBe('Couldn\'t change ~/.claude-work: No skills are installed in /Users/me/.agents yet');
-  expect(result().dataset.tone).toBe('error');
+  expect(result().dataset.variant).toBe('error');
 });
 
 test('a bridge that throws shows the error', async () => {
@@ -295,7 +295,7 @@ describe('update channel', () => {
     await settle(() => radio('latest').click());
     expect(checked()).toBe('nightly');
     expect(result().textContent).toBe('Couldn\'t switch to latest: Cannot change the update channel to latest while an update download is in progress.');
-    expect(result().dataset.tone).toBe('error');
+    expect(result().dataset.variant).toBe('error');
   });
 
   test('a failed download or install says why under the channel', async () => {

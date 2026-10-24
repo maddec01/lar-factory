@@ -2,7 +2,7 @@
 // Ported from the Board cases of test/render.test.ts.
 
 import { beforeEach, expect, test } from 'vite-plus/test';
-import { $, $$, NOW, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, NOW, mountPage, sample, settle, text, variantOf } from '../../test/support.ts';
 import { normalizeItems } from '@mux-factory/shared';
 import type { BoardData, Item, RawItem } from '@mux-factory/shared';
 import { rawIssue, sliceRef } from '@mux-factory/shared/test/raw-items';
@@ -71,6 +71,7 @@ test('List and Done rows show one pill per label instead of the kind pill', asyn
   expect(pills($('#done li[data-anchor="PVTI_sample19"]')!), 'Done rows too').toEqual(['bug', 'os: watchos']);
   expect(pills(listRow('PVTI_sample04')), 'a draft has no labels').toEqual([]);
   expect(listRow('PVTI_sample03').querySelector('.label.kind-feature')).not.toBeNull();
+  expect(variantOf(listRow('PVTI_sample03').querySelector('.label'))).toBe('outline');
   for (const row of [listRow('PVTI_sample03'), $('#done li[data-anchor="PVTI_sample19"]')!]) expect(row.querySelector('.kind'), 'no separate kind pill').toBeNull();
 });
 
@@ -99,6 +100,7 @@ test('an improvement labelled build keeps its improvement pill and still carries
   expect(normalizeItems([builtIssue])[0]?.slices.map((s) => [s.number, s.state])).toEqual([[65, 'CLOSED'], [66, 'OPEN'], [67, 'OPEN']]);
   await mountPage(boardOf([builtIssue]));
   expect(text(card('PVTI_build').querySelector('.kind.kind-improvement'))).toBe('improvement');
+  expect(['.plat', '.kind'].map((pill) => variantOf(card('PVTI_build').querySelector(pill))), 'pills are outline badges').toEqual(['outline', 'outline']);
 });
 
 /** A build card's slice bar segments, its caption, and its active line ('' when it's collapsed). */
@@ -184,12 +186,19 @@ test('a 3-slice and a 14-slice build render the same card structure', async () =
   expect(many).toBe(shape(await buildCard([build(3)], [101, 102])));
 });
 
+test('a blocked card says what blocks it in a red badge', async () => {
+  await mountPage(boardOf([rawIssue('PVTI_blocked', 90, 'In progress', ['feature'], { issueDependenciesSummary: { blockedBy: 2 } })]));
+  const tag = card('PVTI_blocked').querySelector('.blocked-by');
+  expect([text(tag), tag?.getAttribute('title'), variantOf(tag)]).toEqual(['blocked by 2', 'Blocked by 2 issues', 'error']);
+});
+
 test('a card with sub-issues but no build or concept label shows only its counter', async () => {
   const plain = rawIssue('PVTI_plain', 80, 'In progress', ['feature'], {
     subIssuesSummary: { total: 2, completed: 0 }, subIssues: { nodes: [sliceRef(81, 'OPEN'), sliceRef(82, 'OPEN')] },
   });
   await mountPage(boardOf([plain]));
   expect(text(card('PVTI_plain').querySelector('.subs'))).toBe('0/2 sub-issues');
+  expect(variantOf(card('PVTI_plain').querySelector('.subs'))).toBe('outline');
   expect(card('PVTI_plain').querySelector('[aria-label="Slices"]'), 'no fallback list').toBeNull();
 });
 
@@ -293,11 +302,11 @@ test('a linked PR shows its checks: running with counts and age, amber when slow
     { ...pr, number: 15, isDraft: true, checks: null },
   ] };
   await mountPage({ ...sample, items: [item] });
-  expect($$('.linked-pr').map((l) => [text(l.querySelector('a.pr')), l.querySelector('.checks')?.className, l.querySelector('.checks')?.getAttribute('title'), text(l.querySelector('.checks'))])).toEqual([
-    ['PR #9', 'checks running', 'Checks running: 3 of 5 passed, 2 running', 'checks 3/5 · 12m'],
-    ['PR #10', 'checks running slow', 'Checks running for over 30 minutes: 1 of 2 passed, 1 running', 'checks 1/2 · 1h 0m (running over 30 minutes)'],
-    ['PR #11', 'checks passed', 'All 5 checks passed', 'checks passed'],
-    ['PR #12', 'checks failed', '1 of 5 checks failed', 'checks failed'],
+  expect($$('.linked-pr').map((l) => [text(l.querySelector('a.pr')), variantOf(l.querySelector('.checks')), l.querySelector('.checks')?.getAttribute('title'), text(l.querySelector('.checks'))])).toEqual([
+    ['PR #9', 'outline', 'Checks running: 3 of 5 passed, 2 running', 'checks 3/5 · 12m'],
+    ['PR #10', 'warning', 'Checks running for over 30 minutes: 1 of 2 passed, 1 running', 'checks 1/2 · 1h 0m (running over 30 minutes)'],
+    ['PR #11', 'outline', 'All 5 checks passed', 'checks passed'],
+    ['PR #12', 'error', '1 of 5 checks failed', 'checks failed'],
     ['PR #13', undefined, undefined, ''],
     ['PR #14 (closed)', undefined, undefined, ''],
     ['PR #15 (draft)', undefined, undefined, ''],

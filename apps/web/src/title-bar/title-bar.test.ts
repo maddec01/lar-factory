@@ -16,6 +16,8 @@ test('in the Mac app, the title bar holds the brand, then Refreshed, the update 
   expect(actions()!.children[1]!.querySelector('.update-button')).not.toBeNull();
   expect($('header.top button')).toBeNull();
   expect($('header.top .refreshed')).toBeNull();
+  const pill = [...$$('.title-bar-brand [data-slot="badge"]')];
+  expect(pill.map((el) => [el.textContent, el.classList.contains('bg-accent')]), "T3's small badge, on zinc-100").toEqual([['for T3 Code', true]]);
 });
 
 test('clicking the right end\'s buttons never drags the window; the rest of the bar, Refreshed included, does', async () => {

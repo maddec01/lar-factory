@@ -76,6 +76,14 @@ export async function settle(fn: () => unknown = () => {}): Promise<void> {
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';
+/** A banner's title and description. */
+export const bannerText = (el: Element) => ['title', 'description'].map((slot) => text(el.querySelector(`[data-slot="alert-${slot}"]`)));
+/** Which of T3's Badge variants `el` takes, read from the background class each variant sets. */
+export const variantOf = (el: Element | null) => {
+  if (el?.getAttribute('data-slot') !== 'badge') return undefined;
+  const variants = { error: 'bg-destructive/8', warning: 'bg-warning/8', success: 'bg-success/8', outline: 'bg-background', secondary: 'bg-secondary' };
+  return Object.entries(variants).find(([, bg]) => el.classList.contains(bg))?.[0];
+};
 export const toast = () => $('.toasts .toast');
 
 /** Sends `data` down the page's event stream. */

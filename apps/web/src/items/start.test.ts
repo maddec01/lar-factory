@@ -130,7 +130,8 @@ test('picking an entry starts the item with that model, shows the thread, and re
   const thread = { threadId: 'thread-1', title: '#129 Run more than one 4K HDR to 1080p stream at a time' };
   await answer({ thread, error: null });
   const tag = card().querySelector('[data-start-result]')!;
-  expect([tag.className, text(tag), tag.getAttribute('title')]).toEqual(['started-tag', 'Started', 'T3 thread thread-1']);
+  expect([tag.classList.contains('started-tag'), tag.getAttribute('data-slot'), tag.className.includes('bg-success/8'), text(tag), tag.getAttribute('title')])
+    .toEqual([true, 'badge', true, 'Started', 'T3 thread thread-1']);
   expect(card().querySelector('[data-start]'), 'the card keeps only a quiet tag').toBeNull();
   expect(card().querySelector('.card-actions')).toBeNull();
   expect(document.activeElement, 'focus moves to the tag').toBe(tag);
@@ -183,7 +184,8 @@ test('a Start that may have run hides Start and the footer; closing its message 
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!), 'it may have started, so the choice is kept').toEqual({ instanceId: 'codex', model: 'gpt-5.5' });
   await settle(() => message.querySelector<HTMLButtonElement>('button.dismiss')!.click());
   const tag = card().querySelector('.started-tag.unsure')!;
-  expect([text(tag), tag.getAttribute('title')]).toEqual(['May have started', 'Check T3 before starting it again']);
+  expect([tag.getAttribute('data-slot'), tag.className.includes('bg-warning/8'), text(tag), tag.getAttribute('title')])
+    .toEqual(['badge', true, 'May have started', 'Check T3 before starting it again']);
   expect(card().querySelector('[data-start]')).toBeNull();
   expect(card().querySelector('.card-actions')).toBeNull();
 });

@@ -2,7 +2,7 @@
 // Ported from the tool notice cases of test/render.test.ts and its saved copies.
 
 import { expect, test } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, push, sample, settle } from '../../test/support.ts';
+import { $, $$, bannerText, fetchMock, mountPage, push, sample, settle } from '../../test/support.ts';
 import type { BoardData, ToolProblems } from '@mux-factory/shared';
 
 const withTools = (tools: ToolProblems, fields: Partial<BoardData> = {}): BoardData => ({ ...sample, tools, ...fields });
@@ -48,20 +48,21 @@ test('a missing or logged-out gh shows its own notice instead of Stale', async (
   const banners = () => $$('header .banner');
   expect(banners().length).toBe(1);
   expect(banners()[0]!.getAttribute('role')).toBe('alert');
-  expect(banners()[0]!.textContent).toBe('GitHub CLI not found. The board reads the project through gh. Install it with brew install gh Copy, '
-    + 'then press Recheck. The board also looks again every 10 seconds. Recheck');
+  expect(bannerText(banners()[0]!)).toEqual(['GitHub CLI not found.', 'The board reads the project through gh. Install it with brew install gh Copy, '
+    + 'then press Recheck. The board also looks again every 10 seconds. Recheck']);
+  expect(banners()[0]!.dataset.variant).toBe('warning');
   expect(banners()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install gh');
 
   await push(withTools({ gh: { problem: 'logged-out' } }, failed));
   expect(banners().length).toBe(1);
-  expect(banners()[0]!.textContent).toBe('GitHub CLI is logged out. The board reads the project through gh. Run gh auth login Copy in a terminal, '
-    + 'then press Recheck. The board also looks again every 10 seconds. Recheck');
+  expect(bannerText(banners()[0]!)).toEqual(['GitHub CLI is logged out.', 'The board reads the project through gh. Run gh auth login Copy in a terminal, '
+    + 'then press Recheck. The board also looks again every 10 seconds. Recheck']);
 
   await push(withTools({ gh: { problem: 'missing', override: 'GH_PATH=/nowhere/gh' } }));
   expect(banners()[0]!.textContent).toContain('No runnable gh is at GH_PATH=/nowhere/gh. Point GH_PATH at gh or unset it, then press Recheck.');
 
   await push(withTools({}, failed));
-  expect(banners().map((b) => b.textContent), 'other read failures stay Stale').toEqual([expect.stringMatching(/^Stale\. .*HTTP 401/)]);
+  expect(banners().map((b) => bannerText(b).join(' ')), 'other read failures stay Stale').toEqual([expect.stringMatching(/^Stale\. .*HTTP 401/)]);
 });
 
 test('Recheck posts, shows Checking…, then the board once the tool is found, and keeps focus', async () => {

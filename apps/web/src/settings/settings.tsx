@@ -7,6 +7,7 @@ import { boardApp, type UpdateChannel, type UpdateState } from '@mux-factory/sha
 import { Button } from '@mux-factory/ui/button';
 import { profilePath, useSettingsStore } from './settings-store.ts';
 import { useUpdateStore } from '../updates/update-store.ts';
+import { FormResult } from '../notices/form-result.tsx';
 
 const CHANNELS: { channel: UpdateChannel; label: string }[] = [
   { channel: 'nightly', label: 'Nightly' },
@@ -85,10 +86,9 @@ function UpdateChannelChoice() {
 function Result() {
   const result = useSettingsStore((state) => state.result);
   return (
-    <div id="settings-result" role="status" aria-live="polite" aria-atomic="true" data-tone={result.tone}>
-      {result.text}
+    <FormResult id="settings-result" text={result.text} tone={result.tone}>
       {result.paths && <ul>{result.paths.map((path) => <li key={path}><code>{path}</code></li>)}</ul>}
-    </div>
+    </FormResult>
   );
 }
 

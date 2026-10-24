@@ -6,6 +6,7 @@ import type { ToolMissing, ToolProblem } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
 import { BrandMark } from '../board/header.tsx';
 import { CopyButton } from '../copy/copy-button.tsx';
+import { Banner } from './banner.tsx';
 import { useRecheckStore } from './recheck-store.ts';
 
 const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';
@@ -54,13 +55,13 @@ export function T3Missing({ problem }: { problem: ToolMissing }) {
 /** The banner for a missing or logged-out gh, which stops the board reading GitHub. */
 export function GhBanner({ problem }: { problem: ToolProblem }) {
   return (
-    <div className="banner" role="alert">
+    <Banner title={problem.problem === 'logged-out' ? 'GitHub CLI is logged out.' : 'GitHub CLI not found.'}>
       {problem.problem === 'logged-out'
-        ? <><strong>GitHub CLI is logged out.</strong> The board reads the project through <code>gh</code>. Run <CopyableCommand command="gh auth login" /> in a terminal, then press Recheck.</>
-        : <><strong>GitHub CLI not found.</strong> The board reads the project through <code>gh</code>. <Fix problem={problem} tool="gh" what="gh">
+        ? <>The board reads the project through <code>gh</code>. Run <CopyableCommand command="gh auth login" /> in a terminal, then press Recheck.</>
+        : <>The board reads the project through <code>gh</code>. <Fix problem={problem} tool="gh" what="gh">
           Install it with <CopyableCommand command="brew install gh" />, then press Recheck.
         </Fix></>}
       {' '}{LOOKS_AGAIN} <Recheck problem={problem} />
-    </div>
+    </Banner>
   );
 }

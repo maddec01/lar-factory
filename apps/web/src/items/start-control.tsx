@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom';
 import { Menu } from '@base-ui/react/menu';
 import { ref, highlightedChoice, storedChoice } from '@mux-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@mux-factory/shared';
+import { Badge } from '@mux-factory/ui/badge';
 import { Button } from '@mux-factory/ui/button';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './card.tsx';
@@ -61,10 +62,10 @@ export function StartControl({ item, data }: { item: Item; data: BoardData }) {
   const [open, setOpen] = useState(false);
   const thread = startedThread(item, data, start);
   // The toast announces a start; the card only keeps Start from running twice.
-  if (thread) return <span className="start-group"><span className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</span></span>;
+  if (thread) return <span className="start-group"><Badge variant="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
   if (start?.phase === 'uncertain') {
     // Once its message is closed, a tag still says why Start is gone.
-    return <span className="start-group">{!start.message && <span className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</span>}</span>;
+    return <span className="start-group">{!start.message && <Badge variant="warning" className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</Badge>}</span>;
   }
   const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : 'Start';
   // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.

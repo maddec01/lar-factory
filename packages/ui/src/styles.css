@@ -118,7 +118,6 @@
   /* The board's own roles. */
   --you: var(--warning);
   --you-text: var(--warning-foreground);
-  --you-soft: var(--warning-surface);
   --thread: var(--primary);
   --sub: var(--color-violet-500);
   --sub-text: var(--color-violet-600); /* AA on white */

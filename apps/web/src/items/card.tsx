@@ -3,12 +3,13 @@
 
 import { Fragment } from 'react';
 import type { ReactNode } from 'react';
-import { AMBER_STATUSES, STATUSES, HINTS, checksBadge, namedSlices, prLabel, statusTone, plural } from '@mux-factory/shared';
+import { AMBER_STATUSES, STATUSES, HINTS, checksBadge, namedSlices, platformOf, prLabel, statusTone } from '@mux-factory/shared';
 import type { BoardData, Item, LinkedPr, Status } from '@mux-factory/shared';
 import type { ItemAction } from './action-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { SlicePopover, sliceKey } from './slice-popover.tsx';
-import { KindPill, PlatformBadge, TitleLink } from './item-parts.tsx';
+import { Badge } from '@mux-factory/ui/badge';
+import { BlockedBy, KindPill, PlatformBadge, TitleLink } from './item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
 
 /** Ten segments, one per status, with the item's current status coloured, then its caption: two cells of a `.bars` grid. */
@@ -61,7 +62,8 @@ function ChecksBadge({ pr }: { pr: LinkedPr }) {
   const now = useBoardStore((state) => state.now);
   const badge = checksBadge(pr, now);
   if (!badge) return null;
-  return <span className={badge.className} title={badge.title}>{badge.text}{badge.slow && <span className="sr-only"> (running over 30 minutes)</span>}</span>;
+  const variant = badge.slow ? 'warning' : badge.className.includes('failed') ? 'error' : 'outline';
+  return <Badge variant={variant} className={badge.className} title={badge.title}>{badge.text}{badge.slow && <span className="sr-only"> (running over 30 minutes)</span>}</Badge>;
 }
 
 /** Board writes are off in sample mode, so its buttons are too; an action in flight holds them. */
@@ -78,10 +80,10 @@ export function Card({ item, data, extra, action, after }: { item: Item; data: B
     <article className={`card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}`} data-anchor={item.id}>
       <div className="meta">
         <span className="badges">
-          <PlatformBadge item={item} data={data} /><KindPill item={item} />
-          {item.blockedBy > 0 && <span className="blocked-by" title={`Blocked by ${plural(item.blockedBy, 'issue')}`}>blocked by {item.blockedBy}</span>}
+          <PlatformBadge platform={platformOf(item, data.repos)} /><KindPill item={item} />
+          {item.blockedBy > 0 && <BlockedBy count={item.blockedBy} />}
           {/* A build's slices aren't counted here: its slice bar shows them. */}
-          {item.subIssues.total > 0 && <span className="subs">{item.subIssues.completed}/{item.subIssues.total} sub-issues</span>}
+          {item.subIssues.total > 0 && <Badge variant="outline" className="subs">{item.subIssues.completed}/{item.subIssues.total} sub-issues</Badge>}
         </span>
         {action}
       </div>

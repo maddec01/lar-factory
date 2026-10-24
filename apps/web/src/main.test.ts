@@ -1,7 +1,7 @@
 // The page shell: first paint, header, the Board view, live data, and what a re-render keeps.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, fetchMock, mountPage, push, sample, settle, stream } from '../test/support.ts';
+import { $, $$, NOW, bannerText, fetchMock, mountPage, push, sample, settle, stream } from '../test/support.ts';
 import { BRAND_MARK_PATH } from '@mux-factory/shared';
 import type { BoardData } from '@mux-factory/shared';
 
@@ -40,6 +40,8 @@ test('the header shows the Mux logo followed by "factory", and how long ago the 
   expect($('.refreshed')!.textContent).toBe('Refreshed 0s ago');
   expect($('.refreshed a')).toBeNull();
   expect($('.totals .amber')!.textContent).toBe('4 need you');
+  expect($$('.totals li').map((li) => [li.dataset.slot, li.className.includes('bg-warning/8')]), 'counts are badges, need you in amber')
+    .toEqual([['badge', true], ['badge', false], ['badge', false], ['badge', false], ['badge', false]]);
   expect($('.banner')).toBeNull();
 });
 
@@ -58,8 +60,9 @@ test('Refreshed reads "Not read yet" before the first read', async () => {
 
 test('stale data and a failed read show a banner', async () => {
   await mountPage(sample);
-  const banner = $('.banner[role="alert"]')!;
-  expect(banner.textContent).toMatch(/^Stale\. Showing data from \d\d:\d\d \(20 min ago\)\. The last read through gh failed: gh api graphql failed/);
+  const banner = $('.banner[role="alert"][data-variant="warning"]')!;
+  expect(bannerText(banner)[0]).toBe('Stale.');
+  expect(bannerText(banner)[1]).toMatch(/^Showing data from \d\d:\d\d \(20 min ago\)\. The last read through gh failed: gh api graphql failed/);
   expect(banner.querySelector('code.err')).not.toBeNull();
 });
 
@@ -109,7 +112,7 @@ test("a failed fetch says the server can't be reached and keeps the last data", 
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect($('.banner[role="alert"]')!.textContent).toBe("Can't reach the board server. HTTP 502 Showing the last data this page received.");
+  expect(bannerText($('.banner[role="alert"]')!)).toEqual(["Can't reach the board server.", 'HTTP 502 Showing the last data this page received.']);
   expect($('.totals li:last-child')!.textContent).toBe('25 items');
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
@@ -121,7 +124,7 @@ test("the lost server's banner closes, and the next failure after the server ans
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  const close = $<HTMLButtonElement>('.banner .dismiss')!;
+  const close = $<HTMLButtonElement>('.banner [data-slot="alert-action"] .dismiss')!;
   expect(close.getAttribute('aria-label')).toBe("Dismiss: can't reach the board server");
   close.focus();
   await settle(() => close.click());
@@ -134,7 +137,7 @@ test("the lost server's banner closes, and the next failure after the server ans
   await settle(() => vi.advanceTimersByTime(15_000));
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect($('.banner[role="alert"]')!.textContent).toContain("Can't reach the board server.");
+  expect(bannerText($('.banner[role="alert"]')!)[0]).toBe("Can't reach the board server.");
 });
 
 test('new data keeps focus and the <details> the user opened', async () => {

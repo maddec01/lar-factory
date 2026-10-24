@@ -9,6 +9,7 @@ import type { ItemAction } from './action-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { SlicePopover, sliceKey } from './slice-popover.tsx';
 import { Badge } from '@mux-factory/ui/badge';
+import { Card as CardPanel } from '@mux-factory/ui/card';
 import { BlockedBy, KindPill, PlatformBadge, TitleLink } from './item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
 
@@ -77,7 +78,7 @@ export function Card({ item, data, extra, action, after }: { item: Item; data: B
   const hint = HINTS[item.status];
   const total = shownTotal(item, data);
   return (
-    <article className={`card${AMBER_STATUSES.includes(item.status) ? ' amber' : ''}`} data-anchor={item.id}>
+    <CardPanel accent={AMBER_STATUSES.includes(item.status)} data-anchor={item.id}>
       <div className="meta">
         <span className="badges">
           <PlatformBadge platform={platformOf(item, data.repos)} /><KindPill item={item} />
@@ -101,6 +102,6 @@ export function Card({ item, data, extra, action, after }: { item: Item; data: B
       {extra}
       {(item.stats || total) && <p className="card-stats"><StatsBadge item={item} /><TotalBadge total={total} /></p>}
       {after}
-    </article>
+    </CardPanel>
   );
 }

@@ -7,9 +7,11 @@
 /* Tailwind scans only the sources listed, here and in each app's CSS: the page's own class names would
    otherwise turn on Tailwind utilities of the same name. */
 @import "tailwindcss" source(none);
+@source "./card";
 @source "./components/ui";
 @source "./dialog";
 @source "./form";
+@source "./progress";
 
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;

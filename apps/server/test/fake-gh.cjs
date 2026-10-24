@@ -5,7 +5,7 @@ const args = process.argv.slice(2);
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
 fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
 const output = (value) => process.stdout.write(JSON.stringify(value));
-const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued' }];
+const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued' }, { id: 'IN_PROGRESS_1', name: 'In progress' }];
 const main = async () => {
   if (args[0] === '--version') return void process.stdout.write('gh version 2.80.0 (2026-09-01)\n');
   if (args[0] === 'auth' && args[1] === 'status') {
@@ -55,6 +55,29 @@ const main = async () => {
     process.stderr.write('HTTP 403: Must have admin rights to Repository.');
     process.exitCode = 1;
     return;
+  }
+  if (args[0] === 'issue' && args[1] === 'edit') {
+    if (options.fail === 'label') {
+      process.stderr.write('HTTP 403: Resource not accessible by integration');
+      process.exitCode = 1;
+      return;
+    }
+    // Later reads see the label, like GitHub.
+    const item = options.items?.find((i) => i.content?.number === Number(args[2]) && i.content.repository?.nameWithOwner === args[4]);
+    const label = args[args.indexOf('--add-label') + 1];
+    if (item && !item.content.labels.nodes.some((l) => l.name === label)) item.content.labels.nodes.push({ name: label });
+    fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    return;
+  }
+  // An issue read: options.issues holds the labels of issues off the project.
+  if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+\/issues\/\d+$/.test(args[1])) {
+    const issue = options.issues?.[args[1].slice('repos/'.length)];
+    if (!issue) {
+      process.stderr.write('HTTP 404: Not Found');
+      process.exitCode = 1;
+      return;
+    }
+    return output(issue);
   }
   if (options.writeDelay && ['item-edit', 'delete', 'item-delete'].includes(args[1])) await new Promise((r) => setTimeout(r, options.writeDelay));
   // Deletes leave options.items alone, like a GitHub read that still lags behind.

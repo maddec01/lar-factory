@@ -247,6 +247,41 @@ export async function setItemStatus(
   }
 }
 
+/** Adds an issue to the project if it isn't there, as status.sh does, then sets its Status; returns the error, or null. */
+export async function setIssueStatus(
+  config: BoardConfig,
+  url: string,
+  name: Status,
+  run: (args: string[]) => Promise<string> = gh,
+): Promise<string | null> {
+  try {
+    const { number, setStatus } = await statusWriter(config, name, run);
+    const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', config.owner, '--url', url, '--format', 'json'])) as { id?: string };
+    if (!member.id) throw new Error('GitHub did not return a project item.');
+    await setStatus(member.id);
+    return null;
+  } catch (err) {
+    return `Could not set ${name}. ${message(err)}`;
+  }
+}
+
+/** Adds a label to an issue; returns the error, or null when GitHub accepted it. */
+export async function addIssueLabel(repo: string, number: number, label: string,
+  run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+  try {
+    await run(['issue', 'edit', String(number), '-R', repo, '--add-label', label]);
+    return null;
+  } catch (err) {
+    return `Could not add the ${label} label. ${message(err)}`;
+  }
+}
+
+/** An issue's labels as GitHub has them now. */
+export async function issueLabels(repo: string, number: number, run: (args: string[]) => Promise<string> = gh): Promise<string[]> {
+  const issue = JSON.parse(await run(['api', `repos/${repo}/issues/${number}`])) as { labels?: { name: string }[] };
+  return (issue.labels ?? []).map((l) => l.name);
+}
+
 /** A PR's REST path, `repos/<owner>/<repo>/pulls/<n>`, from its URL. */
 function pullPath(url: string): string {
   const match = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/.exec(url);

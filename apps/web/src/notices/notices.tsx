@@ -8,8 +8,8 @@ import { useBoardStore } from '../board/board-store.ts';
 import { useDetailsStore } from '../board/details-store.ts';
 import { useJumpStore } from '../board/jump-store.ts';
 import { TitleLink } from '../items/item-parts.tsx';
-import { useToastStore } from './toast-store.ts';
-import type { Toast } from './toast-store.ts';
+import { clearToast, showToast } from './toasts.tsx';
+import type { Toast } from './toasts.tsx';
 
 export type Notice =
   | { verb: 'Added' | 'Moved'; item: Item; to: Status }
@@ -27,12 +27,12 @@ function viewItem(itemId: string): void {
   const item = data.items.find((i) => i.id === itemId);
   if (!item) return;
   // Its toast has done its job.
-  useToastStore.getState().clear(SLOT);
+  clearToast(SLOT);
   if (item.status === 'List') useDetailsStore.getState().setOpen(listGroupId(platformOf(item, data.repos)), true);
   useJumpStore.getState().request(itemId);
 }
 
-function toastOf(notice: Notice): Omit<Toast, 'key'> {
+function toastOf(notice: Notice): Toast {
   const { item } = notice;
   switch (notice.verb) {
     // The issue is gone, so there is nothing to link to.
@@ -62,5 +62,5 @@ function toastOf(notice: Notice): Omit<Toast, 'key'> {
 }
 
 export function notify(notice: Notice): void {
-  useToastStore.getState().show(toastOf(notice));
+  showToast(toastOf(notice));
 }

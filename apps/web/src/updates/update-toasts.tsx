@@ -4,13 +4,13 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
 
-import { useToastStore } from '../notices/toast-store.ts';
+import { showToast } from '../notices/toasts.tsx';
 
 /** The update toasts share one toast: a new one replaces the last. */
 const SLOT = 'update';
 
 function showUpdateToast(title: string, description: string, failed: boolean): void {
-  useToastStore.getState().show({ slot: SLOT, failed, ...(failed && { tone: 'error' as const }), what: title, body: <><b>{title}</b> {description}</> });
+  showToast({ slot: SLOT, failed, what: title, body: <><b>{title}</b> {description}</> });
 }
 
 /** A failed update action, as T3's error toast: it stays until it's closed, with a red dot. */

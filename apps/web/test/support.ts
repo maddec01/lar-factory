@@ -84,7 +84,8 @@ export const variantOf = (el: Element | null) => {
   const variants = { error: 'bg-destructive/8', warning: 'bg-warning/8', success: 'bg-success/8', outline: 'bg-background', secondary: 'bg-secondary' };
   return Object.entries(variants).find(([, bg]) => el.classList.contains(bg))?.[0];
 };
-export const toast = () => $('.toasts .toast');
+/** The toast on screen. */
+export const toast = () => $('[data-slot="toast-viewport"] [data-toast]');
 
 /** Sends `data` down the page's event stream. */
 export const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));

@@ -45,11 +45,22 @@ test('a new notice replaces the last, and its close button closes it', async () 
   await notify({ verb: 'Added', item: first, to: 'List' });
   expect(text(toast())).toBe(`Added #61 ${first.title} to List. View item`);
   await notify({ verb: 'Moved', item: second, to: 'Queued' });
-  expect(document.querySelectorAll('.toasts .toast').length).toBe(1);
+  expect(document.querySelectorAll('[data-toast]').length).toBe(1);
   expect(text(toast())).toMatch(/^Moved #114 /);
   const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;
   close.focus();
   await settle(() => close.click());
+  expect(toast()).toBeNull();
+  expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
+});
+
+test("a toast swiped away runs the board's close, so focus moves on", async () => {
+  await mountPage();
+  await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
+  toast()!.querySelector<HTMLButtonElement>('button.dismiss')!.focus();
+  // A swipe closes the toast through coss's toast manager, not through the board's close button.
+  const { toastManager } = await import('@mux-factory/ui/toast');
+  await settle(() => toastManager.close(toast()!.getAttribute('data-toast-id')!));
   expect(toast()).toBeNull();
   expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
 });

@@ -8,6 +8,7 @@
 @source "./items/start-control.tsx";
 @source "./notices/banner.tsx";
 @source "./notices/form-result.tsx";
+@source "./notices/toasts.tsx";
 @source "./title-bar/TitleBar.tsx";
 @source "./updates/UpdateButton.tsx";
 @source "./updates/UpdateStatusIcon.tsx";
@@ -134,17 +135,10 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 /* notices: a close button on every failure, and successes as toasts that clear themselves */
 .dismiss { float: right; margin: -3px -6px 0 8px; }
 .action-error .dismiss { float: none; margin: -4px 0 -4px 2px; vertical-align: middle; }
-/* notices/toasts.tsx keeps --toast-top below the header while it's on screen and below the title bar. */
-.toasts { position: fixed; top: var(--toast-top, 12px); right: 12px; z-index: 60; display: grid; gap: 8px; width: min(400px, calc(100vw - 24px)); }
-/* A toast never drags the app's window, even where it overlaps the title bar. */
-.toasts { -webkit-app-region: no-drag; }
-.toast { margin: 0; background: var(--popover); border-color: var(--border); box-shadow: var(--shadow-composer), 0 1px 3px rgb(0 0 0 / 8%); animation: toast-in 0.18s cubic-bezier(0.32, 0.72, 0, 1); }
-.toast.seen { animation: none; }
-.toast::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 8px; }
-.toast[data-tone="error"]::before { background: var(--error); }
-.toast strong { color: var(--foreground); }
-.view-item { margin-left: 4px; }
-@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
+/* notices/toasts.tsx keeps --toast-top below the header while it's on screen and below the title bar.
+   A toast never drags the app's window, even where it overlaps the title bar. */
+[data-slot="toast-viewport"] { top: var(--toast-top); -webkit-app-region: no-drag; }
+.view-item { margin-left: --spacing(1); }
 @media (max-width: 400px) {
   .form-pair { grid-template-columns: 1fr; gap: 0; }
   .add-item { margin-left: 0; }
@@ -213,5 +207,5 @@ p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px
   .rows .row-item:has(.stats) .labels:empty { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .anchor-flash, .toast, .slice-bar li.active { animation: none; }
+  .anchor-flash, .slice-bar li.active { animation: none; }
 }

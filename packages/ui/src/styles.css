@@ -8,6 +8,7 @@
    otherwise turn on Tailwind utilities of the same name. */
 @import "tailwindcss" source(none);
 @source "./card";
+@source "./coss";
 @source "./components/ui";
 @source "./dialog";
 @source "./form";
@@ -69,6 +70,45 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
+}
+
+/* coss's toast (src/coss/toast.tsx): the theme vars and keyframes its registry entry adds
+   (https://coss.com/ui/r/toast.json, cosscom/ui at 3d8ca28), which replay a toast shown again with the same id. */
+@theme {
+  --animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
+  --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
+  --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
+  --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
+}
+
+@keyframes toast-success-odd {
+  0% { scale: 1; }
+  30% { scale: 1.025; }
+  60% { scale: 0.99; }
+  100% { scale: 1; }
+}
+
+@keyframes toast-success-even {
+  0% { scale: 1; }
+  30% { scale: 1.025; }
+  60% { scale: 0.99; }
+  100% { scale: 1; }
+}
+
+@keyframes toast-error-odd {
+  0% { translate: 0 0; }
+  25% { translate: -3px 0; }
+  50% { translate: 3px 0; }
+  75% { translate: -3px 0; }
+  100% { translate: 0 0; }
+}
+
+@keyframes toast-error-even {
+  0% { translate: 0 0; }
+  25% { translate: -3px 0; }
+  50% { translate: 3px 0; }
+  75% { translate: -3px 0; }
+  100% { translate: 0 0; }
 }
 
 :root {

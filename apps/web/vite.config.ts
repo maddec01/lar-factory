@@ -1,6 +1,7 @@
 // Vite+ builds the page into dist/, which the board server (apps/server) reads at startup.
 // Vitest runs the page tests, which sit next to the files they test, in a DOM.
-// `~` is the design system's src/: the components copied from T3 import through it (docs/adr/0016).
+// `~` is the design system's src/: the components copied from T3 import through it, and coss's toast imports
+// the board's cn and T3's button through `@/registry/default` (docs/adr/0016).
 
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
@@ -15,9 +16,18 @@ const renderBlockingEntry: Plugin = {
   transformIndexHtml: { order: 'post', handler: (html) => html.replace(/<script type="module"(?![^>]*\bblocking=)/, '<script type="module" blocking="render"') },
 };
 
+/** A path in the design system's package. */
+const ui = (path: string) => fileURLToPath(new URL(`../../packages/ui/${path}`, import.meta.url));
+
 export default defineConfig({
   plugins: [tailwindcss(), renderBlockingEntry],
-  resolve: { alias: { '~': fileURLToPath(new URL('../../packages/ui/src', import.meta.url)) } },
+  resolve: {
+    alias: {
+      '~': ui('src'),
+      '@/registry/default/lib/utils': ui('src/lib/utils.ts'),
+      '@/registry/default/ui/button': ui('src/components/ui/button.tsx'),
+    },
+  },
   build: {
     outDir: 'dist',
     rolldownOptions: {

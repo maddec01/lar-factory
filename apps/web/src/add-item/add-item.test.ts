@@ -139,7 +139,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   await settle(() => vi.advanceTimersByTime(50));
   expect(dialog()!.hidden, 'the dialog closes').toBe(true);
   expect(document.activeElement, 'focus goes back to Add item').toBe(addButton());
-  const toast = $('.toast[role="status"]')!;
+  const toast = $('[data-toast][role="status"]')!;
   expect(toast.textContent).toBe('Added #501 Playback stalls to List. View item');
   expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added #501');
   expect($('.totals')!.textContent, 'the board shows the new data').toContain(`${sample.items.length + 1} items`);

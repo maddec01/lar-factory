@@ -97,7 +97,7 @@ test('a failed card action shows as a toast naming the item, which stays until c
   await settle(() => button('back-to-list', 'PVTI_sample05').click());
   await answer({ error: 'Could not set List. GitHub is down.' }, 502);
   expect(toast()!.getAttribute('role')).toBe('alert');
-  expect(toast()!.dataset.tone, 'the board\'s own failure toasts keep their look').toBeUndefined();
+  expect(toast()!.dataset.tone, 'a failure\'s dot is red').toBe('error');
   expect(text(toast())).toMatch(/^Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
   expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
   expect($('[data-anchor="PVTI_sample05"] .action-error'), 'the card shows no inline error').toBeNull();
@@ -190,6 +190,7 @@ test("a failed Abandon stays on a List row, but is a toast for a Queued card", a
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
   await answer({ error: 'Could not delete #129.' }, 502);
   expect(text(toast())).toMatch(/^Couldn't abandon #129 .*\. Could not delete #129\.$/);
+  expect(toast()!.dataset.tone).toBe('error');
   expect(document.activeElement, 'back to its Abandon').toBe(button('abandon', 'PVTI_sample05'));
 });
 

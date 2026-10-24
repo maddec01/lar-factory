@@ -12,6 +12,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { isRecord } from '@mux-factory/shared';
 import type { ItemStats } from '@mux-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
+import { length, merged, minus } from './intervals.ts';
+import type { Interval } from './intervals.ts';
 import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens } from './transcript-usage.ts';
 import type { SessionRecordsReader, UsageRecord, UsageSpeed } from './transcript-usage.ts';
 import { apiCost, createOverrideRateTable, parseRateTable, resolveModelAliases } from './usage-pricing.ts';
@@ -132,38 +134,6 @@ function add<V>(map: Map<string, V[]>, key: string, value: V): void {
   if (list) list.push(value);
   else map.set(key, [value]);
 }
-
-type Interval = [number, number];
-
-/** The intervals merged into disjoint ones, earliest first, dropping empty ones. */
-function merged(intervals: Interval[]): Interval[] {
-  const out: Interval[] = [];
-  for (const [start, end] of [...intervals].sort((a, b) => a[0] - b[0])) {
-    if (!(end > start)) continue;
-    const last = out.at(-1);
-    if (last && start <= last[1]) last[1] = Math.max(last[1], end);
-    else out.push([start, end]);
-  }
-  return out;
-}
-
-/** The parts of each interval that no interval in `cut` covers. */
-function minus(intervals: Interval[], cut: Interval[]): Interval[] {
-  const holes = merged(cut);
-  return intervals.flatMap(([start, end]) => {
-    const parts: Interval[] = [];
-    let from = start;
-    for (const [holeStart, holeEnd] of holes) {
-      if (holeEnd <= from || holeStart >= end) continue;
-      if (holeStart > from) parts.push([from, holeStart]);
-      from = Math.max(from, holeEnd);
-    }
-    if (end > from) parts.push([from, end]);
-    return parts;
-  });
-}
-
-const length = (intervals: Interval[]): number => intervals.reduce((total, [start, end]) => total + end - start, 0);
 
 /** The provider threads running a turn now; none when T3 doesn't say, so open turns are capped. */
 function activeProviderThreads(db: DatabaseSync): Set<string> {

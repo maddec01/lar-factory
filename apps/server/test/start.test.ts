@@ -1,5 +1,5 @@
-import { test } from 'node:test';
-import type { TestContext } from 'node:test';
+import { test } from 'vite-plus/test';
+import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,7 +18,7 @@ const MESSAGE = '#12 Issue 12\n$mux-work maddec01/mux-factory#12';
 /** A temporary home with git checkouts of the given origins under ~/Developer/Mux. */
 function home(t: TestContext, origins: Record<string, string | null>): string {
   const dir = mkdtempSync(join(tmpdir(), 'mux-start-home-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   checkouts(dir, origins);
   return dir;
 }

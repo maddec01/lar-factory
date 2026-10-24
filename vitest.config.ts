@@ -6,6 +6,6 @@ import { sharedTest } from './vitest.shared.ts';
 export default defineConfig({
   test: {
     ...sharedTest,
-    projects: ['packages/shared', 'apps/web', 'apps/desktop'],
+    projects: ['packages/shared', 'apps/server', 'apps/web', 'apps/desktop'],
   },
 });

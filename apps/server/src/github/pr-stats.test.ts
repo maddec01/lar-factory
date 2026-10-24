@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mergedStats, prStatsEdits, statsBlock, updatedBody, withStatsBlock } from './pr-stats.ts';
 import type { Item, ItemStats, LinkedPr } from '@mux-factory/shared';

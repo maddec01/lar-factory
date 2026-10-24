@@ -2,7 +2,7 @@
 // (pingdotgg/t3code main at f054d1b8018721bd997d99cbb918a7b17bf098a4), with the
 // costs T3 gives for them.
 
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { apiCost, createOverrideRateTable, lookupRate, parseRateTable, priceUsage, resolveModelAliases } from './usage-pricing.ts';
 import type { Pricing } from './usage-pricing.ts';

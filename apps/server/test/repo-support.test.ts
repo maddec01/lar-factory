@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -8,12 +8,12 @@ import { factoryRepo, testEnv } from './repo-support.ts';
 
 test('git variables inherited from a hook or rebase --exec never reach the real repo', async (t) => {
   const decoy = await mkdtemp(join(tmpdir(), 'mux decoy repo '));
-  t.after(() => rm(decoy, { recursive: true, force: true }));
+  t.onTestFinished(() => rm(decoy, { recursive: true, force: true }));
   execFileSync('git', ['init', '--bare', decoy], { env: testEnv(), stdio: 'ignore' });
   const saved = { GIT_DIR: process.env.GIT_DIR, GIT_WORK_TREE: process.env.GIT_WORK_TREE };
   process.env.GIT_DIR = decoy;
   process.env.GIT_WORK_TREE = decoy;
-  t.after(() => {
+  t.onTestFinished(() => {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
     }

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
-import type { TestContext } from 'node:test';
+import type { TestContext } from 'vite-plus/test';
 import type { BoardData } from '@mux-factory/shared';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
@@ -66,7 +66,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
       await exited;
     }
   };
-  t.after(async () => {
+  t.onTestFinished(async () => {
     await stop();
     await rm(dir, { recursive: true, force: true });
   });
@@ -120,7 +120,7 @@ export const draftItem = (status: string) => ({ id: 'PVTI_draft', updatedAt: '20
  * checkout, and a T3 database with a live project there. */
 export function startableEnv(t: TestContext): Record<string, string> {
   const home = mkdtempSync(join(tmpdir(), 'mux-start-home-'));
-  t.after(() => rmSync(home, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
   checkouts(home, { 'mux-factory': 'git@github.com:maddec01/mux-factory.git' });
   return { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/Mux/mux-factory` }]) };
 }

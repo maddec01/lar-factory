@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { startBoard } from './server-support.ts';
 import type { Board } from './server-support.ts';

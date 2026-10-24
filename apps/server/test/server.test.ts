@@ -1,4 +1,4 @@
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vite-plus/test';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
 import assert from 'node:assert/strict';
@@ -342,7 +342,7 @@ async function hold(t: TestContext, port: number): Promise<void> {
     server.once('error', () => resolve());
     server.listen(port, '127.0.0.1', resolve);
   });
-  t.after(() => new Promise<void>((resolve) => server.listening ? server.close(() => resolve()) : resolve()));
+  t.onTestFinished(() => new Promise<void>((resolve) => server.listening ? server.close(() => resolve()) : resolve()));
 }
 
 test('without BOARD_PORT the board skips a taken 4317, binds the next free port and logs it', async (t) => {
@@ -372,7 +372,7 @@ test('BOARD_PORT on a taken port exits with a log line', async (t) => {
 
 test('a live board records its port for status.sh and removes the record on exit; a sample board records nothing', async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'mux-records-home-'));
-  t.after(() => rmSync(home, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
   const records = join(home, 'Library/Application Support/Mux Factory/boards');
   const sample = await startBoard(t, {}, true, false, { HOME: home });
   const board = await startBoard(t, {}, false, false, { HOME: home });
@@ -385,7 +385,7 @@ test('a live board records its port for status.sh and removes the record on exit
 
 test('BOARD_CONFIG_FILE gives the board its project and repos from a file outside the checkout', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'mux-config-file-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const file = join(dir, 'config.json');
   const repos = [{ repo: 'maddec01/mux-elsewhere', platform: 'Server', role: 'A repo only this file names' }];
   writeFileSync(file, JSON.stringify({ project: { owner: 'maddec01', title: 'Elsewhere' }, repos }));

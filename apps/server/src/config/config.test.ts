@@ -1,4 +1,4 @@
-import { test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -11,7 +11,7 @@ const server = { repo: 'maddec01/mux-server', platform: 'Server', role: 'Backend
 
 async function configWith(t: TestContext, repos: unknown[], extra: object = {}): Promise<URL> {
   const dir = await mkdtemp(join(tmpdir(), 'mux config test '));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   const file = join(dir, 'config.json');
   await writeFile(file, JSON.stringify({ project: { owner: 'maddec01', title: 'Mux' }, repos, ...extra }));
   return pathToFileURL(file);

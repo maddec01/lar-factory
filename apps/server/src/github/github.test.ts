@@ -1,6 +1,6 @@
 // The queries gh sends. The rules that normalise their results are tested in packages/shared's github-items.test.ts.
 
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { ISSUE_SEARCH_QUERY, ITEMS_QUERY } from './github.ts';
 

@@ -98,7 +98,7 @@ rebuild.
 `src/board/` holds the board data and the changes laid over it, `src/items/` the item
 commands and their locks, and `src/http/` the routes.
 
-`pnpm test` runs the server tests with Node's test runner: unit tests sit next to the
+`pnpm test` runs the server tests with Vitest: unit tests sit next to the
 files they test in `src/`, and the tests that start the whole board, with their fixtures,
 in `test/`. The page tests sit next to their files in `apps/web/src/`; `pnpm test` in
 `apps/web` runs them with Vitest in a DOM. That DOM, jsdom, needs Node 22.22.2+, 24.15+ or 26+;

@@ -2,15 +2,15 @@
 // notice that replaces the rest.
 
 import { useLayoutEffect } from 'react';
-import { AbandonDialog } from './AbandonDialog.tsx';
-import { useBoardStore } from './board-store.ts';
-import { BoardView } from './BoardView.tsx';
-import { CopyStatus } from './CopyButton.tsx';
-import { Header } from './Header.tsx';
-import { restoreAnchor } from './keep-anchor.ts';
-import { Toasts } from './Toasts.tsx';
-import { TitleBar } from './TitleBar.tsx';
-import { T3Missing } from './ToolNotices.tsx';
+import { AbandonDialog } from './items/abandon-dialog.tsx';
+import { useBoardStore } from './board/board-store.ts';
+import { BoardView } from './board/board-view.tsx';
+import { CopyStatus } from './copy/copy-button.tsx';
+import { Header } from './board/header.tsx';
+import { restoreAnchor } from './board/keep-anchor.ts';
+import { Toasts } from './notices/toasts.tsx';
+import { TitleBar } from './title-bar/TitleBar.tsx';
+import { T3Missing } from './notices/tool-notices.tsx';
 
 export function App() {
   const data = useBoardStore((state) => state.data);

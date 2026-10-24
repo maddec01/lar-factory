@@ -2,7 +2,7 @@
 // every update state. The bridge stands in for the app's preload and pushes each new update state, as the app does.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight, updatesOff } from './support.ts';
+import { $, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight, updatesOff } from '../../test/support.ts';
 import type { UpdateState } from '@mux-factory/shared';
 
 const idle: UpdateState = {

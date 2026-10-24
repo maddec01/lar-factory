@@ -2,7 +2,7 @@
 // what a start shows on the card and in a toast. Ported from the Start cases of test/render.test.ts.
 
 import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle } from './support.ts';
+import { $, $$, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
 import type { BoardData, ModelGroup } from '@mux-factory/shared';
 
 const MODEL_CHOICES: ModelGroup[] = [

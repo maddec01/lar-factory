@@ -3,8 +3,8 @@
 import { Fragment, act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, test, vi } from 'vite-plus/test';
-import { $, settle } from './support.ts';
-import { CopyButton, CopyStatus } from '../src/app/CopyButton.tsx';
+import { $, settle } from '../../test/support.ts';
+import { CopyButton, CopyStatus } from './copy-button.tsx';
 
 async function mount(): Promise<HTMLButtonElement> {
   document.body.innerHTML = '<div id="root"></div>';

@@ -6,8 +6,8 @@ import { canAbandon, ref } from '@mux-factory/shared';
 import type { BoardData, Item } from '@mux-factory/shared';
 import { useActionStore, useItemAction } from './action-store.ts';
 import { askAbandon, backToList, queueItem } from './card-actions.ts';
-import { writeState } from './Card.tsx';
-import { DismissButton, closeKeepingFocus } from './Toasts.tsx';
+import { writeState } from './card.tsx';
+import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 
 export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);

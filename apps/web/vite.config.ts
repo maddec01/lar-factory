@@ -1,5 +1,5 @@
 // Vite+ builds the page into dist/, which the board server (apps/server) reads at startup.
-// Vitest runs the page tests in test/ in a DOM.
+// Vitest runs the page tests, which sit next to the files they test, in a DOM.
 
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite-plus';
@@ -17,6 +17,6 @@ export default defineConfig({
   build: { outDir: 'dist' },
   test: {
     environment: 'jsdom',
-    include: ['test/**/*.test.ts'],
+    include: ['src/**/*.test.ts'],
   },
 });

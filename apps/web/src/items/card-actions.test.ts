@@ -3,7 +3,7 @@
 // Ported from the card action cases of test/render.test.ts.
 
 import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle } from './support.ts';
+import { $, $$, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
 import type { BoardData, Status } from '@mux-factory/shared';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';

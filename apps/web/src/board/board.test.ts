@@ -2,10 +2,10 @@
 // Ported from the Board cases of test/render.test.ts.
 
 import { beforeEach, expect, test } from 'vite-plus/test';
-import { $, $$, NOW, mountPage, sample, settle } from './support.ts';
+import { $, $$, NOW, mountPage, sample, settle } from '../../test/support.ts';
 import { normalizeItems } from '@mux-factory/shared';
 import type { BoardData, Item, RawItem } from '@mux-factory/shared';
-import { rawIssue, sliceRef } from './raw-items.ts';
+import { rawIssue, sliceRef } from '../../test/raw-items.ts';
 
 const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const card = (id: string) => $(`article[data-anchor="${id}"]`)!;
@@ -23,7 +23,7 @@ async function show(data: BoardData): Promise<void> {
     return mountPage(data);
   }
   // The store instance the mounted page uses; modules reset between tests.
-  const { useBoardStore } = await import('../src/app/board-store.ts');
+  const { useBoardStore } = await import('./board-store.ts');
   await settle(() => useBoardStore.getState().receive(data));
 }
 const openGroups = () => $$<HTMLDetailsElement>('details.platform').filter((d) => d.open).map((d) => d.id);

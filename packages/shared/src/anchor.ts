@@ -1,5 +1,5 @@
 // Which item holds the reading position across a re-render. Shared with the
-// browser, imports nothing; apps/web/src/app/keep-anchor.ts measures the elements.
+// browser, imports nothing; apps/web/src/board/keep-anchor.ts measures the elements.
 
 /** One key per appearance, since an item can be drawn twice (a concept's sub-issue row and its own card). */
 export function anchorKeys(ids: readonly string[]): string[] {

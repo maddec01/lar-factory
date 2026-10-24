@@ -5,9 +5,9 @@ import { flushSync } from 'react-dom';
 import { remembersChoice, startRequest } from '@mux-factory/shared';
 import type { ModelChoice, StartResult } from '@mux-factory/shared';
 import { useActionStore } from './action-store.ts';
-import { useBoardStore } from './board-store.ts';
+import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive, refocus } from './card-actions.ts';
-import { notify } from './notices.tsx';
+import { notify } from '../notices/notices.tsx';
 import { useStartStore } from './start-store.ts';
 
 export async function startItem(itemId: string, choice?: ModelChoice): Promise<void> {

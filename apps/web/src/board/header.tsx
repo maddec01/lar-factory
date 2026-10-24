@@ -4,9 +4,9 @@
 import { countsOf, isStale, ago, clock, BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@mux-factory/shared';
 import type { BoardData } from '@mux-factory/shared';
 import { useBoardStore } from './board-store.ts';
-import { ClosableBanner } from './ClosableBanner.tsx';
+import { ClosableBanner } from '../notices/closable-banner.tsx';
 import { CLIENT_ERROR } from './live-data.ts';
-import { GhBanner } from './ToolNotices.tsx';
+import { GhBanner } from '../notices/tool-notices.tsx';
 
 export function BrandMark() {
   return (

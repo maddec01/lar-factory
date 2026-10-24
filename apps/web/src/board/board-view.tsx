@@ -6,14 +6,14 @@ import type { ReactNode } from 'react';
 import { AMBER_STATUSES, STATUSES, workMessage, boardSections, conceptChildren, day, plural, slug } from '@mux-factory/shared';
 import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from './board-store.ts';
-import { Card } from './Card.tsx';
-import { Disclosure } from './Disclosure.tsx';
-import { AbandonButton, ActionError, BackToListButton, QueueButton } from './ItemActions.tsx';
+import { Card } from '../items/card.tsx';
+import { Disclosure } from './disclosure.tsx';
+import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../items/item-actions.tsx';
 import { jumpTo } from './jump.ts';
 import { useJumpStore } from './jump-store.ts';
-import { StartControl, StartMessage, useStartHolds } from './StartControl.tsx';
-import { KindPill, LabelPills, PlatformBadge, TitleLink } from './item-parts.tsx';
-import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
+import { StartControl, StartMessage, useStartHolds } from '../items/start-control.tsx';
+import { KindPill, LabelPills, PlatformBadge, TitleLink } from '../items/item-parts.tsx';
+import { StatsBadge, TotalBadge, shownTotal } from '../items/stats-badges.tsx';
 
 function Section({ id, title, count, note, children }: { id: string; title: string; count: number; note?: string; children: ReactNode }) {
   return (

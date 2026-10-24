@@ -1,7 +1,7 @@
 // The page shell: first paint, header, the Board view, live data, and what a re-render keeps.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, fetchMock, mountPage, sample, settle, stream } from './support.ts';
+import { $, $$, NOW, fetchMock, mountPage, sample, settle, stream } from '../test/support.ts';
 import { BRAND_MARK_PATH } from '@mux-factory/shared';
 import type { BoardData } from '@mux-factory/shared';
 

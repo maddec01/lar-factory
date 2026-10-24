@@ -6,8 +6,8 @@ import type { ReactNode } from 'react';
 import { AMBER_STATUSES, STATUSES, HINTS, checksBadge, namedSlices, prLabel, statusTone, plural } from '@mux-factory/shared';
 import type { BoardData, Item, LinkedPr, Status } from '@mux-factory/shared';
 import type { ItemAction } from './action-store.ts';
-import { useBoardStore } from './board-store.ts';
-import { SlicePopover, sliceKey } from './SlicePopover.tsx';
+import { useBoardStore } from '../board/board-store.ts';
+import { SlicePopover, sliceKey } from './slice-popover.tsx';
 import { KindPill, PlatformBadge, TitleLink } from './item-parts.tsx';
 import { StatsBadge, TotalBadge, shownTotal } from './stats-badges.tsx';
 

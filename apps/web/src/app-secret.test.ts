@@ -2,7 +2,7 @@
 // outside it (a browser, `pnpm run sample`) it sends no secret header.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, fetchMock, mountPage, settle, stubApp } from './support.ts';
+import { $, fetchMock, mountPage, settle, stubApp } from '../test/support.ts';
 
 const secretOfLastPost = () => {
   const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];

@@ -5,7 +5,7 @@
 import { Dialog } from '@base-ui/react/dialog';
 import { boardApp, type UpdateChannel, type UpdateState } from '@mux-factory/shared';
 import { profilePath, useSettingsStore } from './settings-store.ts';
-import { useUpdateStore } from './update-store.ts';
+import { useUpdateStore } from '../updates/update-store.ts';
 
 const CHANNELS: { channel: UpdateChannel; label: string }[] = [
   { channel: 'nightly', label: 'Nightly' },

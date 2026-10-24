@@ -3,8 +3,8 @@
 
 import type { ReactNode } from 'react';
 import type { ToolMissing, ToolProblem } from '@mux-factory/shared';
-import { BrandMark } from './Header.tsx';
-import { CopyButton } from './CopyButton.tsx';
+import { BrandMark } from '../board/header.tsx';
+import { CopyButton } from '../copy/copy-button.tsx';
 import { useRecheckStore } from './recheck-store.ts';
 
 const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';

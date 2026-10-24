@@ -1,5 +1,5 @@
 // What the Board view shows, as data and plain text: its sections, each card's hint, badge texts
-// and titles, and what Abandon asks. Both the React page (app/BoardView.tsx) and the text-built template use it.
+// and titles, and what Abandon asks. Both the React page (apps/web/src/board/board-view.tsx) and the text-built template use it.
 
 import { AMBER_STATUSES, STATUSES, checkState, isRecentlyDone, isSlow, kindOf, platformOf, ref } from './model.ts';
 import type { BoardData, Item, ItemStats, LinkedPr, Slice, SliceProgress, Status } from './model.ts';

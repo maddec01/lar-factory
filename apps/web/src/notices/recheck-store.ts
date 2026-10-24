@@ -4,8 +4,8 @@
 import { flushSync } from 'react-dom';
 import { create } from 'zustand';
 import type { BoardData } from '@mux-factory/shared';
-import { useBoardStore } from './board-store.ts';
-import { postAction, receive } from './card-actions.ts';
+import { useBoardStore } from '../board/board-store.ts';
+import { postAction, receive } from '../items/card-actions.ts';
 
 /** A Recheck's answer: the error when it failed, else null, and the tool problems it left, serialised. */
 export interface RecheckAnswer {

@@ -6,7 +6,7 @@
 
 import { CheckIcon, DownloadIcon, RotateCwIcon } from 'lucide-react';
 import type { AnimationEventHandler } from 'react';
-import { RefreshIcon } from './RefreshIcon.tsx';
+import { RefreshIcon } from './refresh-icon.tsx';
 
 const DOWNLOAD_PROGRESS_RADIUS = 14;
 const DOWNLOAD_PROGRESS_CIRCUMFERENCE = 2 * Math.PI * DOWNLOAD_PROGRESS_RADIUS;

@@ -1,6 +1,7 @@
-// A <details> that stays as the user left it across re-renders.
+// A Collapsible that stays as the user left it across re-renders.
 
 import type { ReactNode } from 'react';
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from '@mux-factory/ui/collapsible';
 import { useDetailsStore } from './details-store.ts';
 
 export function Disclosure({ id, className, byDefault, summary, children }: {
@@ -13,9 +14,9 @@ export function Disclosure({ id, className, byDefault, summary, children }: {
   const open = useDetailsStore((state) => state.toggled[id] ?? byDefault);
   const setOpen = useDetailsStore((state) => state.setOpen);
   return (
-    <details className={className} id={id} open={open} onToggle={(event) => setOpen(id, event.currentTarget.open)}>
-      <summary>{summary}</summary>
-      {children}
-    </details>
+    <Collapsible className={className} id={id} open={open} onOpenChange={(next) => setOpen(id, next)}>
+      <CollapsibleTrigger className="disclosure-trigger">{summary}</CollapsibleTrigger>
+      <CollapsiblePanel keepMounted>{children}</CollapsiblePanel>
+    </Collapsible>
   );
 }

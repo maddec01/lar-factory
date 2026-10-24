@@ -12,6 +12,7 @@ the Copies instead (`docs/adr/0016-copy-t3s-base-components-unchanged.md`).
 | `src/components/ui/badge.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/badge.tsx` | `d53873b6a479` |
 | `src/components/ui/button.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/button.tsx` | `d53873b6a479` |
 | `src/components/ui/checkbox.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/checkbox.tsx` | `d53873b6a479` |
+| `src/components/ui/collapsible.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/collapsible.tsx` | `d53873b6a479` |
 | `src/components/ui/dialog-styles.ts` | pingdotgg/t3code | `apps/web/src/components/ui/dialog-styles.ts` | `d53873b6a479` |
 | `src/components/ui/dialog.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/dialog.tsx` | `d53873b6a479` |
 | `src/components/ui/input.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/input.tsx` | `d53873b6a479` |

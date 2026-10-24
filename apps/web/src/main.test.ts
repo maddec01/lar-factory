@@ -140,18 +140,15 @@ test("the lost server's banner closes, and the next failure after the server ans
   expect(bannerText($('.banner[role="alert"]')!)[0]).toBe("Can't reach the board server.");
 });
 
-test('new data keeps focus and the <details> the user opened', async () => {
+test('new data keeps focus and the disclosures the user opened', async () => {
   await mountPage(fresh);
-  const done = $<HTMLDetailsElement>('#done-list')!;
-  expect(done.open).toBe(false);
-  await settle(() => {
-    done.open = true;
-    done.dispatchEvent(new Event('toggle'));
-  });
+  const isOpen = () => $('#done-list')!.hasAttribute('data-open');
+  expect(isOpen()).toBe(false);
+  await settle(() => $<HTMLButtonElement>('#done-list > [data-slot="collapsible-trigger"]')!.click());
   $('.add-item')!.focus();
 
   await push({ ...fresh, items: [...fresh.items].reverse() });
-  expect($<HTMLDetailsElement>('#done-list')!.open).toBe(true);
+  expect(isOpen()).toBe(true);
   expect(document.activeElement).toBe($('.add-item'));
 });
 

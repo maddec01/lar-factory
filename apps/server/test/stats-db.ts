@@ -71,9 +71,7 @@ CREATE TABLE orchestration_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, a
 
 /** Writes the database to a temporary folder removed after the test, and returns its path. */
 export function statsDb(t: TestContext, threads: FixtureThread[], requests: FixtureRequest[] = []): string {
-  const dir = mkdtempSync(join(tmpdir(), 'mux-stats-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const path = join(dir, 'statev2.sqlite');
+  const path = join(tempDir(t, 'mux-stats-'), 'statev2.sqlite');
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
   const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?)');
@@ -158,6 +156,9 @@ export function tempDir(t: TestContext, prefix: string): string {
   return dir;
 }
 
+/** Transcript lines as a JSONL file's text; a string line is written as is. */
+const lines = (records: (object | string)[]): string => records.map((r) => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') + '\n';
+
 /**
  * Writes a Claude Code home (its `projects` folder) and returns it: at `home`, or
  * in a temporary folder removed after the test.
@@ -165,7 +166,6 @@ export function tempDir(t: TestContext, prefix: string): string {
 export function claudeHome(t: TestContext, sessions: Record<string, FixtureTranscripts>, home = tempDir(t, 'mux-claude-home-')): string {
   const project = join(home, 'projects', '-Users-pedro--t3-worktrees-mux-factory-feat-60');
   mkdirSync(project, { recursive: true });
-  const lines = (records: (object | string)[]) => records.map((r) => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') + '\n';
   for (const [session, { main, subagents }] of Object.entries(sessions)) {
     if (main) writeFileSync(join(project, `${session}.jsonl`), lines(main));
     if (!subagents) continue;
@@ -188,8 +188,7 @@ export function codexHome(t: TestContext, sessions: Record<string, (object | str
   const day = join(home, 'sessions', '2026', '10', '20');
   mkdirSync(day, { recursive: true });
   for (const [session, records] of Object.entries(sessions)) {
-    writeFileSync(join(day, `rollout-2026-10-20T09-00-00-${session}.jsonl`),
-      records.map((r) => (typeof r === 'string' ? r : JSON.stringify(r))).join('\n') + '\n');
+    writeFileSync(join(day, `rollout-2026-10-20T09-00-00-${session}.jsonl`), lines(records));
   }
   return home;
 }
@@ -241,9 +240,7 @@ export interface FixtureProject {
 
 /** Writes a database holding only T3's projects to a temporary folder removed after the test, and returns its path. */
 export function projectsDb(t: TestContext, projects: FixtureProject[]): string {
-  const dir = mkdtempSync(join(tmpdir(), 'mux-projects-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const path = join(dir, 'statev2.sqlite');
+  const path = join(tempDir(t, 'mux-projects-'), 'statev2.sqlite');
   const db = new DatabaseSync(path);
   db.exec(`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, title TEXT NOT NULL,
     workspace_root TEXT NOT NULL, deleted_at TEXT)`);

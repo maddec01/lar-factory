@@ -52,8 +52,10 @@ test("a Queued card's Start opens a menu: 'T3 default' first, then each provider
     ['Opus 5.5', 'false', 'PVTI_sample05', 'claudeAgent', 'claude-opus-5-5'],
     ['claude-opus-5-5[1m]', 'false', 'PVTI_sample05', 'claudeAgent', 'claude-opus-5-5[1m]'],
   ]);
-  const groups = $$('[role="menu"] [role="group"][aria-labelledby]');
-  expect(groups.map((g) => text(document.getElementById(g.getAttribute('aria-labelledby')!))), 'grouped by instance, by its name').toEqual(['Codex', 'VI <work>']);
+  const label = (g: Element) => text(document.getElementById(g.getAttribute('aria-labelledby')!));
+  expect(label($('[role="menu"] > * > [role="group"]')!), 'the entries are a group, headed "Start with"').toBe('Start with');
+  const groups = $$('[role="menu"] [role="group"] [role="group"][aria-labelledby]');
+  expect(groups.map(label), 'grouped by instance, by its name').toEqual(['Codex', 'VI <work>']);
   expect(document.activeElement, 'focus is on the highlighted entry').toBe(entries()[0]);
   expect($$('[role="menu"]').length, 'only the card whose menu is open shows it').toBe(1);
 });
@@ -77,7 +79,7 @@ test('without model choices, the menu offers only "T3 default"', async () => {
   await mountPage();
   await open();
   expect(entries().map(text)).toEqual(['T3 default']);
-  expect($$('[role="menu"] [role="group"][aria-labelledby]')).toEqual([]);
+  expect($$('[role="menu"] [role="group"] [role="group"][aria-labelledby]')).toEqual([]);
 });
 
 test('arrow keys, Home and End move through the entries and wrap', async () => {

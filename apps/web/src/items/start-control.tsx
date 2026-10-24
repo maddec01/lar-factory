@@ -4,11 +4,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Menu } from '@base-ui/react/menu';
 import { ref, highlightedChoice, storedChoice } from '@mux-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@mux-factory/shared';
 import { Badge } from '@mux-factory/ui/badge';
 import { Button } from '@mux-factory/ui/button';
+import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuTrigger } from '@mux-factory/ui/menu';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './card.tsx';
 import { startItem } from './start-item.ts';
@@ -36,22 +36,28 @@ function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onP
   const sample = data.capture?.enabled === false;
   const checked = storedChoice(highlightedChoice(data.modelChoices, lastChoice));
   const entry = (label: string, choice?: ModelChoice) => (
-    <Menu.RadioItem className="start-pick" value={storedChoice(choice)} ref={storedChoice(choice) === checked ? checkedEntry : undefined}
+    // Pointer events stay on in sample mode, so the entry's title says why it is disabled.
+    <MenuRadioItem className="data-disabled:pointer-events-auto" value={storedChoice(choice)} ref={storedChoice(choice) === checked ? checkedEntry : undefined}
       closeOnClick disabled={sample} title={sample ? 'Disabled in sample mode' : undefined}
       data-start-pick={item.id} data-instance-id={choice?.instanceId} data-model={choice?.model}
-      onClick={() => !sample && onPick(choice)} key={label}>{label}</Menu.RadioItem>
+      onClick={() => !sample && onPick(choice)} key={label}>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <MenuRadioItemIndicator />
+      </span>
+    </MenuRadioItem>
   );
   return (
-    <Menu.RadioGroup value={checked}>
-      <p className="start-menu-head" aria-hidden="true">Start with</p>
+    <MenuRadioGroup value={checked}>
+      <MenuGroupLabel>Start with</MenuGroupLabel>
       {entry('T3 default')}
       {data.modelChoices.map((g) => (
-        <Menu.Group key={g.instanceId}>
-          <Menu.GroupLabel className="start-menu-group">{g.name}</Menu.GroupLabel>
+        <MenuGroup key={g.instanceId}>
+          <MenuGroupLabel>{g.name}</MenuGroupLabel>
           {g.models.map((m) => entry(m.label, { instanceId: g.instanceId, model: m.slug }))}
-        </Menu.Group>
+        </MenuGroup>
       ))}
-    </Menu.RadioGroup>
+    </MenuRadioGroup>
   );
 }
 
@@ -78,18 +84,14 @@ export function StartControl({ item, data }: { item: Item; data: BoardData }) {
   };
   return (
     <span className="start-group">
-      <Menu.Root open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
-        <Menu.Trigger render={<Button size="xs" />} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
+      <Menu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
+        <MenuTrigger render={<Button size="xs" />} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
           {verb}{start?.phase !== 'pending' && ' ▾'}
-        </Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Positioner className="start-menu-positioner" side="bottom" align="end" sideOffset={4}>
-            <Menu.Popup className="start-menu" aria-label={`Start ${ref(item)} with`}>
-              <StartEntries item={item} data={data} onPick={pick} />
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
+        </MenuTrigger>
+        <MenuPopup align="end" aria-label={`Start ${ref(item)} with`}>
+          <StartEntries item={item} data={data} onPick={pick} />
+        </MenuPopup>
+      </Menu>
     </span>
   );
 }

@@ -2,7 +2,7 @@
 // apps/web/src/components/sidebar/DesktopUpdateStatusIcon.tsx at 9a391eb, without the "update everything"
 // icon. T3's sidebar colours are the board's --update-* colours (index.css).
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
 
 import { CheckIcon, DownloadIcon, RotateCwIcon } from 'lucide-react';
 import type { AnimationEventHandler } from 'react';

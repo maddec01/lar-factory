@@ -10,7 +10,7 @@ the issue's **work message** (`#n title`, then `$mux-work owner/repo#n`; first
 `/mux-work owner/repo#n` in
 [commit 3fef010](https://github.com/maddec01/mux-factory/commit/3fef0103641afe76bc954916e473cfeb5e215900),
 changed by [issue #55](https://github.com/maddec01/mux-factory/issues/55)),
-as described in the [board instructions](../../board/README.md).
+as described in the [board instructions](../../apps/server/README.md).
 The current [mux-work workflow](../../skills/mux-work/SKILL.md#1-pick-up)
 shapes an issue when needed, or proceeds directly from a passing brief to
 [launching a separate build](../../skills/mux-work/SKILL.md#5-start-the-build)

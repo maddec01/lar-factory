@@ -2,7 +2,7 @@
 // apps/web/src/lib/visibleAnimation.ts it uses: it spins only while on screen, the window shows and
 // the system allows motion. Sized by the caller, so without T3's size variants.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see app/LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
 
 import { RefreshCwIcon } from 'lucide-react';
 import type { ComponentPropsWithoutRef } from 'react';

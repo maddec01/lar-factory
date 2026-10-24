@@ -1,10 +1,11 @@
 // The line's Queue: Queued items, in order, as numbered rows that open the item dialog, each started by hand. The
-// header shows the build slots against their limit, which the Queue shows but doesn't enforce, and Start next. A
-// concept's decisions show in its dossier, not here. Reordering and Auto-start aren't built yet.
+// header shows the build slots against their limit, which the Queue shows but doesn't enforce, and Start next. An
+// item a dossier shows as a part, such as a concept's decision, shows there, not here; a dossier's parent stays.
+// Reordering and Auto-start aren't built yet.
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { kindOf, platformOf, shortAgo, slug, workMessage } from '@mux-factory/shared';
+import { platformOf, shortAgo, slug, workMessage } from '@mux-factory/shared';
 import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -13,18 +14,12 @@ import { ItemTitle } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
 
 const DRAFT_HINT = 'This draft needs an issue before it can start. Convert it to an issue in a repo.';
 
 /** Keeps a click on a row's controls from opening the item dialog. */
 const stop = (e: MouseEvent) => e.stopPropagation();
-
-/** Whether the item is a decision whose parent is a concept on the board. */
-function isConceptDecision(item: Item, items: readonly Item[]): boolean {
-  const parent = item.parent;
-  return kindOf(item) === 'decision' && parent !== null
-    && items.some((p) => p.number === parent.number && p.repo === parent.repo && kindOf(p) === 'concept');
-}
 
 /** Whether Start can run on the item: an issue, with no item thread running or waiting on you. */
 const canStart = (item: Item) => Boolean(workMessage(item)) && !hasLiveThread(item);
@@ -95,7 +90,8 @@ function Header({ items, building, next, data }: { items: Item[]; building: numb
 /** `items` are the items in the main area's scope; the build slots count the whole factory's. */
 export function Queue({ items }: { items: Item[] }) {
   const { data, now } = useBoardStore();
-  const queued = items.filter((i) => i.status === 'Queued' && !isConceptDecision(i, data.items));
+  const parts = partsInDossiers(dossiersOf(items, data.items));
+  const queued = items.filter((i) => i.status === 'Queued' && !parts.has(i.id));
   const building = buildsInSlots(data.items).length;
   const next = queued.find(canStart);
   return (

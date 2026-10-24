@@ -141,15 +141,21 @@ const SESSION = /^[\w-]+$/;
 const MAIN = /^([\w-]+)\.jsonl$/;
 const SUBAGENT = /^agent-[\w-]+\.jsonl$/;
 
+/** Each session's transcript files, filled in by `fill` on first use. */
+function lazyIndex(fill: (files: Map<string, string[]>) => void): () => Map<string, string[]> {
+  let files: Map<string, string[]> | undefined;
+  return () => {
+    if (!files) fill((files = new Map()));
+    return files;
+  };
+}
+
 /** A session's records, its own transcript first, then its subagents' in name order. */
 export type SessionRecordsReader = (session: string) => UsageRecord[];
 
 /** Reads sessions under the Claude home `home`; its projects folder is listed once, on first use. */
 export function claudeSessionRecords(home: string): SessionRecordsReader {
-  let files: Map<string, string[]> | undefined;
-  const index = (): Map<string, string[]> => {
-    if (files) return files;
-    files = new Map();
+  const index = lazyIndex((files) => {
     const root = join(home, 'projects');
     for (const project of list(root).sort()) {
       const dir = join(root, project);
@@ -165,8 +171,7 @@ export function claudeSessionRecords(home: string): SessionRecordsReader {
         files.set(session, main ? [...paths, ...known] : [...known, ...paths]);
       }
     }
-    return files;
-  };
+  });
   return (session) => (SESSION.test(session) ? (index().get(session) ?? []).flatMap((path) => fileRecords(path, claudeRecords)) : []);
 }
 
@@ -219,15 +224,11 @@ function keyCopiedSessions(files: UsageRecord[][]): UsageRecord[] {
  * parent's history, which T3's rules leave out.
  */
 export function codexSessionRecords(home: string): SessionRecordsReader {
-  let files: Map<string, string[]> | undefined;
-  const index = (): Map<string, string[]> => {
-    if (files) return files;
-    files = new Map();
+  const index = lazyIndex((files) => {
     for (const path of walk(join(home, 'sessions'))) {
       const session = ROLLOUT.exec(path)?.[1]?.toLowerCase();
       if (session) files.set(session, [...(files.get(session) ?? []), path]);
     }
-    return files;
-  };
+  });
   return (session) => keyCopiedSessions((index().get(session.toLowerCase()) ?? []).map((path) => fileRecords(path, codexRecords)));
 }

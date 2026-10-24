@@ -6,22 +6,22 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowRight, Search, Settings, SquarePen, X } from 'lucide-react';
+import { Search, Settings, SquarePen, X } from 'lucide-react';
 import { boardApp, boardSections, platformOf, shortAgo } from '@mux-factory/shared';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@mux-factory/ui/dialog';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
-import type { BoardData, Item, Status } from '@mux-factory/shared';
+import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
-import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, STATUS_COLOR, WindowControls, drag, noDrag, platformColor } from './chrome.tsx';
-import { ActionButtons, PrList, SliceBar, SliceList, ItemTitle, StatsGrid, StepTrack, hint, refText } from './item-bits.tsx';
+import { BRAND_LEFT, Brand, Button, PlatformTag, StatusGlyph, WindowControls, drag, noDrag } from './chrome.tsx';
+import { ActionButtons, PrList, SliceList, ItemTitle, StatsGrid, StepTrack, hint } from './item-bits.tsx';
 import { ToolbarStats } from './toolbar-stats.tsx';
 import { ListSidebar } from './list-sidebar.tsx';
+import { LineSection } from './line/line-switcher.tsx';
 import type { Pick } from './list-sidebar.tsx';
 import { SettingsBody, SettingsHeader, SettingsNav, pages } from './proto-settings.tsx';
 
-const STATIONS: Status[] = ['Queued', 'Shaping', 'Ready', 'In progress', 'Review', 'Verify', 'Ready to merge'];
 const picked = (on: boolean) => (on ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : '');
 
 function DeskCard({ item, data, now, pick }: { item: Item; data: BoardData; now: number; pick: Pick }) {
@@ -39,31 +39,6 @@ function DeskCard({ item, data, now, pick }: { item: Item; data: BoardData; now:
   );
 }
 
-function Line({ items, data, pick }: { items: Item[]; data: BoardData; pick: Pick }) {
-  return (
-    <div className="flex items-stretch overflow-x-auto rounded-xl border border-(--border) bg-(--card)">
-      {STATIONS.map((st, n) => {
-        const here = items.filter((i) => i.status === st);
-        return (
-          <div key={st} className="relative flex min-w-[140px] flex-1 flex-col gap-2 border-r border-(--border) p-3 last:border-r-0">
-            <div className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium"><StatusGlyph status={st} />{st}<span className="text-(--muted-foreground)">{here.length}</span></div>
-            <div className="h-0.5 rounded-full" style={{ background: STATUS_COLOR[st], opacity: here.length ? 1 : 0.25 }} />
-            {here.map((i) => (
-              <button key={i.id} type="button" onClick={() => pick.set(i.id)} title={`${refText(i)} ${i.title}`}
-                className={`grid gap-1 rounded-md bg-(--muted) px-2 py-1.5 text-left hover:bg-(--accent) ${picked(pick.id === i.id)}`}>
-                <span className="line-clamp-2 text-xs leading-snug"><span className="mr-1.5 inline-block size-1.5 rounded-full align-middle" style={{ background: platformColor(platformOf(i, data.repos)) }} /><ItemTitle item={i} /></span>
-                <SliceBar item={i} />
-              </button>
-            ))}
-            {n < STATIONS.length - 1 && <ArrowRight className="absolute -right-2 top-3.5 z-10 size-4 rounded-full bg-(--card) text-(--muted-foreground)" />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** A's item detail in T3's dialog: the same sections, the actions in its footer. Esc or a click outside closes it. */
 function ItemDialog({ item: opened, data, now, onClose }: { item: Item | undefined; data: BoardData; now: number; onClose: () => void }) {
   // The last item stays in the dialog while it animates closed.
   const kept = useRef(opened);
@@ -226,7 +201,7 @@ export function VariantE() {
                 </section>
                 <section className="grid gap-3">
                   <h2 className="m-0 text-[13px] font-medium">The line</h2>
-                  <Line items={scoped.items} data={data} pick={pick} />
+                  <LineSection items={scoped.items} data={data} now={now} pick={pick} />
                 </section>
               </div>
             </div>

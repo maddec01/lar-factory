@@ -45,6 +45,16 @@ jobs:
         id: install
         run: pnpm install --frozen-lockfile
 
+      - name: Shared tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: packages/shared
+        run: pnpm test
+
+      - name: Shared typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: packages/shared
+        run: pnpm run typecheck
+
       - name: Server tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: apps/server

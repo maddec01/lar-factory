@@ -4,6 +4,7 @@
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item/add-item.tsx";
+@source "./items/start-control.tsx";
 @source "./notices/banner.tsx";
 @source "./notices/form-result.tsx";
 @source "./title-bar/TitleBar.tsx";
@@ -191,16 +192,6 @@ button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
 .start { margin: 0; font-size: 12px; }
 p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
 .start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; position: relative; }
-/* Start's menu: under Start (over it when only above has room), lined up with its right edge, grouped by provider instance. */
-.start-menu-positioner { z-index: 50; }
-.start-menu { min-width: 210px; max-height: 60vh; overflow-y: auto; padding: 4px; background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-composer), 0 1px 3px rgb(0 0 0 / 8%); font-size: 12px; outline: none; }
-.start-menu-head, .start-menu-group { margin: 6px 8px 2px; color: var(--muted-foreground); font-size: 11px; font-weight: 500; }
-.start-pick { display: block; box-sizing: border-box; width: 100%; min-height: 24px; text-align: left; font: inherit; border: 0; background: none; color: var(--foreground); padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; }
-.start-pick::before { content: ""; display: inline-block; width: 1.25em; }
-.start-pick[aria-checked="true"] { background: color-mix(in srgb, var(--primary) 10%, transparent); font-weight: 500; }
-.start-pick[aria-checked="true"]::before { content: "\2713" / ""; }
-.start-pick:hover, .start-pick:focus-visible { background: var(--accent); }
-.start-pick[aria-disabled="true"] { cursor: not-allowed; }
 /* A Queued card's quiet footer row: Back to List on the left, Abandon on the right. */
 /* margin-top: auto keeps the stats or actions row on the card's bottom edge across a row of cards; the 8px above it moves to the item before. */
 [data-slot="card"] > :has(+ .card-actions), [data-slot="card"] > :has(+ .card-stats) { margin-bottom: 8px; }

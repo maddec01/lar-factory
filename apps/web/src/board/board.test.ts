@@ -235,7 +235,7 @@ test('Queue and Abandon sit on List rows; Abandon also on Queued cards', async (
 test('Start appears only on Queued issues, alone in the top-right group; a queued draft asks for an issue first', async () => {
   await mountPage();
   expect(ids('[data-start]', 'data-start')).toEqual(sample.items.filter((i) => i.status === 'Queued' && i.number !== null).map((i) => i.id).sort());
-  const start = card('PVTI_sample05').querySelector('.meta > .start-group > button[data-slot="button"].bg-primary')!;
+  const start = card('PVTI_sample05').querySelector('.meta > .start-group > button[data-slot="menu-trigger"].bg-primary')!;
   expect(['aria-label', 'aria-haspopup', 'aria-expanded'].map((a) => start.getAttribute(a))).toEqual(['Start #129 Run more than one 4K HDR to 1080p stream at a time', 'menu', 'false']);
   expect(text(start)).toBe('Start ▾');
   expect(card('PVTI_sample05').querySelector('.cmd, [data-copy], svg'), 'no command box or copy icon').toBeNull();

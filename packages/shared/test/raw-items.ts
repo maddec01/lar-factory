@@ -11,3 +11,7 @@ export const rawIssue = (id: string, number: number, status: string, labels: str
 
 export const sliceRef = (number: number, state: 'OPEN' | 'CLOSED') => ({ number, title: `Issue ${number}`,
   url: `https://github.com/maddec01/mux-factory/issues/${number}`, state, repository: { nameWithOwner: 'maddec01/mux-factory' } });
+
+/** A project issue with the id `PVTI_<number>`, as the server tests' fake gh returns it. */
+export const projectIssue = (number: number, status: string, repo = 'maddec01/mux-factory', labels: string[] = []): RawItem =>
+  rawIssue(`PVTI_${number}`, number, status, labels, { url: `https://github.com/${repo}/issues/${number}`, repository: { nameWithOwner: repo } });

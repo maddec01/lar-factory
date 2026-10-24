@@ -1,26 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rawIssue, startableEnv, startBoard } from './server-support.ts';
+import { draftItem, startableEnv, startBoard, until } from './server-support.ts';
+import type { Board } from './server-support.ts';
+import { projectIssue } from '@mux-factory/shared/test/raw-items';
 import type { BoardData } from '@mux-factory/shared';
 
-type Board = Awaited<ReturnType<typeof startBoard>>;
+const draft = draftItem('List');
 
-const draft = { id: 'PVTI_draft', updatedAt: '2026-10-21T09:00:00Z', status: { name: 'List' },
-  content: { __typename: 'DraftIssue', title: 'Idea', updatedAt: '2026-10-21T09:00:00Z' } };
-
-async function until(board: Board, check: (data: BoardData) => boolean): Promise<BoardData> {
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const data = await board.board() as BoardData;
-    if (check(data)) return data;
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error('The board never reached the expected state');
-}
-
-async function abandon(board: Board, itemId: string, origin = board.url) {
-  const { capture } = await board.board() as BoardData;
-  return board.post({ session: capture!.session, itemId }, origin, '/api/abandon');
-}
+const abandon = (board: Board, itemId: string, origin = board.url) => board.postSession({ itemId }, '/api/abandon', origin);
 
 const has = (data: BoardData, id: string) => data.items.some((i) => i.id === id);
 const deletes = async (board: Board) => (await board.calls()).filter((args) => args[1] === 'delete' || args[1] === 'item-delete');
@@ -32,7 +19,7 @@ async function reads(board: Board, n: number): Promise<void> {
 }
 
 test('Abandon deletes the issue on GitHub and the board drops it at once', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'List'), rawIssue(13, 'List')] });
+  const board = await startBoard(t, { items: [projectIssue(12, 'List'), projectIssue(13, 'List')] });
   await until(board, (d) => d.items.length === 2);
   const response = await abandon(board, 'PVTI_12');
   assert.equal(response.status, 200);
@@ -53,7 +40,7 @@ test('Abandon on a draft removes it from the project', async (t) => {
 });
 
 test('a failed delete keeps the item and reports the error', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'List')], fail: 'delete' });
+  const board = await startBoard(t, { items: [projectIssue(12, 'List')], fail: 'delete' });
   await until(board, (d) => d.items.length === 1);
   const response = await abandon(board, 'PVTI_12');
   assert.equal(response.status, 502);
@@ -64,7 +51,7 @@ test('a failed delete keeps the item and reports the error', async (t) => {
 });
 
 test('an abandoned item does not come back while GitHub still reports it', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'List'), draft] }, false, true);
+  const board = await startBoard(t, { items: [projectIssue(12, 'List'), draft] }, false, true);
   await until(board, (d) => d.items.length === 2);
   assert.equal((await abandon(board, 'PVTI_12')).status, 200);
   assert.equal((await abandon(board, 'PVTI_draft')).status, 200);
@@ -75,22 +62,21 @@ test('an abandoned item does not come back while GitHub still reports it', async
 
 test('an item this board just created does not come back after Abandon', async (t) => {
   const board = await startBoard(t, { items: [] }, false, true);
-  const { capture } = await board.board() as BoardData;
-  const created = await board.post({ session: capture!.session, requestId: '00000000-0000-4000-8000-000000000001',
-    draft: { repo: 'maddec01/mux-server', kind: 'bug', title: 'Throwaway', description: '', labels: [] } });
+  const created = await board.postSession({ requestId: '00000000-0000-4000-8000-000000000001',
+    draft: { repo: 'maddec01/mux-server', kind: 'bug', title: 'Throwaway', description: '', labels: [] } }, '/api/items');
   assert.equal(created.status, 200);
   // GitHub has not reported the new item yet, so only the board's own copy holds it.
   assert.equal((await abandon(board, 'PVTI_900001')).status, 200);
   await reads(board, 2);
   assert.ok(!has(await board.board(), 'PVTI_900001'));
-  await board.update({ items: [rawIssue(900001, 'List', 'maddec01/mux-server')] });
+  await board.update({ items: [projectIssue(900001, 'List', 'maddec01/mux-server')] });
   await reads(board, 3);
   assert.ok(!has(await board.board(), 'PVTI_900001'));
 });
 
 test('Abandon deletes a Queued issue and removes a Queued draft', async (t) => {
-  const queuedDraft = { ...draft, status: { name: 'Queued' } };
-  const board = await startBoard(t, { items: [rawIssue(12, 'Queued'), queuedDraft] });
+  const queuedDraft = draftItem('Queued');
+  const board = await startBoard(t, { items: [projectIssue(12, 'Queued'), queuedDraft] });
   await until(board, (d) => d.items.length === 2);
   assert.equal((await abandon(board, 'PVTI_12')).status, 200);
   const response = await abandon(board, 'PVTI_draft');
@@ -103,7 +89,7 @@ test('Abandon deletes a Queued issue and removes a Queued draft', async (t) => {
 });
 
 test('Abandon only removes List and Queued items', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'Shaping')] });
+  const board = await startBoard(t, { items: [projectIssue(12, 'Shaping')] });
   await until(board, (d) => d.items.length === 1);
   const refused = await abandon(board, 'PVTI_12');
   assert.equal(refused.status, 409);
@@ -114,7 +100,7 @@ test('Abandon only removes List and Queued items', async (t) => {
 });
 
 test('Abandon rejects requests from other pages and sample mode', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'List')] });
+  const board = await startBoard(t, { items: [projectIssue(12, 'List')] });
   await until(board, (d) => d.items.length === 1);
   for (const origin of ['https://evil.example', 'null', '']) assert.equal((await abandon(board, 'PVTI_12', origin)).status, 403);
   assert.deepEqual(await deletes(board), []);
@@ -123,14 +109,11 @@ test('Abandon rejects requests from other pages and sample mode', async (t) => {
   assert.equal((await sample.calls()).length, 0);
 });
 
-async function startItem(board: Board, itemId: string) {
-  const { capture } = await board.board() as BoardData;
-  return board.post({ session: capture!.session, itemId }, board.url, '/api/start');
-}
+const startItem = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/start');
 
 test('Abandon is refused while a Start is in flight, uncertain or done for the item', async (t) => {
   const refused = 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
-  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], t3: { delay: 300 } }, false, false, startableEnv(t));
+  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')], t3: { delay: 300 } }, false, false, startableEnv(t));
   await until(board, (d) => d.items.length === 1);
   const starting = startItem(board, 'PVTI_12');
   await new Promise((r) => setTimeout(r, 100));
@@ -139,7 +122,7 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
   assert.equal((await inFlight.json()).error, refused);
   assert.equal((await starting).status, 200);
   assert.equal((await abandon(board, 'PVTI_12')).status, 409, 'done');
-  const unsure = await startBoard(t, { items: [rawIssue(12, 'Queued')], t3: { fail: 'garbage' } }, false, false, startableEnv(t));
+  const unsure = await startBoard(t, { items: [projectIssue(12, 'Queued')], t3: { fail: 'garbage' } }, false, false, startableEnv(t));
   await until(unsure, (d) => d.items.length === 1);
   assert.equal((await startItem(unsure, 'PVTI_12')).status, 502);
   assert.equal((await abandon(unsure, 'PVTI_12')).status, 409, 'uncertain');
@@ -147,7 +130,7 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
 });
 
 test('Abandon is refused while Back to List is pending for the item', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')], writeDelay: 300 });
+  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')], writeDelay: 300 });
   await until(board, (d) => d.items.length === 1);
   const moving = board.post({ itemId: 'PVTI_12' }, board.url, '/api/back-to-list');
   await new Promise((r) => setTimeout(r, 100));

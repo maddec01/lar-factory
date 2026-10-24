@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import type { TestContext } from 'node:test';
+import type { BoardData } from '@mux-factory/shared';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
@@ -22,18 +23,6 @@ export const SAMPLE_MODELS = {
   T3_SETTINGS: new URL('./t3-settings.sample.json', import.meta.url).pathname,
   T3_MODEL_MANIFEST: new URL('./model-manifest.sample.json', import.meta.url).pathname,
 };
-
-/** A raw GraphQL project item, as the fake gh returns it. */
-export function rawIssue(number: number, status: string, repo = 'maddec01/mux-factory', labels: string[] = []) {
-  return {
-    id: `PVTI_${number}`, updatedAt: '2026-10-21T09:00:00Z', status: { name: status },
-    content: { __typename: 'Issue', number, title: `Issue ${number}`, url: `https://github.com/${repo}/issues/${number}`,
-      state: 'OPEN', closedAt: null, updatedAt: '2026-10-21T09:00:00Z', repository: { nameWithOwner: repo },
-      labels: { nodes: labels.map((name) => ({ name })) }, parent: null, subIssuesSummary: { total: 0, completed: 0 },
-      issueDependenciesSummary: { blockedBy: 0 },
-      closedByPullRequestsReferences: { nodes: [] } },
-  };
-}
 
 export async function freePort(): Promise<number> {
   const socket = createServer();
@@ -81,10 +70,14 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     await stop();
     await rm(dir, { recursive: true, force: true });
   });
+  const board = () => fetch(`${url}/api/board`).then((r) => r.json());
+  const post = (body: unknown, origin = url, path = '/api/items') => fetch(`${url}${path}`, { method: 'POST',
+    headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let url = '';
   for (let attempt = 0; attempt < 100; attempt++) {
     if (child.exitCode !== null) throw new Error(logs);
     // The board logs the address it bound.
-    const url = logs.match(/board on (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
+    url = logs.match(/board on (http:\/\/127\.0\.0\.1:\d+)/)?.[1] ?? '';
     if (url) try {
       const response = await fetch(`${url}/api/board`);
       if (response.ok) return {
@@ -95,15 +88,33 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
         calls: () => readCalls(stateFile + '.calls'),
         t3Calls: () => readCalls(stateFile + '.t3calls'),
         logs: () => logs,
-        board: () => fetch(`${url}/api/board`).then((r) => r.json()),
-        post: (body: unknown, origin = url, path = '/api/items') => fetch(`${url}${path}`, { method: 'POST',
-          headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+        board,
+        post,
+        /** Posts the body with the session the board serves now, as the page does. */
+        postSession: async (body: object, path: string, origin = url) =>
+          post({ session: (await board() as BoardData).capture!.session, ...body }, origin, path),
       };
     } catch { /* Wait for the subprocess to listen. */ }
     await new Promise((r) => setTimeout(r, 25));
   }
   throw new Error(`Board did not start: ${logs}`);
 }
+
+export type Board = Awaited<ReturnType<typeof startBoard>>;
+
+/** Polls the board data until `check` passes, and returns that data. */
+export async function until(board: Board, check: (data: BoardData) => boolean): Promise<BoardData> {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const data = await board.board() as BoardData;
+    if (check(data)) return data;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error('The board never reached the expected state');
+}
+
+/** A draft project item, as the fake gh returns it. */
+export const draftItem = (status: string) => ({ id: 'PVTI_draft', updatedAt: '2026-10-21T09:00:00Z', status: { name: status },
+  content: { __typename: 'DraftIssue', title: 'Idea', updatedAt: '2026-10-21T09:00:00Z' } });
 
 /** Environment for a board that can Start maddec01/mux-factory items: a temporary home holding its
  * checkout, and a T3 database with a live project there. */

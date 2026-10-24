@@ -3,20 +3,13 @@ import assert from 'node:assert/strict';
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { startBoard } from './server-support.ts';
+import { startBoard, until } from './server-support.ts';
+import type { Board } from './server-support.ts';
 
-type Board = Awaited<ReturnType<typeof startBoard>>;
 const recheck = (board: Board) => board.post({}, board.url, '/api/recheck');
 
 /** The board data once the first read has finished, or failed. */
-async function afterRead(board: Board) {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const data = await board.board();
-    if (data.fetchedAt || data.error) return data;
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error('The board never finished its first read.');
-}
+const afterRead = (board: Board) => until(board, (d) => Boolean(d.fetchedAt || d.error));
 
 test('the board listens before a slow login shell answers, and its data waits for that first lookup', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'mux-slow-shell-'));
@@ -81,13 +74,13 @@ test('a missing gh names its override', async (t) => {
 test('a failed read whose gh auth status fails without a logout shows gh\'s error as Stale', async (t) => {
   const data = await afterRead(await startBoard(t, { fail: 'read', ghAuth: 'failed' }));
   assert.deepEqual(data.tools, {});
-  assert.match(data.error, /gh auth status failed: error connecting to api\.github\.com/);
+  assert.match(data.error ?? '', /gh auth status failed: error connecting to api\.github\.com/);
 });
 
 test('a failed read with gh logged in stays Stale with the read\'s error', async (t) => {
   const data = await afterRead(await startBoard(t, { fail: 'read' }));
   assert.deepEqual(data.tools, {});
-  assert.match(data.error, /HTTP 502: Bad Gateway/);
+  assert.match(data.error ?? '', /HTTP 502: Bad Gateway/);
 });
 
 test('sample mode looks no tools up', async (t) => {

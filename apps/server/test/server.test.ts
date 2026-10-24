@@ -2,7 +2,9 @@ import { test, type TestContext } from 'node:test';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
 import assert from 'node:assert/strict';
-import { freePort, rawIssue, startBoard } from './server-support.ts';
+import { freePort, startBoard, until } from './server-support.ts';
+import type { Board } from './server-support.ts';
+import { projectIssue } from '@mux-factory/shared/test/raw-items';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -109,24 +111,17 @@ test('successful refreshes eventually remove a created item whose project member
   assert.equal((await board.board()).items.length, 0, 'a temporary overlay cannot outlive repeated authoritative reads');
 });
 
-/** The board's items once its first read lands. */
-const rawBuild = (number: number, status: string) => rawIssue(number, status, undefined, ['build']);
+const rawBuild = (number: number, status: string) => projectIssue(number, status, undefined, ['build']);
 
-async function readItems(board: Awaited<ReturnType<typeof startBoard>>): Promise<Item[]> {
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const { items } = await board.board();
-    if (items.length) return items;
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error('The board never read its items');
-}
+/** The board's items once its first read lands. */
+const readItems = async (board: Board): Promise<Item[]> => (await until(board, (d) => d.items.length > 0)).items;
 
 test("a refresh finds build sub-issues, active and blocked slices with issue searches, not the board query's labels", async (t) => {
   const repository = { nameWithOwner: 'maddec01/mux-factory' };
   const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/mux-factory/issues/${number}`,
     state: 'OPEN', stateReason: null, repository });
   const parent = rawBuild(13, 'In progress');
-  const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref(12), ref(15), ref(16)] } } }, rawBuild(12, 'In progress'), rawIssue(15, 'In progress')];
+  const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref(12), ref(15), ref(16)] } } }, rawBuild(12, 'In progress'), projectIssue(15, 'In progress')];
   const board = await startBoard(t, { items, builds: [{ number: 12, repository }], active: [{ number: 15, repository }, { number: 16, repository }],
     blocked: [{ number: 16, repository }] });
   const read = await readItems(board);
@@ -152,11 +147,11 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
       { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
     ] }]);
   const home = claudeHome(t, { 'session-1': { main: [assistant('m0', 1, 2, 3, 4)], subagents: { a1: [assistant('m1', 5, 0, 300, 9)] } } });
-  const items = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done'), rawIssue(13, 'Review')] }, false, false,
+  const items = await readItems(await startBoard(t, { items: [projectIssue(12, 'Done'), projectIssue(13, 'Review')] }, false, false,
     { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) }));
   assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 10 + 314 });
   assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
-  const [without] = await readItems(await startBoard(t, { items: [rawIssue(12, 'Done')] }));
+  const [without] = await readItems(await startBoard(t, { items: [projectIssue(12, 'Done')] }));
   assert.equal(without?.stats, undefined);
 });
 
@@ -241,7 +236,7 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
     { number: 41, url: 'https://github.com/maddec01/mux-factory/pull/41', state: 'OPEN', isDraft: false, body: 'PR 41' },
   ] };
   const build = rawBuild(12, 'Done');
-  const parent = rawIssue(13, 'In progress');
+  const parent = projectIssue(13, 'In progress');
   const items = [{ ...parent, content: { ...parent.content, closedByPullRequestsReferences: prs } },
     { ...build, content: { ...build.content, closedByPullRequestsReferences: { nodes: [prs.nodes[0]] } } }];
   const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
@@ -268,7 +263,7 @@ test('a parent with two builds merged at different times: each build keeps its o
     return { ...raw, content: { ...raw.content, state: 'CLOSED', closedAt: '2026-10-20T10:00:00Z', parent: parentRef,
       closedByPullRequestsReferences: { nodes: [linked] } } };
   };
-  const parent = rawIssue(13, 'In progress');
+  const parent = projectIssue(13, 'In progress');
   // The last build's PR also closes the parent.
   const items = [{ ...parent, content: { ...parent.content, subIssuesSummary: { total: 2, completed: 2 },
     closedByPullRequestsReferences: { nodes: [last] } } }, build(12, first), build(14, last)];

@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./install-skills": "./src/install-skills.ts",
-    "./test/sample.json": "./test/sample.json"
+    "./test/sample.json": "./test/sample.json",
+    "./test/raw-items": "./test/raw-items.ts"
   },
   "scripts": {
     "test": "node --disable-warning=ExperimentalWarning --test \"src/*.test.ts\"",

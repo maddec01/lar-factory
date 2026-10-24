@@ -5,13 +5,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { rawIssue, SAMPLE_MODELS, startBoard } from './server-support.ts';
+import { draftItem, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
+import type { Board } from './server-support.ts';
+import { projectIssue } from '@mux-factory/shared/test/raw-items';
 import { checkouts, factoryRepo } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
 import type { BoardData } from '@mux-factory/shared';
-
-type Board = Awaited<ReturnType<typeof startBoard>>;
 
 const MESSAGE = '#12 Issue 12\n$mux-work maddec01/mux-factory#12';
 
@@ -28,7 +28,7 @@ async function boardIn(t: TestContext, items: object[], origins: Record<string, 
   db: (home: string) => string, options: object = {}, env: Record<string, string> = {}) {
   const dir = home(t, origins);
   const board = await startBoard(t, { items, ...options }, false, false, { HOME: dir, T3_STATE_DB: db(dir), ...env });
-  await ready(board, items.length);
+  await until(board, (d) => d.items.length === items.length);
   return { board, home: dir };
 }
 
@@ -48,25 +48,12 @@ async function factoryBoard(t: TestContext, items: object[], options: object = {
   return (await boardIn(t, items, ORIGINS, (dir) => projectsDb(t, PROJECTS(dir)), options, env)).board;
 }
 
-const draft = { id: 'PVTI_draft', updatedAt: '2026-10-21T09:00:00Z', status: { name: 'Queued' },
-  content: { __typename: 'DraftIssue', title: 'Idea', updatedAt: '2026-10-21T09:00:00Z' } };
+const draft = draftItem('Queued');
 
-async function ready(board: Board, count: number): Promise<BoardData> {
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const data = await board.board() as BoardData;
-    if (data.items.length === count) return data;
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error('The board never read its items');
-}
-
-async function start(board: Board, itemId: string, origin = board.url, model?: unknown) {
-  const { capture } = await board.board() as BoardData;
-  return board.post({ session: capture!.session, itemId, model }, origin, '/api/start');
-}
+const start = (board: Board, itemId: string, origin = board.url, model?: unknown) => board.postSession({ itemId, model }, '/api/start', origin);
 
 test("Start begins one mux-work thread in the card's repository project and leaves the Status alone", async (t) => {
-  const board = await factoryBoard(t, [rawIssue(12, 'Queued'), rawIssue(30, 'Queued', 'maddec01/mux-server')]);
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued'), projectIssue(30, 'Queued', 'maddec01/mux-server')]);
   const response = await start(board, 'PVTI_12');
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
@@ -79,7 +66,7 @@ test("Start begins one mux-work thread in the card's repository project and leav
 });
 
 test('Start runs the thread on the picked model choice, still in the repository project', async (t) => {
-  const board = await factoryBoard(t, [rawIssue(12, 'Queued')], {}, SAMPLE_MODELS);
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued')], {}, SAMPLE_MODELS);
   const response = await start(board, 'PVTI_12', board.url, { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
   assert.equal(response.status, 200);
   assert.deepEqual(await board.t3Calls(), [
@@ -88,7 +75,7 @@ test('Start runs the thread on the picked model choice, still in the repository 
 });
 
 test('the board data offers the model choices', async (t) => {
-  const board = await factoryBoard(t, [rawIssue(12, 'Queued')], {}, SAMPLE_MODELS);
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued')], {}, SAMPLE_MODELS);
   const groups = (await board.board() as BoardData).modelChoices;
   assert.deepEqual(groups?.map((g) => g.name), ['Personal', 'VI', 'Codex']);
 });
@@ -103,7 +90,7 @@ for (const [name, model] of [
   ['no object', 'codex/gpt-6-astra'],
 ] as const) {
   test(`Start refuses ${name} as the model choice and runs no t3`, async (t) => {
-    const board = await factoryBoard(t, [rawIssue(12, 'Queued')], {}, SAMPLE_MODELS);
+    const board = await factoryBoard(t, [projectIssue(12, 'Queued')], {}, SAMPLE_MODELS);
     const response = await start(board, 'PVTI_12', board.url, model);
     assert.equal(response.status, 422);
     assert.match((await response.json()).error, /isn't offered/);
@@ -112,7 +99,7 @@ for (const [name, model] of [
 }
 
 test('Start finds the repository project by origin, whatever its folder is called or wherever it lives', async (t) => {
-  const { board } = await boardIn(t, [rawIssue(12, 'Queued')], {}, (dir) => {
+  const { board } = await boardIn(t, [projectIssue(12, 'Queued')], {}, (dir) => {
     checkouts(dir, { 'factory-clone': 'https://github.com/maddec01/mux-factory' }, 'code');
     return projectsDb(t, [{ id: 'project-mux', root: `${dir}/Developer/Mux` },
       { id: 'project-clone', root: '~/code/factory-clone' }]);
@@ -157,7 +144,7 @@ const refusals: { name: string; repo?: string; origins?: Record<string, string |
 
 for (const refusal of refusals) {
   test(`Start refuses ${refusal.name} with a hint and runs no t3`, async (t) => {
-    const item = rawIssue(12, 'Queued', refusal.repo);
+    const item = projectIssue(12, 'Queued', refusal.repo);
     const { board, home: dir } = await boardIn(t, [item], refusal.origins ?? ORIGINS,
       refusal.db ?? ((dir) => projectsDb(t, (refusal.projects ?? PROJECTS)(dir))));
     const response = await start(board, 'PVTI_12');
@@ -171,7 +158,7 @@ for (const refusal of refusals) {
 
 test('Start refuses a T3 database whose schema changed', async (t) => {
   let db = '';
-  const { board } = await boardIn(t, [rawIssue(12, 'Queued')], ORIGINS, (dir) => {
+  const { board } = await boardIn(t, [projectIssue(12, 'Queued')], ORIGINS, (dir) => {
     db = join(dir, 'changed.sqlite');
     const changed = new DatabaseSync(db);
     changed.exec('CREATE TABLE projection_projects (id TEXT)');
@@ -185,7 +172,7 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
 });
 
 test("a card's repository matches its config.json entry whatever the case", async (t) => {
-  const board = await factoryBoard(t, [rawIssue(12, 'Queued', 'MADDEC01/Mux-Factory')]);
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued', 'MADDEC01/Mux-Factory')]);
   const response = await start(board, 'PVTI_12');
   assert.equal(response.status, 200);
   assert.equal((await board.t3Calls())[0]?.[2], 'project-factory');
@@ -197,9 +184,9 @@ test('Start reads config.json each time, so an added repository works without re
   const original = readFileSync(config, 'utf8');
   writeFileSync(config, original.replace('"maddec01/mux-factory"', '"maddec01/elsewhere"'));
   const dir = home(t, ORIGINS);
-  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')] }, false, false,
+  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')] }, false, false,
     { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'apps/server'));
-  await ready(board, 1);
+  await until(board, (d) => d.items.length === 1);
   const refused = await start(board, 'PVTI_12');
   assert.match((await refused.json()).error, /maddec01\/mux-factory isn't in config\.json/);
   writeFileSync(config, original);
@@ -211,9 +198,9 @@ test('Start reads config.json each time, so an added repository works without re
 test('Start refuses an unreadable config.json with a hint', async (t) => {
   const f = await factoryRepo(t);
   const dir = home(t, ORIGINS);
-  const board = await startBoard(t, { items: [rawIssue(12, 'Queued')] }, false, false,
+  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')] }, false, false,
     { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'apps/server'));
-  await ready(board, 1);
+  await until(board, (d) => d.items.length === 1);
   writeFileSync(join(f.repo, 'config.json'), '{ broken');
   const response = await start(board, 'PVTI_12');
   assert.equal(response.status, 409);
@@ -222,13 +209,13 @@ test('Start refuses an unreadable config.json with a hint', async (t) => {
 });
 
 test('a thread T3 returns untitled takes the first line of the work message as its title', async (t) => {
-  const board = await factoryBoard(t, [rawIssue(12, 'Queued')], { t3: { untitled: true } });
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued')], { t3: { untitled: true } });
   const response = await start(board, 'PVTI_12');
   assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
 });
 
 test('a double press, a retry or another page starts no second thread for the item', async (t) => {
-  const board = await factoryBoard(t, [rawIssue(12, 'Queued'), rawIssue(13, 'Queued')], { t3: { delay: 100 } });
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued'), projectIssue(13, 'Queued')], { t3: { delay: 100 } });
   const responses = await Promise.all([start(board, 'PVTI_12'), start(board, 'PVTI_12')]);
   assert.deepEqual(responses.map((r) => r.status), [200, 200]);
   assert.equal((await start(board, 'PVTI_12')).status, 200);
@@ -239,37 +226,37 @@ test('a double press, a retry or another page starts no second thread for the it
 });
 
 test('a T3 error is shown and the same request can try again', async (t) => {
-  const board = await factoryBoard(t, [rawIssue(12, 'Queued')], { t3: { fail: 'down' } });
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued')], { t3: { fail: 'down' } });
   const failed = await start(board, 'PVTI_12');
   assert.equal(failed.status, 502);
   assert.match((await failed.json()).error, /Is T3 Code running\?/);
-  await board.update({ items: [rawIssue(12, 'Queued')] });
+  await board.update({ items: [projectIssue(12, 'Queued')] });
   assert.equal((await start(board, 'PVTI_12')).status, 200);
   assert.equal((await board.t3Calls()).length, 2);
 });
 
 for (const fail of ['killed', 'garbage']) {
   test(`an unconfirmed start (${fail}) is never retried as a new thread`, async (t) => {
-    const board = await factoryBoard(t, [rawIssue(12, 'Queued')], { t3: { fail } });
+    const board = await factoryBoard(t, [projectIssue(12, 'Queued')], { t3: { fail } });
     const first = await start(board, 'PVTI_12');
     assert.equal(first.status, 502);
     assert.equal((await first.json()).uncertain, true);
-    await board.update({ items: [rawIssue(12, 'Queued')] });
+    await board.update({ items: [projectIssue(12, 'Queued')] });
     assert.equal((await (await start(board, 'PVTI_12')).json()).uncertain, true);
     assert.equal((await board.t3Calls()).length, 1);
   });
 }
 
 test('a missing t3 says how to point the board at it', async (t) => {
-  const board = await factoryBoard(t, [rawIssue(12, 'Queued')], {}, { T3_PATH: '/nonexistent/t3' });
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued')], {}, { T3_PATH: '/nonexistent/t3' });
   const response = await start(board, 'PVTI_12');
   assert.equal(response.status, 502);
   assert.match((await response.json()).error, /T3_PATH/);
 });
 
 test('Start only runs for Queued issues from this board page and session', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'List'), rawIssue(13, 'Ready'), rawIssue(14, 'Queued'), draft] });
-  await ready(board, 4);
+  const board = await startBoard(t, { items: [projectIssue(12, 'List'), projectIssue(13, 'Ready'), projectIssue(14, 'Queued'), draft] });
+  await until(board, (d) => d.items.length === 4);
   assert.equal((await start(board, 'PVTI_12')).status, 409);
   assert.equal((await start(board, 'PVTI_13')).status, 409);
   assert.match((await (await start(board, 'PVTI_draft')).json()).error, /needs an issue/);
@@ -286,11 +273,10 @@ test('Start only runs for Queued issues from this board page and session', async
 });
 
 test('Start is refused while Back to List or Abandon is pending for the item', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'Queued'), rawIssue(13, 'Queued')], writeDelay: 300 });
-  await ready(board, 2);
-  const { capture } = await board.board() as BoardData;
+  const board = await startBoard(t, { items: [projectIssue(12, 'Queued'), projectIssue(13, 'Queued')], writeDelay: 300 });
+  await until(board, (d) => d.items.length === 2);
   const moving = board.post({ itemId: 'PVTI_12' }, board.url, '/api/back-to-list');
-  const abandoning = board.post({ session: capture!.session, itemId: 'PVTI_13' }, board.url, '/api/abandon');
+  const abandoning = board.postSession({ itemId: 'PVTI_13' }, '/api/abandon');
   await new Promise((r) => setTimeout(r, 100));
   const refusedMove = await start(board, 'PVTI_12');
   assert.equal(refusedMove.status, 409);

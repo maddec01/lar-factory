@@ -6,6 +6,7 @@ import { writeHeaders } from '@mux-factory/shared';
 import type { BoardData } from '@mux-factory/shared';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
+import type { ItemAction } from './action-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { holdAnchor } from '../board/keep-anchor.ts';
 import { notify } from '../notices/notices.tsx';
@@ -65,37 +66,47 @@ function focusAfterCardLeaving(button: HTMLElement): string[] {
 const pending = (itemId: string) => useActionStore.getState().actions[itemId]?.phase === 'pending';
 const itemOf = (itemId: string) => useBoardStore.getState().data.items.find((i) => i.id === itemId);
 
-export async function queueItem(itemId: string): Promise<void> {
-  const button = buttonOf('data-queue', itemId);
-  if (!button || pending(itemId)) return;
-  const next = focusAfterRowLeaving(button, 'data-queue');
+/** The item's `attr` button, when it's on the page and the item has no action in flight. */
+function readyButton(itemId: string, attr: string): HTMLElement | null {
+  const button = buttonOf(attr, itemId);
+  return button && !pending(itemId) ? button : null;
+}
+
+/**
+ * Marks the item pending, posts `body` to `/api/<kind>`, then in one render shows the board the server sent and runs
+ * `show`, which returns the error to keep on the item, if any.
+ */
+async function runAction(itemId: string, kind: ItemAction['kind'], body: object, show: (result: ActionResult) => string | undefined): Promise<ActionResult> {
   const actions = useActionStore.getState();
-  actions.set(itemId, { phase: 'pending', kind: 'queue' });
-  const result = await postAction('/api/queue', { itemId });
+  actions.set(itemId, { phase: 'pending', kind });
+  const result = await postAction(`/api/${kind}`, body);
   flushSync(() => {
     receive(result);
+    const message = show(result);
+    actions.set(itemId, message === undefined ? undefined : { phase: 'error', kind, message });
+  });
+  return result;
+}
+
+export async function queueItem(itemId: string): Promise<void> {
+  const button = readyButton(itemId, 'data-queue');
+  if (!button) return;
+  const next = focusAfterRowLeaving(button, 'data-queue');
+  const result = await runAction(itemId, 'queue', { itemId }, (result) => {
     const item = itemOf(itemId);
-    if (result.error || !item) actions.set(itemId, { phase: 'error', kind: 'queue', message: result.error ?? 'The item left the board.' });
-    else {
-      actions.set(itemId, undefined);
-      notify({ verb: 'Moved', item, to: 'Queued' });
-    }
+    if (result.error || !item) return result.error ?? 'The item left the board.';
+    notify({ verb: 'Moved', item, to: 'Queued' });
   });
   if (!result.error) refocus(next);
 }
 
 export async function backToList(itemId: string): Promise<void> {
-  const button = buttonOf('data-back-to-list', itemId);
+  const button = readyButton(itemId, 'data-back-to-list');
   const item = itemOf(itemId);
-  if (!button || !item || pending(itemId)) return;
+  if (!button || !item) return;
   const next = focusAfterCardLeaving(button);
-  const actions = useActionStore.getState();
-  actions.set(itemId, { phase: 'pending', kind: 'back-to-list' });
-  const result = await postAction('/api/back-to-list', { itemId });
-  flushSync(() => {
-    receive(result);
-    // A failure is a toast only: the card's footer goes back to its links.
-    actions.set(itemId, undefined);
+  // A failure is a toast only: the card's footer goes back to its links.
+  const result = await runAction(itemId, 'back-to-list', { itemId }, (result) => {
     notify(result.error ? { verb: 'Failed', item, to: 'List', message: result.error } : { verb: 'Moved', item, to: 'List' });
   });
   refocus(result.error ? [by('data-back-to-list', itemId)] : next);
@@ -108,22 +119,15 @@ export function askAbandon(itemId: string): void {
 }
 
 export async function abandonItem(itemId: string): Promise<void> {
-  const button = buttonOf('data-abandon', itemId);
+  const button = readyButton(itemId, 'data-abandon');
   const item = itemOf(itemId);
-  if (!button || !item || pending(itemId)) return;
+  if (!button || !item) return;
   const onCard = Boolean(button.closest('article'));
   const next = onCard ? focusAfterCardLeaving(button) : focusAfterRowLeaving(button, 'data-abandon');
-  const actions = useActionStore.getState();
-  actions.set(itemId, { phase: 'pending', kind: 'abandon' });
-  const result = await postAction('/api/abandon', { session: useBoardStore.getState().data.capture?.session, itemId });
-  flushSync(() => {
-    receive(result);
+  const result = await runAction(itemId, 'abandon', { session: useBoardStore.getState().data.capture?.session, itemId }, (result) => {
     // A List row keeps its error inline; a Queued card's is a toast only, and its footer goes back to its links.
-    if (result.error && !onCard) actions.set(itemId, { phase: 'error', kind: 'abandon', message: result.error });
-    else {
-      actions.set(itemId, undefined);
-      notify(result.error ? { verb: 'Failed', item, message: result.error } : { verb: 'Abandoned', item });
-    }
+    if (result.error && !onCard) return result.error;
+    notify(result.error ? { verb: 'Failed', item, message: result.error } : { verb: 'Abandoned', item });
   });
   // A List row's error sits by its button, which stays; a card's failure goes back to its Abandon.
   if (!result.error) refocus(next);

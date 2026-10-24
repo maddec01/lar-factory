@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { once } from 'node:events';
-import { rawIssue, startBoard } from './server-support.ts';
-
-type Board = Awaited<ReturnType<typeof startBoard>>;
+import { startBoard } from './server-support.ts';
+import type { Board } from './server-support.ts';
+import { projectIssue } from '@mux-factory/shared/test/raw-items';
 
 /** The project item reads the board has started, one per read of GitHub. */
 async function reads(board: Board): Promise<number> {
@@ -34,7 +34,7 @@ const askRead = (board: Board, headers: Record<string, string> = {}) => fetch(`$
   headers: { Origin: board.url, 'Content-Type': 'application/json', ...headers }, body: '{}' });
 
 test('a read request starts a read of GitHub at once', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await askRead(board)).status, 202);
@@ -42,7 +42,7 @@ test('a read request starts a read of GitHub at once', async (t) => {
 });
 
 test('requests during a read queue one more read after it, never two at once', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')], readDelay: 300 });
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')], readDelay: 300 });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await askRead(board)).status, 202);
@@ -56,7 +56,7 @@ test('requests during a read queue one more read after it, never two at once', a
 
 test('an interval read during a read is skipped, not queued', async (t) => {
   // Reads take a tick and a half, so the second tick lands during the first interval read.
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')], readDelay: 1500 }, false, true, { FAST_REFRESH_MS: '1000' });
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')], readDelay: 1500 }, false, true, { FAST_REFRESH_MS: '1000' });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   await waitFor(async () => await reads(board) === before + 1, 'the first interval read');
@@ -66,7 +66,7 @@ test('an interval read during a read is skipped, not queued', async (t) => {
 });
 
 test('a read request without JSON, from another origin or to another host reads nothing', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url }, body: '{}' })).status, 415);

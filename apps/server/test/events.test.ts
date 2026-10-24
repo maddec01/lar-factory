@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import type { IncomingMessage } from 'node:http';
 import { once } from 'node:events';
-import { rawIssue, startBoard } from './server-support.ts';
+import { startBoard } from './server-support.ts';
+import type { Board } from './server-support.ts';
+import { projectIssue } from '@mux-factory/shared/test/raw-items';
 import type { BoardData } from '@mux-factory/shared';
-
-type Board = Awaited<ReturnType<typeof startBoard>>;
 
 /** An open event stream: its response and a wait for the next pushed board that passes a check. */
 async function openStream(t: TestContext, board: Board) {
@@ -42,7 +42,7 @@ const askRead = (board: Board) => fetch(`${board.url}/api/read`, { method: 'POST
   headers: { Origin: board.url, 'Content-Type': 'application/json' }, body: '{}' });
 
 test('the stream sends the board at once with the same headers as other endpoints', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
   const stream = await openStream(t, board);
   assert.equal(stream.response.status, 200);
   assert.equal(stream.response.headers.get('content-type'), 'text/event-stream; charset=utf-8');
@@ -53,16 +53,16 @@ test('the stream sends the board at once with the same headers as other endpoint
 });
 
 test('the stream pushes each read of GitHub as soon as it finishes', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
   const stream = await openStream(t, board);
   await stream.next((d) => statusOf(d, 'PVTI_1') === 'List');
-  await board.update({ items: [rawIssue(1, 'Ready')] });
+  await board.update({ items: [projectIssue(1, 'Ready')] });
   assert.equal((await askRead(board)).status, 202);
   await stream.next((d) => statusOf(d, 'PVTI_1') === 'Ready');
 });
 
 test('a change made through the board reaches every open stream', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(12, 'List')] });
+  const board = await startBoard(t, { items: [projectIssue(12, 'List')] });
   const first = await openStream(t, board);
   const second = await openStream(t, board);
   for (const stream of [first, second]) await stream.next((d) => statusOf(d, 'PVTI_12') === 'List');
@@ -71,7 +71,7 @@ test('a change made through the board reaches every open stream', async (t) => {
 });
 
 test('the stream refuses a foreign Host', async (t) => {
-  const board = await startBoard(t, { items: [rawIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
   // fetch can't set Host.
   const req = request(`${board.url}/api/events`, { headers: { Host: 'evil.example' } });
   req.end();

@@ -5,7 +5,7 @@ import { beforeEach, expect, test } from 'vite-plus/test';
 import { $, $$, NOW, mountPage, sample, settle, text } from '../../test/support.ts';
 import { normalizeItems } from '@mux-factory/shared';
 import type { BoardData, Item, RawItem } from '@mux-factory/shared';
-import { rawIssue, sliceRef } from '../../test/raw-items.ts';
+import { rawIssue, sliceRef } from '@mux-factory/shared/test/raw-items';
 
 const card = (id: string) => $(`article[data-anchor="${id}"]`)!;
 const listRow = (id: string) => $(`#list li[data-anchor="${id}"]`)!;

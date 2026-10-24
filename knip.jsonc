@@ -12,8 +12,12 @@
       "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/fake-board.mjs"]
     },
     "packages/ui": {
-      // The Copies import src/ through `~`, which tsconfig.copies.json maps.
-      "paths": { "~/*": ["./src/*"] }
+      // The Copies import src/ through `~` and coss's toast through `@/registry/default`, which tsconfig.copies.json maps.
+      "paths": {
+        "~/*": ["./src/*"],
+        "@/registry/default/lib/utils": ["./src/lib/utils.ts"],
+        "@/registry/default/ui/button": ["./src/components/ui/button.tsx"]
+      }
     }
   },
   // ensure-electron-runtime.mjs, copied unchanged from T3 Code, runs macOS's `file`;
@@ -23,6 +27,7 @@
   // Copies keep every export upstream has (docs/adr/0016).
   "ignoreIssues": {
     "packages/ui/src/components/ui/*": ["exports", "types"],
+    "packages/ui/src/coss/*": ["exports", "types"],
     "packages/ui/src/lib/visibleAnimation.ts": ["exports", "types"],
     "packages/ui/src/lib/windowControlsOverlay.ts": ["exports", "types"],
     "apps/desktop/src/updates/AppUpdates.ts": ["exports", "types"],

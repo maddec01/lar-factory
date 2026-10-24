@@ -15,7 +15,11 @@
     "noFallthroughCasesInSwitch": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "paths": { "~/*": ["../../packages/ui/src/*"] }
+    "paths": {
+      "~/*": ["../../packages/ui/src/*"],
+      "@/registry/default/lib/utils": ["../../packages/ui/src/lib/utils.ts"],
+      "@/registry/default/ui/button": ["../../packages/ui/src/components/ui/button.tsx"]
+    }
   },
   "include": ["src", "test", "vite.config.ts"]
 }

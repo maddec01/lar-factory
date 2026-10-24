@@ -16,5 +16,5 @@
     "skipLibCheck": true
   },
   "include": ["src"],
-  "exclude": ["src/card", "src/components/ui", "src/dialog", "src/env.ts", "src/form", "src/lib/visibleAnimation.ts", "src/lib/windowControlsOverlay.ts", "src/progress"]
+  "exclude": ["src/card", "src/coss", "src/components/ui", "src/dialog", "src/env.ts", "src/form", "src/lib/visibleAnimation.ts", "src/lib/windowControlsOverlay.ts", "src/progress"]
 }

@@ -1,13 +1,13 @@
-// Toasts: a success clears itself after 5 s, later while it's hovered or has focus; a failure
-// stays until it's closed. They sit top right, below the header while it's on screen and below the app's title bar.
+// Toasts, drawn by coss's toast: a success clears itself after 5 s, later while it's hovered or has focus;
+// a failure stays until it's closed. One toast per slot, so a new one replaces the last. They sit top right,
+// below the header while it's on screen and below the app's title bar.
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { XIcon } from 'lucide-react';
 import { Button } from '@mux-factory/ui/button';
-import { useToastStore } from './toast-store.ts';
-import type { Toast } from './toast-store.ts';
+import { ToastProvider, toastManager } from '@mux-factory/ui/toast';
 
 /** How long a success toast stays. */
 const TOAST_MS = 5_000;
@@ -16,54 +16,97 @@ const RECHECK_MS = 1_000;
 /** Where focus goes when a closed toast had it and names nowhere of its own. */
 const FALLBACK_FOCUS = '.add-item';
 
+export interface Toast {
+  /** One toast per slot: a new one replaces the last. */
+  slot: string;
+  /** A failure is an alert with a red dot, as T3's error toast, that stays until it's closed; a success clears itself after 5 s. */
+  failed?: boolean;
+  /** Names the toast for its close button, such as "Moved #61". */
+  what: string;
+  body: ReactNode;
+  /** Where keyboard focus goes when the toast closes while focus is in it: the first selector that matches. */
+  focusAfter?: string[];
+}
+
 /** The close button every failure and toast carries; `what` names what it closes for screen readers. */
 export function DismissButton({ what, onClick }: { what: string; onClick: () => void }) {
   return <Button variant="ghost" size="icon-xs" className="dismiss" aria-label={`Dismiss${what}`} onClick={onClick}><XIcon /></Button>;
 }
 
-/** Moves focus to the first of `selectors` on the page, if something took it away with the element that had it. */
-export function refocus(selectors: string[]): void {
-  if (document.activeElement !== document.body) return;
+const focusFirst = (selectors: string[]) =>
   // querySelector returns the first in page order; take the first selector that matches.
   selectors.map((sel) => document.querySelector<HTMLElement>(sel)).find(Boolean)?.focus({ preventScroll: true });
+
+/** Moves focus to the first of `selectors` on the page, if something took it away with the element that had it. */
+export function refocus(selectors: string[]): void {
+  if (document.activeElement === document.body) focusFirst(selectors);
 }
+
+/** Moves focus to the first of `next` that's on the page, or to the fallback. */
+const focusAfterClose = (next: string[]) => focusFirst([...next, FALLBACK_FOCUS]);
 
 /** Closes something in `close`, then, if focus was inside `el`, moves it to the first of `next` that's on the page. */
 export function closeKeepingFocus(el: Element | null, close: () => void, next: string[] = []): void {
   const hadFocus = Boolean(el?.contains(document.activeElement));
   flushSync(close);
-  if (hadFocus) refocus([...next, FALLBACK_FOCUS]);
+  if (hadFocus) focusAfterClose(next);
 }
 
-/** One toast. `onClose` runs when it's closed or, for a success, when its time is up. */
-function ToastView({ what, failed = false, tone, focusAfter, onClose, children }: {
-  what: string;
-  failed?: boolean;
-  tone?: 'error';
-  focusAfter?: string[];
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const close = useRef(onClose);
-  close.current = onClose;
+/** The id of the toast in each slot, in coss's toast manager. */
+const slots = new Map<string, string>();
+let count = 0;
+
+/** Shows `toast` in its slot, replacing the one there. */
+export function showToast(toast: Toast): void {
+  clearToast(toast.slot);
+  const id = `toast-${++count}`;
+  slots.set(toast.slot, id);
+  toastManager.add({
+    id,
+    // The board's own clock closes successes (ToastBody), so the manager never does.
+    timeout: 0,
+    description: <ToastBody {...toast} onClose={() => toastManager.close(id)} />,
+    data: { rootProps: { role: toast.failed ? 'alert' : 'status', 'data-toast': toast.slot, 'data-toast-id': id, 'data-tone': toast.failed ? 'error' : undefined } },
+    // Every way a toast closes runs this, a swipe included, while the toast is still on the page.
+    onClose: () => {
+      if (slots.get(toast.slot) === id) slots.delete(toast.slot);
+      const el = document.querySelector(`[data-toast-id="${id}"]`);
+      // A closed toast stays on the page while it animates out, so its focus is moved, not found lost.
+      if (el?.contains(document.activeElement)) focusAfterClose(toast.focusAfter ?? []);
+    },
+  });
+}
+
+/** Closes whatever toast holds this slot. */
+export function clearToast(slot: string): void {
+  const id = slots.get(slot);
+  if (id) toastManager.close(id);
+}
+
+/** One toast's content. `onClose` runs when its close button is clicked or, for a success, when its time is up. */
+function ToastBody({ what, failed = false, body, onClose }: Toast & { onClose: () => void }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const toast = () => ref.current?.closest('[data-toast]') ?? null;
+  // The header's height changes with its banners, so place toasts again as each one shows.
+  useLayoutEffect(placeToasts, []);
   useEffect(() => {
     if (failed) return;
     let timer: ReturnType<typeof setTimeout>;
     const expire = (paused: boolean) => {
       // Being read or used: check again soon, then give it a full 5 s once it's left.
-      if (ref.current?.matches(':hover, :focus-within')) timer = setTimeout(() => expire(true), RECHECK_MS);
+      if (toast()?.matches(':hover, :focus-within')) timer = setTimeout(() => expire(true), RECHECK_MS);
       else if (paused) timer = setTimeout(() => expire(false), TOAST_MS);
-      else close.current();
+      else onClose();
     };
     timer = setTimeout(() => expire(false), TOAST_MS);
     return () => clearTimeout(timer);
-  }, [failed]);
+  }, [failed, onClose]);
   return (
-    <div className="banner toast" role={failed ? 'alert' : 'status'} data-tone={tone} ref={ref}>
-      <DismissButton what={`: ${what}`} onClick={() => closeKeepingFocus(ref.current, onClose, focusAfter)} />
-      {children}
-    </div>
+    <span ref={ref}>
+      <DismissButton what={`: ${what}`} onClick={onClose} />
+      <span className={`me-2 inline-block size-2 rounded-full ${failed ? 'bg-error' : 'bg-success'}`} />
+      {body}
+    </span>
   );
 }
 
@@ -74,13 +117,10 @@ function placeToasts(): void {
   document.documentElement.style.setProperty('--toast-top', `${Math.max(12, Math.round(bottom) + 8)}px`);
 }
 
-/** The page's toasts, from the toast store. */
+/** The page's toasts. */
 export function Toasts() {
-  const toasts = useToastStore((state) => state.toasts);
-  const dismiss = useToastStore((state) => state.dismiss);
-  // The header's height changes with its banners, so place them after every render too.
-  useLayoutEffect(placeToasts);
   useEffect(() => {
+    placeToasts();
     addEventListener('scroll', placeToasts, { passive: true });
     addEventListener('resize', placeToasts);
     return () => {
@@ -88,11 +128,5 @@ export function Toasts() {
       removeEventListener('resize', placeToasts);
     };
   }, []);
-  return (
-    <div className="toasts">
-      {toasts.map((t: Toast) => (
-        <ToastView key={t.key} what={t.what} failed={t.failed} tone={t.tone} focusAfter={t.focusAfter} onClose={() => dismiss(t.key)}>{t.body}</ToastView>
-      ))}
-    </div>
-  );
+  return <ToastProvider position="top-right" />;
 }

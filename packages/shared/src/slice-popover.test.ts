@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { NO_POPOVER, nextPopover, openPopover } from './slice-popover.ts';
 import type { PopoverEvent } from './slice-popover.ts';

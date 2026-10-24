@@ -140,6 +140,10 @@ No releases for mux-apple until TestFlight is set up.
       README.md
     ```
 
+    That tree is the layout as first planned. The board has since moved into a
+    pnpm workspace (`apps/server`, `apps/web`, `apps/desktop`, `packages/shared`);
+    the README's repo layout is current.
+
     The build agents live inside `mux-work` as prompt files, because
     `npx skills` installs skills but not `.claude/agents` files. This way they
     install along with the skill.

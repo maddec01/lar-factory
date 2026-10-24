@@ -3,6 +3,7 @@
 // dist-electron/server/server.mjs for the packaged app, which has no node_modules.
 // The dev window runs apps/server/src/server.ts as source.
 import { defineConfig } from "vite-plus";
+import { sharedTest } from "../../vitest.shared.ts";
 
 const electronOnly = (id: string) => id === "electron" || id.startsWith("electron/");
 
@@ -57,6 +58,7 @@ export default defineConfig({
     },
   ],
   test: {
+    ...sharedTest,
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
     testTimeout: 15_000,
   },

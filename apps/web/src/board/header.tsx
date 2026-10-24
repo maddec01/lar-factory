@@ -1,7 +1,7 @@
 // The page's header, below the title bar: the page's heading for screen readers, the counts, and the banners for a gh
 // the board can't use, stale data and an unreachable server, which closes.
 
-import { countsOf, isStale, ago, clock, BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@mux-factory/shared';
+import { boardSections, isStale, ago, clock, BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@mux-factory/shared';
 import type { BoardData } from '@mux-factory/shared';
 import { useBoardStore } from './board-store.ts';
 import { ClosableBanner } from '../notices/closable-banner.tsx';
@@ -28,17 +28,17 @@ function StaleBanner({ data, now }: { data: BoardData; now: number }) {
 
 export function Header() {
   const { data, now, clientError } = useBoardStore();
-  const counts = countsOf(data);
+  const { needsYou, inFlight, queued, list } = boardSections(data, now);
   return (
     <header className="top">
       {/* The title bar shows the logo, so the heading stays for screen readers only. */}
       <h1 className="sr-only"><BrandMark /><span>factory</span></h1>
       <ul className="totals" aria-label="Counts">
-        <li className={counts.needsYou ? 'amber' : ''}><b>{counts.needsYou}</b> need you</li>
-        <li><b>{counts.inFlight}</b> in flight</li>
-        <li><b>{counts.queued}</b> queued</li>
-        <li><b>{counts.list}</b> in List</li>
-        <li><b>{counts.total}</b> items</li>
+        <li className={needsYou.length ? 'amber' : ''}><b>{needsYou.length}</b> need you</li>
+        <li><b>{inFlight.length}</b> in flight</li>
+        <li><b>{queued.length}</b> queued</li>
+        <li><b>{list.length}</b> in List</li>
+        <li><b>{data.items.length}</b> items</li>
       </ul>
       {clientError && (
         <ClosableBanner dismissKey={CLIENT_ERROR} what=": can't reach the board server">

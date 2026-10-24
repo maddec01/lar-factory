@@ -240,14 +240,6 @@ export interface ToolProblems {
   gh?: ToolProblem;
 }
 
-export interface Counts {
-  total: number;
-  needsYou: number;
-  inFlight: number;
-  queued: number;
-  list: number;
-}
-
 // ---------- kinds ----------
 
 export type Kind =
@@ -348,20 +340,4 @@ export function isStale(data: BoardData, now: number): boolean {
   if (data.error) return true;
   if (!data.fetchedAt) return false;
   return now - Date.parse(data.fetchedAt) > data.refreshSeconds * 3 * 1000;
-}
-
-export function countsOf(data: BoardData): Counts {
-  const by = (statuses: readonly Status[], items = data.items) =>
-    items.filter((i) => statuses.includes(i.status)).length;
-  return {
-    total: data.items.length,
-    needsYou: by(['Needs you', 'Verify', 'Ready to merge']),
-    // Concepts are shown in their own section, not In flight.
-    inFlight: by(
-      ['Shaping', 'Ready', 'In progress', 'Review'],
-      data.items.filter((i) => kindOf(i) !== 'concept'),
-    ),
-    queued: by(['Queued']),
-    list: by(['List']),
-  };
 }

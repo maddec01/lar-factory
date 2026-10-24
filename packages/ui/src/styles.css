@@ -163,7 +163,6 @@
 
   /* The board's own roles. */
   --you: var(--warning);
-  --you-text: var(--warning-foreground);
   --thread: var(--primary);
   --sub: var(--color-violet-500);
   --sub-text: var(--color-violet-600); /* AA on white */

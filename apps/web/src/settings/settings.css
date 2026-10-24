@@ -1,0 +1,4 @@
+/* The Settings dialog. */
+
+#settings-result ul { padding-left: --spacing(4.5); white-space: normal; }
+.profiles [aria-disabled="true"], .update-channel [aria-disabled="true"] { cursor: progress; opacity: 0.7; }

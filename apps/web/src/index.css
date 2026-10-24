@@ -1,6 +1,12 @@
 /* The board page's own styles. Tokens, base styles and the base components' styles come from the design
-   system (packages/ui); the rules here use only its tokens. */
+   system (packages/ui). Each feature folder holds its own layout rules; all of them use only the design
+   system's tokens and Tailwind's spacing scale. */
 @import "@mux-factory/ui/styles.css";
+@import "./board/board.css";
+@import "./items/items.css";
+@import "./notices/notices.css";
+@import "./add-item/add-item.css";
+@import "./settings/settings.css";
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item/add-item.tsx";
@@ -15,200 +21,18 @@
 @source "./updates/refresh-icon.tsx";
 
 /* Full browser width, with T3's workspace gutter. */
-#app { padding: 14px 20px 48px; }
+#app { padding: --spacing(3.5) --spacing(5) --spacing(12); }
+@media (max-width: 35rem) {
+  #app { padding: --spacing(3); }
+}
 /* Tailwind's base styles take links' underline and headings' weight; these put back the browser's. */
 a { color: inherit; text-decoration: underline; }
-a:hover { text-decoration-thickness: 2px; }
-code { font: 12px var(--font-mono); }
+a:hover { text-decoration-thickness: --spacing(0.5); }
+code { font: var(--text-xs) var(--font-mono); }
 /* In the base layer, so a T3 control's outline-none wins and its own focus ring is the only one. */
 @layer base {
-  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--radius-sm); }
+  :focus-visible { outline: --spacing(0.5) solid var(--ring); outline-offset: --spacing(0.5); border-radius: var(--radius-sm); }
 }
-[hidden] { display: none !important; }
-
-/* header */
-.top { margin-bottom: 22px; }
-h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; display: inline-flex; align-items: baseline; gap: 8px; }
-/* Baseline alignment puts the logo's bottom edge on the text's baseline. The x's strokes end 8.75 of the
-   viewBox's 32 units above that edge, so drop the logo by that much: the x sits on the baseline and the
-   µ's tail hangs below like a descender. */
-.brand-mark { width: 28px; height: 16px; flex: none; position: relative; top: calc(16px * 8.75 / 32); }
-.refreshed { margin: 0; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
-.totals { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 10px 0 0; }
-.banner .err { white-space: pre-wrap; word-break: break-word; }
-
-/* tool notices */
-.banner code { overflow-wrap: anywhere; }
-.tool-missing { min-height: calc(100vh - 62px); display: grid; place-items: center; }
-.tool-missing-box { max-width: 520px; border: 1px solid var(--border); background: var(--card); border-radius: var(--radius); padding: 20px 24px; }
-.tool-missing-box p { margin: 12px 0 0; color: var(--muted-foreground); }
-.tool-missing-box code { color: var(--foreground); overflow-wrap: anywhere; }
-
-/* sections */
-.section { margin: 0 0 22px; }
-.section h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
-.section h2 .count { font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
-.section h2 .note { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted-foreground); font-size: 12px; }
-#needs-you h2 { color: var(--you-text); }
-.empty { color: var(--muted-foreground); margin: 0; padding: 10px 12px; border: 1px dashed var(--input); border-radius: var(--radius); font-size: 13px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 10px; }
-.cards.wide { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
-
-.meta { display: flex; gap: 5px; align-items: flex-start; font-size: 11px; }
-/* The badges wrap onto more lines; the action group keeps the top-right corner. */
-.meta .badges { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-/* 3px centres the first line of 18px badges on the 24px Start buttons. */
-.meta:has(.start-group) .badges { padding-block: 3px; }
-.title { font-weight: 500; text-decoration: none; line-height: 1.35; }
-.title:hover { text-decoration: underline; }
-.ref { color: var(--muted-foreground); font-weight: 500; font-variant-numeric: tabular-nums; }
-.parent, .foot, .card-stats { margin: 0; font-size: 12px; color: var(--muted-foreground); }
-.foot, .card-stats { display: flex; flex-wrap: wrap; gap: 4px 10px; }
-.hint { color: var(--you-text); font-weight: 600; }
-.pr { color: var(--foreground); }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.stats { flex: none; white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
-.stats.total { margin-left: 4px; }
-.linked-pr { display: inline-flex; align-items: center; gap: 6px; }
-.checks { font-variant-numeric: tabular-nums; }
-.checks.running { --k: var(--muted-foreground); }
-.checks.passed { --k: var(--build); }
-.checks.failed { --k: var(--error); }
-.checks.slow { --k: var(--you); }
-
-/* The dot T3's Badge doesn't draw, coloured by platform, kind or checks state. */
-.plat::before, .kind::before, .label::before, .checks::before { content: ""; width: --spacing(1.75); height: --spacing(1.75); border-radius: 50%; background: var(--k, var(--muted-foreground)); }
-.plat-server { --k: var(--color-sky-500); }
-.plat-apple { --k: var(--color-pink-500); }
-.plat-draft { --k: var(--muted-foreground); }
-.kind-bug { --k: var(--error); }
-.kind-feature { --k: var(--thread); }
-.kind-improvement { --k: var(--color-teal-500); }
-.kind-concept, .kind-decision, [class*="kind-decision-"] { --k: var(--sub); }
-.kind-build { --k: var(--build); }
-
-/* segmented bars: every card's status bar, and a build's slice bar under it.
-   One grid, so both bars span the same width and their captions share a column. */
-.bars { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 10px; }
-.segbar { list-style: none; display: flex; gap: 2px; margin: 0; padding: 0; min-width: 0; }
-.segbar li { flex: 1; height: 6px; border-radius: 2px; background: var(--soft); }
-.bar-label { font-size: 11px; color: var(--muted-foreground); white-space: nowrap; font-variant-numeric: tabular-nums; }
-/* The current step is marked by colour alone. */
-.steps li.past { background: color-mix(in srgb, var(--foreground) 30%, transparent); }
-.steps li.cur { background: var(--thread); }
-.steps li.cur.amber { background: var(--you); }
-.steps li.cur.done { background: var(--build); }
-.step-label.amber { color: var(--you-text); font-weight: 600; }
-.slice-bar li.done { background: var(--build); }
-.slice-bar li.active { background: var(--thread); animation: slice-pulse 1.6s ease-in-out infinite; }
-/* A blocked slice waits for a re-slice: a calm violet, not an alarm. */
-.slice-bar li.blocked { background: color-mix(in srgb, var(--sub) 50%, transparent); }
-@keyframes slice-pulse { 50% { opacity: 0.45; } }
-.slices-now { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slices-active { color: var(--thread); font-weight: 600; margin-right: 2px; }
-.slices-blocked { color: var(--sub-text); font-weight: 600; margin-right: 2px; }
-.slices-now .sep { color: var(--muted-foreground); }
-/* the separator brings its own spaces, so a count before it drops its margin */
-.slices-now :has(+ .sep) { margin-right: 0; }
-
-/* a build's slice popover: the bars are its trigger; it floats over the board, so the card's height never changes */
-.slices { position: relative; }
-.slices-trigger { display: grid; gap: 4px; border-radius: var(--control-radius); padding: 3px 4px; margin: -3px -4px; cursor: default; }
-.slices-trigger:hover, .slices.open .slices-trigger { background: var(--soft); }
-.slice-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 1px; }
-.slice-rows .row-item { padding: 1px 0; }
-.slice-mark { flex: none; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted-foreground); box-sizing: border-box; }
-.slice-row.done .slice-mark { background: var(--build); border-color: var(--build); }
-.slice-row.active .slice-mark { background: var(--thread); border-color: var(--thread); box-shadow: 0 0 0 3px color-mix(in srgb, var(--thread) 20%, transparent); }
-.slice-row.blocked .slice-mark { background: color-mix(in srgb, var(--sub) 50%, transparent); border-color: var(--sub); }
-.slice-row.done .row-title { color: var(--muted-foreground); text-decoration: line-through; }
-.slice-row.active .row-title { font-weight: 600; }
-
-
-/* Capture form: stays mounted while the board refreshes. */
-.form-hint { color: var(--muted-foreground); margin: 6px 0 12px; font-size: 12px; }
-.form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-field { display: grid; gap: 4px; margin-bottom: 12px; }
-.required-note { color: var(--muted-foreground); font-weight: 400; font-size: 12px; }
-.choices { display: flex; flex-flow: row wrap; gap: --spacing(2.5) --spacing(3.5); }
+.sr-only { position: absolute; width: --spacing(0.25); height: --spacing(0.25); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* T3's Button takes no pointer events while disabled; one that says why keeps them, so its title shows. */
 button:disabled[title] { pointer-events: auto; cursor: not-allowed; }
-#settings-result ul { padding-left: --spacing(4.5); white-space: normal; }
-
-/* notices: a close button on every failure, and successes as toasts that clear themselves */
-.dismiss { float: right; margin: -3px -6px 0 8px; }
-.action-error .dismiss { float: none; margin: -4px 0 -4px 2px; vertical-align: middle; }
-/* notices/toasts.tsx keeps --toast-top below the header while it's on screen and below the title bar.
-   A toast never drags the app's window, even where it overlaps the title bar. */
-[data-slot="toast-viewport"] { top: var(--toast-top); -webkit-app-region: no-drag; }
-.view-item { margin-left: --spacing(1); }
-@media (max-width: 400px) {
-  .form-pair { grid-template-columns: 1fr; gap: 0; }
-  .add-item { margin-left: 0; }
-}
-
-/* concepts */
-.sub-groups { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-.sub-status { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-foreground); }
-.sub-status.amber { color: var(--you-text); font-weight: 600; }
-.sub-groups ul { list-style: none; padding: 0; margin: 2px 0 0; display: grid; gap: 3px; }
-
-/* rows (lists) */
-.rows { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 2px; }
-.row-item { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 0; font-size: 12px; }
-.row-item .plat, .row-item .kind { flex: none; }
-/* Rows light up under the pointer or keyboard focus, so it's clear which item Queue and Abandon act on.
-   The inset padding is cancelled by the margin, so text stays aligned with the rest of the box. */
-.rows .row-item { padding-inline: 6px; margin-inline: -6px; border-radius: var(--control-radius); }
-.rows .row-item:hover, .rows .row-item:focus-within { background: var(--soft); }
-.sub-groups .row-item { flex-wrap: wrap; }
-/* One line: the title shortens first, down to a few words, then the label pills are clipped. */
-.row-title { flex: 0 1000 auto; min-width: min(14ch, 40%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
-.row-title:hover { text-decoration: underline; }
-.labels { flex: 1 1 auto; display: flex; gap: 4px; min-width: 0; overflow: hidden; mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); }
-.labels .label { flex: none; }
-.row-action { flex: none; }
-.profiles [aria-disabled="true"], .update-channel [aria-disabled="true"] { cursor: progress; opacity: 0.7; }
-.start { margin: 0; font-size: 12px; }
-p[data-start-result] { padding: 4px 6px; margin-inline: -6px; border-radius: 6px; }
-.start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; position: relative; }
-/* A Queued card's quiet footer row: Back to List on the left, Abandon on the right. */
-/* margin-top: auto keeps the stats or actions row on the card's bottom edge across a row of cards; the 8px above it moves to the item before. */
-[data-slot="card"] > :has(+ .card-actions), [data-slot="card"] > :has(+ .card-stats) { margin-bottom: 8px; }
-/* The stats row takes the bottom edge; an actions row after it sits right below. */
-.card-stats { margin-top: auto; padding-top: 6px; border-top: 1px solid var(--border); }
-.card-stats + .card-actions { margin-top: 0; }
-.card-actions { display: flex; align-items: center; gap: 12px; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--border); font-size: 11px; }
-/* The padding gives a 24px target (WCAG 2.5.8); the matching negative margin keeps the row's height. */
-.link-action { padding: 5px 0; margin-block: -5px; }
-.link-action.danger { margin-left: auto; }
-.link-action[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
-.thread-id { font-size: 11px; color: var(--muted-foreground); overflow-wrap: anywhere; }
-.row-item:has(.action-error) { flex-wrap: wrap; }
-.action-error { order: 1; flex: 1 1 100%; min-width: 0; color: var(--danger-text); font-weight: 600; overflow-wrap: anywhere; }
-.when { color: var(--muted-foreground); font-size: 11px; white-space: nowrap; }
-.platforms { display: grid; gap: 10px; }
-.platform { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; min-width: 0; }
-.disclosure-trigger { display: flex; align-items: center; gap: 8px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; }
-.disclosure-trigger::after { content: "Show"; margin-left: auto; color: var(--muted-foreground); font-size: 12px; }
-.disclosure-trigger[data-panel-open]::after { content: "Hide"; }
-.disclosure-trigger b { font-size: 15px; font-variant-numeric: tabular-nums; }
-
-/* Where a jump landed. */
-.anchor-flash { animation: anchor-flash 1.6s ease-out; }
-@keyframes anchor-flash { from { box-shadow: 0 0 0 2px var(--primary); } to { box-shadow: 0 0 0 2px transparent; } }
-
-@media (max-width: 720px) {
-  .cards.wide { grid-template-columns: 1fr; }
-}
-@media (max-width: 560px) {
-  #app { padding: 12px; }
-  /* Item stats don't fit beside the title on a phone, so they and the labels wrap below it; the title keeps the first line. */
-  .rows .row-item:has(.stats) { flex-wrap: wrap; }
-  .rows .row-item:has(.stats) .row-title { flex: 1 1 0; }
-  .rows .row-item:has(.stats) .labels { flex: 1 0 100%; flex-wrap: wrap; mask-image: none; }
-  .rows .row-item:has(.stats) .labels:empty { display: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .anchor-flash, .slice-bar li.active { animation: none; }
-}

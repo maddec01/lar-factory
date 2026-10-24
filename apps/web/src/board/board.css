@@ -1,0 +1,66 @@
+/* The board page's header, sections, rows and disclosures. */
+
+/* header */
+.top { margin-bottom: --spacing(5.5); }
+h1 { font-size: var(--text-base); font-weight: 600; margin: 0; letter-spacing: -0.01em; display: inline-flex; align-items: baseline; gap: --spacing(2); }
+/* Baseline alignment puts the logo's bottom edge on the text's baseline. The x's strokes end 8.75 of the
+   viewBox's 32 units above that edge, so drop the logo by that much: the x sits on the baseline and the
+   µ's tail hangs below like a descender. */
+.brand-mark { width: --spacing(7); height: --spacing(4); flex: none; position: relative; top: calc(--spacing(4) * 8.75 / 32); }
+.totals { list-style: none; display: flex; flex-wrap: wrap; gap: --spacing(1.5); padding: 0; margin: --spacing(2.5) 0 0; }
+
+/* sections */
+.section { margin: 0 0 --spacing(5.5); }
+.section h2 { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 --spacing(2); display: flex; flex-wrap: wrap; align-items: baseline; gap: --spacing(1.5); }
+.section h2 .count { font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+.section h2 .note { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted-foreground); font-size: var(--text-xs); }
+#needs-you h2 { color: var(--warning-foreground); }
+.empty { color: var(--muted-foreground); margin: 0; padding: --spacing(2.5) --spacing(3); @apply border border-dashed border-input; border-radius: var(--radius); font-size: var(--text-xs); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(--spacing(67.5), 1fr)); gap: --spacing(2.5); }
+.cards.wide { grid-template-columns: repeat(auto-fill, minmax(--spacing(105), 1fr)); }
+@media (max-width: 45rem) {
+  .cards.wide { grid-template-columns: 1fr; }
+}
+
+/* concepts */
+.sub-groups { list-style: none; padding: 0; margin: 0; display: grid; gap: --spacing(1.5); }
+.sub-status { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-foreground); }
+.sub-status.amber { color: var(--warning-foreground); font-weight: 600; }
+.sub-groups ul { list-style: none; padding: 0; margin: --spacing(0.5) 0 0; display: grid; gap: --spacing(0.75); }
+
+/* rows (lists) */
+.rows { list-style: none; padding: 0; margin: --spacing(1.5) 0 0; display: grid; gap: --spacing(0.5); }
+.row-item { display: flex; align-items: center; gap: --spacing(1.5); min-width: 0; padding: --spacing(0.75) 0; font-size: var(--text-xs); }
+.row-item .plat, .row-item .kind { flex: none; }
+/* Rows light up under the pointer or keyboard focus, so it's clear which item Queue and Abandon act on.
+   The inset padding is cancelled by the margin, so text stays aligned with the rest of the box. */
+.rows .row-item { padding-inline: --spacing(1.5); margin-inline: --spacing(-1.5); border-radius: var(--control-radius); }
+.rows .row-item:hover, .rows .row-item:focus-within { background: var(--soft); }
+.sub-groups .row-item { flex-wrap: wrap; }
+/* One line: the title shortens first, down to a few words, then the label pills are clipped. */
+.row-title { flex: 0 1000 auto; min-width: min(14ch, 40%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.row-title:hover { text-decoration: underline; }
+.labels { flex: 1 1 auto; display: flex; gap: --spacing(1); min-width: 0; overflow: hidden; mask-image: linear-gradient(to right, var(--color-black) calc(100% - --spacing(4)), transparent); }
+.labels .label { flex: none; }
+@media (max-width: 35rem) {
+  /* Item stats don't fit beside the title on a phone, so they and the labels wrap below it; the title keeps the first line. */
+  .rows .row-item:has(.stats) { flex-wrap: wrap; }
+  .rows .row-item:has(.stats) .row-title { flex: 1 1 0; }
+  .rows .row-item:has(.stats) .labels { flex: 1 0 100%; flex-wrap: wrap; mask-image: none; }
+  .rows .row-item:has(.stats) .labels:empty { display: none; }
+}
+
+/* platforms and their disclosures */
+.platforms { display: grid; gap: --spacing(2.5); }
+.platform { background: var(--card); @apply border; border-radius: var(--radius); padding: --spacing(2) --spacing(3); min-width: 0; }
+.disclosure-trigger { display: flex; align-items: center; gap: --spacing(2); width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; }
+.disclosure-trigger::after { content: "Show"; margin-left: auto; color: var(--muted-foreground); font-size: var(--text-xs); }
+.disclosure-trigger[data-panel-open]::after { content: "Hide"; }
+.disclosure-trigger b { font-size: var(--text-base); font-variant-numeric: tabular-nums; }
+
+/* Where a jump landed. */
+.anchor-flash { animation: anchor-flash 1.6s ease-out; }
+@keyframes anchor-flash { from { box-shadow: 0 0 0 --spacing(0.5) var(--primary); } to { box-shadow: 0 0 0 --spacing(0.5) transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .anchor-flash { animation: none; }
+}

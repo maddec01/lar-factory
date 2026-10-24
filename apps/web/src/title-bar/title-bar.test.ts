@@ -10,7 +10,7 @@ const actions = () => $<HTMLElement>('.title-bar-actions');
 test('in the Mac app, the title bar holds the brand, then Refreshed, the update icon, Add item and Settings at its right end', async () => {
   stubApp({ secret: 'launch-secret' });
   await mountPage();
-  expect(titleBar()!.className).toContain('pl-[89px]');
+  expect(titleBar()!.className).toContain('pl-22.25');
   expect(titleBar()!.compareDocumentPosition($('header.top')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect([...actions()!.children].map((el) => el.textContent)).toEqual(['Refreshed 20m ago', '', 'Add item', 'Settings']);
   expect(actions()!.children[1]!.querySelector('.update-button')).not.toBeNull();
@@ -41,7 +41,7 @@ test('screen readers reach the actions and Refreshed but skip the brand; the pag
 
 test('in a browser, the bar shows without the traffic lights\' gap and holds Refreshed and Add item', async () => {
   await mountPage();
-  expect(titleBar()!.className).not.toContain('pl-[89px]');
+  expect(titleBar()!.className).not.toContain('pl-22.25');
   expect([...actions()!.children].map((el) => el.textContent)).toEqual(['Refreshed 20m ago', 'Add item']);
   expect($('h1')!.className).toBe('sr-only');
 });

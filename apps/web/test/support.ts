@@ -137,21 +137,26 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
   return bridge;
 }
 
+/** src/index.css with the feature folders' sheets it imports in their place. */
+const src = join(import.meta.dirname, '../src');
+const pageCss = () => readFileSync(join(src, 'index.css'), 'utf8')
+  .replace(/@import "\.\/(.+?)";/g, (_line, path: string) => readFileSync(join(src, path), 'utf8'));
+
 /** Puts src/index.css on the page. jsdom has no layout but cascades its rules into getComputedStyle; it can't apply
  *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheets' text, the page's
  *  and the design system's, and from Tailwind's arbitrary no-drag class. */
 export function addStylesheet(): { noDrag: (el: Element) => boolean } {
-  const css = readFileSync(join(import.meta.dirname, '../src/index.css'), 'utf8');
+  const css = pageCss();
   const style = document.createElement('style');
   style.textContent = css;
   document.head.append(style);
-  const all = css + readFileSync('../../packages/ui/src/styles.css', 'utf8');
+  const all = css + readFileSync(join(import.meta.dirname, '../../../packages/ui/src/styles.css'), 'utf8');
   const selectors = [...all.matchAll(/([^{}]+)\{[^}]*-webkit-app-region:\s*no-drag/g)].map((rule) => rule[1]!.replace(/\/\*[^]*?\*\//g, ''));
   return { noDrag: (el) => el.classList.contains('[-webkit-app-region:no-drag]') || selectors.some((selector) => el.matches(selector)) };
 }
 
-/** The title bar's height, from its h-[…px] class. */
-export const titleBarHeight = () => Number(/\bh-\[(\d+)px\]/.exec($('.title-bar')!.className)![1]);
+/** The title bar's height, from its h-* class, at 4 px a spacing step. */
+export const titleBarHeight = () => Number(/\bh-(\d+)\b/.exec($('.title-bar')!.className)![1]) * 4;
 
 /** A fake `confirmRestart` for `stubApp`: it records each question and answers `answer`, true for Restart. */
 export const answerRestart = (answer: boolean) => vi.fn(async (_message: string) => answer);

@@ -22,7 +22,7 @@ function Refreshed({ fetchedAt }: { fetchedAt: string | null }) {
     return () => clearInterval(timer);
   }, [fetchedAt]);
   return (
-    <p className="refreshed">
+    <p className="refreshed m-0 whitespace-nowrap text-xs text-(--muted-foreground)">
       {fetchedAt ? <>Refreshed <time dateTime={fetchedAt}>{shortAgo(fetchedAt, now)}</time></> : 'Not read yet'}
     </p>
   );
@@ -34,13 +34,13 @@ export function TitleBar() {
   const board = !data.tools?.t3;
   return (
     // The outer box holds the bar's place in the page; the bar stays at the top as the page scrolls.
-    <div className="h-[52px]">
-      <div className={`title-bar fixed inset-x-0 top-0 z-50 flex h-[52px] select-none items-center gap-2 border-b border-(--border) bg-(--background) pr-4 [-webkit-app-region:drag] ${inMacApp() ? 'pl-[89px]' : 'pl-4'}`}>
+    <div className="h-13">
+      <div className={`title-bar fixed inset-x-0 top-0 z-50 flex h-13 select-none items-center gap-2 border-b border-(--border) bg-(--background) pr-4 [-webkit-app-region:drag] ${inMacApp() ? 'pl-22.25' : 'pl-4'}`}>
         {/* Screen readers skip the brand: the header's hidden h1 already names the page. */}
         <span className="title-bar-brand inline-flex items-center gap-2" aria-hidden="true">
           <span className="inline-flex items-baseline gap-1 text-sm font-medium tracking-tight">
-            {/* The logo sits on the baseline and the µ's tail hangs below, as in the page header (index.css .brand-mark). */}
-            <svg className="relative top-[calc(12.5px*8.75/32)] h-[12.5px] w-[22px] shrink-0" role="img" aria-label="Mux" viewBox={BRAND_MARK_VIEWBOX} fill="none">
+            {/* The logo sits on the baseline and the µ's tail hangs below, as in the page header (board/board.css .brand-mark). */}
+            <svg className="relative top-[calc(--spacing(3.125)*8.75/32)] h-[--spacing(3.125)] w-5.5 shrink-0" role="img" aria-label="Mux" viewBox={BRAND_MARK_VIEWBOX} fill="none">
               <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span className="text-(--muted-foreground)">Factory</span>

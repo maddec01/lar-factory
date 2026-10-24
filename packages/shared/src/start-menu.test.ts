@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { choiceOf, highlightedChoice, menuMove, readChoice, remembersChoice, startRequest, storedChoice } from './start-menu.ts';
 import type { ModelGroup } from './model.ts';

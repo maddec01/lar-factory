@@ -68,6 +68,9 @@ jobs:
           echo "::error::Start a Release from main, not $GITHUB_REF."
           exit 1
 
+      - name: Set git's default branch
+        run: git config --global init.defaultBranch main
+
       - name: Check out main
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -128,6 +131,9 @@ jobs:
             exit 1
           fi
 
+      - name: Set git's default branch
+        run: git config --global init.defaultBranch main
+
       - name: Check out the Release commit
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -143,7 +149,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: package.json
+          node-version-file: .node-version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

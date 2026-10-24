@@ -1,5 +1,6 @@
 // The board's own `~/lib/utils` for the Copies. T3's imports its contracts, Effect and the composer's
-// draft store, so only its `cn` is taken (pingdotgg/t3code apps/web/src/lib/utils.ts at d53873b).
+// draft store, so only its `cn` and platform checks are taken (pingdotgg/t3code apps/web/src/lib/utils.ts
+// at d53873b, and isMacPlatform from packages/shared/src/keybindings.ts, which it re-exports).
 
 import { type CxOptions, cx } from 'class-variance-authority';
 import { extendTailwindMerge } from 'tailwind-merge';
@@ -10,4 +11,12 @@ const twMerge = extendTailwindMerge({ extend: { theme: { text: ['2xs', '3xs', '4
 
 export function cn(...inputs: CxOptions) {
   return twMerge(cx(inputs));
+}
+
+export function isMacPlatform(platform: string): boolean {
+  return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+export function isWindowsPlatform(platform: string): boolean {
+  return /^win(dows)?/i.test(platform);
 }

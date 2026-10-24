@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { choiceOf, highlightedChoice, menuMove, readChoice, remembersChoice, startRequest, storedChoice } from '../src/start-menu.ts';
-import type { ModelGroup } from '../src/model.ts';
+import { choiceOf, highlightedChoice, menuMove, readChoice, remembersChoice, startRequest, storedChoice } from './start-menu.ts';
+import type { ModelGroup } from './model.ts';
 
 test('picking "T3 default" posts no model choice; picking a model posts its instance id and slug', () => {
   assert.deepEqual(startRequest('s1', 'PVTI_1', choiceOf({})), { session: 's1', itemId: 'PVTI_1' });

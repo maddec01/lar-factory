@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NO_POPOVER, nextPopover, openPopover } from '../src/slice-popover.ts';
-import type { PopoverEvent } from '../src/slice-popover.ts';
+import { NO_POPOVER, nextPopover, openPopover } from './slice-popover.ts';
+import type { PopoverEvent } from './slice-popover.ts';
 
 const after = (...events: PopoverEvent[]) => openPopover(events.reduce(nextPopover, NO_POPOVER));
 

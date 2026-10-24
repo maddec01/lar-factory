@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { anchorKeys, survivingAnchor } from '../src/anchor.ts';
+import { anchorKeys, survivingAnchor } from './anchor.ts';
 
 test('an item drawn twice gets one key per appearance', () => {
   assert.deepEqual(anchorKeys(['a', 'b', 'a', 'c']), ['a|0', 'b|0', 'a|1', 'c|0']);

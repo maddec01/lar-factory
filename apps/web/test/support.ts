@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { afterEach, beforeEach, vi } from 'vite-plus/test';
 import { pageWithData } from '@mux-factory/shared';
-import type { BoardData, BoardAppBridge, UpdateState } from '@mux-factory/shared';
+import type { BoardData, BoardAppBridge, Status, UpdateState } from '@mux-factory/shared';
 import template from '../index.html?raw';
 import sampleJson from '@mux-factory/shared/test/sample.json' with { type: 'json' };
 
@@ -48,6 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify(sample)));
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -73,6 +74,31 @@ export async function settle(fn: () => unknown = () => {}): Promise<void> {
 
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
+export const text = (el: Element | null | undefined) => el?.textContent ?? '';
+export const toast = () => $('.toasts .toast');
+
+/** Sends `data` down the page's event stream. */
+export const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));
+/** The sample with the item `id` in `status`. */
+export const moved = (id: string, status: Status): BoardData => ({ ...sample, items: sample.items.map((i) => (i.id === id ? { ...i, status } : i)) });
+
+let answerPost: ((body: object, status?: number) => Promise<void>) | undefined;
+/** Makes each POST wait until the test answers it, so the pending state can be seen; a board read gets `board`. */
+export function holdPosts(board: BoardData = sample): void {
+  fetchMock.mockImplementation(async (url: string) => {
+    if (url === '/api/board') return new Response(JSON.stringify(board));
+    return new Promise<Response>((resolve) => {
+      answerPost = (body, status = 200) => settle(() => resolve(new Response(JSON.stringify(body), { status })));
+    });
+  });
+}
+/** Answers the POST in flight with `body`. */
+export const answer = (body: object, status?: number) => answerPost!(body, status);
+/** Each request but the board reads, as its path and parsed body. */
+export const posted = () => fetchMock.mock.calls.filter(([url]) => url !== '/api/board').map((call) => {
+  const [url, init] = call as unknown as [string, RequestInit | undefined];
+  return [url, init?.body && JSON.parse(init.body as string)];
+});
 
 /** The updater in a `pnpm run dev` app: off, so the update button shows dimmed with the reason. */
 export const updatesOff: UpdateState = {

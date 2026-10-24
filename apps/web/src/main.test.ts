@@ -1,7 +1,7 @@
 // The page shell: first paint, header, the Board view, live data, and what a re-render keeps.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, fetchMock, mountPage, sample, settle, stream } from '../test/support.ts';
+import { $, $$, NOW, fetchMock, mountPage, push, sample, settle, stream } from '../test/support.ts';
 import { BRAND_MARK_PATH } from '@mux-factory/shared';
 import type { BoardData } from '@mux-factory/shared';
 
@@ -136,8 +136,6 @@ test("the lost server's banner closes, and the next failure after the server ans
   await settle(() => vi.advanceTimersByTime(15_000));
   expect($('.banner[role="alert"]')!.textContent).toContain("Can't reach the board server.");
 });
-
-const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));
 
 test('new data keeps focus and the <details> the user opened', async () => {
   await mountPage(fresh);

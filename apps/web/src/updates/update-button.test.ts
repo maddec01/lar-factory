@@ -2,7 +2,7 @@
 // every update state. The bridge stands in for the app's preload and pushes each new update state, as the app does.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight, updatesOff } from '../../test/support.ts';
+import { $, addStylesheet, answerRestart, mountPage, settle, stubApp, titleBarHeight, toast, updatesOff } from '../../test/support.ts';
 import type { UpdateState } from '@mux-factory/shared';
 
 const idle: UpdateState = {
@@ -38,7 +38,6 @@ const label = () => button()!.getAttribute('aria-label');
 const disabled = () => button()!.getAttribute('aria-disabled') === 'true';
 const icon = (name: string) => button()!.querySelector(`svg.lucide-${name}`);
 const click = () => settle(() => button()!.click());
-const toast = () => $('.toasts .toast');
 const toastText = () => toast()?.textContent?.replace(/^×/, '');
 // The spin's turn ends. jsdom runs no animation and has no AnimationEvent, so React listens for the prefixed name.
 const turnEnds = () => settle(() => icon('refresh-cw')!.dispatchEvent(new Event('webkitAnimationIteration', { bubbles: true })));

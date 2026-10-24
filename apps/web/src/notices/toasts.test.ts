@@ -1,20 +1,11 @@
 // Toasts: a success clears itself after 5 s, later while it's in use; the close button; View item;
 // and their place below the header. Ported from the toast cases of test/render.test.ts.
 
-import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { $, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
-import type { BoardData } from '@mux-factory/shared';
-
-const text = (el: Element | null | undefined) => el?.textContent ?? '';
-const toast = () => $('.toasts .toast');
-const queued = (id: string): BoardData => ({ ...sample, items: sample.items.map((i) => (i.id === id ? { ...i, status: 'Queued' as const } : i)) });
-
-afterEach(() => {
-  fetchMock.mockImplementation(async () => new Response(JSON.stringify(sample)));
-});
+import { expect, test, vi } from 'vite-plus/test';
+import { $, fetchMock, mountPage, moved, sample, settle, text, toast } from '../../test/support.ts';
 
 /** Queues the item, which the server moves to Queued, so the page shows a Moved toast. */
-async function queue(id: string, board = queued(id)): Promise<void> {
+async function queue(id: string, board = moved(id, 'Queued')): Promise<void> {
   fetchMock.mockImplementation(async (url: string) => new Response(JSON.stringify(url === '/api/queue' ? { error: null, board } : sample)));
   await settle(() => $<HTMLButtonElement>(`[data-queue="${id}"]`)!.click());
 }
@@ -120,7 +111,7 @@ test("a poll that started before the page's own write doesn't bring back older d
   let answerPoll!: () => void;
   fetchMock.mockImplementation(async (url: string) => {
     if (url === '/api/board') return new Promise<Response>((resolve) => (answerPoll = () => resolve(new Response(JSON.stringify(sample)))));
-    return new Response(JSON.stringify({ error: null, board: queued('PVTI_sample01') }));
+    return new Response(JSON.stringify({ error: null, board: moved('PVTI_sample01', 'Queued') }));
   });
   await settle(() => vi.advanceTimersByTime(15_000));
   await settle(() => $<HTMLButtonElement>('[data-queue="PVTI_sample01"]')!.click());

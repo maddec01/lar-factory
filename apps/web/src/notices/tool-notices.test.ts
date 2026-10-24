@@ -1,15 +1,14 @@
 // The notices for a missing t3, or a missing or logged-out gh, and their Recheck.
 // Ported from the tool notice cases of test/render.test.ts and its saved copies.
 
-import { afterEach, expect, test } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle, stream } from '../../test/support.ts';
+import { expect, test } from 'vite-plus/test';
+import { $, $$, fetchMock, mountPage, push, sample, settle } from '../../test/support.ts';
 import type { BoardData, ToolProblems } from '@mux-factory/shared';
 
 const withTools = (tools: ToolProblems, fields: Partial<BoardData> = {}): BoardData => ({ ...sample, tools, ...fields });
 const failed = { error: 'gh api graphql failed: HTTP 401' };
 const recheckButton = () => $<HTMLButtonElement>('[data-recheck]')!;
 const note = () => $('.recheck-note');
-const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));
 const rechecks = () => fetchMock.mock.calls.filter(([url]) => url === '/api/recheck');
 
 /** The next POST waits until the test answers it, so Checking… can be seen. */
@@ -23,10 +22,6 @@ function holdRecheck(): void {
   });
 }
 const board = (data: BoardData) => new Response(JSON.stringify({ error: null, board: data }));
-
-afterEach(() => {
-  fetchMock.mockImplementation(async () => new Response(JSON.stringify(sample)));
-});
 
 test('a missing t3 replaces the board with a notice and Recheck', async () => {
   await mountPage(withTools({ t3: { problem: 'missing' } }));

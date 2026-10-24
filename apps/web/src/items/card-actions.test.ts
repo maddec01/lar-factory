@@ -2,34 +2,13 @@
 // result as a toast or an error, and keeps focus on the page when the item leaves.
 // Ported from the card action cases of test/render.test.ts.
 
-import { afterEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
-import type { BoardData, Status } from '@mux-factory/shared';
+import { expect, test, vi } from 'vite-plus/test';
+import { $, $$, answer, fetchMock, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
+import type { BoardData } from '@mux-factory/shared';
 
-const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const button = (attr: string, id: string) => $<HTMLButtonElement>(`[data-${attr}="${id}"]`)!;
-const toast = () => $('.toasts .toast');
-const moved = (id: string, status: Status): BoardData => ({ ...sample, items: sample.items.map((i) => (i.id === id ? { ...i, status } : i)) });
 const without = (id: string): BoardData => ({ ...sample, items: sample.items.filter((i) => i.id !== id) });
 
-/** Each POST waits until the test answers it, so the pending state can be seen. */
-let answer: (body: object, status?: number) => Promise<void>;
-function holdPosts(): void {
-  fetchMock.mockImplementation(async (url: string) => {
-    if (url === '/api/board') return new Response(JSON.stringify(sample));
-    return new Promise<Response>((resolve) => {
-      answer = (body, status = 200) => settle(() => resolve(new Response(JSON.stringify(body), { status })));
-    });
-  });
-}
-const posted = () => fetchMock.mock.calls.map((call) => {
-  const [url, init] = call as unknown as [string, RequestInit | undefined];
-  return [url, init?.body && JSON.parse(init.body as string)];
-});
-
-afterEach(() => {
-  fetchMock.mockImplementation(async () => new Response(JSON.stringify(sample)));
-});
 
 test('Queue shows the action in flight, then moves the row to Queued, says so, and keeps focus in the list', async () => {
   holdPosts();

@@ -1,8 +1,8 @@
 // Start on a Queued card: its menu of model choices, how keys and clicks move through it, and
 // what a start shows on the card and in a toast. Ported from the Start cases of test/render.test.ts.
 
-import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
+import { beforeEach, expect, test, vi } from 'vite-plus/test';
+import { $, $$, answer, holdPosts, mountPage, posted, sample, settle, text, toast } from '../../test/support.ts';
 import type { BoardData, ModelGroup } from '@mux-factory/shared';
 
 const MODEL_CHOICES: ModelGroup[] = [
@@ -12,13 +12,11 @@ const MODEL_CHOICES: ModelGroup[] = [
 const withChoices: BoardData = { ...sample, capture: { session: 's1', enabled: true }, modelChoices: MODEL_CHOICES };
 const CHOICE_KEY = 'mux-board:model-choice';
 
-const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const start = (id = 'PVTI_sample05') => $<HTMLButtonElement>(`[data-start="${id}"]`)!;
 const card = (id = 'PVTI_sample05') => $(`#queued article[data-anchor="${id}"]`)!;
 const menu = () => $('[role="menu"]');
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const checked = () => entries().filter((e) => e.getAttribute('aria-checked') === 'true').map(text);
-const toast = () => $('.toasts .toast');
 const key = async (el: Element, k: string) => {
   await settle(() => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })));
   // Base UI moves focus in the next frame.
@@ -35,23 +33,9 @@ const open = async (id = 'PVTI_sample05') => {
   await press(start(id));
 };
 
-/** Each POST waits until the test answers it, so the pending state can be seen. */
-let answer: (body: object, status?: number) => Promise<void>;
 beforeEach(() => {
   localStorage.clear();
-  fetchMock.mockImplementation(async (url: string) => {
-    if (url === '/api/board') return new Response(JSON.stringify(withChoices));
-    return new Promise<Response>((resolve) => {
-      answer = (body, status = 200) => settle(() => resolve(new Response(JSON.stringify(body), { status })));
-    });
-  });
-});
-afterEach(() => {
-  fetchMock.mockImplementation(async () => new Response(JSON.stringify(sample)));
-});
-const posted = () => fetchMock.mock.calls.filter(([url]) => url !== '/api/board').map((call) => {
-  const [url, init] = call as unknown as [string, RequestInit | undefined];
-  return [url, init?.body && JSON.parse(init.body as string)];
+  holdPosts(withChoices);
 });
 
 test("a Queued card's Start opens a menu: 'T3 default' first, then each provider instance with its models", async () => {

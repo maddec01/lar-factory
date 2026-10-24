@@ -202,10 +202,18 @@ _Avoid_: report total, aggregate, rollup
 What an item's tokens would cost at API list prices, as T3 Code estimates it, rather than the subscription bill.
 _Avoid_: cost, spend, price
 
-### Board processes
+### Board server and page
+
+**Board server**:
+The local process that reads GitHub and T3 and serves the board.
+_Avoid_: board process, backend
+
+**Board page**:
+The board's web UI, shown in the board app or in a browser.
+_Avoid_: frontend, board UI
 
 **Sample board**:
-A board process started with `pnpm run sample` on a spare port, reading `packages/shared/test/sample.json` instead of GitHub.
+A board server started with `pnpm run sample` on a spare port, reading `packages/shared/test/sample.json` instead of GitHub.
 _Avoid_: test board, dev board
 
 **Board app**:

@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { buildBranch, buildMessage, canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -82,6 +82,33 @@ test('a $word in the title is kept and $mux-work still opens line 2', () => {
   const message = workMessage(item('Queued', [], { title: 'Fix $foo parsing' }))!;
   assert.equal(message, '#7 Fix $foo parsing\n$mux-work maddec01/mux-server#7');
   assert.equal(message.split('\n')[1], '$mux-work maddec01/mux-server#7');
+});
+
+test('a build branch is <kind>/<n>-<slug>: fix for a bug, feat for a feature or improvement, else chore', () => {
+  const title = 'Add Start build to the board server';
+  assert.equal(buildBranch(item('Ready', ['bug'], { title })), 'fix/7-add-start-build-to-the');
+  assert.equal(buildBranch(item('Ready', ['feature'], { title })), 'feat/7-add-start-build-to-the');
+  assert.equal(buildBranch(item('Ready', ['improvement', 'build'], { title })), 'feat/7-add-start-build-to-the');
+  assert.equal(buildBranch(item('Ready', ['build'], { title })), 'chore/7-add-start-build-to-the');
+  assert.equal(buildBranch(item('Ready', [], { title })), 'chore/7-add-start-build-to-the');
+});
+
+test('a build branch slug takes up to five words of the title, lowercase, with what a branch name cannot hold left out', () => {
+  const branch = (title: string) => buildBranch(item('Ready', ['bug'], { title }));
+  assert.equal(branch('Crash'), 'fix/7-crash');
+  assert.equal(branch('Fix login'), 'fix/7-fix-login');
+  assert.equal(branch("  Board: don't  read ~/.t3 [twice]?  "), 'fix/7-board-dont-read-t3-twice');
+  assert.equal(branch('Fix `t3` CLI\'s path..lock @{ref} ^ * : \\ end'), 'fix/7-fix-t3-clis-path-lock');
+  assert.equal(branch('Café crème über naïve'), 'fix/7-cafe-creme-uber-naive');
+  assert.equal(branch('日本語 title 🚀 here'), 'fix/7-title-here');
+  assert.equal(branch('日本語 🚀'), 'fix/7');
+  assert.equal(buildBranch(item('Ready', [], { type: 'DraftIssue', repo: null, number: null })), null);
+});
+
+test('the build message names the build and the builder agent of the installed mux-work', () => {
+  assert.equal(buildMessage(item('Ready'), '/Users/me/.agents/skills/mux-work'),
+    'Build maddec01/mux-server#7. Read /Users/me/.agents/skills/mux-work/agents/builder.md and follow it.');
+  assert.equal(buildMessage(item('Ready', [], { type: 'DraftIssue', repo: null, number: null }), '/x'), null);
 });
 
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {

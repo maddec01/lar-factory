@@ -380,6 +380,27 @@ export function workMessage(item: Item): string | null {
   return title && `${title}\n$mux-work ${item.repo}#${item.number}`;
 }
 
+/**
+ * The branch Start build's worktree takes: `<kind>/<n>-<slug>`, the kind `fix` for a bug,
+ * `feat` for a feature or improvement, else `chore`. The slug is up to five words of the
+ * title, lowercase and hyphen-joined, accents dropped and anything but a-z and 0-9 left out.
+ * Null for a draft.
+ */
+export function buildBranch(item: Item): string | null {
+  if (!item.repo || item.number === null) return null;
+  const kind = kindOf(item);
+  const prefix = kind === 'bug' ? 'fix' : kind === 'feature' || kind === 'improvement' ? 'feat' : 'chore';
+  const words = item.title.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/['’]/g, '')
+    .split(/[^a-z0-9]+/).filter(Boolean).slice(0, 5);
+  return `${prefix}/${[item.number, ...words].join('-')}`;
+}
+
+/** Start build's message, naming the builder agent of the mux-work installed at `muxWork`. Null for a draft. */
+export function buildMessage(item: Item, muxWork: string): string | null {
+  if (!item.repo || item.number === null) return null;
+  return `Build ${item.repo}#${item.number}. Read ${muxWork}/agents/builder.md and follow it.`;
+}
+
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */
 export function isStale(data: BoardData, now: number): boolean {
   if (data.error) return true;

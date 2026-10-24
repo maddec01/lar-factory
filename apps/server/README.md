@@ -93,6 +93,10 @@ and `pnpm run sample` are for developing the board. A running process keeps the 
 page it started with, so a new browser load still works after checkout changes or a
 rebuild.
 
+`src/server.ts` starts the board: it reads GitHub, checks the tools and wires the rest.
+`src/board/` holds the board data and the changes laid over it, `src/items/` the item
+commands and their locks, and `src/http/` the routes.
+
 `pnpm test` runs the server tests with Node's test runner: unit tests sit next to the
 files they test in `src/`, and the tests that start the whole board, with their fixtures,
 in `test/`. The page tests sit next to their files in `apps/web/src/`; `pnpm test` in

@@ -3,6 +3,7 @@
 
 import type { ReactNode } from 'react';
 import type { ToolMissing, ToolProblem } from '@mux-factory/shared';
+import { Button } from '@mux-factory/ui/button';
 import { BrandMark } from '../board/header.tsx';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { useRecheckStore } from './recheck-store.ts';
@@ -15,7 +16,7 @@ function Recheck({ problem }: { problem: ToolProblem }) {
   const note = answer && !checking ? answer.error ?? (problem.problem === 'logged-out' ? 'Still logged out.' : 'Still not found.') : null;
   return (
     <>
-      <button type="button" className="copy recheck" data-recheck disabled={checking} onClick={() => void recheck()}>{checking ? 'Checking…' : 'Recheck'}</button>
+      <Button variant="outline" size="xs" className="recheck" data-recheck disabled={checking} onClick={() => void recheck()}>{checking ? 'Checking…' : 'Recheck'}</Button>
       {note && <> <span className="recheck-note" role="status">{note}</span></>}
     </>
   );

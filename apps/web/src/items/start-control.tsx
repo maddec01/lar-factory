@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom';
 import { Menu } from '@base-ui/react/menu';
 import { ref, highlightedChoice, storedChoice } from '@mux-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@mux-factory/shared';
+import { Button } from '@mux-factory/ui/button';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './card.tsx';
 import { startItem } from './start-item.ts';
@@ -77,7 +78,7 @@ export function StartControl({ item, data }: { item: Item; data: BoardData }) {
   return (
     <span className="start-group">
       <Menu.Root open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
-        <Menu.Trigger className="copy start-item" data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
+        <Menu.Trigger render={<Button size="xs" />} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
           {verb}{start?.phase !== 'pending' && ' ▾'}
         </Menu.Trigger>
         <Menu.Portal>

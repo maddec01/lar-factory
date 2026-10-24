@@ -4,6 +4,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
+import { XIcon } from 'lucide-react';
+import { Button } from '@mux-factory/ui/button';
 import { useToastStore } from './toast-store.ts';
 import type { Toast } from './toast-store.ts';
 
@@ -16,7 +18,7 @@ const FALLBACK_FOCUS = '.add-item';
 
 /** The close button every failure and toast carries; `what` names what it closes for screen readers. */
 export function DismissButton({ what, onClick }: { what: string; onClick: () => void }) {
-  return <button type="button" className="dismiss" aria-label={`Dismiss${what}`} onClick={onClick}>{'×'}</button>;
+  return <Button variant="ghost" size="icon-xs" className="dismiss" aria-label={`Dismiss${what}`} onClick={onClick}><XIcon /></Button>;
 }
 
 /** Moves focus to the first of `selectors` on the page, if something took it away with the element that had it. */

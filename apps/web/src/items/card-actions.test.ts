@@ -24,7 +24,7 @@ test('Queue shows the action in flight, then moves the row to Queued, says so, a
   await answer({ error: null, board: moved('PVTI_sample01', 'Queued') });
   expect($('#list [data-anchor="PVTI_sample01"]')).toBeNull();
   expect($('#queued article[data-anchor="PVTI_sample01"]')).not.toBeNull();
-  expect([toast()!.getAttribute('role'), text(toast())]).toEqual(['status', `×Moved #61 ${sample.items[0]!.title} to Queued. View item`]);
+  expect([toast()!.getAttribute('role'), text(toast())]).toEqual(['status', `Moved #61 ${sample.items[0]!.title} to Queued. View item`]);
   expect(toast()!.querySelector('button.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Moved #61');
   expect(document.activeElement, 'the next row’s Queue').toBe(button('queue', 'PVTI_sample02'));
 });
@@ -66,7 +66,7 @@ test('Back to List shows only its own pending state, then moves the card and kee
 
   await answer({ error: null, board: moved('PVTI_sample05', 'List') });
   expect($('#queued [data-anchor="PVTI_sample05"]')).toBeNull();
-  expect(text(toast())).toMatch(/^×Moved #129 .* to List\. View item$/);
+  expect(text(toast())).toMatch(/^Moved #129 .* to List\. View item$/);
   const next = $$('#queued article')[0]!.querySelector('[data-start],[data-back-to-list],[data-abandon]');
   expect(document.activeElement, "the next card's first action").toBe(next);
 });
@@ -89,7 +89,7 @@ test('a failed card action shows as a toast naming the item, which stays until c
   await answer({ error: 'Could not set List. GitHub is down.' }, 502);
   expect(toast()!.getAttribute('role')).toBe('alert');
   expect(toast()!.dataset.tone, 'the board\'s own failure toasts keep their look').toBeUndefined();
-  expect(text(toast())).toMatch(/^×Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
+  expect(text(toast())).toMatch(/^Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
   expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
   expect($('[data-anchor="PVTI_sample05"] .action-error'), 'the card shows no inline error').toBeNull();
   expect(text(button('back-to-list', 'PVTI_sample05')), 'the footer goes back to its links').toBe('← Back to List');
@@ -143,7 +143,7 @@ test('confirming Abandon deletes the item, shows it in flight, and announces it 
 
   await answer({ error: null, board: without('PVTI_sample01') });
   expect($('[data-anchor="PVTI_sample01"]')).toBeNull();
-  expect(text(toast())).toBe(`×Deleted #61 ${sample.items[0]!.title}.`);
+  expect(text(toast())).toBe(`Deleted #61 ${sample.items[0]!.title}.`);
   expect(toast()!.querySelector('a, .view-item'), 'nothing to link to').toBeNull();
   expect(document.activeElement, "the next row's Abandon").toBe(button('abandon', 'PVTI_sample02'));
 });
@@ -161,7 +161,7 @@ test("a failed Abandon stays on a List row, but is a toast for a Queued card", a
   await settle(() => button('abandon', 'PVTI_sample05').click());
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
   await answer({ error: 'Could not delete #129.' }, 502);
-  expect(text(toast())).toMatch(/^×Couldn't abandon #129 .*\. Could not delete #129\.$/);
+  expect(text(toast())).toMatch(/^Couldn't abandon #129 .*\. Could not delete #129\.$/);
   expect(document.activeElement, 'back to its Abandon').toBe(button('abandon', 'PVTI_sample05'));
 });
 

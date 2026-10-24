@@ -43,10 +43,10 @@ test('a new notice replaces the last, and its close button closes it', async () 
   await mountPage();
   const [first, second] = [sample.items[0]!, sample.items[1]!];
   await notify({ verb: 'Added', item: first, to: 'List' });
-  expect(text(toast())).toBe(`×Added #61 ${first.title} to List. View item`);
+  expect(text(toast())).toBe(`Added #61 ${first.title} to List. View item`);
   await notify({ verb: 'Moved', item: second, to: 'Queued' });
   expect(document.querySelectorAll('.toasts .toast').length).toBe(1);
-  expect(text(toast())).toMatch(/^×Moved #114 /);
+  expect(text(toast())).toMatch(/^Moved #114 /);
   const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;
   close.focus();
   await settle(() => close.click());

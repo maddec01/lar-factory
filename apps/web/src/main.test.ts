@@ -109,7 +109,7 @@ test("a failed fetch says the server can't be reached and keeps the last data", 
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect($('.banner[role="alert"]')!.textContent).toBe("×Can't reach the board server. HTTP 502 Showing the last data this page received.");
+  expect($('.banner[role="alert"]')!.textContent).toBe("Can't reach the board server. HTTP 502 Showing the last data this page received.");
   expect($('.totals li:last-child')!.textContent).toBe('25 items');
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));

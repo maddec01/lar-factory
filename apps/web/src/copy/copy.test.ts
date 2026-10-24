@@ -20,7 +20,7 @@ test('Copy copies its text, says Copied, and announces it in the copy-status liv
   const button = await mount();
   const status = $('#copy-status')!;
   expect([status.getAttribute('role'), status.getAttribute('aria-live'), status.className]).toEqual(['status', 'polite', 'sr-only']);
-  expect([button.textContent, button.className, button.getAttribute('aria-label')]).toEqual(['Copy', 'copy', 'Copy test command']);
+  expect([button.textContent, button.dataset.slot, button.getAttribute('aria-label')]).toEqual(['Copy', 'button', 'Copy test command']);
 
   await settle(() => button.click());
   expect(writeText).toHaveBeenCalledWith('pnpm test');

@@ -4,6 +4,7 @@
 
 import { Dialog } from '@base-ui/react/dialog';
 import { boardApp, type UpdateChannel, type UpdateState } from '@mux-factory/shared';
+import { Button } from '@mux-factory/ui/button';
 import { profilePath, useSettingsStore } from './settings-store.ts';
 import { useUpdateStore } from '../updates/update-store.ts';
 
@@ -96,13 +97,13 @@ export function Settings() {
   if (!boardApp()) return null;
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger className="copy open-settings">Settings</Dialog.Trigger>
+      <Dialog.Trigger className="open-settings" render={<Button variant="outline" size="xs" />}>Settings</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="dialog-backdrop" />
         <Dialog.Popup id="settings-dialog">
           <div className="form-heading">
             <Dialog.Title id="settings-heading">Settings</Dialog.Title>
-            <Dialog.Close className="copy">Close</Dialog.Close>
+            <Dialog.Close render={<Button variant="outline" size="xs" />}>Close</Dialog.Close>
           </div>
           <p className="form-hint">Mux Factory links its skills and copies its checklists into each ticked profile.</p>
           <Profiles />

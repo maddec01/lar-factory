@@ -90,7 +90,7 @@ function QueuedCard({ item, data }: { item: Item; data: BoardData }) {
   const footer = item.type !== 'PullRequest' && !startHolds && (
     <div className="card-actions">
       <BackToListButton item={item} data={data} />
-      <AbandonButton item={item} data={data} className="link-action danger" />
+      <AbandonButton item={item} data={data} inFooter />
     </div>
   );
   return (

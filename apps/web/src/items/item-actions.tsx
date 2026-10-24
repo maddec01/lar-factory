@@ -4,6 +4,7 @@
 import { useRef } from 'react';
 import { canAbandon, ref } from '@mux-factory/shared';
 import type { BoardData, Item } from '@mux-factory/shared';
+import { Button, InlineButton } from '@mux-factory/ui/button';
 import { useActionStore, useItemAction } from './action-store.ts';
 import { askAbandon, backToList, queueItem } from './card-actions.ts';
 import { writeState } from './card.tsx';
@@ -12,25 +13,27 @@ import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);
   const verb = action?.phase === 'pending' && action.kind === 'queue' ? 'Queuing…' : 'Queue';
-  return <button type="button" className="copy row-action" data-queue={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
-    {...writeState(data, action)} onClick={() => void queueItem(item.id)}>{verb}</button>;
+  return <Button variant="outline" size="xs" className="row-action" data-queue={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
+    {...writeState(data, action)} onClick={() => void queueItem(item.id)}>{verb}</Button>;
 }
 
 /** The muted link-style button in a Queued card's footer row that moves it back to List. */
 export function BackToListButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);
   const moving = action?.phase === 'pending' && action.kind === 'back-to-list';
-  return <button type="button" className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Back to List'} ${ref(item)} ${item.title}`}
-    {...writeState(data, action)} onClick={() => void backToList(item.id)}>{'←'} {moving ? 'Moving to List…' : 'Back to List'}</button>;
+  return <InlineButton tone="muted" className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Back to List'} ${ref(item)} ${item.title}`}
+    {...writeState(data, action)} onClick={() => void backToList(item.id)}>{'←'} {moving ? 'Moving to List…' : 'Back to List'}</InlineButton>;
 }
 
-/** Abandon styled as a List row's button, or as a Queued card footer's link. */
-export function AbandonButton({ item, data, className = 'copy row-action abandon' }: { item: Item; data: BoardData; className?: string }) {
+/** Abandon as a List row's button, or as a Queued card footer's link. */
+export function AbandonButton({ item, data, inFooter = false }: { item: Item; data: BoardData; inFooter?: boolean }) {
   const action = useItemAction(item.id);
   if (!canAbandon(item)) return null;
   const verb = action?.phase === 'pending' && action.kind === 'abandon' ? 'Abandoning…' : 'Abandon';
-  return <button type="button" className={className} data-abandon={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
-    {...writeState(data, action)} onClick={() => askAbandon(item.id)}>{verb}</button>;
+  const props = { 'data-abandon': item.id, 'aria-label': `${verb} ${ref(item)} ${item.title}`, ...writeState(data, action), onClick: () => askAbandon(item.id) };
+  return inFooter
+    ? <InlineButton tone="destructive" className="link-action danger" {...props}>{verb}</InlineButton>
+    : <Button variant="destructive-outline" size="xs" className="row-action" {...props}>{verb}</Button>;
 }
 
 /** A List row's failed Queue or Abandon, by its buttons until it's closed. */

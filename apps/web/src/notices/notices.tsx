@@ -3,6 +3,7 @@
 
 import { platformOf, ref, workTitle, abandonPrompt, listGroupId } from '@mux-factory/shared';
 import type { Item, StartedThread, Status } from '@mux-factory/shared';
+import { Button } from '@mux-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useDetailsStore } from '../board/details-store.ts';
 import { useJumpStore } from '../board/jump-store.ts';
@@ -55,7 +56,7 @@ function toastOf(notice: Notice): Omit<Toast, 'key'> {
     default:
       return {
         slot: SLOT, what: `${notice.verb} ${ref(item)}`,
-        body: <>{notice.verb} <TitleLink item={item} /> to {notice.to}. <button type="button" className="copy view-item" onClick={() => viewItem(item.id)}>View item</button></>,
+        body: <>{notice.verb} <TitleLink item={item} /> to {notice.to}. <Button variant="outline" size="xs" className="view-item" onClick={() => viewItem(item.id)}>View item</Button></>,
       };
   }
 }

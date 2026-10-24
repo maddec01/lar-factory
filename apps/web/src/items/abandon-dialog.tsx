@@ -3,6 +3,7 @@
 
 import { AlertDialog } from '@base-ui/react/alert-dialog';
 import { abandonPrompt } from '@mux-factory/shared';
+import { Button } from '@mux-factory/ui/button';
 import { useAbandonStore } from './abandon-store.ts';
 import { abandonItem } from './card-actions.ts';
 
@@ -21,8 +22,8 @@ export function AbandonDialog() {
           <div className="form-heading"><AlertDialog.Title id="abandon-heading">{prompt?.question}</AlertDialog.Title></div>
           <AlertDialog.Description className="form-hint" id="abandon-detail">{prompt?.detail}</AlertDialog.Description>
           <div className="form-actions">
-            <AlertDialog.Close className="copy">Cancel</AlertDialog.Close>
-            <button type="button" className="copy abandon" onClick={confirm}>{prompt?.confirm}</button>
+            <AlertDialog.Close render={<Button variant="outline" size="xs" />}>Cancel</AlertDialog.Close>
+            <Button variant="destructive" size="xs" onClick={confirm}>{prompt?.confirm}</Button>
           </div>
         </AlertDialog.Popup>
       </AlertDialog.Portal>

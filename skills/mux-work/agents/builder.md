@@ -108,9 +108,9 @@ failed check or a failed Verify) becomes a build there, and this build carries
 on. Write its short brief per **3. Brief** in `<mux-work>/SKILL.md`, with that
 repository's Domain docs only, as a sub-issue of this build that blocks it
 (reuse an open issue that covers the work); run its **4. Gate** Doubt, set it
-**Ready** and launch its thread per step 2 of **5. Start the build**, with no
-launch check. Ask Pedro only a product question he hasn't confirmed, or
-before cloning a repo he can't push to. A slice holding that work
+**Ready** and tell Pedro in chat that it waits for the board's Start build
+(**5. Start the build**). Ask Pedro only a product question he hasn't
+confirmed. A slice holding that work
 loses `active` and closes as not planned, its text moving into the new brief.
 A failed Verify is fixed in this build, or by a new blocking build when
 another repository must change; a merged build is never reopened.

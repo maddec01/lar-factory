@@ -24,8 +24,9 @@ options against the request; report a capability mismatch, never downgrade.
   `childThreadId` is storage, never a conversation.
 - Its worktree starts from this thread's local commit, without uncommitted
   edits: commit before delegating.
-- Top-level threads (`t3_thread_launch`) are a different thing, only for
-  shaping, decision and build threads and handoffs.
+- Top-level threads are a different thing: the board starts shaping, decision
+  and build threads, and a thread uses `t3_thread_launch` only for its own
+  handoff.
 - Every prompt carries the factory report rule: ≤300 words, no whole files,
   logs or screenshots.
 

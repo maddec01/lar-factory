@@ -1,28 +1,16 @@
-// The bits every view draws for an item: its platform badge, kind pill, label pills, blocked-by badge and title link,
-// and the item dialog's status track, slices, pull requests with checks, and agent work.
-// The pills are T3's Badge; the board's CSS adds the coloured dot.
+// The bits every view draws for an item: its numbered title, title link and status track, and the item dialog's
+// platform tag, slices, pull requests with checks, and agent work. The tag is T3's Badge; the board's CSS adds the
+// coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
-import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, kindLabel, kindOf, plural, prLabel, ref, slug } from '@mux-factory/shared';
+import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, slug } from '@mux-factory/shared';
 import type { Item, SliceProgress, Status } from '@mux-factory/shared';
 import { Badge } from '@mux-factory/ui/badge';
 import { STATUS_COLOR } from './status-glyph.tsx';
 
-export function PlatformBadge({ platform }: { platform: string }) {
-  return <Badge variant="outline" className={`plat plat-${slug(platform)}`}>{platform}</Badge>;
-}
-
-/** The control room's platform badge: smaller than PlatformBadge, with a medium label. */
+/** The control room's platform badge, with a medium label. */
 export function PlatformTag({ platform }: { platform: string }) {
   return <Badge variant="outline" size="sm" className={`plat plat-${slug(platform)} gap-1.5 font-medium`}>{platform}</Badge>;
-}
-
-export function KindPill({ item }: { item: Item }) {
-  return <Badge variant="outline" className={`kind kind-${kindOf(item)}`}>{kindLabel(item)}</Badge>;
-}
-
-export function BlockedBy({ count }: { count: number }) {
-  return <Badge variant="error" className="blocked-by" title={`Blocked by ${plural(count, 'issue')}`}>blocked by {count}</Badge>;
 }
 
 export function TitleLink({ item, className = 'title' }: { item: Item; className?: string }) {
@@ -30,11 +18,6 @@ export function TitleLink({ item, className = 'title' }: { item: Item; className
   return item.url
     ? <a className={className} href={item.url} target="_blank" rel="noopener">{text}</a>
     : <span className={className}>{text}</span>;
-}
-
-/** One pill per GitHub label, kind included; a kind label keeps its colour. Always rendered, so it pushes a row's buttons to the end. */
-export function LabelPills({ item }: { item: Item }) {
-  return <span className="labels">{item.labels.map((l) => <Badge variant="outline" className={`label kind-${slug(l)}`} key={l}>{l}</Badge>)}</span>;
 }
 
 /** An item's title with its issue number before it, muted, the way the board lists every item. */

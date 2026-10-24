@@ -2,32 +2,31 @@
    system (packages/ui). Each feature folder holds its own layout rules; all of them use only the design
    system's tokens and Tailwind's spacing scale. */
 @import "@mux-factory/ui/styles.css";
-@import "./board/board.css";
 @import "./items/items.css";
+@import "./sidebar/sidebar.css";
 @import "./notices/notices.css";
 @import "./add-item/add-item.css";
 @import "./settings/settings.css";
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item/add-item.tsx";
+@source "./app.tsx";
+@source "./desk";
 @source "./item-dialog";
 @source "./items/item-parts.tsx";
-@source "./items/slice-popover.tsx";
 @source "./items/start-control.tsx";
 @source "./items/status-glyph.tsx";
+@source "./line";
 @source "./notices/banner.tsx";
+@source "./notices/banners.tsx";
 @source "./notices/form-result.tsx";
 @source "./notices/toasts.tsx";
-@source "./title-bar/TitleBar.tsx";
+@source "./sidebar";
+@source "./title-bar";
 @source "./updates/UpdateButton.tsx";
 @source "./updates/UpdateStatusIcon.tsx";
 @source "./updates/refresh-icon.tsx";
 
-/* Full browser width, with T3's workspace gutter. */
-#app { padding: --spacing(3.5) --spacing(5) --spacing(12); }
-@media (max-width: 35rem) {
-  #app { padding: --spacing(3); }
-}
 /* Tailwind's base styles take links' underline and headings' weight; these put back the browser's. */
 a { color: inherit; text-decoration: underline; }
 a[data-slot="button"] { text-decoration: none; }

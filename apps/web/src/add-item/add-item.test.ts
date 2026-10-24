@@ -142,7 +142,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   const toast = $('[data-toast][role="status"]')!;
   expect(toast.textContent).toBe('Added #501 Playback stalls to List. View item');
   expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added #501');
-  expect($('.totals')!.textContent, 'the board shows the new data').toContain(`${sample.items.length + 1} items`);
+  expect($('.sidebar [data-item="PVTI_created501"]'), 'the board shows the new data').not.toBeNull();
 });
 
 test('a created issue the server could not add offers a retry of the same request', async () => {

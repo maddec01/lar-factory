@@ -1,4 +1,4 @@
-// The header's banners: a warning with a title and a description, and one with a close button that, closed,
+// The page's banners: a warning with a title and a description, and one with a close button that, closed,
 // stays away until its key is restored or the page reloads.
 
 import { useRef } from 'react';
@@ -10,7 +10,7 @@ import { DismissButton, closeKeepingFocus } from './toasts.tsx';
 /** `action` sits at the banner's right end. */
 export function Banner({ title, action, ref, children }: { title: string; action?: ReactNode; ref?: Ref<HTMLDivElement>; children: ReactNode }) {
   return (
-    <Alert variant="warning" className="banner mt-2.5" ref={ref}>
+    <Alert variant="warning" className="banner" ref={ref}>
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription className="block">{children}</AlertDescription>
       {action && <AlertAction>{action}</AlertAction>}

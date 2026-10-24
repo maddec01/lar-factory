@@ -112,10 +112,10 @@ test.each([
   expect(footerControls()).toEqual(['GitHub', `Open thread (disabled: ${reason})`]);
 });
 
-test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Start refining', async (state) => {
+test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Start refining, and neither Back to List nor Abandon', async (state) => {
   await mountPage(withThreads('PVTI_sample05', [thread('live', state)]));
   await openItem('PVTI_sample05');
-  expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', 'Open thread']);
+  expect(footerControls()).toEqual(['GitHub', 'Open thread']);
   expect(statusAction().getAttribute('href')).toBe('t3code://threads/sample-environment/live');
 });
 

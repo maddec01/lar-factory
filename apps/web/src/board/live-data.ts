@@ -3,7 +3,6 @@
 
 import { useBoardStore } from './board-store.ts';
 import { useDismissStore } from '../notices/dismiss-store.ts';
-import { holdAnchor } from './keep-anchor.ts';
 import type { BoardData } from '@mux-factory/shared';
 
 const POLL_MS = 15_000;
@@ -19,7 +18,6 @@ export function startLiveData(): void {
 
   const receive = (text: string) => {
     const data = JSON.parse(text) as BoardData;
-    holdAnchor();
     board.receive(data);
     // The server answered: if it goes away again, say so even if the last banner was closed.
     useDismissStore.getState().restore(CLIENT_ERROR);

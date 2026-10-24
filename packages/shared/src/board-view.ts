@@ -35,7 +35,7 @@ export interface BoardSections {
   concepts: Item[];
   queued: Item[];
   list: Item[];
-  /** One per configured repo's platform, then any other platform a List item has. */
+  /** One per configured repo's platform, then any other platform a List item has; each group's items in board order. */
   listGroups: ListGroup[];
   /** Closed in the last 7 days, most recently closed first. */
   done: Item[];
@@ -56,7 +56,9 @@ export function boardSections(data: BoardData, now: number): BoardSections {
     concepts: items.filter((i) => kindOf(i) === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),
     list,
-    listGroups: platforms.map((platform) => ({ platform, id: listGroupId(platform), items: list.filter((i) => platformOf(i, data.repos) === platform) })),
+    listGroups: platforms.map((platform) => ({
+      platform, id: listGroupId(platform), items: data.items.filter((i) => i.status === 'List' && platformOf(i, data.repos) === platform),
+    })),
     done: items
       .filter((i) => isRecentlyDone(i, now))
       .sort((a, b) => (b.closedAt ?? b.updatedAt).localeCompare(a.closedAt ?? a.updatedAt)),

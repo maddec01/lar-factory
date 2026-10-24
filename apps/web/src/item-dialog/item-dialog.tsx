@@ -30,7 +30,7 @@ function PrLink({ item, label }: { item: Item; label: string }) {
 /** The one thing the item's status asks of you. */
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {
   switch (item.status) {
-    case 'List': return <QueueButton item={item} data={data} primary />;
+    case 'List': return <QueueButton item={item} data={data} />;
     case 'Queued':
       if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
       return workMessage(item) ? <StartControl item={item} data={data} label="Start refining" size="sm" icon={<Play />} /> : null;
@@ -43,12 +43,12 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
   }
 }
 
-/** Back to List and Abandon, as a Queued card's footer has them; a Start in flight, uncertain or done takes them away. */
+/** Back to List and Abandon; a Start in flight, uncertain or done, or a thread at work on the item, takes them away. */
 function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   const startHolds = useStartHolds(item, data);
-  if (item.status === 'List') return <AbandonButton item={item} data={data} inFooter />;
-  if (item.status !== 'Queued' || item.type === 'PullRequest' || startHolds) return null;
-  return <><BackToListButton item={item} data={data} /><AbandonButton item={item} data={data} inFooter /></>;
+  if (item.status === 'List') return <AbandonButton item={item} data={data} />;
+  if (item.status !== 'Queued' || item.type === 'PullRequest' || startHolds || hasLiveThread(item)) return null;
+  return <><BackToListButton item={item} data={data} /><AbandonButton item={item} data={data} /></>;
 }
 
 function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now: number }) {

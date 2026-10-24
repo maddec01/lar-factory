@@ -221,8 +221,15 @@ The installable desktop app that runs the board and updates itself from Releases
 _Avoid_: Electron app, desktop board
 
 **Title bar**:
-The bar at the top of the board page, in the board app and in a browser. It holds the brand on the left, and the Refreshed time and the board's actions on the right.
+The bar at the top of the main area, in the board app and in a browser. It holds the scope, the Refreshed time and the counters. The brand sits in the sidebar's top row.
 _Avoid_: toolbar, top bar
+
+**Desk**:
+The row of items only Pedro can move on: Needs you, Verify and Ready to merge.
+_Avoid_: inbox, queue
+
+**Line**:
+The board's view of the work moving through the factory: the Queue, the dossiers, and everything else in flight on one stage track.
 
 **Design system**:
 The package that holds every token, style and base component of the board page and the board app's starting page; nothing outside it sets its own colours or spacing.

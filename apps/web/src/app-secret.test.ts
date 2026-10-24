@@ -11,7 +11,8 @@ const secretOfLastPost = () => {
 
 async function queueFirstItem(): Promise<void> {
   await mountPage();
-  await settle(() => $<HTMLButtonElement>('[data-queue="PVTI_sample01"]')!.click());
+  await settle(() => $<HTMLButtonElement>('.sidebar [data-item="PVTI_sample01"]')!.click());
+  await settle(() => $<HTMLButtonElement>('[data-item-dialog] [data-queue="PVTI_sample01"]')!.click());
 }
 
 test('in the app, a write carries the secret the bridge holds', async () => {

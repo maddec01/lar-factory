@@ -1,14 +1,8 @@
 // Toasts: a success clears itself after 5 s, later while it's in use; the close button; View item;
-// and their place below the header. Ported from the toast cases of test/render.test.ts.
+// and their place below the banners. Ported from the toast cases of test/render.test.ts.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, fetchMock, mountPage, moved, sample, settle, text, toast } from '../../test/support.ts';
-
-/** Queues the item, which the server moves to Queued, so the page shows a Moved toast. */
-async function queue(id: string, board = moved(id, 'Queued')): Promise<void> {
-  fetchMock.mockImplementation(async (url: string) => new Response(JSON.stringify(url === '/api/queue' ? { error: null, board } : sample)));
-  await settle(() => $<HTMLButtonElement>(`[data-queue="${id}"]`)!.click());
-}
 
 /** Shows a toast straight from the store, as the Add item form will. */
 async function notify(notice: Parameters<typeof import('./notices.tsx').notify>[0]): Promise<void> {
@@ -18,7 +12,7 @@ async function notify(notice: Parameters<typeof import('./notices.tsx').notify>[
 
 test('a success toast clears itself after 5 s', async () => {
   await mountPage();
-  await queue('PVTI_sample01');
+  await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
   expect(toast()).not.toBeNull();
   await settle(() => vi.advanceTimersByTime(4_900));
   expect(toast()).not.toBeNull();
@@ -28,7 +22,7 @@ test('a success toast clears itself after 5 s', async () => {
 
 test('a toast with focus stays, then gets a full 5 s once focus leaves', async () => {
   await mountPage();
-  await queue('PVTI_sample01');
+  await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
   toast()!.querySelector<HTMLElement>('.view-item')!.focus();
   await settle(() => vi.advanceTimersByTime(8_000));
   expect(toast(), 'still being used').not.toBeNull();
@@ -75,54 +69,39 @@ test('toasts in different slots each keep their own row, not a pile that spreads
   expect(document.querySelector('[data-toast="update"] [data-behind]')).not.toBeNull();
 });
 
-test('View item shows the item on the Board, opens its List group, moves focus to it and closes the toast', async () => {
+test('View item opens the item in the item dialog and closes the toast', async () => {
   await mountPage();
-  await settle(() => $<HTMLButtonElement>('#list-server > [data-slot="collapsible-trigger"]')!.click());
-  expect($('#list-server')!.hasAttribute('data-open')).toBe(false);
   await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
   await settle(() => toast()!.querySelector<HTMLButtonElement>('.view-item')!.click());
-  expect($('#list-server')!.hasAttribute('data-open')).toBe(true);
-  const row = $('#list [data-anchor="PVTI_sample01"]')!;
-  expect(row.scrollIntoView).toHaveBeenCalled();
-  expect(row.classList.contains('anchor-flash')).toBe(true);
-  expect(document.activeElement).toBe(row.querySelector('a.row-title'));
+  const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+  expect(useItemDialogStore.getState().itemId).toBe('PVTI_sample01');
+  expect($('[data-item-dialog]')!.textContent).toContain(sample.items[0]!.title);
   expect(toast()).toBeNull();
 });
 
-test("View item goes to the item's own card, not its row inside a concept", async () => {
+test('View item does nothing once the item has left the board', async () => {
   await mountPage();
-  const sub = sample.items.find((i) => i.id === 'PVTI_sample10')!;
-  await notify({ verb: 'Moved', item: sub, to: sub.status });
+  await notify({ verb: 'Added', item: { ...sample.items[0]!, id: 'PVTI_gone' }, to: 'List' });
   await settle(() => toast()!.querySelector<HTMLButtonElement>('.view-item')!.click());
-  expect(document.activeElement!.closest('[data-anchor]')!.matches('article')).toBe(true);
+  expect($('[data-item-dialog]')).toBeNull();
+  expect(toast(), 'the toast stays').not.toBeNull();
 });
 
-test('toasts sit below the header while it is on screen, and at the top once it scrolls away', async () => {
-  await mountPage();
-  let bottom = 100;
-  $('header.top')!.getBoundingClientRect = () => ({ bottom }) as DOMRect;
-  await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
-  const anchor = () => document.documentElement.style.getPropertyValue('--toast-anchor');
-  expect(anchor()).toBe('100px');
-  bottom = -40;
-  dispatchEvent(new Event('scroll'));
-  expect(anchor()).toBe('0px');
-  bottom = 60;
-  dispatchEvent(new Event('resize'));
-  expect(anchor()).toBe('60px');
-});
-
-test('toasts stay below the title bar once the header scrolls away', async () => {
+test('toasts sit below the banners while they are on screen, and below the title bar once they scroll away', async () => {
   await mountPage();
   let bottom = 140;
-  $('header.top')!.getBoundingClientRect = () => ({ bottom }) as DOMRect;
+  $('.banners')!.getBoundingClientRect = () => ({ bottom }) as DOMRect;
   $('.title-bar')!.getBoundingClientRect = () => ({ bottom: 52 }) as DOMRect;
   await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
   const anchor = () => document.documentElement.style.getPropertyValue('--toast-anchor');
   expect(anchor()).toBe('140px');
   bottom = -40;
-  dispatchEvent(new Event('scroll'));
+  // The main area scrolls, not the window.
+  $('main .overflow-y-auto')!.dispatchEvent(new Event('scroll'));
   expect(anchor()).toBe('52px');
+  bottom = 90;
+  dispatchEvent(new Event('resize'));
+  expect(anchor()).toBe('90px');
 });
 
 test("a poll that started before the page's own write doesn't bring back older data", async () => {
@@ -133,8 +112,11 @@ test("a poll that started before the page's own write doesn't bring back older d
     return new Response(JSON.stringify({ error: null, board: moved('PVTI_sample01', 'Queued') }));
   });
   await settle(() => vi.advanceTimersByTime(15_000));
-  await settle(() => $<HTMLButtonElement>('[data-queue="PVTI_sample01"]')!.click());
-  expect($('#queued [data-anchor="PVTI_sample01"]')).not.toBeNull();
+  const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
+  await settle(() => useItemDialogStore.getState().open('PVTI_sample01'));
+  await settle(() => $<HTMLButtonElement>('[data-item-dialog] [data-queue="PVTI_sample01"]')!.click());
+  const inList = () => $('.sidebar [data-item="PVTI_sample01"]');
+  expect(inList()).toBeNull();
   await settle(() => answerPoll());
-  expect($('#queued [data-anchor="PVTI_sample01"]'), 'still Queued').not.toBeNull();
+  expect(inList(), 'still Queued').toBeNull();
 });

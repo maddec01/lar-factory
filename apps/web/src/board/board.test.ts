@@ -2,12 +2,11 @@
 // Ported from the Board cases of test/render.test.ts.
 
 import { beforeEach, expect, test } from 'vite-plus/test';
-import { $, $$, NOW, mountPage, sample, settle } from '../../test/support.ts';
+import { $, $$, NOW, mountPage, sample, settle, text } from '../../test/support.ts';
 import { normalizeItems } from '@mux-factory/shared';
 import type { BoardData, Item, RawItem } from '@mux-factory/shared';
 import { rawIssue, sliceRef } from '../../test/raw-items.ts';
 
-const text = (el: Element | null | undefined) => el?.textContent ?? '';
 const card = (id: string) => $(`article[data-anchor="${id}"]`)!;
 const listRow = (id: string) => $(`#list li[data-anchor="${id}"]`)!;
 const ids = (selector: string, attr: string) => $$(selector).map((el) => el.getAttribute(attr)!).sort();

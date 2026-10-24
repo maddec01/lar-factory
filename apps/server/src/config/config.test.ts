@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { CONFIG_URL, configUrl, loadConfig } from '../src/config.ts';
+import { CONFIG_URL, configUrl, loadConfig } from './config.ts';
 
 const server = { repo: 'maddec01/mux-server', platform: 'Server', role: 'Backend API server' };
 

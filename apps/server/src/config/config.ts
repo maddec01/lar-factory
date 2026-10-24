@@ -14,7 +14,7 @@ export interface BoardConfig {
   refreshSeconds: number;
 }
 
-export const CONFIG_URL = new URL('../../../config.json', import.meta.url);
+export const CONFIG_URL = new URL('../../../../config.json', import.meta.url);
 
 /** BOARD_CONFIG_FILE's absolute path when set, else the checkout's config.json. */
 export function configUrl(env: NodeJS.ProcessEnv = process.env): URL {

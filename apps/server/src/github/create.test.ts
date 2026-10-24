@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addProjectItem } from '../src/github.ts';
-import { loadConfig } from '../src/config.ts';
+import { addProjectItem } from './github.ts';
+import { loadConfig } from '../config/config.ts';
 import type { CreationProgress } from '@mux-factory/shared';
 
 test('creates an Apple issue with the selected labels and explicitly assigns List', async () => {

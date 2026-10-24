@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { loadItemStats } from '../src/item-stats.ts';
-import type { ItemStatsReader, StatsSources } from '../src/item-stats.ts';
-import { assistant, claudeHome, codexHome, codexSession, codexTokens, statsDb, t3Settings, tempDir, usageRates } from './stats-db.ts';
-import type { FixtureThread } from './stats-db.ts';
+import { loadItemStats } from './item-stats.ts';
+import type { ItemStatsReader, StatsSources } from './item-stats.ts';
+import { assistant, claudeHome, codexHome, codexSession, codexTokens, statsDb, t3Settings, tempDir, usageRates } from '../../test/stats-db.ts';
+import type { FixtureThread } from '../../test/stats-db.ts';
 
 /** A home folder, settings and price table that don't exist, so tests never read real transcripts. */
 const NOWHERE = {

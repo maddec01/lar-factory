@@ -7,21 +7,21 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { loadConfig } from './config.ts';
-import { BOARD_PORTS, listenOnFreePort, reportListening } from './port.ts';
-import { recordBoard } from './board-record.ts';
-import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github.ts';
+import { loadConfig } from './config/config.ts';
+import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
+import { recordBoard } from './port/board-record.ts';
+import { abandonItem, addProjectItem, editPrBody, fetchProject, findProjectNumber, readPrBody, setItemStatus } from './github/github.ts';
 import { validateDraft, canAbandon, pageWithData, workMessage } from '@mux-factory/shared';
 import type { CreationProgress, CreationResult, ItemDraft, BoardData, ContentType, Item, ModelChoice, ModelGroup, StartResult, Status } from '@mux-factory/shared';
-import { startThread } from './t3.ts';
-import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools.ts';
-import { repositoryProject } from './repository-project.ts';
-import type { RepositoryProject } from './repository-project.ts';
-import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './item-stats.ts';
-import { findModelChoice, loadModelChoices } from './model-choices.ts';
-import type { StatsSources } from './item-stats.ts';
-import { mergedStats, prStatsEdits, updatedBody } from './pr-stats.ts';
-import { loadBuild } from './page.ts';
+import { startThread } from './t3/t3.ts';
+import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools/tools.ts';
+import { repositoryProject } from './t3/repository-project.ts';
+import type { RepositoryProject } from './t3/repository-project.ts';
+import { loadItemStats, modelManifestPath, statsDbPath, t3SettingsPath, usageRatesPath } from './stats/item-stats.ts';
+import { findModelChoice, loadModelChoices } from './t3/model-choices.ts';
+import type { StatsSources } from './stats/item-stats.ts';
+import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
+import { loadBuild } from './page/page.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
@@ -240,8 +240,10 @@ function readSoon(): void {
   else void refresh();
 }
 
-// The page `pnpm run build` wrote, read once at startup.
-const page = loadBuild();
+// The page `pnpm run build` wrote, read once at startup. The path is relative to this
+// entry, so it holds both for the source and for the packaged app's bundle in
+// Resources/server/dist/, beside Resources/web/dist/.
+const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',

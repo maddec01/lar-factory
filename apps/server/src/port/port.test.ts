@@ -2,8 +2,8 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:net';
 import { once } from 'node:events';
-import { BOARD_PORTS, listenOnFreePort } from '../src/port.ts';
-import { freePort } from './server-support.ts';
+import { BOARD_PORTS, listenOnFreePort } from './port.ts';
+import { freePort } from '../../test/server-support.ts';
 
 async function hold(t: TestContext, port: number): Promise<Server> {
   const server = createServer();

@@ -7,7 +7,7 @@
 // and resolveProviderInstanceDisplayName in packages/client-runtime/src/state/providerInstanceDisplay.ts.
 
 import { readFileSync } from 'node:fs';
-import { isRecord, readSettings } from './item-stats.ts';
+import { isRecord, readSettings } from '../stats/item-stats.ts';
 import { offers } from '@mux-factory/shared';
 import type { ModelChoice, ModelGroup, ModelOption } from '@mux-factory/shared';
 

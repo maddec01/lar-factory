@@ -4,9 +4,9 @@ import { renameSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   claudeSessionRecords, codexSessionRecords, firstCopies, initialCodexScanState, parseClaudeLine, parseCodexLine, scanTranscripts, totalTokens,
-} from '../src/transcript-usage.ts';
-import type { UsageRecord } from '../src/transcript-usage.ts';
-import { assistant, claudeHome, codexHome, codexSession, codexTokens } from './stats-db.ts';
+} from './transcript-usage.ts';
+import type { UsageRecord } from './transcript-usage.ts';
+import { assistant, claudeHome, codexHome, codexSession, codexTokens } from '../../test/stats-db.ts';
 
 // Ported from T3 Code's apps/server/src/provider/Drivers/claudeUsage.test.ts
 // (pingdotgg/t3code main at f054d1b8018721bd997d99cbb918a7b17bf098a4).

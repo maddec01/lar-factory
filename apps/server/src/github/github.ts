@@ -3,8 +3,8 @@
 import { execFile } from 'node:child_process';
 import { buildSubIssueSearch, normalizeItems, projectBuilds, refKey, sliceLabelSearch, validateDraft } from '@mux-factory/shared';
 import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@mux-factory/shared';
-import type { BoardConfig } from './config.ts';
-import { missingTool, toolCommand } from './tools.ts';
+import type { BoardConfig } from '../config/config.ts';
+import { missingTool, toolCommand } from '../tools/tools.ts';
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;

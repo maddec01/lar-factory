@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { freePort, SAMPLE_DATA, SAMPLE_MODELS } from './server-support.ts';
 import { testEnv } from './repo-support.ts';
-import type { ParentMessage } from '../src/port.ts';
+import type { ParentMessage } from '../src/port/port.ts';
 
 /** Starts a sample board with an IPC channel and returns the messages it sends before /healthz answers. */
 async function reportedPorts(t: TestContext, env: Record<string, string>): Promise<ParentMessage[]> {

@@ -1,0 +1,3 @@
+/* The Dock and Finder show this name; the file stays Mux Factory.app. */
+CFBundleDisplayName = "µx Factory";
+CFBundleName = "µx Factory";

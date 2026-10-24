@@ -1,3 +1,6 @@
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
+
 import { describe, expect, it } from "@effect/vitest";
 
 import {
@@ -65,6 +68,32 @@ describe("createBuildConfig", () => {
       { from: "../../config.json", to: "config.json" },
     ]));
     expect(config.files).toContain("!dist-electron/server/**/*");
+  });
+
+  it("shows µx Factory while the app's file, release files and appId keep their ASCII names", () => {
+    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
+
+    expect(config.productName).toBe("Mux Factory");
+    expect(config.artifactName).toBe("Mux-Factory-${version}-${arch}.${ext}");
+    expect(config.appId).toBe("com.maddec01.mux-factory.board");
+    expect(config.mac?.extendInfo).toEqual({
+      CFBundleName: "µx Factory",
+      // macOS shows InfoPlist.strings' name only while this one matches the file's.
+      CFBundleDisplayName: "Mux Factory",
+      LSHasLocalizedDisplayName: true,
+    });
+  });
+
+  it("ships an English InfoPlist.strings, which the Dock and Finder read for the shown name", () => {
+    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
+    const strings = NodeFS.readFileSync(
+      NodePath.join(import.meta.dirname, "../resources/en.lproj/InfoPlist.strings"),
+      "utf8",
+    );
+
+    expect(config.extraResources).toContainEqual({ from: "resources/en.lproj", to: "en.lproj" });
+    expect(strings).toContain('CFBundleDisplayName = "µx Factory";');
+    expect(strings).toContain('CFBundleName = "µx Factory";');
   });
 
   it("signs with hardened runtime and notarizes when signed", () => {

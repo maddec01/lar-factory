@@ -336,7 +336,7 @@ describe('an action the app refuses, as a check runs', () => {
 });
 
 describe('the tooltip', () => {
-  const tooltip = () => $('.update-tooltip');
+  const tooltip = () => $('[data-slot="tooltip-popup"]');
 
   test('opens on hover with the button\'s state', async () => {
     stubBridge(available);
@@ -368,8 +368,7 @@ describe('the tooltip', () => {
     await settle(() => button()!.focus());
     await settle(() => vi.advanceTimersByTime(1000));
     const positioner = tooltip()!.parentElement!;
-    const top = Number(/translate\([^,]+, ([\d.]+)px\)/.exec(positioner.style.transform)![1]);
-    expect(top).toBe(titleBarHeight() + 4);
+    expect(positioner.style.top).toBe(`${titleBarHeight() + 4}px`);
   });
 });
 
@@ -384,24 +383,68 @@ describe('the changelog', () => {
   };
   const pointer = (type: string, el: Element) =>
     settle(() => el.dispatchEvent(new PointerEvent(type, { bubbles: type !== 'pointerenter' && type !== 'pointerleave', pointerType: 'mouse' })));
-  const hover = (el: Element) => pointer('pointerover', el).then(() => pointer('pointerenter', el));
-  const unhover = (el: Element) => pointer('pointerout', el).then(() => pointer('pointerleave', el));
-  const notes = () => $('.update-notes');
+  const mouse = (type: string, el: Element) => settle(() => el.dispatchEvent(new MouseEvent(type, { bubbles: type === 'mousemove' })));
+  // Base UI reads the pointer's type from React's pointerenter, then opens once the mouse has rested on the button.
+  const hover = async (el: Element) => {
+    await pointer('pointerover', el);
+    await pointer('pointerenter', el);
+    await mouse('mouseenter', el);
+    await mouse('mousemove', el);
+    await settle(() => vi.advanceTimersByTime(1000));
+  };
+  const unhover = (el: Element) => pointer('pointerout', el).then(() => pointer('pointerleave', el)).then(() => mouse('mouseleave', el));
+  // The slice popovers are Popovers too, kept mounted.
+  const notes = () => $('[data-slot="popover-popup"][aria-label="Update release notes"]');
+  const tooltip = () => $('[data-slot="tooltip-popup"]');
+  const tab = () => settle(() => button()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));
+  /** Focus from the keyboard: Tab pressed on the page, which jsdom's :focus-visible reads. */
+  const tabTo = async (el: HTMLElement) => {
+    await settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));
+    await settle(() => el.focus());
+  };
+  /** The next element Tab reaches after the button. jsdom doesn't move focus on Tab, so this reads the tab order. */
+  const afterButton = () => {
+    const tabbable = [...document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')]
+      .filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled);
+    return tabbable[tabbable.indexOf(button()!) + 1];
+  };
 
-  test.each(['latest', 'nightly'] as const)('opens on hover on %s with each Release\'s changes, and closes when the pointer leaves', async (channel) => {
+  test.each(['latest', 'nightly'] as const)('opens on hover on %s with each Release\'s changes, in T3\'s Popover in place of the tooltip', async (channel) => {
     stubBridge({ ...withNotes, channel });
     await mountPage();
     expect(notes()).toBeNull();
     await hover(button()!);
-    expect(notes()!.querySelector('.update-notes-title')!.textContent).toBe('Update 1.1.0 ready to download');
+    expect(notes()!.getAttribute('aria-label')).toBe('Update release notes');
+    expect(notes()!.textContent).toMatch(/^Update 1\.1\.0 ready to download/);
     expect([...notes()!.querySelectorAll('h3')].map((h) => h.textContent)).toEqual(['What\'s changed', 'Changes in 1.0.1']);
     expect([...notes()!.querySelectorAll('section:first-of-type li')].map((li) => li.textContent))
       .toEqual(['feat(board): show the changelog', 'fix(board): keep the header steady']);
     expect(notes()!.textContent).toContain('10 more changes in this Release');
     expect(notes()!.textContent).toContain('3 older Releases not shown');
-    expect(button()!.getAttribute('aria-describedby')).toBe(notes()!.id);
-    await unhover(button()!.parentElement!);
+    expect(button()!.getAttribute('aria-expanded')).toBe('true');
+    expect(button()!.getAttribute('aria-controls')).toBe(notes()!.id);
+    expect(tooltip()).toBeNull();
+  });
+
+  test('closes 150 ms after the pointer leaves', async () => {
+    stubBridge(withNotes);
+    await mountPage();
+    await hover(button()!);
+    await unhover(button()!);
+    await settle(() => vi.advanceTimersByTime(140));
+    expect(notes(), 'still open just before the delay ends').not.toBeNull();
+    await settle(() => vi.advanceTimersByTime(20));
+    await settle(() => vi.advanceTimersByTime(500));
     expect(notes()).toBeNull();
+  });
+
+  test('a click runs the update and leaves the changelog open', async () => {
+    const { bridge } = stubBridge(withNotes);
+    await mountPage();
+    await hover(button()!);
+    await click();
+    expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
+    expect(notes()).not.toBeNull();
   });
 
   test('opens below the button', async () => {
@@ -411,33 +454,35 @@ describe('the changelog', () => {
     expect(notes()!.closest('[data-side]')!.getAttribute('data-side')).toBe('bottom');
   });
 
-  test('opens on keyboard focus and closes on blur', async () => {
+  test('opens on keyboard focus, which stays on the button', async () => {
     stubBridge(withNotes);
     await mountPage();
-    await settle(() => button()!.focus());
+    await tabTo(button()!);
     expect(notes()).not.toBeNull();
     expect(document.activeElement).toBe(button());
-    await settle(() => button()!.blur());
-    expect(notes()).toBeNull();
   });
 
-  test('Tab goes from the update button, its changelog open, straight to Add item', async () => {
+  test.each([
+    ['opened on keyboard focus', (el: HTMLElement) => tabTo(el)],
+    ['opened on hover, with the button clicked', async (el: HTMLElement) => { await hover(el); await settle(() => el.focus()); }],
+  ])('a forward Tab from the button moves into the changelog %s', async (_name, open) => {
     stubBridge(withNotes);
     await mountPage();
-    await settle(() => button()!.focus());
+    await open(button()!);
     expect(notes()).not.toBeNull();
-    // jsdom doesn't move focus on Tab, so this reads the tab order: the focusable elements in the page's order.
-    const tabbable = [...document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')]
-      .filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled);
-    const next = tabbable[tabbable.indexOf(button()!) + 1];
-    expect(next?.textContent).toBe('Add item');
+    await tab();
+    // Base UI's focus guard after the button hands focus to the changelog's notes.
+    await settle(() => afterButton()!.focus());
+    expect(notes()!.contains(document.activeElement)).toBe(true);
   });
 
-  test('an update without notes shows no changelog', async () => {
+  test('an update without notes shows the tooltip, and no changelog', async () => {
     stubBridge(available);
     await mountPage();
     await hover(button()!);
     expect(notes()).toBeNull();
+    expect(tooltip()).not.toBeNull();
+    expect(button()!.hasAttribute('aria-expanded')).toBe(false);
   });
 
   test('a check, which has no update to show, shows no changelog', async () => {
@@ -448,27 +493,28 @@ describe('the changelog', () => {
     expect(notes()).toBeNull();
   });
 
-  test('opens below the title bar, bridged to the button, and drags nothing', async () => {
+  test('closes when the update it shows goes', async () => {
+    const { push } = stubBridge(withNotes);
+    await mountPage();
+    await hover(button()!);
+    await push({ ...idle, releaseNotes: withNotes.releaseNotes });
+    await settle(() => vi.advanceTimersByTime(500));
+    expect(notes()).toBeNull();
+  });
+
+  test('opens below the title bar, and drags nothing', async () => {
     stubBridge(withNotes);
     await mountPage();
     const { noDrag } = addStylesheet();
     // jsdom has no layout: the bar is 52 px tall, and the button sits in its middle, 14 px to 38 px down.
     vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1000);
     vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(800);
-    const bar = $('.title-bar')!;
-    vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, titleBarHeight()));
+    vi.spyOn($('.title-bar')!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, titleBarHeight()));
     vi.spyOn(button()!, 'getBoundingClientRect').mockReturnValue(new DOMRect(900, 14, 80, 24));
     await hover(button()!);
     await settle(() => vi.advanceTimersByTime(50));
-    const top = Number(/translate\([^,]+, ([\d.]+)px\)/.exec($('.update-notes-positioner')!.style.transform)![1]);
-    expect(top).toBeGreaterThanOrEqual(titleBarHeight());
-    // The pointer crosses the whole gap from the button's bottom on the changelog's bridge.
-    expect(notes()!.style.getPropertyValue('--update-notes-gap')).toBe(`${top - 38}px`);
+    const positioner = notes()!.closest<HTMLElement>('[data-slot="popover-positioner"]')!;
+    expect(positioner.style.top).toBe(`${titleBarHeight() + 4}px`);
     expect(noDrag(notes()!)).toBe(true);
-    // A resize that moves the button while the changelog is open measures again, so the gap stays bridged.
-    vi.spyOn(button()!, 'getBoundingClientRect').mockReturnValue(new DOMRect(900, 20, 80, 24));
-    await settle(() => dispatchEvent(new Event('resize')));
-    await settle(() => vi.advanceTimersByTime(50));
-    expect(notes()!.style.getPropertyValue('--update-notes-gap')).toBe(`${titleBarHeight() + 4 - 44}px`);
   });
 });

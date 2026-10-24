@@ -1,19 +1,21 @@
 // The title bar's update button: T3 Code's update pill, copied from
-// apps/web/src/components/sidebar/SidebarUpdatePill.tsx at 9a391eb. One round icon button that the board app
+// apps/web/src/components/sidebar/SidebarUpdatePill.tsx at d53873b. One round icon button that the board app
 // always shows: click to check, download or install, with the tooltip saying which, and T3's toasts from the
 // store. Installing asks first in the app's native dialog, as T3 does. Without T3's "update everything" run and
 // its Intel build warning. The store keeps the board's own install flag: while the app installs, the button keeps
 // the downloaded look, disabled.
-// Hovering or focusing it opens the changelog of the Releases since the running version below it, on both
-// channels where T3 shows it on nightly only, as T3 Code's SidebarUpdateReleaseNotes. It is a PreviewCard, not
-// a Popover, as a Popover's focus guards would take the Tab after the button and close it.
+// An update with release notes shows them in T3's changelog popover in place of the tooltip, on both channels
+// where T3 shows it on nightly only, as T3 Code's SidebarUpdateReleaseNotes. It opens on hover and on keyboard
+// focus, closes 150 ms after the pointer leaves, a forward Tab moves into it, and a click runs the update. The
+// title bar sits at the top, so both open below the button, where T3's open above it.
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { PreviewCard } from '@base-ui/react/preview-card';
-import { Tooltip } from '@base-ui/react/tooltip';
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps } from 'react';
+import { flushSync } from 'react-dom';
 import { boardApp, type UpdateState } from '@mux-factory/shared';
+import { Popover, PopoverCreateHandle, PopoverPopup, PopoverTrigger } from '@mux-factory/ui/popover';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { useUpdateStore } from './update-store.ts';
 import {
   canCheckForUpdate,
@@ -30,6 +32,26 @@ import {
   type UpdateStatusIconState,
 } from './UpdateStatusIcon.tsx';
 import { errorMessage, toastUpdateError } from './update-toasts.tsx';
+
+type UpdatePopoverChangeDetails = Parameters<NonNullable<ComponentProps<typeof Popover>['onOpenChange']>>[1];
+type UpdatePopoverHandle = ReturnType<typeof PopoverCreateHandle>;
+
+function handleReleaseNotesPopoverOpenChange(
+  _open: boolean,
+  details: Pick<UpdatePopoverChangeDetails, 'reason' | 'cancel'>,
+): void {
+  if (details.reason === 'trigger-press') details.cancel();
+}
+
+function openReleaseNotesPopoverOnForwardTab(
+  event: { readonly key: string; readonly shiftKey: boolean },
+  handle: Pick<UpdatePopoverHandle, 'open'>,
+  triggerId: string,
+): void {
+  if (event.key !== 'Tab' || event.shiftKey) return;
+  // Hover-open popovers do not manage focus. Promote this one before native Tab runs.
+  flushSync(() => handle.open(triggerId));
+}
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
@@ -53,19 +75,22 @@ function ReleaseNotes({ state }: { state: UpdateState }) {
       {state.releaseNotes.map((note, index) => {
         const omitted = note.totalItems - note.items.length;
         return (
-          <section key={note.version}>
-            <h3>{index === 0 ? 'What\'s changed' : `Changes in ${note.version}`}</h3>
-            <ul>{note.items.map((item, i) => <li key={i}>{item}</li>)}</ul>
-            {omitted > 0 && <p className="update-notes-more">{plural(omitted, 'more change')} in this Release</p>}
+          <section className="not-first:mt-3 not-first:border-t not-first:pt-3" key={note.version}>
+            <h3 className="font-semibold text-foreground text-xs leading-4">{index === 0 ? 'What\'s changed' : `Changes in ${note.version}`}</h3>
+            <ul className="mt-2 space-y-1.5 pl-4 text-popover-foreground/90 text-xs leading-5">
+              {note.items.map((item, i) => <li className="list-disc break-words" key={i}>{item}</li>)}
+            </ul>
+            {omitted > 0 && <p className="mt-2 text-muted-foreground text-xs leading-5">{plural(omitted, 'more change')} in this Release</p>}
           </section>
         );
       })}
-      {state.omittedReleaseCount > 0 && <p className="update-notes-more">{plural(state.omittedReleaseCount, 'older Release')} not shown</p>}
+      {state.omittedReleaseCount > 0 && <p className="mt-3 border-t pt-3 text-muted-foreground text-xs leading-5">{plural(state.omittedReleaseCount, 'older Release')} not shown</p>}
     </>
   );
 }
 
-/** The space between the button and its changelog or tooltip, so either starts 4 px below the title bar the button sits in. */
+/** The space between the button and its changelog or tooltip, so either starts 4 px below the title bar the button sits in.
+ *  Base UI measures again whenever it places them, as when the window resizes. */
 function gapBelowTitleBar(button: HTMLElement | null): number {
   const bar = button?.closest('.title-bar');
   if (!button || !bar) return 4;
@@ -77,10 +102,11 @@ export function UpdateButton() {
   useEffect(follow, [follow]);
   const [isActionPending, setIsActionPending] = useState(false);
   const [checkAnimationKey, setCheckAnimationKey] = useState(0);
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
+  const [releaseNotesPopoverHandle] = useState(() => PopoverCreateHandle());
+  const suppressReleaseNotesFocusOpen = useRef(false);
+  const releaseNotesPopupRef = useRef<HTMLDivElement>(null);
+  const releaseNotesTriggerId = useId();
   const anchor = useRef<HTMLButtonElement>(null);
-  const popup = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   // The spin finishes its turn before the icon shows the check's outcome.
@@ -132,8 +158,19 @@ export function UpdateButton() {
       ? isUpdateButtonDisabled(state) || installing
       : !canCheckForUpdate(state);
   const isInteractionDisabled = disabled || isActionPending;
-  const showReleaseNotes = showUpdateDetails && !!state && state.releaseNotes.length > 0;
-  const notesOpen = showReleaseNotes && (hovered || focused);
+  const showReleaseNotesPopover = showUpdateDetails && !!state && state.releaseNotes.length > 0;
+
+  useEffect(() => {
+    if (!showReleaseNotesPopover) {
+      releaseNotesPopoverHandle.close();
+      return;
+    }
+
+    const trigger = document.getElementById(releaseNotesTriggerId);
+    if (trigger?.matches(':focus-visible')) {
+      releaseNotesPopoverHandle.open(releaseNotesTriggerId);
+    }
+  }, [releaseNotesPopoverHandle, releaseNotesTriggerId, showReleaseNotesPopover]);
 
   const handleAction = async () => {
     const bridge = boardApp();
@@ -172,22 +209,16 @@ export function UpdateButton() {
     );
   };
 
-  // Base UI measures again whenever it places the changelog, as when the window resizes, and the bridge follows.
-  const sideOffset = () => {
-    const gap = gapBelowTitleBar(anchor.current);
-    popup.current?.style.setProperty('--update-notes-gap', `${gap}px`);
-    return gap;
-  };
+  const sideOffset = () => gapBelowTitleBar(anchor.current);
 
   if (!boardApp()) return null;
 
-  const button = (
+  const updateButton = (
     <button
       type="button"
       ref={anchor}
       aria-label={idleTooltip?.detail ? `${tooltip}: ${idleTooltip.detail}` : tooltip}
       aria-disabled={isInteractionDisabled || undefined}
-      aria-describedby={notesOpen ? 'update-notes' : undefined}
       className={[
         'update-button inline-flex size-8 items-center justify-center rounded-full outline-hidden ring-(--ring) transition-colors focus-visible:ring-2 focus-visible:ring-inset',
         isInteractionDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
@@ -197,8 +228,21 @@ export function UpdateButton() {
         disabled && !showUpdateIconState && 'opacity-60',
       ].flat().filter(Boolean).join(' ')}
       onClick={() => void handleAction()}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      onBlur={() => {
+        suppressReleaseNotesFocusOpen.current = false;
+      }}
+      onFocus={(event) => {
+        if (!showReleaseNotesPopover || !event.currentTarget.matches(':focus-visible')) return;
+        if (suppressReleaseNotesFocusOpen.current) {
+          suppressReleaseNotesFocusOpen.current = false;
+          return;
+        }
+        flushSync(() => releaseNotesPopoverHandle.open(releaseNotesTriggerId));
+      }}
+      onKeyDown={(event) => {
+        if (!showReleaseNotesPopover) return;
+        openReleaseNotesPopoverOnForwardTab(event, releaseNotesPopoverHandle, releaseNotesTriggerId);
+      }}
     >
       <UpdateStatusIcon
         key={showCheckIcon ? checkAnimationKey : iconStatus}
@@ -210,52 +254,86 @@ export function UpdateButton() {
     </button>
   );
 
-  // The popup is in <body>, but React's events still bubble from it here, so the pointer on it counts as on the button.
+  // One title bar item, as T3's SidebarMenuItem, so the popover's focus guards beside the button take no gap.
   return (
-    <span className="update"
-      onPointerEnter={(e) => e.pointerType !== 'touch' && setHovered(true)}
-      onPointerLeave={(e) => e.pointerType !== 'touch' && setHovered(false)}>
-      <Tooltip.Root disabled={showReleaseNotes}>
-        <Tooltip.Trigger render={button} />
-        {!showReleaseNotes && (
-          <Tooltip.Portal>
-            <Tooltip.Positioner
-              className="pointer-events-none z-[140] h-(--positioner-height) w-(--positioner-width) max-w-(--available-width) transition-[top,left,right,bottom,transform] data-instant:transition-none"
-              collisionPadding={5} align="center" side="bottom" sideOffset={() => gapBelowTitleBar(anchor.current)}>
-              <Tooltip.Popup className={[
-                'update-tooltip relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) text-balance rounded-md text-(--foreground) text-xs transition-[width,height,scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-md)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]',
-                showUpdateDetails
-                  ? 'dropdown-glass shadow-xl shadow-black/25 before:hidden'
-                  : 'border border-(--border) bg-(--popover) not-dark:bg-clip-padding shadow-md/5',
-                'max-w-80 wrap-anywhere whitespace-normal leading-snug',
-              ].join(' ')}>
-                <div className="relative size-full overflow-clip px-2 py-1">
-                  {idleTooltip?.detail ? (
-                    <div className="text-left">
-                      <div className="font-medium">{idleTooltip.title}</div>
-                      <div className="text-(--muted-foreground)">{idleTooltip.detail}</div>
-                    </div>
-                  ) : (
-                    <span className="whitespace-pre-line">{tooltip}</span>
-                  )}
+    <span className="flex shrink-0">
+      <Popover
+        handle={releaseNotesPopoverHandle}
+        onOpenChange={(open, details) => {
+          if (open && !showReleaseNotesPopover) {
+            details.cancel();
+            return;
+          }
+          handleReleaseNotesPopoverOpenChange(open, details);
+        }}
+      >
+        <Tooltip disabled={showReleaseNotesPopover}>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                {...(!showReleaseNotesPopover
+                  ? {
+                      'aria-controls': undefined,
+                      'aria-expanded': undefined,
+                      'aria-haspopup': undefined,
+                    }
+                  : {})}
+                closeDelay={150}
+                handle={releaseNotesPopoverHandle}
+                id={releaseNotesTriggerId}
+                openOnHover={showReleaseNotesPopover}
+                render={updateButton}
+              />
+            }
+          />
+          {!showReleaseNotesPopover ? (
+            <TooltipPopup
+              align="center"
+              side="bottom"
+              sideOffset={sideOffset}
+              variant={showUpdateDetails ? 'glass' : 'default'}
+            >
+              {idleTooltip?.detail ? (
+                <div className="text-left">
+                  <div className="font-medium">{idleTooltip.title}</div>
+                  <div className="text-muted-foreground">{idleTooltip.detail}</div>
                 </div>
-              </Tooltip.Popup>
-            </Tooltip.Positioner>
-          </Tooltip.Portal>
-        )}
-      </Tooltip.Root>
-      <PreviewCard.Root open={notesOpen} onOpenChange={(next) => {
-        if (!next) { setHovered(false); setFocused(false); }
-      }}>
-        <PreviewCard.Portal>
-          <PreviewCard.Positioner className="update-notes-positioner" side="bottom" align="end" sideOffset={sideOffset} anchor={anchor}>
-            <PreviewCard.Popup className="update-notes" id="update-notes" ref={popup}>
-              <p className="update-notes-title">{tooltip}</p>
-              {state && <ReleaseNotes state={state} />}
-            </PreviewCard.Popup>
-          </PreviewCard.Positioner>
-        </PreviewCard.Portal>
-      </PreviewCard.Root>
+              ) : (
+                <span className="whitespace-pre-line">{tooltip}</span>
+              )}
+            </TooltipPopup>
+          ) : null}
+        </Tooltip>
+        {showReleaseNotesPopover && state ? (
+          // In the Mac app the changelog doesn't drag the window under it, as T3's menus don't.
+          <PopoverPopup
+            align="center"
+            aria-label="Update release notes"
+            className="[-webkit-app-region:no-drag]"
+            initialFocus={false}
+            onKeyDownCapture={(event) => {
+              if (
+                event.key === 'Escape' &&
+                releaseNotesPopupRef.current?.contains(document.activeElement)
+              ) {
+                suppressReleaseNotesFocusOpen.current = true;
+              }
+            }}
+            ref={releaseNotesPopupRef}
+            side="bottom"
+            sideOffset={sideOffset}
+            tooltipStyle
+          >
+            <div className="flex max-h-[calc(var(--available-height)-0.5rem)] min-h-0 w-fit max-w-[min(24rem,calc(100vw-2rem))] flex-col text-left">
+              <div className="shrink-0 px-1 font-medium text-sm leading-5">{tooltip}</div>
+              {/* Focusable, so a forward Tab from the button lands here and the arrow keys scroll the notes. */}
+              <div className="max-h-[min(28rem,calc(100vh-6rem))] min-h-0 overflow-y-auto rounded-sm px-1 pt-4 pb-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" tabIndex={0}>
+                <ReleaseNotes state={state} />
+              </div>
+            </div>
+          </PopoverPopup>
+        ) : null}
+      </Popover>
     </span>
   );
 }

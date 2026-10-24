@@ -16,6 +16,8 @@ interface TokenRates {
   cacheCreationCostPerToken: number;
 }
 
+const TOKEN_RATE_KEYS: (keyof TokenRates)[] = ['inputCostPerToken', 'outputCostPerToken', 'cacheReadCostPerToken', 'cacheCreationCostPerToken'];
+
 /** A model's rates; LiteLLM's `*_above_272k_tokens`, `*_flex` and `*_batches` variants aren't in transcripts, so aren't priced. */
 interface ModelRate extends TokenRates {
   fast: TokenRates | null;
@@ -74,12 +76,7 @@ function readTokenRates(entry: LiteLlmEntry, suffix: string, standard?: TokenRat
 }
 
 function scaleTokenRates(rates: TokenRates, multiple: number): TokenRates {
-  return {
-    inputCostPerToken: rates.inputCostPerToken * multiple,
-    outputCostPerToken: rates.outputCostPerToken * multiple,
-    cacheReadCostPerToken: rates.cacheReadCostPerToken * multiple,
-    cacheCreationCostPerToken: rates.cacheCreationCostPerToken * multiple,
-  };
+  return Object.fromEntries(TOKEN_RATE_KEYS.map((key) => [key, rates[key] * multiple])) as Record<keyof TokenRates, number>;
 }
 
 function fastMultiplier(entry: LiteLlmEntry): number | null {
@@ -127,10 +124,7 @@ export function parseRateTable(document: unknown): RateTable {
 
 function sameTokenRates(a: TokenRates | null, b: TokenRates | null): boolean {
   if (a === null || b === null) return a === b;
-  return a.inputCostPerToken === b.inputCostPerToken &&
-    a.outputCostPerToken === b.outputCostPerToken &&
-    a.cacheReadCostPerToken === b.cacheReadCostPerToken &&
-    a.cacheCreationCostPerToken === b.cacheCreationCostPerToken;
+  return TOKEN_RATE_KEYS.every((key) => a[key] === b[key]);
 }
 
 function sameRate(a: ModelRate, b: ModelRate): boolean {

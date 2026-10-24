@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import * as RestartDialog from "./RestartDialog.ts";
+import * as RestartDialog from "./restart-dialog.ts";
 
 describe("RestartDialog", () => {
   it("asks with Restart as the default button and Cancel as the cancel button", () => {

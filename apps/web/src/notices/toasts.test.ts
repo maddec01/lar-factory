@@ -65,6 +65,16 @@ test("a toast swiped away runs the board's close, so focus moves on", async () =
   expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
 });
 
+test('toasts in different slots each keep their own row, not a pile that spreads only on hover', async () => {
+  await mountPage();
+  const { showToast } = await import('./toasts.tsx');
+  await settle(() => showToast({ slot: 'update', failed: true, what: 'Update failed', body: 'Update failed' }));
+  await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
+  expect(document.querySelectorAll('[data-toast]').length).toBe(2);
+  // coss's toast marks every toast but the newest as behind and piles them up until hovered.
+  expect(document.querySelector('[data-toast="update"] [data-behind]')).not.toBeNull();
+});
+
 test('View item shows the item on the Board, opens its List group, moves focus to it and closes the toast', async () => {
   await mountPage();
   await settle(() => $<HTMLButtonElement>('#list-server > [data-slot="collapsible-trigger"]')!.click());
@@ -92,14 +102,14 @@ test('toasts sit below the header while it is on screen, and at the top once it 
   let bottom = 100;
   $('header.top')!.getBoundingClientRect = () => ({ bottom }) as DOMRect;
   await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
-  const top = () => document.documentElement.style.getPropertyValue('--toast-top');
-  expect(top()).toBe('108px');
+  const anchor = () => document.documentElement.style.getPropertyValue('--toast-anchor');
+  expect(anchor()).toBe('100px');
   bottom = -40;
   dispatchEvent(new Event('scroll'));
-  expect(top()).toBe('12px');
+  expect(anchor()).toBe('0px');
   bottom = 60;
   dispatchEvent(new Event('resize'));
-  expect(top()).toBe('68px');
+  expect(anchor()).toBe('60px');
 });
 
 test('toasts stay below the title bar once the header scrolls away', async () => {
@@ -108,11 +118,11 @@ test('toasts stay below the title bar once the header scrolls away', async () =>
   $('header.top')!.getBoundingClientRect = () => ({ bottom }) as DOMRect;
   $('.title-bar')!.getBoundingClientRect = () => ({ bottom: 52 }) as DOMRect;
   await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
-  const top = () => document.documentElement.style.getPropertyValue('--toast-top');
-  expect(top()).toBe('148px');
+  const anchor = () => document.documentElement.style.getPropertyValue('--toast-anchor');
+  expect(anchor()).toBe('140px');
   bottom = -40;
   dispatchEvent(new Event('scroll'));
-  expect(top()).toBe('60px');
+  expect(anchor()).toBe('52px');
 });
 
 test("a poll that started before the page's own write doesn't bring back older data", async () => {

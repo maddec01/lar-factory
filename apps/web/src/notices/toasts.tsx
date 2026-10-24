@@ -110,11 +110,12 @@ function ToastBody({ what, failed = false, body, onClose }: Toast & { onClose: (
   );
 }
 
-/** Keeps --toast-top below the header while it's on screen, and always below the title bar, so toasts
- * never cover the header's buttons or banners nor sit in the bar that drags the window. */
+/** Keeps --toast-anchor at the bottom of the header while it's on screen, and never above the title bar's,
+ * so toasts (placed below it in notices.css) never cover the header's buttons or banners nor sit in the bar
+ * that drags the window. */
 function placeToasts(): void {
   const bottom = Math.max(...['header.top', '.title-bar'].map((sel) => document.querySelector(sel)?.getBoundingClientRect().bottom ?? 0));
-  document.documentElement.style.setProperty('--toast-top', `${Math.max(12, Math.round(bottom) + 8)}px`);
+  document.documentElement.style.setProperty('--toast-anchor', `${Math.round(bottom)}px`);
 }
 
 /** The page's toasts. */

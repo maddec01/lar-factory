@@ -1,0 +1,93 @@
+/* An item's card and row parts: badges, bars, the slice popover, the Start control and the card's actions. */
+
+.meta { display: flex; gap: --spacing(1.25); align-items: flex-start; font-size: var(--text-2xs); }
+/* The badges wrap onto more lines; the action group keeps the top-right corner. */
+.meta .badges { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: --spacing(1.25); align-items: center; }
+/* Centres the first line of badges on the Start buttons, which are a size-6 control to the badges' 4.5. */
+.meta:has(.start-group) .badges { padding-block: --spacing(0.75); }
+.title { font-weight: 500; text-decoration: none; line-height: 1.35; }
+.title:hover { text-decoration: underline; }
+.ref { color: var(--muted-foreground); font-weight: 500; font-variant-numeric: tabular-nums; }
+.parent, .foot, .card-stats { margin: 0; font-size: var(--text-xs); color: var(--muted-foreground); }
+.foot, .card-stats { display: flex; flex-wrap: wrap; gap: --spacing(1) --spacing(2.5); }
+.hint { color: var(--warning-foreground); font-weight: 600; }
+.pr { color: var(--foreground); }
+.stats { flex: none; white-space: nowrap; font-size: var(--text-2xs); font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+.stats.total { margin-left: --spacing(1); }
+.linked-pr { display: inline-flex; align-items: center; gap: --spacing(1.5); }
+.checks { font-variant-numeric: tabular-nums; }
+.checks.running { --k: var(--muted-foreground); }
+.checks.passed { --k: var(--build); }
+.checks.failed { --k: var(--error); }
+.checks.slow { --k: var(--you); }
+
+/* The dot T3's Badge doesn't draw, coloured by platform, kind or checks state. */
+.plat::before, .kind::before, .label::before, .checks::before { content: ""; width: --spacing(1.75); height: --spacing(1.75); border-radius: 50%; background: var(--k, var(--muted-foreground)); }
+.plat-server { --k: var(--color-sky-500); }
+.plat-apple { --k: var(--color-pink-500); }
+.plat-draft { --k: var(--muted-foreground); }
+.kind-bug { --k: var(--error); }
+.kind-feature { --k: var(--thread); }
+.kind-improvement { --k: var(--color-teal-500); }
+.kind-concept, .kind-decision, [class*="kind-decision-"] { --k: var(--sub); }
+.kind-build { --k: var(--build); }
+
+/* segmented bars: every card's status bar, and a build's slice bar under it.
+   One grid, so both bars span the same width and their captions share a column. */
+.bars { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: --spacing(1.5) --spacing(2.5); }
+.segbar { list-style: none; display: flex; gap: --spacing(0.5); margin: 0; padding: 0; min-width: 0; }
+.segbar li { flex: 1; height: --spacing(1.5); border-radius: var(--radius-xs); background: var(--soft); }
+.bar-label { font-size: var(--text-2xs); color: var(--muted-foreground); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The current step is marked by colour alone. */
+.steps li.past { background: color-mix(in srgb, var(--foreground) 30%, transparent); }
+.steps li.cur { background: var(--thread); }
+.steps li.cur.amber { background: var(--you); }
+.steps li.cur.done { background: var(--build); }
+.step-label.amber { color: var(--warning-foreground); font-weight: 600; }
+.slice-bar li.done { background: var(--build); }
+.slice-bar li.active { background: var(--thread); animation: slice-pulse 1.6s ease-in-out infinite; }
+/* A blocked slice waits for a re-slice: a calm violet, not an alarm. */
+.slice-bar li.blocked { background: color-mix(in srgb, var(--sub) 50%, transparent); }
+@keyframes slice-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .slice-bar li.active { animation: none; }
+}
+.slices-now { margin: 0; font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slices-active { color: var(--thread); font-weight: 600; margin-right: --spacing(0.5); }
+.slices-blocked { color: var(--sub-text); font-weight: 600; margin-right: --spacing(0.5); }
+.slices-now .sep { color: var(--muted-foreground); }
+/* the separator brings its own spaces, so a count before it drops its margin */
+.slices-now :has(+ .sep) { margin-right: 0; }
+
+/* a build's slice popover: the bars are its trigger; it floats over the board, so the card's height never changes */
+.slices { position: relative; }
+.slices-trigger { display: grid; gap: --spacing(1); border-radius: var(--control-radius); padding: --spacing(0.75) --spacing(1); margin: --spacing(-0.75) --spacing(-1); cursor: default; }
+.slices-trigger:hover, .slices.open .slices-trigger { background: var(--soft); }
+.slice-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: --spacing(0.25); }
+.slice-rows .row-item { padding: --spacing(0.25) 0; }
+.slice-mark { flex: none; width: --spacing(2); height: --spacing(2); border-radius: 50%; border: --spacing(0.375) solid var(--muted-foreground); box-sizing: border-box; }
+.slice-row.done .slice-mark { background: var(--build); border-color: var(--build); }
+.slice-row.active .slice-mark { background: var(--thread); border-color: var(--thread); box-shadow: 0 0 0 --spacing(0.75) color-mix(in srgb, var(--thread) 20%, transparent); }
+.slice-row.blocked .slice-mark { background: color-mix(in srgb, var(--sub) 50%, transparent); border-color: var(--sub); }
+.slice-row.done .row-title { color: var(--muted-foreground); text-decoration: line-through; }
+.slice-row.active .row-title { font-weight: 600; }
+
+/* the Start control and the card's actions */
+.row-action { flex: none; }
+.start { margin: 0; font-size: var(--text-xs); }
+p[data-start-result] { padding: --spacing(1) --spacing(1.5); margin-inline: --spacing(-1.5); border-radius: var(--radius-sm); }
+.start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: --spacing(1.25); position: relative; }
+/* margin-top: auto keeps the stats or actions row on the card's bottom edge across a row of cards; the space above it moves to the item before. */
+[data-slot="card"] > :has(+ .card-actions), [data-slot="card"] > :has(+ .card-stats) { margin-bottom: --spacing(2); }
+/* The stats row takes the bottom edge; an actions row after it sits right below. */
+.card-stats { margin-top: auto; padding-top: --spacing(1.5); @apply border-t; }
+.card-stats + .card-actions { margin-top: 0; }
+/* A Queued card's quiet footer row: Back to List on the left, Abandon on the right. */
+.card-actions { display: flex; align-items: center; gap: --spacing(3); margin-top: auto; padding-top: --spacing(1.5); @apply border-t; font-size: var(--text-2xs); }
+/* The padding gives a size-6 target (WCAG 2.5.8); the matching negative margin keeps the row's height. */
+.link-action { padding: --spacing(1.25) 0; margin-block: --spacing(-1.25); }
+.link-action.danger { margin-left: auto; }
+.link-action[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
+.row-item:has(.action-error) { flex-wrap: wrap; }
+.action-error { order: 1; flex: 1 1 100%; min-width: 0; color: var(--danger-text); font-weight: 600; overflow-wrap: anywhere; }
+.when { color: var(--muted-foreground); font-size: var(--text-2xs); white-space: nowrap; }

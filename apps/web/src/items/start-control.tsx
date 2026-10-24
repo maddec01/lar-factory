@@ -62,8 +62,10 @@ function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onP
   );
 }
 
-/** Start, or the tag that took its place; the item dialog names it `label` and sizes it up. */
-export function StartControl({ item, data, label = 'Start', size = 'xs', icon }: { item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; icon?: ReactNode }) {
+/** Start, or the tag that took its place; the item dialog names it `label` and sizes it up, and the Queue outlines its later rows'. */
+export function StartControl({ item, data, label = 'Start', size = 'xs', variant, icon }: {
+  item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; variant?: 'default' | 'outline'; icon?: ReactNode;
+}) {
   const start = useStart(item.id);
   const action = useItemAction(item.id);
   const [open, setOpen] = useState(false);
@@ -86,7 +88,7 @@ export function StartControl({ item, data, label = 'Start', size = 'xs', icon }:
   return (
     <span className="start-group">
       <Menu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
-        <MenuTrigger render={<Button size={size} />} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
+        <MenuTrigger render={<Button size={size} variant={variant} />} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
           {start?.phase !== 'pending' && icon}{verb}{start?.phase !== 'pending' && ' ▾'}
         </MenuTrigger>
         <MenuPopup align="end" aria-label={`Start ${ref(item)} with`}>

@@ -2,6 +2,7 @@
 // with the network stubbed and the clock fixed. Copy a page test for new ones.
 
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act } from 'react';
 import { afterEach, beforeEach, vi } from 'vite-plus/test';
 import { pageWithData } from '@mux-factory/shared';
@@ -130,7 +131,7 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
 /** Puts src/index.css on the page. jsdom has no layout but cascades its rules into getComputedStyle; it can't apply
  *  Tailwind's classes, and it drops -webkit-app-region, so this answers that from the stylesheet's text. */
 export function addStylesheet(): { noDrag: (el: Element) => boolean } {
-  const css = readFileSync('src/index.css', 'utf8');
+  const css = readFileSync(join(import.meta.dirname, '../src/index.css'), 'utf8');
   const style = document.createElement('style');
   style.textContent = css;
   document.head.append(style);

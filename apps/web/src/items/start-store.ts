@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import { readChoice, storedChoice } from '@mux-factory/shared';
 import type { ModelChoice, StartedThread } from '@mux-factory/shared';
+import { setKey } from './action-store.ts';
 
 /** Where this browser keeps the last model choice Start started with. */
 const CHOICE_KEY = 'mux-board:model-choice';
@@ -28,10 +29,7 @@ interface StartStoreState {
 export const useStartStore = create<StartStoreState>()((set) => ({
   starts: {},
   lastChoice: readChoice(localStorage.getItem(CHOICE_KEY)),
-  set: (itemId, start) => set((state) => {
-    const { [itemId]: _, ...rest } = state.starts;
-    return { starts: start ? { ...rest, [itemId]: start } : rest };
-  }),
+  set: (itemId, start) => set((state) => ({ starts: setKey(state.starts, itemId, start) })),
   remember: (choice) => {
     localStorage.setItem(CHOICE_KEY, storedChoice(choice));
     set({ lastChoice: choice });

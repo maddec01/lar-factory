@@ -9,6 +9,12 @@ export interface ItemAction {
   message?: string;
 }
 
+/** `record` with `key` set to `value`, or without `key` when `value` is `undefined`. */
+export function setKey<T>(record: Record<string, T>, key: string, value: T | undefined): Record<string, T> {
+  const { [key]: _, ...rest } = record;
+  return value ? { ...rest, [key]: value } : rest;
+}
+
 interface ActionState {
   actions: Record<string, ItemAction>;
   /** Sets the item's action, or clears it with `undefined`. */
@@ -17,10 +23,7 @@ interface ActionState {
 
 export const useActionStore = create<ActionState>()((set) => ({
   actions: {},
-  set: (itemId, action) => set((state) => {
-    const { [itemId]: _, ...rest } = state.actions;
-    return { actions: action ? { ...rest, [itemId]: action } : rest };
-  }),
+  set: (itemId, action) => set((state) => ({ actions: setKey(state.actions, itemId, action) })),
 }));
 
 export const useItemAction = (itemId: string): ItemAction | undefined => useActionStore((state) => state.actions[itemId]);

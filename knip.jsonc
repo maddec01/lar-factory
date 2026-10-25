@@ -26,8 +26,10 @@
   // Ports from T3 Code keep T3's exports, so later T3 fixes port line for line (docs/adr/0011).
   // Copies keep every export upstream has (docs/adr/0016).
   "ignoreIssues": {
+    "packages/ui/src/components/MorphIcon.tsx": ["exports", "types"],
     "packages/ui/src/components/ui/*": ["exports", "types"],
     "packages/ui/src/coss/*": ["exports", "types"],
+    "packages/ui/src/hooks/*": ["exports", "types"],
     "packages/ui/src/lib/visibleAnimation.ts": ["exports", "types"],
     "packages/ui/src/lib/windowControlsOverlay.ts": ["exports", "types"],
     "apps/desktop/src/updates/AppUpdates.ts": ["exports", "types"],

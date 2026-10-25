@@ -17,6 +17,7 @@
     "./menu": "./src/components/ui/menu.tsx",
     "./popover": "./src/components/ui/popover.tsx",
     "./radio-group": "./src/components/ui/radio-group.tsx",
+    "./sidebar": "./src/components/ui/sidebar.tsx",
     "./textarea": "./src/components/ui/textarea.tsx",
     "./tooltip": "./src/components/ui/tooltip.tsx",
     "./toast": "./src/coss/toast.tsx",
@@ -43,7 +44,10 @@
     "@base-ui/react": "^1.4.1",
     "@tailwindcss/node": "4.3.3",
     "class-variance-authority": "^0.7.1",
+    "effect": "4.0.5",
+    "lucide": "^0.564.0",
     "lucide-react": "^1.61.0",
+    "morphicons": "^1.7.1",
     "react": "19.3.0",
     "tailwind-merge": "^3.4.0"
   }

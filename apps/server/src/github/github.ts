@@ -18,6 +18,15 @@ const SLICE_LIMIT = 50;
 const SEARCH_PAGE_SIZE = 100;
 const MAX_SEARCH_PAGES = 10;
 
+/** A PR's checks: counts over all of them, and the first CHECK_SLICE for the start time. */
+const CHECKS = `statusCheckRollup {
+    contexts(first: ${CHECK_SLICE}) {
+      checkRunCountsByState { state count }
+      statusContextCountsByState { state count }
+      nodes { ... on CheckRun { status startedAt checkSuite { createdAt } } ... on StatusContext { state createdAt } }
+    }
+  }`;
+
 export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String) {
   user(login: $owner) {
     projectV2(number: $number) {
@@ -43,21 +52,16 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               blockedBy(first: ${BLOCKER_LIMIT}) { nodes { number state repository { nameWithOwner } } }
               closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
                 nodes {
-                  number url state isDraft body mergedAt
-                  statusCheckRollup {
-                    contexts(first: ${CHECK_SLICE}) {
-                      checkRunCountsByState { state count }
-                      statusContextCountsByState { state count }
-                      nodes { ... on CheckRun { status startedAt checkSuite { createdAt } } ... on StatusContext { state createdAt } }
-                    }
-                  }
+                  number url state isDraft body mergedAt mergeStateStatus
+                  ${CHECKS}
                 }
               }
             }
             ... on PullRequest {
-              number title url state closedAt updatedAt isDraft
+              number title url state closedAt updatedAt isDraft mergeStateStatus
               repository { nameWithOwner }
               labels(first: 20) { nodes { name } }
+              ${CHECKS}
             }
           }
         }

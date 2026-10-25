@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, isBuild, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, isBuild, prPipeline, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -206,6 +206,14 @@ test('a short age rounds each unit down, and a future time reads 0s ago', () => 
   const at = (s: number) => new Date(now - s * 1000).toISOString();
   assert.deepEqual([0, 59, 60, 59 * 60 + 59, 60 * 60, 47 * 3600 + 59 * 60, 48 * 3600, -30].map((s) => shortAgo(at(s), now)),
     ['0s ago', '59s ago', '1m ago', '59m ago', '1h ago', '47h ago', '2d ago', '0s ago']);
+});
+
+test("an item's pipeline is the PR Open PR opens: its first linked PR, or itself when it is a pull request", () => {
+  const pipeline = { checks: null, mergeState: 'blocked' as const };
+  const linked = (number: number, mergeState: 'can merge' | 'conflicts') => ({ number, url: `u${number}`, state: 'OPEN', isDraft: false, checks: null, mergeState });
+  assert.deepEqual(prPipeline(item('Verify', [], { linkedPrs: [linked(1, 'conflicts'), linked(2, 'can merge')] })), linked(1, 'conflicts'));
+  assert.equal(prPipeline(item('Verify')), null, 'no PR, no pipeline');
+  assert.deepEqual(prPipeline(item('Verify', [], { type: 'PullRequest', pipeline })), pipeline);
 });
 
 test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {

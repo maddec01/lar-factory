@@ -21,7 +21,17 @@ export const AMBER_STATUSES: readonly Status[] = ['Needs you', 'Verify'];
 
 export type ContentType = 'Issue' | 'PullRequest' | 'DraftIssue';
 
-export interface LinkedPr {
+/** A pull request's checks, and whether GitHub lets it merge. */
+export interface Pipeline {
+  /** The head commit's checks; null when it has none. */
+  checks: Checks | null;
+  mergeState: MergeState;
+}
+
+/** GitHub's merge state status, in four: CLEAN, HAS_HOOKS and UNSTABLE can merge; UNKNOWN is checking; DIRTY is conflicts; the rest blocked. */
+export type MergeState = 'can merge' | 'checking' | 'blocked' | 'conflicts';
+
+export interface LinkedPr extends Pipeline {
   number: number;
   url: string;
   state: string;
@@ -30,8 +40,6 @@ export interface LinkedPr {
   body?: string;
   /** When the PR merged, to pick the latest merged PR's block; absent or null when not merged or not read. */
   mergedAt?: string | null;
-  /** The head commit's checks; null when it has none. */
-  checks: Checks | null;
 }
 
 /** Counts over all of a PR's checks, required or not. */
@@ -195,7 +203,10 @@ export interface Item {
   blockers: Blocker[];
   updatedAt: string;
   closedAt: string | null;
+  /** Empty for a pull request item, which has its own `pipeline`. */
   linkedPrs: LinkedPr[];
+  /** A pull request item's own checks and merge state; absent on other items. */
+  pipeline?: Pipeline;
   /** A build's slices, in GitHub's sub-issue order, less those closed as not planned. The project may auto-add them, but they're never board items. Empty for other issues. */
   slices: Slice[];
   /** A dossier's map, parsed from its issue body: always on a concept, and on an item with sub-issues on the board when its body has map sections; absent on other items. */
@@ -375,6 +386,11 @@ export function checkState(checks: Checks | null): CheckState | null {
   if (!checks) return null;
   if (checks.running) return 'running';
   return checks.failed ? 'failed' : 'passed';
+}
+
+/** The pipeline of the PR Open PR opens: the item's own when it is a pull request, else its first linked PR's; null when there is none. */
+export function prPipeline(item: Pick<Item, 'type' | 'linkedPrs' | 'pipeline'>): Pipeline | null {
+  return (item.type === 'PullRequest' ? item.pipeline : item.linkedPrs[0]) ?? null;
 }
 
 export function isSlow(checks: Checks, now: number): boolean {

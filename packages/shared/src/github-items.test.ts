@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { buildSubIssueSearch, normalizeItem, normalizeItems, rawDossiers, sliceLabelSearch } from './github-items.ts';
+import { buildSubIssueSearch, normalizeItem, normalizeItems, normalizeMergeState, rawDossiers, sliceLabelSearch } from './github-items.ts';
 import type { RawIssueRef, RawItem, RawLinkedPr } from './github-items.ts';
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
 
@@ -139,6 +139,34 @@ test("a linked PR's check rollup becomes counts over all checks and the earliest
   assert.equal(pr(null)?.checks, null, 'no checks, no rollup');
   assert.equal(pr({ contexts: { checkRunCountsByState: counts({ SUCCESS: 0 }), statusContextCountsByState: [], nodes: [] } })?.checks, null,
     'a rollup with nothing in it is no checks');
+});
+
+test("GitHub's merge state statuses map to can merge, checking, conflicts and blocked", () => {
+  const states = Object.fromEntries(['CLEAN', 'HAS_HOOKS', 'UNSTABLE', 'UNKNOWN', 'DIRTY', 'BLOCKED', 'BEHIND', 'DRAFT']
+    .map((status) => [status, normalizeMergeState(status)]));
+  assert.deepEqual(states, { CLEAN: 'can merge', HAS_HOOKS: 'can merge', UNSTABLE: 'can merge', UNKNOWN: 'checking',
+    DIRTY: 'conflicts', BLOCKED: 'blocked', BEHIND: 'blocked', DRAFT: 'blocked' });
+  assert.equal(normalizeMergeState(undefined), 'checking', 'a status not read is still being checked');
+  assert.deepEqual(['constructor', 'toString', '__proto__', 'NEW'].map(normalizeMergeState), ['checking', 'checking', 'checking', 'checking'],
+    'an unknown status, even an object member, is checking');
+});
+
+test("a linked PR carries its merge state, and a pull request item its own checks and merge state", () => {
+  const rollup = { contexts: { checkRunCountsByState: [{ state: 'SUCCESS', count: 2 }], statusContextCountsByState: [], nodes: [] } };
+  const issue = normalizeItem({
+    id: 'PVTI_6', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'Verify' },
+    content: { __typename: 'Issue', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
+      closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false, mergeStateStatus: 'DIRTY' }] } },
+  });
+  assert.equal(issue?.linkedPrs[0]?.mergeState, 'conflicts');
+  assert.equal(issue?.pipeline, undefined, 'an issue has no pipeline of its own');
+  const pr = normalizeItem({
+    id: 'PVTI_7', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'Verify' },
+    content: { __typename: 'PullRequest', number: 7, title: 'P', updatedAt: '2026-10-21T08:00:00Z', isDraft: false,
+      mergeStateStatus: 'CLEAN', statusCheckRollup: rollup },
+  });
+  assert.deepEqual(pr?.pipeline, { checks: { passed: 2, failed: 0, running: 0, total: 2, since: null }, mergeState: 'can merge' });
+  assert.deepEqual(pr?.linkedPrs, []);
 });
 
 test("a build's slices come from the board query, open and closed, in GitHub's order; other kinds keep none", () => {

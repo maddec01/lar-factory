@@ -45,7 +45,7 @@ test('a body with a block gets only the block replaced', () => {
 });
 
 const pr = (number: number, state: string, body: string | undefined, mergedAt?: string): LinkedPr =>
-  ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`, state, isDraft: false, checks: null, body, mergedAt });
+  ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`, state, isDraft: false, checks: null, mergeState: 'can merge', body, mergedAt });
 const edits = (items: Item[]) => prStatsEdits(items);
 const item = (linkedPrs: LinkedPr[], itemStats: Item['stats'] | null = stats, labels = ['build'], repo = 'maddec01/mux-factory') =>
   ({ linkedPrs, stats: itemStats ?? undefined, labels, repo }) as Item;

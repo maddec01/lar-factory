@@ -20,9 +20,9 @@ async function openCounter(label: string): Promise<HTMLElement> {
 
 test('the counters show need you, building over the limit of 2, queued, shipped this week and spend', async () => {
   await mountPage();
-  expect(counters().map(text)).toEqual(['5need you', '3/2building', '3queued', '4shipped', '$190.25spend']);
+  expect(counters().map(text)).toEqual(['8need you', '3/2building', '3queued', '4shipped', '$190.25spend']);
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
-    'need you: 5 items only you can move',
+    'need you: 8 items only you can move',
     'building: 1 over the in-flight limit',
     'queued: 3 items ready to build, 4 more in List',
     'shipped: Done in the last 7 days',
@@ -46,13 +46,16 @@ test('the counts are the whole factory\'s with a repository scoped', async () =>
 test('need you lists its items by status, each with its status glyph in its colour', async () => {
   await mountPage();
   const pop = await openCounter('need you');
-  expect(head(pop)).toBe('Needs you5');
-  expect([...pop.querySelectorAll('h3')].map(text)).toEqual(['Needs you 2', 'Ready 1', 'Verify 1', 'Ready to merge 1']);
+  expect(head(pop)).toBe('Needs you8');
+  expect([...pop.querySelectorAll('h3')].map(text)).toEqual(['Needs you 2', 'Ready 1', 'Verify 4', 'Ready to merge 1']);
   expect(rows()).toEqual([
     '#23 Faster library sync on large collections30m ago',
     '#202 Sign-in screen35m ago',
     '#140 Owner accounts1h ago',
+    '#210 Bump FFmpeg to 7.140m ago',
     '#31 New artwork grid layout1h ago',
+    '#34 Swipe between episodes2h ago',
+    '#147 Fall back to software transcoding when the GPU is busy3h ago',
     '#142 Cache probe results between restarts1h ago',
   ]);
   const glyph = pop.querySelector('li svg') as SVGElement;

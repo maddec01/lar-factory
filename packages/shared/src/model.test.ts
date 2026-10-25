@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, isBuild, prPipeline, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -180,7 +180,7 @@ test('sample covers every status and both platforms', () => {
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/mux-server') && repos.has('maddec01/mux-apple'));
   const { needsYou, inFlight, queued, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
-  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [25, 5, 8, 3, 4]);
+  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [28, 8, 8, 3, 4]);
 });
 
 test('the desk holds Ready, Needs you, Verify and Ready to merge, in flow order, and no concepts', () => {
@@ -190,6 +190,13 @@ test('the desk holds Ready, Needs you, Verify and Ready to merge, in flow order,
   const { needsYou } = boardSections({ ...sample, items }, now);
   assert.deepEqual(needsYou.map((i) => i.status), ['Needs you', 'Ready', 'Verify', 'Ready to merge']);
   assert.ok(boardSections(sample, now).needsYou.some((i) => i.status === 'Ready' && i.parent), 'a build sub-issue in Ready is on the desk');
+});
+
+test('the sample has a Verify item in each merge state', () => {
+  const verify = sample.items.filter((i) => i.status === 'Verify');
+  assert.deepEqual(new Set(verify.map((i) => itemPr(i)?.pipeline?.mergeState)), new Set(['can merge', 'checking', 'blocked', 'conflicts']));
+  assert.ok(verify.some((i) => i.type === 'PullRequest'), 'one is itself a pull request');
+  assert.ok(verify.some((i) => itemPr(i)?.pipeline && !itemPr(i)!.pipeline!.checks), 'one has no checks');
 });
 
 test('token counts are compact as on T3 Code\'s usage page', () => {
@@ -208,12 +215,14 @@ test('a short age rounds each unit down, and a future time reads 0s ago', () => 
     ['0s ago', '59s ago', '1m ago', '59m ago', '1h ago', '47h ago', '2d ago', '0s ago']);
 });
 
-test("an item's pipeline is the PR Open PR opens: its first linked PR, or itself when it is a pull request", () => {
+test("an item's PR is the one Open PR opens: its first linked PR, or itself when it is a pull request", () => {
   const pipeline = { checks: null, mergeState: 'blocked' as const };
   const linked = (number: number, mergeState: 'can merge' | 'conflicts') => ({ number, url: `u${number}`, state: 'OPEN', isDraft: false, checks: null, mergeState });
-  assert.deepEqual(prPipeline(item('Verify', [], { linkedPrs: [linked(1, 'conflicts'), linked(2, 'can merge')] })), linked(1, 'conflicts'));
-  assert.equal(prPipeline(item('Verify')), null, 'no PR, no pipeline');
-  assert.deepEqual(prPipeline(item('Verify', [], { type: 'PullRequest', pipeline })), pipeline);
+  assert.deepEqual(itemPr(item('Verify', [], { linkedPrs: [linked(1, 'conflicts'), linked(2, 'can merge')] })), { url: 'u1', pipeline: linked(1, 'conflicts') });
+  assert.equal(itemPr(item('Verify')), null, 'no PR, no link and no pipeline');
+  const pr = item('Verify', [], { type: 'PullRequest', url: 'https://github.com/maddec01/mux-server/pull/7', pipeline, linkedPrs: [linked(1, 'conflicts')] });
+  assert.deepEqual(itemPr(pr), { url: 'https://github.com/maddec01/mux-server/pull/7', pipeline });
+  assert.deepEqual(itemPr({ ...pr, pipeline: undefined }), { url: 'https://github.com/maddec01/mux-server/pull/7', pipeline: null }, 'a PR whose pipeline was not read');
 });
 
 test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {

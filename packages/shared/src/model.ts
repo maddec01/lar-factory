@@ -388,9 +388,17 @@ export function checkState(checks: Checks | null): CheckState | null {
   return checks.failed ? 'failed' : 'passed';
 }
 
-/** The pipeline of the PR Open PR opens: the item's own when it is a pull request, else its first linked PR's; null when there is none. */
-export function prPipeline(item: Pick<Item, 'type' | 'linkedPrs' | 'pipeline'>): Pipeline | null {
-  return (item.type === 'PullRequest' ? item.pipeline : item.linkedPrs[0]) ?? null;
+/** An item's pull request, the one Open PR opens: its link and its pipeline, each null while unknown. */
+interface ItemPr {
+  url: string | null;
+  pipeline: Pipeline | null;
+}
+
+/** The item's pull request: itself when it is one, else the first PR it links; null when it links none. */
+export function itemPr(item: Pick<Item, 'type' | 'url' | 'linkedPrs' | 'pipeline'>): ItemPr | null {
+  if (item.type === 'PullRequest') return { url: item.url, pipeline: item.pipeline ?? null };
+  const pr = item.linkedPrs[0];
+  return pr ? { url: pr.url, pipeline: pr } : null;
 }
 
 export function isSlow(checks: Checks, now: number): boolean {

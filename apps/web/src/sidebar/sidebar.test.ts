@@ -155,10 +155,10 @@ test('a group\'s name scopes the main area to its repository; pressing it again 
   const scope = group('Apple').querySelector<HTMLButtonElement>('button.scope')!;
   await settle(() => scope.click());
   expect(scope.getAttribute('aria-pressed')).toBe('true');
-  expect($$('.desk-card').map((c) => c.dataset.item)).toEqual(['PVTI_sample11', 'PVTI_sample16']);
+  expect($$('.desk-card').map((c) => c.dataset.item)).toEqual(['PVTI_sample11', 'PVTI_sample16', 'PVTI_sample27']);
   await settle(() => scope.click());
   expect(scope.getAttribute('aria-pressed')).toBe('false');
-  expect($$('.desk-card')).toHaveLength(5);
+  expect($$('.desk-card')).toHaveLength(8);
 });
 
 test('a row opens the item dialog and stays marked while it shows', async () => {

@@ -16,10 +16,10 @@ const withItem = (id: string, change: Partial<Item>): BoardData =>
 
 test('the desk shows what only you can move, counted, as cards in one row that scrolls sideways with no scrollbar', async () => {
   await mountPage();
-  expect(text($('#desk-h'))).toBe('Your desk 5');
+  expect(text($('#desk-h'))).toBe('Your desk 8');
   const statuses = cards().map((c) => sample.items.find((i) => i.id === c.dataset.item)!.status);
   expect(new Set(statuses)).toEqual(new Set(['Ready', 'Needs you', 'Verify', 'Ready to merge']));
-  expect(cards()).toHaveLength(5);
+  expect(cards()).toHaveLength(8);
   const row = cards()[0]!.parentElement!.className.split(' ');
   expect(row).toEqual(expect.arrayContaining(['-mx-6', 'px-6', 'overflow-x-auto', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden']));
 });
@@ -77,6 +77,30 @@ test('a pull request on Verify opens itself', async () => {
 test('with no pull request linked, Open PR is disabled, saying why', async () => {
   await mountPage(withItem('PVTI_sample17', { linkedPrs: [] }));
   expect(controls('PVTI_sample17').at(-1)).toBe('Open PR (disabled: No pull request is linked to this item yet)');
+});
+
+const pipeline = (id: string) => [...card(id).querySelector('.desk-pipeline')!.children].map(text);
+
+test.each([
+  ['an issue whose PR can merge', 'PVTI_sample16', ['1 passed · 0 running · 0 failed', 'can merge']],
+  ['a pull request GitHub is still checking', 'PVTI_sample26', ['4 passed · 2 running · 0 failed', 'checking']],
+  ['an issue whose PR is blocked', 'PVTI_sample27', ['3 passed · 0 running · 1 failed', 'blocked']],
+  ['an issue whose PR has no checks and conflicts', 'PVTI_sample28', ['no checks', 'conflicts']],
+])('a Verify card for %s shows its checks and merge state', async (_what, id, lines) => {
+  await mountPage();
+  expect(pipeline(id)).toEqual(lines);
+});
+
+test('a Verify card reads the PR Open PR opens, its first linked one', async () => {
+  const linkedPrs = (id: string) => sample.items.find((i) => i.id === id)!.linkedPrs;
+  await mountPage(withItem('PVTI_sample16', { linkedPrs: [...linkedPrs('PVTI_sample16'), { ...linkedPrs('PVTI_sample27')[0]!, number: 99 }] }));
+  expect(pipeline('PVTI_sample16')).toEqual(['1 passed · 0 running · 0 failed', 'can merge']);
+});
+
+test('a Verify card with no PR linked shows no pipeline, and only Verify cards show one', async () => {
+  await mountPage(withItem('PVTI_sample16', { linkedPrs: [] }));
+  expect(card('PVTI_sample16').querySelector('.desk-pipeline')).toBeNull();
+  expect(card('PVTI_sample17').querySelector('.desk-pipeline')).toBeNull();
 });
 
 test('clicks on a card’s buttons, in the menu one opens, or in its start message open no item dialog', async () => {

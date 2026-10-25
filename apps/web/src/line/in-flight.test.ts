@@ -38,16 +38,16 @@ beforeEach(() => localStorage.clear());
 test('the table lists everything past the Queue and short of Done that no dossier shows, furthest along first, under the stage header', async () => {
   await mountPage();
   const header = table().firstElementChild!;
-  expect(text(header.firstElementChild)).toBe('Everything else in flight · 8');
+  expect(text(header.firstElementChild)).toBe('Everything else in flight · 11');
   expect([...header.querySelectorAll('ol > li')].map((li) => [li.getAttribute('title'), text(li)])).toEqual([
     ['Shaping, Needs you', 'RefineRefining'], ['Ready', 'ReadyReady'], ['In progress', 'BuildBuilding'],
     ['Review', 'ReviewReview'], ['Verify, Ready to merge', 'VerifyVerify'], ['Done', 'DoneDone'],
   ]);
   expect([...header.children].slice(2).map(text)).toEqual(['Agent', 'Thread · next']);
   expect(rows().map((r) => numberOf(r.dataset.item!)), 'Verify first, Refining last, in board order within a stage; #200 and #180 and their parts sit in dossiers')
-    .toEqual([31, 142, 141, 150, 30, 130, 22, 23]);
+    .toEqual([31, 210, 34, 147, 142, 141, 150, 30, 130, 22, 23]);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(loose));
-  expect(rows().map((r) => numberOf(r.dataset.item!)), 'a part out of its dossier is back').toEqual([31, 142, 141, 150, 30, 140, 130, 22, 23]);
+  expect(rows().map((r) => numberOf(r.dataset.item!)), 'a part out of its dossier is back').toEqual([31, 210, 34, 147, 142, 141, 150, 30, 140, 130, 22, 23]);
 });
 
 test('with nothing in flight, the table says so', async () => {
@@ -59,7 +59,7 @@ test('the table takes the main area\'s scope', async () => {
   await mountPage();
   const scope = $$('button.scope').find((b) => text(b).includes('Apple'))!;
   await press(scope);
-  expect(rows().map((r) => numberOf(r.dataset.item!))).toEqual([31, 30, 22, 23]);
+  expect(rows().map((r) => numberOf(r.dataset.item!))).toEqual([31, 34, 30, 22, 23]);
 });
 
 test('a row shows its numbered title, status, repository and age, and a red badge while it is blocked', async () => {

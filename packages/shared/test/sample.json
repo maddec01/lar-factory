@@ -686,7 +686,8 @@
             "running": 2,
             "total": 3,
             "since": "2026-10-21T09:52:00Z"
-          }
+          },
+          "mergeState": "checking"
         }
       ],
       "slices": [],
@@ -738,7 +739,8 @@
             "running": 0,
             "total": 2,
             "since": "2026-10-20T13:00:00Z"
-          }
+          },
+          "mergeState": "can merge"
         }
       ],
       "slices": [],
@@ -805,7 +807,8 @@
             "running": 2,
             "total": 5,
             "since": "2026-10-21T09:18:00Z"
-          }
+          },
+          "mergeState": "checking"
         }
       ],
       "slices": [],
@@ -856,11 +859,113 @@
             "running": 0,
             "total": 1,
             "since": "2026-10-21T08:40:00Z"
-          }
+          },
+          "mergeState": "can merge"
         }
       ],
       "slices": [],
       "stats": "unavailable"
+    },
+    {
+      "id": "PVTI_sample26",
+      "status": "Verify",
+      "type": "PullRequest",
+      "number": 210,
+      "title": "Bump FFmpeg to 7.1",
+      "url": "https://github.com/maddec01/mux-server/pull/210",
+      "repo": "maddec01/mux-server",
+      "labels": [],
+      "state": "OPEN",
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:20:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "pipeline": {
+        "checks": {
+          "passed": 4,
+          "failed": 0,
+          "running": 2,
+          "total": 6,
+          "since": "2026-10-21T09:15:00Z"
+        },
+        "mergeState": "checking"
+      }
+    },
+    {
+      "id": "PVTI_sample27",
+      "status": "Verify",
+      "type": "Issue",
+      "number": 34,
+      "title": "Swipe between episodes",
+      "url": "https://github.com/maddec01/mux-apple/issues/34",
+      "repo": "maddec01/mux-apple",
+      "labels": [
+        "feature"
+      ],
+      "state": "OPEN",
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T07:50:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 35,
+          "url": "https://github.com/maddec01/mux-apple/pull/35",
+          "state": "OPEN",
+          "isDraft": false,
+          "checks": {
+            "passed": 3,
+            "failed": 1,
+            "running": 0,
+            "total": 4,
+            "since": "2026-10-21T07:30:00Z"
+          },
+          "mergeState": "blocked"
+        }
+      ],
+      "slices": []
+    },
+    {
+      "id": "PVTI_sample28",
+      "status": "Verify",
+      "type": "Issue",
+      "number": 147,
+      "title": "Fall back to software transcoding when the GPU is busy",
+      "url": "https://github.com/maddec01/mux-server/issues/147",
+      "repo": "maddec01/mux-server",
+      "labels": [
+        "improvement"
+      ],
+      "state": "OPEN",
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T06:30:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 148,
+          "url": "https://github.com/maddec01/mux-server/pull/148",
+          "state": "OPEN",
+          "isDraft": false,
+          "checks": null,
+          "mergeState": "conflicts"
+        }
+      ],
+      "slices": []
     },
     {
       "id": "PVTI_sample17",
@@ -894,7 +999,8 @@
             "running": 0,
             "total": 5,
             "since": "2026-10-21T08:30:00Z"
-          }
+          },
+          "mergeState": "can merge"
         }
       ],
       "slices": [],
@@ -980,7 +1086,8 @@
             "running": 0,
             "total": 1,
             "since": "2026-10-20T15:00:00Z"
-          }
+          },
+          "mergeState": "can merge"
         }
       ],
       "slices": [],
@@ -1029,7 +1136,8 @@
             "running": 0,
             "total": 2,
             "since": "2026-10-18T10:00:00Z"
-          }
+          },
+          "mergeState": "can merge"
         }
       ],
       "slices": [],
@@ -1094,7 +1202,8 @@
             "running": 0,
             "total": 2,
             "since": "2026-10-20T13:00:00Z"
-          }
+          },
+          "mergeState": "can merge"
         }
       ],
       "slices": [],

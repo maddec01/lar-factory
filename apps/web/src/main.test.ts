@@ -9,7 +9,7 @@ const fresh: BoardData = { ...sample, error: null, fetchedAt: new Date(NOW).toIS
 
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
   await mountPage(fresh);
-  expect($$('.desk-card')).toHaveLength(5);
+  expect($$('.desk-card')).toHaveLength(8);
   expect($$('.sidebar button[data-item]')).toHaveLength(4);
   expect(fetchMock).not.toHaveBeenCalled();
   expect($('#board-data')).not.toBeNull();
@@ -51,7 +51,7 @@ test('the page is the control room, with no tabs: the sidebar, then the title ba
 
 test('a page opened at #flow shows the control room and keeps the hash', async () => {
   await mountPage(sample, '#flow');
-  expect($$('.desk-card')).toHaveLength(5);
+  expect($$('.desk-card')).toHaveLength(8);
   expect(location.hash).toBe('#flow');
 });
 
@@ -87,7 +87,7 @@ test("a failed fetch says the server can't be reached and keeps the last data", 
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
   expect(bannerText($('.banner[role="alert"]')!)).toEqual(["Can't reach the board server.", 'HTTP 502 Showing the last data this page received.']);
-  expect($$('.desk-card')).toHaveLength(5);
+  expect($$('.desk-card')).toHaveLength(8);
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
   await settle(() => vi.advanceTimersByTime(15_000));

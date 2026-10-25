@@ -1,10 +1,10 @@
 // Your desk: the items only you can move, Ready, Needs you, Verify and Ready to merge, as cards in one row that scrolls
 // sideways under the page's padding to the window's edges. A card opens the item dialog, and carries the buttons for
-// its next action: Open thread on every card, Start build on a Ready one, Open PR on Verify and Ready to merge.
+// its next action: Open thread on every card, Start build on a Ready one, Open PR on Verify and Ready to merge. A Verify
+// card also shows that PR's pipeline: its checks and whether GitHub lets it merge.
 
-import type { ReactNode } from 'react';
-import { HINTS, platformOf, shortAgo } from '@mux-factory/shared';
-import type { BoardData, Item } from '@mux-factory/shared';
+import { HINTS, itemPr, platformOf, shortAgo } from '@mux-factory/shared';
+import type { BoardData, Item, MergeState } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, StepTrack } from '../items/item-parts.tsx';
@@ -30,6 +30,24 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
   );
 }
 
+const MERGE_COLOR: Record<MergeState, string> = { 'can merge': 'var(--st-done)', checking: 'var(--warning)', blocked: 'var(--muted-foreground)', conflicts: 'var(--error)' };
+
+/** The checks of the PR Open PR opens, counted, or no checks, then its merge state; nothing while there is no PR. */
+function Pipeline({ item }: { item: Item }) {
+  const pipeline = itemPr(item)?.pipeline;
+  if (!pipeline) return null;
+  const { checks, mergeState } = pipeline;
+  return (
+    <span className="desk-pipeline grid gap-1 text-xs text-(--muted-foreground) tabular-nums">
+      <span>{checks ? `${checks.passed} passed · ${checks.running} running · ${checks.failed} failed` : 'no checks'}</span>
+      {/* The merge state gets its own line, so a narrow card never wraps it after a dangling separator. */}
+      <span className="inline-flex items-center gap-1.5 font-medium text-(--foreground)">
+        <span className="size-2 rounded-full" style={{ background: MERGE_COLOR[mergeState] }} />{mergeState}
+      </span>
+    </span>
+  );
+}
+
 function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: number }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   const hint = HINTS[item.status];
@@ -44,6 +62,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
         </span>
         <span className="line-clamp-2 font-medium leading-snug"><ItemTitle item={item} /></span>
         {hint && <span className="text-xs text-(--muted-foreground)">{hint}</span>}
+        {item.status === 'Verify' && <Pipeline item={item} />}
         <StepTrack status={item.status} />
       </button>
       <Actions item={item} data={data} />

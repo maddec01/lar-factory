@@ -233,7 +233,7 @@ The platform whose repository the board shows, picked in the title bar or the si
 _Avoid_: project, filter
 
 **Desk**:
-The row of items only Pedro can move on: Needs you, Verify and Ready to merge.
+The row of items only Pedro can move on: Ready, Needs you, Verify and Ready to merge. Each card has the button for its next action.
 _Avoid_: inbox, queue
 
 **Line**:

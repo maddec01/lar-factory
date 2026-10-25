@@ -7,6 +7,7 @@
 @import "./notices/notices.css";
 @import "./add-item/add-item.css";
 @import "./settings/settings.css";
+@import "./title-bar/title-bar.css";
 /* Tailwind scans only the files listed here, and the design system's components: the page's own class names
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item/add-item.tsx";

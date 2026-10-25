@@ -7,6 +7,7 @@ the Copies instead (`docs/adr/0016-copy-t3s-base-components-unchanged.md`).
 
 | File | Source | Path | Commit |
 | ---- | ------ | ---- | ------ |
+| `src/components/MorphIcon.tsx` | pingdotgg/t3code | `apps/web/src/components/MorphIcon.tsx` | `d53873b6a479` |
 | `src/components/ui/alert.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/alert.tsx` | `d53873b6a479` |
 | `src/components/ui/alert-dialog.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/alert-dialog.tsx` | `d53873b6a479` |
 | `src/components/ui/badge.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/badge.tsx` | `d53873b6a479` |
@@ -21,10 +22,16 @@ the Copies instead (`docs/adr/0016-copy-t3s-base-components-unchanged.md`).
 | `src/components/ui/popover.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/popover.tsx` | `d53873b6a479` |
 | `src/components/ui/radio-group.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/radio-group.tsx` | `d53873b6a479` |
 | `src/components/ui/scroll-area.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/scroll-area.tsx` | `d53873b6a479` |
+| `src/components/ui/sheet.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/sheet.tsx` | `d53873b6a479` |
+| `src/components/ui/sidebar.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/sidebar.tsx` | `d53873b6a479` |
+| `src/components/ui/sidebarState.ts` | pingdotgg/t3code | `apps/web/src/components/ui/sidebarState.ts` | `d53873b6a479` |
 | `src/components/ui/spinner.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/spinner.tsx` | `d53873b6a479` |
 | `src/components/ui/textarea.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/textarea.tsx` | `d53873b6a479` |
 | `src/components/ui/tooltip.tsx` | pingdotgg/t3code | `apps/web/src/components/ui/tooltip.tsx` | `d53873b6a479` |
 | `src/coss/toast.tsx` | cosscom/ui | `apps/ui/registry/default/ui/toast.tsx` | `3d8ca28e7d90` |
+| `src/hooks/useLocalStorage.ts` | pingdotgg/t3code | `apps/web/src/hooks/useLocalStorage.ts` | `d53873b6a479` |
+| `src/hooks/useMediaQuery.ts` | pingdotgg/t3code | `apps/web/src/hooks/useMediaQuery.ts` | `d53873b6a479` |
+| `src/hooks/useResizeDrag.ts` | pingdotgg/t3code | `apps/web/src/hooks/useResizeDrag.ts` | `d53873b6a479` |
 | `src/lib/visibleAnimation.ts` | pingdotgg/t3code | `apps/web/src/lib/visibleAnimation.ts` | `d53873b6a479` |
 | `src/lib/windowControlsOverlay.ts` | pingdotgg/t3code | `apps/web/src/lib/windowControlsOverlay.ts` | `d53873b6a479` |
 

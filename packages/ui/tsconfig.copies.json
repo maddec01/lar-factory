@@ -25,5 +25,5 @@
       "@/registry/default/ui/button": ["./src/components/ui/button.tsx"]
     }
   },
-  "include": ["src/card", "src/coss", "src/components/ui", "src/dialog", "src/env.ts", "src/form", "src/lib/visibleAnimation.ts", "src/lib/windowControlsOverlay.ts", "src/progress"]
+  "include": ["src/card", "src/coss", "src/components/MorphIcon.tsx", "src/components/ui", "src/dialog", "src/env.ts", "src/form", "src/hooks", "src/lib/visibleAnimation.ts", "src/lib/windowControlsOverlay.ts", "src/progress"]
 }

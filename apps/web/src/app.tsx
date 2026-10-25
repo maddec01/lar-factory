@@ -15,7 +15,7 @@ import { Toasts } from './notices/toasts.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
 import { SettingsMain } from './settings/settings.tsx';
 import { useSettingsStore } from './settings/settings-store.ts';
-import { Sidebar } from './sidebar/sidebar.tsx';
+import { Sidebar, SidebarLayout } from './sidebar/sidebar.tsx';
 import { useSidebarStore } from './sidebar/sidebar-store.ts';
 import { WindowControls } from './sidebar/window-controls.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
@@ -37,12 +37,11 @@ function Content() {
 
 export function App() {
   const t3 = useBoardStore((state) => state.data.tools?.t3);
-  const sidebar = useSidebarStore((state) => state.open);
   const settings = useSettingsStore((state) => state.open);
   return (
-    <div className="fixed inset-0 flex bg-(--background) text-(--foreground)">
+    <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)">
       <WindowControls />
-      <Sidebar board={!t3} open={sidebar} />
+      <Sidebar board={!t3} />
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="contents" hidden={settings}>
           <TitleBar />
@@ -55,6 +54,6 @@ export function App() {
       <Toasts />
       <ItemDialog />
       <AbandonDialog />
-    </div>
+    </SidebarLayout>
   );
 }

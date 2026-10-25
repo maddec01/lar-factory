@@ -1,10 +1,10 @@
-// Whether the sidebar shows, and the repository its group names scope the main area to.
+// Whether the sidebar shows, which T3's SidebarProvider reads and sets (sidebar.tsx), and the repository its group names scope the main area to.
 
 import { create } from 'zustand';
 
 interface SidebarState {
   open: boolean;
-  toggle: () => void;
+  setOpen: (open: boolean) => void;
   /** The platform the main area shows, or `null` for all repositories. */
   scope: string | null;
   setScope: (scope: string | null) => void;
@@ -12,7 +12,7 @@ interface SidebarState {
 
 export const useSidebarStore = create<SidebarState>()((set) => ({
   open: true,
-  toggle: () => set((state) => ({ open: !state.open })),
+  setOpen: (open) => set({ open }),
   scope: null,
   setScope: (scope) => set({ scope }),
 }));

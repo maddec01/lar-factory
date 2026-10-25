@@ -1,9 +1,13 @@
 // The window controls and the sidebar: the toggle and ⌘B, search with Add item and ⌘N, the List's groups by
-// repository with their rows, collapse, "Show N more" and scope, and the foot's Settings and update button.
+// repository with their rows, collapse, "Show N more" and scope, the drag handle that resizes it, and the foot's
+// Settings and update button.
 
-import { expect, test, vi } from 'vite-plus/test';
+import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, fullScreen, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
 import type { BoardData, Item } from '@mux-factory/shared';
+import { THREAD_SIDEBAR_WIDTH_STORAGE_KEY } from './threadSidebarWidth.ts';
+
+beforeEach(() => localStorage.clear());
 
 const group = (platform: string) => $(`.list-group[data-platform="${platform}"]`)!;
 const rows = (platform: string) => [...group(platform).querySelectorAll<HTMLButtonElement>('button[data-item]')].map((b) => b.dataset.item);
@@ -113,13 +117,106 @@ test('the toggle and ⌘B hide and show the sidebar', async () => {
   expect(shown()).toBe(false);
 });
 
-test('below 768 px wide the sidebar is T3\'s sheet, which the toggle opens', async () => {
+test('below 768 px wide the sidebar is T3\'s sheet, which the toggle opens, without the drag handle', async () => {
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 767px)', addEventListener: () => {}, removeEventListener: () => {} }));
   await mountPage();
   expect($('.sidebar')).toBeNull();
   await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
   expect($('[data-slot="sidebar"][data-mobile="true"] .brand')).not.toBeNull();
+  expect(rail(), 'no drag handle').toBeNull();
   expect($('.sidebar-toggle')!.getAttribute('aria-pressed')).toBe('true');
+});
+
+const rail = () => $<HTMLButtonElement>('[data-slot="sidebar-rail"]');
+const width = () => wrapper().style.getPropertyValue('--sidebar-width');
+
+/** A pointer event, which jsdom lacks, as React reads it. */
+function pointer(type: string, clientX: number): MouseEvent {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  return event;
+}
+
+/** Drags the drag handle `by` px in a page `pageWidth` wide (jsdom's window is 1024 px); jsdom has no layout, so the
+ *  sidebar measures at its --sidebar-width. */
+async function drag(by: number, pageWidth = innerWidth): Promise<void> {
+  Object.assign(HTMLElement.prototype, { setPointerCapture() {}, hasPointerCapture: () => true, releasePointerCapture() {} });
+  Object.defineProperty(wrapper(), 'clientWidth', { configurable: true, value: pageWidth });
+  vi.spyOn($('[data-slot="sidebar-container"]')!, 'getBoundingClientRect').mockImplementation(() => ({ width: parseFloat(width()) }) as DOMRect);
+  for (const [type, x] of [['pointerdown', 300], ['pointermove', 300 + by], ['pointerup', 300 + by]] as const) {
+    await settle(() => rail()!.dispatchEvent(pointer(type, x)));
+  }
+}
+
+/** A brand row `inlineSize` px wide, as T3's SidebarBrandWidthProbe measures it. */
+function brandRowWidth(inlineSize: number): void {
+  vi.stubGlobal('ResizeObserver', class {
+    readonly callback: ResizeObserverCallback;
+    constructor(callback: ResizeObserverCallback) { this.callback = callback; }
+    observe(target: Element) { this.callback([{ target, borderBoxSize: [{ inlineSize }] } as unknown as ResizeObserverEntry], this as unknown as ResizeObserver); }
+    disconnect() {}
+  });
+}
+
+test('dragging the sidebar\'s right edge resizes it and stores the width', async () => {
+  await mountPage();
+  await drag(60);
+  expect([width(), localStorage.getItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY)]).toEqual(['360px', '360']);
+});
+
+test('a stored width comes back on load, with the sidebar open', async () => {
+  localStorage.setItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY, '340');
+  await mountPage();
+  expect([width(), shown()]).toEqual(['340px', true]);
+});
+
+test('the width stops at 208 px', async () => {
+  await mountPage();
+  await drag(-200);
+  expect(width()).toBe('208px');
+});
+
+test('the width stops at the brand row with its inset, padding and border when that is wider than 208 px', async () => {
+  brandRowWidth(250.4);
+  await mountPage();
+  expect($('[data-slot="sidebar-wrapper"] > [aria-hidden="true"].invisible .brand')).not.toBeNull();
+  await drag(-200);
+  expect(width()).toBe('251px');
+});
+
+test('the width stops where the main area keeps 640 px, and a drag that would leave it less is refused', async () => {
+  await mountPage();
+  await drag(200);
+  expect(width(), '1024 px less 640 px').toBe('384px');
+  await drag(-84);
+  expect(width()).toBe('300px');
+  await drag(60, 680);
+  expect(width(), 'the main area would be 320 px').toBe('300px');
+  await drag(-40, 680);
+  expect(width(), 'narrowing is always accepted').toBe('260px');
+});
+
+test('double-clicking the drag handle resets the width to 300 px and forgets the stored one', async () => {
+  localStorage.setItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY, '360');
+  await mountPage();
+  await settle(() => rail()!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+  expect([width(), localStorage.getItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY)]).toEqual(['300px', null]);
+});
+
+test('the reset goes to the brand row\'s width when that is wider than 300 px', async () => {
+  brandRowWidth(320);
+  localStorage.setItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY, '360');
+  await mountPage();
+  await settle(() => rail()!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+  expect(width()).toBe('320px');
+});
+
+test('while the sidebar is hidden, as in T3, its drag handle takes no pointer, so it can\'t be reached', async () => {
+  await mountPage();
+  await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
+  expect([sidebar().dataset.collapsible, sidebar().dataset.state]).toEqual(['offcanvas', 'collapsed']);
+  expect(sidebar().contains(rail())).toBe(true);
+  expect(rail()!.className.split(' ')).toContain('[[data-collapsible=offcanvas][data-state=collapsed]_&]:pointer-events-none');
 });
 
 test('⌘N opens Add item', async () => {

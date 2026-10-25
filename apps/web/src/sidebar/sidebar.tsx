@@ -1,12 +1,13 @@
 // The left sidebar, on T3 Code's sidebar component and copied in layout from T3's: the brand T3's gap past the toggle, search with Add item, the
 // List by repository, and Settings and the update button at its foot. Above the missing-t3 notice there's no List to
 // search or add to, so only the brand and Settings show. In Settings the section list takes the List's place, hiding
-// the List rather than closing it, so Back finds it as it was.
+// the List rather than closing it, so Back finds it as it was. Its right edge is T3's drag handle, with T3's width
+// rules (threadSidebarWidth.ts) as T3 Code's apps/web/src/components/AppSidebarLayout.tsx applies them at d53873b.
 
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, useSyncExternalStore, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 import { boardApp } from '@mux-factory/shared';
-import { Sidebar as T3Sidebar, SidebarProvider } from '@mux-factory/ui/sidebar';
+import { Sidebar as T3Sidebar, SidebarProvider, SidebarRail, useSidebar } from '@mux-factory/ui/sidebar';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { AddItem } from '../add-item/add-item.tsx';
 import { SettingsButton, SettingsNav } from '../settings/settings.tsx';
@@ -15,7 +16,15 @@ import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { ListGroups } from './list-groups.tsx';
 import { useSidebarStore } from './sidebar-store.ts';
-import { Brand, useWindowControlsInsetStyle } from './window-controls.tsx';
+import {
+  clampThreadSidebarWidth,
+  resolveInitialThreadSidebarWidth,
+  resolveThreadSidebarMaximumWidth,
+  resolveThreadSidebarMinimumWidth,
+  THREAD_MAIN_CONTENT_MIN_WIDTH,
+  THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
+} from './threadSidebarWidth.ts';
+import { Brand, SidebarControl, useWindowControlsInsetStyle } from './window-controls.tsx';
 
 /** T3's search field over the thread list, with its new-thread button, here Add item, on the right. Search filters List items only. */
 function SearchRow({ query, onQuery }: { query: string; onQuery: (q: string) => void }) {
@@ -49,27 +58,105 @@ function Update() {
  *  the provider, so the sidebar sets it again, where the brand reads it. */
 const TITLEBAR_CONTENT_LEFT = { '--workspace-titlebar-content-left': 'calc(var(--workspace-controls-left) + var(--workspace-titlebar-control-size) + var(--workspace-titlebar-control-gap))' } as CSSProperties;
 
-/** T3's SidebarProvider around the page, at the board's 300 px, with the toggle's inset. The sidebar store holds
- *  open, so the title bar, the app and ⌘B read one value. */
-export function SidebarLayout({ className, children }: { className?: string; children: ReactNode }) {
+function subscribeToViewportWidth(onChange: () => void): () => void {
+  window.addEventListener('resize', onChange);
+  return () => window.removeEventListener('resize', onChange);
+}
+
+function readViewportWidth(): number {
+  return window.innerWidth;
+}
+
+/** The width the drag handle stored, as T3's rail writes it: a JSON number. */
+function readStoredWidth(): number | null {
+  const stored = localStorage.getItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY);
+  if (stored === null) return null;
+  const width: unknown = JSON.parse(stored);
+  if (typeof width !== 'number' || !Number.isFinite(width)) throw new Error(`not a width: ${stored}`);
+  return width;
+}
+
+function readInitialThreadSidebarWidth(): number {
+  try {
+    return resolveInitialThreadSidebarWidth(readStoredWidth(), window.innerWidth);
+  } catch (error) {
+    console.error('Could not read persisted thread sidebar width.', error);
+    return resolveInitialThreadSidebarWidth(null, window.innerWidth);
+  }
+}
+
+/** T3's: an invisible copy of the brand row, with its inset past the toggle, pr-3 and the sidebar's border, whose
+ *  width is the sidebar's narrowest. */
+function SidebarBrandWidthProbe({ onWidthChange }: { onWidthChange: (width: number) => void }) {
+  const observeWidth = (probe: HTMLDivElement) => {
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) onWidthChange(entry.borderBoxSize[0]?.inlineSize ?? probe.offsetWidth);
+    });
+    observer.observe(probe);
+    return () => observer.disconnect();
+  };
+  return (
+    <div aria-hidden="true" className="pointer-events-none invisible fixed top-0 left-0 flex w-max border-r border-transparent pr-3" ref={observeWidth}>
+      <div className="ml-[var(--workspace-titlebar-content-left)] flex"><Brand /></div>
+    </div>
+  );
+}
+
+type SidebarResizable = NonNullable<ComponentProps<typeof T3Sidebar>['resizable']>;
+
+/** T3's SidebarProvider around the page, at the width the drag handle last left, with the toggle's inset, holding
+ *  the toggle, the sidebar and then the page. The sidebar store holds open, so the title bar, the app and ⌘B read
+ *  one value; only the width persists. `board` is the sidebar's. */
+export function SidebarLayout({ className, board, children }: { className?: string; board: boolean; children: ReactNode }) {
   const open = useSidebarStore((state) => state.open);
   const setOpen = useSidebarStore((state) => state.setOpen);
   const windowControlsInsetStyle = useWindowControlsInsetStyle();
+  const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
+  // Subscribed, as in T3: the clamp tracks the live window size.
+  const viewportWidth = useSyncExternalStore(subscribeToViewportWidth, readViewportWidth);
+  const [brandWidth, setBrandWidth] = useState(0);
+  const sidebarMinimumWidth = resolveThreadSidebarMinimumWidth(brandWidth);
+  const sidebarMaximumWidth = resolveThreadSidebarMaximumWidth(viewportWidth, sidebarMinimumWidth);
+  const resetSidebarWidth = () => {
+    try {
+      localStorage.removeItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY);
+    } catch (error) {
+      console.error('Could not clear persisted thread sidebar width.', error);
+    }
+    setSidebarWidth(resolveInitialThreadSidebarWidth(null, viewportWidth));
+  };
+  const resizable: SidebarResizable = {
+    maxWidth: sidebarMaximumWidth,
+    minWidth: sidebarMinimumWidth,
+    shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) => nextWidth <= currentWidth || wrapper.clientWidth - nextWidth >= THREAD_MAIN_CONTENT_MIN_WIDTH,
+    storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
+    onResize: setSidebarWidth,
+  };
+  const sidebarProviderStyle = {
+    '--sidebar-width': `${clampThreadSidebarWidth(sidebarWidth, sidebarMinimumWidth, sidebarMaximumWidth)}px`,
+    ...windowControlsInsetStyle,
+  } as CSSProperties;
   return (
-    <SidebarProvider open={open} onOpenChange={setOpen} className={className} style={{ '--sidebar-width': '300px', ...windowControlsInsetStyle } as CSSProperties}>
+    <SidebarProvider open={open} onOpenChange={setOpen} className={className} style={sidebarProviderStyle}>
+      <SidebarBrandWidthProbe onWidthChange={setBrandWidth} />
+      <SidebarControl />
+      <Sidebar board={board} resizable={resizable} onResetWidth={resetSidebarWidth} />
       {children}
     </SidebarProvider>
   );
 }
 
 /** T3's offcanvas sidebar: closed, it slides away rather than unmounts, so Add item keeps its ⌘N and its draft, and
- *  the search and the groups' collapse survive. Below 768 px it is T3's sheet. */
-export function Sidebar({ board = true }: { board?: boolean }) {
+ *  the search and the groups' collapse survive. Its drag handle resizes it and a double-click resets the width.
+ *  Below 768 px it is T3's sheet. */
+function Sidebar({ board, resizable, onResetWidth }: { board: boolean; resizable: SidebarResizable; onResetWidth: () => void }) {
   const [query, setQuery] = useState('');
   const settings = useSettingsStore((state) => state.open);
   const windowControlsInsetStyle = useWindowControlsInsetStyle();
+  const { isMobile } = useSidebar();
   return (
-    <T3Sidebar collapsible="offcanvas" className="sidebar border-(--sidebar-border) text-(--sidebar-foreground)" style={{ ...windowControlsInsetStyle, ...TITLEBAR_CONTENT_LEFT }}>
+    <T3Sidebar collapsible="offcanvas" resizable={resizable} className="sidebar border-(--sidebar-border) text-(--sidebar-foreground)" style={{ ...windowControlsInsetStyle, ...TITLEBAR_CONTENT_LEFT }}>
       <div className="flex h-13 shrink-0 items-center pr-3 pl-[var(--workspace-titlebar-content-left)] [-webkit-app-region:drag]"><Brand /></div>
       <div className="contents" hidden={settings}>
         {board ? (
@@ -90,6 +177,8 @@ export function Sidebar({ board = true }: { board?: boolean }) {
           {board && <Update />}
         </div>
       )}
+      {/* The sheet below 768 px doesn't resize, so it has no drag handle. */}
+      {!isMobile && <SidebarRail onDoubleClick={onResetWidth} />}
     </T3Sidebar>
   );
 }

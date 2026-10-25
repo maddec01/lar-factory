@@ -60,7 +60,7 @@ test('data pushed over /api/events replaces the board, and the open stream stops
   await settle(() => stream().onopen!());
   await settle(() => vi.advanceTimersByTime(60_000));
   expect(fetchMock).not.toHaveBeenCalled();
-  expect($('.refreshed')!.textContent).toBe('refreshed 1m ago');
+  expect($('.refreshed')!.textContent).toBe('1m ago');
 
   await settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify({ ...fresh, items: fresh.items.slice(0, 1) }) })));
   expect($$('.sidebar button[data-item]')).toHaveLength(1);

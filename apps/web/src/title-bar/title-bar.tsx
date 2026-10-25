@@ -1,44 +1,111 @@
-// The main area's title bar: a 52 px drag bar with the scope ("Whole factory", or the repository the sidebar scoped
-// it to, with an × to clear it), the Refreshed time, the counters and This week. While the sidebar is closed it starts
-// past the window controls. Clicks on its buttons never drag the window; the rest of the bar does.
+// The main area's title bar: a 52 px drag bar with the scope menu ("All repositories", or the platform the menu or
+// the sidebar scoped it to), the Refreshed time, the counters and This week. While the sidebar is closed it starts
+// past the window controls. Clicks on its buttons and on the time never drag the window; the rest of the bar does.
 // Above the missing-t3 notice there's no board to scope or count, so the bar is empty.
 
-import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
-import { shortAgo } from '@mux-factory/shared';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { boardSections, clock, isStale, shortAgo, slug } from '@mux-factory/shared';
+import type { BoardData } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
+import { Menu, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuSeparator, MenuTrigger } from '@mux-factory/ui/menu';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
 import { useSidebarStore } from '../sidebar/sidebar-store.ts';
 import { useBrandLeft } from '../sidebar/window-controls.tsx';
 import { Counters } from './counters.tsx';
 
-/** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. */
-function Refreshed({ fetchedAt }: { fetchedAt: string | null }) {
+const NO_DRAG = '[-webkit-app-region:no-drag]';
+const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-(--ring) focus-visible:ring-offset-1 focus-visible:ring-offset-(--background)';
+
+/** The menu that sets the scope: All repositories, then a platform for each sidebar group, in the sidebar's order. */
+function Scope() {
+  const data = useBoardStore((state) => state.data);
+  const now = useBoardStore((state) => state.now);
+  const { scope, setScope } = useSidebarStore();
+  const platforms = boardSections(data, now).listGroups.map((group) => group.platform);
+  return (
+    <Menu modal={false}>
+      <MenuTrigger render={<button type="button" />} aria-label={`Scope: ${scope ?? 'All repositories'}`}
+        className={`scope -ml-1.5 inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-sm font-medium hover:bg-(--accent) data-[popup-open]:bg-(--accent) ${FOCUS_RING} ${NO_DRAG}`}>
+        {scope ?? 'All repositories'}
+        <ChevronDown className="size-3.5 text-(--muted-foreground)" />
+      </MenuTrigger>
+      <MenuPopup align="start">
+        <MenuRadioGroup value={scope ?? ''} onValueChange={(value: string) => setScope(value || null)}>
+          <MenuGroupLabel>Show</MenuGroupLabel>
+          <MenuRadioItem value="" closeOnClick>
+            <span className="flex items-center gap-2"><span className="flex-1">All repositories</span><MenuRadioItemIndicator /></span>
+          </MenuRadioItem>
+          <MenuSeparator />
+          {platforms.map((platform) => (
+            <MenuRadioItem key={platform} value={platform} closeOnClick>
+              <span className="flex items-center gap-2">
+                <span className={`plat-${slug(platform)} size-2 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} aria-hidden="true" />
+                <span className="flex-1">{platform}</span>
+                <MenuRadioItemIndicator />
+              </span>
+            </MenuRadioItem>
+          ))}
+        </MenuRadioGroup>
+      </MenuPopup>
+    </Menu>
+  );
+}
+
+type Health = 'waiting' | 'live' | 'stale';
+const DOT = { waiting: 'bg-(--muted-foreground)/50', live: 'bg-success', stale: 'bg-amber-500' } as const;
+
+/** How many reads landed after this page opened: a newer `fetchedAt` than the one shown. */
+function useLandedReads(fetchedAt: string | null) {
+  const [landed, setLanded] = useState(0);
+  const shown = useRef(fetchedAt);
+  useEffect(() => {
+    const before = shown.current;
+    shown.current = fetchedAt;
+    if (fetchedAt && (!before || Date.parse(fetchedAt) > Date.parse(before))) setLanded((count) => count + 1);
+  }, [fetchedAt]);
+  return landed;
+}
+
+function RefreshDetails({ data, now }: { data: BoardData; now: number }) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span data-line>{data.fetchedAt ? `Updated ${shortAgo(data.fetchedAt, now)} · ${clock(data.fetchedAt, undefined)}` : 'Not read yet'}</span>
+      <span data-line className="text-(--muted-foreground)">
+        {data.error ? `Last read failed: ${data.error.split('\n')[0]}` : `Reads every ${data.refreshSeconds}s`}
+      </span>
+    </span>
+  );
+}
+
+/** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. A tab stop, so
+ *  keyboard users reach its tooltip. Only the dot changes colour (amber when stale) and only the dot pings. */
+function Refreshed({ data }: { data: BoardData }) {
+  const { fetchedAt } = data;
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, [fetchedAt]);
+  const landed = useLandedReads(fetchedAt);
+  const health: Health = isStale(data, now) ? 'stale' : fetchedAt ? 'live' : 'waiting';
+  const ago = fetchedAt ? shortAgo(fetchedAt, now) : null;
   return (
-    <p className="refreshed m-0 whitespace-nowrap text-xs text-(--muted-foreground)">
-      {fetchedAt ? <>refreshed <time dateTime={fetchedAt}>{shortAgo(fetchedAt, now)}</time></> : 'not read yet'}
-    </p>
-  );
-}
-
-function Scope() {
-  const { scope, setScope } = useSidebarStore();
-  return (
-    <>
-      <span className="scope font-medium">{scope ?? 'Whole factory'}</span>
-      {scope && (
-        <button type="button" aria-label="Show the whole factory" onClick={() => setScope(null)}
-          className="grid size-5 place-items-center rounded-sm text-(--muted-foreground) hover:bg-(--accent) [-webkit-app-region:no-drag]">
-          <X className="size-3" />
-        </button>
-      )}
-    </>
+    <Tooltip>
+      <TooltipTrigger render={<span tabIndex={0} />}
+        className={`refreshed inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm text-xs tabular-nums text-(--muted-foreground) ${FOCUS_RING} ${NO_DRAG}`}>
+        <span className="relative grid size-2 place-items-center">
+          {landed > 0 && health === 'live' && (
+            <span key={landed} data-ping className="absolute size-1.5 rounded-full bg-success motion-safe:animate-[refreshed-ping_1.2s_ease-out_forwards]" />
+          )}
+          <span data-dot className={`size-1.5 rounded-full ${DOT[health]}`} />
+        </span>
+        {!fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
+      </TooltipTrigger>
+      <TooltipPopup side="bottom"><RefreshDetails data={data} now={now} /></TooltipPopup>
+    </Tooltip>
   );
 }
 
@@ -53,7 +120,7 @@ export function TitleBar() {
           {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. */}
           <h1 className="sr-only">µx Factory</h1>
           <Scope />
-          <Refreshed fetchedAt={data.fetchedAt} />
+          <Refreshed data={data} />
           <div className="flex min-w-0 flex-1 items-center justify-center"><Counters /></div>
           <span className="flex items-center gap-1.5 [-webkit-app-region:no-drag]">
             <Button variant="outline" size="xs" disabled title="This week isn't built yet">This week</Button>

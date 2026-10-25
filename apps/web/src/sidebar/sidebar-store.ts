@@ -5,7 +5,7 @@ import { create } from 'zustand';
 interface SidebarState {
   open: boolean;
   toggle: () => void;
-  /** The platform the main area shows, or `null` for the whole factory. */
+  /** The platform the main area shows, or `null` for all repositories. */
   scope: string | null;
   setScope: (scope: string | null) => void;
 }

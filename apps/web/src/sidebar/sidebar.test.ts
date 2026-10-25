@@ -96,9 +96,16 @@ test('the sidebar holds the brand, search and Add item, then a group per reposit
   expect($$('.list-group').map((g) => [g.dataset.platform, text(g.querySelector('.count'))])).toEqual([['Server', '2'], ['Apple', '1'], ['Draft', '1']]);
   expect(rows('Server'), 'in board order, as in the prototype').toEqual(['PVTI_sample01', 'PVTI_sample02']);
   expect(text(group('Server').querySelector('button.scope'))).toBe('SServermux-server');
-  const row = group('Apple').querySelector('button[data-item]')!;
-  expect(text(row)).toBe('#12 Remember the last subtitle language per show19h ago');
+  const row = group('Apple').querySelector<HTMLButtonElement>('button[data-item]')!;
+  expect([...row.querySelectorAll('span > span')].map(text), 'the title over its ref and age').toEqual(['Remember the last subtitle language per show', '#12 · 19h ago']);
+  expect(row.title, 'the full title on hover').toBe('Remember the last subtitle language per show');
   expect(row.querySelector('svg.lucide-circle'), 'the List glyph').not.toBeNull();
+});
+
+test('a draft\'s second line says draft and its age', async () => {
+  await mountPage();
+  const row = group('Draft').querySelector('button[data-item]')!;
+  expect([...row.querySelectorAll('span > span')].map(text)).toEqual(['Shared playback history across devices', 'draft · 2d ago']);
 });
 
 test('a repository with nothing in List says so', async () => {

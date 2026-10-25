@@ -41,6 +41,17 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   expect(text(inDialog('[data-slot="dialog-panel"] > p'))).toBe('build');
 });
 
+test('the slice rows are 13px with the status word at 11px', async () => {
+  await mountPage();
+  await openItem('PVTI_sample13');
+  const rows = [...inDialog('section')!.querySelectorAll('li')];
+  expect(rows).toHaveLength(3);
+  for (const row of rows) {
+    expect(row.classList.contains('text-[13px]')).toBe(true);
+    expect(row.lastElementChild!.classList.contains('text-[11px]')).toBe(true);
+  }
+});
+
 test('the dialog shows the hint, each pull request with its checks, and the agent work figures', async () => {
   await mountPage();
   await openItem('PVTI_sample14');

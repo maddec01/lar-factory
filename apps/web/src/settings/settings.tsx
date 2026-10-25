@@ -8,7 +8,7 @@ import { boardApp } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 import { useSidebarStore } from '../sidebar/sidebar-store.ts';
-import { BRAND_LEFT } from '../sidebar/window-controls.tsx';
+import { useBrandLeft } from '../sidebar/window-controls.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { Kbd, ShownControl, SmallButton, notBuilt } from './controls.tsx';
 import { type Group, type Page, pages } from './settings-pages.tsx';
@@ -108,12 +108,13 @@ function GroupView({ group }: { group: Group }) {
 export function SettingsMain() {
   const page = useSection(usePages());
   const sidebar = useSidebarStore((state) => state.open);
+  const brandLeft = useBrandLeft();
   // The sidebar's update button follows the updater too, but it isn't there above the missing-t3 notice.
   const follow = useUpdateStore((state) => state.follow);
   useEffect(follow, [follow]);
   return (
     <>
-      <header className={`settings-header flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-4 ${sidebar ? 'pl-4' : BRAND_LEFT} [-webkit-app-region:drag]`}>
+      <header className={`settings-header flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-4 ${sidebar ? 'pl-4' : brandLeft} [-webkit-app-region:drag]`}>
         <span className="text-[13px] text-(--muted-foreground)">Settings</span><span className="text-(--muted-foreground)" aria-hidden="true">›</span>
         <h1 className="m-0 text-[13px] font-medium">{page.label}</h1>
         <span className="ml-auto [-webkit-app-region:no-drag]">

@@ -74,6 +74,10 @@ export interface BoardAppBridge {
   secret?: string | undefined;
   listProfiles: () => Promise<ProfilesResult>;
   setProfileTick: (name: string, ticked: boolean) => Promise<ProfilesResult>;
+  /** Whether the window is in full screen, read at once, as T3 Code's. */
+  getWindowFullscreenState: () => boolean;
+  /** Calls `listener` as the window enters and leaves macOS full screen; the returned function stops it. */
+  onWindowFullscreenStateChange: (listener: (fullscreen: boolean) => void) => () => void;
   getUpdateState: () => Promise<UpdateState>;
   /** Calls `listener` with each new update state; the returned function stops it. */
   onUpdateState: (listener: (state: UpdateState) => void) => () => void;

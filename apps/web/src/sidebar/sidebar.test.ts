@@ -2,7 +2,7 @@
 // repository with their rows, collapse, "Show N more" and scope, and the foot's Settings and update button.
 
 import { expect, test } from 'vite-plus/test';
-import { $, $$, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
+import { $, $$, fullScreen, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
 import type { BoardData, Item } from '@mux-factory/shared';
 
 const group = (platform: string) => $(`.list-group[data-platform="${platform}"]`)!;
@@ -36,6 +36,25 @@ test('in the Mac app, macOS draws the traffic lights', async () => {
   await mountPage();
   expect($('.traffic-lights')).toBeNull();
   expect($('.sidebar-toggle')).not.toBeNull();
+});
+
+test('in the Mac app\'s full screen, where macOS hides the traffic lights, the toggle and brand move into their place', async () => {
+  const window = fullScreen(true);
+  stubApp(window.bridge);
+  await mountPage();
+  const toggle = () => $('.sidebar-toggle')!.className.split(' ');
+  const brandRow = () => $('.sidebar .brand')!.parentElement!.className.split(' ');
+  expect([toggle(), brandRow()]).toEqual([expect.arrayContaining(['left-3']), expect.arrayContaining(['pl-11.5'])]);
+  await window.set(false);
+  expect([toggle(), brandRow()]).toEqual([expect.arrayContaining(['left-19']), expect.arrayContaining(['pl-27.5'])]);
+  await window.set(true);
+  expect(toggle()).toContain('left-3');
+});
+
+test('outside the Mac app, full screen leaves the toggle where it is', async () => {
+  stubApp({ ...fullScreen(true).bridge, platform: 'linux' });
+  await mountPage();
+  expect($('.sidebar-toggle')!.className.split(' ')).toContain('left-19');
 });
 
 test('the toggle and ⌘B hide and show the sidebar', async () => {

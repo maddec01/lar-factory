@@ -9,7 +9,7 @@ import { shortAgo } from '@mux-factory/shared';
 import { Button } from '@mux-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useSidebarStore } from '../sidebar/sidebar-store.ts';
-import { BRAND_LEFT } from '../sidebar/window-controls.tsx';
+import { useBrandLeft } from '../sidebar/window-controls.tsx';
 import { Counters } from './counters.tsx';
 
 /** Counts up each second on its own timer, so the rest of the board keeps the store's slower clock. */
@@ -45,8 +45,9 @@ function Scope() {
 export function TitleBar() {
   const data = useBoardStore((state) => state.data);
   const open = useSidebarStore((state) => state.open);
+  const brandLeft = useBrandLeft();
   return (
-    <header className={`title-bar flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-3 ${open ? 'pl-4' : BRAND_LEFT} [-webkit-app-region:drag]`}>
+    <header className={`title-bar flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-3 ${open ? 'pl-4' : brandLeft} [-webkit-app-region:drag]`}>
       {!data.tools?.t3 && (
         <>
           {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. */}

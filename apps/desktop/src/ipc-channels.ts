@@ -4,6 +4,10 @@
 export const LIST_PROFILES = "board-app:list-profiles";
 export const SET_PROFILE_TICK = "board-app:set-profile-tick";
 
+// The window's full screen, as T3 Code's: the page reads it at once and gets each change on macOS.
+export const GET_WINDOW_FULLSCREEN_STATE = "board-app:get-window-fullscreen-state";
+export const WINDOW_FULLSCREEN_STATE = "board-app:window-fullscreen-state";
+
 // The updater's calls, as T3 Code's apps/desktop/src/ipc/channels.ts. UPDATE_STATE pushes each
 // new state to the page; the others are requests.
 export const UPDATE_STATE = "board-app:update-state";

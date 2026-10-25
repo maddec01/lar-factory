@@ -50,7 +50,7 @@ test('a browser without the app has no update button', async () => {
 test('the button is a round icon at the sidebar\'s foot, after Settings, with no text', async () => {
   stubBridge(idle);
   await mountPage();
-  expect([...$('.sidebar-foot')!.children].map((el) => el.getAttribute('aria-label') ?? text(el))).toEqual(['Settings', '']);
+  expect([...$('.sidebar-foot')!.querySelectorAll('li')].map((li) => li.firstElementChild!.getAttribute('aria-label') ?? text(li))).toEqual(['Settings', '']);
   expect(button()!.closest('.sidebar-foot')).not.toBeNull();
   expect(button()!.classList).toContain('rounded-full');
   expect(button()!.textContent).toBe('');

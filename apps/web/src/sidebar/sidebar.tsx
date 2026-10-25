@@ -1,5 +1,5 @@
 // The left sidebar, on T3 Code's sidebar component and copied in layout from T3's: the brand T3's gap past the toggle, search with Add item, the
-// List by repository, and Settings and the update button at its foot. Above the missing-t3 notice there's no List to
+// List by repository, and T3's footer row with Settings left and the update button right. Above the missing-t3 notice there's no List to
 // search or add to, so only the brand and Settings show. In Settings the section list takes the List's place, hiding
 // the List rather than closing it, so Back finds it as it was. Its right edge is T3's drag handle, with T3's width
 // rules (threadSidebarWidth.ts) as T3 Code's apps/web/src/components/AppSidebarLayout.tsx applies them at d53873b.
@@ -7,7 +7,7 @@
 import { useState, useSyncExternalStore, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 import { boardApp } from '@mux-factory/shared';
-import { Sidebar as T3Sidebar, SidebarProvider, SidebarRail, useSidebar } from '@mux-factory/ui/sidebar';
+import { Sidebar as T3Sidebar, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarProvider, SidebarRail, useSidebar } from '@mux-factory/ui/sidebar';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { AddItem } from '../add-item/add-item.tsx';
 import { SettingsButton, SettingsNav } from '../settings/settings.tsx';
@@ -172,10 +172,12 @@ function Sidebar({ board, resizable, onResetWidth }: { board: boolean; resizable
           {board && <span className="absolute bottom-2 right-2"><Update /></span>}
         </>
       ) : (
-        <div className="sidebar-foot flex items-center justify-between px-2 py-2">
-          <SettingsButton />
-          {board && <Update />}
-        </div>
+        <SidebarFooter className="sidebar-foot">
+          <SidebarMenu className="flex-row items-center">
+            <SidebarMenuItem className="shrink-0"><SettingsButton /></SidebarMenuItem>
+            {board && <SidebarMenuItem className="ml-auto shrink-0"><Update /></SidebarMenuItem>}
+          </SidebarMenu>
+        </SidebarFooter>
       )}
       {/* The sheet below 768 px doesn't resize, so it has no drag handle. */}
       {!isMobile && <SidebarRail onDoubleClick={onResetWidth} />}

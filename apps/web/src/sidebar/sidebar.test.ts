@@ -333,3 +333,23 @@ test('in a browser the foot holds Settings and a still stand-in for the update b
   const standIn = $('.sidebar-foot .update-stand-in')!;
   expect([standIn.getAttribute('aria-label'), standIn.getAttribute('aria-disabled')]).toEqual(['Check for updates', 'true']);
 });
+
+test('the foot is T3\'s footer row, Settings left and the update button pushed right, both 32 px', async () => {
+  stubApp({});
+  await mountPage();
+  const foot = $('.sidebar-foot')!;
+  expect(foot.dataset.slot).toBe('sidebar-footer');
+  expect(foot.className).toContain('px-[var(--sidebar-content-inset)] py-1');
+  const [settings, update] = [...foot.querySelectorAll('li')];
+  expect(settings!.querySelector<HTMLElement>('.open-settings')!.dataset.size).toBe('icon');
+  expect(update!.className).toContain('ml-auto shrink-0');
+  expect(update!.querySelector('.update-button')!.classList).toContain('size-8');
+});
+
+test('in a browser the update stand-in sits where the board app\'s update button does, at its size', async () => {
+  await mountPage();
+  const update = [...$('.sidebar-foot')!.querySelectorAll('li')].at(-1)!;
+  expect(update.className).toContain('ml-auto shrink-0');
+  expect(update.querySelector('.update-stand-in')!.classList).toContain('size-8');
+  expect(update.querySelector('.update-stand-in')!.classList).toContain('rounded-full');
+});

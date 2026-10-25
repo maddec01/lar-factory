@@ -2,8 +2,10 @@
 // item. Pure: the server reads the bodies with the board query, reads each PR to
 // edit again, and sends the edits.
 
-import { isBuild, type Item, type ItemStats, duration, formatTokens, wholeUsd } from '@mux-factory/shared';
+import { isBuild, type Item, type ItemStats, duration, formatTokens, wholeUsd } from '@lar-factory/shared';
 
+// The marker keeps its pre-lar name: merged PRs carry blocks with it, and a done build's figures
+// are read back from them once Claude deletes the transcripts.
 const START = '<!-- mux-stats -->';
 const END = '<!-- /mux-stats -->';
 
@@ -26,7 +28,7 @@ function roughDuration(ms: number): string {
 export function statsBlock(stats: ItemStats): string {
   const wall = stats.wallMs === undefined ? '' : ` · wall ${roughDuration(stats.wallMs)}`;
   const cost = stats.costUsd === undefined ? '' : ` · ${wholeUsd(stats.costUsd)}`;
-  return `${START}\n**Item stats** (kept current by the Mux board): Σ ${roughDuration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}\n${END}`;
+  return `${START}\n**Item stats** (kept current by the lar board): Σ ${roughDuration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}\n${END}`;
 }
 
 // A duration as roughDuration writes it, hours then minutes.

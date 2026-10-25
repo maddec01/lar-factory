@@ -6,7 +6,7 @@ import { readJsonRecord } from './json-file.ts';
 import { tempDir } from '../test/stats-db.ts';
 
 test('a JSON file reads as its object, and as null when missing, garbled or not an object', (t) => {
-  const dir = tempDir(t, 'mux-json-');
+  const dir = tempDir(t, 'lar-json-');
   const file = (name: string, text: string) => {
     writeFileSync(join(dir, name), text);
     return join(dir, name);

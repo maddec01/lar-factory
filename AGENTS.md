@@ -1,12 +1,12 @@
-# Mux factory
+# lar Factory
 
-Skills, build agents and a local board for working on Mux. See the README for
+Skills, build agents and a local board for working on lar. See the README for
 the flow and `docs/plan.md` for how it was set up.
 
-- `skills/` holds copies of upstream skills, unchanged, plus Mux's own skills
-  (`mux-work`, `skill-sync`). Never edit a copy by hand: upstream changes come in
-  through `skill-sync`, which updates `UPSTREAM.md`. Mux rules go in `mux-work` or
-  in each Mux repo's `AGENTS.md`.
+- `skills/` holds copies of upstream skills, unchanged, plus lar's own skills
+  (`lar-work`, `skill-sync`). Never edit a copy by hand: upstream changes come in
+  through `skill-sync`, which updates `UPSTREAM.md`. lar rules go in `lar-work` or
+  in each lar repo's `AGENTS.md`.
 - The board is a root pnpm workspace laid out like T3 Code's monorepo:
   `apps/server`, `apps/web`, `apps/desktop` (the Electron board app),
   `packages/shared` and `packages/ui` (the design system). Apps import only
@@ -19,7 +19,7 @@ the flow and `docs/plan.md` for how it was set up.
 - Nothing secret goes in this public repo; the board reads GitHub through the local
   `gh` login, and `config.json` holds only repos and their roles.
 - Every commit and PR title uses conventional commits (`type(scope): description`;
-  scopes: `board`, `mux-work`, `skill-sync`, `skills`, `ci`). A required check and the
+  scopes: `board`, `lar-work`, `skill-sync`, `skills`, `ci`). A required check and the
   `commit-msg` hook enforce it. Update branches by rebase; fold review fixes in with
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   Pedro merges every PR.
@@ -32,9 +32,9 @@ the flow and `docs/plan.md` for how it was set up.
   usually holds 4317). Stop it with that command `| xargs kill`; never `pkill` by pattern.
 - Release secrets wizard changes: run `bash scripts/release-secrets.test.sh` and
   `shellcheck scripts/release-secrets.sh`. Never run the wizard without `--dry-run`.
-- mux-work script changes: run `bash skills/mux-work/scripts/slice.test.sh` and
-  `bash skills/mux-work/scripts/status.test.sh`.
-- A PR that no issue tracks goes on the Mux board too: `bash ~/.agents/skills/mux-work/scripts/status.sh <pr-url> "Ready to merge"`.
+- lar-work script changes: run `bash skills/lar-work/scripts/slice.test.sh` and
+  `bash skills/lar-work/scripts/status.test.sh`.
+- A PR that no issue tracks goes on the lar board too: `bash ~/.agents/skills/lar-work/scripts/status.sh <pr-url> "Ready to merge"`.
 
 ## Domain docs
 

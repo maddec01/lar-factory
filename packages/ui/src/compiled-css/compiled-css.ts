@@ -1,6 +1,6 @@
 // A Vite and Rolldown plugin that compiles a CSS file with Tailwind at build time and imports it as a string,
 // for pages that load no bundle, such as the board app's starting page. A file imported as `./page.css?compiled`
-// can `@import "@mux-factory/ui/styles.css"` and `@apply` utilities; the import is the minified CSS.
+// can `@import "@lar-factory/ui/styles.css"` and `@apply` utilities; the import is the minified CSS.
 import { compile, optimize } from '@tailwindcss/node';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -15,7 +15,7 @@ interface Context {
 }
 
 export const compiledCss = () => ({
-  name: 'mux-factory:compiled-css',
+  name: 'lar-factory:compiled-css',
   enforce: 'pre' as const,
   resolveId(source: string, importer: string | undefined): string | undefined {
     if (!source.endsWith(query) || importer === undefined) return undefined;

@@ -4,8 +4,8 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { duration, formatTokens, formatUsd, openBlockers, platformOf, ref, shortAgo, slug } from '@mux-factory/shared';
-import type { BoardData, Item, ItemStats, Status } from '@mux-factory/shared';
+import { duration, formatTokens, formatUsd, openBlockers, platformOf, ref, shortAgo, slug } from '@lar-factory/shared';
+import type { BoardData, Item, ItemStats, Status } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, SliceBar, SliceList } from '../items/item-parts.tsx';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';

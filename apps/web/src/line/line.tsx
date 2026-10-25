@@ -1,7 +1,7 @@
 // The line: the work moving through the factory, as the Queue, the dossiers, and everything else in flight. Each part
 // takes the items in the main area's scope.
 
-import type { Item } from '@mux-factory/shared';
+import type { Item } from '@lar-factory/shared';
 import { Dossiers } from './dossiers.tsx';
 import { InFlight } from './in-flight.tsx';
 import { Queue } from './queue.tsx';

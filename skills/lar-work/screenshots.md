@@ -1,6 +1,6 @@
 # Screenshots
 
-Keep review screenshots outside the checkout, in `${TMPDIR:-/tmp}/mux-<n>-ui/`,
+Keep review screenshots outside the checkout, in `${TMPDIR:-/tmp}/lar-<n>-ui/`,
 and show them to Pedro in the build conversation by absolute path. Never commit
 them or put them in PR descriptions or comments. PR evidence is a text summary
 of the visual checks and their results, even where the `pr` skill suggests

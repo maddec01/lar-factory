@@ -23,18 +23,18 @@ test('normalizes an issue item from the GraphQL response', () => {
       __typename: 'Issue',
       number: 61,
       title: 'Arr instances',
-      url: 'https://github.com/maddec01/mux-server/issues/61',
+      url: 'https://github.com/maddec01/lar-server/issues/61',
       state: 'OPEN',
       closedAt: null,
       updatedAt: '2026-10-21T08:10:00Z',
-      repository: { nameWithOwner: 'maddec01/mux-server' },
+      repository: { nameWithOwner: 'maddec01/lar-server' },
       labels: { nodes: [{ name: 'feature' }] },
-      parent: { number: 60, title: 'P', url: 'u', state: 'CLOSED', repository: { nameWithOwner: 'maddec01/mux-server' } },
+      parent: { number: 60, title: 'P', url: 'u', state: 'CLOSED', repository: { nameWithOwner: 'maddec01/lar-server' } },
       subIssuesSummary: { total: 3, completed: 1 },
       blockedBy: { nodes: [
-        { number: 7, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } },
-        { number: 8, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-apple' } },
-        { number: 5, state: 'CLOSED', repository: { nameWithOwner: 'maddec01/mux-server' } },
+        { number: 7, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } },
+        { number: 8, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-apple' } },
+        { number: 5, state: 'CLOSED', repository: { nameWithOwner: 'maddec01/lar-server' } },
       ] },
       closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false, body: 'PR body' }] },
     },
@@ -42,12 +42,12 @@ test('normalizes an issue item from the GraphQL response', () => {
   const item = normalizeItem(raw);
   assert.equal(item?.status, 'Needs you');
   assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
-  assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/mux-server', state: 'CLOSED' });
+  assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/lar-server', state: 'CLOSED' });
   assert.equal(item && 'blockedBy' in item, false, 'the open count comes from the blockers, not a field of its own');
   assert.deepEqual(item?.blockers, [
-    { number: 7, repo: 'maddec01/mux-server', state: 'OPEN' },
-    { number: 8, repo: 'maddec01/mux-apple', state: 'OPEN' },
-    { number: 5, repo: 'maddec01/mux-server', state: 'CLOSED' },
+    { number: 7, repo: 'maddec01/lar-server', state: 'OPEN' },
+    { number: 8, repo: 'maddec01/lar-apple', state: 'OPEN' },
+    { number: 5, repo: 'maddec01/lar-server', state: 'CLOSED' },
   ], 'the blocked-by issues come with their repo and state, closed ones too');
   assert.ok(!('blocking' in item!), 'the board reads no blocking links');
   assert.ok(!('map' in item!), 'only a concept has a map');
@@ -173,9 +173,9 @@ test("a build's slices come from the board query, open and closed, in GitHub's o
   const subIssues = [sliceRef(48, 'OPEN'), { ...sliceRef(46, 'CLOSED'), stateReason: 'COMPLETED' }, { ...sliceRef(45, 'CLOSED'), stateReason: 'NOT_PLANNED' },
     { ...sliceRef(47, 'OPEN'), stateReason: 'REOPENED' }, sliceRef(49, 'OPEN')];
   const issue = (labels: string[]) => normalizeItem(withSubIssues('PVTI_5', 5, labels, subIssues),
-    { active: new Set(['maddec01/mux-factory#47', 'maddec01/mux-factory#49']), blocked: new Set(['maddec01/mux-factory#49']) });
+    { active: new Set(['maddec01/lar-factory#47', 'maddec01/lar-factory#49']), blocked: new Set(['maddec01/lar-factory#49']) });
   const slice = (number: number, state: 'OPEN' | 'CLOSED', progress: string) =>
-    ({ number, title: `Issue ${number}`, url: sliceRef(number, state).url, repo: 'maddec01/mux-factory', state, progress });
+    ({ number, title: `Issue ${number}`, url: sliceRef(number, state).url, repo: 'maddec01/lar-factory', state, progress });
   assert.deepEqual(issue(['build'])?.slices, [
     slice(48, 'OPEN', 'waiting'),
     slice(46, 'CLOSED', 'done'),
@@ -193,7 +193,7 @@ test('a slice closed as not planned is still no board item', () => {
 });
 
 test('a build sub-issue the `build` search found is a board item and counts as a sub-issue, not a slice', () => {
-  const builds = new Set(['maddec01/mux-factory#102']);
+  const builds = new Set(['maddec01/lar-factory#102']);
   const items = normalizeItems([
     withSubIssues('PVTI_parent', 100, ['build'], [sliceRef(101, 'OPEN'), sliceRef(102, 'OPEN')]),
     withSubIssues('PVTI_101', 101, ['improvement']),
@@ -209,24 +209,24 @@ test('a build sub-issue the `build` search found is a board item and counts as a
 
 test('active and blocked slices each come from one search over the repos of open slices, so the cost stays flat', () => {
   const raws = [
-    issue900(['build'], [refIn('maddec01/mux-server', 1, 'OPEN'), refIn('maddec01/mux-factory', 2, 'OPEN'), refIn('maddec01/mux-apple', 3, 'CLOSED')]),
-    issue900(['build'], [refIn('maddec01/mux-server', 4, 'OPEN')]),
-    issue900(['concept'], [refIn('maddec01/mux-apple', 5, 'OPEN')]),
-    issue900(['concept', 'build'], [refIn('maddec01/mux-apple', 6, 'OPEN')]),
+    issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN'), refIn('maddec01/lar-factory', 2, 'OPEN'), refIn('maddec01/lar-apple', 3, 'CLOSED')]),
+    issue900(['build'], [refIn('maddec01/lar-server', 4, 'OPEN')]),
+    issue900(['concept'], [refIn('maddec01/lar-apple', 5, 'OPEN')]),
+    issue900(['concept', 'build'], [refIn('maddec01/lar-apple', 6, 'OPEN')]),
   ];
-  assert.equal(sliceLabelSearch('active', raws), 'is:issue is:open label:active repo:maddec01/mux-server repo:maddec01/mux-factory');
-  assert.equal(sliceLabelSearch('blocked', raws), 'is:issue is:open label:blocked repo:maddec01/mux-server repo:maddec01/mux-factory');
-  assert.equal(sliceLabelSearch('active', [issue900(['build'], [refIn('maddec01/mux-apple', 3, 'CLOSED')])]), null, 'no open slice, no search');
+  assert.equal(sliceLabelSearch('active', raws), 'is:issue is:open label:active repo:maddec01/lar-server repo:maddec01/lar-factory');
+  assert.equal(sliceLabelSearch('blocked', raws), 'is:issue is:open label:blocked repo:maddec01/lar-server repo:maddec01/lar-factory');
+  assert.equal(sliceLabelSearch('active', [issue900(['build'], [refIn('maddec01/lar-apple', 3, 'CLOSED')])]), null, 'no open slice, no search');
 });
 
 test("build sub-issues come from one search over the repos of the builds' sub-issues, open and closed", () => {
   assert.equal(buildSubIssueSearch([
-    issue900(['build'], [refIn('maddec01/mux-server', 1, 'OPEN'), refIn('maddec01/mux-apple', 3, 'CLOSED')]),
-    issue900(['build'], [refIn('maddec01/mux-server', 4, 'OPEN')]),
-    issue900(['concept'], [refIn('maddec01/mux-factory', 5, 'OPEN')]),
-  ]), 'is:issue label:build repo:maddec01/mux-server repo:maddec01/mux-apple');
+    issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN'), refIn('maddec01/lar-apple', 3, 'CLOSED')]),
+    issue900(['build'], [refIn('maddec01/lar-server', 4, 'OPEN')]),
+    issue900(['concept'], [refIn('maddec01/lar-factory', 5, 'OPEN')]),
+  ]), 'is:issue label:build repo:maddec01/lar-server repo:maddec01/lar-apple');
   assert.equal(buildSubIssueSearch([issue900(['build'], [])]), null, 'no sub-issue, no search');
-  const onProject = rawIssue('PVTI_1', 1, 'In progress', ['build'], { repository: { nameWithOwner: 'maddec01/mux-server' } });
-  assert.equal(buildSubIssueSearch([issue900(['build'], [refIn('maddec01/mux-server', 1, 'OPEN')]), onProject]), null,
+  const onProject = rawIssue('PVTI_1', 1, 'In progress', ['build'], { repository: { nameWithOwner: 'maddec01/lar-server' } });
+  assert.equal(buildSubIssueSearch([issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN')]), onProject]), null,
     'a sub-issue on the project is judged by its own labels, so it needs no search');
 });

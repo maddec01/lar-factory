@@ -437,10 +437,10 @@ export function workTitle(item: Item): string | null {
   return `#${item.number} ${item.title}`;
 }
 
-/** The work message: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`. Null for a draft. */
+/** The work message: `#<n> <title>`, then `$lar-work <owner/repo>#<n>`. Null for a draft. */
 export function workMessage(item: Item): string | null {
   const title = workTitle(item);
-  return title && `${title}\n$mux-work ${item.repo}#${item.number}`;
+  return title && `${title}\n$lar-work ${item.repo}#${item.number}`;
 }
 
 /**
@@ -458,10 +458,10 @@ export function buildBranch(item: Item): string | null {
   return `${prefix}/${[item.number, ...words].join('-')}`;
 }
 
-/** Start build's message, naming the builder agent of the mux-work installed at `muxWork`. Null for a draft. */
-export function buildMessage(item: Item, muxWork: string): string | null {
+/** Start build's message, naming the builder agent of the lar-work installed at `larWork`. Null for a draft. */
+export function buildMessage(item: Item, larWork: string): string | null {
   if (!item.repo || item.number === null) return null;
-  return `Build ${item.repo}#${item.number}. Read ${muxWork}/agents/builder.md and follow it.`;
+  return `Build ${item.repo}#${item.number}. Read ${larWork}/agents/builder.md and follow it.`;
 }
 
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */

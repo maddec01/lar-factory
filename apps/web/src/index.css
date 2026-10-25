@@ -1,7 +1,7 @@
 /* The board page's own styles. Tokens, base styles and the base components' styles come from the design
    system (packages/ui). Each feature folder holds its own layout rules; all of them use only the design
    system's tokens and Tailwind's spacing scale. */
-@import "@mux-factory/ui/styles.css";
+@import "@lar-factory/ui/styles.css";
 @import "./items/items.css";
 @import "./sidebar/sidebar.css";
 @import "./notices/notices.css";

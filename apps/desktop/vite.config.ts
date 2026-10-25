@@ -2,7 +2,7 @@
 // apps/desktop/vite.config.ts does, and bundles the board server into
 // dist-electron/server/server.mjs for the packaged app, which has no node_modules.
 // The dev window runs apps/server/src/server.ts as source.
-import { compiledCss } from "@mux-factory/ui/compiled-css";
+import { compiledCss } from "@lar-factory/ui/compiled-css";
 import { defineConfig } from "vite-plus";
 import { sharedTest } from "../../vitest.shared.ts";
 
@@ -44,7 +44,7 @@ export default defineConfig({
     },
     {
       // One ES module with every dependency in it; Node can't strip the types of the
-      // .ts files @mux-factory/shared exports, and the packaged app has no node_modules.
+      // .ts files @lar-factory/shared exports, and the packaged app has no node_modules.
       format: "esm",
       outDir: "dist-electron/server",
       dts: false,

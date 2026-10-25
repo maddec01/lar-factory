@@ -5,7 +5,7 @@
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
-import type { BoardData, ProfilesResult, UpdateChannel, UpdateState } from '@mux-factory/shared';
+import type { BoardData, ProfilesResult, UpdateChannel, UpdateState } from '@lar-factory/shared';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
 const listed: ProfilesResult = {
@@ -124,8 +124,8 @@ test('the header drags the window, but not Restore defaults', async () => {
 });
 
 test('Repositories shows the GitHub Project, gh\'s login and each repository with its role, read-only', async () => {
-  await open('Repositories', { ...sample, project: { owner: 'maddec01', title: 'Mux' } });
-  expect(row('project').querySelector('input')!.value).toBe('maddec01 / Mux');
+  await open('Repositories', { ...sample, project: { owner: 'maddec01', title: 'lar' } });
+  expect(row('project').querySelector('input')!.value).toBe('maddec01 / lar');
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in');
   expect(sample.repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual(sample.repos.map((r) => `${r.repo}${r.role}${r.platform}Edit`));
   expect(row('project').querySelector('input')!.readOnly).toBe(true);
@@ -214,15 +214,15 @@ test('unticking says only what it removed', async () => {
     removed: { links: [], checklists: false } });
   await settle(() => switches()[1]!.click());
   expect(bridge.setProfileTick).toHaveBeenLastCalledWith('.claude-work', false);
-  expect(result().textContent).toBe('Mux Factory had no skill links or checklists in ~/.claude-work to remove.');
+  expect(result().textContent).toBe('lar Factory had no skill links or checklists in ~/.claude-work to remove.');
 });
 
 test('a tick that left paths alone names each one', async () => {
-  stubBridge({ ...bothTicked, conflicts: ['~/.claude-work/skills/mux-work'] });
+  stubBridge({ ...bothTicked, conflicts: ['~/.claude-work/skills/lar-work'] });
   await open();
   await settle(() => switches()[1]!.click());
-  expect(result().textContent).toContain('left these alone because Mux Factory didn\'t make them');
-  expect($$('#settings-result li').map((li) => li.textContent)).toEqual(['~/.claude-work/skills/mux-work']);
+  expect(result().textContent).toContain('left these alone because lar Factory didn\'t make them');
+  expect($$('#settings-result li').map((li) => li.textContent)).toEqual(['~/.claude-work/skills/lar-work']);
   expect(result().dataset.variant).toBe('warning');
 });
 
@@ -255,9 +255,9 @@ test('a bridge that throws shows the error', async () => {
 
 test('a list that fails shows its error in plain words', async () => {
   const bridge = stubBridge();
-  bridge.listProfiles.mockResolvedValueOnce({ profiles: [], installed: true, conflicts: [], error: 'Couldn\'t read /Users/me/.agents/.mux-factory-install.json' });
+  bridge.listProfiles.mockResolvedValueOnce({ profiles: [], installed: true, conflicts: [], error: 'Couldn\'t read /Users/me/.agents/.lar-factory-install.json' });
   await open();
-  expect(result().textContent).toBe('Couldn\'t read the Claude profiles: Couldn\'t read /Users/me/.agents/.mux-factory-install.json');
+  expect(result().textContent).toBe('Couldn\'t read the Claude profiles: Couldn\'t read /Users/me/.agents/.lar-factory-install.json');
   expect(text(body())).not.toContain('No Claude profiles found');
 });
 
@@ -292,7 +292,7 @@ test('before the first install the switches show disabled with the reason', asyn
   const bridge = stubBridge();
   bridge.listProfiles.mockResolvedValueOnce({ ...listed, installed: false });
   await open();
-  expect(text(body())).toContain('Mux Factory hasn\'t installed its skills in ~/.agents yet');
+  expect(text(body())).toContain('lar Factory hasn\'t installed its skills in ~/.agents yet');
   expect(switches().slice(0, 2).map((s) => s.disabled)).toEqual([true, true]);
   await settle(() => switches()[1]!.click());
   expect(bridge.setProfileTick).not.toHaveBeenCalled();
@@ -353,7 +353,7 @@ describe('updates', () => {
     expect($('.settings-body [role="radiogroup"]')!.getAttribute('aria-label')).toBe('Update channel');
     expect(radios().map((each) => [each.value, text(each)])).toEqual([['nightly', 'Nightly'], ['latest', 'Latest']]);
     expect(checked()).toBe('nightly');
-    expect(text(row('version'))).toContain('Mux Factory 0.2.0-nightly.20261023.41');
+    expect(text(row('version'))).toContain('lar Factory 0.2.0-nightly.20261023.41');
     expect(status()).toBe('Up to date on 0.2.0-nightly.20261023.41.');
   });
 

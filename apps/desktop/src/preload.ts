@@ -8,7 +8,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
-import type { BoardAppBridge } from "@mux-factory/shared";
+import type { BoardAppBridge } from "@lar-factory/shared";
 import * as IpcChannels from "./ipc-channels.ts";
 import * as LaunchSecret from "./board-server/launch-secret.ts";
 

@@ -21,7 +21,7 @@ const main = async () => {
       process.exitCode = 1;
       return;
     }
-    if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'Mux' }] } } } });
+    if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'lar' }] } } } });
     if (args.some((a) => a.includes('search(type: ISSUE'))) {
       const label = ['build', 'blocked', 'active'].find((l) => args.some((a) => a.includes(`label:${l} `)));
       const nodes = { build: options.builds, blocked: options.blocked, active: options.active }[label];
@@ -40,7 +40,7 @@ const main = async () => {
       await new Promise((r) => setTimeout(r, options.readDelay));
       fs.rmSync(lock, { force: true });
     }
-    return output({ data: { user: { projectV2: { title: 'Mux',
+    return output({ data: { user: { projectV2: { title: 'lar',
       items: { pageInfo: { hasNextPage: false, endCursor: null },
         nodes: (options.items ?? []).map(({ content, ...item }) => ({ ...item, content: content && { ...content, body: undefined } })) } } } } });
   }

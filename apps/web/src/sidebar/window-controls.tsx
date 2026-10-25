@@ -5,10 +5,10 @@
 // the lights, so the toggle moves to the stylesheet's 12 px in. ⌘B toggles the sidebar too.
 
 import { useEffect, useSyncExternalStore, type CSSProperties } from 'react';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, boardApp, inMacApp } from '@mux-factory/shared';
-import { Badge } from '@mux-factory/ui/badge';
-import { SidebarTrigger, useSidebar, useSidebarVisibility } from '@mux-factory/ui/sidebar';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
+import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, boardApp, inMacApp } from '@lar-factory/shared';
+import { Badge } from '@lar-factory/ui/badge';
+import { SidebarTrigger, useSidebar, useSidebarVisibility } from '@lar-factory/ui/sidebar';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { T3Wordmark } from './T3Wordmark.tsx';
 
 // The window's full screen, as T3 Code's apps/web/src/components/AppSidebarLayout.tsx reads it: the bridge's
@@ -61,7 +61,7 @@ function TrafficLights() {
   );
 }
 
-/** The board app's brand: the Mux mark on the baseline with the µ's tail hanging below, a grey "Factory", and its
+/** The board app's brand: the lar mark on the baseline with the µ's tail hanging below, a grey "Factory", and its
  *  "for T3 Code" pill with T3's own wordmark. Screen readers skip it: the page's hidden h1 names the page. */
 export function Brand() {
   return (

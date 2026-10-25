@@ -3,7 +3,7 @@
 
 import { flushSync } from 'react-dom';
 import { create } from 'zustand';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { refocus } from './toasts.tsx';

@@ -3,8 +3,8 @@
 // choice once a thread starts or may have.
 
 import { flushSync } from 'react-dom';
-import { remembersChoice, startRequest } from '@mux-factory/shared';
-import type { ModelChoice, StartResult } from '@mux-factory/shared';
+import { remembersChoice, startRequest } from '@lar-factory/shared';
+import type { ModelChoice, StartResult } from '@lar-factory/shared';
 import { useActionStore } from './action-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from './card-actions.ts';

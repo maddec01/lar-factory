@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: upstream-changes.sh <mux-factory checkout>
+# Usage: upstream-changes.sh <lar-factory checkout>
 # For every row in UPSTREAM.md, prints the upstream log and diff of that skill's
 # folder from the recorded commit to upstream HEAD. Clones into a temp folder.
 set -euo pipefail

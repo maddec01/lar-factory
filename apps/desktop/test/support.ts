@@ -10,8 +10,8 @@ export const tempDir = (prefix: string) => NodeFS.mkdtempSync(NodePath.join(Node
 /** A bundle with one skill and one checklist, as the app's build copies them. */
 export const makeBundle = () => {
   const bundle = tempDir("skill-bundle-");
-  NodeFS.mkdirSync(NodePath.join(bundle, "skills/mux-work"), { recursive: true });
-  NodeFS.writeFileSync(NodePath.join(bundle, "skills/mux-work/SKILL.md"), "# mux-work\n");
+  NodeFS.mkdirSync(NodePath.join(bundle, "skills/lar-work"), { recursive: true });
+  NodeFS.writeFileSync(NodePath.join(bundle, "skills/lar-work/SKILL.md"), "# lar-work\n");
   NodeFS.mkdirSync(NodePath.join(bundle, "references"));
   NodeFS.writeFileSync(NodePath.join(bundle, "references/checklist.md"), "- [ ] check\n");
   return bundle;

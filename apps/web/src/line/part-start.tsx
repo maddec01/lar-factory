@@ -2,8 +2,8 @@
 // today's Start on a Queued decision, Open thread while it has a live thread. While an issue it's blocked by is open,
 // Start is disabled, its title naming the issue, and Start after joins it; the map shows Start after alone.
 
-import { workMessage } from '@mux-factory/shared';
-import type { BoardData } from '@mux-factory/shared';
+import { workMessage } from '@lar-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';

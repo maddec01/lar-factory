@@ -3,7 +3,7 @@ import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 
-import { installSkills } from "@mux-factory/shared/install-skills";
+import { installSkills } from "@lar-factory/shared/install-skills";
 import { makeBundle, tempDir } from "../../test/support.ts";
 import * as ClaudeProfiles from "./claude-profiles.ts";
 
@@ -16,7 +16,7 @@ const makeHome = (install = true) => {
   return home;
 };
 
-const link = (home: string, profile: string) => NodePath.join(home, profile, "skills/mux-work");
+const link = (home: string, profile: string) => NodePath.join(home, profile, "skills/lar-work");
 
 describe("list", () => {
   it("lists every profile with its tick", () => {
@@ -34,10 +34,10 @@ describe("list", () => {
 
   it("returns an error naming a manifest it can't read", () => {
     const home = makeHome();
-    const manifest = NodePath.join(home, ".agents/.mux-factory-install.json");
+    const manifest = NodePath.join(home, ".agents/.lar-factory-install.json");
     NodeFS.writeFileSync(manifest, "{ not json");
     const result = ClaudeProfiles.list(home);
-    assert.include(result.error, "Couldn't read ~/.agents/.mux-factory-install.json:");
+    assert.include(result.error, "Couldn't read ~/.agents/.lar-factory-install.json:");
     assert.notInclude(result.error, home);
     assert.deepStrictEqual(result.profiles, []);
   });
@@ -62,7 +62,7 @@ describe("setTick", () => {
     assert.deepStrictEqual(off.profiles, [{ name: ".claude", ticked: true }, { name: ".claude-work", ticked: false }]);
     assert.isFalse(NodeFS.existsSync(link(home, ".claude-work")));
 
-    assert.deepStrictEqual(off.removed, { links: ["mux-work"], checklists: true });
+    assert.deepStrictEqual(off.removed, { links: ["lar-work"], checklists: true });
 
     const on = ClaudeProfiles.setTick(home, ".claude-work", true);
     assert.deepStrictEqual(on.profiles[1], { name: ".claude-work", ticked: true });
@@ -74,7 +74,7 @@ describe("setTick", () => {
     ClaudeProfiles.setTick(home, ".claude-work", false);
     NodeFS.mkdirSync(link(home, ".claude-work"));
     const result = ClaudeProfiles.setTick(home, ".claude-work", true);
-    assert.deepStrictEqual(result.conflicts, ["~/.claude-work/skills/mux-work"]);
+    assert.deepStrictEqual(result.conflicts, ["~/.claude-work/skills/lar-work"]);
     assert.strictEqual(result.error, undefined);
   });
 

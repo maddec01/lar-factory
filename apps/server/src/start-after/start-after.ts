@@ -4,8 +4,8 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { isRecord, openBlockers, repositoryProjectHint } from '@mux-factory/shared';
-import type { ArmedStart, Item, ModelGroup } from '@mux-factory/shared';
+import { isRecord, openBlockers, repositoryProjectHint } from '@lar-factory/shared';
+import type { ArmedStart, Item, ModelGroup } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import { readJsonRecord } from '../json-file.ts';

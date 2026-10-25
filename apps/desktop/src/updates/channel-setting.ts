@@ -6,7 +6,7 @@ import * as NodePath from "node:path";
 
 import * as Effect from "effect/Effect";
 
-import type { UpdateChannel } from "@mux-factory/shared";
+import type { UpdateChannel } from "@lar-factory/shared";
 
 export interface ChannelSetting {
   /** The chosen channel, or null before any choice or when the file can't be read. */

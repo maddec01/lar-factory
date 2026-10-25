@@ -2,7 +2,7 @@
 // and carrying the buttons for its next action; and the line's heading below it.
 
 import { expect, test } from 'vite-plus/test';
-import type { BoardData, Item } from '@mux-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { $, $$, mountPage, sample, settle, text } from '../../test/support.ts';
 
 const cards = () => $$('.desk-card');
@@ -66,12 +66,12 @@ test('Open thread opens the latest thread in T3, and Open PR the pull request th
   await mountPage();
   expect(card('PVTI_sample12').querySelector('[data-open-thread]')!.getAttribute('href')).toMatch(/^t3code:\/\//);
   const pr = card('PVTI_sample16').querySelector<HTMLAnchorElement>('[data-pr-link]')!;
-  expect([pr.getAttribute('href'), pr.target]).toEqual(['https://github.com/maddec01/mux-apple/pull/32', '_blank']);
+  expect([pr.getAttribute('href'), pr.target]).toEqual(['https://github.com/maddec01/lar-apple/pull/32', '_blank']);
 });
 
 test('a pull request on Verify opens itself', async () => {
-  await mountPage(withItem('PVTI_sample16', { type: 'PullRequest', url: 'https://github.com/maddec01/mux-apple/pull/40' }));
-  expect(card('PVTI_sample16').querySelector('[data-pr-link]')!.getAttribute('href')).toBe('https://github.com/maddec01/mux-apple/pull/40');
+  await mountPage(withItem('PVTI_sample16', { type: 'PullRequest', url: 'https://github.com/maddec01/lar-apple/pull/40' }));
+  expect(card('PVTI_sample16').querySelector('[data-pr-link]')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-apple/pull/40');
 });
 
 test('with no pull request linked, Open PR is disabled, saying why', async () => {

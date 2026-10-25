@@ -1,23 +1,23 @@
 {
   "project": {
     "owner": "maddec01",
-    "title": "Mux"
+    "title": "lar"
   },
   "repos": [
     {
-      "repo": "maddec01/mux-server",
+      "repo": "maddec01/lar-server",
       "platform": "Server",
-      "role": "Backend API server used by mux-apple"
+      "role": "Backend API server used by lar-apple"
     },
     {
-      "repo": "maddec01/mux-apple",
+      "repo": "maddec01/lar-apple",
       "platform": "Apple",
-      "role": "Apple client app for mux-server"
+      "role": "Apple client app for lar-server"
     },
     {
-      "repo": "maddec01/mux-factory",
+      "repo": "maddec01/lar-factory",
       "platform": "Factory",
-      "role": "The factory: board, mux-work skill and process docs"
+      "role": "The factory: board, lar-work skill and process docs"
     }
   ],
   "board": {

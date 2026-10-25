@@ -201,10 +201,10 @@ importers:
       '@electron/osx-sign':
         specifier: 2.7.0
         version: 2.7.0(supports-color@7.2.0)
-      '@mux-factory/shared':
+      '@lar-factory/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@mux-factory/ui':
+      '@lar-factory/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@types/node':
@@ -225,7 +225,7 @@ importers:
 
   apps/server:
     dependencies:
-      '@mux-factory/shared':
+      '@lar-factory/shared':
         specifier: workspace:*
         version: link:../../packages/shared
     devDependencies:
@@ -241,10 +241,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@mux-factory/shared':
+      '@lar-factory/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@mux-factory/ui':
+      '@lar-factory/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       lucide-react:

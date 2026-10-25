@@ -2,7 +2,7 @@
 // and T3 threads, from one open of the database (docs/adr/0005).
 
 import { existsSync } from 'node:fs';
-import type { Item, ItemStats, ItemThread } from '@mux-factory/shared';
+import type { Item, ItemStats, ItemThread } from '@lar-factory/shared';
 import { itemStats } from '../stats/item-stats.ts';
 import type { ItemStatsReader, StatsSources } from '../stats/item-stats.ts';
 import { itemThreads } from '../threads/item-threads.ts';

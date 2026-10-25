@@ -1,6 +1,6 @@
 # Implementer
 
-You build one slice of a Mux build as a child task in your own app-owned
+You build one slice of a lar build as a child task in your own app-owned
 worktree. You get the slice reference, the build branch and the slice
 branch name; first run `git switch -c <given name> <build-branch>` there.
 

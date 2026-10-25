@@ -3,14 +3,14 @@ import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { draftItem, SAMPLE_MODELS, startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue, rawIssue, sliceRef } from '@mux-factory/shared/test/raw-items';
-import type { BoardData, RawItem } from '@mux-factory/shared';
+import { projectIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
+import type { BoardData, RawItem } from '@lar-factory/shared';
 
-/** A Ready issue in mux-factory, with labels and, optionally, a parent. */
+/** A Ready issue in lar-factory, with labels and, optionally, a parent. */
 const readyIssue = (number: number, labels: string[], parent?: number): RawItem =>
   rawIssue(`PVTI_${number}`, number, 'Ready', labels, parent ? { parent: sliceRef(parent, 'OPEN') } : {});
 
-/** A board that can start mux-factory builds, and the home it runs in. */
+/** A board that can start lar-factory builds, and the home it runs in. */
 async function buildBoard(t: TestContext, items: object[], options: object = {}, env: Record<string, string> = {}) {
   const startable = startableEnv(t);
   const board = await startBoard(t, { items, ...options }, false, false, { ...startable, ...env });
@@ -22,7 +22,7 @@ const startBuild = (board: Board, itemId: string, model?: unknown, origin = boar
   board.postSession({ itemId, model }, '/api/start-build', origin);
 
 const message = (home: string, number: number) =>
-  `Build maddec01/mux-factory#${number}. Read ${home}/.agents/skills/mux-work/agents/builder.md and follow it.`;
+  `Build maddec01/lar-factory#${number}. Read ${home}/.agents/skills/lar-work/agents/builder.md and follow it.`;
 
 const statusEdit = (itemId: string, option: string) => ['project', 'item-edit', '--project-id', 'PVT_1', '--id', itemId,
   '--field-id', 'FIELD_1', '--single-select-option-id', option];
@@ -41,7 +41,7 @@ test('Start build labels the build, moves its parent to In progress and starts t
   assert.deepEqual(answer.board.items.find((i: { id: string }) => i.id === 'PVTI_12').labels, ['feature', 'build']);
   assert.equal(answer.board.items.find((i: { id: string }) => i.id === 'PVTI_40').status, 'In progress');
   assert.deepEqual(await writes(board), [
-    ['issue', 'edit', '12', '-R', 'maddec01/mux-factory', '--add-label', 'build'],
+    ['issue', 'edit', '12', '-R', 'maddec01/lar-factory', '--add-label', 'build'],
     statusEdit('PVTI_40', 'IN_PROGRESS_1'),
   ]);
   assert.deepEqual(await board.t3Calls(), [
@@ -73,15 +73,15 @@ test('Start build leaves a labelled build, a parent build and a parent already I
 
 test("Start build reads the labels of a parent that isn't on the board, and adds it to the project to move it", async (t) => {
   const { board } = await buildBoard(t, [readyIssue(12, ['build'], 40), readyIssue(13, ['build'], 41)], {
-    issues: { 'maddec01/mux-factory/issues/40': { labels: [{ name: 'concept' }] }, 'maddec01/mux-factory/issues/41': { labels: [{ name: 'build' }] } },
+    issues: { 'maddec01/lar-factory/issues/40': { labels: [{ name: 'concept' }] }, 'maddec01/lar-factory/issues/41': { labels: [{ name: 'build' }] } },
   });
   assert.equal((await startBuild(board, 'PVTI_12')).status, 200);
   assert.equal((await startBuild(board, 'PVTI_13')).status, 200);
   assert.deepEqual(await writes(board), [
-    ['api', 'repos/maddec01/mux-factory/issues/40'],
-    ['project', 'item-add', '1', '--owner', 'maddec01', '--url', 'https://github.com/maddec01/mux-factory/issues/40', '--format', 'json'],
+    ['api', 'repos/maddec01/lar-factory/issues/40'],
+    ['project', 'item-add', '1', '--owner', 'maddec01', '--url', 'https://github.com/maddec01/lar-factory/issues/40', '--format', 'json'],
     statusEdit('PVTI_900001', 'IN_PROGRESS_1'),
-    ['api', 'repos/maddec01/mux-factory/issues/41'],
+    ['api', 'repos/maddec01/lar-factory/issues/41'],
   ]);
   assert.equal((await board.t3Calls()).length, 2);
 });
@@ -105,17 +105,17 @@ for (const [name, fail, error] of [
 
 test('a refused repository project writes nothing to GitHub and runs no t3', async (t) => {
   const { board } = await buildBoard(t, [rawIssue('PVTI_30', 30, 'Ready', ['feature'],
-    { url: 'https://github.com/maddec01/mux-server/issues/30', repository: { nameWithOwner: 'maddec01/mux-server' } })]);
+    { url: 'https://github.com/maddec01/lar-server/issues/30', repository: { nameWithOwner: 'maddec01/lar-server' } })]);
   const response = await startBuild(board, 'PVTI_30');
   assert.equal(response.status, 409);
-  assert.equal((await response.json()).error, 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code');
+  assert.equal((await response.json()).error, 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code');
   assert.deepEqual(await writes(board), []);
   assert.deepEqual(await board.t3Calls(), []);
 });
 
 test('Start build is refused while an issue the build is blocked by is open, and runs once it closes', async (t) => {
   const blocked = (state: 'OPEN' | 'CLOSED') => rawIssue('PVTI_12', 12, 'Ready', ['build'], {
-    blockedBy: { nodes: [{ number: 5, state, repository: { nameWithOwner: 'maddec01/mux-factory' } }] },
+    blockedBy: { nodes: [{ number: 5, state, repository: { nameWithOwner: 'maddec01/lar-factory' } }] },
   });
   const { board } = await buildBoard(t, [blocked('OPEN')]);
   const refused = await startBuild(board, 'PVTI_12');
@@ -170,8 +170,8 @@ test('the board data says, per repository, whether Start build finds its reposit
   const { board } = await buildBoard(t, [projectIssue(12, 'Ready')]);
   const data = await until(board, (d) => !!d.repositoryProjects) as BoardData;
   assert.deepEqual(data.repositoryProjects, {
-    'maddec01/mux-server': 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code',
-    'maddec01/mux-apple': 'No T3 project is a checkout of maddec01/mux-apple; add the checkout in T3 Code',
-    'maddec01/mux-factory': null,
+    'maddec01/lar-server': 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code',
+    'maddec01/lar-apple': 'No T3 project is a checkout of maddec01/lar-apple; add the checkout in T3 Code',
+    'maddec01/lar-factory': null,
   });
 });

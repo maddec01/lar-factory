@@ -12,7 +12,7 @@ const recheck = (board: Board) => board.post({}, board.url, '/api/recheck');
 const afterRead = (board: Board) => until(board, (d) => Boolean(d.fetchedAt || d.error));
 
 test('the board listens before a slow login shell answers, and its data waits for that first lookup', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'mux-slow-shell-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lar-slow-shell-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const shell = join(dir, 'slow-shell');
   writeFileSync(shell, '#!/bin/sh\nsleep 1\nexec /bin/sh -c "$2"\n', { mode: 0o755 });
@@ -23,7 +23,7 @@ test('the board listens before a slow login shell answers, and its data waits fo
 });
 
 test('Recheck finds a t3 that appeared after startup', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'mux-t3-later-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lar-t3-later-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const t3 = join(dir, 't3');
   const board = await startBoard(t, {}, false, false, { T3_PATH: t3 });
@@ -51,7 +51,7 @@ test('a logged-out gh shows its notice and reads nothing until Recheck finds it 
 });
 
 test('a logged-out gh that logs in is found by the timed retry, which keeps the login PATH it read', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'mux-shell-log-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lar-shell-log-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const shellLog = join(dir, 'runs');
   const shellRuns = () => existsSync(shellLog) ? readFileSync(shellLog, 'utf8').trim().split('\n').length : 0;

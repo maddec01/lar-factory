@@ -6,9 +6,9 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, CircleHelp, FlaskConical, GitPullRequest, ListChecks, Map as MapIcon } from 'lucide-react';
-import { duration, formatTokens, formatUsd, itemTotal, kindOf, platformOf, plural, prLabel, ref } from '@mux-factory/shared';
-import type { BoardData, Blocker, EndToEndCheck, Item, ItemThread } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
+import { duration, formatTokens, formatUsd, itemTotal, kindOf, platformOf, plural, prLabel, ref } from '@lar-factory/shared';
+import type { BoardData, Blocker, EndToEndCheck, Item, ItemThread } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, PlatformTag, SliceBar } from '../items/item-parts.tsx';

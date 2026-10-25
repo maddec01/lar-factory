@@ -5,9 +5,9 @@
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { openBlockers, platformOf, repositoryProjectHint, shortAgo, slug, workMessage } from '@mux-factory/shared';
-import type { BoardData, Item } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
+import { openBlockers, platformOf, repositoryProjectHint, shortAgo, slug, workMessage } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';

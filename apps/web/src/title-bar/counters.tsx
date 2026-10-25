@@ -6,11 +6,11 @@
 
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
-import { boardSections, formatUsd, platformOf, plural, shortAgo, slug } from '@mux-factory/shared';
-import type { BoardData, Item, Status } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
-import { Popover, PopoverClose, PopoverPopup, PopoverTrigger } from '@mux-factory/ui/popover';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
+import { boardSections, formatUsd, platformOf, plural, shortAgo, slug } from '@lar-factory/shared';
+import type { BoardData, Item, Status } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
+import { Popover, PopoverClose, PopoverPopup, PopoverTrigger } from '@lar-factory/ui/popover';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';

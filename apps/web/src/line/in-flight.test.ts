@@ -4,9 +4,9 @@
 
 import { beforeEach, expect, test } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, sample, settle, text, toast } from '../../test/support.ts';
-import { normalizeItems } from '@mux-factory/shared';
-import type { BoardData, Item, ItemThread, RawItem } from '@mux-factory/shared';
-import { rawIssue, sliceRef } from '@mux-factory/shared/test/raw-items';
+import { normalizeItems } from '@lar-factory/shared';
+import type { BoardData, Item, ItemThread, RawItem } from '@lar-factory/shared';
+import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
 const table = () => $('[data-in-flight]')!;
 const rows = () => $$('[data-in-flight] [data-item]');
@@ -20,7 +20,7 @@ const press = (el: Element) => settle(() => (el as HTMLElement).click());
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
 const boardOf = (raws: RawItem[], keys: { active?: number[]; blocked?: number[] } = {}): BoardData => {
-  const set = (numbers: number[] = []) => new Set(numbers.map((n) => `maddec01/mux-factory#${n}`));
+  const set = (numbers: number[] = []) => new Set(numbers.map((n) => `maddec01/lar-factory#${n}`));
   return { ...sample, error: null, items: normalizeItems(raws, { active: set(keys.active), blocked: set(keys.blocked) }) };
 };
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData =>
@@ -29,7 +29,7 @@ const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): 
 const loose = withItem('PVTI_sample13', { parent: null });
 /** #140 with its blocker closed, so its Start build runs, on a board whose writes are on. */
 const unblocked = (data: BoardData = loose): BoardData => withItem('PVTI_sample13', {
-  blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }],
+  blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }],
 }, { ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 
@@ -76,7 +76,7 @@ test('a row shows its numbered title, status, repository and age, and a red badg
 
 test('the badge counts the blocked-by issues still open', async () => {
   await mountPage(withItem('PVTI_sample13', { blockers: [
-    { number: 202, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' },
+    { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' },
   ] }, loose));
   expect(text(cells('PVTI_sample13')[0]!)).toContain('blocked by 1');
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
@@ -149,23 +149,23 @@ test('Start after on a blocked Ready row arms its start on the picked model, the
 
 test("Start after names the last open blocker, another repository's without its owner, and its title and label name it in full", async () => {
   await mountPage(withItem('PVTI_sample13', { blockers: [
-    { number: 202, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 12, repo: 'maddec01/mux-apple', state: 'OPEN' },
+    { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' },
   ] }, loose));
   const after = side('PVTI_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
-  expect([text(after), after.title]).toEqual(['Start after mux-apple#12 ▾', 'Starts by itself once #202, maddec01/mux-apple#12 close']);
-  expect(after.getAttribute('aria-label')).toBe('Start #140 Owner accounts after maddec01/mux-apple#12');
+  expect([text(after), after.title]).toEqual(['Start after lar-apple#12 ▾', 'Starts by itself once #202, maddec01/lar-apple#12 close']);
+  expect(after.getAttribute('aria-label')).toBe('Start #140 Owner accounts after maddec01/lar-apple#12');
 });
 
 test("a blocked build whose repository has no T3 project offers no Start after: Start build shows the project's hint", async () => {
-  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
-  await mountPage({ ...loose, repositoryProjects: { 'maddec01/mux-server': hint } });
+  const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
+  await mountPage({ ...loose, repositoryProjects: { 'maddec01/lar-server': hint } });
   expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
   expect(side('PVTI_sample13').querySelector('[data-start-after]')).toBeNull();
 });
 
 test('a start armed before its repository lost its T3 project still shows Starts after, so it can be disarmed', async () => {
-  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
-  const armed = { ...loose, capture: { session: 's1', enabled: true }, repositoryProjects: { 'maddec01/mux-server': hint },
+  const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
+  const armed = { ...loose, capture: { session: 's1', enabled: true }, repositoryProjects: { 'maddec01/lar-server': hint },
     armed: { PVTI_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } };
   holdPosts(armed);
   await mountPage(armed);
@@ -204,19 +204,19 @@ test('Start build is disabled while a blocker is open, its title naming it, and 
   expect(startBuild().className).toContain('disabled:pointer-events-auto');
   expect(startBuild().className, 'an outline button, as the line draws a held action').toContain('border-input');
   const many = withItem('PVTI_sample13', { blockers: [
-    { number: 202, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' },
-    { number: 12, repo: 'maddec01/mux-apple', state: 'OPEN' },
+    { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' },
+    { number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' },
   ] }, loose);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(many));
-  expect(startBuild().title, 'only the open ones, another repository\'s in full').toBe('Blocked by #202, maddec01/mux-apple#12 until they close');
+  expect(startBuild().title, 'only the open ones, another repository\'s in full').toBe('Blocked by #202, maddec01/lar-apple#12 until they close');
 });
 
 test('Start build is disabled with the hint while T3 has no project for the repository', async () => {
-  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
-  await mountPage({ ...unblocked(), repositoryProjects: { 'maddec01/mux-server': hint, 'maddec01/mux-apple': null } });
+  const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
+  await mountPage({ ...unblocked(), repositoryProjects: { 'maddec01/lar-server': hint, 'maddec01/lar-apple': null } });
   expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
-    .receive({ ...unblocked(), repositoryProjects: { 'maddec01/mux-server': null } }));
+    .receive({ ...unblocked(), repositoryProjects: { 'maddec01/lar-server': null } }));
   expect([startBuild().disabled, text(startBuild())], 'a found project enables it').toEqual([false, 'Start build ▾']);
 });
 
@@ -241,13 +241,13 @@ test('Start build sends the build with the chosen model, then shows the thread i
   expect(dialog(), 'picking an entry does not open the dialog').toBeNull();
   expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'PVTI_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   expect([text(startBuild()), startBuild().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
-  const started = { threadId: 'thread-1', title: 'Build maddec01/mux-server#140' };
+  const started = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
   await answer({ thread: started, error: null });
   const tag = row('PVTI_sample13').querySelector('[data-start-result]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread thread-1']);
   expect(startBuild()).toBeNull();
-  expect(text(toast())).toBe('Started T3 thread Build maddec01/mux-server#140 thread-1 for #140 Owner accounts.');
-  expect(JSON.parse(localStorage.getItem('mux-board:model-choice')!)).toEqual({ instanceId: 'codex', model: 'gpt-5.5' });
+  expect(text(toast())).toBe('Started T3 thread Build maddec01/lar-server#140 thread-1 for #140 Owner accounts.');
+  expect(JSON.parse(localStorage.getItem('lar-board:model-choice')!)).toEqual({ instanceId: 'codex', model: 'gpt-5.5' });
 });
 
 test('a failed Start build shows its error under the row and offers Retry start; closing the error brings Start build back', async () => {
@@ -333,7 +333,7 @@ test('a build\'s count leaves out slices closed as not planned, and names none w
 
 test('an open slice the project auto-added is no row of its own', async () => {
   const slice = rawIssue('PVTI_slice66', 66, 'In progress', ['improvement'], {
-    parent: { number: 59, title: 'Issue 59', url: 'https://github.com/maddec01/mux-factory/issues/59', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-factory' } },
+    parent: { number: 59, title: 'Issue 59', url: 'https://github.com/maddec01/lar-factory/issues/59', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
   const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
     subIssuesSummary: { total: 3, completed: 1 }, subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },

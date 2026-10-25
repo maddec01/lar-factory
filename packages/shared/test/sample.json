@@ -1,18 +1,18 @@
 {
   "project": {
-    "title": "Mux"
+    "title": "lar"
   },
   "repos": [
     {
-      "repo": "maddec01/mux-server",
+      "repo": "maddec01/lar-server",
       "platform": "Server",
-      "path": "~/test/mux-server",
+      "path": "~/test/lar-server",
       "role": "Backend API server"
     },
     {
-      "repo": "maddec01/mux-apple",
+      "repo": "maddec01/lar-apple",
       "platform": "Apple",
-      "path": "~/test/mux-apple",
+      "path": "~/test/lar-apple",
       "role": "Apple client app"
     }
   ],
@@ -28,8 +28,8 @@
       "type": "Issue",
       "number": 61,
       "title": "Arr instances, catalog bindings and content requests",
-      "url": "https://github.com/maddec01/mux-server/issues/61",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/61",
+      "repo": "maddec01/lar-server",
       "labels": [
         "feature",
         "area: server",
@@ -53,8 +53,8 @@
       "type": "Issue",
       "number": 114,
       "title": "Verify VideoToolbox 8-bit HEVC decoding during hardware detection",
-      "url": "https://github.com/maddec01/mux-server/issues/114",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/114",
+      "repo": "maddec01/lar-server",
       "labels": [
         "bug",
         "area: server"
@@ -77,8 +77,8 @@
       "type": "Issue",
       "number": 12,
       "title": "Remember the last subtitle language per show",
-      "url": "https://github.com/maddec01/mux-apple/issues/12",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/12",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "feature",
         "app: music",
@@ -124,8 +124,8 @@
       "type": "Issue",
       "number": 129,
       "title": "Run more than one 4K HDR to 1080p stream at a time",
-      "url": "https://github.com/maddec01/mux-server/issues/129",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/129",
+      "repo": "maddec01/lar-server",
       "labels": [
         "improvement"
       ],
@@ -147,8 +147,8 @@
       "type": "Issue",
       "number": 20,
       "title": "Player controls stay visible after scrubbing <on tvOS>",
-      "url": "https://github.com/maddec01/mux-apple/issues/20",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/20",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "bug"
       ],
@@ -191,8 +191,8 @@
       "type": "Issue",
       "number": 130,
       "title": "Show cold bitmap subtitles within 3 s before preparation finishes",
-      "url": "https://github.com/maddec01/mux-server/issues/130",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/130",
+      "repo": "maddec01/lar-server",
       "labels": [
         "bug"
       ],
@@ -228,8 +228,8 @@
       "type": "Issue",
       "number": 22,
       "title": "Continue watching row on the home screen",
-      "url": "https://github.com/maddec01/mux-apple/issues/22",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/22",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "feature"
       ],
@@ -237,8 +237,8 @@
       "parent": {
         "number": 9,
         "title": "Home screen refresh",
-        "url": "https://github.com/maddec01/mux-apple/issues/9",
-        "repo": "maddec01/mux-apple",
+        "url": "https://github.com/maddec01/lar-apple/issues/9",
+        "repo": "maddec01/lar-apple",
         "state": "OPEN"
       },
       "subIssues": {
@@ -270,9 +270,9 @@
       "status": "Shaping",
       "type": "Issue",
       "number": 200,
-      "title": "Mux cloud: website sign-in and relay",
-      "url": "https://github.com/maddec01/mux-server/issues/200",
-      "repo": "maddec01/mux-server",
+      "title": "lar cloud: website sign-in and relay",
+      "url": "https://github.com/maddec01/lar-server/issues/200",
+      "repo": "maddec01/lar-server",
       "labels": [
         "concept"
       ],
@@ -288,7 +288,7 @@
       "linkedPrs": [],
       "slices": [],
       "map": {
-        "destination": "Anyone with a Mux server signs in on mux.app with an owner account and streams their library away from home through a relay, with no port forwarding. The server registers with the cloud once; clients find it by account.",
+        "destination": "Anyone with a lar server signs in on lar.app with an owner account and streams their library away from home through a relay, with no port forwarding. The server registers with the cloud once; clients find it by account.",
         "decisions": [
           "Owner accounts live in the cloud, not on each server (#203 research).",
           "Hosting the relay costs about $40 a month for the first 500 owners (#203).",
@@ -301,7 +301,7 @@
         "check": {
           "title": "Sign in on the website, then stream from a phone off Wi-Fi",
           "steps": [
-            "Create an owner account on mux.app",
+            "Create an owner account on lar.app",
             "Register a server with the account",
             "Open the app on cellular and play a 4K title"
           ]
@@ -314,17 +314,17 @@
       "type": "Issue",
       "number": 201,
       "title": "Relay: broker only or full TURN?",
-      "url": "https://github.com/maddec01/mux-server/issues/201",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/201",
+      "repo": "maddec01/lar-server",
       "labels": [
         "decision: grill"
       ],
       "state": "OPEN",
       "parent": {
         "number": 200,
-        "title": "Mux cloud: website sign-in and relay",
-        "url": "https://github.com/maddec01/mux-server/issues/200",
-        "repo": "maddec01/mux-server",
+        "title": "lar cloud: website sign-in and relay",
+        "url": "https://github.com/maddec01/lar-server/issues/200",
+        "repo": "maddec01/lar-server",
         "state": "OPEN"
       },
       "subIssues": {
@@ -334,7 +334,7 @@
       "blockers": [
         {
           "number": 203,
-          "repo": "maddec01/mux-server",
+          "repo": "maddec01/lar-server",
           "state": "CLOSED"
         }
       ],
@@ -363,8 +363,8 @@
       "type": "Issue",
       "number": 23,
       "title": "Faster library sync on large collections",
-      "url": "https://github.com/maddec01/mux-apple/issues/23",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/23",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "improvement"
       ],
@@ -372,8 +372,8 @@
       "parent": {
         "number": 9,
         "title": "Home screen refresh",
-        "url": "https://github.com/maddec01/mux-apple/issues/9",
-        "repo": "maddec01/mux-apple",
+        "url": "https://github.com/maddec01/lar-apple/issues/9",
+        "repo": "maddec01/lar-apple",
         "state": "OPEN"
       },
       "subIssues": {
@@ -398,17 +398,17 @@
       "type": "Issue",
       "number": 202,
       "title": "Sign-in screen",
-      "url": "https://github.com/maddec01/mux-server/issues/202",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/202",
+      "repo": "maddec01/lar-server",
       "labels": [
         "decision: prototype"
       ],
       "state": "OPEN",
       "parent": {
         "number": 200,
-        "title": "Mux cloud: website sign-in and relay",
-        "url": "https://github.com/maddec01/mux-server/issues/200",
-        "repo": "maddec01/mux-server",
+        "title": "lar cloud: website sign-in and relay",
+        "url": "https://github.com/maddec01/lar-server/issues/200",
+        "repo": "maddec01/lar-server",
         "state": "OPEN"
       },
       "subIssues": {
@@ -441,17 +441,17 @@
       "type": "Issue",
       "number": 140,
       "title": "Owner accounts",
-      "url": "https://github.com/maddec01/mux-server/issues/140",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/140",
+      "repo": "maddec01/lar-server",
       "labels": [
         "build"
       ],
       "state": "OPEN",
       "parent": {
         "number": 200,
-        "title": "Mux cloud: website sign-in and relay",
-        "url": "https://github.com/maddec01/mux-server/issues/200",
-        "repo": "maddec01/mux-server",
+        "title": "lar cloud: website sign-in and relay",
+        "url": "https://github.com/maddec01/lar-server/issues/200",
+        "repo": "maddec01/lar-server",
         "state": "OPEN"
       },
       "subIssues": {
@@ -461,7 +461,7 @@
       "blockers": [
         {
           "number": 202,
-          "repo": "maddec01/mux-server",
+          "repo": "maddec01/lar-server",
           "state": "OPEN"
         }
       ],
@@ -472,24 +472,24 @@
         {
           "number": 144,
           "title": "Owner table and sign-up",
-          "url": "https://github.com/maddec01/mux-server/issues/144",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/144",
+          "repo": "maddec01/lar-server",
           "state": "CLOSED",
           "progress": "done"
         },
         {
           "number": 145,
           "title": "Sign-in sessions",
-          "url": "https://github.com/maddec01/mux-server/issues/145",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/145",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "active"
         },
         {
           "number": 146,
           "title": "Owner settings page",
-          "url": "https://github.com/maddec01/mux-server/issues/146",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/146",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "waiting"
         }
@@ -509,8 +509,8 @@
       "type": "Issue",
       "number": 150,
       "title": "Relay for streaming away from home",
-      "url": "https://github.com/maddec01/mux-server/issues/150",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/150",
+      "repo": "maddec01/lar-server",
       "labels": [
         "feature",
         "build"
@@ -529,112 +529,112 @@
         {
           "number": 160,
           "title": "Relay protocol framing",
-          "url": "https://github.com/maddec01/mux-server/issues/160",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/160",
+          "repo": "maddec01/lar-server",
           "state": "CLOSED",
           "progress": "done"
         },
         {
           "number": 161,
           "title": "Relay auth handshake",
-          "url": "https://github.com/maddec01/mux-server/issues/161",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/161",
+          "repo": "maddec01/lar-server",
           "state": "CLOSED",
           "progress": "done"
         },
         {
           "number": 162,
           "title": "Session keys rotation",
-          "url": "https://github.com/maddec01/mux-server/issues/162",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/162",
+          "repo": "maddec01/lar-server",
           "state": "CLOSED",
           "progress": "done"
         },
         {
           "number": 163,
           "title": "Device pairing codes",
-          "url": "https://github.com/maddec01/mux-server/issues/163",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/163",
+          "repo": "maddec01/lar-server",
           "state": "CLOSED",
           "progress": "done"
         },
         {
           "number": 164,
           "title": "Pairing screen on Apple TV",
-          "url": "https://github.com/maddec01/mux-server/issues/164",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/164",
+          "repo": "maddec01/lar-server",
           "state": "CLOSED",
           "progress": "done"
         },
         {
           "number": 165,
           "title": "Relay health endpoint",
-          "url": "https://github.com/maddec01/mux-server/issues/165",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/165",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "active"
         },
         {
           "number": 166,
           "title": "Reconnect with backoff",
-          "url": "https://github.com/maddec01/mux-server/issues/166",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/166",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "active"
         },
         {
           "number": 167,
           "title": "Bandwidth probe before streaming",
-          "url": "https://github.com/maddec01/mux-server/issues/167",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/167",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "blocked"
         },
         {
           "number": 168,
           "title": "Fallback to direct connection",
-          "url": "https://github.com/maddec01/mux-server/issues/168",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/168",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "waiting"
         },
         {
           "number": 169,
           "title": "Relay metrics dashboard",
-          "url": "https://github.com/maddec01/mux-server/issues/169",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/169",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "waiting"
         },
         {
           "number": 170,
           "title": "Rate limits per owner",
-          "url": "https://github.com/maddec01/mux-server/issues/170",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/170",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "waiting"
         },
         {
           "number": 171,
           "title": "Abuse report endpoint",
-          "url": "https://github.com/maddec01/mux-server/issues/171",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/171",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "waiting"
         },
         {
           "number": 172,
           "title": "Relay load test",
-          "url": "https://github.com/maddec01/mux-server/issues/172",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/172",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "waiting"
         },
         {
           "number": 173,
           "title": "Docs for self-hosting the relay",
-          "url": "https://github.com/maddec01/mux-server/issues/173",
-          "repo": "maddec01/mux-server",
+          "url": "https://github.com/maddec01/lar-server/issues/173",
+          "repo": "maddec01/lar-server",
           "state": "OPEN",
           "progress": "waiting"
         }
@@ -660,8 +660,8 @@
       "type": "Issue",
       "number": 30,
       "title": "Chapter markers in the scrubber",
-      "url": "https://github.com/maddec01/mux-apple/issues/30",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/30",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "feature"
       ],
@@ -677,7 +677,7 @@
       "linkedPrs": [
         {
           "number": 33,
-          "url": "https://github.com/maddec01/mux-apple/pull/33",
+          "url": "https://github.com/maddec01/lar-apple/pull/33",
           "state": "OPEN",
           "isDraft": true,
           "checks": {
@@ -712,8 +712,8 @@
       "type": "Issue",
       "number": 180,
       "title": "Resume playback across devices",
-      "url": "https://github.com/maddec01/mux-server/issues/180",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/180",
+      "repo": "maddec01/lar-server",
       "labels": [
         "feature"
       ],
@@ -729,7 +729,7 @@
       "linkedPrs": [
         {
           "number": 41,
-          "url": "https://github.com/maddec01/mux-apple/pull/41",
+          "url": "https://github.com/maddec01/lar-apple/pull/41",
           "state": "MERGED",
           "isDraft": false,
           "mergedAt": "2026-10-20T14:00:00Z",
@@ -781,8 +781,8 @@
       "type": "Issue",
       "number": 141,
       "title": "Transcoder leaks a file handle on cancel",
-      "url": "https://github.com/maddec01/mux-server/issues/141",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/141",
+      "repo": "maddec01/lar-server",
       "labels": [
         "bug"
       ],
@@ -798,7 +798,7 @@
       "linkedPrs": [
         {
           "number": 190,
-          "url": "https://github.com/maddec01/mux-server/pull/190",
+          "url": "https://github.com/maddec01/lar-server/pull/190",
           "state": "OPEN",
           "isDraft": false,
           "checks": {
@@ -833,8 +833,8 @@
       "type": "Issue",
       "number": 31,
       "title": "New artwork grid layout",
-      "url": "https://github.com/maddec01/mux-apple/issues/31",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/31",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "feature"
       ],
@@ -850,7 +850,7 @@
       "linkedPrs": [
         {
           "number": 32,
-          "url": "https://github.com/maddec01/mux-apple/pull/32",
+          "url": "https://github.com/maddec01/lar-apple/pull/32",
           "state": "OPEN",
           "isDraft": false,
           "checks": {
@@ -872,8 +872,8 @@
       "type": "PullRequest",
       "number": 210,
       "title": "Bump FFmpeg to 7.1",
-      "url": "https://github.com/maddec01/mux-server/pull/210",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/pull/210",
+      "repo": "maddec01/lar-server",
       "labels": [],
       "state": "OPEN",
       "parent": null,
@@ -903,8 +903,8 @@
       "type": "Issue",
       "number": 34,
       "title": "Swipe between episodes",
-      "url": "https://github.com/maddec01/mux-apple/issues/34",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/34",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "feature"
       ],
@@ -920,7 +920,7 @@
       "linkedPrs": [
         {
           "number": 35,
-          "url": "https://github.com/maddec01/mux-apple/pull/35",
+          "url": "https://github.com/maddec01/lar-apple/pull/35",
           "state": "OPEN",
           "isDraft": false,
           "checks": {
@@ -941,8 +941,8 @@
       "type": "Issue",
       "number": 147,
       "title": "Fall back to software transcoding when the GPU is busy",
-      "url": "https://github.com/maddec01/mux-server/issues/147",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/147",
+      "repo": "maddec01/lar-server",
       "labels": [
         "improvement"
       ],
@@ -958,7 +958,7 @@
       "linkedPrs": [
         {
           "number": 148,
-          "url": "https://github.com/maddec01/mux-server/pull/148",
+          "url": "https://github.com/maddec01/lar-server/pull/148",
           "state": "OPEN",
           "isDraft": false,
           "checks": null,
@@ -973,8 +973,8 @@
       "type": "Issue",
       "number": 142,
       "title": "Cache probe results between restarts",
-      "url": "https://github.com/maddec01/mux-server/issues/142",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/142",
+      "repo": "maddec01/lar-server",
       "labels": [
         "improvement"
       ],
@@ -990,7 +990,7 @@
       "linkedPrs": [
         {
           "number": 151,
-          "url": "https://github.com/maddec01/mux-server/pull/151",
+          "url": "https://github.com/maddec01/lar-server/pull/151",
           "state": "OPEN",
           "isDraft": false,
           "checks": {
@@ -1016,17 +1016,17 @@
       "type": "Issue",
       "number": 203,
       "title": "Hosting cost of the relay",
-      "url": "https://github.com/maddec01/mux-server/issues/203",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/203",
+      "repo": "maddec01/lar-server",
       "labels": [
         "decision: research"
       ],
       "state": "CLOSED",
       "parent": {
         "number": 200,
-        "title": "Mux cloud: website sign-in and relay",
-        "url": "https://github.com/maddec01/mux-server/issues/200",
-        "repo": "maddec01/mux-server",
+        "title": "lar cloud: website sign-in and relay",
+        "url": "https://github.com/maddec01/lar-server/issues/200",
+        "repo": "maddec01/lar-server",
         "state": "OPEN"
       },
       "subIssues": {
@@ -1059,8 +1059,8 @@
       "type": "Issue",
       "number": 5,
       "title": "Crash when a server goes offline mid-playback",
-      "url": "https://github.com/maddec01/mux-apple/issues/5",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/5",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "bug",
         "os: watchos"
@@ -1077,7 +1077,7 @@
       "linkedPrs": [
         {
           "number": 6,
-          "url": "https://github.com/maddec01/mux-apple/pull/6",
+          "url": "https://github.com/maddec01/lar-apple/pull/6",
           "state": "MERGED",
           "isDraft": false,
           "checks": {
@@ -1103,8 +1103,8 @@
       "type": "Issue",
       "number": 181,
       "title": "Store the playback position per device",
-      "url": "https://github.com/maddec01/mux-server/issues/181",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/181",
+      "repo": "maddec01/lar-server",
       "labels": [
         "build"
       ],
@@ -1112,8 +1112,8 @@
       "parent": {
         "number": 180,
         "title": "Resume playback across devices",
-        "url": "https://github.com/maddec01/mux-server/issues/180",
-        "repo": "maddec01/mux-server",
+        "url": "https://github.com/maddec01/lar-server/issues/180",
+        "repo": "maddec01/lar-server",
         "state": "OPEN"
       },
       "subIssues": {
@@ -1126,7 +1126,7 @@
       "linkedPrs": [
         {
           "number": 182,
-          "url": "https://github.com/maddec01/mux-server/pull/182",
+          "url": "https://github.com/maddec01/lar-server/pull/182",
           "state": "MERGED",
           "isDraft": false,
           "mergedAt": "2026-10-18T11:00:00Z",
@@ -1163,8 +1163,8 @@
       "type": "Issue",
       "number": 40,
       "title": "Resume from the stored position",
-      "url": "https://github.com/maddec01/mux-apple/issues/40",
-      "repo": "maddec01/mux-apple",
+      "url": "https://github.com/maddec01/lar-apple/issues/40",
+      "repo": "maddec01/lar-apple",
       "labels": [
         "build"
       ],
@@ -1172,8 +1172,8 @@
       "parent": {
         "number": 180,
         "title": "Resume playback across devices",
-        "url": "https://github.com/maddec01/mux-server/issues/180",
-        "repo": "maddec01/mux-server",
+        "url": "https://github.com/maddec01/lar-server/issues/180",
+        "repo": "maddec01/lar-server",
         "state": "OPEN"
       },
       "subIssues": {
@@ -1183,7 +1183,7 @@
       "blockers": [
         {
           "number": 181,
-          "repo": "maddec01/mux-server",
+          "repo": "maddec01/lar-server",
           "state": "CLOSED"
         }
       ],
@@ -1192,7 +1192,7 @@
       "linkedPrs": [
         {
           "number": 41,
-          "url": "https://github.com/maddec01/mux-apple/pull/41",
+          "url": "https://github.com/maddec01/lar-apple/pull/41",
           "state": "MERGED",
           "isDraft": false,
           "mergedAt": "2026-10-20T14:00:00Z",
@@ -1229,8 +1229,8 @@
       "type": "Issue",
       "number": 100,
       "title": "Old cleanup task",
-      "url": "https://github.com/maddec01/mux-server/issues/100",
-      "repo": "maddec01/mux-server",
+      "url": "https://github.com/maddec01/lar-server/issues/100",
+      "repo": "maddec01/lar-server",
       "labels": [
         "improvement"
       ],

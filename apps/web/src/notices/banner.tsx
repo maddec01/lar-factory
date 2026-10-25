@@ -3,7 +3,7 @@
 
 import { useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@mux-factory/ui/alert';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { useDismissed, useDismissStore } from './dismiss-store.ts';
 import { DismissButton, closeKeepingFocus } from './toasts.tsx';
 

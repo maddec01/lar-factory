@@ -2,8 +2,8 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
-import type { BoardData } from '@mux-factory/shared';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import type { BoardData } from '@lar-factory/shared';
 
 const statusOf = (data: BoardData, id: string) => data.items.find((i) => i.id === id)?.status;
 const queue = (board: Board, itemId: string, origin = board.url) => board.post({ itemId }, origin, '/api/queue');

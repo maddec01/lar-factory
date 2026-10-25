@@ -1,6 +1,6 @@
-# Mux factory
+# lar Factory
 
-A small software factory for [Mux](https://github.com/maddec01): the skills,
+A small software factory for [lar](https://github.com/maddec01): the skills,
 build agents and local board that take an idea from a list to a merged PR.
 A person decides and merges; agents do the rest.
 
@@ -10,23 +10,23 @@ recorded in [ADRs](docs/adr/): [local GitHub access](docs/adr/0001-use-the-local
 [Start in the issue's repository project](docs/adr/0009-start-in-the-issues-repository-project.md), and
 [item stats from T3 Code's database](docs/adr/0005-read-item-stats-from-t3s-database.md).
 
-It's built for Mux, but the parts are plain [Agent Skills](https://agentskills.io)
+It's built for lar, but the parts are plain [Agent Skills](https://agentskills.io)
 and a small board app, so you can borrow them. Issues and ideas are welcome.
 
 ## How work moves
 
-Work lives in GitHub Issues, one repo per platform (`mux-server`, `mux-apple`),
-and on one GitHub Project, "Mux", whose Status column is the board:
+Work lives in GitHub Issues, one repo per platform (`lar-server`, `lar-apple`),
+and on one GitHub Project, "lar", whose Status column is the board:
 
 ```
 List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review → Verify / Ready to merge → Done
 ```
 
 1. **List.** Capture bugs, features and ideas as issues.
-2. **Queued.** Pick one by moving it to Queued, then run `/mux-work <owner/repo#n>`
+2. **Queued.** Pick one by moving it to Queued, then run `/lar-work <owner/repo#n>`
    in a new thread in the issue's repository project (the board's Start does
    this). Nothing starts without this.
-3. **Shaping.** `mux-work` reads the issue and the code through subagents, and
+3. **Shaping.** `lar-work` reads the issue and the code through subagents, and
    proposes a route:
    - **clear**: a bug a subagent can reproduce and diagnose, or a small change;
    - **needs decisions**: it grills you with docs: questions that check your
@@ -58,15 +58,15 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
    suggestion spanning repos becomes one Factory concept for later shaping.
    Capture leaves the source status unchanged and implements none of the picks.
    Its source-issue record tracks links and unfinished steps; rerun
-   `/mux-work <source-owner/repo#n>` to resume capture only, even with a passing
-   brief. See [Retro capture](skills/mux-work/retro-capture.md) for routing,
+   `/lar-work <source-owner/repo#n>` to resume capture only, even with a passing
+   brief. See [Retro capture](skills/lar-work/retro-capture.md) for routing,
    recovery and privacy rules. You merge the original PR to reach **Done**.
 
 **Needs you** means it's waiting on you: a question, a prototype choice or a
 review.
 
 Before using the workflow in a destination repository, follow
-[issue-tracking setup](skills/mux-work/issue-tracker.md#label-setup) to create
+[issue-tracking setup](skills/lar-work/issue-tracker.md#label-setup) to create
 missing workflow labels while preserving existing ones. The same guide covers
 native parent/sub-issue and blocked-by commands. Status stays a Project field.
 
@@ -77,11 +77,11 @@ through a long conversation, and subagents return summaries instead of files.
 
 | Skill | What it does | Source |
 | ----- | ------------ | ------ |
-| `mux-work` | Runs one item: size up, shape, brief, gate, up to Ready | Mux |
-| `mux-work/agents/` | Builder, Doubt, four reviewers, approver, CI fixer | Mux |
-| `skill-sync` | Brings upstream changes into the copies, by your choice | Mux |
-| `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff`, `to-tickets`, `implement` | Shaping and building; `code-review` is for reviewing by hand, and no `mux-work` file loads it | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |
-| `code-review-and-quality`, `security-and-hardening`, `doubt-driven-development`, `frontend-ui-engineering`, `browser-testing-with-devtools` | Source for the Doubt and reviewer checklists in `mux-work/agents/`; not loaded by them | Copies of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
+| `lar-work` | Runs one item: size up, shape, brief, gate, up to Ready | lar |
+| `lar-work/agents/` | Builder, Doubt, four reviewers, approver, CI fixer | lar |
+| `skill-sync` | Brings upstream changes into the copies, by your choice | lar |
+| `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff`, `to-tickets`, `implement` | Shaping and building; `code-review` is for reviewing by hand, and no `lar-work` file loads it | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |
+| `code-review-and-quality`, `security-and-hardening`, `doubt-driven-development`, `frontend-ui-engineering`, `browser-testing-with-devtools` | Source for the Doubt and reviewer checklists in `lar-work/agents/`; not loaded by them | Copies of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
 | `developer-profile` | Pedro's coding style, which the builder follows | Copy of [maddec01/developer-profile-skill](https://github.com/maddec01/developer-profile-skill) |
 
 `UPSTREAM.md` lists the upstream path and commit of every copy.
@@ -89,8 +89,8 @@ through a long conversation, and subagents return summaries instead of files.
 ### Install
 
 Install the board app from
-[GitHub Releases](https://github.com/maddec01/mux-factory/releases): download the
-newest Release's dmg and drag Mux Factory into Applications. On the first launch of
+[GitHub Releases](https://github.com/maddec01/lar-factory/releases): download the
+newest Release's dmg and drag lar Factory into Applications. On the first launch of
 each new version the app installs every skill and the shared checklists from
 `references/` into `~/.agents`, and links them into the Claude profiles ticked in its
 Settings (`~/.claude` and each `~/.claude-*`). The copied skills' `../../references/`
@@ -114,13 +114,13 @@ here makes this repo its source, and updates come from here from then on.
 - To add other skills from Matt or Addy, add them **by name**:
   `npx skills add mattpocock/skills -g -s <name>`. Never add a whole repo at
   once: that would switch the copies back to upstream.
-- Mux's own skills use a `mux-` prefix, so they never collide.
-- Copies are never edited for Mux. Mux rules live in `mux-work` and in each Mux
+- lar's own skills use a `lar-` prefix, so they never collide.
+- Copies are never edited for lar. lar rules live in `lar-work` and in each lar
   repo's `AGENTS.md`, so the copies stay safe to use in any project.
 
 ## Board
 
-The board is a local app that shows the Mux project: what needs you, what's in
+The board is a local app that shows the lar project: what needs you, what's in
 flight, concepts and their progress, and where every item sits in the flow. It
 reads GitHub through your local `gh` login and refreshes itself. The repo is one
 pnpm workspace laid out like T3 Code's monorepo: `apps/server` is the board server,
@@ -145,7 +145,7 @@ To build a Mac app that runs without the checkout:
 cd apps/desktop && pnpm run build --unsigned
 ```
 
-It writes an unsigned Apple Silicon app to `apps/desktop/release/mac-arm64/Mux Factory.app`,
+It writes an unsigned Apple Silicon app to `apps/desktop/release/mac-arm64/lar Factory.app`,
 with the board server bundled into one file, its built page and a copy of `config.json`
 inside. Rebuild it after changing `config.json`. If macOS refuses to open it,
 right-click it in Finder and choose Open. Beside it go a dmg, a zip and the update
@@ -162,11 +162,11 @@ which packaging puts in the app's `Resources/bundle`.
 A packaged app installs them into `~/.agents` and the ticked Claude profiles on the
 first launch of each new version, after its window opens, and shows a dialog for
 an error or a conflict. A run from a checkout installs only with `--install-skills`,
-and `MUX_FACTORY_INSTALL_ROOT` puts the install in another folder instead of your
+and `LAR_FACTORY_INSTALL_ROOT` puts the install in another folder instead of your
 home. From the repo root:
 
 ```bash
-MUX_FACTORY_INSTALL_ROOT="$(mktemp -d)" pnpm run dev --install-skills
+LAR_FACTORY_INSTALL_ROOT="$(mktemp -d)" pnpm run dev --install-skills
 ```
 
 ### Release secrets
@@ -211,7 +211,7 @@ the waiting one. If a run shows as canceled, run it again.
 ## Repo layout
 
 ```
-skills/            copies (original names), mux-work (with agents/), skill-sync
+skills/            copies (original names), lar-work (with agents/), skill-sync
 apps/server/       the board server: reads GitHub, serves the page and the API
 apps/web/          the board page (React, built with Vite+)
 apps/desktop/      the board app: the board in a Mac window (Electron)
@@ -219,7 +219,7 @@ packages/shared/   types and logic the apps share; apps import it, never each ot
 references/        checklists Addy's skills link to
 scripts/setup-worktree.sh installs the workspace in a new worktree (.githooks, t3.json)
 scripts/release-secrets.sh stores the Release signing secrets on GitHub
-config.json        Mux repos (platform, role), board refresh, pickup limits
+config.json        lar repos (platform, role), board refresh, pickup limits
 UPSTREAM.md        source and commit of every copy
 docs/plan.md       how this was set up
 ```

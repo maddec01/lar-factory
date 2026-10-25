@@ -6,7 +6,7 @@ import { basename, dirname, join, relative } from 'node:path';
 import { isRecord } from './is-record.ts';
 
 /** The manifest's file name in ~/.agents. The skills CLI owns .skill-lock.json, so this never touches it. */
-export const INSTALL_MANIFEST = '.mux-factory-install.json';
+export const INSTALL_MANIFEST = '.lar-factory-install.json';
 
 export interface InstallResult {
   /** False when the manifest already named this version and nothing was copied. */
@@ -262,7 +262,7 @@ function readManifest(path: string): Manifest | null {
   try { manifest = JSON.parse(readFileSync(path, 'utf8')) as Manifest; }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw new InstallError(`Couldn't read ${path}: ${(error as Error).message}. Delete that file and start Mux Factory again.`, false, { cause: error });
+    throw new InstallError(`Couldn't read ${path}: ${(error as Error).message}. Delete that file and start lar Factory again.`, false, { cause: error });
   }
   const profiles = isRecord(manifest.profiles) ? Object.fromEntries(Object.entries<unknown>(manifest.profiles)
     .filter((entry): entry is [string, Record<string, unknown>] => isProfileName(entry[0]) && isRecord(entry[1]))

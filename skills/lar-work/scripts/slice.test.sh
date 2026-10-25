@@ -21,7 +21,7 @@ cat >"$bin/gh" <<'EOF'
 case "$1 $2" in
 "issue create")
     echo "create ${*:3}" >>"$FAKE_GH_LOG"
-    echo "https://github.com/maddec01/mux-factory/issues/999"
+    echo "https://github.com/maddec01/lar-factory/issues/999"
     ;;
 "api graphql")
     poll=$(( $(grep -c '^query' "$FAKE_GH_LOG") + 1 ))
@@ -58,16 +58,16 @@ run() {
     printf '%s\n' "$@" >"$items"
     : >"$log"
     status=0
-    output=$(bash "$slice" maddec01/mux-factory 133 "A slice" "$body" 2>"$bin/err") || status=$?
+    output=$(bash "$slice" maddec01/lar-factory 133 "A slice" "$body" 2>"$bin/err") || status=$?
     errors=$(cat "$bin/err")
 }
 count() { grep -c "^$1" "$log" || true; }
 
-url=https://github.com/maddec01/mux-factory/issues/999
+url=https://github.com/maddec01/lar-factory/issues/999
 
 run "PVTI_a" ""
 if ((status == 0)) && [[ $output == "$url" ]] &&
-    [[ $(head -n1 "$log") == "create --repo maddec01/mux-factory --parent 133 --title A slice --body-file $body" ]] &&
+    [[ $(head -n1 "$log") == "create --repo maddec01/lar-factory --parent 133 --title A slice --body-file $body" ]] &&
     [[ $(grep '^delete' "$log") == "delete 1 --owner maddec01 --id PVTI_a" ]] &&
     (($(count query) == 2)) && (($(count 'sleep 2') == 1)) && [[ $errors == *"watching"* ]]; then
     pass "an item on the Project is removed, polling stops at the next empty poll, the URL is printed"
@@ -93,7 +93,7 @@ else
 fi
 
 run "PVTI_stuck"
-if ((status != 0)) && [[ $errors == *"$url"*"still on the Mux board"* ]] &&
+if ((status != 0)) && [[ $errors == *"$url"*"still on the lar board"* ]] &&
     [[ $errors == *"gh project item-delete 1 --owner maddec01 --id PVTI_stuck"* ]]; then
     pass "an item that persists after the poll fails with the command that removes it"
 else
@@ -109,7 +109,7 @@ fi
 
 run "PVTI_a" "!fail"
 if ((status != 0)) && [[ $(grep '^delete' "$log") == "delete 1 --owner maddec01 --id PVTI_a" ]] &&
-    [[ $errors == *"created $url"*"may be on the Mux board"*"gh project item-list"* ]] &&
+    [[ $errors == *"created $url"*"may be on the lar board"*"gh project item-list"* ]] &&
     [[ $errors != *"--id PVTI_a"* ]]; then
     pass "a failure after a removal doesn't ask to remove the already-removed item"
 else
@@ -123,7 +123,7 @@ else
     fail "the poll interval and timeout are overridable: $(cat "$log")"
 fi
 
-if output=$(bash "$slice" maddec01/mux-factory 133 2>&1); then
+if output=$(bash "$slice" maddec01/lar-factory 133 2>&1); then
     fail "missing arguments print usage: $output"
 else
     [[ $output == *usage* ]] && pass "missing arguments print usage" || fail "missing arguments print usage: $output"

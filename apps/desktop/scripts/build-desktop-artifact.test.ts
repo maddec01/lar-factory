@@ -33,7 +33,7 @@ describe("createBuildConfig", () => {
     expect(config.artifactName).not.toContain(" ");
   });
 
-  it("points a Nightly at the nightly channel of mux-factory's prereleases", () => {
+  it("points a Nightly at the nightly channel of lar-factory's prereleases", () => {
     const config = createBuildConfig({
       version: "0.1.0-nightly.20261023.57",
       signed: false,
@@ -44,18 +44,18 @@ describe("createBuildConfig", () => {
       {
         provider: "github",
         owner: "maddec01",
-        repo: "mux-factory",
+        repo: "lar-factory",
         releaseType: "prerelease",
         channel: "nightly",
       },
     ]);
   });
 
-  it("points a Stable Release at mux-factory's latest releases", () => {
+  it("points a Stable Release at lar-factory's latest releases", () => {
     const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
 
     expect(config.publish).toEqual([
-      { provider: "github", owner: "maddec01", repo: "mux-factory", releaseType: "release" },
+      { provider: "github", owner: "maddec01", repo: "lar-factory", releaseType: "release" },
     ]);
   });
 
@@ -70,17 +70,17 @@ describe("createBuildConfig", () => {
     expect(config.files).toContain("!dist-electron/server/**/*");
   });
 
-  it("shows µx Factory while the app's file, release files and appId keep their ASCII names", () => {
+  it("shows lar Factory while the app's file, release files and appId keep their ASCII names", () => {
     const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
 
-    expect(config.productName).toBe("Mux Factory");
-    expect(config.artifactName).toBe("Mux-Factory-${version}-${arch}.${ext}");
-    expect(config.appId).toBe("com.maddec01.mux-factory.board");
+    expect(config.productName).toBe("lar Factory");
+    expect(config.artifactName).toBe("lar-factory-${version}-${arch}.${ext}");
+    expect(config.appId).toBe("com.pedrogomes.lar.factory");
     // Electron aborts at launch unless "<CFBundleName> Helper.app" exists, and the
     // helpers take productName, so Info.plist's CFBundleName must stay productName.
     expect(config.mac?.extendInfo).toEqual({
       // macOS shows InfoPlist.strings' name only while this one matches the file's.
-      CFBundleDisplayName: "Mux Factory",
+      CFBundleDisplayName: "lar Factory",
       LSHasLocalizedDisplayName: true,
     });
   });
@@ -93,8 +93,8 @@ describe("createBuildConfig", () => {
     );
 
     expect(config.extraResources).toContainEqual({ from: "resources/en.lproj", to: "en.lproj" });
-    expect(strings).toContain('CFBundleDisplayName = "µx Factory";');
-    expect(strings).toContain('CFBundleName = "µx Factory";');
+    expect(strings).toContain('CFBundleDisplayName = "lar Factory";');
+    expect(strings).toContain('CFBundleName = "lar Factory";');
   });
 
   it("signs with hardened runtime and notarizes when signed", () => {

@@ -1,9 +1,9 @@
 // A button that opens an item's pull request on GitHub, where it's verified and merged: the PR its issue links first,
 // or the item itself when it is a pull request. Disabled, its title saying why, while there is none.
 
-import { itemPr } from '@mux-factory/shared';
-import type { Item } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
+import { itemPr } from '@lar-factory/shared';
+import type { Item } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
 
 export function PrLink({ item, label, size = 'sm' }: { item: Item; label: string; size?: 'xs' | 'sm' }) {
   const url = itemPr(item)?.url;

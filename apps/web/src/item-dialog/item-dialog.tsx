@@ -4,10 +4,10 @@
 
 import { useEffect, useRef } from 'react';
 import { ExternalLink, Play } from 'lucide-react';
-import { HINTS, openBlockers, platformOf, shortAgo, workMessage } from '@mux-factory/shared';
-import type { BoardData, Item } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@mux-factory/ui/dialog';
+import { HINTS, openBlockers, platformOf, shortAgo, workMessage } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
 import { useBoardStore } from '../board/board-store.ts';
 import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';

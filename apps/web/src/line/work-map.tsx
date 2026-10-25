@@ -4,8 +4,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BookOpen, FlaskConical, Hammer, Lightbulb, MessagesSquare, Shapes, Target } from 'lucide-react';
-import { platformOf, ref, refKey, shortAgo, slug } from '@mux-factory/shared';
-import type { BoardData, EndToEndCheck } from '@mux-factory/shared';
+import { platformOf, ref, refKey, shortAgo, slug } from '@lar-factory/shared';
+import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';

@@ -6,9 +6,9 @@
 
 import { useState, useSyncExternalStore, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
-import { boardApp } from '@mux-factory/shared';
-import { Sidebar as T3Sidebar, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarProvider, SidebarRail, useSidebar } from '@mux-factory/ui/sidebar';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
+import { boardApp } from '@lar-factory/shared';
+import { Sidebar as T3Sidebar, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarProvider, SidebarRail, useSidebar } from '@lar-factory/ui/sidebar';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { AddItem } from '../add-item/add-item.tsx';
 import { SettingsButton, SettingsNav } from '../settings/settings.tsx';
 import { useSettingsStore } from '../settings/settings-store.ts';

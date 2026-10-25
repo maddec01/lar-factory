@@ -2,9 +2,9 @@
 // title says why it can't: the item has no thread yet, T3's database can't be read, or T3 hasn't
 // written its environment id.
 
-import { threadLink } from '@mux-factory/shared';
-import type { BoardData, Item } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
+import { threadLink } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
 
 /** The `t3code://` link to the item's latest thread, or why there is none. */
 function latestThread(item: Item, data: BoardData): { link: string } | { reason: string } {

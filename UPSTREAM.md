@@ -2,8 +2,8 @@
 
 Every copied skill, where it came from, and the upstream commit it matches.
 `skill-sync` compares each copy with upstream from this commit and updates this
-file when you take changes. Copies are never edited by hand; Mux rules live in
-`mux-work` and in each repo's `AGENTS.md`.
+file when you take changes. Copies are never edited by hand; lar rules live in
+`lar-work` and in each repo's `AGENTS.md`.
 
 | Skill | Source | Path | Commit |
 | ----- | ------ | ---- | ------ |

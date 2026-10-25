@@ -1,7 +1,7 @@
 // The board data the server serves, with the items this board just changed or
 // deleted laid over what GitHub last reported, and the pages it pushes changes to.
 
-import type { BoardData, Item } from '@mux-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 
 export interface BoardState {
   /** The board data as served now. */

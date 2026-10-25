@@ -1,5 +1,5 @@
 // The page the server sends on first load: the built index.html and the built assets it loads.
-// pageWithData, in @mux-factory/shared, puts the board's data in it. Server-only.
+// pageWithData, in @lar-factory/shared, puts the board's data in it. Server-only.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { extname } from 'node:path';

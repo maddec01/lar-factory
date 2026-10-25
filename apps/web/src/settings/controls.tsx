@@ -3,8 +3,8 @@
 // the reason as its tooltip.
 
 import type { ReactNode } from 'react';
-import { Button } from '@mux-factory/ui/button';
-import { NativeSelect } from '@mux-factory/ui/native-select';
+import { Button } from '@lar-factory/ui/button';
+import { NativeSelect } from '@lar-factory/ui/native-select';
 
 /** A control that shows a value only; the rows that work render their own. */
 export type Control =

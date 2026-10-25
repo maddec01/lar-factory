@@ -5,9 +5,9 @@ import * as StartingPage from "./starting-page.ts";
 const html = (url: string) => decodeURIComponent(url.slice(url.indexOf(",") + 1));
 
 describe("StartingPage", () => {
-  it("says the board is starting, titled µx Factory", () => {
+  it("says the board is starting, titled lar Factory", () => {
     const page = StartingPage.url();
-    assert.include(html(page), "<title>µx Factory</title>");
+    assert.include(html(page), "<title>lar Factory</title>");
     assert.match(page, /^data:text\/html;charset=utf-8,/);
     assert.include(html(page), "Starting board…");
     assert.notInclude(html(page), "didn't start");

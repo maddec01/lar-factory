@@ -4,16 +4,16 @@ import { get } from 'node:http';
 import assert from 'node:assert/strict';
 import { freePort, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { itemTotal } from '@mux-factory/shared';
-import type { Item } from '@mux-factory/shared';
+import { itemTotal } from '@lar-factory/shared';
+import type { Item } from '@lar-factory/shared';
 
-const draft = { repo: 'maddec01/mux-factory', kind: 'feature', title: 'Capture an item', description: '', labels: [] };
+const draft = { repo: 'maddec01/lar-factory', kind: 'feature', title: 'Capture an item', description: '', labels: [] };
 
 test('writes reject foreign and missing origins before touching GitHub', async (t) => {
   const board = await startBoard(t);
@@ -52,7 +52,7 @@ test('partial HTTP success links the issue and retry finishes project assignment
   const first = await board.post(body);
   assert.equal(first.status, 502);
   const partial = await first.json();
-  assert.equal(partial.issueUrl, 'https://github.com/maddec01/mux-factory/issues/900001');
+  assert.equal(partial.issueUrl, 'https://github.com/maddec01/lar-factory/issues/900001');
   assert.match(partial.error, /List status/);
   assert.equal(partial.board.items.length, 0);
   assert.equal((await board.post({ ...body, draft: { ...draft, title: 'Another item' } })).status, 409);
@@ -117,8 +117,8 @@ const rawBuild = (number: number, status: string) => projectIssue(number, status
 const readItems = async (board: Board): Promise<Item[]> => (await until(board, (d) => d.items.length > 0)).items;
 
 test("a refresh finds build sub-issues, active and blocked slices with issue searches, not the board query's labels", async (t) => {
-  const repository = { nameWithOwner: 'maddec01/mux-factory' };
-  const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/mux-factory/issues/${number}`,
+  const repository = { nameWithOwner: 'maddec01/lar-factory' };
+  const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/lar-factory/issues/${number}`,
     state: 'OPEN', stateReason: null, repository });
   const parent = rawBuild(13, 'In progress');
   const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref(12), ref(15), ref(16)] } } }, rawBuild(12, 'In progress'), projectIssue(15, 'In progress')];
@@ -132,8 +132,8 @@ test("a refresh finds build sub-issues, active and blocked slices with issue sea
 });
 
 test('a build sub-issue on the project stays a board item while the issue search still misses its new label', async (t) => {
-  const repository = { nameWithOwner: 'maddec01/mux-factory' };
-  const ref = { number: 12, title: 'Issue 12', url: 'https://github.com/maddec01/mux-factory/issues/12', state: 'OPEN', stateReason: null, repository };
+  const repository = { nameWithOwner: 'maddec01/lar-factory' };
+  const ref = { number: 12, title: 'Issue 12', url: 'https://github.com/maddec01/lar-factory/issues/12', state: 'OPEN', stateReason: null, repository };
   const parent = rawBuild(13, 'In progress');
   const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref] } } }, rawBuild(12, 'In progress')];
   const read = await readItems(await startBoard(t, { items, builds: [] }));
@@ -142,7 +142,7 @@ test('a build sub-issue on the project stays a board item while the issue search
 });
 
 test('each refresh attaches item stats from T3 Code\'s database and Claude transcripts, and a missing database leaves them out', async (t) => {
-  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'],
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/lar-factory#12'],
     sessions: [{ session: 'session-1', instance: 'claudeAgent_personal' }], turns: [
       { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
     ] }]);
@@ -156,9 +156,9 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
 });
 
 test('each refresh attaches item threads and T3\'s environment id, and leaves them out without T3\'s files', async (t) => {
-  const db = statsDb(t, [{ id: 'build', title: 'Build: owner accounts', messages: ['Build maddec01/mux-factory#12'],
+  const db = statsDb(t, [{ id: 'build', title: 'Build: owner accounts', messages: ['Build maddec01/lar-factory#12'],
     turns: [{ id: 't', startedAt: '2026-10-20T09:00:00Z' }] }]);
-  const environment = join(mkdtempSync(join(tmpdir(), 'mux-t3-env-')), 'environment-id');
+  const environment = join(mkdtempSync(join(tmpdir(), 'lar-t3-env-')), 'environment-id');
   t.onTestFinished(() => rmSync(join(environment, '..'), { recursive: true, force: true }));
   writeFileSync(environment, 'env-1\n');
   const board = await startBoard(t, { items: [projectIssue(12, 'In progress'), projectIssue(13, 'Review')] }, false, false,
@@ -174,10 +174,10 @@ test('each refresh attaches item threads and T3\'s environment id, and leaves th
 });
 
 test('refreshes keep a stats block in open linked PRs, edit only when it changes, and never in sample mode', async (t) => {
-  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/lar-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const pr = (number: number, state: string) => ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`,
+  const pr = (number: number, state: string) => ({ number, url: `https://github.com/maddec01/lar-factory/pull/${number}`,
     state, isDraft: false, body: `PR ${number}` });
   const withPrs = (number: number, prs: object[]) => {
     const raw = rawBuild(number, 'Review');
@@ -190,8 +190,8 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   await new Promise((r) => setTimeout(r, 400));
   const made = await edits();
   assert.equal(made.length, 1, 'later refreshes see the block is current and leave the PR alone');
-  assert.equal(made[0]![3], 'repos/maddec01/mux-factory/pulls/40', 'merged PRs and items without stats are left alone');
-  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
+  assert.equal(made[0]![3], 'repos/maddec01/lar-factory/pulls/40', 'merged PRs and items without stats are left alone');
+  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
 
   const failing = await startBoard(t, { items, fail: 'pr-edit' }, false, false, { T3_STATE_DB: db });
   assert.equal((await readItems(failing)).length, 2, 'a failed edit leaves the board working');
@@ -203,13 +203,13 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
 
 test('a merged item shows the figures in its merged PR\'s block, not live ones, and live ones without a block', async (t) => {
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
-  const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/mux-factory#12'], turns },
-    { id: 'b', messages: ['Build maddec01/mux-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
-  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
+  const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/lar-factory#12'], turns },
+    { id: 'b', messages: ['Build maddec01/lar-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
+  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
   const merged = (number: number, prNumber: number, body: string) => {
     const raw = rawBuild(number, 'Done');
     return { ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
-      { number: prNumber, url: `https://github.com/maddec01/mux-factory/pull/${prNumber}`, state: 'MERGED', isDraft: false, body },
+      { number: prNumber, url: `https://github.com/maddec01/lar-factory/pull/${prNumber}`, state: 'MERGED', isDraft: false, body },
     ] } } };
   };
   const board = await startBoard(t, { items: [merged(12, 40, `PR 40\n\n${block}`), merged(13, 41, 'PR 41'), merged(14, 42, `PR 42\n\n${block}`)] },
@@ -224,11 +224,11 @@ test('a merged item shows the figures in its merged PR\'s block, not live ones, 
 });
 
 test('an item with a merged and an open linked PR shows live stats, and the open PR\'s block tracks them', async (t) => {
-  const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/mux-factory#12'], turns: [
+  const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/lar-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const frozenBlock = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
-  const url = (number: number) => `https://github.com/maddec01/mux-factory/pull/${number}`;
+  const frozenBlock = '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
+  const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
   const raw = rawBuild(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
     { number: 40, url: url(40), state: 'MERGED', isDraft: false, body: `PR 40\n\n${frozenBlock}`, mergedAt: '2026-10-19T00:00:00Z' },
@@ -240,18 +240,18 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
   for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
   const [edit] = await edits();
-  assert.equal(edit?.[3], 'repos/maddec01/mux-factory/pulls/41');
-  assert.equal(edit?.[5], 'body=PR 41\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
+  assert.equal(edit?.[3], 'repos/maddec01/lar-factory/pulls/41');
+  assert.equal(edit?.[5], 'body=PR 41\n\n<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
 });
 
 test('an issue that isn\'t a build shows live figures and writes no block, even linked to a build\'s PRs', async (t) => {
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
-  const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/mux-factory#12'], turns },
-    { id: 'b', messages: ['/mux-work maddec01/mux-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
-  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
+  const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/lar-factory#12'], turns },
+    { id: 'b', messages: ['/lar-work maddec01/lar-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
+  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
   const prs = { nodes: [
-    { number: 40, url: 'https://github.com/maddec01/mux-factory/pull/40', state: 'MERGED', isDraft: false, body: `PR 40\n\n${block}` },
-    { number: 41, url: 'https://github.com/maddec01/mux-factory/pull/41', state: 'OPEN', isDraft: false, body: 'PR 41' },
+    { number: 40, url: 'https://github.com/maddec01/lar-factory/pull/40', state: 'MERGED', isDraft: false, body: `PR 40\n\n${block}` },
+    { number: 41, url: 'https://github.com/maddec01/lar-factory/pull/41', state: 'OPEN', isDraft: false, body: 'PR 41' },
   ] };
   const build = rawBuild(12, 'Done');
   const parent = projectIssue(13, 'In progress');
@@ -268,14 +268,14 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
 test('a parent with two builds merged at different times: each build keeps its own frozen figures, the parent writes no block, its total counts all once', async (t) => {
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
   // The parent's own thread is live; the builds' threads are gone from T3 Code, as after transcript deletion.
-  const db = statsDb(t, [{ id: 'p', messages: ['$mux-work maddec01/mux-factory#13'], turns }]);
-  const block = (figures: string) => `<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): ${figures}\n<!-- /mux-stats -->`;
-  const pr = (number: number, mergedAt: string, body: string) => ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`,
+  const db = statsDb(t, [{ id: 'p', messages: ['$lar-work maddec01/lar-factory#13'], turns }]);
+  const block = (figures: string) => `<!-- mux-stats -->\n**Item stats** (kept current by the lar board): ${figures}\n<!-- /mux-stats -->`;
+  const pr = (number: number, mergedAt: string, body: string) => ({ number, url: `https://github.com/maddec01/lar-factory/pull/${number}`,
     state: 'MERGED', isDraft: false, body, mergedAt });
   const first = pr(40, '2026-10-18T10:00:00Z', `PR 40\n\n${block('Σ 1h 0m · wall 40m · 2M · $10')}`);
   const last = pr(41, '2026-10-20T10:00:00Z', `PR 41\n\n${block('Σ 2h 0m · wall 1h 0m · 3M · $20')}`);
-  const parentRef = { number: 13, title: 'Issue 13', url: 'https://github.com/maddec01/mux-factory/issues/13', state: 'OPEN',
-    repository: { nameWithOwner: 'maddec01/mux-factory' } };
+  const parentRef = { number: 13, title: 'Issue 13', url: 'https://github.com/maddec01/lar-factory/issues/13', state: 'OPEN',
+    repository: { nameWithOwner: 'maddec01/lar-factory' } };
   const build = (number: number, linked: object) => {
     const raw = rawBuild(number, 'Done');
     return { ...raw, content: { ...raw.content, state: 'CLOSED', closedAt: '2026-10-20T10:00:00Z', parent: parentRef,
@@ -301,11 +301,11 @@ test('a parent with two builds merged at different times: each build keeps its o
 });
 
 test('before an edit the board reads the PR again, keeps edits made since its read, and skips a block already current', async (t) => {
-  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/lar-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->';
-  const url = (number: number) => `https://github.com/maddec01/mux-factory/pull/${number}`;
+  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->';
+  const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
   const pr = (number: number, body: string) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body });
   const raw = rawBuild(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
@@ -320,18 +320,18 @@ test('before an edit the board reads the PR again, keeps edits made since its re
   }
   const calls = await prCalls();
   assert.deepEqual(calls.filter((args) => args[2] !== 'PATCH').map((args) => args[1]),
-    ['repos/maddec01/mux-factory/pulls/43', 'repos/maddec01/mux-factory/pulls/40'], 'only PRs the board thinks need an edit are read');
+    ['repos/maddec01/lar-factory/pulls/43', 'repos/maddec01/lar-factory/pulls/40'], 'only PRs the board thinks need an edit are read');
   assert.deepEqual(calls.filter((args) => args[2] === 'PATCH').map((args) => [args[3], args[5]]),
-    [['repos/maddec01/mux-factory/pulls/40', `body=PR 40, edited by Pedro\n\n${block}`]]);
+    [['repos/maddec01/lar-factory/pulls/40', `body=PR 40, edited by Pedro\n\n${block}`]]);
 });
 
 test('PR edits run beside the refreshes without holding them up, and never two syncs at once', async (t) => {
-  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/mux-factory#12'], turns: [
+  const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/lar-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
   const raw = rawBuild(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
-    { number: 40, url: 'https://github.com/maddec01/mux-factory/pull/40', state: 'OPEN', isDraft: false, body: 'PR 40' },
+    { number: 40, url: 'https://github.com/maddec01/lar-factory/pull/40', state: 'OPEN', isDraft: false, body: 'PR 40' },
   ] } } }];
   // Refreshes run every 100 ms; the edit takes 1.5 s.
   const board = await startBoard(t, { items, prEditDelay: 1500 }, false, true, { T3_STATE_DB: db });
@@ -389,9 +389,9 @@ test('BOARD_PORT on a taken port exits with a log line', async (t) => {
 });
 
 test('a live board records its port for status.sh and removes the record on exit; a sample board records nothing', async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'mux-records-home-'));
+  const home = mkdtempSync(join(tmpdir(), 'lar-records-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
-  const records = join(home, 'Library/Application Support/Mux Factory/boards');
+  const records = join(home, 'Library/Application Support/lar Factory/boards');
   const sample = await startBoard(t, {}, true, false, { HOME: home });
   const board = await startBoard(t, {}, false, false, { HOME: home });
   assert.deepEqual(readdirSync(records), [`${board.pid}.json`]);
@@ -402,10 +402,10 @@ test('a live board records its port for status.sh and removes the record on exit
 });
 
 test('BOARD_CONFIG_FILE gives the board its project and repos from a file outside the checkout', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'mux-config-file-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lar-config-file-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const file = join(dir, 'config.json');
-  const repos = [{ repo: 'maddec01/mux-elsewhere', platform: 'Server', role: 'A repo only this file names' }];
+  const repos = [{ repo: 'maddec01/lar-elsewhere', platform: 'Server', role: 'A repo only this file names' }];
   writeFileSync(file, JSON.stringify({ project: { owner: 'maddec01', title: 'Elsewhere' }, repos }));
   const board = await startBoard(t, {}, false, false, { BOARD_CONFIG_FILE: file });
   const state = await board.board() as { project: { title: string }; repos: unknown[] };

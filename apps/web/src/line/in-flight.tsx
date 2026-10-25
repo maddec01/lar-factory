@@ -4,8 +4,8 @@
 // show where they are but take no action here: you act on them from the desk.
 
 import type { ReactNode } from 'react';
-import { openBlockers } from '@mux-factory/shared';
-import type { BoardData, Item } from '@mux-factory/shared';
+import { openBlockers } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { KeepClicks } from '../items/keep-clicks.tsx';
 import { OpenThread } from '../items/open-thread.tsx';

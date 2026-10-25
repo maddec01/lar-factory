@@ -1,6 +1,6 @@
 // Starts T3 Code threads through the local `t3` CLI.
 
-import type { ModelChoice, StartResult } from '@mux-factory/shared';
+import type { ModelChoice, StartResult } from '@lar-factory/shared';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 

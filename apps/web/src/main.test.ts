@@ -2,8 +2,8 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, NOW, bannerText, fetchMock, mountPage, push, sample, settle, stream } from '../test/support.ts';
-import { BRAND_MARK_PATH } from '@mux-factory/shared';
-import type { BoardData } from '@mux-factory/shared';
+import { BRAND_MARK_PATH } from '@lar-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 
 const fresh: BoardData = { ...sample, error: null, fetchedAt: new Date(NOW).toISOString() };
 
@@ -15,9 +15,9 @@ test('the first paint shows the board data the server put in the page, with no f
   expect($('#board-data')).not.toBeNull();
 });
 
-test('the tab shows "µx Factory" and the logo as its icon', async () => {
+test('the tab shows "lar Factory" and the logo as its icon', async () => {
   await mountPage(fresh);
-  expect(document.title).toBe('µx Factory');
+  expect(document.title).toBe('lar Factory');
   const icon = decodeURIComponent($<HTMLLinkElement>('link[rel="icon"]')!.getAttribute('href')!);
   expect(icon).toMatch(/^data:image\/svg\+xml,<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 56 32"/);
   expect(icon).toContain(`d="${BRAND_MARK_PATH}"`);

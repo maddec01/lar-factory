@@ -3,8 +3,8 @@
 // issue rather than making two. A created item closes the dialog and shows the Added toast.
 
 import { create } from 'zustand';
-import { validateDraft, writeHeaders } from '@mux-factory/shared';
-import type { CreationResult, ItemDraft, BoardData } from '@mux-factory/shared';
+import { validateDraft, writeHeaders } from '@lar-factory/shared';
+import type { CreationResult, ItemDraft, BoardData } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { notify } from '../notices/notices.tsx';
 

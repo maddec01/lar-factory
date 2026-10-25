@@ -200,13 +200,13 @@ finish() {
 # ──────────────────────────────────────────────────────────────────────────
 
 # Release secrets: everything the Release workflow's secrets check asks for, stored
-# in the release environment of maddec01/mux-factory, which only main can use.
+# in the release environment of maddec01/lar-factory, which only main can use.
 # Run: bash scripts/release-secrets.sh [--dry-run]
 # --dry-run prints each gh command that would change GitHub instead of running it.
 # Re-running is safe: it skips an environment or branch policy that already exists
 # and replaces the secrets with the values you give it.
 
-REPO=maddec01/mux-factory
+REPO=maddec01/lar-factory
 ENV_PATH=repos/$REPO/environments/release
 DRY_RUN=""
 # Nothing is saved to disk, so there are no stored answers to offer on a re-run.
@@ -351,7 +351,7 @@ ask_until ask_secret CSC_KEY_PASSWORD "The .p12 password (hidden):"
 stage "Apple: App Store Connect API key for notarization"
 open_url "https://appstoreconnect.apple.com/access/integrations/api"
 step "Under Team Keys, click Generate API Key (or +). The first time, request access first."
-step "Name it 'mux-factory notarization', give it the Developer role, and Generate."
+step "Name it 'lar-factory notarization', give it the Developer role, and Generate."
 step "Download the key. Apple lets you download it only once: AuthKey_<key ID>.p8."
 step "The Issuer ID is shown above the keys table; the Key ID is in the key's row."
 ask_file P8_PATH "Path to the downloaded .p8:"

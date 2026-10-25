@@ -3,7 +3,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
-import type { BoardData, Item, ItemThread } from '@mux-factory/shared';
+import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
 const inDialog = <T extends Element = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
@@ -30,7 +30,7 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   expect(text(meta)).toBe('Server Ready · updated 1h agoblocked by 1');
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('#140 Owner accounts');
   const parent = inDialog<HTMLAnchorElement>('[data-slot="dialog-description"] a')!;
-  expect([text(parent), parent.href]).toEqual(['#200 Mux cloud: website sign-in and relay', 'https://github.com/maddec01/mux-server/issues/200']);
+  expect([text(parent), parent.href]).toEqual(['#200 lar cloud: website sign-in and relay', 'https://github.com/maddec01/lar-server/issues/200']);
   const [track, names] = $$('[data-item-dialog] [data-slot="dialog-panel"] > div:first-child ol');
   expect(track!.children).toHaveLength(10);
   expect(text(names!.querySelector('.font-semibold'))).toBe('Ready');
@@ -57,7 +57,7 @@ test('the dialog shows the hint, each pull request with its checks, and the agen
   await openItem('PVTI_sample14');
   expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/^Apple In progress · updated 25m ago$/);
   const pr = inDialog('section li')!;
-  expect([text(pr), pr.querySelector('a')!.getAttribute('href')]).toEqual(['PR #33 (draft)checks running', 'https://github.com/maddec01/mux-apple/pull/33']);
+  expect([text(pr), pr.querySelector('a')!.getAttribute('href')]).toEqual(['PR #33 (draft)checks running', 'https://github.com/maddec01/lar-apple/pull/33']);
   expect($$('[data-item-dialog] dl > div').map(text)).toEqual(['Agent time2h 14m', 'Wall time1h 20m', 'Tokens16.6M', 'Cost$24.18']);
 
   await openItem('PVTI_sample16');
@@ -100,14 +100,14 @@ test('GitHub opens the item, and Verify build and Merge PR open its pull request
   await mountPage();
   await openItem('PVTI_sample16');
   const links = [...footer().querySelectorAll('a')].map((a) => [text(a).trim(), a.getAttribute('href'), a.target]);
-  expect(links).toEqual([['GitHub', 'https://github.com/maddec01/mux-apple/issues/31', '_blank'], ['Verify build', 'https://github.com/maddec01/mux-apple/pull/32', '_blank']]);
+  expect(links).toEqual([['GitHub', 'https://github.com/maddec01/lar-apple/issues/31', '_blank'], ['Verify build', 'https://github.com/maddec01/lar-apple/pull/32', '_blank']]);
   await openItem('PVTI_sample17');
   expect(footer().querySelector('a:last-child')!.getAttribute('href')).toMatch(/\/pull\/\d+$/);
 });
 
 test('a Queued item blocked by an open issue has Start refining disabled in the footer, with Start after', async () => {
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'PVTI_sample05'
-    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'OPEN' as const }] } : i)) });
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'OPEN' as const }] } : i)) });
   await openItem('PVTI_sample05');
   expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', 'Start refining (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']);
 });
@@ -214,7 +214,7 @@ test('a failed Start shows in the dialog and offers Retry start', async () => {
 /** The sample with #140's blocker closed, so its Start build runs, and writes on. */
 const readyBuild: BoardData = {
   ...withThreads('PVTI_sample13', undefined), capture: { session: 's1', enabled: true },
-  items: sample.items.map((i) => (i.id === 'PVTI_sample13' ? { ...i, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }] } : i)),
+  items: sample.items.map((i) => (i.id === 'PVTI_sample13' ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }] } : i)),
 };
 
 test('Start build in a Ready item’s footer sends the build, then tags it Started', async () => {
@@ -226,12 +226,12 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
   await settle(() => vi.advanceTimersByTime(20));
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
   expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'PVTI_sample13' }]]);
-  await answer({ thread: { threadId: 'thread-1', title: 'Build maddec01/mux-server#140' }, error: null });
+  await answer({ thread: { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' }, error: null });
   expect(text(inDialog('[data-start-result="PVTI_sample13"]'))).toBe('Started');
 });
 
 test('a build the board started, through Start after or from another page, shows Started at once', async () => {
-  await mountPage({ ...readyBuild, startedBuilds: { PVTI_sample13: { threadId: 'build-1', title: 'Build maddec01/mux-server#140' } } });
+  await mountPage({ ...readyBuild, startedBuilds: { PVTI_sample13: { threadId: 'build-1', title: 'Build maddec01/lar-server#140' } } });
   await openItem('PVTI_sample13');
   const tag = inDialog('[data-start-result="PVTI_sample13"]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread build-1']);
@@ -245,14 +245,14 @@ test('a failed Start build shows in the dialog and offers Retry start', async ()
   await press(button('start', 'PVTI_sample13'));
   await settle(() => vi.advanceTimersByTime(20));
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
-  await answer({ thread: null, error: 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code' }, 409);
-  expect(text(inDialog('p.start [role="alert"]'))).toBe('No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code');
+  await answer({ thread: null, error: 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code' }, 409);
+  expect(text(inDialog('p.start [role="alert"]'))).toBe('No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code');
   expect(text(button('start', 'PVTI_sample13'))).toBe('Retry start ▾');
 });
 
 test('Start build is disabled with the hint while T3 has no project for the repository', async () => {
-  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
-  await mountPage({ ...readyBuild, repositoryProjects: { 'maddec01/mux-server': hint } });
+  const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
+  await mountPage({ ...readyBuild, repositoryProjects: { 'maddec01/lar-server': hint } });
   await openItem('PVTI_sample13');
   expect(footerControls()).toEqual(['GitHub', `Start build (disabled: ${hint})`]);
 });

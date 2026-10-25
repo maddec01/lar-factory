@@ -3,7 +3,7 @@
 // replaces the main area's content and the sidebar shows only its brand and Settings. Settings takes the main area's
 // place, hiding the board rather than closing it, so Back finds it as it was.
 
-import { boardSections, platformOf } from '@mux-factory/shared';
+import { boardSections, platformOf } from '@lar-factory/shared';
 import { useBoardStore } from './board/board-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';

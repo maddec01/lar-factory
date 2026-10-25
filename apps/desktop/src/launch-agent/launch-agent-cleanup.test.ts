@@ -11,9 +11,9 @@ import * as LaunchAgentCleanup from "./launch-agent-cleanup.ts";
 /** A home with the old agent's plist, pointing at a checkout that must stay. */
 const makeHome = (withAgent: boolean) => {
   const home = tempDir("launch-agent-home-");
-  const checkout = NodePath.join(home, "Code/mux-factory");
+  const checkout = NodePath.join(home, "Code/lar-factory");
   NodeFS.mkdirSync(checkout, { recursive: true });
-  NodeFS.writeFileSync(NodePath.join(checkout, "README.md"), "# Mux factory\n");
+  NodeFS.writeFileSync(NodePath.join(checkout, "README.md"), "# lar factory\n");
   if (withAgent) {
     NodeFS.mkdirSync(NodePath.dirname(LaunchAgentCleanup.plistPath(home)), { recursive: true });
     NodeFS.writeFileSync(LaunchAgentCleanup.plistPath(home), `<plist><string>${checkout}</string></plist>\n`);

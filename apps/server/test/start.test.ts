@@ -7,17 +7,17 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { draftItem, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue, rawIssue } from '@mux-factory/shared/test/raw-items';
+import { projectIssue, rawIssue } from '@lar-factory/shared/test/raw-items';
 import { checkouts, factoryRepo } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 
-const MESSAGE = '#12 Issue 12\n$mux-work maddec01/mux-factory#12';
+const MESSAGE = '#12 Issue 12\n$lar-work maddec01/lar-factory#12';
 
-/** A temporary home with git checkouts of the given origins under ~/Developer/Mux. */
+/** A temporary home with git checkouts of the given origins under ~/Developer/lar. */
 function home(t: TestContext, origins: Record<string, string | null>): string {
-  const dir = mkdtempSync(join(tmpdir(), 'mux-start-home-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lar-start-home-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   checkouts(dir, origins);
   return dir;
@@ -32,16 +32,16 @@ async function boardIn(t: TestContext, items: object[], origins: Record<string, 
   return { board, home: dir };
 }
 
-/** The live Mux project holds every checkout but is no checkout itself, so only origins tell repositories apart. */
+/** The live lar project holds every checkout but is no checkout itself, so only origins tell repositories apart. */
 const PROJECTS = (dir: string): FixtureProject[] => [
-  { id: 'project-mux', root: `${dir}/Developer/Mux` },
-  { id: 'project-factory', root: `${dir}/Developer/Mux/mux-factory/` },
-  { id: 'project-server-old', root: `${dir}/Developer/Mux/mux-server`, deletedAt: '2026-10-01T00:00:00Z' },
-  { id: 'project-server', root: '~/Developer/Mux/mux-server' },
+  { id: 'project-lar', root: `${dir}/Developer/lar` },
+  { id: 'project-factory', root: `${dir}/Developer/lar/lar-factory/` },
+  { id: 'project-server-old', root: `${dir}/Developer/lar/lar-server`, deletedAt: '2026-10-01T00:00:00Z' },
+  { id: 'project-server', root: '~/Developer/lar/lar-server' },
 ];
 const ORIGINS = {
-  'mux-factory': 'git@github.com:maddec01/mux-factory.git',
-  'mux-server': 'https://github.com/MADDEC01/Mux-Server',
+  'lar-factory': 'git@github.com:maddec01/lar-factory.git',
+  'lar-server': 'https://github.com/MADDEC01/Lar-Server',
 };
 
 async function factoryBoard(t: TestContext, items: object[], options: object = {}, env: Record<string, string> = {}) {
@@ -52,15 +52,15 @@ const draft = draftItem('Queued');
 
 const start = (board: Board, itemId: string, origin = board.url, model?: unknown) => board.postSession({ itemId, model }, '/api/start', origin);
 
-test("Start begins one mux-work thread in the card's repository project and leaves the Status alone", async (t) => {
-  const board = await factoryBoard(t, [projectIssue(12, 'Queued'), projectIssue(30, 'Queued', 'maddec01/mux-server')]);
+test("Start begins one lar-work thread in the card's repository project and leaves the Status alone", async (t) => {
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued'), projectIssue(30, 'Queued', 'maddec01/lar-server')]);
   const response = await start(board, 'PVTI_12');
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).thread, { threadId: 'thread-1', title: '#12 Issue 12' });
   assert.equal((await start(board, 'PVTI_30')).status, 200);
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', MESSAGE, '--json'],
-    ['thread', 'start', 'project-server', '#30 Issue 30\n$mux-work maddec01/mux-server#30', '--json'],
+    ['thread', 'start', 'project-server', '#30 Issue 30\n$lar-work maddec01/lar-server#30', '--json'],
   ]);
   assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
 });
@@ -100,21 +100,21 @@ for (const [name, model] of [
 
 test('Start finds the repository project by origin, whatever its folder is called or wherever it lives', async (t) => {
   const { board } = await boardIn(t, [projectIssue(12, 'Queued')], {}, (dir) => {
-    checkouts(dir, { 'factory-clone': 'https://github.com/maddec01/mux-factory' }, 'code');
-    return projectsDb(t, [{ id: 'project-mux', root: `${dir}/Developer/Mux` },
+    checkouts(dir, { 'factory-clone': 'https://github.com/maddec01/lar-factory' }, 'code');
+    return projectsDb(t, [{ id: 'project-lar', root: `${dir}/Developer/lar` },
       { id: 'project-clone', root: '~/code/factory-clone' }]);
   });
   assert.equal((await start(board, 'PVTI_12')).status, 200);
   assert.equal((await board.t3Calls())[0]?.[2], 'project-clone');
 });
 
-const NO_PROJECT = 'No T3 project is a checkout of maddec01/mux-factory; add the checkout in T3 Code';
+const NO_PROJECT = 'No T3 project is a checkout of maddec01/lar-factory; add the checkout in T3 Code';
 
-/** A folder whose `.git` is a file, as in a git worktree of the mux-factory checkout. */
+/** A folder whose `.git` is a file, as in a git worktree of the lar-factory checkout. */
 function worktree(dir: string): string {
-  const folder = join(dir, 'worktrees/mux-factory-1');
+  const folder = join(dir, 'worktrees/lar-factory-1');
   mkdirSync(folder, { recursive: true });
-  writeFileSync(join(folder, '.git'), `gitdir: ${dir}/Developer/Mux/mux-factory/.git\n`);
+  writeFileSync(join(folder, '.git'), `gitdir: ${dir}/Developer/lar/lar-factory/.git\n`);
   return folder;
 }
 
@@ -123,21 +123,21 @@ const refusals: { name: string; repo?: string; origins?: Record<string, string |
   { name: 'an unlisted repository', repo: 'maddec01/other',
     error: () => "maddec01/other isn't in config.json; add it with a role" },
   { name: 'a project whose folder is gone', origins: {}, error: () => NO_PROJECT },
-  { name: "another repository's checkout", origins: { 'mux-factory': 'https://github.com/maddec01/mux-server.git' },
+  { name: "another repository's checkout", origins: { 'lar-factory': 'https://github.com/maddec01/lar-server.git' },
     error: () => NO_PROJECT },
-  { name: 'a checkout with no origin', origins: { 'mux-factory': null }, error: () => NO_PROJECT },
-  { name: 'a deleted T3 project', projects: (dir) => [{ id: 'project-mux', root: `${dir}/Developer/Mux` },
-    { id: 'project-factory', root: `${dir}/Developer/Mux/mux-factory`, deletedAt: '2026-10-01T00:00:00Z' }],
+  { name: 'a checkout with no origin', origins: { 'lar-factory': null }, error: () => NO_PROJECT },
+  { name: 'a deleted T3 project', projects: (dir) => [{ id: 'project-lar', root: `${dir}/Developer/lar` },
+    { id: 'project-factory', root: `${dir}/Developer/lar/lar-factory`, deletedAt: '2026-10-01T00:00:00Z' }],
     error: () => NO_PROJECT },
   { name: 'a worktree or a folder inside the checkout', projects: (dir) => [
-    { id: 'project-worktree', root: worktree(dir) }, { id: 'project-board', root: `${dir}/Developer/Mux/mux-factory/board` }],
+    { id: 'project-worktree', root: worktree(dir) }, { id: 'project-board', root: `${dir}/Developer/lar/lar-factory/board` }],
     error: () => NO_PROJECT },
   { name: 'two checkouts of the repository',
     projects: (dir) => {
-      checkouts(dir, { 'factory-clone': 'git@github.com:maddec01/mux-factory.git' }, 'code');
+      checkouts(dir, { 'factory-clone': 'git@github.com:maddec01/lar-factory.git' }, 'code');
       return [...PROJECTS(dir), { id: 'project-clone', root: `${dir}/code/factory-clone` }];
     },
-    error: () => 'Several T3 projects are checkouts of maddec01/mux-factory: ~/Developer/Mux/mux-factory, ~/code/factory-clone; remove all but one in T3 Code' },
+    error: () => 'Several T3 projects are checkouts of maddec01/lar-factory: ~/Developer/lar/lar-factory, ~/code/factory-clone; remove all but one in T3 Code' },
   { name: 'a missing T3 database', db: (dir) => join(dir, 'none.sqlite'),
     error: (dir) => `Can't read T3 Code's projects at ${join(dir, 'none.sqlite')}` },
 ];
@@ -172,7 +172,7 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
 });
 
 test("a card's repository matches its config.json entry whatever the case", async (t) => {
-  const board = await factoryBoard(t, [projectIssue(12, 'Queued', 'MADDEC01/Mux-Factory')]);
+  const board = await factoryBoard(t, [projectIssue(12, 'Queued', 'MADDEC01/Lar-Factory')]);
   const response = await start(board, 'PVTI_12');
   assert.equal(response.status, 200);
   assert.equal((await board.t3Calls())[0]?.[2], 'project-factory');
@@ -182,13 +182,13 @@ test('Start reads config.json each time, so an added repository works without re
   const f = await factoryRepo(t);
   const config = join(f.repo, 'config.json');
   const original = readFileSync(config, 'utf8');
-  writeFileSync(config, original.replace('"maddec01/mux-factory"', '"maddec01/elsewhere"'));
+  writeFileSync(config, original.replace('"maddec01/lar-factory"', '"maddec01/elsewhere"'));
   const dir = home(t, ORIGINS);
   const board = await startBoard(t, { items: [projectIssue(12, 'Queued')] }, false, false,
     { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'apps/server'));
   await until(board, (d) => d.items.length === 1);
   const refused = await start(board, 'PVTI_12');
-  assert.match((await refused.json()).error, /maddec01\/mux-factory isn't in config\.json/);
+  assert.match((await refused.json()).error, /maddec01\/lar-factory isn't in config\.json/);
   writeFileSync(config, original);
   const retried = await start(board, 'PVTI_12');
   assert.equal(retried.status, 200);
@@ -274,12 +274,12 @@ test('Start only runs for Queued issues from this board page and session', async
 
 test('Start is refused while an issue the item is blocked by is open', async (t) => {
   const blocked = rawIssue('PVTI_12', 12, 'Queued', ['decision: grill'], {
-    blockedBy: { nodes: [5, 6].map((number) => ({ number, state: 'OPEN', repository: { nameWithOwner: number === 5 ? 'maddec01/mux-factory' : 'maddec01/mux-server' } })) },
+    blockedBy: { nodes: [5, 6].map((number) => ({ number, state: 'OPEN', repository: { nameWithOwner: number === 5 ? 'maddec01/lar-factory' : 'maddec01/lar-server' } })) },
   });
   const board = await factoryBoard(t, [blocked]);
   const refused = await start(board, 'PVTI_12');
   assert.equal(refused.status, 409);
-  assert.equal((await refused.json()).error, 'Blocked by #5, maddec01/mux-server#6 until they close; use Start after to start it then.');
+  assert.equal((await refused.json()).error, 'Blocked by #5, maddec01/lar-server#6 until they close; use Start after to start it then.');
   assert.deepEqual(await board.t3Calls(), []);
 });
 

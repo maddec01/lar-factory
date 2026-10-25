@@ -1,6 +1,6 @@
 /* The starting page's styles, compiled with the design system's tokens and base styles at build time
    (packages/ui's compiledCss), since the page is a data: URL that loads nothing. */
-@import "@mux-factory/ui/styles.css";
+@import "@lar-factory/ui/styles.css";
 
 html, body { @apply h-full; }
 /* The whole page drags the window, as the board's title bar does; the top padding is the title bar's height. */

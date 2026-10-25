@@ -13,7 +13,7 @@ function rows(partial: Partial<ThreadRows>): ThreadRows {
 test('an item\'s time comes from plain rows: its root\'s turns less waits, and a child\'s work outside its parent\'s', () => {
   const time = agentTime(rows({
     threads: [
-      { id: 'root', title: 'root', deletedAt: null, root: 'root', parent: null, text: 'Build maddec01/Mux-Factory#7' },
+      { id: 'root', title: 'root', deletedAt: null, root: 'root', parent: null, text: 'Build maddec01/Lar-Factory#7' },
       { id: 'child', title: 'child', deletedAt: null, root: 'root', parent: 'root', text: null },
       { id: 'other', title: 'other', deletedAt: null, root: 'other', parent: null, text: 'hello' },
     ],
@@ -24,8 +24,8 @@ test('an item\'s time comes from plain rows: its root\'s turns less waits, and a
     waits: [{ turn: 't1', createdAt: at(2), resolvedAt: at(4) }],
   }), Date.parse(at(60)));
   // The root works 0-2 and 4-10; the child 5-20, of which 10-20 is outside the root's work.
-  assert.deepEqual(time('maddec01/mux-factory', 7), { agentMs: 18 * MIN, wallMs: 18 * MIN, threads: ['root', 'child'] });
-  assert.equal(time('maddec01/mux-factory', 8), null);
+  assert.deepEqual(time('maddec01/lar-factory', 7), { agentMs: 18 * MIN, wallMs: 18 * MIN, threads: ['root', 'child'] });
+  assert.equal(time('maddec01/lar-factory', 8), null);
 });
 
 test('an open turn on an active provider thread runs up to now; on an idle one it stops at the thread\'s last activity', () => {

@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { factoryRepo, testEnv } from './repo-support.ts';
 
 test('git variables inherited from a hook or rebase --exec never reach the real repo', async (t) => {
-  const decoy = await mkdtemp(join(tmpdir(), 'mux decoy repo '));
+  const decoy = await mkdtemp(join(tmpdir(), 'lar decoy repo '));
   t.onTestFinished(() => rm(decoy, { recursive: true, force: true }));
   execFileSync('git', ['init', '--bare', decoy], { env: testEnv(), stdio: 'ignore' });
   const saved = { GIT_DIR: process.env.GIT_DIR, GIT_WORK_TREE: process.env.GIT_WORK_TREE };

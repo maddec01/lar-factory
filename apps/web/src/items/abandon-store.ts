@@ -2,7 +2,7 @@
 // the question doesn't change under the closing animation.
 
 import { create } from 'zustand';
-import type { Item } from '@mux-factory/shared';
+import type { Item } from '@lar-factory/shared';
 
 interface AbandonState {
   open: boolean;

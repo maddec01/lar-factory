@@ -5,11 +5,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { boardSections, clock, isStale, shortAgo, slug } from '@mux-factory/shared';
-import type { BoardData } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
-import { Menu, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuSeparator, MenuTrigger } from '@mux-factory/ui/menu';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
+import { boardSections, clock, isStale, shortAgo, slug } from '@lar-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
+import { Menu, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuSeparator, MenuTrigger } from '@lar-factory/ui/menu';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
 import { useSidebarStore } from '../sidebar/sidebar-store.ts';
 import { useTitlebarInset } from '../sidebar/window-controls.tsx';
@@ -117,7 +117,7 @@ export function TitleBar() {
       {!data.tools?.t3 && (
         <>
           {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. */}
-          <h1 className="sr-only">µx Factory</h1>
+          <h1 className="sr-only">lar Factory</h1>
           <Scope />
           <Refreshed data={data} />
           <div className="flex min-w-0 flex-1 items-center justify-center"><Counters /></div>

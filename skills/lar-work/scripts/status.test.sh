@@ -85,11 +85,11 @@ listen() {
 }
 # status.sh reads board records from this home, never the real one.
 export HOME="$bin/home"
-records="$HOME/Library/Application Support/Mux Factory/boards"
+records="$HOME/Library/Application Support/lar Factory/boards"
 record() { mkdir -p "$records"; printf '{"port":%s}' "$2" >"$records/$1.json"; }
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
 
-url=https://github.com/maddec01/mux-factory/issues/7
+url=https://github.com/maddec01/lar-factory/issues/7
 expected="$url → Ready to merge"
 
 # run [port]: runs status.sh with fresh logs, sets $output, $errors, $status and $seconds.
@@ -97,7 +97,7 @@ run() {
     : >"$log"
     status=0
     local start=$SECONDS
-    output=$(MUX_BOARD_PORT=${1:-} bash "$status_sh" maddec01/mux-factory#7 "Ready to merge" 2>"$bin/err") || status=$?
+    output=$(LAR_BOARD_PORT=${1:-} bash "$status_sh" maddec01/lar-factory#7 "Ready to merge" 2>"$bin/err") || status=$?
     seconds=$((SECONDS - start))
     errors=$(cat "$bin/err")
 }
@@ -117,15 +117,15 @@ else
     fail "after setting the status, asks the board for a read once with JSON and its Origin: $status $output / $errors / $(cat "$log") / $request"
 fi
 
-# With no records and no MUX_BOARD_PORT there is no board to ask.
+# With no records and no LAR_BOARD_PORT there is no board to ask.
 : >"$log"
 status=0
-output=$(env -u MUX_BOARD_PORT bash "$status_sh" maddec01/mux-factory#7 "Ready to merge" 2>"$bin/err") || status=$?
+output=$(env -u LAR_BOARD_PORT bash "$status_sh" maddec01/lar-factory#7 "Ready to merge" 2>"$bin/err") || status=$?
 errors=$(cat "$bin/err")
 if same_as_today && (($(curls) == 0)); then
-    pass "with no board records and no MUX_BOARD_PORT, asks no board"
+    pass "with no board records and no LAR_BOARD_PORT, asks no board"
 else
-    fail "with no board records and no MUX_BOARD_PORT, asks no board: $status $output / $errors / $(cat "$log")"
+    fail "with no board records and no LAR_BOARD_PORT, asks no board: $status $output / $errors / $(cat "$log")"
 fi
 
 # Two live boards, a stale record whose process is gone (its port answers, to
@@ -152,17 +152,17 @@ fi
 : >"$bin/a"; : >"$bin/b"
 run "$b_port"
 if same_as_today && (($(reads b) == 1)) && [[ -z $(requests a) ]]; then
-    pass "MUX_BOARD_PORT asks only the board on that port"
+    pass "LAR_BOARD_PORT asks only the board on that port"
 else
-    fail "MUX_BOARD_PORT asks only the board on that port: $status $output / $errors / a: $(requests a) / b: $(requests b)"
+    fail "LAR_BOARD_PORT asks only the board on that port: $status $output / $errors / a: $(requests a) / b: $(requests b)"
 fi
 
 : >"$bin/a"; : >"$bin/b"
 run '4317/x?'
 if same_as_today && (($(reads a) == 1 && $(reads b) == 1)) && ! grep -q '4317' "$log"; then
-    pass "a MUX_BOARD_PORT that isn't a number is ignored for the records"
+    pass "a LAR_BOARD_PORT that isn't a number is ignored for the records"
 else
-    fail "a MUX_BOARD_PORT that isn't a number is ignored for the records: $status $output / $errors / $(cat "$log")"
+    fail "a LAR_BOARD_PORT that isn't a number is ignored for the records: $status $output / $errors / $(cat "$log")"
 fi
 rm -rf "$records"
 

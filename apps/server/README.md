@@ -1,6 +1,6 @@
 # Board
 
-A local board for the Mux project. It reads the project through your `gh` login
+A local board for the lar project. It reads the project through your `gh` login
 every 45 seconds (`config.json`) and serves it on the first free port from
 4317 to 4416, which it logs; `BOARD_PORT` pins the port. The board app's board
 usually gets 4317. `BOARD_CONFIG_FILE`, an absolute path, makes it read that file in
@@ -29,8 +29,8 @@ new build or `src/` change.
   in Queued at once and keeps it there until GitHub reports the change.
 - **Start** on a Queued issue opens a T3 Code thread in the issue's repository
   project, the T3 project whose folder is a main checkout with the repository
-  as its git `origin`, whose first message is the issue's work message: `#n title`, then `$mux-work owner/repo#n`. T3 titles the
-  thread from line 1 and runs mux-work, which shapes or builds the issue and
+  as its git `origin`, whose first message is the issue's work message: `#n title`, then `$lar-work owner/repo#n`. T3 titles the
+  thread from line 1 and runs lar-work, which shapes or builds the issue and
   sets its Status. Start ▾ opens a menu of model choices: "T3 default" (the
   project's default model), then each enabled T3 provider instance with its
   models; picking one starts the thread on it, and Escape or a click outside
@@ -65,7 +65,7 @@ new build or `src/` change.
   issue is created, its link and **Retry this submission** finish the same issue.
 
 Creation and Queue use the same local `gh` login as reads and need permission
-to create issues and edit the Mux project. Start runs the local `t3` CLI and
+to create issues and edit the lar project. Start runs the local `t3` CLI and
 needs T3 Code running. If a response is lost, retry the current submission. An
 uncertain GitHub creation or a board restart asks you to check the repository
 issues before starting another item.
@@ -88,7 +88,7 @@ read and shows a stale warning. `pnpm run sample` serves `packages/shared/test/s
 adding, queuing and starting are disabled in sample mode.
 
 To use the board every day, install the board app from
-[GitHub Releases](https://github.com/maddec01/mux-factory/releases) (see the
+[GitHub Releases](https://github.com/maddec01/lar-factory/releases) (see the
 [factory install instructions](../README.md#install)). `pnpm start`, `pnpm run dev`
 and `pnpm run sample` are for developing the board. A running process keeps the built
 page it started with, so a new browser load still works after checkout changes or a

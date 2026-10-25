@@ -13,8 +13,8 @@ const NOWHERE = {
   home: join(tmpdir(), 'no-such-dir', 'home'),
 };
 const NOW = Date.parse('2026-10-20T12:00:00Z');
-const REPO = 'maddec01/mux-factory';
-/** Issue `number` in mux-factory, as the board item the lookups take. */
+const REPO = 'maddec01/lar-factory';
+/** Issue `number` in lar-factory, as the board item the lookups take. */
 const item = (number: number | null) => ({ repo: REPO, number });
 /** A lookup's result once it's read, failing the test when there was none or it was unavailable. */
 function found<T>(value: T | 'unavailable' | undefined): T {
@@ -31,7 +31,7 @@ function renameColumn(path: string, table: string, from: string, to: string): vo
 }
 
 test('one read of the database gives each item its stats and threads, and undefined for an item with none', (t) => {
-  const db = statsDb(t, [{ id: 'a', title: 'Shape #1', messages: [`$mux-work ${REPO}#1`], turns: [turn] }]);
+  const db = statsDb(t, [{ id: 'a', title: 'Shape #1', messages: [`$lar-work ${REPO}#1`], turns: [turn] }]);
   const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
   assert.equal(found(reads.stats(item(1))).agentMs, 10 * 60_000);
   assert.deepEqual(found(reads.threads(item(1))).map((th) => [th.id, th.state]), [['a', 'done']]);
@@ -43,14 +43,14 @@ test('one read of the database gives each item its stats and threads, and undefi
 test('a missing database gives no stats or threads, and an unexpected schema gives unavailable', (t) => {
   const missing = loadT3Reads({ db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite'), ...NOWHERE }, NOW);
   assert.deepEqual([missing.stats(item(1)), missing.threads(item(1)), missing.statsUnavailable, missing.priced], [undefined, undefined, false, null]);
-  const changed = statsDb(t, [{ id: 'a', messages: [`$mux-work ${REPO}#1`] }]);
+  const changed = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`] }]);
   renameColumn(changed, 'orchestration_v2_projection_provider_turns', 'started_at', 'began_at');
   const broken = loadT3Reads({ db: changed, ...NOWHERE }, NOW);
   assert.deepEqual([broken.stats(item(1)), broken.threads(item(1)), broken.statsUnavailable, broken.priced], ['unavailable', 'unavailable', true, null]);
 });
 
 test('stats read more than the thread rows, so they can be unavailable while the threads are read', (t) => {
-  const db = statsDb(t, [{ id: 'a', title: 'Shape #1', messages: [`$mux-work ${REPO}#1`], turns: [turn] }]);
+  const db = statsDb(t, [{ id: 'a', title: 'Shape #1', messages: [`$lar-work ${REPO}#1`], turns: [turn] }]);
   renameColumn(db, 'orchestration_v2_projection_provider_threads', 'payload_json', 'payload');
   const reads = loadT3Reads({ db, ...NOWHERE }, NOW);
   assert.equal(reads.stats(item(1)), 'unavailable');

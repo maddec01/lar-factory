@@ -6,8 +6,8 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
-import { boardSections, ref, shortAgo, slug } from '@mux-factory/shared';
-import type { Item } from '@mux-factory/shared';
+import { boardSections, ref, shortAgo, slug } from '@lar-factory/shared';
+import type { Item } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { StatusGlyph } from '../items/status-glyph.tsx';

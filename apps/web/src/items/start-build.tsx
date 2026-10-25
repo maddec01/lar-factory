@@ -4,7 +4,7 @@
 // blocker holds it, Start after joins it.
 
 import type { ReactNode } from 'react';
-import type { BoardData, Item } from '@mux-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { OpenThread, hasLiveThread } from './open-thread.tsx';
 import { StartOrAfter } from './start-after.tsx';
 

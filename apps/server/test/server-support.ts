@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import type { TestContext } from 'vite-plus/test';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
@@ -16,7 +16,7 @@ async function readCalls(file: string): Promise<string[][]> {
 }
 
 /** The board data sample mode serves. */
-export const SAMPLE_DATA = fileURLToPath(import.meta.resolve('@mux-factory/shared/test/sample.json'));
+export const SAMPLE_DATA = fileURLToPath(import.meta.resolve('@lar-factory/shared/test/sample.json'));
 
 /** Sample mode's T3 settings and model list, so the Start menu can be tried without T3. */
 export const SAMPLE_MODELS = {
@@ -35,7 +35,7 @@ export async function freePort(): Promise<number> {
 }
 
 export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}, directory?: string) {
-  const dir = await mkdtemp(join(tmpdir(), 'mux-board-test-'));
+  const dir = await mkdtemp(join(tmpdir(), 'lar-board-test-'));
   const stateFile = join(dir, 'github.json');
   await writeFile(stateFile, JSON.stringify(options));
   await writeFile(stateFile + '.calls', '');
@@ -132,11 +132,11 @@ export async function until(board: Board, check: (data: BoardData) => boolean): 
 export const draftItem = (status: string) => ({ id: 'PVTI_draft', updatedAt: '2026-10-21T09:00:00Z', status: { name: status },
   content: { __typename: 'DraftIssue', title: 'Idea', updatedAt: '2026-10-21T09:00:00Z' } });
 
-/** Environment for a board that can Start maddec01/mux-factory items: a temporary home holding its
+/** Environment for a board that can Start maddec01/lar-factory items: a temporary home holding its
  * checkout, and a T3 database with a live project there. */
 export function startableEnv(t: TestContext): Record<string, string> {
-  const home = mkdtempSync(join(tmpdir(), 'mux-start-home-'));
+  const home = mkdtempSync(join(tmpdir(), 'lar-start-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  checkouts(home, { 'mux-factory': 'git@github.com:maddec01/mux-factory.git' });
-  return { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/Mux/mux-factory` }]) };
+  checkouts(home, { 'lar-factory': 'git@github.com:maddec01/lar-factory.git' });
+  return { HOME: home, T3_STATE_DB: projectsDb(t, [{ id: 'project-factory', root: `${home}/Developer/lar/lar-factory` }]) };
 }

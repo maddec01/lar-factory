@@ -1,10 +1,10 @@
 ---
 name: skill-sync
-description: Review upstream changes to the skills copied into mux-factory, take the ones Pedro picks, and add or drop copies. Use when the user runs /skill-sync.
+description: Review upstream changes to the skills copied into lar-factory, take the ones Pedro picks, and add or drop copies. Use when the user runs /skill-sync.
 disable-model-invocation: true
 ---
 
-The copied skills in `maddec01/mux-factory` change only through this skill.
+The copied skills in `maddec01/lar-factory` change only through this skill.
 `UPSTREAM.md` records the upstream commit each copy matches.
 
 Before writing anything, read the `unslop` skill
@@ -14,8 +14,8 @@ you write: chat, commit messages, the PR body and `UPSTREAM.md`. Apply them whil
 drafting, as you write each sentence, not as a later scan-and-rewrite pass. Code
 and copied files follow their own rules.
 
-1. Work in a fresh branch `chore/skill-sync-<date>` of the mux-factory checkout
-   (`~/Developer/Mux/mux-factory`), updated from `origin/main`.
+1. Work in a fresh branch `chore/skill-sync-<date>` of the lar-factory checkout
+   (`~/Developer/lar/lar-factory`), updated from `origin/main`.
 2. Run `bash <this skill>/scripts/upstream-changes.sh <checkout>`. It prints, per
    copy, whether upstream changed since the recorded commit, the upstream commits
    and the diff.
@@ -59,5 +59,5 @@ and copied files follow their own rules.
    first launch of the new version updates the skills and the checklists in
    `references/`, and installs an added copy with no further edit.
 
-Never edit a copy for Mux reasons. Mux rules belong in `mux-work` or a repo's
+Never edit a copy for lar reasons. lar rules belong in `lar-work` or a repo's
 `AGENTS.md`.

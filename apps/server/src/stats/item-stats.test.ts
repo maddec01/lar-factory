@@ -16,7 +16,7 @@ const NOWHERE = {
 };
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
-const REPO = 'maddec01/mux-factory';
+const REPO = 'maddec01/lar-factory';
 const MIN = 60_000;
 
 /** A finished ten-minute turn. */
@@ -30,25 +30,25 @@ function reader(db: string, sources: Partial<StatsSources> = {}): ItemStatsReade
 
 test('an item\'s threads are the roots whose first user message names it, in any of the three forms', (t) => {
   const threads: FixtureThread[] = [
-    { id: 'start', messages: [`#60 Show new item stats.\n$mux-work ${REPO}#60`, `Build ${REPO}#61`], turns: [turn('a')] },
-    { id: 'handoff', messages: [`Carry on with the review.\n/mux-work ${REPO}#60 please`], turns: [turn('b')] },
+    { id: 'start', messages: [`#60 Show new item stats.\n$lar-work ${REPO}#60`, `Build ${REPO}#61`], turns: [turn('a')] },
+    { id: 'handoff', messages: [`Carry on with the review.\n/lar-work ${REPO}#60 please`], turns: [turn('b')] },
     { id: 'build', messages: [`Build ${REPO}#60. Read builder.md and follow it.`], turns: [turn('c')] },
     // Named only in a later message, in the middle of a line, or by another repo.
-    { id: 'later', messages: ['hello', `$mux-work ${REPO}#60`], turns: [turn('d')] },
+    { id: 'later', messages: ['hello', `$lar-work ${REPO}#60`], turns: [turn('d')] },
     { id: 'inline', messages: [`please Build ${REPO}#60`], turns: [turn('e')] },
-    { id: 'other-repo', messages: [`$mux-work maddec01/mux-server#60`], turns: [turn('f')] },
+    { id: 'other-repo', messages: [`$lar-work maddec01/lar-server#60`], turns: [turn('f')] },
   ];
   const stats = reader(statsDb(t, threads));
   assert.deepEqual(stats(REPO, 60), { agentMs: 30 * MIN, wallMs: 10 * MIN, tokens: 0 }, 'T3\'s own token counts are not read');
   assert.equal(stats(REPO, 61), null, 'only the first user message counts');
-  assert.equal(stats('maddec01/mux-server', 60)?.agentMs, 10 * MIN);
+  assert.equal(stats('maddec01/lar-server', 60)?.agentMs, 10 * MIN);
 });
 
 test('a first message naming several issues counts only toward the first one named, in any form', (t) => {
   const stats = reader(statsDb(t, [
-    { id: 'two-work', messages: [`$mux-work ${REPO}#1\n/mux-work ${REPO}#2`], turns: [turn('a')] },
-    { id: 'build-first', messages: [`Build ${REPO}#3, then $mux-work ${REPO}#4`], turns: [turn('b')] },
-    { id: 'work-first', messages: [`/mux-work ${REPO}#5 before Build`], turns: [turn('c')] },
+    { id: 'two-work', messages: [`$lar-work ${REPO}#1\n/lar-work ${REPO}#2`], turns: [turn('a')] },
+    { id: 'build-first', messages: [`Build ${REPO}#3, then $lar-work ${REPO}#4`], turns: [turn('b')] },
+    { id: 'work-first', messages: [`/lar-work ${REPO}#5 before Build`], turns: [turn('c')] },
   ]));
   assert.equal(stats(REPO, 1)?.agentMs, 10 * MIN);
   assert.equal(stats(REPO, 2), null);
@@ -59,17 +59,17 @@ test('a first message naming several issues counts only toward the first one nam
 
 test('owner and repo match whatever their case', (t) => {
   const stats = reader(statsDb(t, [
-    { id: 'upper', messages: [`$mux-work Maddec01/Mux-Factory#5`], turns: [turn('a')] },
+    { id: 'upper', messages: [`$lar-work Maddec01/Lar-Factory#5`], turns: [turn('a')] },
     { id: 'lower', messages: [`Build ${REPO}#5`], turns: [turn('b')] },
   ]));
   assert.equal(stats(REPO, 5)?.agentMs, 20 * MIN);
-  assert.equal(stats('MADDEC01/mux-factory', 5)?.agentMs, 20 * MIN);
+  assert.equal(stats('MADDEC01/lar-factory', 5)?.agentMs, 20 * MIN);
 });
 
 test('the number must match exactly, and titles are never used', (t) => {
   const stats = reader(statsDb(t, [
     { id: 'build-59', title: 'slice #68', messages: [`Build ${REPO}#59`], turns: [turn('a')] },
-    { id: 'issue-60', title: '#6 fix', messages: [`$mux-work ${REPO}#60`], turns: [turn('b')] },
+    { id: 'issue-60', title: '#6 fix', messages: [`$lar-work ${REPO}#60`], turns: [turn('b')] },
   ]));
   assert.equal(stats(REPO, 68), null);
   assert.equal(stats(REPO, 6), null);
@@ -80,7 +80,7 @@ test('the number must match exactly, and titles are never used', (t) => {
 test('child threads count through their lineage root, even when their own first message names another issue', (t) => {
   const stats = reader(statsDb(t, [
     { id: 'root', messages: [`Build ${REPO}#60`], turns: [turn('a')] },
-    { id: 'child', rootThreadId: 'root', messages: [`$mux-work ${REPO}#72`],
+    { id: 'child', rootThreadId: 'root', messages: [`$lar-work ${REPO}#72`],
       turns: [{ id: 'b', startedAt: '2026-10-20T09:20:00Z', completedAt: '2026-10-20T09:30:00Z' }] },
     { id: 'stranger', rootThreadId: 'elsewhere', turns: [turn('c')] },
   ]));
@@ -146,10 +146,10 @@ test('a subagent under a child task has its time taken out of that child\'s work
 test('wall time is the time any of the item\'s agents worked: overlap once, no waits on Pedro, no idle gaps', (t) => {
   const stats = reader(statsDb(t, [
     root(1), subagent('left', 1, '09:10', '09:25'), subagent('right', 1, '09:15', '09:30'),
-    { id: 'waits', messages: [`$mux-work ${REPO}#2`], turns: [
+    { id: 'waits', messages: [`$lar-work ${REPO}#2`], turns: [
       { id: 'w', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T10:00:00Z' },
     ] },
-    root(3), { id: 'later', messages: [`$mux-work ${REPO}#3`], turns: [
+    root(3), { id: 'later', messages: [`$lar-work ${REPO}#3`], turns: [
       { id: 'l', startedAt: '2026-10-20T11:00:00Z', completedAt: '2026-10-20T11:05:00Z' },
     ] },
   ], [{ turnId: 'w', createdAt: '2026-10-20T09:10:00Z', resolvedAt: '2026-10-20T09:40:00Z' }]));
@@ -161,14 +161,14 @@ test('wall time is the time any of the item\'s agents worked: overlap once, no w
 
 test('agent time leaves out waits on Pedro inside a turn, and a running turn or wait counts up to now', (t) => {
   const stats = reader(statsDb(t, [
-    { id: 'waits', messages: [`$mux-work ${REPO}#1`], turns: [
+    { id: 'waits', messages: [`$lar-work ${REPO}#1`], turns: [
       { id: 't1', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T10:00:00Z' },
     ] },
-    { id: 'running', messages: [`$mux-work ${REPO}#2`], turns: [
+    { id: 'running', messages: [`$lar-work ${REPO}#2`], turns: [
       { id: 't2', startedAt: '2026-10-20T11:30:00Z', completedAt: null },
     ] },
-    { id: 'parallel', messages: [`$mux-work ${REPO}#3`], turns: [turn('t3')] },
-    { id: 'parallel-2', messages: [`$mux-work ${REPO}#3`], turns: [turn('t4')] },
+    { id: 'parallel', messages: [`$lar-work ${REPO}#3`], turns: [turn('t3')] },
+    { id: 'parallel-2', messages: [`$lar-work ${REPO}#3`], turns: [turn('t4')] },
   ], [
     // Two overlapping waits (09:10-09:30) and one past the turn's end (09:50-10:00 counted).
     { turnId: 't1', createdAt: '2026-10-20T09:10:00Z', resolvedAt: '2026-10-20T09:20:00Z' },
@@ -185,11 +185,11 @@ test('agent time leaves out waits on Pedro inside a turn, and a running turn or 
 test('an open turn whose thread isn\'t running stops at the thread\'s latest activity, not now', (t) => {
   const stats = reader(statsDb(t, [
     // Its run failed at 09:00; the message stamps 08:00, the wait 09:05-09:20.
-    { id: 'abandoned', messages: [`$mux-work ${REPO}#7`], turns: [
+    { id: 'abandoned', messages: [`$lar-work ${REPO}#7`], turns: [
       { id: 'a1', startedAt: '2026-10-20T08:30:00Z', completedAt: '2026-10-20T08:40:00Z' },
       { id: 'a2', startedAt: '2026-10-20T09:00:00Z', completedAt: null, abandoned: true },
     ] },
-    { id: 'abandoned-quiet', messages: [`$mux-work ${REPO}#8`], turns: [
+    { id: 'abandoned-quiet', messages: [`$lar-work ${REPO}#8`], turns: [
       { id: 'b1', startedAt: '2026-10-20T09:00:00Z', completedAt: null, abandoned: true },
     ] },
   ], [{ turnId: 'a2', createdAt: '2026-10-20T09:05:00Z', resolvedAt: '2026-10-20T09:20:00Z' }]));
@@ -200,7 +200,7 @@ test('an open turn whose thread isn\'t running stops at the thread\'s latest act
 test('a stale open turn on an active provider thread stops at the next turn\'s start, and only the latest counts to now', (t) => {
   const stats = reader(statsDb(t, [
     // A turn that failed at 09:00 and T3 never closed, then a turn running since 11:30 on the same provider thread.
-    { id: 'retried', messages: [`$mux-work ${REPO}#9`], turns: [
+    { id: 'retried', messages: [`$lar-work ${REPO}#9`], turns: [
       { id: 'r1', startedAt: '2026-10-20T09:00:00Z', completedAt: null, providerThread: 'claude' },
       { id: 'r2', startedAt: '2026-10-20T10:00:00Z', completedAt: '2026-10-20T10:10:00Z', providerThread: 'claude' },
       { id: 'r3', startedAt: '2026-10-20T11:30:00Z', completedAt: null, providerThread: 'claude' },
@@ -210,7 +210,7 @@ test('a stale open turn on an active provider thread stops at the next turn\'s s
 });
 
 test('tokens are T3\'s totals over each session\'s own and subagent transcripts, each message once', (t) => {
-  const home = tempDir(t, 'mux-home-');
+  const home = tempDir(t, 'lar-home-');
   claudeHome(t, {
     'session-a1': {
       main: [
@@ -230,8 +230,8 @@ test('tokens are T3\'s totals over each session\'s own and subagent transcripts,
   const stats = reader(statsDb(t, [
     // A thread with two provider threads: both sessions count.
     { id: 'build', messages: [`Build ${REPO}#60`], sessions: ['session-a1', 'session-a2'], turns: [turn('t1')] },
-    { id: 'other', messages: [`$mux-work ${REPO}#61`], sessions: ['session-other'] },
-    { id: 'plain', messages: [`$mux-work ${REPO}#62`], sessions: ['session-none'], turns: [turn('t2')] },
+    { id: 'other', messages: [`$lar-work ${REPO}#61`], sessions: ['session-other'] },
+    { id: 'plain', messages: [`$lar-work ${REPO}#62`], sessions: ['session-none'], turns: [turn('t2')] },
   ]), { home });
   assert.deepEqual(stats(REPO, 60), { agentMs: 10 * MIN, wallMs: 10 * MIN, tokens: 6042 + 6101 + 15 + 101 });
   assert.equal(stats(REPO, 61)?.tokens, 198);
@@ -239,17 +239,17 @@ test('tokens are T3\'s totals over each session\'s own and subagent transcripts,
 });
 
 test('each thread reads the transcripts under its own provider instance\'s Claude home, from T3\'s settings', (t) => {
-  const home = tempDir(t, 'mux-home-');
+  const home = tempDir(t, 'lar-home-');
   // The same session ID in both homes: only the thread's own instance counts.
   claudeHome(t, { shared: { main: [assistant('msg-work', 0, 0, 1000, 0)] } }, join(home, '.claude'));
   claudeHome(t, { shared: { main: [assistant('msg-personal', 0, 0, 20, 0)] } }, join(home, '.claude-personal'));
   const elsewhere = claudeHome(t, { 'session-x': { main: [assistant('msg-x', 0, 0, 3, 0)] } });
   const db = statsDb(t, [
-    { id: 'work', messages: [`$mux-work ${REPO}#1`], sessions: [{ session: 'shared', instance: 'claudeAgent' }] },
-    { id: 'personal', messages: [`$mux-work ${REPO}#2`], sessions: [{ session: 'shared', instance: 'claudeAgent_personal' }] },
-    { id: 'absolute', messages: [`$mux-work ${REPO}#3`], sessions: [{ session: 'session-x', instance: 'claudeAgent_x' }] },
-    { id: 'unknown', messages: [`$mux-work ${REPO}#4`], sessions: [{ session: 'shared', instance: 'claudeAgent_gone' }] },
-    { id: 'codex', messages: [`$mux-work ${REPO}#5`], sessions: [{ session: 'shared', instance: 'codex', driver: 'codex' }] },
+    { id: 'work', messages: [`$lar-work ${REPO}#1`], sessions: [{ session: 'shared', instance: 'claudeAgent' }] },
+    { id: 'personal', messages: [`$lar-work ${REPO}#2`], sessions: [{ session: 'shared', instance: 'claudeAgent_personal' }] },
+    { id: 'absolute', messages: [`$lar-work ${REPO}#3`], sessions: [{ session: 'session-x', instance: 'claudeAgent_x' }] },
+    { id: 'unknown', messages: [`$lar-work ${REPO}#4`], sessions: [{ session: 'shared', instance: 'claudeAgent_gone' }] },
+    { id: 'codex', messages: [`$lar-work ${REPO}#5`], sessions: [{ session: 'shared', instance: 'codex', driver: 'codex' }] },
   ]);
   const settings = t3Settings(t, { claudeAgent_personal: '~/.claude-personal', claudeAgent: '', claudeAgent_x: elsewhere });
   const stats = reader(db, { settings, home });
@@ -259,7 +259,7 @@ test('each thread reads the transcripts under its own provider instance\'s Claud
 });
 
 test('an item totals its Claude and Codex threads, each Codex thread from its own instance\'s Codex home', (t) => {
-  const home = tempDir(t, 'mux-home-');
+  const home = tempDir(t, 'lar-home-');
   const build = '01a13627-9790-70d0-8342-58f71022e222';
   const child = '01a13628-c84a-7f33-9a04-c55eb4c75845';
   const other = '01a13628-ffd8-70c1-a4a8-67217b17f950';
@@ -276,7 +276,7 @@ test('an item totals its Claude and Codex threads, each Codex thread from its ow
     { id: 'build', messages: [`Build ${REPO}#60`], turns: [turn('t1')],
       sessions: ['session-claude', { session: build, instance: 'codex', driver: 'codex' }] },
     { id: 'child', rootThreadId: 'build', sessions: [{ session: child, instance: 'codex', driver: 'codex' }] },
-    { id: 'other', messages: [`$mux-work ${REPO}#61`], sessions: [{ session: other, instance: 'codex_work', driver: 'codex' }] },
+    { id: 'other', messages: [`$lar-work ${REPO}#61`], sessions: [{ session: other, instance: 'codex_work', driver: 'codex' }] },
   ]);
   const settings = t3Settings(t, { codex_work: { driver: 'codex', homePath: elsewhere } });
   const stats = reader(db, { settings, home });
@@ -285,7 +285,7 @@ test('an item totals its Claude and Codex threads, each Codex thread from its ow
 });
 
 test('a record forked threads share counts once, for the item whose thread produced it first', (t) => {
-  const home = tempDir(t, 'mux-home-');
+  const home = tempDir(t, 'lar-home-');
   claudeHome(t, {
     original: { main: [assistant('msg-1', 0, 0, 500, 0), assistant('msg-2', 0, 0, 60, 0)] },
     // A fork copies the original's records forward, then adds its own.
@@ -293,15 +293,15 @@ test('a record forked threads share counts once, for the item whose thread produ
   }, join(home, '.claude'));
   const stats = reader(statsDb(t, [
     // Listed first, but created after the original.
-    { id: 'forked', messages: [`$mux-work ${REPO}#61`], sessions: [{ session: 'fork', createdAt: '2026-10-20T10:00:00.000Z' }] },
-    { id: 'first', messages: [`$mux-work ${REPO}#60`], sessions: [{ session: 'original', createdAt: '2026-10-20T09:00:00.000Z' }] },
+    { id: 'forked', messages: [`$lar-work ${REPO}#61`], sessions: [{ session: 'fork', createdAt: '2026-10-20T10:00:00.000Z' }] },
+    { id: 'first', messages: [`$lar-work ${REPO}#60`], sessions: [{ session: 'original', createdAt: '2026-10-20T09:00:00.000Z' }] },
   ]), { home });
   assert.equal(stats(REPO, 60)?.tokens, 560);
   assert.equal(stats(REPO, 61)?.tokens, 7);
 });
 
 test('missing or garbled transcripts leave tokens out, and never break the stats', (t) => {
-  const home = tempDir(t, 'mux-home-');
+  const home = tempDir(t, 'lar-home-');
   claudeHome(t, { 'session-a': { main: ['{not json', '"a string"', 'null', JSON.stringify({ type: 'assistant', message: { id: 'm' } })] } },
     join(home, '.claude'));
   const db = statsDb(t, [{ id: 'build', messages: [`Build ${REPO}#60`], sessions: ['session-a', '../escape'], turns: [turn('t1')] }]);
@@ -314,7 +314,7 @@ const close = (actual: number | undefined, expected: number) =>
   assert.ok(actual !== undefined && Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
 
 test('API cost is T3\'s price for the item\'s records, with the aliases and overrides in T3\'s settings', (t) => {
-  const home = tempDir(t, 'mux-home-');
+  const home = tempDir(t, 'lar-home-');
   claudeHome(t, {
     'session-a': { main: [
       assistant('m1', 1000, 2000, 10000, 500, 'claude-opus-4-1'),
@@ -329,8 +329,8 @@ test('API cost is T3\'s price for the item\'s records, with the aliases and over
     'session-b': { main: [assistant('m6', 1000, 0, 0, 0, 'mystery-model'), assistant('m7', 1000, 0, 0, 0, 'opus')] },
   }, join(home, '.claude'));
   const db = statsDb(t, [
-    { id: 'priced', messages: [`$mux-work ${REPO}#60`], sessions: ['session-a'] },
-    { id: 'unpriced', messages: [`$mux-work ${REPO}#61`], sessions: ['session-b'] },
+    { id: 'priced', messages: [`$lar-work ${REPO}#60`], sessions: ['session-a'] },
+    { id: 'unpriced', messages: [`$lar-work ${REPO}#61`], sessions: ['session-b'] },
   ]);
   const settings = t3Settings(t, {}, {
     usageModelAliases: { 'internal-model': 'my-proxy' },
@@ -351,7 +351,7 @@ test('API cost is T3\'s price for the item\'s records, with the aliases and over
 });
 
 test('a Codex record whose rollout has no speed tier takes the one its turn started with in T3\'s history', (t) => {
-  const home = tempDir(t, 'mux-home-');
+  const home = tempDir(t, 'lar-home-');
   const sessions = ['01a13627-9790-70d0-8342-58f71022e001', '01a13627-9790-70d0-8342-58f71022e002', '01a13627-9790-70d0-8342-58f71022e003'];
   const rollout = (id: string, turnId: string) => [
     { type: 'session_meta', timestamp: '2026-10-20T09:00:00.000Z', payload: { type: 'session_meta', id, model_provider: 'openai' } },
@@ -366,7 +366,7 @@ test('a Codex record whose rollout has no speed tier takes the one its turn star
     // A selection for another model can't tell this record's tier.
     [selection('gpt-6-sol', [{ id: 'serviceTier', value: 'priority' }])],
   ].map(([sel], i) => ({
-    id: `codex-${i}`, messages: [`$mux-work ${REPO}#${70 + i}`], sessions: [{ session: sessions[i]!, instance: 'codex', driver: 'codex' }],
+    id: `codex-${i}`, messages: [`$lar-work ${REPO}#${70 + i}`], sessions: [{ session: sessions[i]!, instance: 'codex', driver: 'codex' }],
     turns: [{ ...turn(`t${i}`), codex: { session: sessions[i]!, nativeTurn: `turn-${i}`, selection: sel! } }],
   })));
   const rates = usageRates(t, { 'gpt-6-astra': {

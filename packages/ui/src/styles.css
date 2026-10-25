@@ -126,6 +126,7 @@
   --sidebar-control-gap: 0.5rem;
   --sidebar-row-content-inset: 0.625rem;
   --z-sheet: 46;
+  --workspace-topbar-height: 52px;
   --workspace-controls-top: 0px;
   --workspace-controls-left: calc(env(safe-area-inset-left) + 0.75rem);
   --workspace-controls-right: calc(env(safe-area-inset-right) + 0.75rem);

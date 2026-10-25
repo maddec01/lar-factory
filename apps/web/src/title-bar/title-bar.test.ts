@@ -1,9 +1,9 @@
 // The main area's title bar, in the Mac app and in a browser: the scope menu, the Refreshed time, the counters and
-// This week, past the window controls while the sidebar is closed.
+// This week, T3's gap past the toggle while the sidebar is hidden.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { clock } from '@mux-factory/shared';
-import { $, $$, NOW, fullScreen, mountPage, push, sample, settle, stubApp, text } from '../../test/support.ts';
+import { $, $$, NOW, mountPage, push, sample, settle, stubApp, text } from '../../test/support.ts';
 
 const titleBar = () => $<HTMLElement>('.title-bar')!;
 const scopeButton = (platform: string) => $<HTMLButtonElement>(`.list-group[data-platform="${platform}"] button.scope`)!;
@@ -96,22 +96,18 @@ test('the scope trigger and the time show a focus ring on keyboard focus', async
   expect(refreshed().tabIndex).toBe(0);
 });
 
-test('the bar starts past the window controls while the sidebar is closed', async () => {
+test('the bar starts T3\'s gap past the toggle while the sidebar is hidden', async () => {
   await mountPage();
   expect(titleBar().className.split(' ')).toContain('pl-4');
   await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
   expect($('[data-slot="sidebar"]')!.dataset.state).toBe('collapsed');
-  expect(titleBar().className.split(' ')).toContain('pl-27.5');
+  expect(titleBar().className.split(' ')).toContain('pl-[var(--workspace-titlebar-content-left)]');
 });
 
-test('in the Mac app\'s full screen, the bar of a closed sidebar starts 6 px past the toggle, and moves back on leaving', async () => {
-  const window = fullScreen(true);
-  stubApp(window.bridge);
+test('below 768 px wide, the bar starts past the toggle while the sheet is closed', async () => {
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 767px)', addEventListener: () => {}, removeEventListener: () => {} }));
   await mountPage();
-  await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
-  expect(titleBar().className.split(' ')).toContain('pl-11.5');
-  await window.set(false);
-  expect(titleBar().className.split(' ')).toContain('pl-27.5');
+  expect(titleBar().className.split(' ')).toContain('pl-[var(--workspace-titlebar-content-left)]');
 });
 
 test('screen readers skip the brand; the page keeps one h1, for screen readers only', async () => {

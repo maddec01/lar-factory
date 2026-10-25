@@ -118,6 +118,8 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
     platform: 'darwin',
     listProfiles: unused,
     setProfileTick: unused,
+    getWindowFullscreenState: () => false,
+    onWindowFullscreenStateChange: () => () => {},
     getUpdateState: async () => updatesOff,
     onUpdateState: () => () => {},
     checkForUpdate: unused,
@@ -129,6 +131,23 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
   };
   vi.stubGlobal('boardApp', bridge);
   return bridge;
+}
+
+/** Bridge parts for `stubApp` whose window starts in macOS full screen if `on`; `set` enters or leaves it. */
+export function fullScreen(on: boolean) {
+  const listeners = new Set<(fullscreen: boolean) => void>();
+  const bridge: Pick<BoardAppBridge, 'getWindowFullscreenState' | 'onWindowFullscreenStateChange'> = {
+    getWindowFullscreenState: () => on,
+    onWindowFullscreenStateChange: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  const set = (next: boolean) => settle(() => {
+    on = next;
+    listeners.forEach((listener) => listener(next));
+  });
+  return { bridge, set };
 }
 
 /** src/index.css with the feature folders' sheets it imports in their place. */

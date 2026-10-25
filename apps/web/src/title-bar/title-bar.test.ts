@@ -2,7 +2,7 @@
 // week, past the window controls while the sidebar is closed.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
+import { $, $$, fullScreen, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
 
 const titleBar = () => $<HTMLElement>('.title-bar')!;
 const scopeButton = (platform: string) => $<HTMLButtonElement>(`.list-group[data-platform="${platform}"] button.scope`)!;
@@ -41,6 +41,16 @@ test('the bar starts past the window controls while the sidebar is closed', asyn
   expect(titleBar().className.split(' ')).toContain('pl-4');
   await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
   expect($('.sidebar')!.hidden).toBe(true);
+  expect(titleBar().className.split(' ')).toContain('pl-27.5');
+});
+
+test('in the Mac app\'s full screen, the bar of a closed sidebar starts 6 px past the toggle, and moves back on leaving', async () => {
+  const window = fullScreen(true);
+  stubApp(window.bridge);
+  await mountPage();
+  await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
+  expect(titleBar().className.split(' ')).toContain('pl-11.5');
+  await window.set(false);
   expect(titleBar().className.split(' ')).toContain('pl-27.5');
 });
 

@@ -13,7 +13,7 @@ import { useSettingsStore } from '../settings/settings-store.ts';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { ListGroups } from './list-groups.tsx';
-import { BRAND_LEFT, Brand } from './window-controls.tsx';
+import { Brand, useBrandLeft } from './window-controls.tsx';
 
 /** T3's search field over the thread list, with its new-thread button, here Add item, on the right. Search filters List items only. */
 function SearchRow({ query, onQuery }: { query: string; onQuery: (q: string) => void }) {
@@ -48,9 +48,10 @@ function Update() {
 export function Sidebar({ board = true, open = true }: { board?: boolean; open?: boolean }) {
   const [query, setQuery] = useState('');
   const settings = useSettingsStore((state) => state.open);
+  const brandLeft = useBrandLeft();
   return (
     <aside hidden={!open} className="sidebar relative flex w-75 shrink-0 flex-col border-r border-(--sidebar-border) bg-(--sidebar) text-(--sidebar-foreground)">
-      <div className={`flex h-13 shrink-0 items-center pr-3 ${BRAND_LEFT} [-webkit-app-region:drag]`}><Brand /></div>
+      <div className={`flex h-13 shrink-0 items-center pr-3 ${brandLeft} [-webkit-app-region:drag]`}><Brand /></div>
       <div className="contents" hidden={settings}>
         {board ? (
           <>

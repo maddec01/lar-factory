@@ -4,7 +4,7 @@
 // the profiles and updates show disabled.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, answerRestart, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
+import { $, $$, addStylesheet, answerRestart, fullScreen, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
 import type { BoardData, ProfilesResult, UpdateChannel, UpdateState } from '@mux-factory/shared';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
@@ -107,6 +107,16 @@ test('a row that isn\'t built yet shows the prototype\'s value, disabled, and sa
   expect($$<HTMLButtonElement>('.settings-body button').every((b) => b.disabled)).toBe(true);
   const restore = [...$$<HTMLButtonElement>('.settings-header button')].find((b) => text(b).trim() === 'Restore defaults')!;
   expect([restore.disabled, restore.title]).toEqual([true, 'Restore defaults isn\'t built yet']);
+});
+
+test('with the sidebar closed, the header starts past the toggle, closer in the Mac app\'s full screen', async () => {
+  const window = fullScreen(false);
+  stubApp(window.bridge);
+  await open('General');
+  await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
+  expect($('.settings-header')!.className.split(' ')).toContain('pl-27.5');
+  await window.set(true);
+  expect($('.settings-header')!.className.split(' ')).toContain('pl-11.5');
 });
 
 test('the header drags the window, but not Restore defaults', async () => {

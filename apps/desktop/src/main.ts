@@ -86,6 +86,14 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
   window.webContents.ipc.on(LaunchSecret.CHANNEL, (event) => {
     event.returnValue = LaunchSecret.forFrame(event.senderFrame?.url ?? "", boardOrigin(), secret);
   });
+  // While macOS full screen hides the traffic lights, the page moves its top-left controls into their place.
+  window.webContents.ipc.on(IpcChannels.GET_WINDOW_FULLSCREEN_STATE, (event) => {
+    event.returnValue = window.isFullScreen();
+  });
+  if (process.platform === "darwin") {
+    window.on("enter-full-screen", () => window.webContents.send(IpcChannels.WINDOW_FULLSCREEN_STATE, true));
+    window.on("leave-full-screen", () => window.webContents.send(IpcChannels.WINDOW_FULLSCREEN_STATE, false));
+  }
   // Links to GitHub and elsewhere open in the browser, and thread links in T3 Code; only the board stays in the window.
   window.webContents.setWindowOpenHandler(({ url: target }) => {
     openOutside(target);

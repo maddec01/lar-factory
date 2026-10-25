@@ -1,5 +1,5 @@
 // The notices for a tool the board can't use: a missing t3 replaces the main area, and a missing
-// or logged-out gh, which stops the board reading GitHub, shows a banner in place of Stale.
+// or logged-out gh, which stops the board reading GitHub, shows a banner.
 
 import type { ReactNode } from 'react';
 import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@mux-factory/shared';

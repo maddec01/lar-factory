@@ -37,12 +37,9 @@ test('fresh data shows no banner', async () => {
   expect($('.banner')).toBeNull();
 });
 
-test('stale data and a failed read show a banner', async () => {
+test('stale data and a failed read show no banner, the title bar carries them', async () => {
   await mountPage(sample);
-  const banner = $('.banner[role="alert"][data-variant="warning"]')!;
-  expect(bannerText(banner)[0]).toBe('Stale.');
-  expect(bannerText(banner)[1]).toMatch(/^Showing data from \d\d:\d\d \(20 min ago\)\. The last read through gh failed: gh api graphql failed/);
-  expect(banner.querySelector('code.err')).not.toBeNull();
+  expect($('.banner')).toBeNull();
 });
 
 test('the page is the control room, with no tabs: the sidebar, then the title bar, banners, desk and line', async () => {

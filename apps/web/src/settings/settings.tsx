@@ -5,8 +5,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, RotateCcw, Search, Settings as SettingsIcon } from 'lucide-react';
 import { boardApp } from '@mux-factory/shared';
+import { SidebarMenuButton } from '@mux-factory/ui/sidebar';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
-import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 import { useTitlebarInset } from '../sidebar/window-controls.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { Kbd, ShownControl, SmallButton, notBuilt } from './controls.tsx';
@@ -25,9 +26,14 @@ function useSection(all: Page[]): Page {
   return all.find((p) => p.id === section) ?? all[0]!;
 }
 
-/** The sidebar's foot button that opens Settings. */
+/** The sidebar's foot button that opens Settings: T3's SidebarUtilityItem, a 32 px icon button with its label in a tooltip. */
 export function SettingsButton() {
-  return <SidebarIconButton label="Settings" className="open-settings" onClick={() => useSettingsStore.getState().setOpen(true)}><SettingsIcon /></SidebarIconButton>;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<SidebarMenuButton size="icon" aria-label="Settings" className="open-settings" onClick={() => useSettingsStore.getState().setOpen(true)}><SettingsIcon /></SidebarMenuButton>} />
+      <TooltipPopup side="top">Settings</TooltipPopup>
+    </Tooltip>
+  );
 }
 
 /** The prototype's sidebar row: an icon and a label, the selected one on the sidebar's selected colour. */

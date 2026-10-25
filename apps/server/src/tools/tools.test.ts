@@ -8,7 +8,7 @@ import { findTools, mergePaths, readLoginPath } from './tools.ts';
 
 /** A temp folder with `bin` holding runnable files of the given names, and a login shell whose PATH starts with `bin`. */
 async function machine(t: TestContext, names: string[]) {
-  const dir = await mkdtemp(join(tmpdir(), 'mux-tools-test-'));
+  const dir = await mkdtemp(join(tmpdir(), 'lar-tools-test-'));
   t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   const bin = join(dir, 'bin');
   await mkdir(bin);

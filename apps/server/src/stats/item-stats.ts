@@ -8,8 +8,8 @@
 // apps/server/src/usage/UsageService.ts.
 
 import type { DatabaseSync } from 'node:sqlite';
-import { isRecord } from '@mux-factory/shared';
-import type { ItemStats } from '@mux-factory/shared';
+import { isRecord } from '@lar-factory/shared';
+import type { ItemStats } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
 import { codexTurnSelections, threadSessions } from '../t3/t3-db.ts';
 import type { CodexTurnSelection, ThreadRows } from '../t3/t3-db.ts';

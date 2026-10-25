@@ -2,10 +2,10 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [
-  ...sample.repos, { repo: 'maddec01/mux-factory', platform: 'Factory', role: 'The factory' },
+  ...sample.repos, { repo: 'maddec01/lar-factory', platform: 'Factory', role: 'The factory' },
 ] };
 const addButton = () => $<HTMLButtonElement>('.add-item')!;
 const dialog = () => $('#add-item-dialog');
@@ -38,7 +38,7 @@ async function fillDraft(): Promise<void> {
 }
 
 const respond = (body: object, status = 200) => fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify(body), { status }));
-const created = { number: 501, html_url: 'https://github.com/maddec01/mux-server/issues/501' };
+const created = { number: 501, html_url: 'https://github.com/maddec01/lar-server/issues/501' };
 const posted = () => JSON.parse(String((fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>;
 
 test('Add item opens a dialog with the configured repositories, kinds, and the selected repo\'s applicability', async () => {
@@ -48,13 +48,13 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
   expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Add item');
   expect(document.activeElement, 'focus starts on the repo select').toBe(field('item-repo'));
   expect($$<HTMLOptionElement>('#item-repo option').map((o) => [o.value, o.textContent])).toEqual([
-    ['maddec01/mux-server', 'Server'], ['maddec01/mux-apple', 'Apple'], ['maddec01/mux-factory', 'Factory']]);
+    ['maddec01/lar-server', 'Server'], ['maddec01/lar-apple', 'Apple'], ['maddec01/lar-factory', 'Factory']]);
   expect($$<HTMLOptionElement>('#item-kind option').map((o) => o.value)).toEqual(['', 'bug', 'feature', 'improvement']);
   expect($('label[for="item-title"]')!.textContent).toBe('Title (required)');
   expect(field('item-title').required).toBe(true);
   expect($('label[for="item-description"]')!.textContent).toBe('Description (optional)');
   expect([result().getAttribute('role'), result().dataset.slot, result().dataset.variant]).toEqual(['status', 'alert', 'warning']);
-  expect(popup.textContent).toContain('Create an issue in Mux and add it to List.');
+  expect(popup.textContent).toContain('Create an issue in lar and add it to List.');
 
   expect(labels()).toEqual(['area: server', 'area: web']);
   expect(popup.textContent).toContain('Selecting neither means both server and web.');
@@ -66,17 +66,17 @@ test('changing the repo shows its applicability, unchecked, and a repo with none
   await open();
   await settle(() => box('area: web').click());
   await enter(field<HTMLSelectElement>('item-kind'), 'bug');
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-apple');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-apple');
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-apple');
   expect(field<HTMLSelectElement>('item-kind').value, 'the kind stays').toBe('bug');
   expect(labels()).toEqual(['app: music', 'app: video', 'app: photos', 'app: books', 'os: ios', 'os: macos', 'os: tvos', 'os: watchos']);
   expect(dialog()!.textContent).toContain('No apps selected means all apps.');
   expect(dialog()!.textContent).toContain('No OSes selected means all OSes.');
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-factory');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-factory');
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-factory');
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-factory');
   expect($('.applicability')).toBeNull();
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-server');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-server');
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-server');
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-server');
   expect(field<HTMLSelectElement>('item-kind').value, 'the kind stays').toBe('bug');
   expect($$<HTMLInputElement>('input[name="labels"]').some((input) => input.checked), 'a repo shown again starts unchecked').toBe(false);
 });
@@ -104,12 +104,12 @@ test('a repo picked while a message shows is the one posted', async () => {
   await open();
   await settle(() => submit().click());
   expect(result().textContent).toBe('Choose bug, feature or improvement.');
-  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/mux-apple');
-  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/mux-apple');
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-apple');
   await fillDraft();
   respond({ item: null, issueUrl: null, error: null }, 500);
   await settle(() => submit().click());
-  expect((posted().draft as Record<string, unknown>).repo).toBe('maddec01/mux-apple');
+  expect((posted().draft as Record<string, unknown>).repo).toBe('maddec01/lar-apple');
 });
 
 test('submitting posts the draft, shows it sending, then closes and announces the new item', async () => {
@@ -122,7 +122,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
 
   expect(fetchMock.mock.calls.at(-1)![0]).toBe('/api/items');
   const body = posted();
-  expect(body.draft).toEqual({ repo: 'maddec01/mux-server', kind: 'bug', title: 'Playback stalls', description: 'After a seek.', labels: ['area: web'] });
+  expect(body.draft).toEqual({ repo: 'maddec01/lar-server', kind: 'bug', title: 'Playback stalls', description: 'After a seek.', labels: ['area: web'] });
   expect(typeof body.requestId).toBe('string');
   expect(submit().textContent).toBe('Adding…');
   expect(submit().disabled).toBe(true);
@@ -178,7 +178,7 @@ test('an uncertain creation points at the repo\'s issues and only New item goes 
   await fillDraft();
   respond({ item: null, issueUrl: null, error: 'GitHub did not answer.', uncertain: true });
   await settle(() => submit().click());
-  expect(result().querySelector('a')!.href).toBe('https://github.com/maddec01/mux-server/issues');
+  expect(result().querySelector('a')!.href).toBe('https://github.com/maddec01/lar-server/issues');
   expect(result().querySelector('a')!.textContent).toBe('Check repository issues');
   expect(submit().disabled).toBe(true);
   expect(field<HTMLButtonElement>('item-new').hidden).toBe(false);

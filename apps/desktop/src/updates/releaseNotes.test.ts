@@ -6,9 +6,9 @@ import { normalizeReleaseNotes } from "./releaseNotes.ts";
 const body = (...titles: string[]) =>
   [
     "## What's Changed",
-    ...titles.map((title, i) => `* ${title} by @maddec01 in https://github.com/maddec01/mux-factory/pull/${i + 1}`),
+    ...titles.map((title, i) => `* ${title} by @maddec01 in https://github.com/maddec01/lar-factory/pull/${i + 1}`),
     "",
-    "**Full Changelog**: https://github.com/maddec01/mux-factory/compare/v0.1.0...v0.2.0",
+    "**Full Changelog**: https://github.com/maddec01/lar-factory/compare/v0.1.0...v0.2.0",
   ].join("\n");
 
 const titles = (count: number, prefix = "feat(board): change") =>
@@ -30,14 +30,14 @@ describe("normalizeReleaseNotes", () => {
         {
           version: "0.4.0",
           items: [
-            "fix(board): keep the header steady by @maddec01 in https://github.com/maddec01/mux-factory/pull/2",
-            "feat(board): show the changelog by @maddec01 in https://github.com/maddec01/mux-factory/pull/1",
+            "fix(board): keep the header steady by @maddec01 in https://github.com/maddec01/lar-factory/pull/2",
+            "feat(board): show the changelog by @maddec01 in https://github.com/maddec01/lar-factory/pull/1",
           ],
           totalItems: 2,
         },
         {
           version: "0.3.0",
-          items: ["refactor(board): split the & store by @maddec01 in https://github.com/maddec01/mux-factory/pull/1"],
+          items: ["refactor(board): split the & store by @maddec01 in https://github.com/maddec01/lar-factory/pull/1"],
           totalItems: 1,
         },
       ],

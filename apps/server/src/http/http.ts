@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData } from '@mux-factory/shared';
+import { pageWithData } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -243,7 +243,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       return drainRequest(res);
     }
     if (write) {
-      if (draining) return json(res, 503, { error: 'The board is installing an update. Try again once Mux Factory restarts.' });
+      if (draining) return json(res, 503, { error: 'The board is installing an update. Try again once lar Factory restarts.' });
       return guardedWrite(req, res, write);
     }
     if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);

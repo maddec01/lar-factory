@@ -1,4 +1,4 @@
-// The Mux logo: viewBox and path copied unchanged from mux-server's BrandMark.tsx.
+// The lar logo: viewBox and path copied unchanged from lar-server's BrandMark.tsx.
 // The page draws it in its header; index.html's favicon copies the path.
 
 export const BRAND_MARK_VIEWBOX = '0 0 56 32';

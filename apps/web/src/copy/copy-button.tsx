@@ -1,7 +1,7 @@
 // A button that copies its text and says Copied for a moment, and the live region that announces it.
 
 import { useEffect, useState } from 'react';
-import { Button } from '@mux-factory/ui/button';
+import { Button } from '@lar-factory/ui/button';
 import { useCopyStore } from './copy-store.ts';
 
 async function writeClipboard(text: string): Promise<void> {

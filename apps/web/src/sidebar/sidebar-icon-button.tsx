@@ -2,7 +2,7 @@
 // `render` swaps the button for another trigger, such as a dialog's.
 
 import type { ReactElement, ReactNode } from 'react';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 
 export function SidebarIconButton({ label, tooltip = label, className = '', render = <button type="button" />, onClick, children }: {
   label: string;

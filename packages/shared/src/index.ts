@@ -1,5 +1,5 @@
 // The modules the server, the page and the desktop app share. None of them uses Node, so
-// the page can bundle them; the skill installer, which does, is @mux-factory/shared/install-skills.
+// the page can bundle them; the skill installer, which does, is @lar-factory/shared/install-skills.
 
 export * from './model.ts';
 export * from './format.ts';

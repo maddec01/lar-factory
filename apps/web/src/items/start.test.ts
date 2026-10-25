@@ -3,14 +3,14 @@
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, sample, settle, text, toast } from '../../test/support.ts';
-import type { BoardData, ModelGroup } from '@mux-factory/shared';
+import type { BoardData, ModelGroup } from '@lar-factory/shared';
 
 const MODEL_CHOICES: ModelGroup[] = [
   { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
   { instanceId: 'claudeAgent', name: 'VI <work>', models: [{ slug: 'claude-opus-5-5', label: 'Opus 5.5' }, { slug: 'claude-opus-5-5[1m]', label: 'claude-opus-5-5[1m]' }] },
 ];
 const withChoices: BoardData = { ...sample, capture: { session: 's1', enabled: true }, modelChoices: MODEL_CHOICES };
-const CHOICE_KEY = 'mux-board:model-choice';
+const CHOICE_KEY = 'lar-board:model-choice';
 
 const start = (id = 'PVTI_sample05') => $<HTMLButtonElement>(`[data-item-dialog] [data-start="${id}"]`)!;
 const card = () => $('[data-item-dialog]')!;

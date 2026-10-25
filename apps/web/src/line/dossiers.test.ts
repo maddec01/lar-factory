@@ -3,9 +3,9 @@
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, sample, settle, text } from '../../test/support.ts';
-import { normalizeItems } from '@mux-factory/shared';
-import type { BoardData, Item, ItemThread } from '@mux-factory/shared';
-import { rawIssue, sliceRef } from '@mux-factory/shared/test/raw-items';
+import { normalizeItems } from '@lar-factory/shared';
+import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
+import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
 const C200 = 'PVTI_sample09';
 const C180 = 'PVTI_sample23';
@@ -26,7 +26,7 @@ const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): 
 const writable = (data: BoardData = sample): BoardData =>
   ({ ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 /** #140 with its blocker #202 closed, on a board whose writes are on. */
-const unblocked = () => writable(withItem('PVTI_sample13', { blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'CLOSED' }] }));
+const unblocked = () => writable(withItem('PVTI_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }] }));
 const c200 = sample.items.find((i) => i.id === C200)!;
 /** A Queued grill under #200, blocked by `blockers`. */
 const decision = (blockers: Item['blockers'] = []): Item => ({
@@ -51,7 +51,7 @@ test('the header shows the kind, status, parts done and repositories, the title,
   await mountPage();
   const [title, track, agent, side] = header();
   expect([...title!.children].map(text)).toEqual([
-    'ConceptShaping · 1/4 parts done · Server', '#200 Mux cloud: website sign-in and relay', '4 T3 threads · 1 running · 1 need you',
+    'ConceptShaping · 1/4 parts done · Server', '#200 lar cloud: website sign-in and relay', '4 T3 threads · 1 running · 1 need you',
   ]);
   expect(title!.className.split(' '), 'one column as wide as the cell, so the lines truncate at 840 px, not overflow').toContain('grid-cols-[minmax(0,1fr)]');
   expect(track!.getAttribute('title')).toBe('Shaping');
@@ -66,14 +66,14 @@ test('the header opens the dossier\'s item, and its "waits on you" opens that pa
   await press(header()[3]!.querySelector('button')!);
   expect(dialogTitle()).toBe('#202 Sign-in screen');
   await press(dossier().firstElementChild!);
-  expect(dialogTitle()).toBe('#200 Mux cloud: website sign-in and relay');
+  expect(dialogTitle()).toBe('#200 lar cloud: website sign-in and relay');
 });
 
 test("the map shows the destination, decisions so far and open questions, each #n opening its item", async () => {
   await mountPage();
   const about = dossier().querySelector('[data-about]')!;
   expect([...about.children].slice(0, 3).map((s) => text(s.firstElementChild))).toEqual(['Destination', 'Decisions so far 3', 'Open questions 2']);
-  expect(text(about.querySelector('p'))).toMatch(/^Anyone with a Mux server signs in on mux\.app/);
+  expect(text(about.querySelector('p'))).toMatch(/^Anyone with a lar server signs in on lar\.app/);
   expect([...about.querySelectorAll('li')].map(text)[4]).toBe('What does the sign-in screen look like on the website and in the apps? (#202)');
   await press(button(about, '#203'));
   expect(dialogTitle()).toBe(`#203 ${sample.items.find((i) => i.number === 203)!.title}`);
@@ -82,13 +82,13 @@ test("the map shows the destination, decisions so far and open questions, each #
 
 test("in the map, #n opens the issue in the concept's repository, and owner/repo#n the one in that repository", async () => {
   const s10 = sample.items.find((i) => i.id === 'PVTI_sample10')!;
-  const twin: Item = { ...s10, id: 'PVTI_twin', repo: 'maddec01/mux-apple', url: 'https://github.com/maddec01/mux-apple/issues/201', title: 'Apple twin' };
-  const map = { ...c200.map!, decisions: [...c200.map!.decisions, 'The apps follow maddec01/mux-apple#201.'] };
+  const twin: Item = { ...s10, id: 'PVTI_twin', repo: 'maddec01/lar-apple', url: 'https://github.com/maddec01/lar-apple/issues/201', title: 'Apple twin' };
+  const map = { ...c200.map!, decisions: [...c200.map!.decisions, 'The apps follow maddec01/lar-apple#201.'] };
   await mountPage({ ...sample, items: [twin, ...sample.items.map((i) => (i.id === C200 ? { ...i, map } : i))] });
   const about = dossier().querySelector('[data-about]')!;
   await press(button(about, '#201'));
   expect(dialogTitle()).toBe(`#201 ${s10.title}`);
-  await press(button(about, 'maddec01/mux-apple#201'));
+  await press(button(about, 'maddec01/lar-apple#201'));
   expect(dialogTitle()).toBe('#201 Apple twin');
 });
 
@@ -162,8 +162,8 @@ test("Start on a Queued decision is today's Start", async () => {
 });
 
 test('Start on a Queued decision is disabled while a blocker is open, its title naming it, and Start after names the last open one', async () => {
-  const data = withDecision([{ number: 201, repo: 'maddec01/mux-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' },
-    { number: 140, repo: 'maddec01/mux-server', state: 'OPEN' }]);
+  const data = withDecision([{ number: 201, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' },
+    { number: 140, repo: 'maddec01/lar-server', state: 'OPEN' }]);
   holdPosts(data);
   await mountPage(data);
   const start = startIn(step('PVTI_d204'))!;
@@ -179,16 +179,16 @@ test('Start on a Queued decision is disabled while a blocker is open, its title 
 
 test('in the map, a part waiting on something that is neither Ready nor Queued starts by itself after it', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('PVTI_sample10', { blockers: [{ number: 203, repo: 'maddec01/mux-server', state: 'OPEN' }] }));
+  await mountPage(withItem('PVTI_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'OPEN' }] }));
   await press(button(dossier(), 'Map'));
   expect(text(dossier().querySelector('[data-map-part="PVTI_sample10"]'))).toContain('starts by itself after #203');
 });
 
 test("in the map, a part waiting on another repository's issue names it without its owner", async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('PVTI_sample10', { blockers: [{ number: 12, repo: 'maddec01/mux-apple', state: 'OPEN' }] }));
+  await mountPage(withItem('PVTI_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' }] }));
   await press(button(dossier(), 'Map'));
-  expect(text(dossier().querySelector('[data-map-part="PVTI_sample10"]'))).toContain('starts by itself after mux-apple#12');
+  expect(text(dossier().querySelector('[data-map-part="PVTI_sample10"]'))).toContain('starts by itself after lar-apple#12');
 });
 
 test('Open thread takes Start\'s place while a part has a live thread', async () => {
@@ -201,7 +201,7 @@ test('Open thread takes Start\'s place while a part has a live thread', async ()
 test("the end-to-end check comes from the map: its title, numbered steps and waiting, with running it not built yet", async () => {
   await mountPage();
   const box = dossier().querySelector('[data-about] [data-check]')!;
-  expect([...box.children].map(text)).toEqual(['End-to-end check', 'Sign in on the website, then stream from a phone off Wi-Fiwaiting', 'Create an owner account on mux.appRegister a server with the accountOpen the app on cellular and play a 4K title']);
+  expect([...box.children].map(text)).toEqual(['End-to-end check', 'Sign in on the website, then stream from a phone off Wi-Fiwaiting', 'Create an owner account on lar.appRegister a server with the accountOpen the app on cellular and play a 4K title']);
   const check = phases()[2]!;
   expect(text(check)).toContain('waitingwaits on #140Thread starts when #140 is done');
   for (const label of ['Run end-to-end', 'Watch run']) {
@@ -229,11 +229,11 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   const map = dossier().querySelector('[data-work-map]')!;
   expect(dossier().querySelector('[data-checklist]'), 'the map takes the checklist\'s place').toBeNull();
   expect(dossier().querySelector('[data-about]'), 'the map\'s sections stay under it').not.toBeNull();
-  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research', 'Servermux-server']);
+  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research', 'Serverlar-server']);
   expect([...map.querySelectorAll('.h-7\\.5')].map(text)).toEqual(['Wave 1· 2 in parallel', 'Wave 2· 2 in parallel', 'Check']);
   expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part'))).toEqual(['PVTI_sample18', 'PVTI_sample12', 'PVTI_sample10', 'PVTI_sample13']);
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
-    'maddec01/mux-server#203 maddec01/mux-server#201', 'maddec01/mux-server#202 maddec01/mux-server#140', 'maddec01/mux-server#140 e2e',
+    'maddec01/lar-server#203 maddec01/lar-server#201', 'maddec01/lar-server#202 maddec01/lar-server#140', 'maddec01/lar-server#140 e2e',
   ]);
   expect(text(map.querySelector('[data-map-check]'))).toBe('end-to-end checkSign in on the website, then stream from a phone off Wi-Fiwaiting · 3 stepsagents run it once #140 land');
   const node = (id: string) => map.querySelector(`[data-map-part="${id}"]`)!;
@@ -250,14 +250,14 @@ test('an item with sub-issues on the board is coupled work; with no map, it says
     subIssues: { nodes: [sliceRef(101, 'OPEN'), sliceRef(102, 'OPEN'), sliceRef(103, 'OPEN')] },
   });
   const child = rawIssue('PVTI_102', 102, 'In progress', ['build'], {
-    parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/mux-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-factory' } },
+    parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
-  await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/mux-factory#102', 'maddec01/mux-factory#103']) }) });
+  await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });
   const d = dossier('PVTI_parent');
-  expect(text(header('PVTI_parent')[0]!.firstElementChild)).toBe('Coupled workIn progress · 0/1 parts done · mux-factory');
+  expect(text(header('PVTI_parent')[0]!.firstElementChild)).toBe('Coupled workIn progress · 0/1 parts done · lar-factory');
   expect(text(d.querySelector('[data-checklist]')!.previousElementSibling)).toBe("No map yet: the parts come from GitHub's sub-issues.");
   expect(progress('PVTI_parent').map((r) => r.dataset.item), 'its build sub-issue is a part; its slice is not').toEqual(['PVTI_102']);
-  expect(phases('PVTI_parent').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build mux-factory']);
+  expect(phases('PVTI_parent').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build lar-factory']);
   expect($('[data-in-flight] [data-item="PVTI_102"]'), 'out of the rest of the line').toBeNull();
 });
 

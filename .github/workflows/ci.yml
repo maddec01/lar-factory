@@ -106,13 +106,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash scripts/setup-worktree.test.sh
 
-      - name: mux-work slice tests
+      - name: lar-work slice tests
         if: ${{ !cancelled() }}
-        run: bash skills/mux-work/scripts/slice.test.sh
+        run: bash skills/lar-work/scripts/slice.test.sh
 
-      - name: mux-work status tests
+      - name: lar-work status tests
         if: ${{ !cancelled() }}
-        run: bash skills/mux-work/scripts/status.test.sh
+        run: bash skills/lar-work/scripts/status.test.sh
 
       - name: skill-sync preview tests
         if: ${{ !cancelled() }}

@@ -3,7 +3,7 @@
 
 import { expect, test } from 'vite-plus/test';
 import { $, $$, bannerText, fetchMock, mountPage, push, sample, settle } from '../../test/support.ts';
-import type { BoardData, ToolProblems } from '@mux-factory/shared';
+import type { BoardData, ToolProblems } from '@lar-factory/shared';
 
 const withTools = (tools: ToolProblems, fields: Partial<BoardData> = {}): BoardData => ({ ...sample, tools, ...fields });
 const failed = { error: 'gh api graphql failed: HTTP 401' };

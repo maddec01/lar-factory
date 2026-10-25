@@ -94,7 +94,7 @@ than repeat a possibly successful mutation.
    Map (no sub-issues yet). Capture creates no decisions or sub-issues and
    starts no shaping or build.
 4. For a **new** issue only, after retaining its URL, run
-   `bash <mux-work>/scripts/status.sh <issue-url> "List"`. Creation and board
+   `bash <lar-work>/scripts/status.sh <issue-url> "List"`. Creation and board
    placement are separate: a failure leaves that URL with `Board: pending`;
    retry placement on the same issue, never create a replacement. Recovered
    creations still need their pending placement.
@@ -103,5 +103,5 @@ than repeat a possibly successful mutation.
    clear the remaining steps. Otherwise leave it pending with the exact
    unfinished steps and errors. Report created/reused links (respecting
    visibility) and pending failures to Pedro. Resume with
-   `/mux-work <source-owner/repo#n>`; Pick up finishes capture only, even when
+   `/lar-work <source-owner/repo#n>`; Pick up finishes capture only, even when
    the source already has a passing brief.

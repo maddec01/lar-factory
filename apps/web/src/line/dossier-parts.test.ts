@@ -2,8 +2,8 @@
 // which items they take off the rest of the line.
 
 import { expect, test } from 'vite-plus/test';
-import type { Item } from '@mux-factory/shared';
-import sampleJson from '@mux-factory/shared/test/sample.json' with { type: 'json' };
+import type { Item } from '@lar-factory/shared';
+import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
 import { dossiersOf, inDossiers, openWaits, partKind, partsOf } from './dossier-parts.ts';
 
 const items = (sampleJson as unknown as { items: Item[] }).items;
@@ -23,7 +23,7 @@ test('every open concept, and every open item with a sub-issue on the board, is 
 });
 
 test('a dossier shows where its parent or any part is in the scope', () => {
-  const apple = items.filter((i) => i.repo === 'maddec01/mux-apple');
+  const apple = items.filter((i) => i.repo === 'maddec01/lar-apple');
   expect(dossiersOf(apple, items).map((d) => d.parent.number), '#180 through its Apple build #40').toEqual([180]);
   expect(dossiersOf([], items)).toEqual([]);
 });
@@ -36,7 +36,7 @@ test('parts run decisions first, research, grill, prototype, then builds, each w
 
 test("each part carries its blocked-by issues and its newest thread", () => {
   const [research, grill, prototype, build] = partsOf(byNumber(200), items);
-  expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/mux-server', state: 'CLOSED' }]);
+  expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' }]);
   expect([research!.thread?.title, grill!.thread?.state, prototype!.thread?.state, build!.thread?.state]).toEqual(['Research: hosting cost of the relay', 'running', 'needs you', 'done']);
 });
 

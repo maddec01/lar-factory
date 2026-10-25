@@ -5,20 +5,20 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SAMPLE_MODELS, startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { rawIssue } from '@mux-factory/shared/test/raw-items';
-import type { BoardData, RawItem } from '@mux-factory/shared';
+import { rawIssue } from '@lar-factory/shared/test/raw-items';
+import type { BoardData, RawItem } from '@lar-factory/shared';
 
 const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 
-/** A mux-factory issue in `status`, blocked by issues 5 and 6 in the given states. */
+/** A lar-factory issue in `status`, blocked by issues 5 and 6 in the given states. */
 const blockedIssue = (number: number, status: string, labels: string[], states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED']): RawItem =>
   rawIssue(`PVTI_${number}`, number, status, labels, {
-    blockedBy: { nodes: states.map((state, n) => ({ number: 5 + n, state, repository: { nameWithOwner: 'maddec01/mux-factory' } })) },
+    blockedBy: { nodes: states.map((state, n) => ({ number: 5 + n, state, repository: { nameWithOwner: 'maddec01/lar-factory' } })) },
   });
 
 const blockedBuild = (states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED'] = ['CLOSED', 'OPEN']) => blockedIssue(12, 'Ready', ['build'], states);
 
-/** A board that can start mux-factory threads, offering the sample model choices, and its environment. */
+/** A board that can start lar-factory threads, offering the sample model choices, and its environment. */
 async function armableBoard(t: TestContext, items: RawItem[], options: object = {}, env: Record<string, string> = { ...startableEnv(t), ...SAMPLE_MODELS }) {
   const board = await startBoard(t, { items, ...options }, false, false, env);
   await until(board, (d) => d.items.length === items.length);
@@ -27,7 +27,7 @@ async function armableBoard(t: TestContext, items: RawItem[], options: object = 
 
 const arm = (board: Board, itemId: string, model?: unknown) => board.postSession({ itemId, model }, '/api/arm');
 const disarm = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/disarm');
-const armedFile = (home: string) => JSON.parse(readFileSync(join(home, 'Library/Application Support/Mux Factory/armed-starts.json'), 'utf8'));
+const armedFile = (home: string) => JSON.parse(readFileSync(join(home, 'Library/Application Support/lar Factory/armed-starts.json'), 'utf8'));
 
 /** Asks for a read and waits until it lands. */
 async function read(board: Board): Promise<BoardData> {
@@ -80,7 +80,7 @@ test("a Queued decision starts with today's Start once its blockers close", asyn
   await board.update({ items: [decision(['CLOSED', 'CLOSED'])] });
   await read(board);
   await until(board, (d) => !!d.started?.PVTI_20);
-  assert.deepEqual(await board.t3Calls(), [['thread', 'start', 'project-factory', '#20 Issue 20\n$mux-work maddec01/mux-factory#20', '--json']]);
+  assert.deepEqual(await board.t3Calls(), [['thread', 'start', 'project-factory', '#20 Issue 20\n$lar-work maddec01/lar-factory#20', '--json']]);
 });
 
 test('a failed start disarms the part and shows its error on it, until it is armed again', async (t) => {
@@ -98,15 +98,15 @@ test('a failed start disarms the part and shows its error on it, until it is arm
 
 test("a part whose repository has no T3 project can't be armed, as its start would fail", async (t) => {
   const server = rawIssue('PVTI_30', 30, 'Ready', ['build'], {
-    url: 'https://github.com/maddec01/mux-server/issues/30', repository: { nameWithOwner: 'maddec01/mux-server' },
-    blockedBy: { nodes: [{ number: 5, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-factory' } }] },
+    url: 'https://github.com/maddec01/lar-server/issues/30', repository: { nameWithOwner: 'maddec01/lar-server' },
+    blockedBy: { nodes: [{ number: 5, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } }] },
   });
   const { board } = await armableBoard(t, [server]);
   await until(board, (d) => !!d.repositoryProjects);
   const refused = await arm(board, 'PVTI_30');
   assert.equal(refused.status, 409);
   const answer = await refused.json();
-  assert.equal(answer.error, 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code');
+  assert.equal(answer.error, 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code');
   assert.deepEqual(answer.board.armed, {});
 });
 

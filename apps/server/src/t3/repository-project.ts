@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { runTool } from '../tools/run-tool.ts';
 import { liveProjects } from './t3-db.ts';
 import { statsDbPath } from './t3-settings.ts';
-import type { RepoConfig } from '@mux-factory/shared';
+import type { RepoConfig } from '@lar-factory/shared';
 
 export type RepositoryProject = { projectId: string; error?: undefined } | { error: string };
 

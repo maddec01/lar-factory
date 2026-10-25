@@ -1,9 +1,9 @@
 # Slices are sub-issues merged into the build branch
 
-[Issue #35](https://github.com/maddec01/mux-factory/issues/35) settled, over
-grilling [round 1](https://github.com/maddec01/mux-factory/issues/35#issuecomment-6326984285),
-[rounds 2–3](https://github.com/maddec01/mux-factory/issues/35#issuecomment-6327155861)
-and [round 4](https://github.com/maddec01/mux-factory/issues/35#issuecomment-6327423563),
+[Issue #35](https://github.com/maddec01/lar-factory/issues/35) settled, over
+grilling [round 1](https://github.com/maddec01/lar-factory/issues/35#issuecomment-6326984285),
+[rounds 2–3](https://github.com/maddec01/lar-factory/issues/35#issuecomment-6327155861)
+and [round 4](https://github.com/maddec01/lar-factory/issues/35#issuecomment-6327423563),
 that a build's slices are native sub-issues of its build issue. Each is built
 by one implementer subagent in its own worktree and fast-forwarded into the
 build branch; a slice never gets its own PR, branch on origin or board Status.

@@ -1,17 +1,17 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mergedStats, prStatsEdits, statsBlock, updatedBody, withStatsBlock } from './pr-stats.ts';
-import type { Item, ItemStats, LinkedPr } from '@mux-factory/shared';
+import type { Item, ItemStats, LinkedPr } from '@lar-factory/shared';
 
 const stats: ItemStats = { agentMs: 65 * 60_000, wallMs: 47 * 60_000, tokens: 12_436_000, costUsd: 41.2 };
 const block = statsBlock(stats);
 
 test('the block shows agent time, wall time, total tokens and API cost, between markers', () => {
-  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 1h 0m · wall 45m · 12.4M · $41\n<!-- /mux-stats -->');
+  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 0m · wall 45m · 12.4M · $41\n<!-- /mux-stats -->');
   assert.equal(statsBlock({ agentMs: 195 * 60_000, wallMs: 75 * 60_000, tokens: 980 }),
-    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 3h 15m · wall 1h 15m · 980\n<!-- /mux-stats -->', 'nothing priced, no cost');
+    '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 3h 15m · wall 1h 15m · 980\n<!-- /mux-stats -->', 'nothing priced, no cost');
   assert.equal(statsBlock({ agentMs: stats.agentMs, tokens: 980 }),
-    '<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): Σ 1h 0m · 980\n<!-- /mux-stats -->', 'no wall time, no wall part');
+    '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 0m · 980\n<!-- /mux-stats -->', 'no wall time, no wall part');
 });
 
 test('the block\'s cost is in whole dollars, to the nearest, and <$1 below a dollar, so cents don\'t rewrite it', () => {
@@ -45,9 +45,9 @@ test('a body with a block gets only the block replaced', () => {
 });
 
 const pr = (number: number, state: string, body: string | undefined, mergedAt?: string): LinkedPr =>
-  ({ number, url: `https://github.com/maddec01/mux-factory/pull/${number}`, state, isDraft: false, checks: null, mergeState: 'can merge', body, mergedAt });
+  ({ number, url: `https://github.com/maddec01/lar-factory/pull/${number}`, state, isDraft: false, checks: null, mergeState: 'can merge', body, mergedAt });
 const edits = (items: Item[]) => prStatsEdits(items);
-const item = (linkedPrs: LinkedPr[], itemStats: Item['stats'] | null = stats, labels = ['build'], repo = 'maddec01/mux-factory') =>
+const item = (linkedPrs: LinkedPr[], itemStats: Item['stats'] | null = stats, labels = ['build'], repo = 'maddec01/lar-factory') =>
   ({ linkedPrs, stats: itemStats ?? undefined, labels, repo }) as Item;
 
 test('markers count only alone on their own line, so a marker quoted in prose is left as it is', () => {
@@ -78,11 +78,11 @@ test('an edit\'s block applies again to a newer body, and a body already current
 
 test('PRs in a repo with no items on the project are left alone; any repo with items gets its blocks', () => {
   const elsewhere = { ...pr(7, 'OPEN', 'Body'), url: 'https://github.com/someone/other/pull/7' };
-  const prefix = { ...pr(8, 'OPEN', 'Body'), url: 'https://github.com/maddec01/mux-factory-fork/pull/8' };
-  const app = { ...pr(10, 'OPEN', 'Body'), url: 'https://github.com/maddec01/mux-app/pull/10' };
-  assert.deepEqual(edits([item([elsewhere, prefix, pr(9, 'OPEN', 'Body')]), item([app], stats, ['build'], 'maddec01/mux-app')]).map((e) => e.url),
+  const prefix = { ...pr(8, 'OPEN', 'Body'), url: 'https://github.com/maddec01/lar-factory-fork/pull/8' };
+  const app = { ...pr(10, 'OPEN', 'Body'), url: 'https://github.com/maddec01/lar-app/pull/10' };
+  assert.deepEqual(edits([item([elsewhere, prefix, pr(9, 'OPEN', 'Body')]), item([app], stats, ['build'], 'maddec01/lar-app')]).map((e) => e.url),
     [pr(9, 'OPEN', '').url, app.url]);
-  assert.deepEqual(edits([item([app]), item([], null, [], 'maddec01/mux-app')]).map((e) => e.url), [app.url],
+  assert.deepEqual(edits([item([app]), item([], null, [], 'maddec01/lar-app')]).map((e) => e.url), [app.url],
     'an item without stats still puts its repo on the project');
 });
 
@@ -127,7 +127,7 @@ test('a merged item takes the figures its merged PR\'s block holds, frozen, as t
 });
 
 test('a merged item reads a block in the old format, from before wall time, with no wall time', () => {
-  const old = (figures: string) => mergedStats(item([pr(1, 'MERGED', `Body\n\n<!-- mux-stats -->\n**Item stats** (kept current by the Mux board): ${figures}\n<!-- /mux-stats -->`)], null));
+  const old = (figures: string) => mergedStats(item([pr(1, 'MERGED', `Body\n\n<!-- mux-stats -->\n**Item stats** (kept current by the lar board): ${figures}\n<!-- /mux-stats -->`)], null));
   assert.deepEqual(old('agent time 3h 15m · 12.4M tokens · $41'), { agentMs: 195 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true });
   assert.deepEqual(old('agent time 5m · 980 tokens'), { agentMs: 5 * 60_000, tokens: 980, frozen: true }, 'nothing priced, no cost');
 });

@@ -11,7 +11,7 @@ import type { ParentMessage } from '../src/port/port.ts';
 
 /** Starts a sample board with an IPC channel and returns the messages it sends before /healthz answers. */
 async function reportedPorts(t: TestContext, env: Record<string, string>): Promise<ParentMessage[]> {
-  const home = mkdtempSync(join(tmpdir(), 'mux-board-parent-'));
+  const home = mkdtempSync(join(tmpdir(), 'lar-board-parent-'));
   const child = fork('src/server.ts', [], {
     cwd: new URL('../', import.meta.url), execArgv: ['--disable-warning=ExperimentalWarning'], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { ...testEnv(), ...SAMPLE_MODELS, HOME: home, BOARD_DATA_FILE: SAMPLE_DATA, ...env },

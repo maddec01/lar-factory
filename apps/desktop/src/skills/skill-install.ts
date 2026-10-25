@@ -7,12 +7,12 @@ import * as NodePath from "node:path";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 
-import { InstallError, installSkills, type InstallResult } from "@mux-factory/shared/install-skills";
+import { InstallError, installSkills, type InstallResult } from "@lar-factory/shared/install-skills";
 
 /** Starts a dev run's install. A packaged app ignores it and installs each new version. */
 export const INSTALL_FLAG = "--install-skills";
 /** Installs into this folder instead of the user's home, for dev runs and tests. */
-export const ROOT_ENV = "MUX_FACTORY_INSTALL_ROOT";
+export const ROOT_ENV = "LAR_FACTORY_INSTALL_ROOT";
 
 export interface LaunchInput {
   readonly isPackaged: boolean;
@@ -86,7 +86,7 @@ export const notice = (outcome: InstallResult | SkillInstallError): Notice | und
   if (outcome instanceof SkillInstallError) {
     return {
       type: "error",
-      message: "Mux Factory couldn't install its skills",
+      message: "lar Factory couldn't install its skills",
       detail: outcome.changed
         ? `${outcome.message}\n\nThe install stopped partway, so some skills may be the new version and some the old. The next launch tries again.`
         : `${outcome.message}\n\nThe previous skills are still in place. The next launch tries again.`,
@@ -95,7 +95,7 @@ export const notice = (outcome: InstallResult | SkillInstallError): Notice | und
   if (outcome.conflicts.length === 0) return undefined;
   return {
     type: "warning",
-    message: "Mux Factory left some skills alone",
-    detail: `These folders have a bundled skill's name but Mux Factory didn't install them, so it didn't overwrite them:\n\n${outcome.conflicts.join("\n")}`,
+    message: "lar Factory left some skills alone",
+    detail: `These folders have a bundled skill's name but lar Factory didn't install them, so it didn't overwrite them:\n\n${outcome.conflicts.join("\n")}`,
   };
 };

@@ -2,12 +2,12 @@
 // and the model choice this browser last started with.
 
 import { create } from 'zustand';
-import { readChoice, storedChoice } from '@mux-factory/shared';
-import type { ModelChoice, StartedThread } from '@mux-factory/shared';
+import { readChoice, storedChoice } from '@lar-factory/shared';
+import type { ModelChoice, StartedThread } from '@lar-factory/shared';
 import { setKey } from './action-store.ts';
 
 /** Where this browser keeps the last model choice Start started with. */
-const CHOICE_KEY = 'mux-board:model-choice';
+const CHOICE_KEY = 'lar-board:model-choice';
 
 /** Which start: today's Start, which refines a Queued item, or Start build on a Ready one. */
 export type StartKind = 'refine' | 'build';

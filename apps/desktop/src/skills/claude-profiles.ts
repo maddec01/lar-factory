@@ -6,8 +6,8 @@
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
-import { INSTALL_MANIFEST, isProfileName, listClaudeProfiles, setProfileTick } from "@mux-factory/shared/install-skills";
-import type { ProfilesResult } from "@mux-factory/shared";
+import { INSTALL_MANIFEST, isProfileName, listClaudeProfiles, setProfileTick } from "@lar-factory/shared/install-skills";
+import type { ProfilesResult } from "@lar-factory/shared";
 
 const message = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
 

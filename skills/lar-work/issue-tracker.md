@@ -1,13 +1,13 @@
 # Issue tracking
 
 Use the local `gh` login. The **factory repository**, home of the workflow,
-the board and cross-repository work, is `maddec01/mux-factory`. Read the
+the board and cross-repository work, is `maddec01/lar-factory`. Read the
 destination's `AGENTS.md` and issue conventions before writing. Choose
 the destination explicitly, even when the checkout belongs to another
 repository:
 
 ```sh
-repo=maddec01/mux-factory
+repo=maddec01/lar-factory
 gh repo view "$repo" --json nameWithOwner,url
 ```
 
@@ -63,7 +63,7 @@ gh api --paginate "repos/$repo/labels" --jq '.[].name'
 
 All eleven names above must be present. List, Queued, Shaping, Needs you, Ready,
 In progress, Review, Verify, Ready to merge and Done are **Project Status
-values**, not labels: move them with `bash <mux-work>/scripts/status.sh
+values**, not labels: move them with `bash <lar-work>/scripts/status.sh
 <issue-url> "<Status>"` as the workflow directs.
 
 ## Native relationships
@@ -131,15 +131,15 @@ and [issue dependencies API](https://docs.github.com/en/rest/issues/issue-depend
 
 A slice is a native sub-issue of a `build` issue; a sub-issue labelled
 `build` is a build, never a slice. Create it only with `slice.sh`: it makes the
-sub-issue, prints its URL and deletes the item GitHub auto-adds to the Mux
+sub-issue, prints its URL and deletes the item GitHub auto-adds to the lar
 Project, so slices stay off the board with no Status. Later label and body
-edits, closing and reopening never put it back. Put a build on the Mux board
+edits, closing and reopening never put it back. Put a build on the lar board
 before slicing it, since adding a build later pulls its slices onto the board.
 Then add its blocked-by links with `--add-blocked-by`
 above.
 
 ```sh
-bash <mux-work>/scripts/slice.sh "$repo" "$build" "<title>" /path/to/slice.md
+bash <lar-work>/scripts/slice.sh "$repo" "$build" "<title>" /path/to/slice.md
 ```
 
 An **active slice** carries the `active` label while

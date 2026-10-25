@@ -4,9 +4,9 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, RotateCcw, Search, Settings as SettingsIcon } from 'lucide-react';
-import { boardApp } from '@mux-factory/shared';
-import { SidebarMenuButton } from '@mux-factory/ui/sidebar';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
+import { boardApp } from '@lar-factory/shared';
+import { SidebarMenuButton } from '@lar-factory/ui/sidebar';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
 import { useTitlebarInset } from '../sidebar/window-controls.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';

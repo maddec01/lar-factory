@@ -5,8 +5,8 @@
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import type { BoardData, ToolProblem } from '@mux-factory/shared';
-import type { ClaudeProfile } from '@mux-factory/shared/install-skills';
+import type { BoardData, ToolProblem } from '@lar-factory/shared';
+import type { ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { PlatformTag } from '../items/item-parts.tsx';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, ReadOnlyText, SmallButton, ToolState, notBuilt } from './controls.tsx';
@@ -72,13 +72,13 @@ function updateRows({ app, version }: PagesInput): Row[] {
   if (!app) {
     return [
       { ...channel, control: { type: 'segmented', options: ['Nightly', 'Latest'], value: 'Nightly' }, reason: ONLY_APP_UPDATES },
-      { id: 'version', title: 'Mux Factory 0.1.0-nightly.42', description: 'Up to date · checked 3 minutes ago', control: { type: 'button', label: 'Check now' }, reason: ONLY_APP_UPDATES },
+      { id: 'version', title: 'lar Factory 0.1.0-nightly.42', description: 'Up to date · checked 3 minutes ago', control: { type: 'button', label: 'Check now' }, reason: ONLY_APP_UPDATES },
       install,
     ];
   }
   return [
     { ...channel, control: custom(() => <ChannelChoice />) },
-    { id: 'version', title: version ? `Mux Factory ${version}` : 'Mux Factory', description: <UpdateStatus />, control: custom(() => <CheckNow />) },
+    { id: 'version', title: version ? `lar Factory ${version}` : 'lar Factory', description: <UpdateStatus />, control: custom(() => <CheckNow />) },
     install,
   ];
 }
@@ -102,7 +102,7 @@ export function pages(input: PagesInput): Page[] {
       ] },
       { title: 'App', rows: [
         { id: 'login', title: 'Open at login', control: { type: 'switch', value: true } },
-        { id: 'menu-bar', title: 'Show in the menu bar', description: 'A µx icon with the Needs you count; click for a quick list.', control: { type: 'switch', value: true } },
+        { id: 'menu-bar', title: 'Show in the menu bar', description: 'A lar icon with the Needs you count; click for a quick list.', control: { type: 'switch', value: true } },
         { id: 'dock-badge', title: 'Dock badge', control: { type: 'select', options: ['Needs you count', 'In flight count', 'Off'], value: 'Needs you count' } },
         { id: 'float', title: 'Keep above T3 Code', description: 'Floats the window over T3 Code, like a palette.', control: { type: 'switch', value: false } },
         { id: 'dock-side', title: 'Dock beside T3 Code', description: 'Snaps the window to T3 Code’s edge and follows it.', control: { type: 'segmented', options: ['Off', 'Left', 'Right'], value: 'Off' } },
@@ -128,7 +128,7 @@ export function pages(input: PagesInput): Page[] {
         { id: 'project', title: data.project.title, description: 'The Project the board reads and moves items on.', control: custom(() => <ReadOnlyText label="GitHub Project" value={project} />) },
         { id: 'gh', title: 'GitHub CLI', description: 'Reads through your gh login. The board never stores a token.', control: custom(() => <ToolState {...toolState(data.tools?.gh, 'Signed in')} />) },
       ] },
-      { title: 'Repositories', description: 'Each repo’s platform names its List group and colour; its role goes to mux-work.', rows: data.repos.map((r) => ({
+      { title: 'Repositories', description: 'Each repo’s platform names its List group and colour; its role goes to lar-work.', rows: data.repos.map((r) => ({
         id: `repo-${r.repo}`, title: r.repo, description: r.role,
         control: custom(() => <span className="flex items-center gap-2"><PlatformTag platform={r.platform} /><SmallButton reason={notBuilt('Edit')}>Edit</SmallButton></span>),
       })), footer: <SmallButton reason={notBuilt('Add repository')}>Add repository</SmallButton> },
@@ -138,7 +138,7 @@ export function pages(input: PagesInput): Page[] {
         { id: 't3-app', title: 'T3 Code (Nightly)', description: '~/.t3/userdata · read for thread stats and the model list', control: { type: 'status', text: 'Connected', tone: 'success' } },
         { id: 't3-stats', title: 'Read thread stats', description: 'Agent time, tokens and cost on each item.', control: { type: 'switch', value: true } },
       ] },
-      { title: 'Start', description: 'What Start does when it opens a mux-work thread.', rows: [
+      { title: 'Start', description: 'What Start does when it opens a lar-work thread.', rows: [
         { id: 'model', title: 'Default model', control: { type: 'select', options: models, value: 'T3 default' } },
         { id: 'workspace', title: 'Workspace', control: { type: 'segmented', options: ['New worktree', 'Local checkout'], value: 'New worktree' } },
         { id: 'base', title: 'Base branch', control: { type: 'text', value: 'main', mono: true } },
@@ -185,7 +185,7 @@ export function pages(input: PagesInput): Page[] {
     { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, groups: [
       { title: 'Tools', rows: [
         { id: 'd-gh', title: 'gh', description: toolDescription('Reads the GitHub Project and its issues.', data.tools?.gh), control: custom(() => <ToolState {...toolState(data.tools?.gh)} />) },
-        { id: 'd-t3', title: 't3', description: toolDescription('Starts the mux-work threads in T3 Code.', data.tools?.t3), control: custom(() => <ToolState {...toolState(data.tools?.t3)} />) },
+        { id: 'd-t3', title: 't3', description: toolDescription('Starts the lar-work threads in T3 Code.', data.tools?.t3), control: custom(() => <ToolState {...toolState(data.tools?.t3)} />) },
         { id: 'd-server', title: 'Board server', description: `127.0.0.1:4317 · last read ${data.fetchedAt ? 'OK' : 'never'}`, control: { type: 'button', label: 'Open logs' }, reason: notBuilt('Open logs') },
       ] },
     ] },

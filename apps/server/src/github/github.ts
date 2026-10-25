@@ -1,7 +1,7 @@
-// Reads the Mux project through the local `gh` CLI (`gh api graphql`).
+// Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
-import { buildSubIssueSearch, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@mux-factory/shared';
-import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@mux-factory/shared';
+import { buildSubIssueSearch, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@lar-factory/shared';
+import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@lar-factory/shared';
 import type { BoardConfig } from '../config/config.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';

@@ -53,7 +53,7 @@ test("a toast swiped away runs the board's close, so focus moves on", async () =
   await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
   toast()!.querySelector<HTMLButtonElement>('button.dismiss')!.focus();
   // A swipe closes the toast through coss's toast manager, not through the board's close button.
-  const { toastManager } = await import('@mux-factory/ui/toast');
+  const { toastManager } = await import('@lar-factory/ui/toast');
   await settle(() => toastManager.close(toast()!.getAttribute('data-toast-id')!));
   expect(toast()).toBeNull();
   expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));

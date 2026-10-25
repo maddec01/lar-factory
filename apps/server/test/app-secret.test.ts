@@ -2,7 +2,7 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { startBoard } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
 
 const SECRET = 'app-secret-for-tests';
 const REFUSED = 'Submit from the board app.';

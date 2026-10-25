@@ -1,12 +1,12 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 import { startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
 
 const SECRET = 'app-secret-for-tests';
-const DRAINING = 'The board is installing an update. Try again once Mux Factory restarts.';
+const DRAINING = 'The board is installing an update. Try again once lar Factory restarts.';
 const GUARDED = ['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/recheck'];
 
 const post = (board: Board, path: string, body: unknown = {}, headers: Record<string, string> = { 'X-Board-Secret': SECRET }) =>

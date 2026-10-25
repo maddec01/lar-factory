@@ -1,8 +1,8 @@
 #!/bin/bash
 # Usage: status.sh <owner/repo#number | issue or PR URL> <Status>
-# Adds the item to the "Mux" project if it isn't there yet, then sets its Status.
-# Then asks each running local board to read GitHub now: the one on MUX_BOARD_PORT when
-# that is set, else every board recorded in ~/Library/Application Support/Mux Factory/boards.
+# Adds the item to the "lar" project if it isn't there yet, then sets its Status.
+# Then asks each running local board to read GitHub now: the one on LAR_BOARD_PORT when
+# that is set, else every board recorded in ~/Library/Application Support/lar Factory/boards.
 set -euo pipefail
 
 # shellcheck source=project.sh
@@ -33,13 +33,13 @@ read_board() {
     curl --silent --output /dev/null --max-time 1 --request POST --header 'Content-Type: application/json' \
         --header "Origin: http://127.0.0.1:$1" --data '{}' "http://127.0.0.1:$1/api/read" || true
 }
-if [[ ${MUX_BOARD_PORT:-} =~ ^[0-9]+$ ]]; then
-    read_board "$MUX_BOARD_PORT"
+if [[ ${LAR_BOARD_PORT:-} =~ ^[0-9]+$ ]]; then
+    read_board "$LAR_BOARD_PORT"
     exit 0
 fi
 # Each live board records its port in <pid>.json. A record whose process is gone,
 # or whose port no longer answers /healthz, is left over from a board that died.
-for record in "$HOME/Library/Application Support/Mux Factory/boards/"*.json; do
+for record in "$HOME/Library/Application Support/lar Factory/boards/"*.json; do
     [[ -f $record ]] || continue
     pid=$(basename "$record" .json)
     port=$(jq -r '.port' "$record" 2>/dev/null || true)

@@ -4,7 +4,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answer, fetchMock, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 
 const button = (attr: string, id: string) => $<HTMLButtonElement>(`[data-item-dialog] [data-${attr}="${id}"]`)!;
 const press = async (el: HTMLElement) => {
@@ -82,7 +82,7 @@ test('Abandon asks first, naming the issue it deletes or the draft it removes; C
   const dialog = $('#abandon-dialog')!;
   expect(dialog.getAttribute('role')).toBe('alertdialog');
   expect(text($('#abandon-heading'))).toBe(`Delete #61 ${sample.items[0]!.title}?`);
-  expect(text($('#abandon-detail'))).toBe("This permanently deletes the issue from maddec01/mux-server on GitHub. It can't be undone.");
+  expect(text($('#abandon-detail'))).toBe("This permanently deletes the issue from maddec01/lar-server on GitHub. It can't be undone.");
   expect($$('#abandon-dialog button').map(text)).toEqual(['Cancel', 'Delete issue']);
   await settle(() => vi.advanceTimersByTime(100));
   expect(document.activeElement, 'Cancel takes focus').toBe($$('#abandon-dialog button')[0]);

@@ -1,7 +1,7 @@
 # Planner
 
-You split one Mux build into slices, or re-slice a blocked one. You get the
-issue reference and the repo path. `<mux-work>` is the folder holding this file's parent.
+You split one lar build into slices, or re-slice a blocked one. You get the
+issue reference and the repo path. `<lar-work>` is the folder holding this file's parent.
 
 Before you write anything, read `unslop` once
 (`~/.claude/skills/unslop/SKILL.md` in Claude Code,
@@ -13,14 +13,14 @@ scan-and-rewrite pass. Code is out of scope.
   `~/.agents/skills/to-tickets/SKILL.md` in Codex) on the build: explore
   the code, then split the work into vertical slices, each sized for one fresh
   context. Chain slices that touch the same file with blocked-by.
-- Publish each slice with `bash <mux-work>/scripts/slice.sh <owner/repo>
+- Publish each slice with `bash <lar-work>/scripts/slice.sh <owner/repo>
   <build> "<title>" <body-file>`, then add native blocked-by links (**Slices**
-  in `<mux-work>/issue-tracker.md`). Its body,
+  in `<lar-work>/issue-tracker.md`). Its body,
   self-contained for an implementer that has seen nothing else: What to build,
   Acceptance criteria, and a short **Where to look** (files or modules to
   start from). A slice editing skills, `AGENTS.md` or `CLAUDE.md` says to load
   `writing-for-agents`.
-- Mux overrides `to-tickets`: skip its quiz, tracker setup and
+- lar overrides `to-tickets`: skip its quiz, tracker setup and
   `ready-for-agent` label; Where to look replaces its no-file-paths rule;
   blocked-by lives only in native links.
 - Re-slicing a blocked slice (you also get its reference): read it and its

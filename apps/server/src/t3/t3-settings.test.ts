@@ -16,7 +16,7 @@ test('T3\'s files are under its userdata folder unless the environment names the
 });
 
 test('T3\'s environment id is the file\'s trimmed text, absent when the file is missing or blank', (t) => {
-  const dir = tempDir(t, 'mux-t3-env-');
+  const dir = tempDir(t, 'lar-t3-env-');
   writeFileSync(join(dir, 'environment-id'), '5e3c-8c5a\n');
   writeFileSync(join(dir, 'blank'), ' \n');
   assert.equal(readEnvironmentId(join(dir, 'environment-id')), '5e3c-8c5a');

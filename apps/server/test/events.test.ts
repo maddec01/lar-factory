@@ -6,8 +6,8 @@ import type { IncomingMessage } from 'node:http';
 import { once } from 'node:events';
 import { startBoard } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
-import type { BoardData } from '@mux-factory/shared';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import type { BoardData } from '@lar-factory/shared';
 
 /** An open event stream: its response and a wait for the next pushed board that passes a check. */
 async function openStream(t: TestContext, board: Board) {

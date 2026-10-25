@@ -8,7 +8,7 @@ import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
 
-import type { UpdateChannel } from "@mux-factory/shared";
+import type { UpdateChannel } from "@lar-factory/shared";
 
 export class ElectronUpdaterError extends Data.TaggedError("ElectronUpdaterError")<{
   readonly operation: "check" | "download" | "install";

@@ -4,8 +4,8 @@
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { blockedText, buildBranch, buildMessage, canAbandon, isBuild, validateDraft, workMessage } from '@mux-factory/shared';
-import type { BoardData, ContentType, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, StartResult, Status } from '@mux-factory/shared';
+import { blockedText, buildBranch, buildMessage, canAbandon, isBuild, validateDraft, workMessage } from '@lar-factory/shared';
+import type { BoardData, ContentType, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { loadConfig } from '../config/config.ts';
 import type { BoardConfig } from '../config/config.ts';
@@ -30,7 +30,7 @@ export interface ItemCommands {
   start(itemId: string, model: unknown): Promise<Reply>;
   /**
    * Starts a Ready build's thread in a new worktree, at most once per board run, once nothing open blocks it, as
-   * mux-work's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
+   * lar-work's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
    */
   startBuild(itemId: string, model: unknown): Promise<Reply>;
   abandon(itemId: string): Promise<Reply>;
@@ -81,8 +81,8 @@ function track<T>(inFlight: Map<string, Promise<T>>, key: string, work: Promise<
   return tracked;
 }
 
-/** Where mux-work is installed, for the build message. */
-const MUX_WORK = join(homedir(), '.agents/skills/mux-work');
+/** Where lar-work is installed, for the build message. */
+const LAR_WORK = join(homedir(), '.agents/skills/lar-work');
 
 /** The repository project from config.json as it is now, so a path fixed after a refusal works on the next Start. */
 async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
@@ -238,7 +238,7 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
       if (busy) return withBoard(409, { error: busy });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
-      const message = buildMessage(item, MUX_WORK);
+      const message = buildMessage(item, LAR_WORK);
       const branch = buildBranch(item);
       if (!message || !branch || !item.repo || item.number === null) return reply(409, { error: 'This item needs an issue before it can start.' });
       const { repo, number } = item;

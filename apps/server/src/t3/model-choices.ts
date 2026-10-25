@@ -7,8 +7,8 @@
 // and resolveProviderInstanceDisplayName in packages/client-runtime/src/state/providerInstanceDisplay.ts.
 
 import { readJsonRecord } from '../json-file.ts';
-import { isRecord, offers } from '@mux-factory/shared';
-import type { ModelChoice, ModelGroup, ModelOption } from '@mux-factory/shared';
+import { isRecord, offers } from '@lar-factory/shared';
+import type { ModelChoice, ModelGroup, ModelOption } from '@lar-factory/shared';
 
 /** Each driver's name in T3 (PROVIDER_DISPLAY_NAMES). */
 const DRIVER_NAMES: Record<string, string> = {

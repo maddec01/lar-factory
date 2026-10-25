@@ -3,7 +3,7 @@
 set -euo pipefail
 
 WIZARD="$(cd "$(dirname "$0")" && pwd)/release-secrets.sh"
-REPO_PATH=repos/maddec01/mux-factory/environments/release
+REPO_PATH=repos/maddec01/lar-factory/environments/release
 
 failures=0
 pass() { printf 'ok   %s\n' "$1"; }
@@ -25,7 +25,7 @@ make_bin() {
 printf '%s\n' "\$*" >>"\$GH_LOG"
 case "\$*" in
   "auth status"*) exit 0 ;;
-  "api repos/maddec01/mux-factory --jq .permissions.admin")
+  "api repos/maddec01/lar-factory --jq .permissions.admin")
     [[ -z \${GH_ADMIN_ERROR:-} ]] || { echo "\$GH_ADMIN_ERROR" >&2; exit 1; }
     echo "\${GH_ADMIN:-true}" ;;
   "api $REPO_PATH --jq"*)
@@ -58,10 +58,10 @@ run_wizard() {
   files=$(mktemp -d)
   dir=$(mktemp -d)
   logs=$(mktemp -d)
-  printf '%s' "$P12_BODY" >"$files/mux.p12"
+  printf '%s' "$P12_BODY" >"$files/lar.p12"
   printf '%s' "$P8_BODY" >"$files/AuthKey_ABC123.p8"
   touch "$logs/args" "$logs/stdin"
-  local answers=("${ANSWERS[@]/#<p12>/$files/mux.p12}")
+  local answers=("${ANSWERS[@]/#<p12>/$files/lar.p12}")
   answers=("${answers[@]/#<p8>/$files/AuthKey_ABC123.p8}")
   status=0
   output=$(cd "$dir" && printf '%s\n' "${answers[@]}" |
@@ -86,10 +86,10 @@ check "dry run prints the main-only branch policy" "$output" \
   "gh api --method POST $REPO_PATH/deployment-branch-policies -f name=main -f type=branch"
 for name in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER; do
   check "dry run prints the $name secret" "$output" \
-    "gh secret set $name --env release --repo maddec01/mux-factory"
+    "gh secret set $name --env release --repo maddec01/lar-factory"
 done
 check "dry run prints the team ID variable" "$output" \
-  "gh variable set APPLE_TEAM_ID --env release --repo maddec01/mux-factory --body ABCDE12345"
+  "gh variable set APPLE_TEAM_ID --env release --repo maddec01/lar-factory --body ABCDE12345"
 check "asks again after an empty answer" "$output" "This can't be empty."
 check "asks again after a Team ID that is not 10 uppercase letters and digits" "$output" \
   "A Team ID is 10 uppercase letters and digits."
@@ -136,19 +136,19 @@ fi
 
 GH_ADMIN=false run_wizard
 check_status "stops when the gh account is not an admin" 1
-check "names the admin requirement" "$output" "isn't an admin of maddec01/mux-factory"
+check "names the admin requirement" "$output" "isn't an admin of maddec01/lar-factory"
 check_not "stops before the Apple stages" "$output" "Stage 1"
 
 GH_ADMIN=false run_wizard --dry-run
 check_status "a dry run goes on when the gh account is not an admin" 0
 check "a dry run warns that the account is not an admin" "$output" \
-  "isn't an admin of maddec01/mux-factory, so a real run would stop here"
+  "isn't an admin of maddec01/lar-factory, so a real run would stop here"
 check "a dry run as a non-admin reaches the Apple stages" "$output" "Stage 1"
 
 GH_ADMIN_ERROR='gh: HTTP 403: Resource protected by organization SAML enforcement' run_wizard --dry-run
 check_status "stops when gh can't read the permissions" 1
 check "shows gh's error when it can't read the permissions" "$output" \
-  "couldn't read maddec01/mux-factory's permissions: gh: HTTP 403: Resource protected by organization SAML enforcement"
+  "couldn't read maddec01/lar-factory's permissions: gh: HTTP 403: Resource protected by organization SAML enforcement"
 check_not "a failed permissions read is not called a non-admin" "$output" "isn't an admin"
 check_not "a failed permissions read stops before the Apple stages" "$output" "Stage 1"
 

@@ -4,7 +4,7 @@
 import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
-import type { ToolMissing, ToolProblem } from '@mux-factory/shared';
+import type { ToolMissing, ToolProblem } from '@lar-factory/shared';
 import { runTool } from './run-tool.ts';
 
 export const TOOL_NAMES = ['t3', 'gh', 'az'] as const;
@@ -12,8 +12,8 @@ export type ToolName = typeof TOOL_NAMES[number];
 
 const OVERRIDES: Record<ToolName, string> = { t3: 'T3_PATH', gh: 'GH_PATH', az: 'AZ_PATH' };
 const FALLBACK_DIRS = ['/opt/homebrew/bin', '/usr/local/bin'];
-const START = '__MUX_BOARD_PATH_START__';
-const END = '__MUX_BOARD_PATH_END__';
+const START = '__LAR_BOARD_PATH_START__';
+const END = '__LAR_BOARD_PATH_END__';
 
 /** A found tool's path, or null with the override that pointed nowhere, if one did. */
 type ToolLookup = { path: string } | { path: null; override?: string };

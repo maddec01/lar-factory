@@ -1,7 +1,7 @@
 // One glyph per status, the way T3 marks a thread working, waiting or done, in the status's colour.
 
 import { Check, Circle, CircleDashed, CircleDot, Clock3, Eye, GitMerge, LoaderCircle } from 'lucide-react';
-import type { Status } from '@mux-factory/shared';
+import type { Status } from '@lar-factory/shared';
 
 export const STATUS_COLOR: Record<Status, string> = {
   List: 'var(--st-idle)', Queued: 'var(--st-idle)', Shaping: 'var(--st-now)', 'Needs you': 'var(--st-amber)', Ready: 'var(--st-now)',

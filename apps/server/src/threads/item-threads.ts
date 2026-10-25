@@ -2,14 +2,14 @@
 // each with where it stands (docs/adr/0005). t3/t3-db.ts reads the rows, and
 // t3/t3-reads.ts opens the database; this file is pure.
 
-import type { ItemThread, ThreadState } from '@mux-factory/shared';
+import type { ItemThread, ThreadState } from '@lar-factory/shared';
 import type { ThreadRows, TurnRow } from '../t3/t3-db.ts';
 
 /** An item's threads by repo and issue number, newest first; empty when no thread names it. */
 export type ItemThreadsReader = (repo: string, number: number) => ItemThread[];
 
-// `$mux-work <ref>` or `/mux-work <ref>` on any line, or a message starting `Build <ref>`.
-const WORK_REF = /(?:^|\s)[$/]mux-work ([\w.-]+\/[\w.-]+)#(\d+)/;
+// `$lar-work <ref>` or `/lar-work <ref>` on any line, or a message starting `Build <ref>`.
+const WORK_REF = /(?:^|\s)[$/]lar-work ([\w.-]+\/[\w.-]+)#(\d+)/;
 const BUILD_REF = /^Build ([\w.-]+\/[\w.-]+)#(\d+)/;
 
 /** The issue a thread's first user message names first, as lowercase `owner/repo#n`. */

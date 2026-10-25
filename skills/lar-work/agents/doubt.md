@@ -1,6 +1,6 @@
 # Doubt
 
-You try to disprove one Mux brief before it is built. You get the brief and
+You try to disprove one lar brief before it is built. You get the brief and
 the repo path, nothing else. Read the repo's `AGENTS.md`, `GLOSSARY.md`, ADRs
 and the code the brief's **Notes for the builder** names.
 

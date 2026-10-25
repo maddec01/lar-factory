@@ -68,9 +68,9 @@ describe("onLaunch", () => {
 
       const first = yield* SkillInstall.onLaunch(input);
       assert.strictEqual(first?.installed, true);
-      assert.isTrue(NodeFS.existsSync(NodePath.join(home, ".agents/skills/mux-work/SKILL.md")));
+      assert.isTrue(NodeFS.existsSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md")));
       assert.isTrue(NodeFS.existsSync(NodePath.join(home, ".agents/references/checklist.md")));
-      assert.isTrue(NodeFS.lstatSync(NodePath.join(home, ".claude/skills/mux-work")).isSymbolicLink());
+      assert.isTrue(NodeFS.lstatSync(NodePath.join(home, ".claude/skills/lar-work")).isSymbolicLink());
 
       const second = yield* SkillInstall.onLaunch(input);
       assert.strictEqual(second?.installed, false);
@@ -102,7 +102,7 @@ describe("onLaunch", () => {
   it.effect("names a manifest it can't read", () =>
     Effect.gen(function* () {
       const home = tempDir("skill-home-");
-      const manifest = NodePath.join(home, ".agents/.mux-factory-install.json");
+      const manifest = NodePath.join(home, ".agents/.lar-factory-install.json");
       NodeFS.mkdirSync(NodePath.dirname(manifest));
       NodeFS.writeFileSync(manifest, "{ not json");
 
@@ -115,7 +115,7 @@ describe("onLaunch", () => {
 describe("notice", () => {
   it("says nothing after a clean install", () => {
     assert.strictEqual(
-      SkillInstall.notice({ installed: true, version: "1.0.0", skills: ["mux-work"], conflicts: [] }),
+      SkillInstall.notice({ installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [] }),
       undefined,
     );
   });
@@ -125,10 +125,10 @@ describe("notice", () => {
       installed: true,
       version: "1.0.0",
       skills: [],
-      conflicts: ["/home/.agents/skills/mux-work"],
+      conflicts: ["/home/.agents/skills/lar-work"],
     });
     assert.strictEqual(notice?.type, "warning");
-    assert.include(notice?.detail, "/home/.agents/skills/mux-work");
+    assert.include(notice?.detail, "/home/.agents/skills/lar-work");
   });
 
   it("reports a failed install as an error that the next launch retries", () => {

@@ -1,7 +1,7 @@
-# Mux factory plan
+# lar Factory plan
 
 Written 2026-10-20. Nothing in this plan has been applied yet. Start once the
-open PRs (mux-server #126, mux-apple #89) are merged, so the new rules start
+open PRs (lar-server #126, lar-apple #89) are merged, so the new rules start
 on a clean `main`.
 
 Owner tags: **Claude** means an agent does it. **You** means only you can do it.
@@ -16,15 +16,15 @@ Owner tags: **Claude** means an agent does it. **You** means only you can do it.
   GitHub account, so a bypass for you is a bypass for them.
 - You cut releases by hand. Release notes come from PR titles.
 - GitHub Issues hold the work, one repo per platform. One GitHub Project
-  ("Mux") spans every repo and is the board.
+  ("lar") spans every repo and is the board.
 - Nothing starts until you move it to Queued. You start queued items with
-  `/mux-work <issue>` in a new T3 thread. Automatic pickup with a limit comes later.
-- The `mux-work` skill sizes an item up and picks one of three routes: clear,
+  `/lar-work <issue>` in a new T3 thread. Automatic pickup with a limit comes later.
+- The `lar-work` skill sizes an item up and picks one of three routes: clear,
   needs decisions, or foggy. Foggy work becomes a parent issue whose body is
   the map, with decision and build sub-issues linked by blocked-by.
 - Builds pass four reviewers (code, security, UX, UI), then an approver opens
   the PR and sends it to Verify or Ready to merge. You merge every PR.
-- `mux-factory` is one public repo that holds the skills, agents, and a local
+- `lar-factory` is one public repo that holds the skills, agents, and a local
   board app that refreshes itself. Skills install globally with `npx skills`.
 - Copied Matt Pocock and Addy Osmani skills are owned by you. Upstream changes
   come in only when you pick them.
@@ -42,7 +42,7 @@ Owner tags: **Claude** means an agent does it. **You** means only you can do it.
 Order matters here. The conventional-commit check must exist on `main` before a
 ruleset requires it, or nothing can merge.
 
-### mux-server
+### lar-server
 
 Current state, read from the API: two rulesets on `main`. "Main verification"
 requires a PR and four checks, but you have an "always" bypass, which is how
@@ -75,14 +75,14 @@ update `main`. Merge commits are titled "Merge pull request #n from …".
      reusing the existing verified-container script instead of rebuilding;
    - `.github/release.yml` groups the notes into Features, Fixes and Other,
      using labels a small workflow adds from each PR title's type;
-   - the Unraid template (`packaging/unraid/mux-server.xml`) switches from
+   - the Unraid template (`packaging/unraid/lar-server.xml`) switches from
      `:edge` to `:latest`.
 6. **You.** Merge it, then run "Prepare release" with `0.1.0` and merge the
    release PR. That creates the first tag, so later notes only cover new work.
 7. **You.** On Unraid, change the installed container's repository tag from
    `:edge` to `:latest` (the template change only affects new installs).
 
-### mux-apple
+### lar-apple
 
 There is no CI and no protection on `main` today.
 
@@ -96,28 +96,28 @@ There is no CI and no protection on `main` today.
     the conventional-commit check, allow only rebase merge, block force
     pushes, no bypass.
 
-No releases for mux-apple until TestFlight is set up.
+No releases for lar-apple until TestFlight is set up.
 
-## Phase 2: the mux-factory repo and skills
+## Phase 2: the lar-factory repo and skills
 
-12. **Claude, you approve.** Create `maddec01/mux-factory` as a **public** repo
+12. **Claude, you approve.** Create `maddec01/lar-factory` as a **public** repo
     with issues turned on, so other people can report problems, and clone it to
-    `~/Developer/Mux/mux-factory`. Same settings and ruleset as mux-apple. Add:
+    `~/Developer/lar/lar-factory`. Same settings and ruleset as lar-apple. Add:
     - an MIT licence, and `THIRD_PARTY_NOTICES.md` with the MIT notices of
       `mattpocock/skills` and `addyosmani/agent-skills` (both checked: MIT);
     - issue templates for bug reports and feature requests;
     - a README that covers:
       - what the factory is and how an item moves through it, from List to
         Done;
-      - installing: `npx skills add maddec01/mux-factory -g -s <names>`, and
+      - installing: `npx skills add maddec01/lar-factory -g -s <names>`, and
         which skills are copies (with their upstream source) and which are
-        Mux's own (`mux-work`, `skill-sync`);
+        lar's own (`lar-work`, `skill-sync`);
       - updating: copies only change when a `skill-sync` PR merges, then
         `npx skills update -g` pulls the change;
       - avoiding conflicts: one source per skill name. Add Matt's or Addy's
         other skills by name only (`-s <name>`), never all at once, because
         that would switch the copies back to upstream;
-      - Mux-specific rules live in `mux-work` and each repo's `AGENTS.md`,
+      - lar-specific rules live in `lar-work` and each repo's `AGENTS.md`,
         never in the copies;
       - running the board, and the credits and licences of the copied skills;
     - this plan, moved in as `docs/plan.md`.
@@ -126,14 +126,14 @@ No releases for mux-apple until TestFlight is set up.
     your local `gh` login, and `config` only names the repos.
 
     ```
-    mux-factory/
+    lar-factory/
       skills/
         grilling/, tdd/, ...  copies of Matt's and Addy's skills, original names
-        mux-work/             the Mux work skill
+        lar-work/             the lar work skill
           agents/             builder, reviewers (code, security, UX, UI), approver
         skill-sync/
       board/                  the local board app, its template, its saved-copy test
-      config                  Mux repos and platforms, board refresh interval, limits
+      config                  lar repos and platforms, board refresh interval, limits
       UPSTREAM.md             source repo and commit for every copied skill
       THIRD_PARTY_NOTICES.md
       AGENTS.md
@@ -144,7 +144,7 @@ No releases for mux-apple until TestFlight is set up.
     pnpm workspace (`apps/server`, `apps/web`, `apps/desktop`, `packages/shared`);
     the README's repo layout is current.
 
-    The build agents live inside `mux-work` as prompt files, because
+    The build agents live inside `lar-work` as prompt files, because
     `npx skills` installs skills but not `.claude/agents` files. This way they
     install along with the skill.
 
@@ -158,20 +158,20 @@ No releases for mux-apple until TestFlight is set up.
       `browser-testing-with-devtools`;
     - `developer-profile` stays in its own repo, as it is today.
 14. **Claude.** Test the install with one skill before switching the rest:
-    - run `npx skills add maddec01/mux-factory -g -s grilling`;
-    - check that `~/.agents/.skill-lock.json` now lists `maddec01/mux-factory`
+    - run `npx skills add maddec01/lar-factory -g -s grilling`;
+    - check that `~/.agents/.skill-lock.json` now lists `maddec01/lar-factory`
       as the source of `grilling`;
     - run `npx skills update -g` and check that Matt's version doesn't come
       back.
 
     If the CLI behaves differently, stop here and rethink before step 15.
 15. **Claude, you approve.** Install the rest the same way, globally from your
-    repo: the other copies from step 13, `mux-work`, and `skill-sync`.
+    repo: the other copies from step 13, `lar-work`, and `skill-sync`.
     - The `skills` CLI keeps one source per skill name, so the copies now
       update from your repo, which only changes when you merge something.
       Their files match what's installed today, so your other projects behave
       the same.
-    - `mux-work` has its own prefixed name, so it can never collide with
+    - `lar-work` has its own prefixed name, so it can never collide with
       anything.
     - Every other Matt skill (`wayfinder`, `to-spec`, `to-tickets`,
       `implement-spec`, `triage`, `grill-me` and the rest) stays installed from
@@ -181,17 +181,17 @@ No releases for mux-apple until TestFlight is set up.
     - The rule from now on: add Matt skills by name only
       (`npx skills add mattpocock/skills -g -s <name>`), never all at once.
       Adding all of them would likely switch your copies back to Matt's.
-16. **Claude.** Keep Mux-specific rules out of the copied skills, so the copies
+16. **Claude.** Keep lar-specific rules out of the copied skills, so the copies
     stay safe to use in every project. Conventional PR titles and branch
     cleanup (review fixes as `--fixup` commits folded in with
-    `git rebase --autosquash`) go in each Mux repo's `AGENTS.md` and in the
-    builder prompt inside `mux-work`, not in `pr`.
+    `git rebase --autosquash`) go in each lar repo's `AGENTS.md` and in the
+    builder prompt inside `lar-work`, not in `pr`.
 17. **Claude.** Write `skill-sync`. It compares each copied skill with the
     latest upstream version against the commit in `UPSTREAM.md` and lists the
     changes. You pick which ones to take. It merges them through a PR in
-    `mux-factory` and updates `UPSTREAM.md`, then you run
+    `lar-factory` and updates `UPSTREAM.md`, then you run
     `npx skills update -g`.
-18. **Claude.** Write the `mux-work` skill:
+18. **Claude.** Write the `lar-work` skill:
     - read the issue, the code and related docs, then propose a route (clear,
       needs decisions, foggy) in two or three lines for you to confirm;
     - clear and needs-decisions routes: grill in the same thread, build
@@ -206,12 +206,12 @@ No releases for mux-apple until TestFlight is set up.
       `doubt-driven-development` before anything moves to Ready;
     - move the issue's Status at every step, and hand off to a fresh thread if
       the context passes about 150k tokens.
-19. **Claude.** Write the build agent prompts in `mux-work/agents`:
+19. **Claude.** Write the build agent prompts in `lar-work/agents`:
     - builder: its own worktree, `tdd`, `developer-profile`, conventional
       commits, exploration notes for big builds;
     - reviewers in parallel: code (`code-review-and-quality` plus Matt's
       `code-review`), security (`security-and-hardening`), UX, and UI (T3
-      browser preview for web, simulator through mux-apple's run scripts for
+      browser preview for web, simulator through lar-apple's run scripts for
       Apple). At most two rework rounds;
     - approver: opens the PR, then sends it to Verify with test steps when the
       change is visible, something couldn't be checked by an agent, or it
@@ -220,14 +220,14 @@ No releases for mux-apple until TestFlight is set up.
 
 ## Phase 3: the board
 
-20. **Claude.** Create the "Mux" Project (needs step 1 of "Before starting"):
+20. **Claude.** Create the "lar" Project (needs step 1 of "Before starting"):
     - Status column: List, Queued, Shaping, Needs you, Ready, In progress,
       Review, Verify, Ready to merge, Done;
     - views: Board, one per platform (filtered by repository), Concepts
       (parent issues with sub-issue progress, grouped by parent);
-    - built-in workflows: auto-add issues from mux-server and mux-apple, and
+    - built-in workflows: auto-add issues from lar-server and lar-apple, and
       move to Done when an issue closes or its PR merges. GitHub limits how many
-      auto-add workflows a free account gets; if it's one, `mux-work` adds
+      auto-add workflows a free account gets; if it's one, `lar-work` adds
       items itself.
 21. **Claude.** Create the same labels in every repo: `bug`, `feature`,
     `improvement`, `concept`, `decision: grill`, `decision: prototype`,
@@ -237,8 +237,8 @@ No releases for mux-apple until TestFlight is set up.
     Project. **You** check the result.
 23. **Claude, then You.** Prototype three board layouts filled with your real
     issues. You pick one.
-24. **Claude.** Build the board app in `mux-factory/board` (TypeScript, like
-    `mux-server/web`):
+24. **Claude.** Build the board app in `lar-factory/board` (TypeScript, like
+    `lar-server/web`):
     - a local server that reads the Project through `gh` every 30 to 60
       seconds and caches it;
     - the fixed template from step 23, using T3's theme colours, with sections
@@ -249,11 +249,11 @@ No releases for mux-apple until TestFlight is set up.
 
 ## Phase 4: trial runs
 
-25. **You, with Claude.** Run one small bug through `/mux-work`.
+25. **You, with Claude.** Run one small bug through `/lar-work`.
 26. **You, with Claude.** Run one visual feature with prototypes.
-27. **You, with Claude.** Run the Mux cloud concept (website sign-in and relay)
-    as the first foggy item, using `docs/mux-hosted-services-todo.md` and
-    `docs/mux-server-remote-access-plan.md` as input.
+27. **You, with Claude.** Run the lar cloud concept (website sign-in and relay)
+    as the first foggy item, using `docs/lar-hosted-services-todo.md` and
+    `docs/lar-server-remote-access-plan.md` as input.
 28. **You, with Claude.** After each run, `retro` suggests fixes to the skills.
     You pick which to apply.
 
@@ -264,9 +264,9 @@ No releases for mux-apple until TestFlight is set up.
   browser.
 - A scheduled T3 task that starts the next Queued item while fewer than 2 items
   are in Shaping, In progress or Review, and pauses while Needs you holds more
-  than 3. Both limits live in `mux-factory/config`. Not now: for now you start
+  than 3. Both limits live in `lar-factory/config`. Not now: for now you start
   every item yourself.
-- Releases and builds for mux-apple once TestFlight and the developer account
+- Releases and builds for lar-apple once TestFlight and the developer account
   are ready.
 
 ## Decided
@@ -275,6 +275,6 @@ No releases for mux-apple until TestFlight is set up.
 - No automatic pickup for now. When it comes, the limit is 2 items in flight.
 - Matt skills the factory doesn't use stay installed globally for your other
   projects (step 15).
-- `mux-factory` is public, with issues open for other people's reports.
+- `lar-factory` is public, with issues open for other people's reports.
 - Copied skills keep their original names and install from your repo.
-  Mux-specific skills use a `mux-` prefix.
+  lar-specific skills use a `lar-` prefix.

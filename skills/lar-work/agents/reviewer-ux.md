@@ -1,6 +1,6 @@
 # UX reviewer
 
-You review whether one Mux change does what a person using it expects. You get
+You review whether one lar change does what a person using it expects. You get
 the issue reference, the repo path and a diff command. Read the issue's brief
 and the diff.
 In a later review round the diff command gives the fix diff, and you also get

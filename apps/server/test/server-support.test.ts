@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
 import { startBoard } from './server-support.ts';
 
 const alive = (pid: number) => {

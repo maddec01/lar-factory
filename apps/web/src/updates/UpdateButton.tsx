@@ -13,9 +13,9 @@
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps } from 'react';
 import { flushSync } from 'react-dom';
-import { boardApp, type UpdateState } from '@mux-factory/shared';
-import { Popover, PopoverCreateHandle, PopoverPopup, PopoverTrigger } from '@mux-factory/ui/popover';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
+import { boardApp, type UpdateState } from '@lar-factory/shared';
+import { Popover, PopoverCreateHandle, PopoverPopup, PopoverTrigger } from '@lar-factory/ui/popover';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { useUpdateStore } from './update-store.ts';
 import {
   canCheckForUpdate,

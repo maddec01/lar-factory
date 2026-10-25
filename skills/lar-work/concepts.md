@@ -54,7 +54,7 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
 4. Keep the map in Shaping while decisions are open. Each `grill`,
    `prototype` or `task` decision waits in Queued for the board's Start, which
    opens its **decision thread** in its repository project's root with
-   `/mux-work <owner/repo#n>`. A blocked one starts only once every issue it's
+   `/lar-work <owner/repo#n>`. A blocked one starts only once every issue it's
    blocked by closes, by hand or through the board's Start after. Research
    decisions get no thread. Tell Pedro in chat which decisions wait on which;
    this shaping thread is done.

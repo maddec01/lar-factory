@@ -2,9 +2,9 @@
 // both, each with its pending label, plus a failed Queue's error.
 
 import { useRef } from 'react';
-import { canAbandon, ref } from '@mux-factory/shared';
-import type { BoardData, Item } from '@mux-factory/shared';
-import { Button, InlineButton } from '@mux-factory/ui/button';
+import { canAbandon, ref } from '@lar-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
+import { Button, InlineButton } from '@lar-factory/ui/button';
 import { useActionStore, useItemAction } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
 import { askAbandon, backToList, queueItem } from './card-actions.ts';

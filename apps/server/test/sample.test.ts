@@ -2,7 +2,7 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { SAMPLE_DATA, startBoard } from './server-support.ts';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 
 /** Every `owner/repo#n` the data names, with each distinct way it is named (issue or PR, and title). */
 function refUses(data: unknown): Map<string, Set<string>> {

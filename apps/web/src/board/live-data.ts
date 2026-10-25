@@ -3,7 +3,7 @@
 
 import { useBoardStore } from './board-store.ts';
 import { useDismissStore } from '../notices/dismiss-store.ts';
-import type { BoardData } from '@mux-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 
 const POLL_MS = 15_000;
 /** The key of the banner that says the page can't reach the server. */

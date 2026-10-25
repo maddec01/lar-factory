@@ -4,7 +4,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
-import type { UpdateChannel, UpdateReleaseNote } from "@mux-factory/shared";
+import type { UpdateChannel, UpdateReleaseNote } from "@lar-factory/shared";
 import { defaultChannel } from "./updateMachine.ts";
 
 interface ElectronReleaseNoteInfo {

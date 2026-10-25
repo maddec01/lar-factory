@@ -5,7 +5,7 @@
 
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
-import { isRecord } from '@mux-factory/shared';
+import { isRecord } from '@lar-factory/shared';
 import { readJsonRecord } from '../json-file.ts';
 import type { PriceOverride } from '../stats/usage-pricing.ts';
 

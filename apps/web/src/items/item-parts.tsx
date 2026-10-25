@@ -3,9 +3,9 @@
 // adds the coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
-import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, slug } from '@mux-factory/shared';
-import type { Item, SliceProgress, Status } from '@mux-factory/shared';
-import { Badge } from '@mux-factory/ui/badge';
+import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, slug } from '@lar-factory/shared';
+import type { Item, SliceProgress, Status } from '@lar-factory/shared';
+import { Badge } from '@lar-factory/ui/badge';
 import { STATUS_COLOR } from './status-glyph.tsx';
 
 /** The control room's platform badge, with a medium label. */

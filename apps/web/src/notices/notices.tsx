@@ -1,9 +1,9 @@
 // What this page just did to an item, announced in a toast: added or moved with View item,
 // abandoned, started in T3, or a Queued card's action that failed.
 
-import { ref, workTitle, abandonPrompt } from '@mux-factory/shared';
-import type { Item, StartedThread, Status } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
+import { ref, workTitle, abandonPrompt } from '@lar-factory/shared';
+import type { Item, StartedThread, Status } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { TitleLink } from '../items/item-parts.tsx';

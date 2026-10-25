@@ -6,11 +6,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { ref, highlightedChoice, storedChoice } from '@mux-factory/shared';
-import type { BoardData, Item, ModelChoice } from '@mux-factory/shared';
-import { Badge } from '@mux-factory/ui/badge';
-import { Button } from '@mux-factory/ui/button';
-import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuTrigger } from '@mux-factory/ui/menu';
+import { ref, highlightedChoice, storedChoice } from '@lar-factory/shared';
+import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
+import { Badge } from '@lar-factory/ui/badge';
+import { Button } from '@lar-factory/ui/button';
+import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuTrigger } from '@lar-factory/ui/menu';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './item-actions.tsx';
 import { startItem } from './start-item.ts';

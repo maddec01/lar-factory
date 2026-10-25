@@ -1,11 +1,11 @@
 ---
-name: mux-work
-description: Take a queued Mux issue from shaping to a Ready brief, for the board to start its build. Use when the user runs /mux-work with an issue.
+name: lar-work
+description: Take a queued lar issue from shaping to a Ready brief, for the board to start its build. Use when the user runs /lar-work with an issue.
 argument-hint: "<owner/repo#n or issue URL>"
 disable-model-invocation: true
 ---
 
-You run one Mux factory item. Pedro answers questions, picks prototypes,
+You run one lar factory item. Pedro answers questions, picks prototypes,
 verifies visible changes and merges every PR; the rest is yours.
 
 ## Rules
@@ -17,10 +17,10 @@ verifies visible changes and merges every PR; the rest is yours.
   commit messages, docs and skill files (skill files also follow
   `writing-for-agents`). Write each text clean the first time rather than as a
   separate scan-and-rewrite pass, though unslop calls itself an editing pass.
-  Code is out of scope. This holds for every thread that runs `/mux-work`:
+  Code is out of scope. This holds for every thread that runs `/lar-work`:
   shaping, concept and decision threads, and a fresh thread resuming one after
   a handoff. Build threads get it from `agents/builder.md`.
-- Move the issue's Status on the "Mux" board at every step:
+- Move the issue's Status on the "lar" board at every step:
   `bash <this skill>/scripts/status.sh <owner/repo#n> "<Status>"`. Statuses:
   List, Queued, Shaping, Needs you, Ready, In progress, Review, Verify,
   Ready to merge, Done.
@@ -40,7 +40,7 @@ verifies visible changes and merges every PR; the rest is yours.
 - Past about 150k tokens, hand off: post a handoff written per
   `~/.agents/skills/handoff/SKILL.md` as an issue comment, then continue in a
   fresh thread with `t3_thread_launch`.
-  - Shaping thread: `/mux-work <issue>` in the issue's repository project,
+  - Shaping thread: `/lar-work <issue>` in the issue's repository project,
     `workspaceStrategy` `{"type":"root"}`.
   - Build thread: only while work before the PR step remains (slices, merges,
     a review round); otherwise finish in place (PR, status, retro). Past the
@@ -89,8 +89,8 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
   `AGENTS.md`, `GLOSSARY.md`, relevant ADRs and the code this issue touches,
   and returns ≤300 words in `domain-modeling` vocabulary: what exists, where,
   and what the issue would change. It also returns each repository's **role**
-  from mux-factory's `config.json` on `main`, read with
-  `gh api -H "Accept: application/vnd.github.raw" "repos/maddec01/mux-factory/contents/config.json?ref=main"`
+  from lar-factory's `config.json` on `main`, read with
+  `gh api -H "Accept: application/vnd.github.raw" "repos/maddec01/lar-factory/contents/config.json?ref=main"`
   (this checkout may be another repo's).
 
 ## 2. Size up
@@ -205,5 +205,5 @@ Start build stays disabled until Pedro adds the project in T3. Start build:
 3. starts the build thread in the build's repository project, in a new
    worktree on branch `<kind>/<n>-<slug>` from `main` (`fix` for a `bug`,
    `feat` for a `feature` or `improvement`, else `chore`), with the message
-   `Build <owner/repo>#<n>. Read <installed mux-work>/agents/builder.md and follow it.`,
-   where `<installed mux-work>` is this skill's absolute path.
+   `Build <owner/repo>#<n>. Read <installed lar-work>/agents/builder.md and follow it.`,
+   where `<installed lar-work>` is this skill's absolute path.

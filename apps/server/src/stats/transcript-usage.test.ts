@@ -103,7 +103,7 @@ test('a session\'s records come from its own transcript and its subagents\' tran
 
 test('a scan drops the cached records of transcripts it no longer reads, so the cache doesn\'t keep deleted files', (t) => {
   const home = claudeHome(t, { 'session-a': { main: [assistant('msg-1', 1, 0, 0, 1)] } });
-  const path = join(home, 'projects', '-Users-pedro--t3-worktrees-mux-factory-feat-60', 'session-a.jsonl');
+  const path = join(home, 'projects', '-Users-pedro--t3-worktrees-lar-factory-feat-60', 'session-a.jsonl');
   const ids = () => scanTranscripts(() => claudeSessionRecords(home)('session-a')).map((r) => r.dedupeKey);
   const at = 1_760_000_000;
   utimesSync(path, at, at);

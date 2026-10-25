@@ -1,6 +1,6 @@
-# Mux factory
+# lar Factory
 
-The Mux factory takes ideas through shaping, building and review to a PR that
+The lar factory takes ideas through shaping, building and review to a PR that
 Pedro merges. This vocabulary describes its work, roles and board statuses.
 
 ## Language
@@ -46,7 +46,7 @@ _Avoid_: build issue
 
 **Slice**:
 A small, independently testable piece of a build, recorded as a sub-issue of
-its build and implemented by one implementer. Slices stay off the Mux
+its build and implemented by one implementer. Slices stay off the lar
 board. A sub-issue labelled `build` is a build, never a slice.
 _Avoid_: ticket, chunk, task
 
@@ -65,8 +65,8 @@ slices that aren't active.
 _Avoid_: re-plan
 
 **Work message**:
-The two-line text the board sends to a new shaping or decision thread: `#<n> <title>`, then `$mux-work <owner/repo>#<n>`.
-_Avoid_: work command, `/mux-work` command
+The two-line text the board sends to a new shaping or decision thread: `#<n> <title>`, then `$lar-work <owner/repo>#<n>`.
+_Avoid_: work command, `/lar-work` command
 
 **Model choice**:
 The provider instance and model a new thread runs on, picked at Start; "T3 default" leaves it to T3.
@@ -74,7 +74,7 @@ _Avoid_: model selection, provider setup
 
 **Repository project**:
 The T3 project whose folder is a repository's main checkout, recognised by its git origin; an issue's threads run in its repository's project.
-_Avoid_: Mux project, factory project (for where threads run)
+_Avoid_: lar project, factory project (for where threads run)
 
 **Repository role**:
 A one-line description of what a repository is to the others, such as the API server a client app uses.
@@ -92,7 +92,7 @@ The conversation in the issue's repository project that resolves an issue's open
 decisions and produces a passing brief, then stops at Ready.
 
 **Decision thread**:
-A top-level thread, started from the board, running `/mux-work` on one `decision: *` sub-issue of a map,
+A top-level thread, started from the board, running `/lar-work` on one `decision: *` sub-issue of a map,
 in the repo's main checkout, writing only to issues.
 _Avoid_: Decision session
 
@@ -139,7 +139,7 @@ Captured work that has not yet been selected to start.
 _Avoid_: Queued (for unselected work)
 
 **Queued**:
-Work selected for pickup by mux-work, by Pedro or by its concept's shaping,
+Work selected for pickup by lar-work, by Pedro or by its concept's shaping,
 awaiting a start from the board.
 _Avoid_: In progress (for work awaiting pickup)
 

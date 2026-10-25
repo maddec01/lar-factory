@@ -5,7 +5,7 @@ import type { IncomingMessage } from 'node:http';
 import { once } from 'node:events';
 import { startBoard } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
 
 /** The project item reads the board has started, one per read of GitHub. */
 async function reads(board: Board): Promise<number> {
@@ -35,15 +35,15 @@ const askRead = (board: Board, headers: Record<string, string> = {}) => fetch(`$
 
 test("a dossier's map and every item's blockers reach the page; only the bodies of concepts and items with sub-issues on the board are read", async (t) => {
   const body = '## Destination\nThere.\n\n## End-to-end check\nTry it\n1. Step\n';
-  const concept = projectIssue(1, 'Shaping', 'maddec01/mux-server', ['concept']);
-  const feature = projectIssue(2, 'List', 'maddec01/mux-server', ['feature']);
-  const coupled = projectIssue(3, 'In progress', 'maddec01/mux-server', ['feature']);
-  const part = projectIssue(4, 'Ready', 'maddec01/mux-apple', ['build']);
+  const concept = projectIssue(1, 'Shaping', 'maddec01/lar-server', ['concept']);
+  const feature = projectIssue(2, 'List', 'maddec01/lar-server', ['feature']);
+  const coupled = projectIssue(3, 'In progress', 'maddec01/lar-server', ['feature']);
+  const part = projectIssue(4, 'Ready', 'maddec01/lar-apple', ['build']);
   Object.assign(concept.content!, { id: 'I_1', body });
-  Object.assign(feature.content!, { id: 'I_2', body, blockedBy: { nodes: [{ number: 1, state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } }] } });
+  Object.assign(feature.content!, { id: 'I_2', body, blockedBy: { nodes: [{ number: 1, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } }] } });
   Object.assign(coupled.content!, { id: 'I_3', body });
   Object.assign(part.content!, { id: 'I_4', body,
-    parent: { number: 3, title: 'Issue 3', url: 'https://github.com/maddec01/mux-server/issues/3', state: 'OPEN', repository: { nameWithOwner: 'maddec01/mux-server' } } });
+    parent: { number: 3, title: 'Issue 3', url: 'https://github.com/maddec01/lar-server/issues/3', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } } });
   const board = await startBoard(t, { items: [concept, feature, coupled, part] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const [map, plain, parent, child] = (await board.board()).items;
@@ -51,7 +51,7 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
   assert.deepEqual(map?.map, read);
   assert.deepEqual(parent?.map, read, 'an item with a sub-issue on the board is a dossier, with its map');
   assert.deepEqual(map?.blockers, []);
-  assert.deepEqual(plain?.blockers, [{ number: 1, repo: 'maddec01/mux-server', state: 'OPEN' }]);
+  assert.deepEqual(plain?.blockers, [{ number: 1, repo: 'maddec01/lar-server', state: 'OPEN' }]);
   assert.ok(!('map' in plain!) && !('body' in plain!), 'a feature gets no map and no body');
   assert.ok(!('map' in child!) && !('body' in child!), 'nor does a part');
   const bodyReads = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:')));

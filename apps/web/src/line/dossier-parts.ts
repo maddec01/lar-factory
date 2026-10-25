@@ -2,8 +2,8 @@
 // in the order they run. Each part's kind comes from its labels, what it waits on from its blocked-by issues, and its
 // thread is its newest item thread.
 
-import { blockerRef, decisionType, kindOf, openBlockers } from '@mux-factory/shared';
-import type { Blocker, Item, ItemThread, Status, ThreadState } from '@mux-factory/shared';
+import { blockerRef, decisionType, kindOf, openBlockers } from '@lar-factory/shared';
+import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'build'] as const;
 export type PartKind = (typeof PART_KINDS)[number];

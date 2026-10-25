@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { BoardData, Item, ModelGroup } from '@mux-factory/shared';
+import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { loadConfig } from './config/config.ts';
 import { editPrBody, fetchProject, findProjectNumber, readPrBody } from './github/github.ts';

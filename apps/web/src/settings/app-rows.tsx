@@ -2,7 +2,7 @@
 // checklists into it or removes them at once, the update channel, and the version with what the updater last found
 // and Check now. Each group's note says what the last call did.
 
-import type { UpdateChannel, UpdateState } from '@mux-factory/shared';
+import type { UpdateChannel, UpdateState } from '@lar-factory/shared';
 import { FormResult } from '../notices/form-result.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { canCheckForUpdate, getUpdateDisabledReason } from '../updates/update-button-logic.ts';
@@ -56,7 +56,7 @@ export function ProfilesNote() {
   return (
     <div className="profiles-note grid gap-2 px-1" aria-busy={profiles === null}>
       {!installed && (
-        <p className="m-0 text-xs text-(--muted-foreground)">Mux Factory hasn't installed its skills in ~/.agents yet, so you can't tick or untick a profile. It installs them when it starts and ticks every profile it finds on that first install. If the install failed, restart Mux Factory to try again.</p>
+        <p className="m-0 text-xs text-(--muted-foreground)">lar Factory hasn't installed its skills in ~/.agents yet, so you can't tick or untick a profile. It installs them when it starts and ticks every profile it finds on that first install. If the install failed, restart lar Factory to try again.</p>
       )}
       {profiles === null && <p className="m-0 text-xs text-(--muted-foreground)">Loading…</p>}
       {profiles?.length === 0 && !(result.from === 'profiles' && result.tone === 'error') && <p className="m-0 text-xs text-(--muted-foreground)">No Claude profiles found in ~.</p>}

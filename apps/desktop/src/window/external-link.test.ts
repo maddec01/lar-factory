@@ -4,7 +4,7 @@ import * as ExternalLink from "./external-link.ts";
 
 describe("ExternalLink", () => {
   it("opens web links in the browser", () => {
-    assert.strictEqual(ExternalLink.outsideUrl("https://github.com/maddec01/mux-factory/issues/203"), "https://github.com/maddec01/mux-factory/issues/203");
+    assert.strictEqual(ExternalLink.outsideUrl("https://github.com/maddec01/lar-factory/issues/203"), "https://github.com/maddec01/lar-factory/issues/203");
     assert.strictEqual(ExternalLink.outsideUrl("http://example.com"), "http://example.com/");
   });
 

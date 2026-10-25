@@ -4,7 +4,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
 
-export const THREAD_SIDEBAR_WIDTH_STORAGE_KEY = 'mux_board_sidebar_width';
+export const THREAD_SIDEBAR_WIDTH_STORAGE_KEY = 'lar_board_sidebar_width';
 const THREAD_SIDEBAR_DEFAULT_WIDTH = 300;
 const THREAD_SIDEBAR_MIN_WIDTH = 13 * 16;
 export const THREAD_MAIN_CONTENT_MIN_WIDTH = 40 * 16;

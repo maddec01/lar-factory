@@ -1,5 +1,5 @@
 {
-  "name": "@mux-factory/ui",
+  "name": "@lar-factory/ui",
   "private": true,
   "version": "0.1.0",
   "description": "The design system: the board's tokens, base styles and base components, copied from T3 Code.",

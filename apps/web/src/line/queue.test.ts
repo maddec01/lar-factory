@@ -4,14 +4,14 @@
 
 import { beforeEach, expect, test } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, moved, mountPage, posted, sample, settle, text, toast } from '../../test/support.ts';
-import type { BoardData, Item, ModelGroup } from '@mux-factory/shared';
+import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
 
 const MODEL_CHOICES: ModelGroup[] = [
   { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
   { instanceId: 'claudeAgent', name: 'Claude', models: [{ slug: 'claude-opus-5-5', label: 'Opus 5.5' }] },
 ];
 const withChoices: BoardData = { ...sample, capture: { session: 's1', enabled: true }, modelChoices: MODEL_CHOICES };
-const CHOICE_KEY = 'mux-board:model-choice';
+const CHOICE_KEY = 'lar-board:model-choice';
 
 const queue = () => $('.queue')!;
 const rows = () => $$<HTMLLIElement>('.queue ol > li');
@@ -90,7 +90,7 @@ test('the header shows the build slots; while they are full the first row waits 
 
 test('a Queued item blocked by an open issue has its Start refining disabled, with Start after, and Start next passes over it', async () => {
   const blocked = { ...withChoices, items: sample.items.map((i) => (i.id === 'PVTI_sample05'
-    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'OPEN' as const }] } : i)) };
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'OPEN' as const }] } : i)) };
   await mountPage(blocked);
   expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, 'Blocked by #202 until it closes']);
   expect(text(row('PVTI_sample05').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
@@ -100,8 +100,8 @@ test('a Queued item blocked by an open issue has its Start refining disabled, wi
 });
 
 test("a Queued item whose repository has no T3 project has its Start refining disabled with the project's hint, and Start next passes over it", async () => {
-  const hint = 'No T3 project is a checkout of maddec01/mux-server; add the checkout in T3 Code';
-  await mountPage({ ...withChoices, repositoryProjects: { 'maddec01/mux-server': hint } });
+  const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
+  await mountPage({ ...withChoices, repositoryProjects: { 'maddec01/lar-server': hint } });
   expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, hint]);
   expect(row('PVTI_sample05').querySelector('[data-start-after]'), 'nothing blocks it, so no Start after').toBeNull();
   expect(startNext().getAttribute('data-start')).toBe('PVTI_sample06');
@@ -109,7 +109,7 @@ test("a Queued item whose repository has no T3 project has its Start refining di
 
 test('when no queued item can start, Start next shows disabled and says why', async () => {
   const held = { ...withChoices, items: sample.items.map((i) => (['PVTI_sample05', 'PVTI_sample06'].includes(i.id)
-    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/mux-server', state: 'OPEN' as const }] } : i)) };
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'OPEN' as const }] } : i)) };
   await mountPage(held);
   const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
   expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs an issue or a T3 project, or has a thread at work.']);

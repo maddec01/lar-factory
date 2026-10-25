@@ -1,11 +1,11 @@
 // Abandon's confirmation: it names the item it deletes or removes. Cancel or Escape closes it and
 // focus goes back to Abandon; a click outside leaves it open. The confirm button abandons the item.
 
-import { abandonPrompt } from '@mux-factory/shared';
+import { abandonPrompt } from '@lar-factory/shared';
 import {
   AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
-} from '@mux-factory/ui/alert-dialog';
-import { Button } from '@mux-factory/ui/button';
+} from '@lar-factory/ui/alert-dialog';
+import { Button } from '@lar-factory/ui/button';
 import { useAbandonStore } from './abandon-store.ts';
 import { abandonItem } from './card-actions.ts';
 

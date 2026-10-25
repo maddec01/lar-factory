@@ -2,8 +2,8 @@
 // keyboard focus in the dialog.
 
 import { flushSync } from 'react-dom';
-import { writeHeaders } from '@mux-factory/shared';
-import type { BoardData } from '@mux-factory/shared';
+import { writeHeaders } from '@lar-factory/shared';
+import type { BoardData } from '@lar-factory/shared';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';

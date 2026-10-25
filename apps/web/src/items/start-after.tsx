@@ -6,10 +6,10 @@
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { blockedText, openBlockerRefs, openBlockers, ref, repositoryProjectHint, startRequest } from '@mux-factory/shared';
-import type { BoardData, Item, ModelChoice } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
-import { Menu, MenuPopup, MenuTrigger } from '@mux-factory/ui/menu';
+import { blockedText, openBlockerRefs, openBlockers, ref, repositoryProjectHint, startRequest } from '@lar-factory/shared';
+import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
+import { Menu, MenuPopup, MenuTrigger } from '@lar-factory/ui/menu';
 import { useBoardStore } from '../board/board-store.ts';
 import { notify } from '../notices/notices.tsx';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';

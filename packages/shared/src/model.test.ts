@@ -13,8 +13,8 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
     type: 'Issue',
     number: 7,
     title: 't',
-    url: 'https://github.com/maddec01/mux-server/issues/7',
-    repo: 'maddec01/mux-server',
+    url: 'https://github.com/maddec01/lar-server/issues/7',
+    repo: 'maddec01/lar-server',
     labels,
     state: 'OPEN',
     parent: null,
@@ -63,30 +63,30 @@ test('the build label makes a build whatever the kind, except on a concept', () 
 });
 
 test("an item's open blockers are the blocked-by issues still open", () => {
-  const blockers = [{ number: 3, repo: 'maddec01/mux-server', state: 'CLOSED' as const }, { number: 4, repo: 'maddec01/mux-apple', state: 'OPEN' as const }];
+  const blockers = [{ number: 3, repo: 'maddec01/lar-server', state: 'CLOSED' as const }, { number: 4, repo: 'maddec01/lar-apple', state: 'OPEN' as const }];
   assert.deepEqual(openBlockers(item('Ready', [], { blockers })), [blockers[1]]);
 });
 
 test('the blocked text names the open blockers, with the repository when it is another', () => {
   const blocker = (number: number, repo: string, state: 'OPEN' | 'CLOSED') => ({ number, repo, state });
-  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'OPEN')] })), 'Blocked by #3 until it closes');
-  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'OPEN'), blocker(4, 'maddec01/mux-apple', 'OPEN')] })),
-    'Blocked by #3, maddec01/mux-apple#4 until they close');
-  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/mux-server', 'CLOSED')] })), null);
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'OPEN')] })), 'Blocked by #3 until it closes');
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'OPEN'), blocker(4, 'maddec01/lar-apple', 'OPEN')] })),
+    'Blocked by #3, maddec01/lar-apple#4 until they close');
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'CLOSED')] })), null);
 });
 
 test("a blocker's ref is #n for the item's repository, and names another repository in full, or without its owner when short", () => {
   const own = item('Ready', []);
   assert.deepEqual([blockerRef(own, { number: 3, repo: own.repo! }), blockerRef(own, { number: 3, repo: own.repo! }, true)], ['#3', '#3']);
-  assert.deepEqual([blockerRef(own, { number: 4, repo: 'maddec01/mux-apple' }), blockerRef(own, { number: 4, repo: 'maddec01/mux-apple' }, true)],
-    ['maddec01/mux-apple#4', 'mux-apple#4']);
+  assert.deepEqual([blockerRef(own, { number: 4, repo: 'maddec01/lar-apple' }), blockerRef(own, { number: 4, repo: 'maddec01/lar-apple' }, true)],
+    ['maddec01/lar-apple#4', 'lar-apple#4']);
 });
 
 test("a repository's project hint is found whatever the case, and is null once T3 has its project or before any read", () => {
-  const repositoryProjects = { 'maddec01/mux-server': 'Add the checkout in T3 Code', 'maddec01/mux-factory': null };
-  assert.equal(repositoryProjectHint({ repositoryProjects }, 'MADDEC01/Mux-Server'), 'Add the checkout in T3 Code');
-  assert.equal(repositoryProjectHint({ repositoryProjects }, 'maddec01/mux-factory'), null);
-  assert.equal(repositoryProjectHint({}, 'maddec01/mux-server'), null);
+  const repositoryProjects = { 'maddec01/lar-server': 'Add the checkout in T3 Code', 'maddec01/lar-factory': null };
+  assert.equal(repositoryProjectHint({ repositoryProjects }, 'MADDEC01/Lar-Server'), 'Add the checkout in T3 Code');
+  assert.equal(repositoryProjectHint({ repositoryProjects }, 'maddec01/lar-factory'), null);
+  assert.equal(repositoryProjectHint({}, 'maddec01/lar-server'), null);
 });
 
 test('Done counts for 7 days after closing', () => {
@@ -96,18 +96,18 @@ test('Done counts for 7 days after closing', () => {
   assert.equal(isRecentlyDone(item('Review', [], { closedAt: '2026-10-21T09:00:00Z' }), now), false);
 });
 
-test('the work message titles the thread, then runs mux-work on the issue', () => {
-  assert.equal(workMessage(item('Queued')), '#7 t\n$mux-work maddec01/mux-server#7');
+test('the work message titles the thread, then runs lar-work on the issue', () => {
+  assert.equal(workMessage(item('Queued')), '#7 t\n$lar-work maddec01/lar-server#7');
   assert.equal(workTitle(item('Queued')), '#7 t');
   const draft = item('Queued', [], { type: 'DraftIssue', repo: null, number: null });
   assert.equal(workMessage(draft), null);
   assert.equal(workTitle(draft), null);
 });
 
-test('a $word in the title is kept and $mux-work still opens line 2', () => {
+test('a $word in the title is kept and $lar-work still opens line 2', () => {
   const message = workMessage(item('Queued', [], { title: 'Fix $foo parsing' }))!;
-  assert.equal(message, '#7 Fix $foo parsing\n$mux-work maddec01/mux-server#7');
-  assert.equal(message.split('\n')[1], '$mux-work maddec01/mux-server#7');
+  assert.equal(message, '#7 Fix $foo parsing\n$lar-work maddec01/lar-server#7');
+  assert.equal(message.split('\n')[1], '$lar-work maddec01/lar-server#7');
 });
 
 test('a build branch is <kind>/<n>-<slug>: fix for a bug, feat for a feature or improvement, else chore', () => {
@@ -131,20 +131,20 @@ test('a build branch slug takes up to five words of the title, lowercase, with w
   assert.equal(buildBranch(item('Ready', [], { type: 'DraftIssue', repo: null, number: null })), null);
 });
 
-test('the build message names the build and the builder agent of the installed mux-work', () => {
-  assert.equal(buildMessage(item('Ready'), '/Users/me/.agents/skills/mux-work'),
-    'Build maddec01/mux-server#7. Read /Users/me/.agents/skills/mux-work/agents/builder.md and follow it.');
+test('the build message names the build and the builder agent of the installed lar-work', () => {
+  assert.equal(buildMessage(item('Ready'), '/Users/me/.agents/skills/lar-work'),
+    'Build maddec01/lar-server#7. Read /Users/me/.agents/skills/lar-work/agents/builder.md and follow it.');
   assert.equal(buildMessage(item('Ready', [], { type: 'DraftIssue', repo: null, number: null }), '/x'), null);
 });
 
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {
-  const repo = 'maddec01/mux-server';
-  const under = (n: number) => ({ number: n, title: 't', url: `https://github.com/${repo}/issues/${n}`, repo: 'Maddec01/Mux-Server', state: 'OPEN' as const });
+  const repo = 'maddec01/lar-server';
+  const under = (n: number) => ({ number: n, title: 't', url: `https://github.com/${repo}/issues/${n}`, repo: 'Maddec01/Lar-Server', state: 'OPEN' as const });
   const parent = item('In progress', [], { id: 'p', number: 7, stats: { agentMs: 10, wallMs: 1, tokens: 100, costUsd: 0.5 } });
   const build = item('Done', ['build'], { id: 'b', number: 8, parent: under(7), stats: { agentMs: 20, wallMs: 2, tokens: 200, costUsd: 3, frozen: true } });
   const nested = item('Done', ['build'], { id: 'n', number: 9, parent: under(8), stats: { agentMs: 40, tokens: 400, costUsd: 5, frozen: true } });
   const quiet = item('Ready', [], { id: 'q', number: 10, parent: under(7) });
-  const other = item('Done', [], { id: 'o', number: 11, repo: 'maddec01/mux-apple', parent: under(7), stats: { agentMs: 1, tokens: 1 } });
+  const other = item('Done', [], { id: 'o', number: 11, repo: 'maddec01/lar-apple', parent: under(7), stats: { agentMs: 1, tokens: 1 } });
   const items = [parent, build, nested, quiet, other];
   assert.deepEqual(itemTotal(parent, items), { agentMs: 71, tokens: 701, costUsd: 8.5 },
     'parent repos match in any case; wall only when every figure has it, frozen only when all are');
@@ -178,7 +178,7 @@ test('sample covers every status and both platforms', () => {
   const statuses = new Set(sample.items.map((i) => i.status));
   assert.equal(statuses.size, 10);
   const repos = new Set(sample.items.map((i) => i.repo));
-  assert.ok(repos.has('maddec01/mux-server') && repos.has('maddec01/mux-apple'));
+  assert.ok(repos.has('maddec01/lar-server') && repos.has('maddec01/lar-apple'));
   const { needsYou, inFlight, queued, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
   assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [28, 8, 8, 3, 4]);
 });
@@ -220,9 +220,9 @@ test("an item's PR is the one Open PR opens: its first linked PR, or itself when
   const linked = (number: number, mergeState: 'can merge' | 'conflicts') => ({ number, url: `u${number}`, state: 'OPEN', isDraft: false, checks: null, mergeState });
   assert.deepEqual(itemPr(item('Verify', [], { linkedPrs: [linked(1, 'conflicts'), linked(2, 'can merge')] })), { url: 'u1', pipeline: linked(1, 'conflicts') });
   assert.equal(itemPr(item('Verify')), null, 'no PR, no link and no pipeline');
-  const pr = item('Verify', [], { type: 'PullRequest', url: 'https://github.com/maddec01/mux-server/pull/7', pipeline, linkedPrs: [linked(1, 'conflicts')] });
-  assert.deepEqual(itemPr(pr), { url: 'https://github.com/maddec01/mux-server/pull/7', pipeline });
-  assert.deepEqual(itemPr({ ...pr, pipeline: undefined }), { url: 'https://github.com/maddec01/mux-server/pull/7', pipeline: null }, 'a PR whose pipeline was not read');
+  const pr = item('Verify', [], { type: 'PullRequest', url: 'https://github.com/maddec01/lar-server/pull/7', pipeline, linkedPrs: [linked(1, 'conflicts')] });
+  assert.deepEqual(itemPr(pr), { url: 'https://github.com/maddec01/lar-server/pull/7', pipeline });
+  assert.deepEqual(itemPr({ ...pr, pipeline: undefined }), { url: 'https://github.com/maddec01/lar-server/pull/7', pipeline: null }, 'a PR whose pipeline was not read');
 });
 
 test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {

@@ -3,7 +3,7 @@
 //
 // Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
 
-import type { UpdateChannel, UpdateReleaseNote, UpdateState } from "@mux-factory/shared";
+import type { UpdateChannel, UpdateReleaseNote, UpdateState } from "@lar-factory/shared";
 
 const NIGHTLY_VERSION_PATTERN = /^[^-+]+-nightly\.\d{8}\.\d+$/;
 

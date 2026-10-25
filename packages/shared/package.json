@@ -1,5 +1,5 @@
 {
-  "name": "@mux-factory/shared",
+  "name": "@lar-factory/shared",
   "private": true,
   "version": "0.1.0",
   "description": "What the board's apps share: the item and board model and rules, the desktop bridge contract, and the skill installer.",

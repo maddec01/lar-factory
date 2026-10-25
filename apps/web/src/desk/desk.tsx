@@ -3,8 +3,8 @@
 // its next action: Open thread on every card, Start build on a Ready one, Open PR on Verify and Ready to merge. A Verify
 // card also shows that PR's pipeline: its checks and whether GitHub lets it merge.
 
-import { HINTS, itemPr, platformOf, shortAgo } from '@mux-factory/shared';
-import type { BoardData, Item, MergeState } from '@mux-factory/shared';
+import { HINTS, itemPr, platformOf, shortAgo } from '@lar-factory/shared';
+import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, StepTrack } from '../items/item-parts.tsx';

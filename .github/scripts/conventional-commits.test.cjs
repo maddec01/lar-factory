@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const { headerProblem, findProblems, commitMessageProblem } = require('./conventional-commits.cjs');
 
 test('accepts conventional headers', () => {
-    for (const header of ['feat: add rails', 'fix(video): keep depth', 'refactor(mux-db)!: drop table', 'ci: check commits']) {
+    for (const header of ['feat: add rails', 'fix(video): keep depth', 'refactor(lar-db)!: drop table', 'ci: check commits']) {
         assert.equal(headerProblem(header), null, header);
     }
 });

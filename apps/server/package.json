@@ -1,8 +1,8 @@
 {
-  "name": "@mux-factory/server",
+  "name": "@lar-factory/server",
   "private": true,
   "version": "0.1.0",
-  "description": "Local board for the Mux factory: reads the Mux GitHub Project through gh and shows it as a board.",
+  "description": "Local board for the lar factory: reads the lar GitHub Project through gh and shows it as a board.",
   "type": "module",
   "scripts": {
     "build:web": "pnpm --dir ../web run build",
@@ -13,7 +13,7 @@
     "sample": "pnpm run build:web && BOARD_DATA_FILE=../../packages/shared/test/sample.json T3_SETTINGS=test/t3-settings.sample.json T3_MODEL_MANIFEST=test/model-manifest.sample.json node --disable-warning=ExperimentalWarning src/server.ts"
   },
   "dependencies": {
-    "@mux-factory/shared": "workspace:*"
+    "@lar-factory/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

@@ -7,13 +7,13 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CONFIG_URL, configUrl, loadConfig } from './config.ts';
 
-const server = { repo: 'maddec01/mux-server', platform: 'Server', role: 'Backend API server' };
+const server = { repo: 'maddec01/lar-server', platform: 'Server', role: 'Backend API server' };
 
 async function configWith(t: TestContext, repos: unknown[], extra: object = {}): Promise<URL> {
-  const dir = await mkdtemp(join(tmpdir(), 'mux config test '));
+  const dir = await mkdtemp(join(tmpdir(), 'lar config test '));
   t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   const file = join(dir, 'config.json');
-  await writeFile(file, JSON.stringify({ project: { owner: 'maddec01', title: 'Mux' }, repos, ...extra }));
+  await writeFile(file, JSON.stringify({ project: { owner: 'maddec01', title: 'lar' }, repos, ...extra }));
   return pathToFileURL(file);
 }
 
@@ -27,8 +27,8 @@ test('an older entry with a checkout path still loads, with the path ignored', a
 
 test('a repository entry without a role is refused, naming the repo', async (t) => {
   const { role: _role, ...noRole } = server;
-  await assert.rejects(async () => loadConfig(await configWith(t, [noRole])), /maddec01\/mux-server.*"role"/);
-  await assert.rejects(async () => loadConfig(await configWith(t, [{ ...server, role: ' ' }])), /maddec01\/mux-server.*"role"/);
+  await assert.rejects(async () => loadConfig(await configWith(t, [noRole])), /maddec01\/lar-server.*"role"/);
+  await assert.rejects(async () => loadConfig(await configWith(t, [{ ...server, role: ' ' }])), /maddec01\/lar-server.*"role"/);
 });
 
 test('the factory config gives every repository a role and no checkout path', () => {

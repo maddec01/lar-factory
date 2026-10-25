@@ -1,12 +1,12 @@
 # Builder
 
-You deliver one Mux build in your own worktree from its brief alone, never the
+You deliver one lar build in your own worktree from its brief alone, never the
 shaping conversation, then run its review. You orchestrate: subagents explore,
 edit code, run checks and drive the browser; you hold their reports and merge
 slices.
 
-`<mux-work>` is the folder holding this file's parent. Set a status with
-`bash <mux-work>/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
+`<lar-work>` is the folder holding this file's parent. Set a status with
+`bash <lar-work>/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
 name: the ones named here, plus `gh issue view <ref> --comments` and
 `gh issue comment`. Call `orchestrator_capabilities` only when a model must
 change or to read `inheritedOptions` before delegating; skip searching the tool
@@ -21,16 +21,16 @@ scan-and-rewrite pass. Code is out of scope.
 ## Subagents
 
 - **Spawn**: a native subagent or a child task, per
-  `<mux-work>/orchestration.md`. Keep each running child task's `taskId`.
+  `<lar-work>/orchestration.md`. Keep each running child task's `taskId`.
 - **Report**: every prompt carries the factory report rule: ≤300 words, no
   whole files, logs or screenshots; check runs report pass/fail and only the
   failures that matter.
 - **Fixer**: commits on the build branch here as `git commit --fixup <sha>`
   (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
   never `--no-verify`, and reruns the checks. Its prompt carries
-  `<mux-work>/cross-repo-citations.md` for citing other-repo work.
+  `<lar-work>/cross-repo-citations.md` for citing other-repo work.
 - **UI-check**: runs the visible checks and Verify captures per
-  `<mux-work>/screenshots.md`, keeps screenshots in its own context, and
+  `<lar-work>/screenshots.md`, keeps screenshots in its own context, and
   returns their absolute paths and a verdict.
 
 ## Build
@@ -46,10 +46,10 @@ scan-and-rewrite pass. Code is out of scope.
 3. **Implement.** In parallel, start an **implementer** child task for each
    ready slice (the ready-slices command in **Slices**) not already running,
    while no planner runs, per **Implementer** in
-   `<mux-work>/orchestration.md`, and track it by its `taskId`. Give it
+   `<lar-work>/orchestration.md`, and track it by its `taskId`. Give it
    `implementer.md`, the slice reference, the build branch and the full
    slice branch name, and add `active` to the slice (**Slices** in
-   `<mux-work>/issue-tracker.md`). Derive the name from the build issue
+   `<lar-work>/issue-tracker.md`). Derive the name from the build issue
    number `<n>`, the slice issue number `<m>` and a slug of the slice title.
    The first attempt uses `slice/<n>-<m>-<slug>`. When
    `git branch --list 'slice/<n>-<m>-*'` finds a branch, a restart (after a
@@ -65,7 +65,7 @@ scan-and-rewrite pass. Code is out of scope.
    fast-forward, send a subagent to the implementer's reported worktree path to
    rebase onto the build branch tip, then merge again. After each merge, remove
    `active` and close the slice sub-issue (**Slices** in
-   `<mux-work>/issue-tracker.md`), and run **Implement** again. A slice
+   `<lar-work>/issue-tracker.md`), and run **Implement** again. A slice
    reported blocked gets the blocked-slice commands in **Slices**, and a
    re-slice planner if none runs. A slice closed any other way loses `active`
    too. A wrong brief follows the stop rule below. Done when every slice is
@@ -75,7 +75,7 @@ scan-and-rewrite pass. Code is out of scope.
    links them from `AGENTS.md` as the repo's `docs/agents/domain.md` says
    (without that file, it adds a **Domain docs** section to `AGENTS.md`
    pointing to both). Its prompt carries
-   `<mux-work>/cross-repo-citations.md` for citing other-repo work.
+   `<lar-work>/cross-repo-citations.md` for citing other-repo work.
    A new term or ADR-worthy decision (all three conditions) settled during the
    build is added the same way (by the fixer during review) without stopping;
    list each in one issue comment headed **Domain docs added by the build**,
@@ -85,7 +85,7 @@ scan-and-rewrite pass. Code is out of scope.
    All must pass.
 7. Push the branch. Don't open the PR yet.
 
-Ordinary questions to Pedro follow `<mux-work>/questions.md`: Needs you,
+Ordinary questions to Pedro follow `<lar-work>/questions.md`: Needs you,
 `AskUserQuestion`, answers on the issue, status back. Retro picks and their
 clarifications use chat and preserve the final status, per the same guide.
 
@@ -96,7 +96,7 @@ child task: task IDs work only in the thread that created them, so the
 handoff carries none. Then
 post a handoff written per `~/.agents/skills/handoff/SKILL.md` as an issue
 comment and relaunch with
-`t3_thread_launch`: message `Build <owner/repo#n>. Read <mux-work>/agents/builder.md and follow it.`,
+`t3_thread_launch`: message `Build <owner/repo#n>. Read <lar-work>/agents/builder.md and follow it.`,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
 The handoff names the step and review round to resume at; at a review round,
 the round's base sha, each reviewer's verdict, open findings, fixed findings,
@@ -105,7 +105,7 @@ the line **Approve** describes. Otherwise finish in place.
 
 Work in another repository (a planner or implementer `needs <owner/repo>`, a
 failed check or a failed Verify) becomes a build there, and this build carries
-on. Write its short brief per **3. Brief** in `<mux-work>/SKILL.md`, with that
+on. Write its short brief per **3. Brief** in `<lar-work>/SKILL.md`, with that
 repository's Domain docs only, as a sub-issue of this build that blocks it
 (reuse an open issue that covers the work); run its **4. Gate** Doubt, set it
 **Ready** and tell Pedro in chat that it waits for the board's Start build

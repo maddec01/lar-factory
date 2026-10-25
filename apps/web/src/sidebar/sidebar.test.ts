@@ -4,7 +4,7 @@
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, fullScreen, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
-import type { BoardData, Item } from '@mux-factory/shared';
+import type { BoardData, Item } from '@lar-factory/shared';
 import { THREAD_SIDEBAR_WIDTH_STORAGE_KEY } from './threadSidebarWidth.ts';
 
 beforeEach(() => localStorage.clear());
@@ -246,7 +246,7 @@ test('the sidebar holds the brand, search and Add item, then a group per reposit
   expect($('.sidebar .add-item')!.getAttribute('aria-label')).toBe('Add item');
   expect($$('.list-group').map((g) => [g.dataset.platform, text(g.querySelector('.count'))])).toEqual([['Server', '2'], ['Apple', '1'], ['Draft', '1']]);
   expect(rows('Server'), 'in board order, as in the prototype').toEqual(['PVTI_sample01', 'PVTI_sample02']);
-  expect(text(group('Server').querySelector('button.scope'))).toBe('SServermux-server');
+  expect(text(group('Server').querySelector('button.scope'))).toBe('SServerlar-server');
   const row = group('Apple').querySelector<HTMLButtonElement>('button[data-item]')!;
   expect([...row.querySelectorAll('span > span')].map(text), 'the title over its ref and age').toEqual(['Remember the last subtitle language per show', '#12 · 19h ago']);
   expect(row.title, 'the full title on hover').toBe('Remember the last subtitle language per show');

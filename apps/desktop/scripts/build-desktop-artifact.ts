@@ -20,11 +20,11 @@ import * as NodeUtil from "node:util";
 
 import type { Configuration } from "electron-builder";
 
-import type { UpdateChannel } from "@mux-factory/shared";
+import type { UpdateChannel } from "@lar-factory/shared";
 import { defaultChannel as updateChannel } from "../src/updates/updateMachine.ts";
 
 const APP_DIR = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "..");
-const UPDATE_REPOSITORY = { owner: "maddec01", repo: "mux-factory" } as const;
+const UPDATE_REPOSITORY = { owner: "maddec01", repo: "lar-factory" } as const;
 
 export const SIGNING_VARIABLES = [
   "CSC_LINK",
@@ -68,10 +68,10 @@ function publishConfig(channel: UpdateChannel) {
 
 export function createBuildConfig({ version, signed, outputDir }: BuildOptions): Configuration {
   return {
-    appId: "com.maddec01.mux-factory.board",
-    productName: "Mux Factory",
+    appId: "com.pedrogomes.lar.factory",
+    productName: "lar Factory",
     // GitHub renames release assets with spaces, which breaks the feed's links.
-    artifactName: "Mux-Factory-${version}-${arch}.${ext}",
+    artifactName: "lar-factory-${version}-${arch}.${ext}",
     extraMetadata: { version },
     electronLanguages: ["en-US"],
     // No native modules to rebuild for Electron.
@@ -116,7 +116,7 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
       // aborts without it. The display name must match the file's name for macOS to
       // show the localized one, so a user's rename wins.
       extendInfo: {
-        CFBundleDisplayName: "Mux Factory",
+        CFBundleDisplayName: "lar Factory",
         LSHasLocalizedDisplayName: true,
       },
       notarize: signed,

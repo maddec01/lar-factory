@@ -20,7 +20,7 @@ const MANIFEST = {
 };
 
 function files(t: TestContext, settings: unknown, manifest: unknown = MANIFEST) {
-  const dir = tempDir(t, 'mux-model-choices-');
+  const dir = tempDir(t, 'lar-model-choices-');
   const write = (name: string, value: unknown) => {
     writeFileSync(join(dir, name), typeof value === 'string' ? value : JSON.stringify(value));
     return join(dir, name);
@@ -86,7 +86,7 @@ for (const [name, settingsValue, manifestValue] of [
 }
 
 test('missing files offer only T3 default', (t) => {
-  const dir = tempDir(t, 'mux-model-choices-');
+  const dir = tempDir(t, 'lar-model-choices-');
   assert.deepEqual(loadModelChoices(join(dir, 'none.json'), join(dir, 'none.json')), []);
 });
 

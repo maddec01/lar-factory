@@ -5,10 +5,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act } from 'react';
 import { afterEach, beforeAll, beforeEach, vi } from 'vite-plus/test';
-import { pageWithData } from '@mux-factory/shared';
-import type { BoardData, BoardAppBridge, Status, UpdateState } from '@mux-factory/shared';
+import { pageWithData } from '@lar-factory/shared';
+import type { BoardData, BoardAppBridge, Status, UpdateState } from '@lar-factory/shared';
 import template from '../index.html?raw';
-import sampleJson from '@mux-factory/shared/test/sample.json' with { type: 'json' };
+import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
 
 export const sample = sampleJson as unknown as BoardData;
 /** The page's clock: twenty minutes after the sample was read. */

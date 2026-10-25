@@ -6,8 +6,8 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { XIcon } from 'lucide-react';
-import { Button } from '@mux-factory/ui/button';
-import { ToastProvider, toastManager } from '@mux-factory/ui/toast';
+import { Button } from '@lar-factory/ui/button';
+import { ToastProvider, toastManager } from '@lar-factory/ui/toast';
 import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 
 /** How long a success toast stays. */

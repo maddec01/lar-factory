@@ -2,8 +2,8 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { draftItem, startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@mux-factory/shared/test/raw-items';
-import type { BoardData } from '@mux-factory/shared';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import type { BoardData } from '@lar-factory/shared';
 
 const draft = draftItem('List');
 
@@ -27,7 +27,7 @@ test('Abandon deletes the issue on GitHub and the board drops it at once', async
   assert.equal(result.error, null);
   assert.ok(!has(result.board, 'PVTI_12'));
   assert.ok(has(result.board, 'PVTI_13'));
-  assert.deepEqual(await deletes(board), [['issue', 'delete', '12', '-R', 'maddec01/mux-factory', '--yes']]);
+  assert.deepEqual(await deletes(board), [['issue', 'delete', '12', '-R', 'maddec01/lar-factory', '--yes']]);
 });
 
 test('Abandon on a draft removes it from the project', async (t) => {
@@ -63,13 +63,13 @@ test('an abandoned item does not come back while GitHub still reports it', async
 test('an item this board just created does not come back after Abandon', async (t) => {
   const board = await startBoard(t, { items: [] }, false, true);
   const created = await board.postSession({ requestId: '00000000-0000-4000-8000-000000000001',
-    draft: { repo: 'maddec01/mux-server', kind: 'bug', title: 'Throwaway', description: '', labels: [] } }, '/api/items');
+    draft: { repo: 'maddec01/lar-server', kind: 'bug', title: 'Throwaway', description: '', labels: [] } }, '/api/items');
   assert.equal(created.status, 200);
   // GitHub has not reported the new item yet, so only the board's own copy holds it.
   assert.equal((await abandon(board, 'PVTI_900001')).status, 200);
   await reads(board, 2);
   assert.ok(!has(await board.board(), 'PVTI_900001'));
-  await board.update({ items: [projectIssue(900001, 'List', 'maddec01/mux-server')] });
+  await board.update({ items: [projectIssue(900001, 'List', 'maddec01/lar-server')] });
   await reads(board, 3);
   assert.ok(!has(await board.board(), 'PVTI_900001'));
 });
@@ -83,7 +83,7 @@ test('Abandon deletes a Queued issue and removes a Queued draft', async (t) => {
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).board.items, []);
   assert.deepEqual(await deletes(board), [
-    ['issue', 'delete', '12', '-R', 'maddec01/mux-factory', '--yes'],
+    ['issue', 'delete', '12', '-R', 'maddec01/lar-factory', '--yes'],
     ['project', 'item-delete', '1', '--owner', 'maddec01', '--id', 'PVTI_draft'],
   ]);
 });

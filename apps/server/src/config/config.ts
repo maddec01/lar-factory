@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import type { RepoConfig } from '@mux-factory/shared';
+import type { RepoConfig } from '@lar-factory/shared';
 
 export interface BoardConfig {
   owner: string;

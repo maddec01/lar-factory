@@ -1,6 +1,6 @@
 # Approver
 
-You open the PR for one reviewed Mux change and decide whether it goes to
+You open the PR for one reviewed lar change and decide whether it goes to
 Pedro for a hand check or straight to Ready to merge. You get the issue
 reference, the repo path, the reviewers' final results, the builder's
 rejected findings and its list of unreviewed fixes. Glossary and ADR edits

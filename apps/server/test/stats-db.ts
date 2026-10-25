@@ -73,7 +73,7 @@ CREATE TABLE orchestration_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, a
 
 /** Writes the database to a temporary folder removed after the test, and returns its path. */
 export function statsDb(t: TestContext, threads: FixtureThread[], requests: FixtureRequest[] = []): string {
-  const path = join(tempDir(t, 'mux-stats-'), 'statev2.sqlite');
+  const path = join(tempDir(t, 'lar-stats-'), 'statev2.sqlite');
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
   const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?, ?)');
@@ -165,8 +165,8 @@ const lines = (records: (object | string)[]): string => records.map((r) => (type
  * Writes a Claude Code home (its `projects` folder) and returns it: at `home`, or
  * in a temporary folder removed after the test.
  */
-export function claudeHome(t: TestContext, sessions: Record<string, FixtureTranscripts>, home = tempDir(t, 'mux-claude-home-')): string {
-  const project = join(home, 'projects', '-Users-pedro--t3-worktrees-mux-factory-feat-60');
+export function claudeHome(t: TestContext, sessions: Record<string, FixtureTranscripts>, home = tempDir(t, 'lar-claude-home-')): string {
+  const project = join(home, 'projects', '-Users-pedro--t3-worktrees-lar-factory-feat-60');
   mkdirSync(project, { recursive: true });
   for (const [session, { main, subagents }] of Object.entries(sessions)) {
     if (main) writeFileSync(join(project, `${session}.jsonl`), lines(main));
@@ -186,7 +186,7 @@ export function claudeHome(t: TestContext, sessions: Record<string, FixtureTrans
  * rollout under the day folder Codex files it in, at `home` or in a temporary
  * folder removed after the test. A string line is written as is.
  */
-export function codexHome(t: TestContext, sessions: Record<string, (object | string)[]>, home = tempDir(t, 'mux-codex-home-')): string {
+export function codexHome(t: TestContext, sessions: Record<string, (object | string)[]>, home = tempDir(t, 'lar-codex-home-')): string {
   const day = join(home, 'sessions', '2026', '10', '20');
   mkdirSync(day, { recursive: true });
   for (const [session, records] of Object.entries(sessions)) {
@@ -217,7 +217,7 @@ export function t3Settings(t: TestContext, homes: Record<string, string | { driv
   usageModelAliases?: unknown;
   usagePriceOverrides?: unknown;
 } = {}): string {
-  const path = join(tempDir(t, 'mux-t3-settings-'), 'settings.json');
+  const path = join(tempDir(t, 'lar-t3-settings-'), 'settings.json');
   const providerInstances = Object.fromEntries(Object.entries(homes).map(([id, entry]) => {
     const { driver, homePath } = typeof entry === 'string' ? { driver: 'claudeAgent', homePath: entry } : entry;
     return [id, { driver, displayName: id, enabled: true, config: { homePath } }];
@@ -228,7 +228,7 @@ export function t3Settings(t: TestContext, homes: Record<string, string | { driv
 
 /** Writes T3's cached price table, `usage-model-rates.json`, around a LiteLLM document, and returns its path. */
 export function usageRates(t: TestContext, document: Record<string, object>): string {
-  const path = join(tempDir(t, 'mux-t3-rates-'), 'usage-model-rates.json');
+  const path = join(tempDir(t, 'lar-t3-rates-'), 'usage-model-rates.json');
   writeFileSync(path, JSON.stringify({ fetchedAtMs: Date.parse('2026-10-20T00:00:00Z'), document }));
   return path;
 }
@@ -242,7 +242,7 @@ export interface FixtureProject {
 
 /** Writes a database holding only T3's projects to a temporary folder removed after the test, and returns its path. */
 export function projectsDb(t: TestContext, projects: FixtureProject[]): string {
-  const path = join(tempDir(t, 'mux-projects-'), 'statev2.sqlite');
+  const path = join(tempDir(t, 'lar-projects-'), 'statev2.sqlite');
   const db = new DatabaseSync(path);
   db.exec(`CREATE TABLE projection_projects (project_id TEXT PRIMARY KEY, title TEXT NOT NULL,
     workspace_root TEXT NOT NULL, deleted_at TEXT)`);

@@ -2,7 +2,7 @@
 // This week, T3's gap past the toggle while the sidebar is hidden.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { clock } from '@mux-factory/shared';
+import { clock } from '@lar-factory/shared';
 import { $, $$, NOW, mountPage, push, sample, settle, stubApp, text } from '../../test/support.ts';
 
 const titleBar = () => $<HTMLElement>('.title-bar')!;
@@ -114,7 +114,7 @@ test('screen readers skip the brand; the page keeps one h1, for screen readers o
   await mountPage();
   expect($('.brand')!.getAttribute('aria-hidden')).toBe('true');
   expect(titleBar().closest('[aria-hidden="true"]')).toBeNull();
-  expect($$('h1').map((h) => [h.className, text(h)])).toEqual([['sr-only', 'µx Factory']]);
+  expect($$('h1').map((h) => [h.className, text(h)])).toEqual([['sr-only', 'lar Factory']]);
 });
 
 test('the time counts up each second, between the board\'s 15 s ticks, in muted 12 px digits of fixed width', async () => {

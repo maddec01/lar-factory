@@ -65,7 +65,7 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
     ...bounds,
     minWidth: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.width,
     minHeight: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.height,
-    title: "µx Factory",
+    title: "lar Factory",
     // Shown once the first page paints, already maximized if restoring that, so it doesn't open small and then grow.
     show: false,
     ...WindowTitleBar.options(process.platform),
@@ -281,9 +281,9 @@ const program = Effect.gen(function* () {
 
 // The app menu's About, Hide and Quit items read app.name. Electron derives userData
 // from the name, so pin it first: update-channel.json, window-state.json, .updaterId and the
-// single-instance lock stay in the folder the app has always used.
-Electron.app.setPath("userData", NodePath.join(Electron.app.getPath("appData"), "@mux-factory/desktop"));
-Electron.app.setName("µx Factory");
+// single-instance lock stay in the package's folder, whatever the shown name.
+Electron.app.setPath("userData", NodePath.join(Electron.app.getPath("appData"), "@lar-factory/desktop"));
+Electron.app.setName("lar Factory");
 
 // One app at a time: a second launch hands over to the first (see "second-instance") and quits.
 if (Electron.app.requestSingleInstanceLock()) NodeRuntime.runMain(program);

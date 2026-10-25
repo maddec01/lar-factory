@@ -2,16 +2,16 @@
 // or logged-out gh, which stops the board reading GitHub, shows a banner.
 
 import type { ReactNode } from 'react';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@mux-factory/shared';
-import type { ToolMissing, ToolProblem } from '@mux-factory/shared';
-import { Button } from '@mux-factory/ui/button';
+import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@lar-factory/shared';
+import type { ToolMissing, ToolProblem } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/button';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { Banner } from './banner.tsx';
 import { useRecheckStore } from './recheck-store.ts';
 
 function BrandMark() {
   return (
-    <svg className="brand-mark" role="img" aria-label="Mux" viewBox={BRAND_MARK_VIEWBOX} fill="none">
+    <svg className="brand-mark" role="img" aria-label="lar" viewBox={BRAND_MARK_VIEWBOX} fill="none">
       <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

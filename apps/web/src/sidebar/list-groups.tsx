@@ -11,6 +11,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle } from '../items/item-parts.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
+import { RowA, RowB, RowC, useSidebarVariant } from './prototype-variants.tsx';
 import { useSidebarStore } from './sidebar-store.ts';
 
 const PREVIEW = 6;
@@ -18,6 +19,11 @@ const matches = (item: Item, q: string) => !q || `${item.title} ${ref(item)}`.to
 
 function Row({ item, now }: { item: Item; now: number }) {
   const on = useItemDialogStore((state) => state.itemId === item.id);
+  const variant = useSidebarVariant();
+  const open = () => useItemDialogStore.getState().open(item.id);
+  if (variant === 'a') return <RowA item={item} now={now} on={on} open={open} />;
+  if (variant === 'b') return <RowB item={item} now={now} on={on} open={open} />;
+  if (variant === 'c') return <RowC item={item} now={now} on={on} open={open} />;
   return (
     <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
       className={`flex h-9 w-full items-center gap-2.5 rounded-md pl-8 pr-2.5 text-left text-sm hover:bg-(--sidebar-row-hover) ${on ? 'bg-(--sidebar-row-selected) font-medium text-(--sidebar-foreground)' : 'text-(--sidebar-foreground)/80'}`}>
@@ -68,7 +74,12 @@ function Group({ platform, repo, items, now, q }: { platform: string; repo: stri
 /** `query` is the search, lower case and trimmed. */
 export function ListGroups({ query: q }: { query: string }) {
   const { data, now } = useBoardStore();
-  const groups = boardSections(data, now).listGroups
+  // PROTOTYPE: `?fill=1` puts every sample item in the List (keeping their real status glyphs) so density is judgeable.
+  const fill = new URLSearchParams(location.search).has('fill');
+  const real = new Map(data.items.map((i) => [i.id, i]));
+  const view = fill ? boardSections({ ...data, items: data.items.map((i) => ({ ...i, status: 'List' as const })) }, now) : boardSections(data, now);
+  const groups = view.listGroups
+    .map((group) => ({ ...group, items: group.items.map((i) => real.get(i.id) ?? i) }))
     .map((group) => ({ ...group, items: group.items.filter((i) => matches(i, q)) }))
     .filter((group) => !q || group.items.length);
   return (

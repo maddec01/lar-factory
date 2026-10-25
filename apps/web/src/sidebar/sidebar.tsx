@@ -13,6 +13,7 @@ import { useSettingsStore } from '../settings/settings-store.ts';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { ListGroups } from './list-groups.tsx';
+import { SidebarVariantBar } from './prototype-variants.tsx';
 import { BRAND_LEFT, Brand } from './window-controls.tsx';
 
 /** T3's search field over the thread list, with its new-thread button, here Add item, on the right. Search filters List items only. */
@@ -59,6 +60,7 @@ export function Sidebar({ board = true, open = true }: { board?: boolean; open?:
           </>
         ) : <div className="flex-1" />}
       </div>
+      <SidebarVariantBar />
       {settings ? (
         <>
           <SettingsNav />

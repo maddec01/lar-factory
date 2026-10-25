@@ -241,7 +241,7 @@ test('a closed sidebar stays mounted: ⌘N still opens Add item, and the search 
 
 test('the sidebar holds the brand, search and Add item, then a group per repository and a Draft group with their List items', async () => {
   await mountPage();
-  expect(text($('.sidebar .brand'))).toBe('FactoryforCode');
+  expect(text($('.sidebar .brand'))).toBe('larFactoryforCode');
   expect(search().placeholder).toBe('Search List');
   expect($('.sidebar .add-item')!.getAttribute('aria-label')).toBe('Add item');
   expect($$('.list-group').map((g) => [g.dataset.platform, text(g.querySelector('.count'))])).toEqual([['Server', '2'], ['Apple', '1'], ['Draft', '1']]);

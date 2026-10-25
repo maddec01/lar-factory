@@ -98,8 +98,6 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
       { from: "../web/dist", to: "web/dist" },
       { from: "dist-electron/bundle", to: "bundle" },
       { from: "../../config.json", to: "config.json" },
-      // InfoPlist.strings: with LSHasLocalizedDisplayName, the Dock and Finder show its name.
-      { from: "resources/en.lproj", to: "en.lproj" },
       // T3 Code's MIT licence: the main process, preload and scripts copy its code.
       { from: "LICENSE", to: "LICENSE.t3code.txt" },
     ],
@@ -111,14 +109,8 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
         { target: "zip", arch: ["arm64"] },
       ],
       category: "public.app-category.developer-tools",
-      // The menu bar, Dock and Finder show en.lproj's names. Info.plist's CFBundleName
-      // stays productName: Electron finds "<CFBundleName> Helper.app" at launch and
-      // aborts without it. The display name must match the file's name for macOS to
-      // show the localized one, so a user's rename wins.
-      extendInfo: {
-        CFBundleDisplayName: "lar Factory",
-        LSHasLocalizedDisplayName: true,
-      },
+      // lar-brand's icons/apple/Factory/Factory.icns.
+      icon: "resources/icon.icns",
       notarize: signed,
       ...(signed
         ? { hardenedRuntime: true, sign: NodePath.join(APP_DIR, "scripts/sign-macos.ts") }

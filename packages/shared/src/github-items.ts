@@ -2,7 +2,7 @@
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
 import { STATUSES, isBuild, sliceProgress } from './model.ts';
-import type { Checks, ConceptMap, ContentType, IssueRef, Item, LinkedPr, Slice, Status } from './model.ts';
+import type { Checks, ConceptMap, ContentType, IssueRef, Item, LinkedPr, MergeState, Slice, Status } from './model.ts';
 import { parseConceptMap } from './concept-map.ts';
 
 interface RawLabelConn {
@@ -46,6 +46,9 @@ interface RawContent {
   state?: string;
   closedAt?: string | null;
   isDraft?: boolean;
+  /** A pull request item's own. */
+  mergeStateStatus?: string;
+  statusCheckRollup?: RawLinkedPr['statusCheckRollup'];
   repository?: { nameWithOwner: string };
   labels?: RawLabelConn;
   parent?: RawIssueRef | null;
@@ -67,6 +70,7 @@ export interface RawLinkedPr {
   isDraft: boolean;
   body?: string;
   mergedAt?: string | null;
+  mergeStateStatus?: string;
   statusCheckRollup?: {
     contexts: {
       checkRunCountsByState: RawStateCount[];
@@ -129,8 +133,19 @@ export function normalizeChecks(rollup: RawLinkedPr['statusCheckRollup']): Check
   return checks;
 }
 
-function normalizeLinkedPr({ statusCheckRollup, ...pr }: RawLinkedPr): LinkedPr {
-  return { ...pr, checks: normalizeChecks(statusCheckRollup) };
+const MERGE_STATES: Record<string, MergeState> = {
+  CLEAN: 'can merge', HAS_HOOKS: 'can merge', UNSTABLE: 'can merge', UNKNOWN: 'checking',
+  DIRTY: 'conflicts', BLOCKED: 'blocked', BEHIND: 'blocked', DRAFT: 'blocked',
+};
+
+/** GitHub's MergeStateStatus in four; checking while GitHub hasn't worked it out, or it wasn't read. */
+export function normalizeMergeState(status: string | undefined): MergeState {
+  // Own keys only, so a status such as constructor can't read the prototype.
+  return (status && Object.hasOwn(MERGE_STATES, status) ? MERGE_STATES[status] : undefined) ?? 'checking';
+}
+
+function normalizeLinkedPr({ statusCheckRollup, mergeStateStatus, ...pr }: RawLinkedPr): LinkedPr {
+  return { ...pr, checks: normalizeChecks(statusCheckRollup), mergeState: normalizeMergeState(mergeStateStatus) };
 }
 
 function toStatus(name: string | undefined): Status {
@@ -198,6 +213,7 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
     slices: normalizeSlices(rawSlices(raw, builds), active, blocked),
   };
+  if (c.__typename === 'PullRequest') item.pipeline = { checks: normalizeChecks(c.statusCheckRollup), mergeState: normalizeMergeState(c.mergeStateStatus) };
   if (isRawConcept(raw)) item.map = parseConceptMap(c.body ?? '');
   return item;
 }

@@ -9,7 +9,13 @@ test('the board query reads the blocked-by issues, no issue bodies, and linked P
   assert.doesNotMatch(ITEMS_QUERY, /blocking\(/, 'the query reads no blocking links');
   assert.doesNotMatch(ITEMS_QUERY, /issueDependenciesSummary/, 'the open blockers come from the blocked-by issues, not a summary count');
   assert.doesNotMatch(ITEMS_QUERY, /\.\.\. on Issue \{[^}]*\bbody\b/, "issue bodies are read for dossiers only, in a query of their own");
-  assert.match(ITEMS_QUERY, /number url state isDraft body mergedAt\n/, 'linked PR bodies come with the board query, not a call per item');
+  assert.match(ITEMS_QUERY, /number url state isDraft body mergedAt mergeStateStatus\n/, 'linked PR bodies come with the board query, not a call per item');
+});
+
+test('the board query reads a pull request item\'s own checks and merge state', () => {
+  const pr = /\.\.\. on PullRequest \{([\s\S]*)\n {12}\}/.exec(ITEMS_QUERY)?.[1] ?? '';
+  assert.match(pr, /\bmergeStateStatus\b/);
+  assert.match(pr, /statusCheckRollup \{\s+contexts\(first: \d+\) \{\s+checkRunCountsByState/);
 });
 
 test("the board query reads each slice's state reason", () => {

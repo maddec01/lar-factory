@@ -1,12 +1,14 @@
 // The window controls and the sidebar: the toggle and ⌘B, search with Add item and ⌘N, the List's groups by
 // repository with their rows, collapse, "Show N more" and scope, and the foot's Settings and update button.
 
-import { expect, test } from 'vite-plus/test';
+import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, fullScreen, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
 import type { BoardData, Item } from '@mux-factory/shared';
 
 const group = (platform: string) => $(`.list-group[data-platform="${platform}"]`)!;
 const rows = (platform: string) => [...group(platform).querySelectorAll<HTMLButtonElement>('button[data-item]')].map((b) => b.dataset.item);
+const sidebar = () => $('[data-slot="sidebar"]')!;
+const shown = () => sidebar().dataset.state === 'expanded' && !sidebar().hasAttribute('inert');
 const search = () => $<HTMLInputElement>('.sidebar input[type="search"]')!;
 const press = (key: string) => settle(() => dispatchEvent(new KeyboardEvent('keydown', { key, metaKey: true, bubbles: true, cancelable: true })));
 
@@ -57,15 +59,31 @@ test('outside the Mac app, full screen leaves the toggle where it is', async () 
   expect($('.sidebar-toggle')!.className.split(' ')).toContain('left-19');
 });
 
+test('the sidebar is T3\'s offcanvas sidebar, 300 px wide', async () => {
+  await mountPage();
+  expect($('[data-slot="sidebar-wrapper"]')!.style.getPropertyValue('--sidebar-width')).toBe('300px');
+  expect([sidebar().dataset.side, shown()]).toEqual(['left', true]);
+  expect(sidebar().querySelector('.sidebar .brand')).not.toBeNull();
+});
+
 test('the toggle and ⌘B hide and show the sidebar', async () => {
   await mountPage();
   await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
-  expect($('.sidebar')!.hidden).toBe(true);
+  expect([shown(), sidebar().dataset.collapsible]).toEqual([false, 'offcanvas']);
   expect($('.sidebar-toggle')!.getAttribute('aria-pressed')).toBe('false');
   await press('b');
-  expect($('.sidebar')!.hidden).toBe(false);
+  expect(shown()).toBe(true);
   await press('b');
-  expect($('.sidebar')!.hidden).toBe(true);
+  expect(shown()).toBe(false);
+});
+
+test('below 768 px wide the sidebar is T3\'s sheet, which the toggle opens', async () => {
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 767px)', addEventListener: () => {}, removeEventListener: () => {} }));
+  await mountPage();
+  expect($('.sidebar')).toBeNull();
+  await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
+  expect($('[data-slot="sidebar"][data-mobile="true"] .brand')).not.toBeNull();
+  expect($('.sidebar-toggle')!.getAttribute('aria-pressed')).toBe('true');
 });
 
 test('⌘N opens Add item', async () => {

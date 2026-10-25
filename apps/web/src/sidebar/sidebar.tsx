@@ -1,11 +1,12 @@
-// The left sidebar, copied in layout from T3 Code's: the brand beside the window controls, search with Add item, the
+// The left sidebar, on T3 Code's sidebar component and copied in layout from T3's: the brand beside the window controls, search with Add item, the
 // List by repository, and Settings and the update button at its foot. Above the missing-t3 notice there's no List to
 // search or add to, so only the brand and Settings show. In Settings the section list takes the List's place, hiding
 // the List rather than closing it, so Back finds it as it was.
 
-import { useState } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { Search, X } from 'lucide-react';
 import { boardApp } from '@mux-factory/shared';
+import { Sidebar as T3Sidebar, SidebarProvider } from '@mux-factory/ui/sidebar';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { AddItem } from '../add-item/add-item.tsx';
 import { SettingsButton, SettingsNav } from '../settings/settings.tsx';
@@ -13,6 +14,7 @@ import { useSettingsStore } from '../settings/settings-store.ts';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { ListGroups } from './list-groups.tsx';
+import { useSidebarStore } from './sidebar-store.ts';
 import { Brand, useBrandLeft } from './window-controls.tsx';
 
 /** T3's search field over the thread list, with its new-thread button, here Add item, on the right. Search filters List items only. */
@@ -43,14 +45,26 @@ function Update() {
   );
 }
 
-/** Closed, the sidebar hides rather than unmounts, so Add item keeps its ⌘N and its draft, and the search and the
- *  groups' collapse survive. */
-export function Sidebar({ board = true, open = true }: { board?: boolean; open?: boolean }) {
+/** T3's SidebarProvider around the page, at the board's 300 px. The sidebar store holds open, so the title bar, the
+ *  app and ⌘B read one value. */
+export function SidebarLayout({ className, children }: { className?: string; children: ReactNode }) {
+  const open = useSidebarStore((state) => state.open);
+  const setOpen = useSidebarStore((state) => state.setOpen);
+  return (
+    <SidebarProvider open={open} onOpenChange={setOpen} className={className} style={{ '--sidebar-width': '300px' } as CSSProperties}>
+      {children}
+    </SidebarProvider>
+  );
+}
+
+/** T3's offcanvas sidebar: closed, it slides away rather than unmounts, so Add item keeps its ⌘N and its draft, and
+ *  the search and the groups' collapse survive. Below 768 px it is T3's sheet. */
+export function Sidebar({ board = true }: { board?: boolean }) {
   const [query, setQuery] = useState('');
   const settings = useSettingsStore((state) => state.open);
   const brandLeft = useBrandLeft();
   return (
-    <aside hidden={!open} className="sidebar relative flex w-75 shrink-0 flex-col border-r border-(--sidebar-border) bg-(--sidebar) text-(--sidebar-foreground)">
+    <T3Sidebar collapsible="offcanvas" className="sidebar border-(--sidebar-border) text-(--sidebar-foreground)">
       <div className={`flex h-13 shrink-0 items-center pr-3 ${brandLeft} [-webkit-app-region:drag]`}><Brand /></div>
       <div className="contents" hidden={settings}>
         {board ? (
@@ -71,6 +85,6 @@ export function Sidebar({ board = true, open = true }: { board?: boolean; open?:
           {board && <Update />}
         </div>
       )}
-    </aside>
+    </T3Sidebar>
   );
 }

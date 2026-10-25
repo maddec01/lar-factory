@@ -9,9 +9,9 @@ import { PanelLeft, PanelLeftClose } from 'lucide-react';
 import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, boardApp, inMacApp } from '@mux-factory/shared';
 import { Badge } from '@mux-factory/ui/badge';
 import { Button } from '@mux-factory/ui/button';
+import { useSidebar, useSidebarVisibility } from '@mux-factory/ui/sidebar';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { T3Wordmark } from './T3Wordmark.tsx';
-import { useSidebarStore } from './sidebar-store.ts';
 
 // The window's full screen, as T3 Code's apps/web/src/components/AppSidebarLayout.tsx reads it: the bridge's
 // synchronous read, cached until a subscription follows the changes.
@@ -71,26 +71,28 @@ export function Brand() {
   );
 }
 
-/** Fixed to the window's top left, so the toggle stays put while the sidebar slides away. */
+/** Fixed to the window's top left, so the toggle stays put while the sidebar slides away. The toggle and ⌘B go
+ *  through T3's SidebarProvider, which sets the sidebar store, or opens the sheet below 768 px. */
 export function WindowControls() {
-  const { open, toggle } = useSidebarStore();
+  const { toggleSidebar } = useSidebar();
+  const open = useSidebarVisibility();
   const left = useLightsHidden() ? 'left-3' : 'left-19';
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') {
         event.preventDefault();
-        useSidebarStore.getState().toggle();
+        void toggleSidebar();
       }
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
-  }, []);
+  }, [toggleSidebar]);
   return (
     <div className="pointer-events-none fixed left-0 top-0 z-50 flex h-13 items-center">
       <TrafficLights />
       <Tooltip>
         <TooltipTrigger render={
-          <Button variant="ghost" size="icon" aria-label="Toggle main sidebar" aria-pressed={open} aria-keyshortcuts="Meta+B" onClick={toggle}
+          <Button variant="ghost" size="icon" aria-label="Toggle main sidebar" aria-pressed={open} aria-keyshortcuts="Meta+B" onClick={() => void toggleSidebar()}
             className={`sidebar-toggle pointer-events-auto absolute ${left} size-7! [-webkit-app-region:no-drag]`} />
         }>
           {open ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}

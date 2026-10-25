@@ -100,7 +100,7 @@ test('the bar starts past the window controls while the sidebar is closed', asyn
   await mountPage();
   expect(titleBar().className.split(' ')).toContain('pl-4');
   await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
-  expect($('.sidebar')!.hidden).toBe(true);
+  expect($('[data-slot="sidebar"]')!.dataset.state).toBe('collapsed');
   expect(titleBar().className.split(' ')).toContain('pl-27.5');
 });
 

@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act } from 'react';
-import { afterEach, beforeEach, vi } from 'vite-plus/test';
+import { afterEach, beforeAll, beforeEach, vi } from 'vite-plus/test';
 import { pageWithData } from '@mux-factory/shared';
 import type { BoardData, BoardAppBridge, Status, UpdateState } from '@mux-factory/shared';
 import template from '../index.html?raw';
@@ -34,7 +34,26 @@ export const fetchMock = vi.fn(async (_url: string) => new Response(JSON.stringi
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// Loads the page's modules before a file's first test, so that test doesn't spend its timeout on the app's first load
+// while the root `pnpm test` runs every package's workers at once.
+beforeAll(async () => {
+  document.documentElement.innerHTML = new DOMParser().parseFromString(pageWithData(template, sample), 'text/html').documentElement.innerHTML;
+  await import('../src/app.tsx');
+  vi.resetModules();
+});
+
+/** The window and document listeners the test's page added. A page stays mounted after its test (its entry never
+ *  unmounts), so without their removal every earlier test's page also answers each key a later test presses. */
+const pageListeners: [EventTarget, string, EventListenerOrEventListenerObject | null, boolean | EventListenerOptions | undefined][] = [];
+
 beforeEach(() => {
+  for (const target of new Set<EventTarget>([globalThis, window, document])) {
+    const add = target.addEventListener.bind(target);
+    vi.spyOn(target, 'addEventListener').mockImplementation((type, listener, options) => {
+      pageListeners.push([target, type, listener, options]);
+      add(type, listener, options);
+    });
+  }
   vi.useFakeTimers({ now: NOW });
   FakeEventSource.current = null;
   fetchMock.mockClear();
@@ -45,10 +64,13 @@ beforeEach(() => {
   vi.stubGlobal('scrollBy', vi.fn());
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
   Element.prototype.scrollIntoView = vi.fn();
+  // T3's SidebarProvider writes a cookie the board never reads; jsdom has no Cookie Store API.
+  vi.stubGlobal('cookieStore', { set: vi.fn(async () => {}) });
   history.replaceState(null, '', '/');
 });
 
 afterEach(() => {
+  for (const [target, type, listener, options] of pageListeners.splice(0)) target.removeEventListener(type, listener, options);
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(sample)));
   vi.useRealTimers();
   vi.unstubAllGlobals();

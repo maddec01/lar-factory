@@ -23,6 +23,7 @@ import * as ClaudeProfiles from "./skills/claude-profiles.ts";
 import * as LaunchAgentCleanup from "./launch-agent/launch-agent-cleanup.ts";
 import * as SkillInstall from "./skills/skill-install.ts";
 import * as ExternalLink from "./window/external-link.ts";
+import * as MainWindowBounds from "./window/MainWindowBounds.ts";
 import * as IpcChannels from "./ipc-channels.ts";
 import * as LaunchSecret from "./board-server/launch-secret.ts";
 import * as RestartDialog from "./updates/restart-dialog.ts";
@@ -56,12 +57,17 @@ const openOutside = (target: string) => {
 };
 
 const createWindow = (boardOrigin: () => string, secret: string) => {
+  const setting = MainWindowBounds.atFile(NodePath.join(Electron.app.getPath("userData"), "window-state.json"));
+  const persisted = Effect.runSync(setting.read);
+  const displays = Electron.screen.getAllDisplays().map((display) => display.bounds);
+  const bounds = MainWindowBounds.resolveInitialMainWindowBounds(persisted.mainWindowBounds, displays);
   const window = new Electron.BrowserWindow({
-    width: 1280,
-    height: 860,
-    minWidth: 840,
-    minHeight: 620,
+    ...bounds,
+    minWidth: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.width,
+    minHeight: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.height,
     title: "µx Factory",
+    // Shown once the first page paints, already maximized if restoring that, so it doesn't open small and then grow.
+    show: false,
     ...WindowTitleBar.options(process.platform),
     webPreferences: {
       preload: NodePath.join(import.meta.dirname, "preload.cjs"),
@@ -70,6 +76,13 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
       sandbox: true,
     },
   });
+  window.once("ready-to-show", () => {
+    // A window whose saved bounds no longer fit a display opens as a new one, not maximized.
+    if (persisted.mainWindowMaximized && bounds === persisted.mainWindowBounds) window.maximize();
+    window.show();
+  });
+  // Quitting holds in before-quit and then exits, so the window gets no close event to save on.
+  Electron.app.on("before-quit", MainWindowBounds.persistMainWindowBounds(window, setting));
   window.webContents.ipc.on(LaunchSecret.CHANNEL, (event) => {
     event.returnValue = LaunchSecret.forFrame(event.senderFrame?.url ?? "", boardOrigin(), secret);
   });
@@ -259,7 +272,7 @@ const program = Effect.gen(function* () {
 );
 
 // The app menu's About, Hide and Quit items read app.name. Electron derives userData
-// from the name, so pin it first: update-channel.json, .updaterId and the
+// from the name, so pin it first: update-channel.json, window-state.json, .updaterId and the
 // single-instance lock stay in the folder the app has always used.
 Electron.app.setPath("userData", NodePath.join(Electron.app.getPath("appData"), "@mux-factory/desktop"));
 Electron.app.setName("µx Factory");

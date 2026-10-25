@@ -224,6 +224,10 @@ _Avoid_: Electron app, desktop board
 The bar at the top of the main area, in the board app and in a browser. It holds the scope, the Refreshed time and the counters. The brand sits in the sidebar's top row.
 _Avoid_: toolbar, top bar
 
+**Sidebar**:
+The resizable column on the left of the board, beside the main area. The brand sits in its top row; Settings and the Update button sit in its foot.
+_Avoid_: drawer, nav, side panel
+
 **Platform**:
 The short name `config.json` gives a repository, such as Apple or Server; the sidebar groups by it and the Scope picks one.
 _Avoid_: project, repo type

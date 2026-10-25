@@ -11,20 +11,13 @@ import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, Dia
 import { useBoardStore } from '../board/board-store.ts';
 import { AbandonButton, ActionError, BackToListButton, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
+import { PrLink } from '../items/pr-link.tsx';
 import { ItemTitle, PlatformTag, PrList, SliceList, StatsGrid, StepTrack } from '../items/item-parts.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { StatusGlyph } from '../items/status-glyph.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
-
-/** Opens the item's pull request on GitHub, where it's verified and merged; disabled, saying why, while none is linked. */
-function PrLink({ item, label }: { item: Item; label: string }) {
-  const url = item.linkedPrs[0]?.url;
-  // Pointer events stay on while it's disabled, so its title says why.
-  if (!url) return <Button size="sm" className="disabled:pointer-events-auto" disabled title="No pull request is linked to this item yet">{label}</Button>;
-  return <Button size="sm" render={<a href={url} target="_blank" rel="noopener" />}>{label}</Button>;
-}
 
 /** The one thing the item's status asks of you. */
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {

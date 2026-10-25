@@ -76,8 +76,9 @@ describe("createBuildConfig", () => {
     expect(config.productName).toBe("Mux Factory");
     expect(config.artifactName).toBe("Mux-Factory-${version}-${arch}.${ext}");
     expect(config.appId).toBe("com.maddec01.mux-factory.board");
+    // Electron aborts at launch unless "<CFBundleName> Helper.app" exists, and the
+    // helpers take productName, so Info.plist's CFBundleName must stay productName.
     expect(config.mac?.extendInfo).toEqual({
-      CFBundleName: "µx Factory",
       // macOS shows InfoPlist.strings' name only while this one matches the file's.
       CFBundleDisplayName: "Mux Factory",
       LSHasLocalizedDisplayName: true,

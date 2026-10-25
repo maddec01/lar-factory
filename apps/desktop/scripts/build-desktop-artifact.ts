@@ -111,11 +111,11 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
         { target: "zip", arch: ["arm64"] },
       ],
       category: "public.app-category.developer-tools",
-      // The menu bar title reads CFBundleName; productName keeps the file Mux Factory.app.
-      // The Dock and Finder show en.lproj's display name only while this one matches
-      // the file's name, so a user's rename wins.
+      // The menu bar, Dock and Finder show en.lproj's names. Info.plist's CFBundleName
+      // stays productName: Electron finds "<CFBundleName> Helper.app" at launch and
+      // aborts without it. The display name must match the file's name for macOS to
+      // show the localized one, so a user's rename wins.
       extendInfo: {
-        CFBundleName: "µx Factory",
         CFBundleDisplayName: "Mux Factory",
         LSHasLocalizedDisplayName: true,
       },

@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { openBlockers } from '@mux-factory/shared';
 import type { BoardData, Item } from '@mux-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
+import { KeepClicks } from '../items/keep-clicks.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
@@ -16,7 +17,7 @@ import { OnYourDesk, Row, StageHeader, THREAD_TEXT, YOURS, stageOf } from './sta
 
 /** A button that doesn't open the item underneath it, nor do clicks in the menu it opens. It wraps to its own line, inside the cell. */
 function Act({ children }: { children: ReactNode }) {
-  return <span className="min-w-0 max-w-full" onClick={(e) => e.stopPropagation()}>{children}</span>;
+  return <KeepClicks as="span" className="min-w-0 max-w-full">{children}</KeepClicks>;
 }
 
 /** The one thing a status asks next. */
@@ -45,7 +46,7 @@ export function InFlight({ items }: { items: Item[] }) {
       <StageHeader label={`Everything else in flight · ${rows.length}`} side="Thread · next" />
       {rows.length ? rows.map((i) => (
         <Row key={i.id} item={i} data={data} now={now} waiting={openBlockers(i).length > 0} side={<Side item={i} data={data} />}>
-          {i.status === 'Ready' && <div className="px-3 pb-2 pl-7 empty:hidden" onClick={(e) => e.stopPropagation()}><StartMessage item={i} kind="build" /><StartAfterError item={i} data={data} /></div>}
+          {i.status === 'Ready' && <KeepClicks className="px-3 pb-2 pl-7 empty:hidden"><StartMessage item={i} kind="build" /><StartAfterError item={i} data={data} /></KeepClicks>}
         </Row>
       )) : <p className="m-0 p-6 text-center text-(--muted-foreground)">Nothing else in flight.</p>}
     </div>

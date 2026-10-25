@@ -1,4 +1,4 @@
-// The left sidebar, on T3 Code's sidebar component and copied in layout from T3's: the brand beside the window controls, search with Add item, the
+// The left sidebar, on T3 Code's sidebar component and copied in layout from T3's: the brand T3's gap past the toggle, search with Add item, the
 // List by repository, and Settings and the update button at its foot. Above the missing-t3 notice there's no List to
 // search or add to, so only the brand and Settings show. In Settings the section list takes the List's place, hiding
 // the List rather than closing it, so Back finds it as it was.
@@ -15,7 +15,7 @@ import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { ListGroups } from './list-groups.tsx';
 import { useSidebarStore } from './sidebar-store.ts';
-import { Brand, useBrandLeft } from './window-controls.tsx';
+import { Brand, useWindowControlsInsetStyle } from './window-controls.tsx';
 
 /** T3's search field over the thread list, with its new-thread button, here Add item, on the right. Search filters List items only. */
 function SearchRow({ query, onQuery }: { query: string; onQuery: (q: string) => void }) {
@@ -45,13 +45,18 @@ function Update() {
   );
 }
 
-/** T3's SidebarProvider around the page, at the board's 300 px. The sidebar store holds open, so the title bar, the
- *  app and ⌘B read one value. */
+/** The inset past the toggle, as SidebarProvider sets it on the page. Below 768 px the sidebar's sheet portals out of
+ *  the provider, so the sidebar sets it again, where the brand reads it. */
+const TITLEBAR_CONTENT_LEFT = { '--workspace-titlebar-content-left': 'calc(var(--workspace-controls-left) + var(--workspace-titlebar-control-size) + var(--workspace-titlebar-control-gap))' } as CSSProperties;
+
+/** T3's SidebarProvider around the page, at the board's 300 px, with the toggle's inset. The sidebar store holds
+ *  open, so the title bar, the app and ⌘B read one value. */
 export function SidebarLayout({ className, children }: { className?: string; children: ReactNode }) {
   const open = useSidebarStore((state) => state.open);
   const setOpen = useSidebarStore((state) => state.setOpen);
+  const windowControlsInsetStyle = useWindowControlsInsetStyle();
   return (
-    <SidebarProvider open={open} onOpenChange={setOpen} className={className} style={{ '--sidebar-width': '300px' } as CSSProperties}>
+    <SidebarProvider open={open} onOpenChange={setOpen} className={className} style={{ '--sidebar-width': '300px', ...windowControlsInsetStyle } as CSSProperties}>
       {children}
     </SidebarProvider>
   );
@@ -62,10 +67,10 @@ export function SidebarLayout({ className, children }: { className?: string; chi
 export function Sidebar({ board = true }: { board?: boolean }) {
   const [query, setQuery] = useState('');
   const settings = useSettingsStore((state) => state.open);
-  const brandLeft = useBrandLeft();
+  const windowControlsInsetStyle = useWindowControlsInsetStyle();
   return (
-    <T3Sidebar collapsible="offcanvas" className="sidebar border-(--sidebar-border) text-(--sidebar-foreground)">
-      <div className={`flex h-13 shrink-0 items-center pr-3 ${brandLeft} [-webkit-app-region:drag]`}><Brand /></div>
+    <T3Sidebar collapsible="offcanvas" className="sidebar border-(--sidebar-border) text-(--sidebar-foreground)" style={{ ...windowControlsInsetStyle, ...TITLEBAR_CONTENT_LEFT }}>
+      <div className="flex h-13 shrink-0 items-center pr-3 pl-[var(--workspace-titlebar-content-left)] [-webkit-app-region:drag]"><Brand /></div>
       <div className="contents" hidden={settings}>
         {board ? (
           <>

@@ -1,6 +1,6 @@
 // The main area's title bar: a 52 px drag bar with the scope menu ("All repositories", or the platform the menu or
-// the sidebar scoped it to), the Refreshed time, the counters and This week. While the sidebar is closed it starts
-// past the window controls. Clicks on its buttons and on the time never drag the window; the rest of the bar does.
+// the sidebar scoped it to), the Refreshed time, the counters and This week. While the sidebar is hidden it starts
+// T3's gap past the toggle. Clicks on its buttons and on the time never drag the window; the rest of the bar does.
 // Above the missing-t3 notice there's no board to scope or count, so the bar is empty.
 
 import { useEffect, useRef, useState } from 'react';
@@ -12,7 +12,7 @@ import { Menu, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRad
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
 import { useSidebarStore } from '../sidebar/sidebar-store.ts';
-import { useBrandLeft } from '../sidebar/window-controls.tsx';
+import { useTitlebarInset } from '../sidebar/window-controls.tsx';
 import { Counters } from './counters.tsx';
 
 const NO_DRAG = '[-webkit-app-region:no-drag]';
@@ -111,10 +111,9 @@ function Refreshed({ data }: { data: BoardData }) {
 
 export function TitleBar() {
   const data = useBoardStore((state) => state.data);
-  const open = useSidebarStore((state) => state.open);
-  const brandLeft = useBrandLeft();
+  const inset = useTitlebarInset();
   return (
-    <header className={`title-bar flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-3 ${open ? 'pl-4' : brandLeft} [-webkit-app-region:drag]`}>
+    <header className={`title-bar flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-3 ${inset} [-webkit-app-region:drag]`}>
       {!data.tools?.t3 && (
         <>
           {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. */}

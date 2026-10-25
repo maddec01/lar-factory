@@ -1,15 +1,13 @@
-// The window's top-left corner, from T3 Code: the traffic lights, the sidebar toggle 8 px past them and the brand
-// 6 px past the toggle. In the Mac app the lights are macOS's own (apps/desktop/src/window/WindowTitleBar.ts puts
-// them 16 px in, centred in the 52 px bar); in a browser, grey stand-ins hold their place so the layout reads like
-// the app. In the Mac app's full screen macOS hides the lights, so the toggle moves to 12 px in. ⌘B toggles the
-// sidebar too.
+// The window's top-left corner, from T3 Code: the traffic lights, the sidebar toggle at T3's --workspace-controls-left
+// and the brand T3's gap past the toggle. In the Mac app the lights are macOS's own (apps/desktop/src/window/
+// WindowTitleBar.ts puts them 16 px in, centred in the 52 px bar) and the toggle sits 90 px in, past them; in a
+// browser, grey stand-ins hold their place so the layout reads like the app. In the Mac app's full screen macOS hides
+// the lights, so the toggle moves to the stylesheet's 12 px in. ⌘B toggles the sidebar too.
 
-import { useEffect, useSyncExternalStore } from 'react';
-import { PanelLeft, PanelLeftClose } from 'lucide-react';
+import { useEffect, useSyncExternalStore, type CSSProperties } from 'react';
 import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, boardApp, inMacApp } from '@mux-factory/shared';
 import { Badge } from '@mux-factory/ui/badge';
-import { Button } from '@mux-factory/ui/button';
-import { useSidebar, useSidebarVisibility } from '@mux-factory/ui/sidebar';
+import { SidebarTrigger, useSidebar, useSidebarVisibility } from '@mux-factory/ui/sidebar';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@mux-factory/ui/tooltip';
 import { T3Wordmark } from './T3Wordmark.tsx';
 
@@ -40,16 +38,26 @@ function readFullscreen(): boolean {
 /** Whether macOS full screen hides the traffic lights; false outside the Mac app. */
 const useLightsHidden = () => useSyncExternalStore(subscribeToFullscreen, readFullscreen);
 
-/** Where the brand starts, and the title bar while the sidebar is closed: the toggle, its 28 px, and a 6 px gap. The
- *  toggle is at 76 px, or 12 px while the traffic lights are hidden. */
-export const useBrandLeft = () => (useLightsHidden() ? 'pl-11.5' : 'pl-27.5');
+const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = 'var(--desktop-window-controls-inset, 90px)';
+
+/** T3's windowControlsInsetStyle: the toggle's left edge, 90 px in past the traffic lights or their stand-ins, or the
+ *  stylesheet's 12 px while full screen hides them. */
+export function useWindowControlsInsetStyle(): CSSProperties {
+  return (useLightsHidden() ? {} : { '--workspace-controls-left': MACOS_TRAFFIC_LIGHTS_LEFT_INSET }) as CSSProperties;
+}
+
+/** The left padding of the title bar and the Settings header: T3's gap past the toggle while the sidebar is hidden. It
+ *  follows the sidebar's visibility, not the store's open, which stays true below 768 px while the sheet is closed. */
+export const useTitlebarInset = () => (useSidebarVisibility() ? 'pl-4' : 'pl-[var(--workspace-titlebar-content-left)]');
 
 function TrafficLights() {
   if (inMacApp()) return null;
   return (
-    <span className="traffic-lights absolute left-4 flex gap-2" aria-hidden="true">
-      {['close', 'minimize', 'zoom'].map((light) => <span key={light} className="size-3 rounded-full bg-(--traffic-stand-in)" />)}
-    </span>
+    <div className="pointer-events-none fixed left-0 top-0 z-50 flex h-13 items-center">
+      <span className="traffic-lights absolute left-4 flex gap-2" aria-hidden="true">
+        {['close', 'minimize', 'zoom'].map((light) => <span key={light} className="size-3 rounded-full bg-(--traffic-stand-in)" />)}
+      </span>
+    </div>
   );
 }
 
@@ -71,34 +79,34 @@ export function Brand() {
   );
 }
 
-/** Fixed to the window's top left, so the toggle stays put while the sidebar slides away. The toggle and ⌘B go
- *  through T3's SidebarProvider, which sets the sidebar store, or opens the sheet below 768 px. */
-export function WindowControls() {
+/** Fixed to the window's top left: T3's SidebarControl, which stays put while the sidebar slides away, and the
+ *  traffic lights' stand-ins. The toggle and ⌘B go through T3's SidebarProvider, which sets the sidebar store, or
+ *  opens the sheet below 768 px. */
+export function SidebarControl() {
   const { toggleSidebar } = useSidebar();
-  const open = useSidebarVisibility();
-  const left = useLightsHidden() ? 'left-3' : 'left-19';
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') {
         event.preventDefault();
-        void toggleSidebar();
+        // The provider writes its cookie after it sets the store; where there's no Cookie Store API that write
+        // rejects, and the board never reads the cookie.
+        Promise.resolve(toggleSidebar()).catch(() => {});
       }
     };
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
   }, [toggleSidebar]);
   return (
-    <div className="pointer-events-none fixed left-0 top-0 z-50 flex h-13 items-center">
+    <>
       <TrafficLights />
-      <Tooltip>
-        <TooltipTrigger render={
-          <Button variant="ghost" size="icon" aria-label="Toggle main sidebar" aria-pressed={open} aria-keyshortcuts="Meta+B" onClick={() => void toggleSidebar()}
-            className={`sidebar-toggle pointer-events-auto absolute ${left} size-7! [-webkit-app-region:no-drag]`} />
-        }>
-          {open ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
-        </TooltipTrigger>
-        <TooltipPopup side="bottom">Toggle main sidebar (⌘B)</TooltipPopup>
-      </Tooltip>
-    </div>
+      <div className="pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center" data-sidebar-control="">
+        <Tooltip>
+          <TooltipTrigger render={
+            <SidebarTrigger className="sidebar-toggle pointer-events-auto" aria-label="Toggle main sidebar" aria-keyshortcuts="Meta+B" />
+          } />
+          <TooltipPopup side="bottom">Toggle main sidebar (⌘B)</TooltipPopup>
+        </Tooltip>
+      </div>
+    </>
   );
 }

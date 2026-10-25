@@ -23,40 +23,59 @@ function withServerList(count: number): BoardData {
   return { ...sample, items: [...sample.items, ...extra] };
 }
 
-test('in a browser, grey stand-ins hold the traffic lights\' place, with the sidebar toggle 8 px past them', async () => {
+const wrapper = () => $('[data-slot="sidebar-wrapper"]')!;
+const control = () => $('[data-sidebar-control]')!.className.split(' ');
+const brandRow = () => $('.sidebar .brand')!.parentElement!.className.split(' ');
+/** The left edge the toggle sits at, T3's --workspace-controls-left: set on the page to 90 px past the traffic
+ *  lights, or left at the stylesheet's 12 px. */
+const controlsLeft = () => [wrapper(), $('[data-slot="sidebar-container"]')!].map((el) => el.style.getPropertyValue('--workspace-controls-left'));
+const PAST_LIGHTS = 'var(--desktop-window-controls-inset, 90px)';
+
+test('the toggle is T3\'s SidebarControl, at --workspace-controls-left plus a pixel, and the brand starts T3\'s gap past it', async () => {
+  await mountPage();
+  const toggle = $<HTMLButtonElement>('.sidebar-toggle')!;
+  expect([toggle.dataset.sidebar, toggle.getAttribute('aria-label'), toggle.getAttribute('aria-pressed')]).toEqual(['trigger', 'Toggle main sidebar', 'true']);
+  expect(control()).toEqual(expect.arrayContaining(['fixed', 'left-[var(--workspace-controls-left)]', 'ml-px', 'h-[var(--workspace-topbar-height)]']));
+  expect(brandRow()).toContain('pl-[var(--workspace-titlebar-content-left)]');
+});
+
+test('in a browser, grey stand-ins hold the traffic lights\' place, with the toggle past them as in the Mac app', async () => {
   await mountPage();
   const lights = $$('.traffic-lights > span');
   expect(lights).toHaveLength(3);
   expect(lights.every((s) => s.className.split(' ').includes('bg-(--traffic-stand-in)') && !s.style.background), 'one grey token, no colours').toBe(true);
-  const toggle = $<HTMLButtonElement>('.sidebar-toggle')!;
-  expect([toggle.getAttribute('aria-label'), toggle.getAttribute('aria-pressed')]).toEqual(['Toggle main sidebar', 'true']);
-  expect(toggle.className.split(' ')).toContain('left-19');
+  expect(controlsLeft()).toEqual([PAST_LIGHTS, PAST_LIGHTS]);
 });
 
-test('in the Mac app, macOS draws the traffic lights', async () => {
+test('in the Mac app, macOS draws the traffic lights and the toggle sits 90 px in, past them', async () => {
   stubApp({});
   await mountPage();
   expect($('.traffic-lights')).toBeNull();
-  expect($('.sidebar-toggle')).not.toBeNull();
+  expect(controlsLeft()).toEqual([PAST_LIGHTS, PAST_LIGHTS]);
 });
 
-test('in the Mac app\'s full screen, where macOS hides the traffic lights, the toggle and brand move into their place', async () => {
+test('in the Mac app\'s full screen, where macOS hides the traffic lights, the toggle and brand move to 12 px in', async () => {
   const window = fullScreen(true);
   stubApp(window.bridge);
   await mountPage();
-  const toggle = () => $('.sidebar-toggle')!.className.split(' ');
-  const brandRow = () => $('.sidebar .brand')!.parentElement!.className.split(' ');
-  expect([toggle(), brandRow()]).toEqual([expect.arrayContaining(['left-3']), expect.arrayContaining(['pl-11.5'])]);
+  expect(controlsLeft()).toEqual(['', '']);
   await window.set(false);
-  expect([toggle(), brandRow()]).toEqual([expect.arrayContaining(['left-19']), expect.arrayContaining(['pl-27.5'])]);
+  expect(controlsLeft()).toEqual([PAST_LIGHTS, PAST_LIGHTS]);
   await window.set(true);
-  expect(toggle()).toContain('left-3');
+  expect(controlsLeft()).toEqual(['', '']);
 });
 
 test('outside the Mac app, full screen leaves the toggle where it is', async () => {
   stubApp({ ...fullScreen(true).bridge, platform: 'linux' });
   await mountPage();
-  expect($('.sidebar-toggle')!.className.split(' ')).toContain('left-19');
+  expect(controlsLeft()).toEqual([PAST_LIGHTS, PAST_LIGHTS]);
+});
+
+test('the toggle stays put while the sidebar hides', async () => {
+  await mountPage();
+  await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
+  expect(sidebar().contains($('[data-sidebar-control]'))).toBe(false);
+  expect([control(), controlsLeft()]).toEqual([expect.arrayContaining(['fixed', 'left-[var(--workspace-controls-left)]']), [PAST_LIGHTS, PAST_LIGHTS]]);
 });
 
 test('the sidebar is T3\'s offcanvas sidebar, 300 px wide', async () => {
@@ -66,6 +85,22 @@ test('the sidebar is T3\'s offcanvas sidebar, 300 px wide', async () => {
   expect(sidebar().querySelector('.sidebar .brand')).not.toBeNull();
 });
 
+test('⌘B still toggles where the provider\'s cookie write fails, without an unhandled rejection', async () => {
+  await mountPage();
+  vi.stubGlobal('cookieStore', { set: vi.fn(async () => { throw new TypeError('no Cookie Store API'); }) });
+  const unhandled = vi.fn();
+  process.on('unhandledRejection', unhandled);
+  try {
+    await press('b');
+    // Node reports an unhandled rejection once the microtasks drain, so wait a real tick.
+    vi.useRealTimers();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect([shown(), vi.mocked(cookieStore.set).mock.calls.length, unhandled.mock.calls]).toEqual([false, 1, []]);
+  } finally {
+    process.off('unhandledRejection', unhandled);
+  }
+});
+
 test('the toggle and ⌘B hide and show the sidebar', async () => {
   await mountPage();
   await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
@@ -73,6 +108,7 @@ test('the toggle and ⌘B hide and show the sidebar', async () => {
   expect($('.sidebar-toggle')!.getAttribute('aria-pressed')).toBe('false');
   await press('b');
   expect(shown()).toBe(true);
+  expect($('.sidebar-toggle')!.getAttribute('aria-pressed')).toBe('true');
   await press('b');
   expect(shown()).toBe(false);
 });

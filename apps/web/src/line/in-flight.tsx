@@ -1,6 +1,7 @@
 // Everything else in flight, on the line's stage track: every item past the Queue and short of Done that no dossier
 // shows, furthest along first. Each row carries its agent figures, a build its slices, and its side its thread and
-// next action. Items waiting on you show where they are but take no action here: you act on them from the desk.
+// next action. Ready items keep Start build here as well as on the desk. Items in Needs you, Verify or Ready to merge
+// show where they are but take no action here: you act on them from the desk.
 
 import type { ReactNode } from 'react';
 import { openBlockers } from '@mux-factory/shared';

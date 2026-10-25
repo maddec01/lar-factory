@@ -1,4 +1,4 @@
-// Your desk: the items only you can move, Needs you, Verify and Ready to merge, as cards in one row that scrolls
+// Your desk: the items only you can move, Ready, Needs you, Verify and Ready to merge, as cards in one row that scrolls
 // sideways under the page's padding to the window's edges. A card opens the item dialog.
 
 import { HINTS, platformOf, shortAgo } from '@mux-factory/shared';

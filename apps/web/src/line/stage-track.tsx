@@ -31,7 +31,7 @@ const AGENT = 'hidden @2xl:grid';
 export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
 const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
-/** The statuses only you can move on, from the desk. */
+/** The desk's statuses the line takes no action on. Ready is on the desk too, but keeps Start build on the line. */
 export const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
 
 /** What an item's thread is doing at each status where one is at work, or about to be. */

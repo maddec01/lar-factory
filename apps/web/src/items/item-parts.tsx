@@ -64,7 +64,7 @@ export function SliceList({ item }: { item: Item }) {
   return (
     <ul className="m-0 grid list-none gap-0.5 p-0">
       {item.slices.map((s) => (
-        <li key={s.number} className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-(--soft)">
+        <li key={s.number} className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px] hover:bg-(--soft)">
           <span className="grid size-4 place-items-center rounded-full border-[1.5px]"
             style={{ borderColor: SLICE_COLOR[s.progress], background: s.progress === 'done' ? 'var(--st-done)' : 'transparent' }}>
             {s.progress === 'done' && <Check className="size-2.5 text-white" strokeWidth={3} />}

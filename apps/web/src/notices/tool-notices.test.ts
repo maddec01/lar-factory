@@ -44,7 +44,7 @@ test('a t3 override that points nowhere is named', async () => {
   expect($$('.tool-missing-box code').map((c) => c.textContent)).toEqual(['t3', 'T3_PATH=/nowhere/t3']);
 });
 
-test('a missing or logged-out gh shows its own notice instead of Stale', async () => {
+test('a missing or logged-out gh shows its own notice, and other read failures show none', async () => {
   await mountPage(withTools({ gh: { problem: 'missing' } }, failed));
   const banners = () => $$('.banners .banner');
   expect(banners().length).toBe(1);
@@ -63,7 +63,7 @@ test('a missing or logged-out gh shows its own notice instead of Stale', async (
   expect(banners()[0]!.textContent).toContain('No runnable gh is at GH_PATH=/nowhere/gh. Point GH_PATH at gh or unset it, then press Recheck.');
 
   await push(withTools({}, failed));
-  expect(banners().map((b) => bannerText(b).join(' ')), 'other read failures stay Stale').toEqual([expect.stringMatching(/^Stale\. .*HTTP 401/)]);
+  expect(banners(), 'a failed read is the title bar\'s to show').toEqual([]);
 });
 
 test('Recheck posts, shows Checking…, then the board once the tool is found, and keeps focus', async () => {

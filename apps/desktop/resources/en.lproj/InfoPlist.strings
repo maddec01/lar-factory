@@ -1,3 +1,0 @@
-/* The Dock and Finder show this name; the file stays lar Factory.app. */
-CFBundleDisplayName = "lar Factory";
-CFBundleName = "lar Factory";

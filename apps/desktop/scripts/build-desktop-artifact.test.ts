@@ -70,31 +70,14 @@ describe("createBuildConfig", () => {
     expect(config.files).toContain("!dist-electron/server/**/*");
   });
 
-  it("shows lar Factory while the app's file, release files and appId keep their ASCII names", () => {
+  it("names the app lar Factory, keeps its release files and appId ASCII, and uses the lar Factory icon", () => {
     const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
 
     expect(config.productName).toBe("lar Factory");
     expect(config.artifactName).toBe("lar-factory-${version}-${arch}.${ext}");
     expect(config.appId).toBe("com.pedrogomes.lar.factory");
-    // Electron aborts at launch unless "<CFBundleName> Helper.app" exists, and the
-    // helpers take productName, so Info.plist's CFBundleName must stay productName.
-    expect(config.mac?.extendInfo).toEqual({
-      // macOS shows InfoPlist.strings' name only while this one matches the file's.
-      CFBundleDisplayName: "lar Factory",
-      LSHasLocalizedDisplayName: true,
-    });
-  });
-
-  it("ships an English InfoPlist.strings, which the Dock and Finder read for the shown name", () => {
-    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
-    const strings = NodeFS.readFileSync(
-      NodePath.join(import.meta.dirname, "../resources/en.lproj/InfoPlist.strings"),
-      "utf8",
-    );
-
-    expect(config.extraResources).toContainEqual({ from: "resources/en.lproj", to: "en.lproj" });
-    expect(strings).toContain('CFBundleDisplayName = "lar Factory";');
-    expect(strings).toContain('CFBundleName = "lar Factory";');
+    expect(config.mac?.icon).toBe("resources/icon.icns");
+    expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, "..", config.mac!.icon!))).toBe(true);
   });
 
   it("signs with hardened runtime and notarizes when signed", () => {

@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/lar-factory-on-dark.png">
+    <img alt="lar Factory" src=".github/assets/lar-factory-on-light.png" height="56">
+  </picture>
+</p>
+
 # lar Factory
 
 A small software factory for [lar](https://github.com/maddec01): the skills,

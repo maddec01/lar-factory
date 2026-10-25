@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../../.github/assets/lar-factory-on-dark.png">
+    <img alt="lar Factory" src="../../.github/assets/lar-factory-on-light.png" height="56">
+  </picture>
+</p>
+
 # Board
 
 A local board for the lar project. It reads the project through your `gh` login

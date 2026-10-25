@@ -2,20 +2,12 @@
 // or logged-out gh, which stops the board reading GitHub, shows a banner.
 
 import type { ReactNode } from 'react';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX } from '@lar-factory/shared';
 import type { ToolMissing, ToolProblem } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
+import { BrandMark } from '../brand/brand-mark.tsx';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { Banner } from './banner.tsx';
 import { useRecheckStore } from './recheck-store.ts';
-
-function BrandMark() {
-  return (
-    <svg className="brand-mark" role="img" aria-label="lar" viewBox={BRAND_MARK_VIEWBOX} fill="none">
-      <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';
 
@@ -47,7 +39,7 @@ export function T3Missing({ problem }: { problem: ToolMissing }) {
   return (
     <div className="tool-missing">
       <div className="tool-missing-box" role="alert">
-        <h1><BrandMark /><span>T3 Code not found</span></h1>
+        <h1><BrandMark className="brand-mark" label="lar" /><span>T3 Code not found</span></h1>
         <p>
           <Fix problem={problem} tool="t3" what="the T3 Code CLI">
             The board starts threads through T3 Code's <code>t3</code> command and didn't find it on the login shell's PATH, in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck.

@@ -5,10 +5,8 @@
 /* Fills the main area below the title bar. */
 .tool-missing { flex: 1; display: grid; place-items: center; padding: --spacing(5); }
 .tool-missing-box h1 { font-size: var(--text-base); font-weight: 600; margin: 0; letter-spacing: -0.01em; display: inline-flex; align-items: baseline; gap: --spacing(2); }
-/* Baseline alignment puts the logo's bottom edge on the text's baseline. The x's strokes end 8.75 of the
-   viewBox's 32 units above that edge, so drop the logo by that much: the x sits on the baseline and the
-   µ's tail hangs below like a descender. */
-.brand-mark { width: --spacing(7); height: --spacing(4); flex: none; position: relative; top: calc(--spacing(4) * 8.75 / 32); }
+/* Baseline alignment puts the mark's bottom edge on the text's baseline; at 0.705em its top meets the l's. */
+.brand-mark { width: 0.705em; height: 0.705em; flex: none; }
 .tool-missing-box { max-width: --spacing(130); @apply border; background: var(--card); border-radius: var(--radius); padding: --spacing(5) --spacing(6); }
 .tool-missing-box p { margin: --spacing(3) 0 0; color: var(--muted-foreground); }
 .tool-missing-box code { color: var(--foreground); overflow-wrap: anywhere; }

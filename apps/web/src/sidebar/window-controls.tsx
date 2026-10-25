@@ -5,10 +5,11 @@
 // the lights, so the toggle moves to the stylesheet's 12 px in. ⌘B toggles the sidebar too.
 
 import { useEffect, useSyncExternalStore, type CSSProperties } from 'react';
-import { BRAND_MARK_PATH, BRAND_MARK_VIEWBOX, boardApp, inMacApp } from '@lar-factory/shared';
+import { boardApp, inMacApp } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/badge';
 import { SidebarTrigger, useSidebar, useSidebarVisibility } from '@lar-factory/ui/sidebar';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
+import { BrandMark } from '../brand/brand-mark.tsx';
 import { T3Wordmark } from './T3Wordmark.tsx';
 
 // The window's full screen, as T3 Code's apps/web/src/components/AppSidebarLayout.tsx reads it: the bridge's
@@ -61,16 +62,16 @@ function TrafficLights() {
   );
 }
 
-/** The board app's brand: the lar mark on the baseline with the µ's tail hanging below, a grey "Factory", and its
- *  "for T3 Code" pill with T3's own wordmark. Screen readers skip it: the page's hidden h1 names the page. */
+/** The board app's brand: the lar lockup (the mark on the baseline, "lar" in bold and a grey "Factory", spaced as
+ *  lar-brand's SPEC.md lays out) and its "for T3 Code" pill with T3's own wordmark. Screen readers skip it: the
+ *  page's hidden h1 names the page. */
 export function Brand() {
   return (
     <span className="brand inline-flex items-center gap-2" aria-hidden="true">
-      <span className="inline-flex items-baseline gap-1 text-sm font-medium tracking-tight">
-        <svg className="relative top-[calc(--spacing(3.125)*8.75/32)] h-[--spacing(3.125)] w-5.5 shrink-0" viewBox={BRAND_MARK_VIEWBOX} fill="none">
-          <path d={BRAND_MARK_PATH} stroke="currentColor" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span className="text-(--muted-foreground)">Factory</span>
+      <span className="inline-flex items-baseline text-sm">
+        <BrandMark className="size-[0.705em] shrink-0" />
+        <span className="ml-[0.266em] font-bold tracking-[-0.03em]">lar</span>
+        <span className="ml-[0.26em] font-medium text-(--muted-foreground)">Factory</span>
       </span>
       <Badge variant="secondary" size="sm" className="ml-1 gap-1 bg-accent">
         for<T3Wordmark className="h-[1cap] w-auto shrink-0" />Code

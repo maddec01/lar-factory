@@ -15,9 +15,8 @@ import { Toasts } from './notices/toasts.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
 import { SettingsMain } from './settings/settings.tsx';
 import { useSettingsStore } from './settings/settings-store.ts';
-import { Sidebar, SidebarLayout } from './sidebar/sidebar.tsx';
+import { SidebarLayout } from './sidebar/sidebar.tsx';
 import { useSidebarStore } from './sidebar/sidebar-store.ts';
-import { SidebarControl } from './sidebar/window-controls.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
 
 function Content() {
@@ -39,9 +38,7 @@ export function App() {
   const t3 = useBoardStore((state) => state.data.tools?.t3);
   const settings = useSettingsStore((state) => state.open);
   return (
-    <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)">
-      <SidebarControl />
-      <Sidebar board={!t3} />
+    <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)" board={!t3}>
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="contents" hidden={settings}>
           <TitleBar />

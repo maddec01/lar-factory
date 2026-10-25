@@ -25,6 +25,7 @@ export interface ListGroup {
 }
 
 export interface BoardSections {
+  /** The desk: Ready, Needs you, Verify and Ready to merge, concepts left out. */
   needsYou: Item[];
   inFlight: Item[];
   concepts: Item[];
@@ -45,9 +46,10 @@ export function boardSections(data: BoardData, now: number): BoardSections {
     const p = platformOf(i, data.repos);
     if (!platforms.includes(p)) platforms.push(p);
   }
+  const notConcept = (i: Item) => kindOf(i) !== 'concept';
   return {
-    needsYou: inStatus('Needs you', 'Verify', 'Ready to merge'),
-    inFlight: inStatus('Shaping', 'Ready', 'In progress', 'Review').filter((i) => kindOf(i) !== 'concept'),
+    needsYou: inStatus('Ready', 'Needs you', 'Verify', 'Ready to merge').filter(notConcept),
+    inFlight: inStatus('Shaping', 'Ready', 'In progress', 'Review').filter(notConcept),
     concepts: items.filter((i) => kindOf(i) === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),
     list,

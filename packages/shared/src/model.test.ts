@@ -180,7 +180,16 @@ test('sample covers every status and both platforms', () => {
   const repos = new Set(sample.items.map((i) => i.repo));
   assert.ok(repos.has('maddec01/mux-server') && repos.has('maddec01/mux-apple'));
   const { needsYou, inFlight, queued, list } = boardSections(sample, Date.parse('2026-10-21T10:00:00Z'));
-  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [25, 4, 8, 3, 4]);
+  assert.deepEqual([sample.items.length, needsYou.length, inFlight.length, queued.length, list.length], [25, 5, 8, 3, 4]);
+});
+
+test('the desk holds Ready, Needs you, Verify and Ready to merge, in flow order, and no concepts', () => {
+  const now = Date.parse('2026-10-21T10:00:00Z');
+  const items = [item('Verify'), item('Ready'), item('Ready', ['concept']), item('Needs you', ['concept']), item('Ready to merge'), item('Needs you'), item('In progress')]
+    .map((i, n) => ({ ...i, id: `i${n}` }));
+  const { needsYou } = boardSections({ ...sample, items }, now);
+  assert.deepEqual(needsYou.map((i) => i.status), ['Needs you', 'Ready', 'Verify', 'Ready to merge']);
+  assert.ok(boardSections(sample, now).needsYou.some((i) => i.status === 'Ready' && i.parent), 'a build sub-issue in Ready is on the desk');
 });
 
 test('token counts are compact as on T3 Code\'s usage page', () => {

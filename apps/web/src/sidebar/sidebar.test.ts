@@ -158,7 +158,7 @@ test('a group\'s name scopes the main area to its repository; pressing it again 
   expect($$('.desk-card').map((c) => c.dataset.item)).toEqual(['PVTI_sample11', 'PVTI_sample16']);
   await settle(() => scope.click());
   expect(scope.getAttribute('aria-pressed')).toBe('false');
-  expect($$('.desk-card')).toHaveLength(4);
+  expect($$('.desk-card')).toHaveLength(5);
 });
 
 test('a row opens the item dialog and stays marked while it shows', async () => {

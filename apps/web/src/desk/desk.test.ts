@@ -1,4 +1,4 @@
-// Your desk: Needs you, Verify and Ready to merge items as cards in one sideways row, each opening the item dialog;
+// Your desk: Ready, Needs you, Verify and Ready to merge items as cards in one sideways row, each opening the item dialog;
 // and the line's heading below it.
 
 import { expect, test } from 'vite-plus/test';
@@ -8,10 +8,10 @@ const cards = () => $$<HTMLButtonElement>('.desk-card');
 
 test('the desk shows what only you can move, counted, as cards in one row that scrolls sideways with no scrollbar', async () => {
   await mountPage();
-  expect(text($('#desk-h'))).toBe('Your desk 4');
+  expect(text($('#desk-h'))).toBe('Your desk 5');
   const statuses = cards().map((c) => sample.items.find((i) => i.id === c.dataset.item)!.status);
-  expect(new Set(statuses)).toEqual(new Set(['Needs you', 'Verify', 'Ready to merge']));
-  expect(cards()).toHaveLength(4);
+  expect(new Set(statuses)).toEqual(new Set(['Ready', 'Needs you', 'Verify', 'Ready to merge']));
+  expect(cards()).toHaveLength(5);
   const row = cards()[0]!.parentElement!.className.split(' ');
   expect(row).toEqual(expect.arrayContaining(['-mx-6', 'px-6', 'overflow-x-auto', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden']));
 });
@@ -33,7 +33,7 @@ test('a desk card opens the item dialog and stays marked while it shows', async 
 });
 
 test('an empty desk says the line runs without you', async () => {
-  await mountPage({ ...sample, items: sample.items.filter((i) => !['Needs you', 'Verify', 'Ready to merge'].includes(i.status)) });
+  await mountPage({ ...sample, items: sample.items.filter((i) => !['Ready', 'Needs you', 'Verify', 'Ready to merge'].includes(i.status)) });
   expect(text($('#desk-h'))).toBe('Your desk 0');
   expect(text($('.desk p'))).toBe('Desk clear. The line runs without you.');
 });

@@ -17,8 +17,6 @@ import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
 import { ItemTitle } from '../items/item-parts.tsx';
 import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
 
-const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
-
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? item.stats.costUsd ?? 0 : 0);
 
 /** One toolbar counter: a ghost button with a glyph, a tabular count and a label that shows only when there's room. */
@@ -125,7 +123,7 @@ export function Counters() {
           <PopHead icon={glyph('Needs you')} title="Needs you" sub={s.needsYou.length} />
           {s.needsYou.length ? (
             <div className="grid gap-1 py-1">
-              {YOURS.map((status) => {
+              {[...new Set(s.needsYou.map((i) => i.status))].map((status) => {
                 const items = s.needsYou.filter((i) => i.status === status);
                 return items.length > 0 && (
                   <section key={status}>

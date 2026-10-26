@@ -3,6 +3,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { ITEM_SOURCE_KINDS } from '@lar-factory/shared';
 import type { RepoConfig } from '@lar-factory/shared';
 
 export interface BoardConfig {
@@ -41,10 +42,12 @@ export function loadConfig(url: URL = configUrl()): BoardConfig {
   };
 }
 
-/** A repos entry with a role; an older entry's checkout `path` is dropped. */
+/** A repos entry with a role, and its item source when it names one; an older entry's checkout `path` is dropped. */
 function checkRepo(entry: RepoConfig, url: URL): RepoConfig {
-  if (typeof entry.role !== 'string' || !entry.role.trim()) {
-    throw new Error(`${fileURLToPath(url)}: ${entry.repo ?? 'a repos entry'} needs a "role"`);
+  const name = entry.repo ?? 'a repos entry';
+  if (typeof entry.role !== 'string' || !entry.role.trim()) throw new Error(`${fileURLToPath(url)}: ${name} needs a "role"`);
+  if (entry.items !== undefined && !ITEM_SOURCE_KINDS.includes(entry.items)) {
+    throw new Error(`${fileURLToPath(url)}: ${name} has "items": ${JSON.stringify(entry.items)}; use "project" or "issues"`);
   }
-  return { repo: entry.repo, platform: entry.platform, role: entry.role };
+  return { repo: entry.repo, platform: entry.platform, role: entry.role, ...(entry.items ? { items: entry.items } : {}) };
 }

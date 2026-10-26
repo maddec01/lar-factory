@@ -47,6 +47,7 @@ export function mergeSources(project: ItemSource, byRepo: ReadonlyMap<string, It
       return { title: reads[0]!.title, items };
     },
     setStatus: (item, status) => sourceOf(item).setStatus(item, status),
+    statusRefusal: (item) => ('id' in item ? sourceOf(item) : forRepo(item.repo)).statusRefusal(item),
     addLabel: (item, label) => sourceOf(item).addLabel(item, label),
     create: (draft, progress) => forRepo(draft.repo).create(draft, progress),
     setParentStatus: (parent, status) => forRepo(parent.repo).setParentStatus(parent, status),

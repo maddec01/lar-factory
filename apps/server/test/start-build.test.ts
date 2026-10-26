@@ -124,7 +124,7 @@ test('Start build is refused while an issue the build is blocked by is open, and
   assert.deepEqual([...await writes(board), ...await board.t3Calls()], []);
   await board.update({ items: [blocked('CLOSED')] });
   await board.post({}, board.url, '/api/read');
-  await until(board, (d) => d.items[0]?.blockers[0]?.state === 'CLOSED');
+  await until(board, (d) => d.items[0]?.blockers[0]?.state === 'closed');
   assert.equal((await startBuild(board, 'I_12')).status, 200);
 });
 

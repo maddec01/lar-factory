@@ -2,6 +2,7 @@
 
 import type { BoardConfig } from '../config/config.ts';
 import type { ItemSource } from '../items/item-source.ts';
+import type { ProjectCreationProgress } from './github.ts';
 import { abandonItem, addIssueLabel, addProjectItem, fetchProject, findProjectNumber, setIssueStatus, setItemStatus } from './github.ts';
 
 export function githubProject(config: BoardConfig): ItemSource {
@@ -21,10 +22,13 @@ export function githubProject(config: BoardConfig): ItemSource {
       const projectItemId = projectItemIds.get(item.id);
       return projectItemId ? setItemStatus(project(), projectItemId, status) : `Could not set ${status}. The board has not read this item from the project.`;
     },
+    statusRefusal: () => null,
     addLabel: (item, label) => addIssueLabel(item.repo!, item.number!, label),
-    async create(draft, progress) {
+    async create(draft, shared) {
+      // The Project item id rides on Add item's progress object, so a retry reuses it, but only this adapter reads it.
+      const progress: ProjectCreationProgress = shared;
       const result = await addProjectItem(project(), draft, progress);
-      if (result.item && progress.itemId) projectItemIds.set(result.item.id, progress.itemId);
+      if (result.item && progress.projectItemId) projectItemIds.set(result.item.id, progress.projectItemId);
       return result;
     },
     setParentStatus: (parent, status) => setIssueStatus(project(), parent.url, status),

@@ -10,7 +10,7 @@ const items = (sampleJson as unknown as { items: Item[] }).items;
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
 const child = (number: number, parent: Item, change: Partial<Item> = {}): Item => ({
   ...byNumber(129), id: `I_c${number}`, number, status: 'Shaping', labels: [],
-  parent: { number: parent.number!, repo: parent.repo!, title: parent.title, url: parent.url!, state: 'OPEN' }, ...change,
+  parent: { number: parent.number!, repo: parent.repo!, title: parent.title, url: parent.url!, state: 'open' }, ...change,
 });
 
 test('every open concept, and every open item with a sub-issue on the board, is a dossier, in board order', () => {
@@ -36,7 +36,7 @@ test('parts run decisions first, research, grill, prototype, then builds, each w
 
 test("each part carries its blocked-by issues and its newest thread", () => {
   const [research, grill, prototype, build] = partsOf(byNumber(200), items);
-  expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' }]);
+  expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/lar-server', state: 'closed' }]);
   expect([research!.thread?.title, grill!.thread?.state, prototype!.thread?.state, build!.thread?.state]).toEqual(['Research: hosting cost of the relay', 'running', 'needs you', 'done']);
 });
 

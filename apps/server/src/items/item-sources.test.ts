@@ -16,6 +16,7 @@ function fakeSource(title: string, items: Item[], writes: string[]): ItemSource 
   return {
     read: async () => ({ title, items }),
     setStatus: async (i, status) => write(`${i.id} ${status}`)(),
+    statusRefusal: (i) => `${title} refuses ${'id' in i ? i.id : `${i.repo}#${i.number}`}`,
     addLabel: async (i, label) => write(`${i.id} ${label}`)(),
     create: async (draft) => { writes.push(`${title} create ${draft.repo}`); return { item: null, issueUrl: null, error: null }; },
     setParentStatus: async (parent, status) => write(`${parent.repo}#${parent.number} ${status}`)(),
@@ -44,9 +45,20 @@ test('a write goes to the source that listed the item, or else to the source its
   await sources.abandon(item('I_9', 'maddec01/lar-server'));
   await sources.create({ kind: 'feature', repo: 'maddec01/lar-apple', title: 'New', description: '', labels: [] }, {});
   await sources.create({ kind: 'feature', repo: 'maddec01/lar-server', title: 'New', description: '', labels: [] }, {});
-  await sources.setParentStatus({ number: 5, title: 'Parent', url: '', repo: 'maddec01/lar-apple', state: 'OPEN' }, 'In progress');
+  await sources.setParentStatus({ number: 5, title: 'Parent', url: '', repo: 'maddec01/lar-apple', state: 'open' }, 'In progress');
   assert.deepEqual(writes, ['lar I_1 Queued', 'apple I_2 build', 'lar abandon I_9', 'apple create maddec01/lar-apple',
     'lar create maddec01/lar-server', 'apple maddec01/lar-apple#5 In progress']);
+});
+
+test('a status refusal comes from the source that listed the item, or else the source its repository names', async () => {
+  const project = fakeSource('lar', [item('I_1', 'maddec01/lar-apple')], []);
+  const issues = fakeSource('apple', [item('I_1', 'maddec01/lar-apple'), item('I_2', 'maddec01/lar-apple')], []);
+  const sources = mergeSources(project, new Map([['maddec01/lar-apple', issues]]));
+  await sources.read();
+  assert.equal(sources.statusRefusal(item('I_1', 'maddec01/lar-apple')), 'lar refuses I_1');
+  assert.equal(sources.statusRefusal(item('I_2', 'maddec01/lar-apple')), 'apple refuses I_2');
+  assert.equal(sources.statusRefusal({ number: 5, title: 'Parent', url: '', repo: 'maddec01/lar-apple', state: 'open' }), 'apple refuses maddec01/lar-apple#5');
+  assert.equal(sources.statusRefusal({ number: 6, title: 'Parent', url: '', repo: 'maddec01/lar-server', state: 'open' }), 'lar refuses maddec01/lar-server#6');
 });
 
 test('a saved id is renamed by whichever source knows it', () => {

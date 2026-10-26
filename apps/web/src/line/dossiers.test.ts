@@ -26,12 +26,12 @@ const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): 
 const writable = (data: BoardData = sample): BoardData =>
   ({ ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 /** #140 with its blocker #202 closed, on a board whose writes are on. */
-const unblocked = () => writable(withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }] }));
+const unblocked = () => writable(withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }] }));
 const c200 = sample.items.find((i) => i.id === C200)!;
 /** A Queued grill under #200, blocked by `blockers`. */
 const decision = (blockers: Item['blockers'] = []): Item => ({
   ...sample.items.find((i) => i.id === 'I_sample05')!, id: 'I_d204', number: 204, title: 'Pick the relay host', labels: ['decision: grill'],
-  repo: c200.repo, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'OPEN' },
+  repo: c200.repo, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'open' },
   blockers,
 });
 const withDecision = (blockers?: Item['blockers']) => writable({ ...sample, items: [...sample.items, decision(blockers)] });
@@ -162,8 +162,8 @@ test("Start on a Queued decision is today's Start", async () => {
 });
 
 test('Start on a Queued decision is disabled while a blocker is open, its title naming it, and Start after names the last open one', async () => {
-  const data = withDecision([{ number: 201, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' },
-    { number: 140, repo: 'maddec01/lar-server', state: 'OPEN' }]);
+  const data = withDecision([{ number: 201, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
+    { number: 140, repo: 'maddec01/lar-server', state: 'open' }]);
   holdPosts(data);
   await mountPage(data);
   const start = startIn(step('I_d204'))!;
@@ -179,14 +179,14 @@ test('Start on a Queued decision is disabled while a blocker is open, its title 
 
 test('in the map, a part waiting on something that is neither Ready nor Queued starts by itself after it', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'OPEN' }] }));
+  await mountPage(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'open' }] }));
   await press(button(dossier(), 'Map'));
   expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('starts by itself after #203');
 });
 
 test("in the map, a part waiting on another repository's issue names it without its owner", async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('I_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' }] }));
+  await mountPage(withItem('I_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'open' }] }));
   await press(button(dossier(), 'Map'));
   expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('starts by itself after lar-apple#12');
 });

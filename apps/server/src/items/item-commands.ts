@@ -127,6 +127,8 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
     if (!item) return reply(404, { error: GONE });
     if (item.status === to) return withBoard(200, { error: null });
     if (item.status !== from) return reply(409, { error: refused(item.status) });
+    const refusal = items.statusRefusal(item);
+    if (refusal) return withBoard(409, { error: refusal });
     const busy = busyReason(itemId, action);
     if (busy) return withBoard(409, { error: busy });
     moving.add(itemId);
@@ -173,22 +175,32 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
     return withBoard(refused ? 409 : result.error ? 502 : 200, result);
   }
 
-  /** Moves the item's parent to In progress, unless it's a build or there already; returns the error, or null. */
-  async function parentInProgress({ parent }: Item): Promise<string | null> {
+  /**
+   * Plans the move of the item's parent to In progress, unless it's a build or there already: null when there is
+   * nothing to move, the error or refusal to show, or the move, which returns its error or null. The parent moves
+   * through its own item source, so a source that refuses it does so here, before Start build writes anything.
+   */
+  async function parentInProgress({ parent }: Item): Promise<null | { error: string; refused?: true } | { move: () => Promise<string | null> }> {
     if (!parent) return null;
     const onBoard = board.snapshot().items.find((i) => i.content === 'ticket' && i.number === parent.number &&
       i.repo?.toLowerCase() === parent.repo.toLowerCase());
     if (onBoard) {
       if (isBuild(onBoard) || onBoard.status === 'In progress') return null;
-      const error = await items.setStatus(onBoard, 'In progress');
-      if (!error) board.showChanged({ ...onBoard, status: 'In progress' });
-      return error;
+      const refusal = items.statusRefusal(onBoard);
+      if (refusal) return { error: refusal, refused: true };
+      return { move: async () => {
+        const error = await items.setStatus(onBoard, 'In progress');
+        if (!error) board.showChanged({ ...onBoard, status: 'In progress' });
+        return error;
+      } };
     }
     // A parent off the board has no labels here, so GitHub says whether it's a build.
     let labels: string[];
     try { labels = await issueLabels(parent.repo, parent.number); }
-    catch (err) { return `Could not read the labels of ${parent.repo}#${parent.number}. ${(err as Error).message}`; }
-    return isBuild({ labels }) ? null : items.setParentStatus(parent, 'In progress');
+    catch (err) { return { error: `Could not read the labels of ${parent.repo}#${parent.number}. ${(err as Error).message}` }; }
+    if (isBuild({ labels })) return null;
+    const refusal = items.statusRefusal(parent);
+    return refusal ? { error: refusal, refused: true } : { move: () => items.setParentStatus(parent, 'In progress') };
   }
 
   return {
@@ -249,12 +261,14 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
         const repoProject = await currentRepositoryProject(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
+        const parent = await parentInProgress(item);
+        if (parent && 'error' in parent) return { thread: null, ...parent };
         if (!item.labels.includes('build')) {
           const error = await items.addLabel(item, 'build');
           if (error) return { thread: null, error };
           board.showChanged({ ...item, labels: [...item.labels, 'build'] });
         }
-        const error = await parentInProgress(item);
+        const error = await parent?.move();
         if (error) return { thread: null, error };
         return startThread(repoProject.projectId, message, choice, { base: 'main', branch });
       };

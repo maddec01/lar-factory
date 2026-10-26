@@ -44,12 +44,12 @@ test('normalizes an issue item from the GraphQL response', () => {
   assert.equal(item?.id, 'I_61', "an item's id is its content's node id, not the Project item id");
   assert.equal(item?.status, 'Needs you');
   assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
-  assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/lar-server', state: 'CLOSED' });
+  assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/lar-server', state: 'closed' });
   assert.equal(item && 'blockedBy' in item, false, 'the open count comes from the blockers, not a field of its own');
   assert.deepEqual(item?.blockers, [
-    { number: 7, repo: 'maddec01/lar-server', state: 'OPEN' },
-    { number: 8, repo: 'maddec01/lar-apple', state: 'OPEN' },
-    { number: 5, repo: 'maddec01/lar-server', state: 'CLOSED' },
+    { number: 7, repo: 'maddec01/lar-server', state: 'open' },
+    { number: 8, repo: 'maddec01/lar-apple', state: 'open' },
+    { number: 5, repo: 'maddec01/lar-server', state: 'closed' },
   ], 'the blocked-by issues come with their repo and state, closed ones too');
   assert.ok(!('blocking' in item!), 'the board reads no blocking links');
   assert.ok(!('map' in item!), 'only a concept has a map');

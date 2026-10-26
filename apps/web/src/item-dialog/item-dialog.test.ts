@@ -107,7 +107,7 @@ test('GitHub opens the item, and Verify build and Merge PR open its pull request
 
 test('a Queued item blocked by an open issue has Start refining disabled in the footer, with Start after', async () => {
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample05'
-    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'OPEN' as const }] } : i)) });
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) });
   await openItem('I_sample05');
   expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', 'Start refining (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']);
 });
@@ -214,7 +214,7 @@ test('a failed Start shows in the dialog and offers Retry start', async () => {
 /** The sample with #140's blocker closed, so its Start build runs, and writes on. */
 const readyBuild: BoardData = {
   ...withThreads('I_sample13', undefined), capture: { session: 's1', enabled: true },
-  items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }] } : i)),
+  items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }] } : i)),
 };
 
 test('Start build in a Ready item’s footer sends the build, then tags it Started', async () => {

@@ -28,7 +28,7 @@ const sample05 = sample.items.find((i) => i.id === 'I_sample05')!;
 /** A Queued decision under `parent`, a sample item's number. */
 const decision = (id: string, parent: number): Item => ({
   ...sample05, id, number: 300 + parent, title: `Decide under #${parent}`, labels: ['decision: grill'],
-  parent: { number: parent, repo: sample05.repo!, title: 'Parent', url: 'https://github.com/x', state: 'OPEN' },
+  parent: { number: parent, repo: sample05.repo!, title: 'Parent', url: 'https://github.com/x', state: 'open' },
 });
 
 beforeEach(() => localStorage.clear());
@@ -90,7 +90,7 @@ test('the header shows the build slots; while they are full the first row waits 
 
 test('a Queued item blocked by an open issue has its Start refining disabled, with Start after, and Start next passes over it', async () => {
   const blocked = { ...withChoices, items: sample.items.map((i) => (i.id === 'I_sample05'
-    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'OPEN' as const }] } : i)) };
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };
   await mountPage(blocked);
   expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, 'Blocked by #202 until it closes']);
   expect(text(row('I_sample05').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
@@ -109,7 +109,7 @@ test("a Queued item whose repository has no T3 project has its Start refining di
 
 test('when no queued item can start, Start next shows disabled and says why', async () => {
   const held = { ...withChoices, items: sample.items.map((i) => (['I_sample05', 'I_sample06'].includes(i.id)
-    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'OPEN' as const }] } : i)) };
+    ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };
   await mountPage(held);
   const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
   expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs an issue or a T3 project, or has a thread at work.']);

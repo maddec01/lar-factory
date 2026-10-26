@@ -21,7 +21,8 @@ and copied files follow their own rules.
 2. Run `bash <this skill>/scripts/upstream-changes.sh <checkout>`. It prints, per
    copy, whether upstream changed since the recorded commit, upstream HEAD's
    12-character sha and date (`== <name>: changed (<source>
-   <commit>..<head>, <date>)`), the upstream commits and the diff. Then run
+   <commit>..<head>, <date>)`), the upstream commits and the diff of the
+   copy's path and of the licence file its `LICENSE` comes from. Then run
    `bash <this skill>/scripts/override-changes.sh <checkout>`. It prints each
    Override (a lar rule that sets aside part of a Copy, listed in the row's
    "Overridden in" column) whose cited section upstream changed, and each one
@@ -38,12 +39,13 @@ and copied files follow their own rules.
 4. Confirm each add and drop with the maintainer before step 5:
    - **Add**: run
      `bash <this skill>/scripts/preview-copy.sh <owner/repo> <path> [commit]`.
-     It prints the source's HEAD, the commit to copy, the files at the path
-     and the source's licence files. Show the maintainer that output and wait for their
+     It prints the source's HEAD, the commit to copy, the files at the path,
+     the source's licence files and, after `LICENSE from:`, the one the Copy's
+     `LICENSE` will hold. Show the maintainer that output and wait for their
      yes. If the script fails (no files at the path, unknown commit), stop and
-     ask them for the source again. If it lists no licence files, tell them so
-     before they confirm; add the copy without a `THIRD_PARTY_NOTICES.md`
-     section only if they still say yes.
+     ask them for the source again. If it prints `LICENSE from: none`, tell them
+     so before they confirm; add the copy without a `LICENSE` or a
+     `THIRD_PARTY_NOTICES.md` section only if they still say yes.
    - **Drop**: name what goes (the folder, its `UPSTREAM.md` row, the
      Overrides in that row's "Overridden in" column, and the source's full
      commit and notice if no other row uses that source) and wait for their yes.
@@ -51,7 +53,8 @@ and copied files follow their own rules.
    - **Take a change**: make the Copy's folder or file match upstream's path
      at the new commit. Copy every upstream file whole. Delete each file
      upstream deleted there, inside the Copy's own folder under
-     `skills/<name>/` only; a single-file Copy changes only that file. In its
+     `skills/<name>/` only, and keep its `LICENSE`; a single-file Copy changes
+     only that file. In its
      `UPSTREAM.md` row, set the commit to the 12-character upstream commit you
      took and the Date to that commit's date as YYYY-MM-DD (the `<head>` and
      `<date>` upstream-changes.sh printed for that copy).
@@ -67,11 +70,24 @@ and copied files follow their own rules.
      new, add its licence to `THIRD_PARTY_NOTICES.md` under a
      `## <owner/repo>` heading with its URL.
    - **Drop**: delete the copy and its `UPSTREAM.md` row, and remove each
-     Override that row lists from its lar file. When no row uses its
+     Override that row lists from its lar file. Deleting a folder deletes its
+     `LICENSE`; delete `references/LICENSE` once no row lists a file under
+     `references/`. When no row uses its
      source any more, also remove that source's full commit and its
      `THIRD_PARTY_NOTICES.md` section. Tell the maintainer the installed copies in
      `~/.agents/skills` and `~/.claude/skills` stay, since they use them in
      projects outside the factory; they remove them by hand if they want them gone.
+
+   After any take or add, run `bash <this skill>/scripts/copy-licences.sh <checkout>`.
+   For every `UPSTREAM.md` row it writes the source's licence file at the row's
+   commit, byte for byte, to `LICENSE` in the Copy's folder (`references/LICENSE`
+   for the files under `references/`). It picks the licence file with the same
+   rule as `preview-copy.sh` and `upstream-changes.sh`: the nearest one from the
+   upstream path up to the repo root, such as `pstack/LICENSE` in cursor/plugins.
+   It prints each `LICENSE` it writes or removes, and `no licence: <name>` for a
+   source with none, whose Copy gets no `LICENSE`. Commit its changes with the
+   take or add. Only this script writes a Copy's `LICENSE`; lar's own skills
+   have none.
 6. Commit as `chore(skills): sync <names> from upstream` (`feat(skills): add
    <name> as a copy` or `chore(skills): drop <name>` for add and drop), push,
    and open a PR listing what was taken, skipped, added and dropped. The maintainer

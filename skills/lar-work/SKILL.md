@@ -5,7 +5,7 @@ argument-hint: "<owner/repo#n or issue URL>"
 disable-model-invocation: true
 ---
 
-You run one lar factory item. Pedro answers questions, picks prototypes,
+You run one Lar Factory item. Pedro answers questions, picks prototypes,
 verifies visible changes and merges every PR; the rest is yours.
 
 ## Rules

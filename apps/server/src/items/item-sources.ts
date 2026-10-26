@@ -2,7 +2,7 @@
 // The board knows only the GitHub provider in this build, so each source is a GitHub adapter.
 
 import type { Item, RepoConfig } from '@lar-factory/shared';
-import type { RepositoryConfig } from '../config/repository-config.ts';
+import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
 import type { ItemSource } from './item-source.ts';
@@ -97,20 +97,24 @@ export interface OnboardedSources extends ItemSource {
 /**
  * The item source the onboarded repositories name as `load` reads their configs now: each read loads them first and
  * builds the merged source again when they changed, so a config merged to a default branch shows on the next read. A
+ * read leaves out the items of each repository whose config `load` couldn't read, which a Project may still list. A
  * write goes through the source the last read built.
  */
-export function onboardedSources(load: () => Promise<RepositoryConfig[]>, build = configuredSources): OnboardedSources {
+export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = configuredSources): OnboardedSources {
   let configs: RepositoryConfig[] = [];
   let current = build(configs);
   let key = JSON.stringify(configs);
   return {
     async read() {
-      configs = await load();
+      const loaded = await load();
+      configs = loaded.configs;
       if (JSON.stringify(configs) !== key) {
         current = build(configs);
         key = JSON.stringify(configs);
       }
-      return current.read();
+      const leftOff = new Set(loaded.problems.map((p) => p.repo.toLowerCase()));
+      const read = await current.read();
+      return { ...read, items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')) };
     },
     repos: () => configs.map(repoView),
     setStatus: (item, status) => current.setStatus(item, status),

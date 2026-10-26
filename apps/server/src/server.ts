@@ -53,9 +53,16 @@ const modelManifest = modelManifestPath();
 const environmentIdFile = environmentIdPath();
 // Each read publishes the repositories once their configs load, so Add item offers them while the items still load.
 const items = onboardedSources(async () => {
-  const configs = await readOnboardedConfigs();
-  board.update({ repos: configs.map(repoView) });
-  return configs;
+  let list: OnboardedRepository[];
+  try { list = readRepositoryList(); }
+  catch (err) {
+    // A list the board can't read onboards nothing, so no repository or notice of the last good read stays beside its error.
+    board.update({ repos: [], repositoryConfigProblems: [] });
+    throw err;
+  }
+  const read = await readOnboardedConfigs(list);
+  board.update({ repos: read.configs.map(repoView), repositoryConfigProblems: read.problems });
+  return read;
 });
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */

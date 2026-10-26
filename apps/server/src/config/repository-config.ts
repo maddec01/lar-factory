@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { SHOW_SETTINGS, type ShowSetting } from '@lar-factory/shared';
+import { SHOW_SETTINGS, type RepositoryConfigProblem, type ShowSetting } from '@lar-factory/shared';
 import { readDefaultBranchFile } from '../github/github.ts';
 import { boardDataDir } from '../port/board-record.ts';
 
@@ -91,16 +91,27 @@ function problem(raw: Record<string, unknown>): string | null {
   return null;
 }
 
+/** A .lar-factory.json that is missing or wrong, which leaves its repository off the board; other read failures stay plain errors. */
+class RepositoryConfigError extends Error {
+  readonly repo: string;
+  readonly problem: string;
+  constructor(repo: string, problem: string) {
+    super(`${repo}: ${problem}`);
+    this.repo = repo;
+    this.problem = problem;
+  }
+}
+
 /** The repository's .lar-factory.json from its default branch, never a checkout, with defaults filled in; throws why it can't. */
 export async function readRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>): Promise<RepositoryConfig> {
   const text = await readDefaultBranchFile(repo, '.lar-factory.json', run);
-  if (text === null) throw new Error(`${repo}: no .lar-factory.json on its default branch.`);
+  if (text === null) throw new RepositoryConfigError(repo, 'no .lar-factory.json on its default branch.');
   let raw: unknown;
   try { raw = JSON.parse(text); }
-  catch { throw new Error(`${repo}: .lar-factory.json isn't valid JSON.`); }
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error(`${repo}: .lar-factory.json isn't a JSON object.`);
+  catch { throw new RepositoryConfigError(repo, ".lar-factory.json isn't valid JSON."); }
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new RepositoryConfigError(repo, ".lar-factory.json isn't a JSON object.");
   const wrong = problem(raw as Record<string, unknown>);
-  if (wrong) throw new Error(`${repo}: .lar-factory.json ${wrong}.`);
+  if (wrong) throw new RepositoryConfigError(repo, `.lar-factory.json ${wrong}.`);
   const file = raw as Partial<RepositoryConfig> & { role: string };
   const itemSource: RepositoryItemSource = file.itemSource?.kind === 'github-project'
     ? { kind: 'github-project', owner: file.itemSource.owner, number: file.itemSource.number }
@@ -108,7 +119,23 @@ export async function readRepositoryConfig(repo: string, run?: (args: string[]) 
   return { repo, version: file.version ?? 1, role: file.role, itemSource, show: file.show ?? 'all', labels: file.labels ?? [] };
 }
 
-/** Each onboarded repository's config, in the list's order; throws the first that can't be read. */
-export async function readOnboardedConfigs(dir = boardDataDir()): Promise<RepositoryConfig[]> {
-  return Promise.all(readRepositoryList(dir).map(({ repo }) => readRepositoryConfig(repo)));
+/** The onboarded repositories' configs, and why each repository left off the board couldn't be read. */
+export interface OnboardedConfigs {
+  configs: RepositoryConfig[];
+  problems: RepositoryConfigProblem[];
+}
+
+/**
+ * Each onboarded repository's config, in the list's order, and the problem of each whose .lar-factory.json is
+ * missing or wrong, which stays off the board; throws any other failure, such as a logged-out gh.
+ */
+export async function readOnboardedConfigs(list: readonly OnboardedRepository[], run?: (args: string[]) => Promise<string>): Promise<OnboardedConfigs> {
+  const read = await Promise.all(list.map(({ repo }) => readRepositoryConfig(repo, run).catch((err: unknown) => {
+    if (err instanceof RepositoryConfigError) return { repo: err.repo, problem: err.problem };
+    throw err;
+  })));
+  return {
+    configs: read.filter((r): r is RepositoryConfig => 'role' in r),
+    problems: read.filter((r): r is RepositoryConfigProblem => !('role' in r)),
+  };
 }

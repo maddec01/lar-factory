@@ -7,10 +7,11 @@ import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
 import type { ItemSource } from './item-source.ts';
 
-/** The Project for every repository, merged with the issues of each repository whose entry names them. */
+/** The Project for every repository, merged with the issues of each repository whose entry names them, showing each repository's items as its entry says. */
 export function configuredSources(config: BoardConfig): ItemSource {
   const issues = config.repos.filter((r) => r.items === 'issues').map((r): [string, ItemSource] => [r.repo, repoIssues(r.repo)]);
-  return mergeSources(githubProject(config), new Map(issues));
+  const optedIn = config.repos.filter((r) => r.show === 'opted-in').map((r) => r.repo);
+  return mergeSources(githubProject(config), new Map(issues), optedIn);
 }
 
 /**
@@ -18,10 +19,14 @@ export function configuredSources(config: BoardConfig): ItemSource {
  * the Project's title; an item two sources list shows once, as the Project lists it. A write goes to the source that
  * last listed the item, or, for an item none has listed, to the source its repository names, else the Project. A read
  * fails whole when any source's read fails, so items never vanish on a passing error; another source's error starts
- * with its repository, so the user knows which repos entry to fix.
+ * with its repository, so the user knows which repos entry to fix. A read leaves out each item from a repository in
+ * `optedIn` that carries no status, except a closed item the Project lists: being in the Project opts it in.
  */
-export function mergeSources(project: ItemSource, byRepo: ReadonlyMap<string, ItemSource>): ItemSource {
+export function mergeSources(project: ItemSource, byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = []): ItemSource {
   const others = new Map([...byRepo].map(([repo, source]) => [repo.toLowerCase(), source]));
+  const optIn = new Set(optedIn.map((repo) => repo.toLowerCase()));
+  const shows = (item: Item, source: ItemSource) => item.statuses.length > 0 || !optIn.has(item.repo?.toLowerCase() ?? '')
+    || (item.state === 'closed' && source === project);
   const sources = [project, ...others.values()];
   const named = new Map([...byRepo].map(([repo, source]) => [source, repo]));
   const readOf = (source: ItemSource) => {
@@ -44,7 +49,7 @@ export function mergeSources(project: ItemSource, byRepo: ReadonlyMap<string, It
         return true;
       }));
       listedBy = listed;
-      return { title: reads[0]!.title, items };
+      return { title: reads[0]!.title, items: items.filter((item) => shows(item, listed.get(item.id)!)) };
     },
     setStatus: (item, status) => sourceOf(item).setStatus(item, status),
     statusRefusal: (item) => ('id' in item ? sourceOf(item) : forRepo(item.repo)).statusRefusal(item),

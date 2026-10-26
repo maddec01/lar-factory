@@ -61,10 +61,24 @@ the result:
 gh api --paginate "repos/$repo/labels" --jq '.[].name'
 ```
 
-All eleven names above must be present. List, Queued, Shaping, Needs you, Ready,
-In progress, Review, Verify, Ready to merge and Done are **Project Status
-values**, not labels: move them with `bash <lar-work>/scripts/status.sh
-<issue-url> "<Status>"` as the workflow directs.
+All eleven names above must be present. The block doesn't create the
+`status-<name>` labels: `status.sh` and the board create each one when it's
+first needed.
+
+## Status
+
+Status lives on the item. The statuses are List, Queued, Shaping, Needs you,
+Ready, In progress, Review, Verify, Ready to merge and Done. A GitHub Project
+keeps them in its Status field. A repository whose entry in lar-factory's
+`config.json` has `"items": "issues"` keeps them on its issues as
+`status-<name>` labels: the status lowercased with hyphens for spaces, such as
+`status-shaping` or `status-ready-to-merge`. An issue carries one. No write
+stores Done: closing the issue makes it Done.
+
+Move an item with `bash <lar-work>/scripts/status.sh <issue-url> "<Status>"`
+as the workflow directs. It swaps the issue's label or sets the Project's
+field. It refuses Done, and an issue with two status labels until someone
+removes all but one.
 
 ## Native relationships
 

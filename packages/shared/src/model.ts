@@ -285,7 +285,13 @@ export interface RepoConfig {
   platform: string;
   /** Repository role: what this repository is to the others. */
   role: string;
+  /** Its item source: the GitHub Project config.json names, the default, or the repository's issues. */
+  items?: ItemSourceKind;
 }
+
+export const ITEM_SOURCE_KINDS = ['project', 'issues'] as const;
+
+export type ItemSourceKind = (typeof ITEM_SOURCE_KINDS)[number];
 
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */

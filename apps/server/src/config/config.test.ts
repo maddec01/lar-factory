@@ -31,6 +31,15 @@ test('a repository entry without a role is refused, naming the repo', async (t) 
   await assert.rejects(async () => loadConfig(await configWith(t, [{ ...server, role: ' ' }])), /maddec01\/lar-server.*"role"/);
 });
 
+test('a repository entry reads its items from the Project unless it names its issues', async (t) => {
+  const config = loadConfig(await configWith(t, [server, { ...server, repo: 'maddec01/lar-apple', items: 'issues' }, { ...server, repo: 'maddec01/lar-factory', items: 'project' }]));
+  assert.deepEqual(config.repos.map((r) => r.items), [undefined, 'issues', 'project']);
+});
+
+test('a repository entry with any other items is refused, naming the repo', async (t) => {
+  await assert.rejects(async () => loadConfig(await configWith(t, [{ ...server, items: 'sprint' }])), /maddec01\/lar-server.*"items"/);
+});
+
 test('the factory config gives every repository a role and no checkout path', () => {
   for (const repo of loadConfig().repos) assert.ok(repo.role.trim(), repo.repo);
   const shipped = JSON.parse(readFileSync(CONFIG_URL, 'utf8')) as { repos: object[] };

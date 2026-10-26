@@ -77,11 +77,18 @@ export const asksSetup = (project: ProjectChoice): boolean => project.provider =
 /** A GitHub login, as .lar-factory.json's itemSource.owner takes it. */
 const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 
-/** Whether the setup step's answers are whole: a role, and for a GitHub Project its owner and a positive whole number. */
-function setupAnswered(setup: SetupAnswers | null): boolean {
-  if (!setup?.role.trim()) return false;
-  return setup.itemSource === 'issues' || GITHUB_LOGIN.test(setup.projectOwner) && /^[1-9]\d*$/.test(setup.projectNumber);
+/** What each of the setup step's answers that Next waits for needs: a role, and for a GitHub Project its owner and a positive whole number. */
+export function setupProblems(setup: SetupAnswers): Partial<Record<'projectOwner' | 'projectNumber' | 'role', string>> {
+  const project = setup.itemSource === 'github-project';
+  return {
+    ...project && !GITHUB_LOGIN.test(setup.projectOwner) && { projectOwner: 'Next needs a GitHub login: letters, digits and single hyphens, not at either end.' },
+    ...project && !/^[1-9]\d*$/.test(setup.projectNumber) && { projectNumber: 'Next needs the number, a positive whole number like 3.' },
+    ...!setup.role.trim() && { role: 'Next needs the repository’s role.' },
+  };
 }
+
+/** Whether the setup step's answers are whole, as setupProblems says. */
+const setupAnswered = (setup: SetupAnswers | null): boolean => !!setup && Object.keys(setupProblems(setup)).length === 0;
 
 /** The item source the run reads: its reused .lar-factory.json's, else its answers'; null until they are whole. */
 export function itemSourceOf(run: Run, project: ProjectChoice): RepositoryItemSource | null {

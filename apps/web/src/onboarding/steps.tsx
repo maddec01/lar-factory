@@ -1,7 +1,7 @@
 // The body of each onboarding step, which the dialog shows one at a time. Each field sits on its own row with its
 // label and one line of help. The Pull request step opens the PR that adds .lar-factory.json, then waits for its merge.
 
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Check, CircleAlert, FolderPlus, GitPullRequest, Info, LoaderCircle, RotateCw, X } from 'lucide-react';
 import { SETUP_CHECKS, onboardingConfigFile, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
@@ -15,7 +15,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import {
-  COMMAND_CHECKS, type Checks, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, onboarded, pickedProject, prClosed, suggestedShow,
+  COMMAND_CHECKS, type Checks, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, onboarded, pickedProject, prClosed, setupProblems, suggestedShow,
   unpickable, useWizardStore,
 } from './wizard-store.ts';
 
@@ -29,9 +29,28 @@ function Choice({ value, title, children, disabled }: { value: string; title: Re
   );
 }
 
-/** One field on its own row: its label, the control, then one line of help. */
-function Field({ name, label, hint, children }: { name?: string; label: string; hint?: ReactNode; children: ReactNode }) {
-  return <label data-field={name} className="grid gap-1.5"><span className="text-sm font-medium">{label}</span>{children}{hint && <span className="text-xs text-muted-foreground">{hint}</span>}</label>;
+/** The props that tie a field's control to its help and problem. */
+type Described = { 'aria-describedby'?: string; 'aria-invalid'?: true };
+
+/**
+ * One field on its own row: its label and control, one line of help, then what Next waits for from it, if anything.
+ * The help and problem sit outside the label and describe the control, so they aren't read as its name. The problem
+ * is muted help until `invalid`, which marks it and the control.
+ */
+function Field({ name, label, hint, problem, invalid = false, children }: {
+  name?: string; label: string; hint?: ReactNode; problem?: string; invalid?: boolean; children: (described: Described) => ReactNode;
+}) {
+  const id = useId();
+  const marked = !!problem && invalid;
+  const describedBy = [hint && `${id}-hint`, problem && `${id}-problem`].filter(Boolean).join(' ');
+  return (
+    <div data-field={name} className="grid gap-1.5">
+      <label className="grid gap-1.5"><span className="text-sm font-medium">{label}</span>
+        {children({ ...describedBy && { 'aria-describedby': describedBy }, ...marked && { 'aria-invalid': true } })}</label>
+      {hint && <span id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</span>}
+      {problem && <span id={`${id}-problem`} data-problem className={`text-xs ${marked ? 'text-destructive-foreground' : 'text-muted-foreground'}`}>{problem}</span>}
+    </div>
+  );
 }
 
 /** A group of choices on its own row: its legend, one line of help, then the choices. */
@@ -80,13 +99,13 @@ function NewProject({ creating }: { creating: Creating }) {
   return (
     <div className="grid gap-3 rounded-lg border p-4">
       <Field label="Folder" hint="The repository’s main checkout on this Mac, as a full path. T3 Code adds it as a project.">
-        <span className="flex gap-2">
-          <Input data-new-folder font="mono" placeholder="~/Developer/lar-web" value={creating.folder} disabled={creating.adding}
+        {(described) => <span className="flex gap-2">
+          <Input data-new-folder font="mono" placeholder="~/Developer/lar-web" value={creating.folder} disabled={creating.adding} {...described}
             onChange={(e) => setFolder(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
           <Button data-add-project variant="outline" disabled={creating.adding || !creating.folder.trim()} onClick={add}>
             {creating.adding ? <><LoaderCircle className="animate-spin" /> Adding…</> : <><FolderPlus /> Add to T3 Code</>}
           </Button>
-        </span>
+        </span>}
       </Field>
       {creating.error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t create the T3 project</AlertTitle><AlertDescription>{creating.error}</AlertDescription></Alert>}
     </div>
@@ -150,10 +169,26 @@ function ReusedConfig({ project, config }: { project: ProjectChoice; config: Non
   );
 }
 
-/** The questions: item source, show setting with the suggested one marked, and Repository role. */
+type TextAnswer = keyof ReturnType<typeof setupProblems>;
+
+/**
+ * The questions: item source, show setting with the suggested one marked, and Repository role. A text answer's problem
+ * is muted help until its field is edited or left.
+ */
 function SetupQuestions({ project, setup }: { project: ProjectChoice; setup: SetupAnswers }) {
   const answer = useWizardStore((s) => s.answer);
   const suggested = suggestedShow(setup.itemSource);
+  const problems = setupProblems(setup);
+  const [touched, setTouched] = useState<ReadonlySet<TextAnswer>>(new Set());
+  const touch = (key: TextAnswer) => { if (!touched.has(key)) setTouched(new Set([...touched, key])); };
+  /** A text answer's problem, whether it's marked, and the handlers that mark it. */
+  const textAnswer = (key: TextAnswer) => ({
+    field: { problem: problems[key], invalid: touched.has(key) },
+    control: { value: setup[key], onBlur: () => touch(key), onChange: (e: { target: { value: string } }) => { touch(key); answer({ [key]: e.target.value }); } },
+  });
+  const owner = textAnswer('projectOwner');
+  const number = textAnswer('projectNumber');
+  const role = textAnswer('role');
   return (<>
     <Group legend="Item source" hint="Where the board finds this repository’s items. It lists the items that can show.">
       <RadioGroup value={setup.itemSource} onValueChange={(v) => answer({ itemSource: v as SetupAnswers['itemSource'] })} className="gap-2">
@@ -162,11 +197,11 @@ function SetupQuestions({ project, setup }: { project: ProjectChoice; setup: Set
       </RadioGroup>
     </Group>
     {setup.itemSource === 'github-project' && (<>
-      <Field name="project-owner" label="Project owner" hint="The GitHub user or organization that owns the Project.">
-        <Input font="mono" value={setup.projectOwner} onChange={(e) => answer({ projectOwner: e.target.value })} />
+      <Field name="project-owner" label="Project owner" hint="The GitHub user or organization that owns the Project." {...owner.field}>
+        {(described) => <Input font="mono" {...owner.control} {...described} />}
       </Field>
-      <Field name="project-number" label="Project number" hint="The number in the Project’s URL, after /projects/.">
-        <Input font="mono" inputMode="numeric" placeholder="3" value={setup.projectNumber} onChange={(e) => answer({ projectNumber: e.target.value })} />
+      <Field name="project-number" label="Project number" hint="The number in the Project’s URL, after /projects/." {...number.field}>
+        {(described) => <Input font="mono" inputMode="numeric" placeholder="3" {...number.control} {...described} />}
       </Field>
     </>)}
     <Group legend="Show" hint="Which of the item source’s items show on the board.">
@@ -179,8 +214,8 @@ function SetupQuestions({ project, setup }: { project: ProjectChoice; setup: Set
         ))}
       </RadioGroup>
     </Group>
-    <Field name="role" label="Repository role" hint="What this repository is to the others.">
-      <Input placeholder="Web client that talks to the API server" value={setup.role} onChange={(e) => answer({ role: e.target.value })} />
+    <Field name="role" label="Repository role" hint="What this repository is to the others." {...role.field}>
+      {(described) => <Input placeholder="Web client that talks to the API server" {...role.control} {...described} />}
     </Field>
   </>);
 }

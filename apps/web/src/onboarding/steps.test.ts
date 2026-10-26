@@ -144,6 +144,45 @@ test('the step shows the provider read-only, then asks the item source, show set
   expect(dialog()!.querySelector('[data-field="platform"], [data-field="list-group"]')).toBeNull();
 });
 
+test('while Next is disabled each answer it waits for says what it needs, under its field', async () => {
+  await openSetup(project('lar-web'));
+  const problem = (name: string) => text(field(name)!.querySelector('[data-problem]')) || null;
+  expect([problem('project-owner'), problem('project-number'), problem('role')])
+    .toEqual([null, 'Next needs the number, a positive whole number like 3.', 'Next needs the repository’s role.']);
+  await type(input('project-owner')!, '-maddec01');
+  await type(input('project-number')!, '3.5');
+  expect(problem('project-owner')).toBe('Next needs a GitHub login: letters, digits and single hyphens, not at either end.');
+  expect(problem('project-number')).toBe('Next needs the number, a positive whole number like 3.');
+  await type(input('project-owner')!, 'maddec01');
+  await type(input('project-number')!, '3');
+  await type(input('role')!, 'Web client');
+  expect(dialog()!.querySelector('[data-problem]')).toBeNull();
+  expect(nextButton().disabled).toBe(false);
+});
+
+test('an answer Next waits for is muted help until its field is edited or left, then marks the field invalid', async () => {
+  await openSetup(project('lar-web'));
+  const invalid = (name: string) => input(name)!.getAttribute('aria-invalid') === 'true';
+  const note = (name: string) => field(name)!.querySelector<HTMLElement>('[data-problem]')!;
+  expect([invalid('project-number'), invalid('role')], 'nothing marked before any typing').toEqual([false, false]);
+  expect(note('role').className).toContain('text-muted-foreground');
+  await type(input('project-number')!, '3.5');
+  expect([invalid('project-number'), invalid('role')]).toEqual([true, false]);
+  expect(note('project-number').className).toContain('text-destructive-foreground');
+  await settle(() => input('role')!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(invalid('role'), 'left empty').toBe(true);
+});
+
+test("each field's help and problem describe its input, outside its label", async () => {
+  await openSetup(project('lar-web'));
+  const role = input('role')!;
+  const label = role.closest('label')!;
+  expect(label.querySelector('[data-problem]'), 'the problem is not part of the name').toBeNull();
+  expect(text(label)).toBe('Repository role');
+  const described = role.getAttribute('aria-describedby')!.split(' ').map((id) => text(document.getElementById(id)));
+  expect(described).toEqual(['What this repository is to the others.', 'Next needs the repository’s role.']);
+});
+
 test('a picked show setting stays when the item source changes', async () => {
   await openSetup(project('lar-web'));
   await settle(() => choice('opted-in').querySelector<HTMLElement>('[role="radio"]')!.click());

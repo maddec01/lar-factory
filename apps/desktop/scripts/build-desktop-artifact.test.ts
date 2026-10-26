@@ -70,6 +70,17 @@ describe("createBuildConfig", () => {
     expect(config.files).toContain("!dist-electron/server/**/*");
   });
 
+  it("ships THIRD_PARTY_NOTICES.md from the repo root instead of T3's licence", () => {
+    const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
+
+    expect(config.extraResources).toContainEqual({
+      from: "../../THIRD_PARTY_NOTICES.md",
+      to: "THIRD_PARTY_NOTICES.md",
+    });
+    expect(config.extraResources).not.toContainEqual(expect.objectContaining({ to: "LICENSE.t3code.txt" }));
+    expect(NodeFS.existsSync(NodePath.join(import.meta.dirname, "../../../THIRD_PARTY_NOTICES.md"))).toBe(true);
+  });
+
   it("names the app Lar Factory, keeps its release files and appId ASCII, and uses the Lar Factory icon", () => {
     const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
 

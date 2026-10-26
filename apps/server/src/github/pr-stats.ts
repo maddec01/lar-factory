@@ -4,10 +4,8 @@
 
 import { isBuild, type Item, type ItemStats, duration, formatTokens, wholeUsd } from '@lar-factory/shared';
 
-// The marker keeps its pre-lar name: merged PRs carry blocks with it, and a done build's figures
-// are read back from them once Claude deletes the transcripts.
-const START = '<!-- mux-stats -->';
-const END = '<!-- /mux-stats -->';
+const START = '<!-- lar-stats -->';
+const END = '<!-- /lar-stats -->';
 
 const MIN = 60_000;
 
@@ -77,8 +75,8 @@ export function mergedStats(item: Item): ItemStats | null {
 }
 
 // A marker counts only alone on its own line, so one quoted in prose isn't the block.
-const START_LINE = /^<!-- mux-stats -->[ \t]*\r?$/gm;
-const END_LINE = /^<!-- \/mux-stats -->[ \t]*\r?$/gm;
+const START_LINE = /^<!-- lar-stats -->[ \t]*\r?$/gm;
+const END_LINE = /^<!-- \/lar-stats -->[ \t]*\r?$/gm;
 
 /** Where the body's block starts and ends, or null when it has none. */
 function blockRange(body: string): [number, number] | null {

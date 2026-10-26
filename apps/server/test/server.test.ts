@@ -191,7 +191,7 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   const made = await edits();
   assert.equal(made.length, 1, 'later refreshes see the block is current and leave the PR alone');
   assert.equal(made[0]![3], 'repos/maddec01/lar-factory/pulls/40', 'merged PRs and items without stats are left alone');
-  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
+  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /lar-stats -->');
 
   const failing = await startBoard(t, { items, fail: 'pr-edit' }, false, false, { T3_STATE_DB: db });
   assert.equal((await readItems(failing)).length, 2, 'a failed edit leaves the board working');
@@ -205,7 +205,7 @@ test('a merged item shows the figures in its merged PR\'s block, not live ones, 
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
   const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/lar-factory#12'], turns },
     { id: 'b', messages: ['Build maddec01/lar-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
-  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
+  const block = '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /lar-stats -->';
   const merged = (number: number, prNumber: number, body: string) => {
     const raw = rawBuild(number, 'Done');
     return { ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
@@ -227,7 +227,7 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/lar-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const frozenBlock = '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
+  const frozenBlock = '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /lar-stats -->';
   const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
   const raw = rawBuild(12, 'Review');
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
@@ -241,14 +241,14 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
   const [edit] = await edits();
   assert.equal(edit?.[3], 'repos/maddec01/lar-factory/pulls/41');
-  assert.equal(edit?.[5], 'body=PR 41\n\n<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->');
+  assert.equal(edit?.[5], 'body=PR 41\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /lar-stats -->');
 });
 
 test('an issue that isn\'t a build shows live figures and writes no block, even linked to a build\'s PRs', async (t) => {
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
   const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/lar-factory#12'], turns },
     { id: 'b', messages: ['/lar-work maddec01/lar-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
-  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /mux-stats -->';
+  const block = '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): agent time 2h 15m · 12.4M tokens · $41\n<!-- /lar-stats -->';
   const prs = { nodes: [
     { number: 40, url: 'https://github.com/maddec01/lar-factory/pull/40', state: 'MERGED', isDraft: false, body: `PR 40\n\n${block}` },
     { number: 41, url: 'https://github.com/maddec01/lar-factory/pull/41', state: 'OPEN', isDraft: false, body: 'PR 41' },
@@ -269,7 +269,7 @@ test('a parent with two builds merged at different times: each build keeps its o
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
   // The parent's own thread is live; the builds' threads are gone from T3 Code, as after transcript deletion.
   const db = statsDb(t, [{ id: 'p', messages: ['$lar-work maddec01/lar-factory#13'], turns }]);
-  const block = (figures: string) => `<!-- mux-stats -->\n**Item stats** (kept current by the lar board): ${figures}\n<!-- /mux-stats -->`;
+  const block = (figures: string) => `<!-- lar-stats -->\n**Item stats** (kept current by the lar board): ${figures}\n<!-- /lar-stats -->`;
   const pr = (number: number, mergedAt: string, body: string) => ({ number, url: `https://github.com/maddec01/lar-factory/pull/${number}`,
     state: 'MERGED', isDraft: false, body, mergedAt });
   const first = pr(40, '2026-10-18T10:00:00Z', `PR 40\n\n${block('Σ 1h 0m · wall 40m · 2M · $10')}`);
@@ -304,7 +304,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/lar-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const block = '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /mux-stats -->';
+  const block = '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /lar-stats -->';
   const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
   const pr = (number: number, body: string) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body });
   const raw = rawBuild(12, 'Review');

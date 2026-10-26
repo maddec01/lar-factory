@@ -7,11 +7,11 @@ const stats: ItemStats = { agentMs: 65 * 60_000, wallMs: 47 * 60_000, tokens: 12
 const block = statsBlock(stats);
 
 test('the block shows agent time, wall time, total tokens and API cost, between markers', () => {
-  assert.equal(block, '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 0m · wall 45m · 12.4M · $41\n<!-- /mux-stats -->');
+  assert.equal(block, '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 0m · wall 45m · 12.4M · $41\n<!-- /lar-stats -->');
   assert.equal(statsBlock({ agentMs: 195 * 60_000, wallMs: 75 * 60_000, tokens: 980 }),
-    '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 3h 15m · wall 1h 15m · 980\n<!-- /mux-stats -->', 'nothing priced, no cost');
+    '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 3h 15m · wall 1h 15m · 980\n<!-- /lar-stats -->', 'nothing priced, no cost');
   assert.equal(statsBlock({ agentMs: stats.agentMs, tokens: 980 }),
-    '<!-- mux-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 0m · 980\n<!-- /mux-stats -->', 'no wall time, no wall part');
+    '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 0m · 980\n<!-- /lar-stats -->', 'no wall time, no wall part');
 });
 
 test('the block\'s cost is in whole dollars, to the nearest, and <$1 below a dollar, so cents don\'t rewrite it', () => {
@@ -38,8 +38,8 @@ test('a body without a block gets one appended; the text before it is kept byte 
 
 test('a body with a block gets only the block replaced', () => {
   const before = 'Intro\r\n\r\n';
-  const after = '\r\n\r\n## Verify\r\nSteps <!-- mux-stats --> quoted later';
-  const body = `${before}<!-- mux-stats -->\nold numbers\n<!-- /mux-stats -->${after}`;
+  const after = '\r\n\r\n## Verify\r\nSteps <!-- lar-stats --> quoted later';
+  const body = `${before}<!-- lar-stats -->\nold numbers\n<!-- /lar-stats -->${after}`;
   assert.equal(withStatsBlock(body, block), `${before}${block}${after}`);
   assert.equal(withStatsBlock(withStatsBlock(body, block), block), `${before}${block}${after}`, 'the same stats leave the body as it is');
 });
@@ -51,12 +51,12 @@ const item = (linkedPrs: LinkedPr[], itemStats: Item['stats'] | null = stats, la
   ({ linkedPrs, stats: itemStats ?? undefined, labels, repo }) as Item;
 
 test('markers count only alone on their own line, so a marker quoted in prose is left as it is', () => {
-  const prose = 'The board writes `<!-- mux-stats -->` and <!-- /mux-stats --> markers.';
+  const prose = 'The board writes `<!-- lar-stats -->` and <!-- /lar-stats --> markers.';
   assert.equal(withStatsBlock(prose, block), `${prose}\n\n${block}`);
-  const quotedThenReal = `Quote: <!-- mux-stats --> here\r\n<!-- mux-stats -->\r\nold\r\n<!-- /mux-stats -->\r\nEnd <!-- /mux-stats -->`;
-  assert.equal(withStatsBlock(quotedThenReal, block), `Quote: <!-- mux-stats --> here\r\n${block}\r\nEnd <!-- /mux-stats -->`);
-  assert.equal(withStatsBlock('<!-- mux-stats -->\nno end, then <!-- /mux-stats --> inline', block),
-    `<!-- mux-stats -->\nno end, then <!-- /mux-stats --> inline\n\n${block}`);
+  const quotedThenReal = `Quote: <!-- lar-stats --> here\r\n<!-- lar-stats -->\r\nold\r\n<!-- /lar-stats -->\r\nEnd <!-- /lar-stats -->`;
+  assert.equal(withStatsBlock(quotedThenReal, block), `Quote: <!-- lar-stats --> here\r\n${block}\r\nEnd <!-- /lar-stats -->`);
+  assert.equal(withStatsBlock('<!-- lar-stats -->\nno end, then <!-- /lar-stats --> inline', block),
+    `<!-- lar-stats -->\nno end, then <!-- /lar-stats --> inline\n\n${block}`);
 });
 
 test('edits go to open linked PRs whose block is missing or out of date, never to closed or merged ones', () => {
@@ -127,13 +127,13 @@ test('a merged item takes the figures its merged PR\'s block holds, frozen, as t
 });
 
 test('a merged item reads a block in the old format, from before wall time, with no wall time', () => {
-  const old = (figures: string) => mergedStats(item([pr(1, 'MERGED', `Body\n\n<!-- mux-stats -->\n**Item stats** (kept current by the lar board): ${figures}\n<!-- /mux-stats -->`)], null));
+  const old = (figures: string) => mergedStats(item([pr(1, 'MERGED', `Body\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): ${figures}\n<!-- /lar-stats -->`)], null));
   assert.deepEqual(old('agent time 3h 15m · 12.4M tokens · $41'), { agentMs: 195 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true });
   assert.deepEqual(old('agent time 5m · 980 tokens'), { agentMs: 5 * 60_000, tokens: 980, frozen: true }, 'nothing priced, no cost');
 });
 
 test('a merged item falls back to live stats when no merged PR has a readable block', () => {
-  const garbled = '<!-- mux-stats -->\n**Item stats**: agent time soon · lots of tokens\n<!-- /mux-stats -->';
+  const garbled = '<!-- lar-stats -->\n**Item stats**: agent time soon · lots of tokens\n<!-- /lar-stats -->';
   assert.equal(mergedStats(item([pr(1, 'MERGED', 'Body without a block')])), null);
   assert.equal(mergedStats(item([pr(1, 'MERGED', garbled)])), null);
   assert.equal(mergedStats(item([pr(1, 'MERGED', undefined)])), null, 'an unread body');

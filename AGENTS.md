@@ -6,7 +6,9 @@ the flow and `docs/plan.md` for how it was set up.
 - `skills/` holds copies of upstream skills, unchanged, plus lar's own skills
   (`lar-work`, `skill-sync`). Never edit a copy by hand: upstream changes come in
   through `skill-sync`, which updates `UPSTREAM.md`. lar rules go in `lar-work` or
-  in each lar repo's `AGENTS.md`.
+  in each lar repo's `AGENTS.md`. To set aside part of a Copy, write an Override:
+  a lar rule in `lar-work` that cites the Copy's file and section heading, listed
+  in the Copy's "Overridden in" column of `UPSTREAM.md`.
 - The board is a root pnpm workspace laid out like T3 Code's monorepo:
   `apps/server`, `apps/web`, `apps/desktop` (the Electron board app),
   `packages/shared` and `packages/ui` (the design system). Apps import only

@@ -3,7 +3,8 @@
 Every copied skill, where it came from, the upstream commit it matches and that
 commit's date. `skill-sync` compares each copy with upstream from this commit
 and updates this file when you take changes. Copies are never edited by hand; lar rules live in
-`lar-work` and in each repo's `AGENTS.md`.
+`lar-work` and in each repo's `AGENTS.md`. To set aside part of a Copy, lar writes an
+Override in its own skill, citing the Copy's file and section heading, and lists it here.
 
 "Overridden in" lists the Copy's Overrides: lar rules, in lar's own skills, that
 replace or set aside part of the Copy. Each entry is `<copy file>#<heading> (<lar file>)`,
@@ -15,7 +16,7 @@ it and flags each Override an upstream change touches.
 | ----- | ------ | ---- | ------ | ---- | ------------- |
 | `grilling` | mattpocock/skills | `skills/productivity/grilling` | `5beb35b040e3` | 2026-10-19 |  |
 | `domain-modeling` | mattpocock/skills | `skills/engineering/domain-modeling` | `5beb35b040e3` | 2026-10-19 |  |
-| `prototype` | mattpocock/skills | `skills/engineering/prototype` | `5beb35b040e3` | 2026-10-19 |  |
+| `prototype` | mattpocock/skills | `skills/engineering/prototype` | `5beb35b040e3` | 2026-10-19 | LOGIC.md#3. Build the shareable HTML file (skills/lar-work/SKILL.md); LOGIC.md#4. Hand it over (skills/lar-work/SKILL.md); LOGIC.md#Anti-patterns (skills/lar-work/SKILL.md); UI.md#5. Hand it over (skills/lar-work/SKILL.md); SKILL.md#Rules that apply to both (skills/lar-work/SKILL.md) |
 | `research` | mattpocock/skills | `skills/engineering/research` | `5beb35b040e3` | 2026-10-19 |  |
 | `diagnosing-bugs` | mattpocock/skills | `skills/engineering/diagnosing-bugs` | `5beb35b040e3` | 2026-10-19 |  |
 | `tdd` | mattpocock/skills | `skills/engineering/tdd` | `5beb35b040e3` | 2026-10-19 |  |
@@ -25,7 +26,7 @@ it and flags each Override an upstream change touches.
 | `pr` | mattpocock/skills | `skills/engineering/pr` | `5beb35b040e3` | 2026-10-19 |  |
 | `retro` | mattpocock/skills | `skills/engineering/retro` | `5beb35b040e3` | 2026-10-19 |  |
 | `handoff` | mattpocock/skills | `skills/productivity/handoff` | `5beb35b040e3` | 2026-10-19 |  |
-| `to-tickets` | mattpocock/skills | `skills/engineering/to-tickets` | `5beb35b040e3` | 2026-10-19 |  |
+| `to-tickets` | mattpocock/skills | `skills/engineering/to-tickets` | `5beb35b040e3` | 2026-10-19 | SKILL.md#4. Quiz the user (skills/lar-work/agents/planner.md); SKILL.md#5. Publish the tickets to the configured tracker (skills/lar-work/agents/planner.md); SKILL.md#Blocked by (skills/lar-work/agents/planner.md) |
 | `implement` | mattpocock/skills | `skills/engineering/implement` | `5beb35b040e3` | 2026-10-19 |  |
 | `code-review-and-quality` | addyosmani/agent-skills | `skills/code-review-and-quality` | `aeac41d4d005` | 2026-10-13 |  |
 | `security-and-hardening` | addyosmani/agent-skills | `skills/security-and-hardening` | `aeac41d4d005` | 2026-10-13 |  |

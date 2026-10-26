@@ -85,7 +85,7 @@ listen() {
 }
 # status.sh reads board records from this home, never the real one.
 export HOME="$bin/home"
-records="$HOME/Library/Application Support/lar Factory/boards"
+records="$HOME/Library/Application Support/Lar Factory/boards"
 record() { mkdir -p "$records"; printf '{"port":%s}' "$2" >"$records/$1.json"; }
 free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])'; }
 

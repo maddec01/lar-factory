@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Test-only T3 Code CLI. Never starts a real thread.
+// Test-only T3 Code CLI. Never starts a real thread or adds a real project.
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 // The tool check's version probe, which tests don't count as a call.
@@ -11,6 +11,19 @@ const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8')).t
 fs.appendFileSync(process.env.FAKE_GH_STATE + '.t3calls', JSON.stringify(args) + '\n');
 const main = async () => {
   if (options.delay) await new Promise((r) => setTimeout(r, options.delay));
+  // Adding a project: T3 lists the folder as project `added`, or refuses with `addFails` as its message.
+  if (args[0] === 'project' && args[1] === 'add') {
+    if (options.addFails) {
+      process.stderr.write(options.addFails);
+      process.exitCode = 1;
+      return;
+    }
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(process.env.T3_STATE_DB);
+    db.prepare('INSERT INTO projection_projects VALUES (?, ?, ?, NULL)').run('added', 'added', args[2]);
+    db.close();
+    return;
+  }
   if (options.fail === 'down') {
     process.stderr.write('Could not reach the T3 Code server. Is T3 Code running?');
     process.exitCode = 1;

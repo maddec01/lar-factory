@@ -41,6 +41,34 @@ test('the sample board lists no T3 projects to onboard', async (t) => {
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }]);
 });
 
+test('creating a T3 project runs t3 project add on the folder and answers with the new project to pick', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  checkouts(home, { 'lar-web': 'git@github.com:maddec01/lar-web.git' });
+  const db = projectsDb(t, []);
+  const board = await startBoard(t, { repositories: [], repoConfigs: { 'maddec01/lar-web': null } }, false, false, { HOME: home, T3_STATE_DB: db });
+  const response = await board.post({ folder: '~/Developer/lar/lar-web' }, board.url, '/api/onboarding/projects');
+  assert.equal(response.status, 200);
+  const { projects, projectId } = await response.json() as { projects: { id: string; repo: string }[]; projectId: string };
+  assert.equal(projectId, 'added');
+  assert.deepEqual(projects.map((p) => [p.id, p.repo]), [['added', 'maddec01/lar-web']]);
+  assert.deepEqual(await board.t3Calls(), [['project', 'add', join(home, 'Developer/lar/lar-web')]]);
+});
+
+test("a failing t3 project add answers with t3's message", async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  const board = await startBoard(t, { t3: { addFails: 'Could not reach the T3 Code server.' } }, false, false, { HOME: home });
+  const response = await board.post({ folder: home }, board.url, '/api/onboarding/projects');
+  assert.deepEqual([response.status, await response.json()], [502, { error: 't3 could not add the project: Could not reach the T3 Code server.' }]);
+});
+
+test('the sample board creates no T3 project', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const response = await board.post({ folder: '/tmp' }, board.url, '/api/onboarding/projects');
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }]);
+});
+
 const progress = { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } };
 
 test('a repository still onboarding is in the board data with its progress, and the board reads no Repository config for it', async (t) => {

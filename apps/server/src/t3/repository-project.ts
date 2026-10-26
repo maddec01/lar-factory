@@ -1,7 +1,8 @@
 // Finds the repository project Start opens a card's thread in: the T3 project whose
 // folder is a main checkout with the repository as its git origin. Each failure is a
-// hint that names the fix; the board never adds or changes T3 projects. The same checkouts
-// tell whether a listed repository is on Azure DevOps, which only then needs az.
+// hint that names the fix. Only onboarding adds a T3 project, and the board never changes
+// one. The same checkouts tell whether a listed repository is on Azure DevOps, which only
+// then needs az.
 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';

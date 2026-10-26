@@ -15,6 +15,7 @@ import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { onboardedSources, repoView } from './items/item-sources.ts';
 import { log } from './log.ts';
+import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import { projectChoices } from './onboarding/project-choices.ts';
 import { loadBuild } from './page/page.ts';
@@ -273,6 +274,7 @@ const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: () => projectChoices(onboarded()),
   keepOnboarding: (input) => keepOnboarding(input),
+  createProject: (input) => createProject(input, () => projectChoices(onboarded())),
 });
 
 /** Logs why the board can't start and exits. */

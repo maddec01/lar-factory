@@ -31,6 +31,8 @@ export interface HttpDeps {
   projectChoices(): Promise<ProjectChoice[]>;
   /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
   keepOnboarding(input: Record<string, unknown>): { onboarding: OnboardingRepository[] } | { status: number; error: string };
+  /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
+  createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | { status: number; error: string }>;
 }
 
 export interface BoardServer {
@@ -105,7 +107,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding }: HttpDeps): BoardServer {
+export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -158,6 +160,13 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       what: 'the item to abandon', disabled: 'Abandoning is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),
       run: forItem('Name the item to abandon.', (itemId) => commands.abandon(itemId)),
+    },
+    '/api/onboarding/projects': {
+      what: 'the folder to add', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const created = await createProject(input);
+        return 'error' in created ? { status: created.status, body: { error: created.error } } : { status: 200, body: { ...created, error: null } };
+      },
     },
     '/api/onboarding/repositories': {
       what: 'the onboarding to keep', disabled: 'Sample mode onboards no repository.',

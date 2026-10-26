@@ -11,7 +11,7 @@
 //
 //   node scripts/build-desktop-artifact.ts [--build-version <v>] [--output-dir <dir>] [--unsigned]
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
@@ -98,8 +98,8 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
       { from: "../web/dist", to: "web/dist" },
       { from: "dist-electron/bundle", to: "bundle" },
       { from: "../../config.json", to: "config.json" },
-      // T3 Code's MIT licence: the main process, preload and scripts copy its code.
-      { from: "LICENSE", to: "LICENSE.t3code.txt" },
+      // The licence notices of the code the app copies, T3 Code's among them.
+      { from: "../../THIRD_PARTY_NOTICES.md", to: "THIRD_PARTY_NOTICES.md" },
     ],
     // The feed and the app's app-update.yml follow the version's channel.
     publish: [publishConfig(updateChannel(version))],

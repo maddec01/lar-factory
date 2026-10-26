@@ -3,7 +3,7 @@
 // curl and an az that fails its check.
 
 import type { ReactNode } from 'react';
-import { GH_FLOOR, type FailedCheck } from '@lar-factory/shared';
+import { GH_FLOOR, type AzCheck, type CommandCheck, type FailedCheck, type GhCheck, type T3Check } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { BrandMark } from '../brand/brand-mark.tsx';
 import { CopyButton } from '../copy/copy-button.tsx';
@@ -42,7 +42,7 @@ function Fix({ check, tool, what, children }: { check: FailedCheck; tool: string
 }
 
 /** The notice that fills the main area while no t3 is found. */
-export function T3Missing({ check }: { check: FailedCheck }) {
+export function T3Missing({ check }: { check: FailedCheck<T3Check> }) {
   return (
     <div className="tool-missing">
       <div className="tool-missing-box" role="alert">
@@ -60,7 +60,7 @@ export function T3Missing({ check }: { check: FailedCheck }) {
 }
 
 /** The banner while T3 Code isn't running, which stops starts but not the read. */
-export function T3NotRunningBanner({ check }: { check: FailedCheck }) {
+export function T3NotRunningBanner({ check }: { check: FailedCheck<T3Check> }) {
   return (
     <Banner title="T3 Code is not running.">
       The board starts threads through T3 Code, which has to be open. Open T3 Code, then press Recheck.
@@ -70,11 +70,11 @@ export function T3NotRunningBanner({ check }: { check: FailedCheck }) {
 }
 
 /** gh's banner title and what to do, by its check's result. */
-function ghNotice(check: FailedCheck): { title: string; body: ReactNode } {
+function ghNotice(check: FailedCheck<GhCheck>): { title: string; body: ReactNode } {
   switch (check.result) {
     case 'missing':
       return { title: 'GitHub CLI not found.', body: <>The board reads the project through <code>gh</code>. <Fix check={check} tool="gh" what="gh">
-        Install it with <CopyableCommand command="brew install gh" />, then press Recheck.
+        Install it with <CopyableCommand command={check.fix} />, then press Recheck.
       </Fix></> };
     case 'logged-out':
       return { title: 'GitHub CLI is logged out.', body: <>The board reads the project through <code>gh</code>. Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</> };
@@ -84,14 +84,11 @@ function ghNotice(check: FailedCheck): { title: string; body: ReactNode } {
     case 'no-project-scope':
       return { title: "GitHub CLI can't read Projects.", body: <>The board reads the GitHub Project through <code>gh</code>, and your gh login has no <code>project</code> scope.
         Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</> };
-    default:
-      // Only az has an extension to miss, and only t3 runs as an app.
-      return { title: 'GitHub CLI failed its check.', body: <>{'fix' in check && <>Run <CopyableCommand command={check.fix} /> in a terminal, then </>}press Recheck.</> };
   }
 }
 
 /** The banner for a gh the board can't use as it is: missing or logged out, which stops the read, too old, or without the project scope. */
-export function GhBanner({ check }: { check: FailedCheck }) {
+export function GhBanner({ check }: { check: FailedCheck<GhCheck> }) {
   const { title, body } = ghNotice(check);
   return (
     <Banner title={title}>
@@ -101,19 +98,19 @@ export function GhBanner({ check }: { check: FailedCheck }) {
   );
 }
 
-/** az's banner title by its check's result; az has no version floor or scopes. */
-const AZ_TITLES: Partial<Record<FailedCheck['result'], string>> = {
+/** az's banner title by its check's result. */
+const AZ_TITLES: Record<FailedCheck<AzCheck>['result'], string> = {
   'missing': 'Azure CLI not found.', 'logged-out': 'Azure CLI is logged out.', 'no-extension': 'Azure CLI has no azure-devops extension.',
 };
 
 /** The banner for an az that fails its check, which shows only while a listed repository is on Azure DevOps and never stops the read. */
-export function AzBanner({ check }: { check: FailedCheck }) {
+export function AzBanner({ check }: { check: FailedCheck<AzCheck> }) {
   return (
-    <Banner title={AZ_TITLES[check.result] ?? 'Azure CLI failed its check.'}>
+    <Banner title={AZ_TITLES[check.result]}>
       The board reads repositories on Azure DevOps through <code>az</code>.{' '}
       {check.result === 'missing'
-        ? <Fix check={check} tool="az" what="az">Install it with <CopyableCommand command={check.fix ?? 'brew install azure-cli'} />, then press Recheck.</Fix>
-        : <>{'fix' in check && <>Run <CopyableCommand command={check.fix} /> in a terminal, then </>}press Recheck.</>}
+        ? <Fix check={check} tool="az" what="az">Install it with <CopyableCommand command={check.fix} />, then press Recheck.</Fix>
+        : <>Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</>}
       {' '}{LOOKS_AGAIN} <Recheck check={check} />
     </Banner>
   );
@@ -128,16 +125,15 @@ const COMMAND_USES = {
 export type Command = keyof typeof COMMAND_USES;
 
 /** The banner for a missing git, jq or curl, which the board reads without. */
-export function CommandBanner({ name, check }: { name: Command; check: FailedCheck }) {
-  const install = check.result === 'missing' ? check.fix : undefined;
-  const override = check.result === 'missing' ? check.override : undefined;
+export function CommandBanner({ name, check }: { name: Command; check: FailedCheck<CommandCheck> }) {
+  const { fix: install, override } = check;
   return (
     <Banner title={`${name} not found.`}>
       {COMMAND_USES[name]} <code>{name}</code>.{' '}
       {override
         ? <>No runnable <code>{name}</code> is at <code>{override}</code>. Point {override.split('=')[0]} at {name}, or unset it and install it</>
         : <>Install it</>}
-      {install && <> with <CopyableCommand command={install} /></>}, then press Recheck.
+      {' '}with <CopyableCommand command={install} />, then press Recheck.
       {' '}{LOOKS_AGAIN} <Recheck check={check} />
     </Banner>
   );

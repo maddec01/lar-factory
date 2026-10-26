@@ -24,7 +24,7 @@ the flow and `docs/plan.md` for how it was set up.
   scopes: `board`, `lar-work`, `skill-sync`, `skills`, `ci`). A required check and the
   `commit-msg` hook enforce it. Update branches by rebase; fold review fixes in with
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
-  Pedro merges every PR.
+  The user merges every PR.
 - Board changes: run `pnpm test` in each of `apps/server`, `apps/web`,
   `apps/desktop`, `packages/shared` and `packages/ui` that changed (`pnpm test` at
   the root runs them all), then `pnpm run typecheck` and `pnpm run knip` at the root.

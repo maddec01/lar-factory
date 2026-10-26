@@ -13,7 +13,7 @@ A person decides and merges; agents do the rest.
 
 The [glossary](GLOSSARY.md) defines the factory's terms. Existing decisions are
 recorded in [ADRs](docs/adr/): [local GitHub access](docs/adr/0001-use-the-local-gh-login.md),
-[Pedro merges every PR](docs/adr/0002-pedro-merges-every-pr.md),
+[The user merges every PR](docs/adr/0002-the-user-merges-every-pr.md),
 [Start in the issue's repository project](docs/adr/0009-start-in-the-issues-repository-project.md), and
 [item stats from T3 Code's database](docs/adr/0005-read-item-stats-from-t3s-database.md).
 
@@ -89,7 +89,7 @@ through a long conversation, and subagents return summaries instead of files.
 | `skill-sync` | Brings upstream changes into the copies, by your choice | lar |
 | `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff`, `to-tickets`, `implement` | Shaping and building; `code-review` is for reviewing by hand, and no `lar-work` file loads it | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |
 | `code-review-and-quality`, `security-and-hardening`, `doubt-driven-development`, `frontend-ui-engineering`, `browser-testing-with-devtools` | Source for the Doubt and reviewer checklists in `lar-work/agents/`; not loaded by them | Copies of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
-| `developer-profile` | Pedro's coding style, which the builder follows | Copy of [maddec01/developer-profile-skill](https://github.com/maddec01/developer-profile-skill) |
+| `developer-profile` | The maintainer's coding style, which the builder follows | Copy of [maddec01/developer-profile-skill](https://github.com/maddec01/developer-profile-skill) |
 
 `UPSTREAM.md` lists the upstream path and commit of every copy.
 
@@ -178,7 +178,7 @@ LAR_FACTORY_INSTALL_ROOT="$(mktemp -d)" pnpm run dev --install-skills
 
 ### Release secrets
 
-The Release workflow signs and notarizes the board app with Pedro's Developer ID, and
+The Release workflow signs and notarizes the board app with the maintainer's Developer ID, and
 it fails without the signing secrets. Run the wizard once before the first Release,
 and again when the certificate or the API key changes:
 
@@ -193,7 +193,7 @@ without running them.
 
 ### Releasing
 
-Pedro starts every Release by hand. Open Actions > Release > Run workflow on main
+The maintainer starts every Release by hand. Open Actions > Release > Run workflow on main
 and pick a channel, `nightly` (the default) or `stable`. Tick `dry_run` to build,
 sign and notarize without publishing.
 

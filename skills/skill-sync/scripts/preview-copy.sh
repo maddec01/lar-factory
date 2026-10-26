@@ -1,10 +1,14 @@
 #!/bin/bash
 # Usage: preview-copy.sh <owner/repo> <path> [commit]
 # Before adding a copy: prints the source's HEAD commit, the commit to copy
-# (HEAD by default), the files at <path> in that commit and the source's licence
-# files. Exits non-zero for an unknown commit or a path with no files.
+# (HEAD by default), the files at <path> in that commit, the source's licence
+# files and the one copy-licences.sh writes as the Copy's LICENSE. Exits non-zero for an unknown commit or a path with no files.
 # Clones into a temp folder without file contents. SKILL_SYNC_GIT_BASE overrides https://github.com.
 set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source-path=SCRIPTDIR source=licence-file.sh
+source "$here/licence-file.sh"
 
 if (($# < 2)); then
     echo "usage: preview-copy.sh <owner/repo> <path> [commit]" >&2
@@ -29,6 +33,7 @@ fi
 echo "HEAD: $(git log -1 --format='%H %cs %s' HEAD)"
 echo "Copy: $(git log -1 --format='%H %cs %s' --end-of-options "$commit")"
 echo "Files at $path:"
-sed 's/^/   /' <<<"$files"
+echo "   ${files//$'\n'/$'\n   '}"
 echo "Licence files:"
 git ls-tree -r --name-only --end-of-options "$commit" | grep -iE '(^|/)(LICEN[CS]E|COPYING)[^/]*$' | sed 's/^/   /' || echo "   none"
+echo "LICENSE from: $(licence_file . "$commit" "$path" || echo none)"

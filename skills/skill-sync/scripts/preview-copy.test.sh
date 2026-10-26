@@ -34,6 +34,7 @@ check "copies HEAD by default" "$out" "^Copy: $head .* second"
 check "lists the files at the path" "$out" "pack/skills/demo/refs/notes.md"
 check "leaves out files outside the path" "$out" "pack/skills/other" absent
 check "lists the licence" "$out" "^   pack/LICENSE$"
+check "names the licence the Copy gets" "$out" "^LICENSE from: pack/LICENSE$"
 
 out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/preview-copy.sh" owner/repo pack/skills/demo "$first")
 check "copies the chosen commit" "$out" "^Copy: $first .* first"
@@ -45,6 +46,11 @@ if out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/preview-copy.sh" owner/r
 else
     check "exits non-zero for an unknown commit" "$out" "^unknown commit: nosuchcommit$"
 fi
+
+git -C "$repo" rm --quiet pack/LICENSE
+git -C "$repo" -c user.name=t -c user.email=t@t commit --quiet -m third
+out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/preview-copy.sh" owner/repo pack/skills/demo)
+check "says when the Copy gets no licence" "$out" "^LICENSE from: none$"
 
 if out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/preview-copy.sh" owner/repo pack/skills/demo --output=x 2>&1); then
     echo "FAIL rejects a commit that looks like an option"; fail=1

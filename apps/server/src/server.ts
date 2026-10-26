@@ -18,7 +18,7 @@ import { log } from './log.ts';
 import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
-import { loadBundledSkills } from './skills/bundled-skills.ts';
+import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
 import { createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
@@ -35,6 +35,8 @@ const fixture = process.env.BOARD_DATA_FILE;
 const capture = { session: randomUUID(), enabled: !fixture };
 const bundled = loadBundledSkills();
 if (bundled.error) log(`no bundled skills in Settings: ${bundled.error}`);
+/** The bundled skills with their install state; the Sample board shows none, as it installs nothing. */
+const bundledSkills = () => fixture ? bundled.skills : withInstallState(bundled.skills, installHome());
 
 const board = createBoardState({
   capture,
@@ -45,7 +47,7 @@ const board = createBoardState({
   error: settings.problem ?? null,
   items: [],
   modelChoices: [],
-  bundledSkills: bundled.skills,
+  bundledSkills: bundledSkills(),
 });
 
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
@@ -219,6 +221,8 @@ async function refresh(): Promise<void> {
   let read = false;
   const readRevision = board.revision();
   offerModelChoices();
+  // The app installs after the board server starts, so each read picks up the latest install's state.
+  board.update({ bundledSkills: bundledSkills() });
   try {
     const snapshot = await items.read();
     const { error, fetchedAt } = board.snapshot();

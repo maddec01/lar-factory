@@ -1,9 +1,9 @@
 // The onboarding run: its steps, the T3 projects it offers, picking one, moving between the steps, and keeping it
 // on the board when the dialog closes, to resume.
 
-import { expect, test } from 'vite-plus/test';
-import { fetchMock, sample, settle } from '../../test/support.ts';
-import type { BoardData, ProjectChoice, SetupAnswers } from '@lar-factory/shared';
+import { expect, test, vi } from 'vite-plus/test';
+import { fetchMock, sample, settle, toolChecks } from '../../test/support.ts';
+import type { BoardData, ProjectChoice, SetupAnswers, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
 
 const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
@@ -238,4 +238,114 @@ test("a new project that can't be picked stays on the form with the reason", asy
   expect(wizard.getState().run).toMatchObject({ projectId: null });
   expect(wizard.getState().creating).toEqual({ folder: '/Users/me/notes-2', adding: false,
     error: "T3 Code added the project, but it can't be picked: Its folder is no main checkout with a GitHub or Azure DevOps origin." });
+});
+
+const PASS: SetupCheckResult = { passed: true, detail: 'fine' };
+const json = (body: object) => new Response(JSON.stringify(body));
+
+/**
+ * The store, fresh, with `projects` as T3's, the commands rechecked as `tools`, each setup check answered from `results`
+ * (passing when it isn't named) and Finish answered with `finish`.
+ */
+async function checkingStore(projects: ProjectChoice[], results: Partial<Record<SetupCheckId, SetupCheckResult>> = {},
+  tools = toolChecks(), finish: object = { board: { ...sample, onboarding: [] }, error: null }) {
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url === '/api/onboarding/projects') return json({ projects });
+    if (url === '/api/recheck') return json({ board: { ...sample, tools }, error: null });
+    if (url === '/api/onboarding/checks') return json({ result: results[(JSON.parse(String(init!.body)) as { check: SetupCheckId }).check] ?? PASS, error: null });
+    if (url === '/api/onboarding/finish') return json(finish);
+    return json({ error: null });
+  });
+  const { useWizardStore } = await import('./wizard-store.ts');
+  return useWizardStore;
+}
+
+/** Picks `name`, passes the setup step, with the repository's issues and a role when it asks, and waits for the checks. */
+async function toChecks(wizard: Awaited<ReturnType<typeof checkingStore>>, name: string): Promise<void> {
+  await settle(() => wizard.getState().start());
+  wizard.getState().pick(name);
+  wizard.getState().next();
+  wizard.getState().answer({ itemSource: 'issues', role: 'Web client' });
+  wizard.getState().next();
+  await vi.waitFor(() => expect(wizard.getState().checks?.setup.push.state).toBe('done'));
+}
+
+const checkPosts = () => (fetchMock.mock.calls as unknown as [string, RequestInit?][])
+  .filter(([url]) => url === '/api/recheck' || url === '/api/onboarding/checks').map(([url, init]) => url === '/api/recheck' ? 'recheck' : JSON.parse(String(init!.body)));
+
+test('reaching Checks runs the command checks, then each setup check with the repository, T3 project and item source', async () => {
+  const wizard = await checkingStore([project('lar-web')]);
+  const { stepReady } = await import('./wizard-store.ts');
+  await toChecks(wizard, 'lar-web');
+  const sent = { repo: 'maddec01/lar-web', projectId: 'lar-web', itemSource: { kind: 'issues' } };
+  expect(checkPosts()).toEqual(['recheck', { check: 'checkout', ...sent }, { check: 'source', ...sent }, { check: 'push', ...sent }]);
+  const { run, projects, checks } = wizard.getState();
+  expect(checks!.commands).toEqual({ state: 'done' });
+  expect(stepReady(run!, projects, checks, toolChecks())).toBe(true);
+});
+
+test('a failed check holds Next until its Retry passes, and Retry reruns only that check', async () => {
+  const failed: SetupCheckResult = { passed: false, problem: "gh's login can't push to maddec01/lar-web.", fix: 'Get write access.', command: 'gh auth login' };
+  const wizard = await checkingStore([project('lar-web')], { push: failed });
+  const { stepReady } = await import('./wizard-store.ts');
+  await toChecks(wizard, 'lar-web');
+  const ready = () => stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks());
+  expect(wizard.getState().checks!.setup.push).toEqual({ state: 'done', result: failed });
+  expect(ready()).toBe(false);
+  wizard.getState().next();
+  expect(wizard.getState().run!.step).toBe('checks');
+
+  fetchMock.mockClear();
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/checks' ? json({ result: PASS, error: null }) : served(url, init));
+  await settle(() => wizard.getState().retryCheck('push'));
+  expect(checkPosts().map((p) => p.check)).toEqual(['push']);
+  expect(ready()).toBe(true);
+});
+
+test('a failing command holds Next; gh without the project scope passes only for issues', async () => {
+  const { checksPassed } = await import('./wizard-store.ts');
+  const checks = { commands: { state: 'done' as const }, setup: { checkout: { state: 'done' as const, result: PASS }, source: { state: 'done' as const, result: PASS },
+    push: { state: 'done' as const, result: PASS } }, finishing: false, finishError: null };
+  const noScope = toolChecks({ gh: { result: 'no-project-scope', fix: 'gh auth refresh -s project' } });
+  expect(checksPassed(checks, noScope, { kind: 'issues' })).toBe(true);
+  expect(checksPassed(checks, noScope, { kind: 'github-project', owner: 'maddec01', number: 3 })).toBe(false);
+  expect(checksPassed(checks, toolChecks({ t3: { result: 'not-running' } }), { kind: 'issues' })).toBe(false);
+  expect(checksPassed({ ...checks, commands: { state: 'running' } }, toolChecks(), { kind: 'issues' })).toBe(false);
+});
+
+const REUSED = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } });
+
+test("a reused .lar-factory.json's item source is the one checked, and Finish ends the run with no PR and keeps nothing", async () => {
+  const wizard = await checkingStore([REUSED]);
+  await toChecks(wizard, 'lar-web');
+  expect(checkPosts()[2]).toMatchObject({ check: 'source', itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 } });
+  const { finishesOnChecks } = await import('./wizard-store.ts');
+  expect(finishesOnChecks(wizard.getState().run!, wizard.getState().projects)).toBe(true);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks() }));
+  await settle(() => wizard.getState().finish());
+  const posts = (fetchMock.mock.calls as unknown as [string, RequestInit?][]).filter(([url]) => url.startsWith('/api/onboarding/finish') || url === '/api/onboarding/repositories');
+  expect(posts.map(([url, init]) => [url, JSON.parse(String(init!.body))])).toEqual([['/api/onboarding/finish', { repo: 'maddec01/lar-web' }]]);
+  expect(wizard.getState().run).toBeNull();
+});
+
+test("Finish that the board refuses keeps the run on Checks with the board's reason", async () => {
+  const wizard = await checkingStore([REUSED], {}, toolChecks(), { error: 'maddec01/lar-web has no .lar-factory.json on its default branch to reuse.' });
+  await toChecks(wizard, 'lar-web');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks() }));
+  await settle(() => wizard.getState().finish());
+  expect(wizard.getState().run!.step).toBe('checks');
+  expect(wizard.getState().checks).toMatchObject({ finishing: false, finishError: 'maddec01/lar-web has no .lar-factory.json on its default branch to reuse.' });
+});
+
+test('Resume on the Checks step runs the checks again once it has read the projects', async () => {
+  const wizard = await checkingStore([project('lar-web')]);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const progress = { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-web', setup: { ...SETUP, itemSource: 'issues' as const, role: 'Web client' } } };
+  useBoardStore.getState().receive({ ...sample, onboarding: [{ repo: 'maddec01/lar-web', progress }] });
+  await settle(() => wizard.getState().resume('maddec01/lar-web'));
+  await vi.waitFor(() => expect(wizard.getState().checks?.setup.push.state).toBe('done'));
+  expect(checkPosts()[0]).toBe('recheck');
 });

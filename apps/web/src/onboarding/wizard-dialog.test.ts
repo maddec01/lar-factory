@@ -15,6 +15,7 @@ test('the dialog is 768px wide with a scrolling body, the step, its place and th
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('T3 project');
   expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard a repository · step 1 of 4');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('0');
+  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label'), 'the bar is named by its caption').toBe('0 of 4 done');
 });
 
 test('Next is disabled until a project is picked, then shows the next step, and Back returns', async () => {
@@ -31,6 +32,15 @@ test('Next is disabled until a project is picked, then shows the next step, and 
   await settle(() => button('Back')!.click());
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('T3 project');
   expect(radio('lar-web').getAttribute('aria-checked'), 'the pick stays').toBe('true');
+});
+
+test('a run that reuses its .lar-factory.json counts no Pull request step', async () => {
+  await openOnboarding([project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client' } })]);
+  await settle(() => radio('lar-web').click());
+  await settle(() => button('Next')!.click());
+  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 3');
+  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuemax')).toBe('3');
+  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label')).toBe('1 of 3 done');
 });
 
 test('Onboard a repository after a close starts a new run', async () => {

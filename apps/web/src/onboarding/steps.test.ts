@@ -1,10 +1,11 @@
 // The T3 project step: T3's projects, each with its provider and whether its repository has .lar-factory.json, and
 // the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
-// and role, or the values of a .lar-factory.json it reuses.
+// and role, or the values of a .lar-factory.json it reuses. The Checks step: each check with its state, a failure's
+// fix with Retry, and Finish for a reused .lar-factory.json.
 
-import { expect, test } from 'vite-plus/test';
-import type { ProjectChoice } from '@lar-factory/shared';
-import { $, fetchMock, sample, settle, text } from '../../test/support.ts';
+import { expect, test, vi } from 'vite-plus/test';
+import type { ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
+import { $, fetchMock, sample, settle, text, toolChecks } from '../../test/support.ts';
 import { dialog, openOnboarding, project } from './onboarding-support.ts';
 
 const rows = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-choice]')];
@@ -194,4 +195,82 @@ test('Resume shows the answers the step had when it closed', async () => {
   expect($('[data-onboarding-dialog]')).not.toBeNull();
   expect(input('role')!.value).toBe('Web client');
   expect(choice('issues').querySelector('[role="radio"]')!.getAttribute('aria-checked')).toBe('true');
+});
+
+/** Answers the command recheck with `tools` and each setup check from `results`, passing when it isn't named. */
+function answerChecks(results: Partial<Record<SetupCheckId, SetupCheckResult>> = {}, tools = toolChecks()): void {
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url === '/api/recheck') return new Response(JSON.stringify({ board: { ...sample, tools }, error: null }));
+    if (url === '/api/onboarding/checks') {
+      const { check } = JSON.parse(String(init!.body)) as { check: SetupCheckId };
+      return new Response(JSON.stringify({ result: results[check] ?? { passed: true, detail: `${check} is fine` }, error: null }));
+    }
+    return served(url);
+  });
+}
+
+const checkRow = (id: string) => dialog()!.querySelector<HTMLElement>(`[data-check="${id}"]`)!;
+const footerButton = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).trim().startsWith(label));
+
+/** Moves from the Provider and item source step, answered or reused, to Checks, and waits for the checks. */
+async function openChecks(): Promise<void> {
+  await settle(() => nextButton().click());
+  await vi.waitFor(() => expect(checkRow('push').dataset.status).not.toMatch(/waiting|running/));
+  await settle();
+}
+
+test('the Checks step lists the command checks, then the setup checks, each with its state', async () => {
+  await openSetup(project('lar-web'));
+  await settle(() => choice('issues').querySelector<HTMLElement>('[role="radio"]')!.click());
+  await type(input('role')!, 'Web client');
+  answerChecks({}, toolChecks({ gh: { result: 'ok', version: '2.96.1' } }));
+  await openChecks();
+  const ids = [...dialog()!.querySelectorAll<HTMLElement>('[data-check]')].map((r) => r.dataset.check);
+  expect(ids).toEqual(['gh', 't3', 'git', 'jq', 'curl', 'checkout', 'source', 'push']);
+  expect(ids.map((id) => checkRow(id!).dataset.status)).toEqual(Array(8).fill('passed'));
+  expect(text(checkRow('gh'))).toContain('Signed in');
+  expect(text(checkRow('source'))).toContain('source is fine');
+  expect(dialog()!.querySelector('[data-slot="dialog-panel"] [role="progressbar"]')!.getAttribute('aria-label')).toBe('8 of 8 passed');
+  expect(nextButton().disabled).toBe(false);
+});
+
+test('a failed check shows its problem, fix and Retry, and Next stays disabled until Retry passes', async () => {
+  await openSetup(project('lar-web'));
+  await settle(() => choice('issues').querySelector<HTMLElement>('[role="radio"]')!.click());
+  await type(input('role')!, 'Web client');
+  answerChecks({ push: { passed: false, problem: "gh's login can't push to maddec01/lar-web.", fix: 'Get write access, or log gh in as an account that has it:', command: 'gh auth login' } },
+    toolChecks({ jq: { result: 'missing', fix: 'brew install jq' } }));
+  await openChecks();
+  expect(checkRow('jq').dataset.status).toBe('failed');
+  expect(text(checkRow('jq'))).toContain('brew install jq');
+  const push = checkRow('push');
+  expect(push.dataset.status).toBe('failed');
+  for (const part of ["gh's login can't push to maddec01/lar-web.", 'Get write access', 'gh auth login']) expect(text(push)).toContain(part);
+  expect(nextButton().disabled).toBe(true);
+
+  answerChecks();
+  await settle(() => [...push.querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
+  await vi.waitFor(() => expect(checkRow('push').dataset.status).toBe('passed'));
+  expect(nextButton().disabled, 'jq still fails').toBe(true);
+  await settle(() => [...checkRow('jq').querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
+  await vi.waitFor(() => expect(checkRow('jq').dataset.status).toBe('passed'));
+  await vi.waitFor(() => expect(checkRow('push').dataset.status).toBe('passed'));
+  await settle();
+  expect(nextButton().disabled).toBe(false);
+});
+
+test('with a reused .lar-factory.json the Checks step ends in Finish, which puts the repository on the board with no PR', async () => {
+  await openSetup(project('lar-web', { hasConfig: true,
+    config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } }));
+  answerChecks();
+  await openChecks();
+  expect(footerButton('Next'), 'no Pull request step').toBeUndefined();
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/finish'
+    ? new Response(JSON.stringify({ board: { ...sample, onboarding: [] }, error: null })) : served(url, init));
+  await settle(() => footerButton('Finish')!.click());
+  await settle();
+  expect(dialog()).toBeNull();
+  expect(fetchMock.mock.calls.some(([url]) => url === '/api/onboarding/repositories'), 'a finished run is not kept as onboarding').toBe(false);
 });

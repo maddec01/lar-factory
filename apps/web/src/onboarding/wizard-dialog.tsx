@@ -1,15 +1,27 @@
 // The onboarding dialog: 768px wide over the board, showing one step at a time with a progress bar, Back and Next.
 // The empty board, an offer and Resume open it; closing it drops the run until a T3 project is picked, or an offered run until Next or a change, then keeps it to resume.
 
+import { useEffect, useRef } from 'react';
 import { ArrowLeft, ArrowRight, Check, LoaderCircle } from 'lucide-react';
 import { Button } from '@lar-factory/ui/button';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
 import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
 import { useBoardStore } from '../board/board-store.ts';
-import { type Run, STEPS, finishesOnChecks, onboarded, pickedProject, prClosed, stepReady, useWizardStore } from './wizard-store.ts';
+import { sameRepo } from '@lar-factory/shared';
+import { type Run, type StepId, STEPS, finishesOnChecks, onboarded, pickedProject, prClosed, stepReady, useWizardStore } from './wizard-store.ts';
 
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
+
+/**
+ * Where focus goes when the dialog closes: the button that opened it; once that's gone, as the Resume of a repository
+ * the dialog finished, the repository's entry in the sidebar, else the page's main heading.
+ */
+function closedFocus(opener: HTMLElement | null, repo: string | null): HTMLElement | true {
+  if (opener?.isConnected) return opener;
+  const entry = repo ? [...document.querySelectorAll<HTMLElement>('.list-group[data-repo]')].find((g) => sameRepo(g.dataset.repo!, repo)) : undefined;
+  return entry?.querySelector<HTMLElement>('.scope') ?? document.querySelector<HTMLElement>('.title-bar h1') ?? true;
+}
 
 /**
  * Back, and Next, which is Finish on the Checks step of a run that reuses its .lar-factory.json. Once the PR is open
@@ -37,7 +49,19 @@ function Nav({ run }: { run: Run }) {
 }
 
 export function WizardDialog() {
-  const { run, projects, close } = useWizardStore();
+  const { run, projects, opener, close } = useWizardStore();
+  const title = useRef<HTMLHeadingElement>(null);
+  const shown = useRef<StepId | null>(null);
+  /** The run's repository, which closedFocus reads once the run is gone. */
+  const lastRepo = useRef<string | null>(null);
+  if (run) lastRepo.current = run.repo;
+  useEffect(() => {
+    const now = run?.step ?? null;
+    const moved = shown.current !== null && now !== null && now !== shown.current;
+    shown.current = now;
+    // A new step, or a button such as Retry that went away with this render, puts focus on the step's heading, not the page.
+    if (moved || now && document.activeElement === document.body) title.current?.focus();
+  });
   const data = useBoardStore((s) => s.data);
   const step = run && STEPS[indexOf(run)];
   // A run that reuses its .lar-factory.json finishes on the Checks step, with no PR to open.
@@ -48,11 +72,11 @@ export function WizardDialog() {
   const done = finished ? 'Onboarded' : `${doneCount} of ${steps} done`;
   return (
     <Dialog open={!!run} onOpenChange={(open) => !open && close()}>
-      <DialogPopup className="max-w-3xl" data-onboarding-dialog>
+      <DialogPopup className="max-w-3xl" data-onboarding-dialog finalFocus={() => closedFocus(opener, lastRepo.current)}>
         {run && step && (<>
           <DialogHeader>
             <DialogDescription>Onboard {pickedProject(run, projects)?.name ?? run.repo?.split('/')[1] ?? 'a repository'} · step {indexOf(run) + 1} of {steps}</DialogDescription>
-            <DialogTitle>{step.label}</DialogTitle>
+            <DialogTitle ref={title} tabIndex={-1} className="outline-none">{step.label}</DialogTitle>
             <Progress value={doneCount} max={steps} caption={done} aria-label={done} />
           </DialogHeader>
           <DialogPanel className="py-6"><StepBody run={run} step={run.step} /></DialogPanel>

@@ -165,6 +165,8 @@ interface WizardState {
   creating: Creating | null;
   /** The Checks step's checks; null until the run first reaches it. */
   checks: Checks | null;
+  /** The button that opened the dialog, which gets focus back when it closes. */
+  opener: HTMLElement | null;
   /** Opens a new run, with the offered T3 project picked when it comes from an offer. */
   start: (offer?: OnboardingOffer) => void;
   /** Reopens the onboarding the board keeps for `repo`, on its step with its answers. */
@@ -240,6 +242,9 @@ const WAITING: Record<SetupCheckId, SetupCheckState> = { checkout: { state: 'wai
 
 const isStep = (id: string): id is StepId => STEPS.some((s) => s.id === id);
 
+/** The focused element, as the button that opens the dialog; null when nothing is. */
+const focused = (): HTMLElement | null => document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+
 /** The run a kept onboarding resumes; a step this dialog doesn't have, as a newer board's, resumes on the T3 project step. */
 function resumed(repo: string, progress: OnboardingProgress): Run {
   return { step: isStep(progress.step) ? progress.step : 'project', done: progress.done.filter(isStep), projectId: progress.answers.projectId, repo,
@@ -302,20 +307,21 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     creating: null,
     checks: null,
     pr: IDLE,
+    opener: null,
     start: (offer) => {
       checkRuns++;
       // The board offers only GitHub repositories until build #386.
       const run: Run = { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer ? 'GitHub' : null,
         savedAs: null, setup: null, prUrl: null };
       untouchedOffer = offer ? run : null;
-      set({ run, creating: null, checks: null, pr: IDLE });
+      set({ run, creating: null, checks: null, pr: IDLE, opener: focused() });
       void get().loadProjects();
     },
     resume: (repo) => {
       const kept = useBoardStore.getState().data.onboarding?.find((o) => sameRepo(o.repo, repo));
       if (!kept) return;
       checkRuns++;
-      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, pr: IDLE });
+      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, pr: IDLE, opener: focused() });
       // The checks read the picked project, so they wait for T3's projects.
       void get().loadProjects().then(() => { if (get().run?.step === 'checks') void get().runChecks(); });
     },

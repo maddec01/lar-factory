@@ -1,8 +1,9 @@
 // The onboarding dialog: 768px wide over the board, a scrolling body, the progress bar, and Back and Next.
 
-import { expect, test } from 'vite-plus/test';
-import { $, settle, text } from '../../test/support.ts';
-import { dialog, openOnboarding, project } from './onboarding-support.ts';
+import { expect, test, vi } from 'vite-plus/test';
+import type { BoardData, OnboardingRepository, SetupAnswers } from '@lar-factory/shared';
+import { $, mountPage, sample, settle, text } from '../../test/support.ts';
+import { dialog, empty, openOnboarding, project, serve } from './onboarding-support.ts';
 
 const inDialog = <T extends HTMLElement = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
 const button = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).trim() === label);
@@ -51,4 +52,53 @@ test('Onboard a repository after a close starts a new run', async () => {
   expect(useWizardStore.getState().run).toBeNull();
   await settle(() => $<HTMLButtonElement>('[data-onboard]')!.click());
   expect(radio('lar-web').getAttribute('aria-checked')).toBe('false');
+});
+
+test('Next and Back move focus to the step heading, and closing returns it to the button that opened the dialog', async () => {
+  serve(empty, [project('lar-web')]);
+  await mountPage(empty);
+  const onboard = $<HTMLButtonElement>('[data-onboard]')!;
+  onboard.focus();
+  await settle(() => onboard.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  await settle(() => radio('lar-web').click());
+  await settle(() => button('Next')!.click());
+  expect(document.activeElement, 'Next').toBe(inDialog('[data-slot="dialog-title"]'));
+  await settle(() => button('Back')!.click());
+  expect(document.activeElement, 'Back').toBe(inDialog('[data-slot="dialog-title"]'));
+  // Unpicked, so closing keeps nothing and the empty board's button stays.
+  const { useWizardStore } = await import('./wizard-store.ts');
+  await settle(() => useWizardStore.getState().chooseNew());
+  await settle(() => inDialog<HTMLButtonElement>('[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(500));
+  expect(document.activeElement).toBe($('[data-onboard]'));
+});
+
+const PR = 'https://github.com/maddec01/lar-apple/pull/14';
+const SETUP: SetupAnswers = { itemSource: 'issues', projectOwner: 'maddec01', projectNumber: '', show: 'opted-in', showPicked: false, role: 'iOS app' };
+const waiting: OnboardingRepository = { repo: 'maddec01/lar-apple', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-apple', setup: SETUP }, prUrl: PR } };
+
+/** Resumes lar-apple's onboarding from its card, waiting for its PR, has the board finish it with `after`, then presses Go to the board. */
+async function finishFromResume(after: BoardData): Promise<void> {
+  const before = { ...sample, repos: sample.repos.filter((r) => r.repo !== waiting.repo), items: sample.items.filter((i) => i.repo !== waiting.repo), onboarding: [waiting] };
+  serve(before, [project('lar-apple', { onBoard: true })]);
+  await mountPage(before);
+  const resume = $<HTMLButtonElement>(`[data-onboarding-card="${waiting.repo}"] [data-resume]`)!;
+  resume.focus();
+  await settle(() => resume.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(after));
+  await settle(() => button('Go to the board')!.click());
+  await settle(() => vi.advanceTimersByTime(500));
+}
+
+test('Go to the board, with the Resume that opened the dialog gone, focuses the new repository in the sidebar', async () => {
+  await finishFromResume({ ...sample, onboarding: [] });
+  expect(document.activeElement).toBe($(`.list-group[data-repo="${waiting.repo}"] .scope`));
+});
+
+test('Go to the board, before the board has read the new repository, focuses the main heading', async () => {
+  await finishFromResume({ ...sample, repos: sample.repos.filter((r) => r.repo !== waiting.repo), items: sample.items.filter((i) => i.repo !== waiting.repo), onboarding: [] });
+  expect(document.activeElement).toBe($('.title-bar h1'));
 });

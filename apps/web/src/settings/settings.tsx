@@ -8,7 +8,7 @@ import { boardApp } from '@lar-factory/shared';
 import { SidebarMenuButton } from '@lar-factory/ui/sidebar';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
-import { RepositoriesPrototype } from '../onboarding-prototype/variants.tsx';
+import { RepositoriesGroup } from '../onboarding-prototype/board.tsx';
 import { PROTOTYPE } from '../onboarding-prototype/wizard-store.ts';
 import { useTitlebarInset } from '../sidebar/window-controls.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
@@ -129,8 +129,8 @@ export function SettingsMain() {
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="settings-body mx-auto grid max-w-2xl gap-6 px-8 py-8">
-          {/* PROTOTYPE (#363): the onboarding wizard's repository list, and variant C's checklist. */}
-          {page.groups.map((g) => (PROTOTYPE && page.id === 'repos' && g.title === 'Repositories' ? <RepositoriesPrototype key={g.title} /> : <GroupView group={g} key={g.title} />))}
+          {/* PROTOTYPE (#363): the onboarding wizard's repository list. */}
+          {page.groups.map((g) => (PROTOTYPE && page.id === 'repos' && g.title === 'Repositories' ? <RepositoriesGroup key={g.title} /> : <GroupView group={g} key={g.title} />))}
         </div>
       </div>
     </>

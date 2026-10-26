@@ -8,6 +8,7 @@ import { Archive, Bell, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings
 import type { BoardData, ToolProblem } from '@lar-factory/shared';
 import type { ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { PlatformTag } from '../items/item-parts.tsx';
+import { PROTOTYPE } from '../onboarding-prototype/wizard-store.ts';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, ReadOnlyText, SmallButton, ToolState, notBuilt } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
@@ -124,7 +125,11 @@ export function pages(input: PagesInput): Page[] {
       { title: 'Platform colours', rows: data.repos.map((r) => ({ id: `color-${r.platform}`, title: r.platform, description: r.repo, control: custom(() => <PlatformTag platform={r.platform} />) })) },
     ] },
     { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, groups: [
-      { title: 'GitHub Project', rows: [
+      // PROTOTYPE (#363): each repository has its own item source, so the prototype drops the one GitHub Project.
+      PROTOTYPE ? { title: 'Command line tools', description: 'The board reads each provider through your own login and never stores a token.', rows: [
+        { id: 'gh', title: 'GitHub CLI', description: 'gh, for repositories on GitHub.', control: custom(() => <ToolState {...toolState(data.tools?.gh, 'Signed in')} />) },
+        { id: 'az', title: 'Azure CLI', description: 'az with the azure-devops extension, for repositories on Azure DevOps.', control: { type: 'status', text: 'Signed in', tone: 'success' } },
+      ] } : { title: 'GitHub Project', rows: [
         { id: 'project', title: data.project.title, description: 'The Project the board reads and moves items on.', control: custom(() => <ReadOnlyText label="GitHub Project" value={project} />) },
         { id: 'gh', title: 'GitHub CLI', description: 'Reads through your gh login. The board never stores a token.', control: custom(() => <ToolState {...toolState(data.tools?.gh, 'Signed in')} />) },
       ] },

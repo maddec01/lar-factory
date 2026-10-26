@@ -1,4 +1,4 @@
-// PROTOTYPE (#363), throwaway: the body of each onboarding step, which every variant shows in its own container.
+// PROTOTYPE (#363), throwaway: the body of each onboarding step, which the wizard dialog shows one at a time.
 
 import type { ReactNode } from 'react';
 import { Check, CircleAlert, ExternalLink, FileText, GitPullRequest, LoaderCircle, Lock, RotateCw, X } from 'lucide-react';
@@ -16,7 +16,7 @@ import {
   AGENT_LOG, AGENT_MODELS, ALWAYS_WRITTEN, AZURE_TEAMS, CHECKS, type Clash, FOREIGN_LABELS, GITHUB_PROJECTS, LABELS, SKILL_CLASH, T3_PROJECTS,
   providerOf, repoOf,
 } from './mock.ts';
-import { type CheckStatus, type Run, type Show, type StepId, projectOf, providerOfRun, useWizardStore } from './wizard-store.ts';
+import { type CheckStatus, type Run, type Show, type StepId, projectOf, providerOfRun, sourceOfRun, useWizardStore } from './wizard-store.ts';
 
 const patch = (change: Partial<Run>) => useWizardStore.getState().patch(change);
 
@@ -83,7 +83,7 @@ function SetupStep({ run }: { run: Run }) {
           <dt className="text-muted-foreground">Provider</dt><dd className="m-0">{provider}</dd>
           <dt className="text-muted-foreground">Item source</dt><dd className="m-0">{config.itemSource}</dd>
           <dt className="text-muted-foreground">Show</dt><dd className="m-0">{config.show}</dd>
-          <dt className="text-muted-foreground">Platform</dt><dd className="m-0">{config.platform}</dd>
+          <dt className="text-muted-foreground">List group</dt><dd className="m-0">{config.platform}</dd>
           <dt className="text-muted-foreground">Repository role</dt><dd className="m-0">{config.role}</dd>
           <dt className="text-muted-foreground">Labels</dt><dd className="m-0">{config.labels.join(', ')}</dd>
         </dl>
@@ -123,7 +123,7 @@ function SetupStep({ run }: { run: Run }) {
         </RadioGroup>
       </Fieldset>
       <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
-        <Field label="Platform" hint="Names its List group."><Input placeholder="Web" value={run.platform} onChange={(e) => patch({ platform: e.target.value })} /></Field>
+        <Field label="List group" hint="Names this repository’s group in the List and in the Scope picker."><Input placeholder="Web" value={run.platform} onChange={(e) => patch({ platform: e.target.value, platformTouched: true })} /></Field>
         <Field label="Repository role" hint="What this repository is to the others."><Input placeholder="Web client that talks to the API server" value={run.role} onChange={(e) => patch({ role: e.target.value })} /></Field>
       </div>
       <Fieldset unstyled className="grid gap-2">
@@ -141,13 +141,11 @@ function SetupStep({ run }: { run: Run }) {
   );
 }
 
-export function StatusIcon({ status }: { status: CheckStatus | 'locked' | 'current' }) {
+function StatusIcon({ status }: { status: CheckStatus }) {
   switch (status) {
     case 'passed': return <span className="grid size-5 shrink-0 place-items-center rounded-full bg-success/16 text-success"><Check className="size-3.5" /></span>;
     case 'failed': return <span className="grid size-5 shrink-0 place-items-center rounded-full bg-destructive/16 text-destructive"><X className="size-3.5" /></span>;
     case 'running': return <LoaderCircle className="size-5 shrink-0 animate-spin text-info" />;
-    case 'locked': return <Lock className="size-4 shrink-0 text-muted-foreground" />;
-    case 'current': return <span className="grid size-5 shrink-0 place-items-center"><span className="size-2.5 rounded-full bg-primary" /></span>;
     default: return <span className="size-5 shrink-0 rounded-full border border-dashed" />;
   }
 }
@@ -326,25 +324,14 @@ export function StepBody({ run, step }: { run: Run; step: StepId }) {
   }
 }
 
-/** One line on a finished step, for the rail and the checklist's collapsed sections. */
+/** One line on a step, for the onboarding cards on the board. */
 export function stepSummary(run: Run, step: StepId): string {
   const project = projectOf(run);
   switch (step) {
     case 'project': return project ? `${project.name} · ${project.path}` : 'Pick a project';
-    case 'setup': return project?.config ? 'From .lar-factory.json' : `${providerOfRun(run)} · ${{ project: run.githubProject, issues: 'Repository’s issues', sprint: `${run.team} sprint`, backlog: `${run.team} backlog` }[run.source]} · ${run.show}`;
+    case 'setup': return project?.config ? 'From .lar-factory.json' : `${providerOfRun(run)} · ${sourceOfRun(run)} · ${run.show}`;
     case 'checks': { const failed = run.checks.filter((c) => c.status === 'failed').length; return run.checks.length ? (failed ? `${failed} failed` : `${run.checks.filter((c) => c.status === 'passed').length} of ${run.checks.length} passed`) : 'Not run'; }
     case 'cleanup': return run.agent.state === 'done' ? `${run.clashes.filter((c) => c.ticked).length} edits ticked` : run.agent.state === 'running' ? 'Agent running' : 'Not run';
     case 'pr': return run.pr === 'merged' ? 'Merged' : run.pr === 'open' ? 'PR #14 waiting for merge' : 'Not opened';
   }
-}
-
-/** A step's state for the rail and checklist icons. */
-export function stepState(run: Run, step: StepId): CheckStatus | 'locked' | 'current' {
-  if (step === 'checks' && run.checks.some((c) => c.status === 'failed')) return 'failed';
-  if (step === 'checks' && run.step === 'checks' && run.checks.some((c) => c.status === 'running' || c.status === 'waiting')) return 'running';
-  if (step === 'cleanup' && run.agent.state === 'running') return 'running';
-  if (step === 'pr' && run.pr === 'open') return 'running';
-  if (run.done.includes(step)) return 'passed';
-  if (run.step === step) return 'current';
-  return 'locked';
 }

@@ -5,8 +5,8 @@
 
 import { boardSections, platformOf } from '@lar-factory/shared';
 import { useBoardStore } from './board/board-store.ts';
-import { BoardSlot, EmptyState, PrototypeSwitcher } from './onboarding-prototype/board.tsx';
-import { Takeover, WizardDialog } from './onboarding-prototype/variants.tsx';
+import { BoardSlot, EmptyState, PrototypeBar } from './onboarding-prototype/board.tsx';
+import { WizardDialog } from './onboarding-prototype/wizard-dialog.tsx';
 import { PROTOTYPE, useHasOnboarded, useWizardStore } from './onboarding-prototype/wizard-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
@@ -43,21 +43,19 @@ function Content() {
 export function App() {
   const t3 = useBoardStore((state) => state.data.tools?.t3);
   const settings = useSettingsStore((state) => state.open);
-  // PROTOTYPE (#363): the onboarding wizard's empty board, variant A's takeover, B's dialog and the switcher.
+  // PROTOTYPE (#363): the onboarding wizard's empty board, its dialog and the prototype bar.
   const onboarded = useHasOnboarded();
   const empty = PROTOTYPE && !onboarded;
-  const takeover = useWizardStore((state) => PROTOTYPE && state.variant === 'A' && !!state.run) && !settings;
   return (
     <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)" board={!t3 && !empty}>
       <main className="flex min-w-0 flex-1 flex-col">
-        <div className="contents" hidden={settings || takeover}>
+        <div className="contents" hidden={settings}>
           <TitleBar />
           {t3 ? <T3Missing problem={t3} /> : empty ? <EmptyState /> : <Content />}
         </div>
         {settings && <SettingsMain />}
-        {takeover && <Takeover />}
       </main>
-      {PROTOTYPE && <><WizardDialog /><PrototypeSwitcher /></>}
+      {PROTOTYPE && <><WizardDialog /><PrototypeBar /></>}
       {/* Outside main, so the announcement sits apart from the page. */}
       <CopyStatus />
       <Toasts />

@@ -1,10 +1,10 @@
-// PROTOTYPE (#363), throwaway: what the board and Settings › Repositories show around the wizard, the same in every
-// variant: the empty state, the onboarding cards with Resume, the offer for T3 projects that have a Repository
-// config, the repository rows with Reset, and the floating variant switcher.
+// PROTOTYPE (#363), throwaway: what the board and Settings › Repositories show around the wizard dialog: the empty
+// state, the onboarding cards with Resume, the offer for T3 projects that have a Repository config, the repository
+// rows with Edit and Reset, and the floating prototype bar.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, FileText, FolderGit2, Play, Plus, RotateCcw } from 'lucide-react';
+import { FileText, FolderGit2, Play, Plus, RotateCcw } from 'lucide-react';
 import {
   AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
 } from '@lar-factory/ui/alert-dialog';
@@ -13,9 +13,11 @@ import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { Card } from '@lar-factory/ui/card';
 import { BrandMark } from '../brand/brand-mark.tsx';
+import { PlatformTag } from '../items/item-parts.tsx';
+import { SmallButton, notBuilt } from '../settings/controls.tsx';
 import { T3_PROJECTS, repoOf } from './mock.ts';
 import { stepSummary } from './steps.tsx';
-import { STEPS, VARIANTS, useWizardStore } from './wizard-store.ts';
+import { STEPS, useWizardStore } from './wizard-store.ts';
 
 /** T3 projects whose repository has a `.lar-factory.json` and isn't on the board yet. */
 function useDetected() {
@@ -100,7 +102,11 @@ function ResetDialog({ repo, onClose }: { repo: string | null; onClose: () => vo
   );
 }
 
-/** Settings › Repositories in the prototype: every repository with its onboarding state, Resume or Reset, and Add repository. */
+/**
+ * Settings › Repositories in the prototype: every repository with its provider, item source, show setting and List
+ * group, Resume while onboarding, Edit, Reset, and Add repository. Each repository has its own item source, so no
+ * group names one GitHub Project for the board.
+ */
 export function RepositoriesGroup() {
   const { repos, resume, start } = useWizardStore();
   const [resetting, setResetting] = useState<string | null>(null);
@@ -108,18 +114,25 @@ export function RepositoriesGroup() {
     <section className="grid gap-2">
       <div className="px-1">
         <h3 className="m-0 text-[13px] font-medium">Repositories</h3>
-        <p className="m-0 text-xs text-muted-foreground">Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list.</p>
+        <p className="m-0 text-xs text-muted-foreground">Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list. Its List group names its group in the List and in the Scope picker.</p>
       </div>
       <div className="divide-y overflow-hidden rounded-xl border bg-card">
         {repos.length === 0 && <div className="px-4 py-3 text-xs text-muted-foreground">No repository is onboarded.</div>}
         {repos.map((r) => (
           <div key={r.repo} className="flex items-center gap-4 px-4 py-3">
-            <div className="min-w-0 flex-1">
+            <div className="grid min-w-0 flex-1 gap-1">
               <div className="flex items-center gap-2 truncate text-[13px] font-medium">{r.repo}
                 {r.state === 'onboarding' ? <Badge variant="warning" size="sm">Onboarding</Badge> : <Badge variant="success" size="sm">Onboarded</Badge>}</div>
-              <div className="text-xs text-muted-foreground">{r.platform}{r.role && ` · ${r.role}`}</div>
+              <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-xs">
+                <dt className="text-muted-foreground">Provider</dt><dd className="m-0">{r.provider}</dd>
+                <dt className="text-muted-foreground">Item source</dt><dd className="m-0 truncate">{r.source}</dd>
+                <dt className="text-muted-foreground">Show</dt><dd className="m-0">{r.show}</dd>
+                <dt className="text-muted-foreground">List group</dt><dd className="m-0"><PlatformTag platform={r.platform} /></dd>
+                {r.role && <><dt className="text-muted-foreground">Role</dt><dd className="m-0 truncate">{r.role}</dd></>}
+              </dl>
             </div>
             {r.state === 'onboarding' && <Button size="xs" onClick={() => resume(r.repo)}>Resume</Button>}
+            <SmallButton reason={notBuilt('Edit')}>Edit</SmallButton>
             <Button size="xs" variant="outline" onClick={() => setResetting(r.repo)}><RotateCcw /> Reset</Button>
           </div>
         ))}
@@ -130,27 +143,14 @@ export function RepositoriesGroup() {
   );
 }
 
-/** The prototype's floating bar: ← variant →, the empty-board toggle. Not part of the design being judged. */
-export function PrototypeSwitcher() {
-  const { variant, setVariant, empty, setEmpty, close } = useWizardStore();
-  const i = VARIANTS.findIndex((v) => v.key === variant);
-  const go = (step: number) => { close(); setVariant(VARIANTS[(i + step + VARIANTS.length) % VARIANTS.length]!.key); };
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable]')) return;
-      if (event.key === 'ArrowLeft') go(-1);
-      if (event.key === 'ArrowRight') go(1);
-    };
-    addEventListener('keydown', onKey);
-    return () => removeEventListener('keydown', onKey);
-  });
+/** The prototype's floating bar: the empty-board toggle. Not part of the design being judged. */
+export function PrototypeBar() {
+  const { empty, setEmpty } = useWizardStore();
   // In body, outside the sidebar wrapper's stacking context, so it sits above a dialog's viewport too.
   return createPortal(
     <div className="fixed bottom-4 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-1 rounded-full bg-neutral-900 px-1.5 py-1 text-xs text-white shadow-lg ring-1 ring-white/20">
-      <button type="button" aria-label="Previous variant" className="grid size-7 place-items-center rounded-full hover:bg-white/15" onClick={() => go(-1)}><ChevronLeft className="size-4" /></button>
-      <span className="min-w-32 text-center font-medium">{variant} ({VARIANTS[i]!.name})</span>
-      <button type="button" aria-label="Next variant" className="grid size-7 place-items-center rounded-full hover:bg-white/15" onClick={() => go(1)}><ChevronRight className="size-4" /></button>
-      <span className="mx-1 h-4 w-px bg-white/25" />
+      <span className="px-2 font-medium">Prototype</span>
+      <span className="h-4 w-px bg-white/25" />
       <label className="flex cursor-pointer items-center gap-1.5 rounded-full px-2 py-1 hover:bg-white/15">
         <input type="checkbox" checked={empty} onChange={(e) => setEmpty(e.target.checked)} /> Empty board
       </label>

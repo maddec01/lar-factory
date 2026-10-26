@@ -34,8 +34,9 @@ the flow and `docs/plan.md` for how it was set up.
   usually holds 4317). Stop it with that command `| xargs kill`; never `pkill` by pattern.
 - Release secrets wizard changes: run `bash scripts/release-secrets.test.sh` and
   `shellcheck scripts/release-secrets.sh`. Never run the wizard without `--dry-run`.
-- lar-work script changes: run `bash skills/lar-work/scripts/slice.test.sh` and
-  `bash skills/lar-work/scripts/status.test.sh`.
+- lar-work script changes: run `bash skills/lar-work/scripts/slice.test.sh`,
+  `bash skills/lar-work/scripts/status.test.sh` and
+  `bash skills/lar-work/scripts/repo-config.test.sh`.
 - skill-sync script changes: run each `skills/skill-sync/scripts/*.test.sh` with `bash`.
 - A PR that no issue tracks goes on the lar board too: `bash ~/.agents/skills/lar-work/scripts/status.sh <pr-url> "Ready to merge"`.
 

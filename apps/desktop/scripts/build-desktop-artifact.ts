@@ -92,12 +92,11 @@ export function createBuildConfig({ version, signed, outputDir }: BuildOptions):
     // The board server, bundled into one file by vp pack, runs with Electron's Node
     // from Resources/, beside the page's build: it serves ../../web/dist from its own
     // file. Packaged, Electron's app path is Resources/app.asar, and
-    // src/board-server/BoardServer.ts finds server/ and config.json beside it.
+    // src/board-server/BoardServer.ts finds server/ beside it.
     extraResources: [
       { from: "dist-electron/server", to: "server/dist" },
       { from: "../web/dist", to: "web/dist" },
       { from: "dist-electron/bundle", to: "bundle" },
-      { from: "../../config.json", to: "config.json" },
       // The licence notices of the code the app copies, T3 Code's among them.
       { from: "../../THIRD_PARTY_NOTICES.md", to: "THIRD_PARTY_NOTICES.md" },
     ],

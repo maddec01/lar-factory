@@ -51,18 +51,16 @@ export interface BoardLocation {
   readonly serverDir: string;
   /** The file Node runs. */
   readonly serverFile: string;
-  readonly configFile: string;
   /** The packaged app's skills bundle, which the server credits in Settings; the checkout's root otherwise. */
   readonly bundleDir?: string;
 }
 
 /**
- * Finds the board server and `config.json` from `appPath`, Electron's app path. In
- * development that is `apps/desktop` in the checkout: the server runs from
- * `apps/server/src/server.ts`, with `config.json` at the repo root. Packaged, it is
- * `Resources/app.asar`, which has no node_modules, so the server runs as one bundled
- * file in `Resources/server/dist`, which finds the page's build in `Resources/web/dist`;
- * `config.json` and the skills bundle sit in `Resources/`.
+ * Finds the board server from `appPath`, Electron's app path. In development that is
+ * `apps/desktop` in the checkout: the server runs from `apps/server/src/server.ts`.
+ * Packaged, it is `Resources/app.asar`, which has no node_modules, so the server runs
+ * as one bundled file in `Resources/server/dist`, which finds the page's build in
+ * `Resources/web/dist`; the skills bundle sits in `Resources/`.
  */
 export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
   const serverDir = NodePath.resolve(appPath, "../server");
@@ -70,20 +68,18 @@ export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
     ? {
         serverDir,
         serverFile: NodePath.join(serverDir, "dist/server.mjs"),
-        configFile: NodePath.resolve(appPath, "../config.json"),
         bundleDir: NodePath.resolve(appPath, "../bundle"),
       }
     : {
         serverDir,
         serverFile: NodePath.join(serverDir, "src/server.ts"),
-        configFile: NodePath.resolve(appPath, "../../config.json"),
       };
 };
 
 /**
  * Runs `serverFile` with `executablePath` in Node mode. In the app that is the
  * Electron binary, whose Node strips the types when the server runs as source.
- * The server reads `configFile` and `bundleDir`, and refuses guarded writes that don't carry `secret`.
+ * The server reads `bundleDir`, and refuses guarded writes that don't carry `secret`.
  */
 export const makeStartConfig = (input: BoardLocation & {
   readonly executablePath: string;
@@ -96,7 +92,6 @@ export const makeStartConfig = (input: BoardLocation & {
   env: {
     ...input.env,
     ELECTRON_RUN_AS_NODE: "1",
-    BOARD_CONFIG_FILE: input.configFile,
     BOARD_APP_SECRET: input.secret,
     ...(input.bundleDir && { BOARD_BUNDLE_DIR: input.bundleDir }),
   },

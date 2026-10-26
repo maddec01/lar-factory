@@ -27,19 +27,17 @@ const isRunning = (pid: number) => {
 };
 
 describe("locate", () => {
-  it("runs apps/server's source, with the root config.json, beside apps/desktop in development", () => {
+  it("runs apps/server's source beside apps/desktop in development", () => {
     assert.deepStrictEqual(BoardServer.locate("/repo/apps/desktop", false), {
       serverDir: "/repo/apps/server",
       serverFile: "/repo/apps/server/src/server.ts",
-      configFile: "/repo/config.json",
     });
   });
 
-  it("runs the bundled server, with config.json and the skills bundle, from the packaged app's Resources", () => {
+  it("runs the bundled server, with the skills bundle, from the packaged app's Resources", () => {
     assert.deepStrictEqual(BoardServer.locate("/Applications/Board.app/Contents/Resources/app.asar", true), {
       serverDir: "/Applications/Board.app/Contents/Resources/server",
       serverFile: "/Applications/Board.app/Contents/Resources/server/dist/server.mjs",
-      configFile: "/Applications/Board.app/Contents/Resources/config.json",
       bundleDir: "/Applications/Board.app/Contents/Resources/bundle",
     });
   });
@@ -48,18 +46,17 @@ describe("locate", () => {
 describe("makeStartConfig", () => {
   it("names the skills bundle when the app has one", () => {
     const config = BoardServer.makeStartConfig({
-      executablePath: "/Board", serverDir: "/server", serverFile: "/server/dist/server.mjs", configFile: "/config.json",
+      executablePath: "/Board", serverDir: "/server", serverFile: "/server/dist/server.mjs",
       bundleDir: "/bundle", env: {}, secret: "launch-secret",
     });
     assert.equal(config.env.BOARD_BUNDLE_DIR, "/bundle");
   });
 
-  it("runs the server file with the given executable in Node mode, the config file and the launch secret", () => {
+  it("runs the server file with the given executable in Node mode and the launch secret", () => {
     const config = BoardServer.makeStartConfig({
       executablePath: "/Applications/Board.app/Contents/MacOS/Board",
       serverDir: "/repo/apps/server",
       serverFile: "/repo/apps/server/src/server.ts",
-      configFile: "/repo/config.json",
       env: { PATH: "/usr/bin", ELECTRON_RUN_AS_NODE: "0" },
       secret: "launch-secret",
     });
@@ -70,7 +67,6 @@ describe("makeStartConfig", () => {
       env: {
         PATH: "/usr/bin",
         ELECTRON_RUN_AS_NODE: "1",
-        BOARD_CONFIG_FILE: "/repo/config.json",
         BOARD_APP_SECRET: "launch-secret",
       },
     });

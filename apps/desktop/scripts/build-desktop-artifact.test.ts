@@ -59,13 +59,12 @@ describe("createBuildConfig", () => {
     ]);
   });
 
-  it("ships the bundled server, the built page and config.json where the server finds them", () => {
+  it("ships the bundled server and the built page where the server finds them", () => {
     const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
 
     expect(config.extraResources).toEqual(expect.arrayContaining([
       { from: "dist-electron/server", to: "server/dist" },
       { from: "../web/dist", to: "web/dist" },
-      { from: "../../config.json", to: "config.json" },
     ]));
     expect(config.files).toContain("!dist-electron/server/**/*");
   });

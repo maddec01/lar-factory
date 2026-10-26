@@ -1,7 +1,7 @@
 // The GitHub Project item source: reads and writes the Project config.json names, through github.ts.
 
 import type { BoardConfig } from '../config/config.ts';
-import type { ItemSource } from '../items/item-source.ts';
+import { DONE_REFUSED, type ItemSource } from '../items/item-source.ts';
 import type { ProjectCreationProgress } from './github.ts';
 import { abandonItem, addIssueLabel, addProjectItem, fetchProject, findProjectNumber, setIssueStatus, setItemStatus } from './github.ts';
 
@@ -19,6 +19,7 @@ export function githubProject(config: BoardConfig): ItemSource {
       return items;
     },
     async setStatus(item, status) {
+      if (status === 'Done') return DONE_REFUSED;
       const projectItemId = projectItemIds.get(item.id);
       return projectItemId ? setItemStatus(project(), projectItemId, status) : `Could not set ${status}. The board has not read this item from the project.`;
     },
@@ -31,7 +32,7 @@ export function githubProject(config: BoardConfig): ItemSource {
       if (result.item && progress.projectItemId) projectItemIds.set(result.item.id, progress.projectItemId);
       return result;
     },
-    setParentStatus: (parent, status) => setIssueStatus(project(), parent.url, status),
+    setParentStatus: async (parent, status) => (status === 'Done' ? DONE_REFUSED : setIssueStatus(project(), parent.url, status)),
     abandon: (item) => abandonItem(project(), item, projectItemIds.get(item.id)),
     renamedId: (savedId) => [...projectItemIds].find(([, projectItemId]) => projectItemId === savedId)?.[0],
   };

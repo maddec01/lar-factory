@@ -8,12 +8,12 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
-import { loadConfig } from './config/config.ts';
+import { readBoardSettings, readOnboardedConfigs, readRepositoryList, type OnboardedRepository } from './config/repository-config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
-import { configuredSources } from './items/item-sources.ts';
+import { onboardedSources, repoView } from './items/item-sources.ts';
 import { log } from './log.ts';
 import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
@@ -28,7 +28,9 @@ import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t
 import { TOOL_NAMES, checkTools, lookUpTools, missingTool, probeGh, tools } from './tools/tools.ts';
 
 const HOST = '127.0.0.1';
-const config = loadConfig();
+const settings = readBoardSettings();
+// A settings file the board can't use leaves it on the defaults; the problem stays the board's read error until it restarts.
+if (settings.problem) log(`using the default settings: ${settings.problem}`);
 const fixture = process.env.BOARD_DATA_FILE;
 const capture = { session: randomUUID(), enabled: !fixture };
 const bundled = loadBundledSkills();
@@ -36,11 +38,11 @@ if (bundled.error) log(`no bundled skills in Settings: ${bundled.error}`);
 
 const board = createBoardState({
   capture,
-  project: { owner: config.owner, title: config.title },
-  repos: config.repos,
-  refreshSeconds: config.refreshSeconds,
+  project: { title: '' },
+  repos: [],
+  refreshSeconds: settings.refreshSeconds,
   fetchedAt: null,
-  error: null,
+  error: settings.problem ?? null,
   items: [],
   modelChoices: [],
   bundledSkills: bundled.skills,
@@ -49,7 +51,12 @@ const board = createBoardState({
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
 const modelManifest = modelManifestPath();
 const environmentIdFile = environmentIdPath();
-const items = configuredSources(config);
+// Each read publishes the repositories once their configs load, so Add item offers them while the items still load.
+const items = onboardedSources(async () => {
+  const configs = await readOnboardedConfigs();
+  board.update({ repos: configs.map(repoView) });
+  return configs;
+});
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;
@@ -168,7 +175,7 @@ async function recheckTools(rereadLoginPath = true): Promise<void> {
   const { tools: before } = board.snapshot();
   const ghBlocked = ghStopsRead(before?.gh);
   checkingTools = (async () => {
-    const [, withAz] = await Promise.all([lookUpTools(process.env, rereadLoginPath), anyOnAzureDevOps(config.repos)]);
+    const [, withAz] = await Promise.all([lookUpTools(process.env, rereadLoginPath), anyOnAzureDevOps(onboarded())]);
     const { tools: checks, ghError } = await checkTools(withAz);
     showToolChecks(checks);
     if (ghError) log(`gh probe failed: ${ghError}`);
@@ -178,9 +185,19 @@ async function recheckTools(rereadLoginPath = true): Promise<void> {
   if (ghBlocked && !ghStopsRead(board.snapshot().tools?.gh)) readSoon();
 }
 
-/** Whether gh's check stops the read: it blocks every repository the board lists, or the Project when it lists none. */
+/** The onboarded repositories as the list is now; none while it can't be read, which the read reports. */
+function onboarded(): OnboardedRepository[] {
+  try { return readRepositoryList(); }
+  catch { return []; }
+}
+
+/**
+ * Whether gh's check stops the read: it blocks every repository the board lists. With none, nothing reads a Project,
+ * so only a missing or logged-out gh stops it.
+ */
 function ghStopsRead(check: GhCheck | undefined): boolean {
-  const sources: ItemSource[] = config.repos.length ? config.repos.map(itemSource) : ['project'];
+  const repos = items.repos();
+  const sources: ItemSource[] = repos.length ? repos.map(itemSource) : ['issues'];
   return sources.every((source) => ghBlocksRead(check, source));
 }
 
@@ -198,11 +215,12 @@ async function refresh(): Promise<void> {
   try {
     const snapshot = await items.read();
     const { error, fetchedAt } = board.snapshot();
-    const recovered = error !== null || fetchedAt === null;
+    const recovered = error !== null && error !== settings.problem || fetchedAt === null;
     board.applyRead(snapshot.items, readRevision, withT3Reads);
-    board.update({ project: { owner: config.owner, title: snapshot.title }, fetchedAt: new Date().toISOString(), error: null,
-      t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(config.repos) });
-    if (recovered) log(`read ${snapshot.items.length} items from the ${snapshot.title} project`);
+    const repos = items.repos();
+    board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: settings.problem ?? null,
+      t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
+    if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;
   } catch (err) {
     // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale.
@@ -232,7 +250,7 @@ function readSoon(): void {
 // Resources/server/dist/, beside Resources/web/dist/.
 const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
-const commands = createItemCommands({ board, items, repos: config.repos, offerModelChoices });
+const commands = createItemCommands({ board, items, repos: items.repos, offerModelChoices });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json'),
   renamedId: items.renamedId });
@@ -258,7 +276,7 @@ const ports = pinned ? [Number(pinned)] : BOARD_PORTS;
 const port = await listenOnFreePort(server, HOST, ports) ?? await exitWith(ports.length === 1
   ? `port ${ports[0]} is taken; stop what holds it or choose another BOARD_PORT`
   : `ports ${ports[0]} to ${ports.at(-1)} are all taken; stop a board or set BOARD_PORT`);
-log(`board on http://${HOST}:${port}, refreshing every ${config.refreshSeconds} s`);
+log(`board on http://${HOST}:${port}, refreshing every ${settings.refreshSeconds} s`);
 reportListening(port);
 // status.sh finds live boards by their records; a sample board isn't one to refresh.
 if (!fixture) process.on('exit', recordBoard(port));
@@ -268,13 +286,13 @@ if (!fixture) firstToolCheck = recheckTools();
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).
 if (fixture) {
-  board.update({ ...JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, repos: config.repos, capture });
+  board.update({ ...JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, capture });
   offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
 }
 const timer = setInterval(() => {
   if (!fixture) void refresh();
-}, config.refreshSeconds * 1000);
+}, settings.refreshSeconds * 1000);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {

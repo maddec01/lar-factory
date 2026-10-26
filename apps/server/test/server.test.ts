@@ -2,7 +2,7 @@ import { test, type TestContext } from 'vite-plus/test';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
 import assert from 'node:assert/strict';
-import { freePort, startBoard, until } from './server-support.ts';
+import { freePort, onboarded, readsRepositoryConfig, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectIssue } from '@lar-factory/shared/test/raw-items';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
@@ -23,12 +23,13 @@ test('writes reject foreign and missing origins before touching GitHub', async (
   }
   const calls = await board.calls();
   // Reads and the startup gh probe touch nothing.
-  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && args[0] !== '--version' && args[0] !== 'auth');
+  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && args[0] !== '--version' && args[0] !== 'auth' && !readsRepositoryConfig(args));
   assert.equal(writes.length, 0);
 });
 
 test('a completed submission is immediately visible and duplicate delivery reuses it', async (t) => {
   const board = await startBoard(t, { createDelay: 80, readDelay: 700 });
+  await onboarded(board);
   const initial = await board.board();
   const body = { session: initial.capture.session, requestId: randomUUID(), draft };
   const responses = await Promise.all([board.post(body), board.post(body)]);
@@ -47,6 +48,7 @@ test('a completed submission is immediately visible and duplicate delivery reuse
 
 test('partial HTTP success links the issue and retry finishes project assignment once', async (t) => {
   const board = await startBoard(t, { fail: 'status' });
+  await onboarded(board);
   const initial = await board.board();
   const body = { session: initial.capture.session, requestId: randomUUID(), draft };
   const first = await board.post(body);
@@ -100,6 +102,7 @@ test('sample mode never writes through the local GitHub login', async (t) => {
 
 test('successful refreshes eventually remove a created item whose project membership is absent', async (t) => {
   const board = await startBoard(t, {}, false, true);
+  await onboarded(board);
   const initial = await board.board();
   const response = await board.post({ session: initial.capture.session, requestId: randomUUID(), draft });
   assert.equal((await response.json()).board.items.length, 1, 'creation appears immediately');
@@ -314,7 +317,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
   ] } } }];
   const liveBodies = { [url(40)]: 'PR 40, edited by hand', [url(43)]: `PR 43\n\n${block}` };
   const board = await startBoard(t, { items, liveBodies }, false, false, { T3_STATE_DB: db });
-  const prCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && args[1] !== 'graphql');
+  const prCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && args[1] !== 'graphql' && !readsRepositoryConfig(args));
   for (let attempt = 0; attempt < 80 && !(await prCalls()).some((args) => args[2] === 'PATCH'); attempt++) {
     await new Promise((r) => setTimeout(r, 25));
   }
@@ -335,7 +338,7 @@ test('PR edits run beside the refreshes without holding them up, and never two s
   ] } } }];
   // Refreshes run every 100 ms; the edit takes 1.5 s.
   const board = await startBoard(t, { items, prEditDelay: 1500 }, false, true, { T3_STATE_DB: db });
-  const prCalls = async () => (await board.calls()).filter((args) => args[1]?.startsWith('repos/') || args[2] === 'PATCH');
+  const prCalls = async () => (await board.calls()).filter((args) => (args[1]?.startsWith('repos/') && !readsRepositoryConfig(args)) || args[2] === 'PATCH');
   for (let attempt = 0; attempt < 80 && !(await prCalls()).some((args) => args[2] === 'PATCH'); attempt++) {
     await new Promise((r) => setTimeout(r, 25));
   }
@@ -399,16 +402,4 @@ test('a live board records its port for status.sh and removes the record on exit
   await sample.stop();
   await board.stop();
   assert.deepEqual(readdirSync(records), []);
-});
-
-test('BOARD_CONFIG_FILE gives the board its project and repos from a file outside the checkout', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'lar-config-file-'));
-  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
-  const file = join(dir, 'config.json');
-  const repos = [{ repo: 'maddec01/lar-elsewhere', role: 'A repo only this file names' }];
-  writeFileSync(file, JSON.stringify({ project: { owner: 'maddec01', title: 'Elsewhere' }, repos }));
-  const board = await startBoard(t, {}, false, false, { BOARD_CONFIG_FILE: file });
-  const state = await board.board() as { project: { title: string }; repos: unknown[] };
-  assert.equal(state.project.title, 'Elsewhere');
-  assert.deepEqual(state.repos, repos);
 });

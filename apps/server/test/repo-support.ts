@@ -40,7 +40,6 @@ export async function factoryRepo(t: TestContext) {
   await cp(new URL('../../web/.gitignore', import.meta.url), join(repo, 'apps/web/.gitignore'));
   // The built page, which .gitignore keeps out of the fixture's commits as it does in the real repo.
   await cp(new URL('../../web/dist', import.meta.url), join(repo, 'apps/web/dist'), { recursive: true });
-  await cp(new URL('../../../config.json', import.meta.url), join(repo, 'config.json'));
   await cp(new URL(import.meta.resolve('@lar-factory/shared/test/sample.json')), join(repo, 'sample.json'));
   await writeFile(join(repo, 'apps/server/package.json'), '{"type":"module"}');
   // The shared package the server imports, linked into its node_modules as pnpm links it.

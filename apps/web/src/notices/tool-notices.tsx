@@ -101,12 +101,14 @@ function OneGhBanner({ check }: { check: FailedCheck<GhCheck> }) {
 
 /**
  * The banner for a gh the board can't use as it is: missing or logged out, which stops the read, too old, or without
- * the project scope; a login without the scope on a gh also too old shows the too-old banner as well.
+ * the project scope while a repository reads a Project; a login without the scope on a gh also too old shows the
+ * too-old banner as well.
  */
-export function GhBanner({ check }: { check: FailedCheck<GhCheck> }) {
+export function GhBanner({ check, readsProject }: { check: FailedCheck<GhCheck>; readsProject: boolean }) {
   const outdated = check.result === 'no-project-scope' && check.upgrade && check.version
     ? { result: 'outdated' as const, version: check.version, fix: check.upgrade } : null;
-  return <><OneGhBanner check={check} />{outdated && <OneGhBanner check={outdated} />}</>;
+  const shown = check.result !== 'no-project-scope' || readsProject;
+  return <>{shown && <OneGhBanner check={check} />}{outdated && <OneGhBanner check={outdated} />}</>;
 }
 
 /** az's banner title by its check's result. */

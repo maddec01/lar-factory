@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { SquarePen } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { applicability, ITEM_KINDS, repoName } from '@lar-factory/shared';
+import { applicability, ITEM_KINDS, noneOnboarded, repoName } from '@lar-factory/shared';
 import type { RepoConfig } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Checkbox } from '@lar-factory/ui/checkbox';
@@ -19,6 +19,7 @@ import { FormResult } from '../notices/form-result.tsx';
 import { useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
+import { AddingARepository } from '../notices/adding-a-repository.tsx';
 import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 
 /** The applicability checkboxes of one repo, each group with the hint for choosing none. Base UI's checkboxes
@@ -49,7 +50,9 @@ function AddItemForm() {
   const [repo, setRepo] = useState(data.repos[0]?.repo ?? '');
   const { phase } = submission;
   const locked = phase !== 'editing';
-  const selected = data.repos.find((r) => r.repo === repo);
+  // Opened before the repositories arrived, repo matches none: the select then shows the first.
+  const selected = data.repos.find((r) => r.repo === repo) ?? data.repos[0];
+  const hint = noneOnboarded(data);
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,7 +67,7 @@ function AddItemForm() {
     <form id="add-item-form" className="flex min-h-0 flex-col" noValidate aria-busy={phase === 'pending'} onSubmit={onSubmit} onInput={edit}>
       <DialogHeader>
         <DialogTitle id="add-item-heading">Add item</DialogTitle>
-        <DialogDescription>Create an issue in {data.project.title} and add it to List.</DialogDescription>
+        <DialogDescription>Create an issue{selected && ` in ${repoName(selected.repo, data.repos)}`} and add it to List.</DialogDescription>
       </DialogHeader>
       <DialogPanel>
         <Fieldset id="item-fields" unstyled disabled={locked}>
@@ -73,9 +76,11 @@ function AddItemForm() {
               <Label htmlFor="item-repo">Repository</Label>
               {/* Uncontrolled and read on input: the form's onInput re-renders before the select's change
                   event, and a controlled select would be set back to the old repo. */}
-              <NativeSelect id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}>
+              <NativeSelect id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}
+                aria-describedby={hint ? 'item-repo-hint' : undefined}>
                 {data.repos.map((r) => <option value={r.repo} key={r.repo}>{repoName(r.repo, data.repos)}</option>)}
               </NativeSelect>
+              {hint && <p className="form-hint" id="item-repo-hint">No repository is onboarded. <AddingARepository /></p>}
             </div>
             <div className="form-field">
               <Label htmlFor="item-kind">Kind</Label>
@@ -100,7 +105,7 @@ function AddItemForm() {
       </DialogPanel>
       <DialogFooter>
         <Button type="submit" id="item-submit"
-          disabled={phase === 'pending' || phase === 'uncertain' || data.capture?.enabled === false}>
+          disabled={phase === 'pending' || phase === 'uncertain' || data.capture?.enabled === false || !data.repos.length}>
           {phase === 'pending' ? 'Adding…' : phase === 'retry' ? 'Retry this submission' : 'Add to List'}
         </Button>
         <Button variant="outline" size="xs" id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>New item</Button>

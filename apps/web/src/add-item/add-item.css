@@ -2,7 +2,7 @@
 
 .form-hint { color: var(--muted-foreground); margin: --spacing(1.5) 0 --spacing(3); font-size: var(--text-xs); }
 .form-pair { display: grid; grid-template-columns: 1fr 1fr; gap: --spacing(3); }
-.form-field { display: grid; gap: --spacing(1); margin-bottom: --spacing(3); }
+.form-field { display: grid; align-content: start; gap: --spacing(1); margin-bottom: --spacing(3); }
 .required-note { color: var(--muted-foreground); font-weight: 400; font-size: var(--text-xs); }
 .choices { display: flex; flex-flow: row wrap; gap: --spacing(2.5) --spacing(3.5); }
 @media (max-width: 25rem) {

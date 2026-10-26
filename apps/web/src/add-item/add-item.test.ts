@@ -1,7 +1,7 @@
 // The Add item dialog: the form, its repo-dependent fields, and each phase of a submission.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, fetchMock, mountPage, sample, settle } from '../../test/support.ts';
+import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle } from '../../test/support.ts';
 import type { BoardData } from '@lar-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [
@@ -54,7 +54,7 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
   expect(field('item-title').required).toBe(true);
   expect($('label[for="item-description"]')!.textContent).toBe('Description (optional)');
   expect([result().getAttribute('role'), result().dataset.slot, result().dataset.variant]).toEqual(['status', 'alert', 'warning']);
-  expect(popup.textContent).toContain('Create an issue in lar and add it to List.');
+  expect(popup.textContent).toContain('Create an issue in lar-server and add it to List.');
 
   expect(labels()).toEqual(['area: server', 'area: web']);
   expect(popup.textContent).toContain('Selecting neither means both server and web.');
@@ -197,6 +197,40 @@ test('sample mode disables adding and says so', async () => {
   await open({ ...withFactory, capture: { session: 's', enabled: false } });
   expect(submit().disabled).toBe(true);
   expect(result().textContent).toBe('Adding items is disabled in sample mode.');
+});
+
+test('the description names the repository picked', async () => {
+  await open();
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
+  expect(dialog()!.textContent).toContain('Create an issue in lar-apple and add it to List.');
+});
+
+test('with no repository onboarded, adding is disabled and says where to add one, but not before the first read, beside a read error or a repository left off the board', async () => {
+  const empty = { ...withFactory, repos: [], repositoryConfigProblems: [], error: null };
+  const hint = () => $('#item-repo-hint');
+  await open(empty);
+  expect(submit().disabled).toBe(true);
+  expect(dialog()!.textContent).toContain('Create an issue and add it to List.');
+  expect(hint()!.textContent).toBe('No repository is onboarded. See Adding a repository in apps/server/README.md.');
+  expect(field('item-repo').getAttribute('aria-describedby')).toBe('item-repo-hint');
+  addStylesheet();
+  expect(getComputedStyle(field('item-kind').closest('.form-field')!).alignContent, 'the hint grows its row without stretching Kind').toBe('start');
+  for (const data of [{ ...empty, error: 'gh: HTTP 502' }, { ...empty, fetchedAt: null },
+    { ...empty, repositoryConfigProblems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }] }]) {
+    await push(data);
+    expect(hint()).toBeNull();
+    expect(field('item-repo').hasAttribute('aria-describedby')).toBe(false);
+    expect(submit().disabled).toBe(true);
+  }
+});
+
+test('opened before the repositories arrive, the dialog picks the first one once they do', async () => {
+  await open({ ...withFactory, repos: [], fetchedAt: null });
+  await push(withFactory);
+  expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-server');
+  expect(dialog()!.textContent).toContain('Create an issue in lar-server and add it to List.');
+  expect(labels()).toEqual(['area: server', 'area: web']);
+  expect(submit().disabled).toBe(false);
 });
 
 test('the dialog opens centred on T3\'s backdrop and glass panel, and nothing over the title bar drags', async () => {

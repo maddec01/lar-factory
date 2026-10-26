@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createServer, type Socket } from 'node:net';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,6 +34,20 @@ export async function freePort(): Promise<number> {
   return address.port;
 }
 
+/** The repositories a test board has onboarded unless its options name others. */
+const TEST_REPOSITORIES = ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec01/lar-factory'];
+
+/** Writes the board app's list of onboarded repositories under `home`. */
+export function writeRepositoryList(home: string, repos: readonly string[]): void {
+  const dir = join(home, 'Library/Application Support/Lar Factory');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'repositories.json'), JSON.stringify({ repositories: repos.map((repo) => ({ repo })) }));
+}
+
+/**
+ * Starts a board on the fake gh, whose state `options` holds. Its home lists TEST_REPOSITORIES as onboarded, or
+ * `options.repositories` (null for no list file), unless the home already has a list.
+ */
 export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}, directory?: string) {
   const dir = await mkdtemp(join(tmpdir(), 'lar-board-test-'));
   const stateFile = join(dir, 'github.json');
@@ -47,6 +61,9 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const runtimeFile = join(dir, 't3-runtime.json');
   await writeFile(runtimeFile, JSON.stringify({ version: 1, pid: process.pid, port: 3773, origin: 'http://127.0.0.1:3773' }));
   // Each test gets a spare port; BOARD_PORT '' leaves the board to pick one from its range.
+  const home = env.HOME ?? dir;
+  const { repositories = TEST_REPOSITORIES } = options as { repositories?: readonly string[] | null };
+  if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'))) writeRepositoryList(home, repositories);
   const port = 'BOARD_PORT' in env ? env.BOARD_PORT : String(await freePort());
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
@@ -130,6 +147,12 @@ export async function until(board: Board, check: (data: BoardData) => boolean): 
   }
   throw new Error('The board never reached the expected state');
 }
+
+/** Waits for the board to load its repositories' configs, which Add item checks a draft's repository against. */
+export const onboarded = (board: Board) => until(board, (data) => data.repos.length > 0);
+
+/** Whether a gh call reads a repository's .lar-factory.json. */
+export const readsRepositoryConfig = (args: readonly string[]) => args[0] === 'api' && !!args[1]?.endsWith('/.lar-factory.json');
 
 /** A draft project item, as the fake gh returns it. */
 export const draftItem = (status: string) => ({ id: 'PVTI_draft', updatedAt: '2026-10-21T09:00:00Z', status: { name: status },

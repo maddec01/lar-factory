@@ -1,8 +1,7 @@
 // Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
-import { DONE_WINDOW_MS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, statusLabel, validateDraft } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, statusLabel } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, Searched, Status, StatusSource } from '@lar-factory/shared';
-import type { BoardConfig } from '../config/config.ts';
 import type { ItemsRead } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -100,10 +99,6 @@ export const DOSSIER_BODIES_QUERY = `query($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Issue { id body } }
 }`;
 
-const FIND_PROJECT_QUERY = `query($owner: String!, $title: String!) {
-  user(login: $owner) { projectsV2(first: 50, query: $title) { nodes { number title } } }
-}`;
-
 // ---------- raw GraphQL shapes ----------
 
 interface PageInfo {
@@ -154,16 +149,21 @@ async function graphql<T>(query: string, vars: Record<string, string | number | 
   return JSON.parse(await gh(args)) as T;
 }
 
-export async function findProjectNumber(owner: string, title: string): Promise<number> {
-  const res = await graphql<{
-    data: { user: { projectsV2: { nodes: { number: number; title: string }[] } } | null };
-  }>(FIND_PROJECT_QUERY, { owner, title });
-  const match = res.data.user?.projectsV2.nodes.find((p) => p.title === title);
-  if (!match) throw new Error(`No project titled "${title}" for user ${owner}`);
-  return match.number;
+/** A GitHub Project, by its owner and number, as a repository's .lar-factory.json names it. */
+export interface GithubProjectRef {
+  owner: string;
+  number: number;
 }
 
-const projectNumber = (config: BoardConfig) => config.number ?? findProjectNumber(config.owner, config.title);
+/** A file's text on the repository's default branch, read through the contents API without a ref; null when it has none there. */
+export async function readDefaultBranchFile(repo: string, path: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+  try {
+    return await run(['api', `repos/${repo}/contents/${path}`, '-H', 'Accept: application/vnd.github.raw']);
+  } catch (err) {
+    if (/HTTP 404/.test(message(err))) return null;
+    throw err;
+  }
+}
 
 /** Reads up to `maxPages` pages, each after the cursor the one before ended at; throws `tooMany` when there are more. */
 async function readPages(maxPages: number, tooMany: string, readPage: (after: string | null) => Promise<PageInfo>): Promise<void> {
@@ -269,29 +269,29 @@ export async function fetchRepoIssues(repo: string, now = Date.now()): Promise<I
 export const message = (err: unknown) => (err instanceof Error ? err.message : 'GitHub request failed.');
 
 /** Looks up the project's Status option once and returns a writer for it. */
-async function statusWriter(config: BoardConfig, name: Status, run: (args: string[]) => Promise<string>) {
-  const number = await projectNumber(config);
-  const project = JSON.parse(await run(['project', 'view', String(number), '--owner', config.owner, '--format', 'json'])) as { id: string };
-  const fields = JSON.parse(await run(['project', 'field-list', String(number), '--owner', config.owner, '--format', 'json'])) as {
+async function statusWriter(project: GithubProjectRef, name: Status, run: (args: string[]) => Promise<string>) {
+  const { owner, number } = project;
+  const view = JSON.parse(await run(['project', 'view', String(number), '--owner', owner, '--format', 'json'])) as { id: string };
+  const fields = JSON.parse(await run(['project', 'field-list', String(number), '--owner', owner, '--format', 'json'])) as {
     fields: { id: string; name: string; options?: { id: string; name: string }[] }[];
   };
   const status = fields.fields.find((f) => f.name === 'Status');
   const option = status?.options?.find((o) => o.name === name);
-  if (!project.id || !status || !option) throw new Error(`The project has no ${name} status.`);
-  const setStatus = (itemId: string) => run(['project', 'item-edit', '--project-id', project.id, '--id', itemId,
+  if (!view.id || !status || !option) throw new Error(`The project has no ${name} status.`);
+  const setStatus = (itemId: string) => run(['project', 'item-edit', '--project-id', view.id, '--id', itemId,
     '--field-id', status.id, '--single-select-option-id', option.id]);
   return { number, setStatus };
 }
 
 /** Sets an existing project item's Status; returns the error, or null when GitHub accepted it. */
 export async function setItemStatus(
-  config: BoardConfig,
+  project: GithubProjectRef,
   itemId: string,
   name: Status,
   run: (args: string[]) => Promise<string> = gh,
 ): Promise<string | null> {
   try {
-    await (await statusWriter(config, name, run)).setStatus(itemId);
+    await (await statusWriter(project, name, run)).setStatus(itemId);
     return null;
   } catch (err) {
     return `Could not set ${name}. ${message(err)}`;
@@ -300,14 +300,14 @@ export async function setItemStatus(
 
 /** Adds an issue to the project if it isn't there, as status.sh does, then sets its Status; returns the error, or null. */
 export async function setIssueStatus(
-  config: BoardConfig,
+  project: GithubProjectRef,
   url: string,
   name: Status,
   run: (args: string[]) => Promise<string> = gh,
 ): Promise<string | null> {
   try {
-    const { number, setStatus } = await statusWriter(config, name, run);
-    const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', config.owner, '--url', url, '--format', 'json'])) as { id?: string };
+    const { number, setStatus } = await statusWriter(project, name, run);
+    const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', project.owner, '--url', url, '--format', 'json'])) as { id?: string };
     if (!member.id) throw new Error('GitHub did not return a project item.');
     await setStatus(member.id);
     return null;
@@ -398,7 +398,7 @@ export async function deleteIssue(item: Item, run: (args: string[]) => Promise<s
 
 /** Deletes an issue for good, or removes a draft from the project by its Project item id; returns the error, or null when GitHub accepted it. */
 export async function abandonItem(
-  config: BoardConfig,
+  project: GithubProjectRef,
   item: Item,
   projectItemId: string | undefined,
   run: (args: string[]) => Promise<string> = gh,
@@ -406,8 +406,7 @@ export async function abandonItem(
   if (!isDraft(item)) return deleteIssue(item, run);
   try {
     if (!projectItemId) throw new Error('The board has not read this draft from the project.');
-    const number = await projectNumber(config);
-    await run(['project', 'item-delete', String(number), '--owner', config.owner, '--id', projectItemId]);
+    await run(['project', 'item-delete', String(project.number), '--owner', project.owner, '--id', projectItemId]);
     return null;
   } catch (err) {
     return `Could not remove draft ${item.title}. ${message(err)}`;
@@ -425,19 +424,18 @@ export type ProjectCreationProgress = CreationProgress & { projectItemId?: strin
 
 /** Creates an issue, adds it to the configured project and explicitly assigns List. */
 export async function addProjectItem(
-  config: BoardConfig,
-  input: unknown,
+  project: GithubProjectRef,
+  draft: ItemDraft,
   progress: ProjectCreationProgress,
   run: (args: string[]) => Promise<string> = gh,
 ): Promise<CreationResult> {
-  const draft = validateDraft(input, config.repos);
   return createIssue(draft, progress, run, async () => {
-    const { number, setStatus } = await statusWriter(config, 'List', run);
+    const { number, setStatus } = await statusWriter(project, 'List', run);
     return [
       { step: 'project membership', run: async (issue) => {
         if (progress.projectItemId) return;
         // GitHub item-add reuses membership when the issue is already on this project.
-        const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', config.owner,
+        const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', project.owner,
           '--url', issue.html_url, '--format', 'json'])) as { id: string };
         if (!member.id) throw new Error('GitHub did not return a project item.');
         progress.projectItemId = member.id;

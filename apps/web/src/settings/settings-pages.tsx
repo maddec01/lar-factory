@@ -129,7 +129,7 @@ export function pages(input: PagesInput): Page[] {
   return [
     { id: 'general', label: 'General', icon: <Settings2 />, groups: [
       { title: 'Board', rows: [
-        { id: 'refresh', title: 'Refresh every', description: 'How often the board reads the GitHub Project through gh.', control: refreshEvery(data.refreshSeconds) },
+        { id: 'refresh', title: 'Refresh every', description: "How often the board reads each repository's items and .lar-factory.json through gh.", control: refreshEvery(data.refreshSeconds) },
         { id: 'done-window', title: 'Done shows', description: 'Items closed within this window stay on the board.', control: { type: 'select', options: ['3 days', '7 days', '14 days', '30 days'], value: '7 days' } },
         { id: 'open-in', title: 'Open an item in', control: { type: 'segmented', options: ['GitHub', 'T3 thread', 'Ask'], value: 'T3 thread' } },
         { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon closes the issue as not planned.', control: { type: 'switch', value: true } },

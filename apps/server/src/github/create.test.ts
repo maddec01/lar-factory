@@ -1,8 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { addProjectItem } from './github.ts';
-import { loadConfig } from '../config/config.ts';
-import type { CreationProgress } from '@lar-factory/shared';
+import type { CreationProgress, ItemDraft } from '@lar-factory/shared';
 
 test('creates an Apple issue with the selected labels and explicitly assigns List', async () => {
   const calls: string[][] = [];
@@ -13,7 +12,7 @@ test('creates an Apple issue with the selected labels and explicitly assigns Lis
     { id: 'PVTI_81' },
     {},
   ];
-  const result = await addProjectItem({ ...loadConfig(), number: 1 }, {
+  const result = await addProjectItem({ owner: 'maddec01', number: 1 }, {
     repo: 'maddec01/lar-apple', kind: 'bug', title: 'Playback stalls', description: 'After seeking.',
     labels: ['app: music', 'app: books', 'os: ios'],
   }, {}, async (args: string[]) => {
@@ -31,20 +30,6 @@ test('creates an Apple issue with the selected labels and explicitly assigns Lis
     '--field-id', 'FIELD_1', '--single-select-option-id', 'LIST_1']);
 });
 
-test('rejects invalid repositories, kinds, blank titles and labels from another repository before GitHub', async () => {
-  let calls = 0;
-  const run = async () => { calls++; return '{}'; };
-  const draft = { repo: 'maddec01/lar-server', kind: 'feature', title: 'Index files', description: '', labels: [] };
-  for (const input of [
-    null, { ...draft, repo: 'other/repo' }, { ...draft, kind: 'concept' },
-    { ...draft, title: ' \n ' }, { ...draft, title: 12 }, { ...draft, description: {} },
-    { ...draft, labels: ['app: music'] }, { ...draft, labels: ['area: server', 'anything'] },
-  ]) {
-    await assert.rejects(addProjectItem({ ...loadConfig(), number: 1 }, input, {}, run), /./);
-  }
-  assert.equal(calls, 0);
-});
-
 for (const failedStep of ['project membership', 'List status']) {
   test(`retry after failed ${failedStep} finishes the same issue without another creation`, async () => {
     const calls: string[][] = [];
@@ -57,8 +42,8 @@ for (const failedStep of ['project membership', 'List status']) {
       if (fail && args[1] === (failedStep === 'project membership' ? 'item-add' : 'item-edit')) throw new Error('GitHub unavailable');
       return JSON.stringify(args[1] === 'item-add' ? { id: 'PVTI_82' } : {});
     };
-    const config = { ...loadConfig(), number: 1 };
-    const draft = { repo: 'maddec01/lar-server', kind: 'improvement', title: 'Fast indexing', description: '', labels: [] };
+    const config = { owner: 'maddec01', number: 1 };
+    const draft: ItemDraft = { repo: 'maddec01/lar-server', kind: 'improvement', title: 'Fast indexing', description: '', labels: [] };
     const progress: CreationProgress = {};
     const partial = await addProjectItem(config, draft, progress, run);
     assert.match(partial.error!, new RegExp(failedStep));
@@ -80,8 +65,8 @@ test('an ambiguous GitHub creation response is never retried as a new issue', as
     throw new Error('Connection lost');
   };
   const progress: CreationProgress = {};
-  const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 'Lost response', description: '', labels: [] };
-  const config = { ...loadConfig(), number: 1 };
+  const draft: ItemDraft = { repo: 'maddec01/lar-server', kind: 'bug', title: 'Lost response', description: '', labels: [] };
+  const config = { owner: 'maddec01', number: 1 };
   const first = await addProjectItem(config, draft, progress, run);
   assert.equal(first.uncertain, true);
   const retry = await addProjectItem(config, draft, progress, run);

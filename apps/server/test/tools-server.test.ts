@@ -156,16 +156,13 @@ test('a listed repository on Azure DevOps gets an az check, which Recheck reruns
   const home = mkdtempSync(join(tmpdir(), 'lar-azure-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
   checkouts(home, { 'lar-api': 'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api' });
-  const config = join(home, 'config.json');
-  writeFileSync(config, JSON.stringify({ project: { owner: 'maddec01', title: 'lar' },
-    repos: [{ repo: 'maddec01/lar-factory', role: 'factory' }, { repo: 'Fabrikam/lar-api', role: 'api' }] }));
   const az = join(home, 'az');
   const fakeAz = (account: number) => {
     writeFileSync(az, `#!/bin/sh\n[ "$1" = --version ] && echo 'azure-cli 2.67.0' && exit 0\n[ "$1" = account ] && exit ${account}\nexit 0\n`);
     chmodSync(az, 0o755);
   };
   fakeAz(1);
-  const board = await startBoard(t, {}, false, false, { HOME: home, BOARD_CONFIG_FILE: config, AZ_PATH: az,
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory', 'Fabrikam/lar-api'] }, false, false, { HOME: home, AZ_PATH: az,
     T3_STATE_DB: projectsDb(t, [{ id: 'project-api', root: join(home, 'Developer/lar/lar-api') }]) });
   const data = await afterRead(board);
   assert.ok(data.fetchedAt, 'the board reads GitHub');

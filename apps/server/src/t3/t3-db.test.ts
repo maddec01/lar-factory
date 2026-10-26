@@ -23,7 +23,7 @@ test('a thread\'s sessions come back earliest first', (t) => {
   ]);
 });
 
-test('live projects leave deleted ones out and give each folder with `~` expanded and no trailing slash', (t) => {
+test('live projects leave deleted ones out and give each title and folder with `~` expanded and no trailing slash', (t) => {
   const db = projectsDb(t, [{ id: 'a', root: '~/lar/' }, { id: 'b', root: '/srv/b', deletedAt: '2026-10-20T08:00:00Z' }]);
-  assert.deepEqual(liveProjects(db, '/Users/me'), [{ id: 'a', folder: '/Users/me/lar' }]);
+  assert.deepEqual(liveProjects(db, '/Users/me'), [{ id: 'a', title: 'a', folder: '/Users/me/lar' }]);
 });

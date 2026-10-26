@@ -15,6 +15,7 @@ import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { onboardedSources, repoView } from './items/item-sources.ts';
 import { log } from './log.ts';
+import { projectChoices } from './onboarding/project-choices.ts';
 import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
@@ -268,7 +269,7 @@ const startAfter = createStartAfter({ board, commands, offerModelChoices, file: 
   renamedId: items.renamedId });
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
-  recheck: recheckTools, readSoon, ready: () => firstToolCheck,
+  recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: () => projectChoices(onboarded()),
 });
 
 /** Logs why the board can't start and exits. */

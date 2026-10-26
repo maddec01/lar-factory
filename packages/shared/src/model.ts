@@ -598,3 +598,21 @@ export function isStale(data: BoardData, now: number): boolean {
   if (!data.fetchedAt) return false;
   return now - Date.parse(data.fetchedAt) > data.refreshSeconds * 3 * 1000;
 }
+
+/** The service that hosts a repository, from its origin's host. */
+export type Provider = 'GitHub' | 'Azure DevOps';
+
+/** A T3 project onboarding can offer, with what the T3 project step shows about its repository. */
+export interface ProjectChoice {
+  id: string;
+  /** The T3 project's title. */
+  name: string;
+  folder: string;
+  /** `owner/name` from the folder's origin; null when the folder isn't a main checkout with an origin on a provider. */
+  repo: string | null;
+  provider: Provider | null;
+  /** Whether the repository has `.lar-factory.json` on its default branch; null when that couldn't be read. */
+  hasConfig: boolean | null;
+  /** Whether the repository is on this Mac's list already. */
+  onBoard: boolean;
+}

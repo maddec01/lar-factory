@@ -114,9 +114,9 @@ jobs:
         if: ${{ !cancelled() }}
         run: bash skills/lar-work/scripts/status.test.sh
 
-      - name: skill-sync preview tests
+      - name: skill-sync tests
         if: ${{ !cancelled() }}
-        run: bash skills/skill-sync/scripts/preview-copy.test.sh
+        run: for test in skills/skill-sync/scripts/*.test.sh; do bash "$test" || exit 1; done
 
       - name: Release plan tests
         if: ${{ !cancelled() }}

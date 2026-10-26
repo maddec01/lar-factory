@@ -10,10 +10,11 @@ export const project = (name: string, parts: Partial<ProjectChoice> = {}): Proje
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
 });
 
-/** Serves `data` as the board and `projects` as T3's projects. */
-export function serve(data: BoardData, projects: ProjectChoice[] | { error: string }): void {
+/** Serves `data` as the board and `projects` as T3's projects, and answers each onboarding kept with `keep` and `status`. */
+export function serve(data: BoardData, projects: ProjectChoice[] | { error: string }, keep: object = { error: null }, status = 200): void {
   fetchMock.mockImplementation(async (url: string) => url === '/api/onboarding/projects'
     ? new Response(JSON.stringify(Array.isArray(projects) ? { projects } : projects), { status: Array.isArray(projects) ? 200 : 502 })
+    : url === '/api/onboarding/repositories' ? new Response(JSON.stringify(keep), { status })
     : new Response(JSON.stringify(data)));
 }
 

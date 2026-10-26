@@ -128,3 +128,50 @@ test('a project read that answers after the run closed changes nothing', async (
   await settle(() => answer(new Response(JSON.stringify({ projects: PROJECTS }))));
   expect(wizard.getState().projects).toEqual({ state: 'loading' });
 });
+
+/** The store, fresh, whose project reads answer PROJECTS and whose project creation answers `created`. */
+async function creatingStore(created: () => Response) {
+  const wizard = await store();
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => init?.method === 'POST' && url === '/api/onboarding/projects' ? created()
+    : new Response(JSON.stringify({ projects: PROJECTS })));
+  await settle(() => wizard.getState().start());
+  return wizard;
+}
+
+const added = project('lar-apple', { folder: '/Users/me/Developer/lar-apple' });
+
+test('Create a new T3 project adds the folder, then picks the new project', async () => {
+  const wizard = await creatingStore(() => new Response(JSON.stringify({ projects: [...PROJECTS, added], projectId: 'lar-apple', error: null })));
+  wizard.getState().pick('lar-web');
+  wizard.getState().chooseNew();
+  expect(wizard.getState().run).toMatchObject({ projectId: null, repo: null });
+  wizard.getState().setFolder('~/Developer/lar-apple');
+  await settle(() => wizard.getState().createProject());
+  const posts = (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([, init]) => init?.method === 'POST');
+  expect(posts.map(([url, init]) => [url, JSON.parse(String(init.body))])).toEqual([['/api/onboarding/projects', { folder: '~/Developer/lar-apple' }]]);
+  expect(wizard.getState().projects).toEqual({ state: 'loaded', projects: [...PROJECTS, added] });
+  expect(wizard.getState().run).toMatchObject({ projectId: 'lar-apple', repo: 'maddec01/lar-apple' });
+  expect(wizard.getState().creating).toBeNull();
+});
+
+test('a failing t3 project add keeps the folder on the step with its message', async () => {
+  const wizard = await creatingStore(() => new Response(JSON.stringify({ error: 't3 could not add the project: Could not reach the T3 Code server.' }), { status: 502 }));
+  wizard.getState().chooseNew();
+  wizard.getState().setFolder('~/Developer/lar-apple');
+  await settle(() => wizard.getState().createProject());
+  expect(wizard.getState().creating).toEqual({ folder: '~/Developer/lar-apple', adding: false,
+    error: 't3 could not add the project: Could not reach the T3 Code server.' });
+  expect(wizard.getState().run).toMatchObject({ step: 'project', projectId: null });
+  expect(wizard.getState().projects).toEqual({ state: 'loaded', projects: PROJECTS });
+});
+
+test("a new project that can't be picked stays on the form with the reason", async () => {
+  const bare = project('notes-2', { repo: null, provider: null, hasConfig: null });
+  const wizard = await creatingStore(() => new Response(JSON.stringify({ projects: [...PROJECTS, bare], projectId: 'notes-2', error: null })));
+  wizard.getState().chooseNew();
+  wizard.getState().setFolder('/Users/me/notes-2');
+  await settle(() => wizard.getState().createProject());
+  expect(wizard.getState().run).toMatchObject({ projectId: null });
+  expect(wizard.getState().creating).toEqual({ folder: '/Users/me/notes-2', adding: false,
+    error: "T3 Code added the project, but it can't be picked: Its folder is no main checkout with a GitHub or Azure DevOps origin." });
+});

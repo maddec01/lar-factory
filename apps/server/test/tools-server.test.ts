@@ -79,6 +79,24 @@ test('a logged-out gh that logs in is found by the timed retry, which keeps the 
   assert.equal(shellRuns(), 2, 'Recheck reads it again');
 });
 
+/** How many times the board has run `gh auth status`, once per gh probe. */
+const ghProbes = async (board: Board) => (await board.calls()).filter((args) => args[0] === 'auth' && args[1] === 'status').length;
+
+test('an old gh and a missing jq wait for Recheck, while T3 Code not running is looked at again by itself', async (t) => {
+  const waiting = await startBoard(t, { ghVersion: '2.93.1' }, false, false, { JQ_PATH: '/nowhere/jq', BOARD_TOOL_RETRY_MS: '50' });
+  assert.ok((await afterRead(waiting)).fetchedAt, 'the board reads GitHub');
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  assert.equal(await ghProbes(waiting), 1, 'no timed retry');
+
+  const dir = mkdtempSync(join(tmpdir(), 'lar-t3-closed-'));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const retrying = await startBoard(t, {}, false, false, { T3_SERVER_RUNTIME: join(dir, 'server-runtime.json'), BOARD_TOOL_RETRY_MS: '50' });
+  await afterRead(retrying);
+  const deadline = Date.now() + 5_000;
+  while (await ghProbes(retrying) < 2 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.ok(await ghProbes(retrying) >= 2, 'the timed retry probes again');
+});
+
 test('a gh older than 2.94.0 shows its notice and the board still reads GitHub', async (t) => {
   const board = await startBoard(t, { ghVersion: '2.93.1' });
   const data = await afterRead(board);

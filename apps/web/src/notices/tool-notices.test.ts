@@ -70,7 +70,7 @@ test('a gh older than 2.94.0 shows its banner with brew upgrade gh, and the boar
   await mountPage(withTools({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }));
   expect($$('.banners .banner').map(bannerText)).toEqual([['GitHub CLI is older than 2.94.0.', 'lar-work’s scripts need the --parent, '
     + '--add-sub-issue and --blocked-by flags that gh 2.94.0 added, and this gh is 2.93.1. Run brew upgrade gh Copy in a terminal, '
-    + 'then press Recheck. The board also looks again every 10 seconds. Recheck']]);
+    + 'then press Recheck. Recheck']]);
   expect($('.desk')).not.toBeNull();
 });
 
@@ -90,7 +90,8 @@ test('a login without the project scope on a gh older than 2.94.0 shows both ban
   await mountPage(withTools({ gh: { result: 'no-project-scope', version: '2.93.1', fix: 'gh auth refresh -s project', upgrade: 'brew upgrade gh' } }));
   const banners = $$('.banners .banner').map(bannerText);
   expect(banners.map(([title]) => title)).toEqual(["GitHub CLI can't read Projects.", 'GitHub CLI is older than 2.94.0.']);
-  expect(banners[1]![1]).toContain('this gh is 2.93.1. Run brew upgrade gh Copy in a terminal');
+  expect(banners[0]![1], 'a login without the scope stops the read, so the board looks again').toContain('looks again every 10 seconds');
+  expect(banners[1]![1]).toContain('this gh is 2.93.1. Run brew upgrade gh Copy in a terminal, then press Recheck. Recheck');
 });
 
 test('scopes the board couldn\'t read show no banner', async () => {
@@ -157,14 +158,14 @@ test('a missing git, jq or curl shows a banner with its install command and Rech
   await mountPage(withTools({ jq: { result: 'missing', fix: 'brew install jq' } }));
   const banners = () => $$('.banners .banner');
   expect(banners().map(bannerText)).toEqual([['jq not found.', 'lar-work’s scripts read gh’s answers with jq. Install it with brew install jq Copy, '
-    + 'then press Recheck. The board also looks again every 10 seconds. Recheck']]);
+    + 'then press Recheck. Recheck']]);
   expect(banners()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install jq');
   expect($('.desk')).not.toBeNull();
 
   await push(withTools({ git: { result: 'missing', override: 'GIT_PATH=/nowhere/git', fix: 'brew install git' }, curl: { result: 'missing', fix: 'brew install curl' } }));
   expect(banners().map((b) => bannerText(b)[0])).toEqual(['git not found.', 'curl not found.']);
   expect(bannerText(banners()[0]!)[1]).toBe('lar-work’s agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. '
-    + 'Point GIT_PATH at git, or unset it and install it with brew install git Copy, then press Recheck. The board also looks again every 10 seconds. Recheck');
+    + 'Point GIT_PATH at git, or unset it and install it with brew install git Copy, then press Recheck. Recheck');
   expect(bannerText(banners()[1]!)[1]).toContain('lar-work’s scripts tell the board to refresh with curl. Install it with brew install curl Copy');
 });
 
@@ -174,7 +175,7 @@ test('an az that fails its check shows a banner with its fix, and the board stil
   await mountPage(loggedOut);
   const banners = () => $$('.banners .banner');
   expect(banners().map(bannerText)).toEqual([['Azure CLI is logged out.', 'The board reads repositories on Azure DevOps through az. '
-    + 'Run az login Copy in a terminal, then press Recheck. The board also looks again every 10 seconds. Recheck']]);
+    + 'Run az login Copy in a terminal, then press Recheck. Recheck']]);
   expect($('.desk')).not.toBeNull();
   await settle(() => recheckButton().click());
   await answer(board(loggedOut));
@@ -182,7 +183,7 @@ test('an az that fails its check shows a banner with its fix, and the board stil
 
   await push(withTools({ az: { result: 'no-extension', fix: 'az extension add --name azure-devops' } }));
   expect(bannerText(banners()[0]!)).toEqual(['Azure CLI has no azure-devops extension.', 'The board reads repositories on Azure DevOps through az. '
-    + 'Run az extension add --name azure-devops Copy in a terminal, then press Recheck. The board also looks again every 10 seconds. Recheck']);
+    + 'Run az extension add --name azure-devops Copy in a terminal, then press Recheck. Recheck']);
   await push(withTools({ az: { result: 'missing', fix: 'brew install azure-cli' } }));
   expect(bannerText(banners()[0]!)[0]).toBe('Azure CLI not found.');
   expect(bannerText(banners()[0]!)[1]).toContain('Install it with brew install azure-cli Copy, then press Recheck.');

@@ -93,7 +93,8 @@ function OneGhBanner({ check }: { check: FailedCheck<GhCheck> }) {
   return (
     <Banner title={title}>
       {body}
-      {' '}{LOOKS_AGAIN} <Recheck check={check} />
+      {/* An old gh doesn't stop the read, so only Recheck looks again. */}
+      {check.result !== 'outdated' && <>{' '}{LOOKS_AGAIN}</>} <Recheck check={check} />
     </Banner>
   );
 }
@@ -121,7 +122,7 @@ export function AzBanner({ check }: { check: FailedCheck<AzCheck> }) {
       {check.result === 'missing'
         ? <Fix check={check} tool="az" what="az">Install it with <CopyableCommand command={check.fix} />, then press Recheck.</Fix>
         : <>Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</>}
-      {' '}{LOOKS_AGAIN} <Recheck check={check} />
+      {' '}<Recheck check={check} />
     </Banner>
   );
 }
@@ -144,7 +145,7 @@ export function CommandBanner({ name, check }: { name: Command; check: FailedChe
         ? <>No runnable <code>{name}</code> is at <code>{override}</code>. Point {override.split('=')[0]} at {name}, or unset it and install it</>
         : <>Install it</>}
       {' '}with <CopyableCommand command={install} />, then press Recheck.
-      {' '}{LOOKS_AGAIN} <Recheck check={check} />
+      {' '}<Recheck check={check} />
     </Banner>
   );
 }

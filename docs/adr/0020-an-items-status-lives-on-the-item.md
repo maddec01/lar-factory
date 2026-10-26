@@ -1,0 +1,5 @@
+# An item's status lives on the item
+
+Settled in [#354's decision](https://github.com/maddec01/lar-factory/issues/354#issuecomment-6416457322).
+
+Each item keeps its status on its own provider, in the form its item source allows: the Status field of a GitHub Project, a `status-` label on an issue, or a `status-` tag on an Azure work item. Done is never stored; an item is Done when it closes. On Azure the board also moves the work item's State, but only when the state category changes, so the team's own states are left alone. We chose this over a local status store so that status travels with the ticket to any machine, and over Azure state categories alone because five categories can't hold ten statuses.

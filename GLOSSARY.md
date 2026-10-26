@@ -142,6 +142,10 @@ _Avoid_: Merger (for the approver)
 
 ### Board statuses
 
+**Status**:
+An item's place in the factory's flow, one of the board statuses, kept on the item itself in the form its item source allows. Done is never stored; it follows from the item closing.
+_Avoid_: column, state, stage
+
 **List**:
 Captured work that has not yet been selected to start.
 _Avoid_: Queued (for unselected work)
@@ -180,7 +184,7 @@ Reviewed work whose required checks have passed, with no outstanding findings
 or hand checks, awaiting the user's merge.
 
 **Done**:
-Completed work, reached when its issue closes or its PR merges.
+Completed work, reached when its item closes or its PR merges.
 
 **Abandon**:
 Discarding a List or Queued item for good. The issue is deleted, or the draft

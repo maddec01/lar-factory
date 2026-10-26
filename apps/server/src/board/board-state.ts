@@ -28,6 +28,9 @@ export interface BoardState {
   subscribe(send: (data: BoardData) => void): () => void;
 }
 
+/** Whether two copies of an item carry the same statuses, so a pick shows until a read drops the others. */
+const sameStatuses = (a: Item, b: Item) => a.statuses.join() === b.statuses.join();
+
 export function createBoardState(initial: BoardData): BoardState {
   const state = initial;
   let revision = 0;
@@ -49,7 +52,7 @@ export function createBoardState(initial: BoardData): BoardState {
       for (const [id, recent] of recentItems) {
         if (since < recent.revision) continue;
         // Give GitHub three successful reads to expose the change, then trust what it reports.
-        const reported = items.some((i) => i.id === id && i.status === recent.item.status);
+        const reported = items.some((i) => i.id === id && i.status === recent.item.status && sameStatuses(i, recent.item));
         if (reported || ++recent.unconfirmedReads >= 3) recentItems.delete(id);
       }
       state.items = enrich([...items.filter((i) => !recentItems.has(i.id) && !abandoned.has(i.id)), ...[...recentItems.values()].map((r) => r.item)]);

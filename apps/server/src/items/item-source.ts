@@ -15,6 +15,7 @@ export const DONE_REFUSED = 'Could not set Done. The board never stores Done. Cl
 /** Every write returns the error to show, or null when the provider accepted it. */
 export interface ItemSource {
   read(): Promise<ItemsRead>;
+  /** Sets the item's status, dropping every other status it carries. Callers check `statusRefusal` first. */
   setStatus(item: Item, status: Status): Promise<string | null>;
   /** Why a status write on an item, or on a parent that isn't on the board, would be refused before it runs; null when it may run. */
   statusRefusal(item: Item | IssueRef): string | null;

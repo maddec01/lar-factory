@@ -127,6 +127,10 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       what: 'the item to move back to List', disabled: 'Moving items back to List is disabled in sample mode.',
       run: forItem('Name the item to move back to List.', (itemId) => commands.backToList(itemId)),
     },
+    '/api/pick-status': {
+      what: 'the item and the status to keep', disabled: 'Picking a status is disabled in sample mode.',
+      run: forItem('Name the item to pick a status for.', (itemId, input) => commands.pickStatus(itemId, input.status)),
+    },
     '/api/start': {
       what: 'the item to start', disabled: 'Starting threads is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),

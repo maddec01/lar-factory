@@ -4,10 +4,11 @@
 import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { DONE_REFUSED, type ItemSource } from '../items/item-source.ts';
-import { addIssueLabel, createIssue, createStatusLabel, deleteIssue, fetchRepoIssues, issueLabels, setStatusLabel } from './github.ts';
+import { addIssueLabel, createIssue, createStatusLabel, deleteIssue, fetchRepoIssues, issueLabels, message, setStatusLabel } from './github.ts';
 
-/** Why an issue carrying more than one status label can't move, or null when it carries at most one. */
-const twoStatuses = (statuses: readonly Status[]): string | null => (carriesTwoStatuses({ statuses }) ? keepOneText(statuses) : null);
+/** Why an open issue carrying more than one status label can't move, or null when it carries at most one. */
+const twoStatuses = (issue: { statuses: readonly Status[]; state: 'open' | 'closed' }): string | null =>
+  (carriesTwoStatuses(issue) ? keepOneText(issue.statuses) : null);
 
 /** `run` stands in for gh in tests; the github.ts functions use gh when it is undefined. */
 export function repoIssues(repo: string, run?: (args: string[]) => Promise<string>): ItemSource {
@@ -19,14 +20,15 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     if (!error) known.add(status);
     return error;
   }
+  /** Adds the status's label and removes every other status label the issue carries. */
   async function write(number: number, carried: readonly Status[], status: Status): Promise<string | null> {
     if (status === 'Done') return DONE_REFUSED;
-    return twoStatuses(carried) ?? (await ensureLabel(status)) ?? setStatusLabel(repo, number, status, carried, run);
+    return (await ensureLabel(status)) ?? setStatusLabel(repo, number, status, carried, run);
   }
   return {
     read: async () => ({ title: repo, items: await fetchRepoIssues(repo) }),
     setStatus: (item, status) => write(item.number!, item.statuses, status),
-    statusRefusal: (item) => ('statuses' in item ? twoStatuses(item.statuses) : null),
+    statusRefusal: (item) => ('statuses' in item ? twoStatuses(item) : null),
     addLabel: (item, label) => addIssueLabel(item.repo!, item.number!, label, run),
     // The new issue gets status-list, so it shows on a repository that shows only Opted-in items.
     create: (draft, progress) => createIssue({ ...draft, labels: [...draft.labels, statusLabel('List')] }, progress, run, async () => {
@@ -37,9 +39,10 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     async setParentStatus(parent, status) {
       if (status === 'Done') return DONE_REFUSED;
       try {
-        return await write(parent.number, labelStatuses(await issueLabels(repo, parent.number, run)), status);
+        const carried = labelStatuses(await issueLabels(repo, parent.number, run));
+        return twoStatuses({ statuses: carried, state: parent.state }) ?? (await write(parent.number, carried, status));
       } catch (err) {
-        return `Could not set ${status}. ${err instanceof Error ? err.message : 'GitHub request failed.'}`;
+        return `Could not set ${status}. ${message(err)}`;
       }
     },
     abandon: (item) => deleteIssue(item, run),

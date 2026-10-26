@@ -89,7 +89,8 @@ through a long conversation, and subagents return summaries instead of files.
 | `skill-sync` | Brings upstream changes into the copies, by your choice | lar |
 | `grilling`, `domain-modeling`, `prototype`, `research`, `diagnosing-bugs`, `tdd`, `code-review`, `codebase-design`, `writing-for-agents`, `pr`, `retro`, `handoff`, `to-tickets`, `implement` | Shaping and building; `code-review` is for reviewing by hand, and no `lar-work` file loads it | Copies of [mattpocock/skills](https://github.com/mattpocock/skills) |
 | `code-review-and-quality`, `security-and-hardening`, `doubt-driven-development`, `frontend-ui-engineering`, `browser-testing-with-devtools` | Source for the Doubt and reviewer checklists in `lar-work/agents/`; not loaded by them | Copies of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) |
-| `developer-profile` | The maintainer's coding style, which the builder follows | Copy of [maddec01/developer-profile-skill](https://github.com/maddec01/developer-profile-skill) |
+| `developer-profile` | The maintainer's coding style, which the builder follows | lar |
+| `unslop` | Cuts AI writing patterns from prose; the implementer applies it while drafting | Copy of [cursor/plugins](https://github.com/cursor/plugins/tree/main/pstack) (`pstack`) |
 
 `UPSTREAM.md` lists the upstream path and commit of every copy.
 

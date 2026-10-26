@@ -27,7 +27,7 @@ async function issuesConfig(t: TestContext): Promise<string> {
   return file;
 }
 
-test("a repository reading its issues shows the open ones as List and those closed this week as Done, without slices; the Project's copy wins", async (t) => {
+test("a repository reading its issues places the open ones by their status labels, shows those closed this week as Done and hides those not planned, without slices; the Project's copy wins", async (t) => {
   const build = appleIssue(8, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [{ ...sliceRef(11, 'OPEN'), repository: { nameWithOwner: APPLE },
     url: `https://github.com/${APPLE}/issues/11` }] } });
   const repoIssues = { [APPLE]: [
@@ -35,12 +35,14 @@ test("a repository reading its issues shows the open ones as List and those clos
     appleIssue(9, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(2), updatedAt: daysAgo(2) }),
     appleIssue(10, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(10), updatedAt: daysAgo(1) }),
     appleIssue(12, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(20), updatedAt: daysAgo(20) }),
+    appleIssue(13, { labels: { nodes: [{ name: 'status-shaping' }] } }),
+    appleIssue(14, { state: 'CLOSED', stateReason: 'NOT_PLANNED', closedAt: daysAgo(1), updatedAt: daysAgo(1) }),
   ] };
   const board = await startBoard(t, { items: [projectIssue(1, 'In progress', 'maddec01/lar-server'), projectIssue(7, 'Queued', APPLE)], repoIssues },
     false, false, { BOARD_CONFIG_FILE: await issuesConfig(t) });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]),
-    [['maddec01/lar-server', 1, 'In progress'], [APPLE, 7, 'Queued'], [APPLE, 8, 'List'], [APPLE, 9, 'Done']]);
+    [['maddec01/lar-server', 1, 'In progress'], [APPLE, 7, 'Queued'], [APPLE, 8, 'List'], [APPLE, 13, 'Shaping'], [APPLE, 9, 'Done']]);
   assert.equal(data.project.title, 'lar');
   assert.ok(!(await board.calls()).some((args) => args.some((a) => a.includes('repository(owner:')) && args.includes('name=lar-server')),
     'a repository on the Project reads no issues');

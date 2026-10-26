@@ -2,6 +2,7 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { buildSubIssueSearch, normalizeItem, normalizeItems, normalizeMergeState, rawDossiers, sliceLabelSearch } from './github-items.ts';
 import type { RawIssueRef, RawItem, RawLinkedPr } from './github-items.ts';
+import type { Item } from './model.ts';
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
 
 /** A project issue in progress with the given sub-issues, counted in its summary. */
@@ -13,6 +14,9 @@ const refIn = (repo: string, number: number, state: 'OPEN' | 'CLOSED'): RawIssue
 
 /** Project issue 900 with the given labels and sub-issues. It is none of the sub-issues, so the searches look for all of them. */
 const issue900 = (labels: string[], subIssues: RawIssueRef[]) => withSubIssues('PVTI_x', 900, labels, subIssues);
+
+/** The status an item shows by, and every status it carries. */
+const pick = (item: Item | null) => item && [item.status, item.statuses];
 
 test('normalizes an issue item from the GraphQL response', () => {
   const raw: RawItem = {
@@ -256,4 +260,38 @@ test("build sub-issues come from one search over the repos of the builds' sub-is
   const onProject = rawIssue('PVTI_1', 1, 'In progress', ['build'], { repository: { nameWithOwner: 'maddec01/lar-server' } });
   assert.equal(buildSubIssueSearch([issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN')]), onProject]), null,
     'a sub-issue on the project is judged by its own labels, so it needs no search');
+});
+
+test("a Project item's status comes from its Status field, which never stores Done", () => {
+  assert.deepEqual(pick(normalizeItem(rawIssue('PVTI_1', 1, 'Review', []))), ['Review', ['Review']]);
+  assert.deepEqual(pick(normalizeItem({ ...rawIssue('PVTI_2', 2, 'List', []), status: null })), ['List', []]);
+  assert.deepEqual(pick(normalizeItem(rawIssue('PVTI_3', 3, 'Done', []))), ['List', []], 'an open item marked Done');
+});
+
+test("an issue from a repository's issues takes its statuses from its status labels, and shows by the first in flow order", () => {
+  const fromLabels = (...labels: string[]) => pick(normalizeItem({ ...rawIssue('I_1', 1, 'Review', labels), status: null }, {}, 'labels'));
+  assert.deepEqual(fromLabels('status-shaping', 'feature'), ['Shaping', ['Shaping']]);
+  assert.deepEqual(fromLabels('feature'), ['List', []]);
+  assert.deepEqual(fromLabels('status-review', 'status-shaping'), ['Shaping', ['Shaping', 'Review']]);
+  assert.deepEqual(fromLabels('status-ready-to-merge'), ['Ready to merge', ['Ready to merge']]);
+  assert.deepEqual(fromLabels('status-done'), ['List', []], 'Done has no label');
+});
+
+test('a closed issue and a merged PR are Done from either item source, whatever their Status field or labels say', () => {
+  const closed = { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: '2026-10-21T08:00:00Z' } as const;
+  const issue = rawIssue('PVTI_1', 1, 'Review', ['status-review'], closed);
+  const pr = rawIssue('PVTI_2', 2, 'Verify', ['status-verify'], { __typename: 'PullRequest', state: 'MERGED' });
+  for (const from of ['field', 'labels'] as const) {
+    assert.deepEqual(normalizeItems([issue, pr], {}, from).map((i) => i.status), ['Done', 'Done'], from);
+  }
+});
+
+test('an item closed as not planned is no board item, from either item source', () => {
+  const raws = [
+    rawIssue('PVTI_1', 1, 'Review', ['status-review'], { state: 'CLOSED', stateReason: 'NOT_PLANNED' }),
+    rawIssue('PVTI_2', 2, 'Review', ['status-review'], { state: 'CLOSED', stateReason: 'DUPLICATE' }),
+    rawIssue('PVTI_3', 3, 'Review', ['status-review'], { __typename: 'PullRequest', state: 'CLOSED' }),
+    rawIssue('PVTI_4', 4, 'Review', ['status-review']),
+  ];
+  for (const from of ['field', 'labels'] as const) assert.deepEqual(normalizeItems(raws, {}, from).map((i) => i.number), [4], from);
 });

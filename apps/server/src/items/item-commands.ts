@@ -134,7 +134,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
     moving.add(itemId);
     const error = await items.setStatus(item, to).finally(() => moving.delete(itemId));
     if (error) return withBoard(502, { error });
-    board.showChanged({ ...item, status: to });
+    board.showChanged({ ...item, status: to, statuses: [to] });
     return withBoard(200, { error: null });
   }
 
@@ -190,7 +190,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
       if (refusal) return { error: refusal, refused: true };
       return { move: async () => {
         const error = await items.setStatus(onBoard, 'In progress');
-        if (!error) board.showChanged({ ...onBoard, status: 'In progress' });
+        if (!error) board.showChanged({ ...onBoard, status: 'In progress', statuses: ['In progress'] });
         return error;
       } };
     }

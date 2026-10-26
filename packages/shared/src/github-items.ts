@@ -1,7 +1,7 @@
 // Project items as GitHub's GraphQL API returns them, and the rules that turn them into the
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
-import { STATUSES, isBuild, isDraft, sliceProgress } from './model.ts';
+import { STATUSES, isBuild, isDraft, sliceProgress, statusLabel } from './model.ts';
 import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice, Status } from './model.ts';
 import { parseConceptMap } from './concept-map.ts';
 
@@ -161,8 +161,14 @@ function closing(c: RawContent): Pick<Item, 'state' | 'closedAs'> {
   return { state: 'closed', closedAs: notPlanned ? 'not-planned' : 'done' };
 }
 
-function toStatus(name: string | undefined): Status {
-  return (STATUSES as readonly string[]).includes(name ?? '') ? (name as Status) : 'List';
+/** Where an item source keeps an item's status: a Project's Status field, or an issue's `status-<name>` labels. */
+export type StatusSource = 'field' | 'labels';
+
+/** The statuses an item carries, in flow order. Done is never read from storage. */
+function storedStatuses(raw: RawItem, from: StatusSource): Status[] {
+  if (from === 'field') return STATUSES.filter((s) => s !== 'Done' && s === raw.status?.name);
+  const labels = rawLabels(raw);
+  return STATUSES.filter((s) => s !== 'Done' && labels.includes(statusLabel(s)));
 }
 
 /** GitHub's issue state, as the board's provider-neutral one. */
@@ -206,21 +212,24 @@ function normalizeSlices(raws: RawIssueRef[], active: ReadonlySet<string>, block
   });
 }
 
-/** Turns one raw project item into the board's Item; null for items we can't see. */
-export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new Set(), builds = new Set() }: Searched = {}): Item | null {
+/** Turns one raw item into the board's Item, reading its statuses `from` its item source's store; null for items we can't see. */
+export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new Set(), builds = new Set() }: Searched = {}, from: StatusSource = 'field'): Item | null {
   const c = raw.content;
   if (!c) return null;
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
+  const closed = closing(c);
+  const statuses = storedStatuses(raw, from);
   const item: Item = {
     id: c.id,
-    status: toStatus(raw.status?.name),
+    status: closed.closedAs === 'done' ? 'Done' : statuses[0] ?? 'List',
+    statuses,
     content: c.__typename === 'PullRequest' ? 'pr' : 'ticket',
     number: c.number ?? null,
     title: c.title,
     url: c.url ?? null,
     repo: c.repository?.nameWithOwner ?? null,
     labels: rawLabels(raw),
-    ...closing(c),
+    ...closed,
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
     subIssues: subIssueCounts(raw, builds),
     blockers: c.blockedBy?.nodes.map((b) => ({ number: b.number, repo: b.repository.nameWithOwner, state: issueState(b.state) })) ?? [],
@@ -235,23 +244,24 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
 }
 
 /**
- * Normalizes a project's raw items into board items. A slice lives inside its
+ * Normalizes an item source's raw items into board items. A slice lives inside its
  * build's card, so it's dropped here even when the project's auto-add put it on
  * the project. Membership in some build's slices decides, since `parent` has no labels.
+ * An item closed as not planned is abandoned, and dropped too.
  */
-export function normalizeItems(raws: RawItem[], searched: Searched = {}): Item[] {
+export function normalizeItems(raws: RawItem[], searched: Searched = {}, from: StatusSource = 'field'): Item[] {
   const items: Item[] = [];
   const bodies = new Map<string, string | undefined>();
   const slices = new Set<string>();
   for (const raw of raws) {
-    const item = normalizeItem(raw, searched);
+    const item = normalizeItem(raw, searched, from);
     if (!item) continue;
     items.push(item);
     bodies.set(item.id, raw.content?.body);
     // A slice closed as not planned is hidden from its build, but it's still no board item.
     for (const s of rawSlices(raw, searched.builds ?? new Set())) slices.add(refKey(s.repository.nameWithOwner, s.number));
   }
-  const board = items.filter((i) => isDraft(i) || !slices.has(refKey(i.repo, i.number)));
+  const board = items.filter((i) => i.closedAs !== 'not-planned' && (isDraft(i) || !slices.has(refKey(i.repo, i.number))));
   // An item with sub-issues on the board is a dossier too, so its body's map sections show, when it has any.
   const parents = parentKeys(board);
   for (const item of board) {

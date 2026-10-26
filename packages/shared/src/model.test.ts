@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -10,6 +10,7 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
   return {
     id: 'x',
     status,
+    statuses: status === 'Done' ? [] : [status],
     content: 'ticket',
     number: 7,
     title: 't',
@@ -275,4 +276,10 @@ test('gh blocks every read while missing or logged out, and only Project reads w
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'project'), true);
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'issues'), false);
   assert.equal(itemSource({ repo: 'maddec01/lar', platform: 'Apple', role: 'app' }), 'project');
+});
+
+test("a status's label is status- and its name in lowercase with hyphens for spaces", () => {
+  assert.equal(statusLabel('Shaping'), 'status-shaping');
+  assert.equal(statusLabel('Ready to merge'), 'status-ready-to-merge');
+  assert.equal(statusLabel('Needs you'), 'status-needs-you');
 });

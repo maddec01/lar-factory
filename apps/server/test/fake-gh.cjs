@@ -77,10 +77,35 @@ const main = async () => {
       process.exitCode = 1;
       return;
     }
-    // Later reads see the label, like GitHub.
-    const item = options.items?.find((i) => i.content?.number === Number(args[2]) && i.content.repository?.nameWithOwner === args[4]);
-    const label = args[args.indexOf('--add-label') + 1];
-    if (item && !item.content.labels.nodes.some((l) => l.name === label)) item.content.labels.nodes.push({ name: label });
+    // Later reads see the labels added and removed, like GitHub, on the Project's items and the repositories' issues.
+    const contents = [...(options.items ?? []).map((i) => i.content), ...(options.repoIssues?.[args[4]] ?? [])];
+    const content = contents.find((c) => c?.number === Number(args[2]) && c.repository?.nameWithOwner === args[4]);
+    const values = (flag) => args.filter((_, i) => args[i - 1] === flag);
+    if (content) {
+      const kept = content.labels.nodes.filter((l) => !values('--remove-label').includes(l.name));
+      content.labels.nodes = [...kept, ...values('--add-label').filter((name) => !kept.some((l) => l.name === name)).map((name) => ({ name }))];
+    }
+    fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    return;
+  }
+  // A label check: options.repoLabels holds the labels each repository has, by owner/name; any other is missing.
+  const labelPath = args[0] === 'api' && /^repos\/([\w.-]+\/[\w.-]+)\/labels\/([^/]+)$/.exec(args[1]);
+  if (labelPath) {
+    if (!(options.repoLabels?.[labelPath[1]] ?? []).includes(labelPath[2])) {
+      process.stderr.write('HTTP 404: Not Found');
+      process.exitCode = 1;
+      return;
+    }
+    return output({ name: labelPath[2] });
+  }
+  if (args[0] === 'label' && args[1] === 'create') {
+    if (options.fail === 'label-create') {
+      process.stderr.write('HTTP 403: Must have admin rights to Repository.');
+      process.exitCode = 1;
+      return;
+    }
+    const repo = args[args.indexOf('-R') + 1];
+    options.repoLabels = { ...options.repoLabels, [repo]: [...(options.repoLabels?.[repo] ?? []), args[2]] };
     fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
     return;
   }

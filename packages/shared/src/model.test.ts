@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repositoryProjectHint, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -282,4 +282,17 @@ test("a status's label is status- and its name in lowercase with hyphens for spa
   assert.equal(statusLabel('Shaping'), 'status-shaping');
   assert.equal(statusLabel('Ready to merge'), 'status-ready-to-merge');
   assert.equal(statusLabel('Needs you'), 'status-needs-you');
+});
+
+test("an issue's labels hold the statuses whose labels it carries, in flow order, and never Done", () => {
+  assert.deepEqual(labelStatuses(['bug', 'status-verify', 'status-shaping', 'status-done']), ['Shaping', 'Verify']);
+  assert.deepEqual(labelStatuses(['bug']), []);
+});
+
+test('an item carrying more than one status moves only once one is kept, and says which it carries', () => {
+  assert.equal(carriesTwoStatuses({ statuses: ['Ready', 'Verify'] }), true);
+  assert.equal(carriesTwoStatuses({ statuses: ['Ready'] }), false);
+  assert.equal(carriesTwoStatuses({ statuses: [] }), false);
+  assert.equal(keepOneText(['Ready', 'Verify']), 'This issue carries Ready and Verify. Keep one to move it again.');
+  assert.equal(keepOneText(['Shaping', 'Ready', 'Review']), 'This issue carries Shaping, Ready and Review. Keep one to move it again.');
 });

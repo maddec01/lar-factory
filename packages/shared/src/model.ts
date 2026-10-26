@@ -19,6 +19,18 @@ export type Status = (typeof STATUSES)[number];
 /** A status kept on an issue as a label: `status-` and its name in lowercase, with hyphens for spaces. Done has no label. */
 export const statusLabel = (status: Exclude<Status, 'Done'>): string => `status-${status.toLowerCase().replaceAll(' ', '-')}`;
 
+/** The statuses an issue's labels hold, in flow order. */
+export const labelStatuses = (labels: readonly string[]): Status[] => STATUSES.filter((s) => s !== 'Done' && labels.includes(statusLabel(s)));
+
+/** Whether an item carries more than one status, as a hand edit of an issue's labels can leave it. Nothing moves it until the user keeps one. */
+export const carriesTwoStatuses = (item: { statuses: readonly Status[] }): boolean => item.statuses.length > 1;
+
+/** The statuses as words: "Shaping, Ready and Review". */
+export const statusesText = (statuses: readonly Status[]): string => statuses.join(', ').replace(/, ([^,]*)$/, ' and $1');
+
+/** Why an item carrying more than one status doesn't move, and what to do. */
+export const keepOneText = (statuses: readonly Status[]): string => `This issue carries ${statusesText(statuses)}. Keep one to move it again.`;
+
 /** Statuses only the user can move on from. */
 export const AMBER_STATUSES: readonly Status[] = ['Needs you', 'Verify'];
 

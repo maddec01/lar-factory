@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData } from '@lar-factory/shared';
+import { pageWithData, type ProjectChoice } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -27,6 +27,8 @@ export interface HttpDeps {
   readSoon(): void;
   /** The startup tool check; requests other than /healthz and assets wait for it. */
   ready(): Promise<void> | undefined;
+  /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
+  projectChoices(): Promise<ProjectChoice[]>;
 }
 
 export interface BoardServer {
@@ -101,7 +103,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready }: HttpDeps): BoardServer {
+export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -209,6 +211,13 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     json(res, 202, {});
   }
 
+  /** Lists T3's projects for onboarding's T3 project step, which reads gh for each repository's Repository config. */
+  async function projectsRequest(res: ServerResponse): Promise<void> {
+    if (sample) return json(res, 403, { error: 'Sample mode onboards no repository.' });
+    try { json(res, 200, { projects: await projectChoices() }); }
+    catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
+  }
+
   /** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
   function openStream(req: IncomingMessage, res: ServerResponse): void {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
@@ -258,6 +267,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       return send(res, 200, 'text/html; charset=utf-8', pageWithData(page.template, board.snapshot()));
     }
     if (path === '/api/events') return openStream(req, res);
+    if (path === '/api/onboarding/projects') return projectsRequest(res);
     if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));
     if (path === '/healthz') return json(res, 200, {});
     const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;

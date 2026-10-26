@@ -188,16 +188,16 @@ export function codexTurnSelections(db: DatabaseSync, turnIds: Iterable<string>)
 }
 
 // T3's live projects and their folders.
-const PROJECTS = `SELECT project_id AS id, workspace_root AS root FROM projection_projects WHERE deleted_at IS NULL`;
+const PROJECTS = `SELECT project_id AS id, title, workspace_root AS root FROM projection_projects WHERE deleted_at IS NULL`;
 
 /**
- * T3's live projects, each folder with `~` expanded and no trailing slash. Unlike
+ * T3's live projects with their titles, each folder with `~` expanded and no trailing slash. Unlike
  * stats, this doesn't fail soft: it throws when the database is missing or can't
  * be read, e.g. T3 changed its schema.
  */
-export function liveProjects(db: string, home: string): { id: string; folder: string }[] {
-  return readT3Db(db, (open) => (open.prepare(PROJECTS).all() as { id: unknown; root: unknown }[]).flatMap(({ id, root }) =>
-    typeof id === 'string' && typeof root === 'string' ? [{ id, folder: normalPath(root, home) }] : []));
+export function liveProjects(db: string, home: string): { id: string; title: string; folder: string }[] {
+  return readT3Db(db, (open) => (open.prepare(PROJECTS).all() as { id: unknown; title: unknown; root: unknown }[]).flatMap(({ id, title, root }) =>
+    typeof id === 'string' && typeof root === 'string' ? [{ id, title: typeof title === 'string' ? title : id, folder: normalPath(root, home) }] : []));
 }
 
 /** A folder with `~` expanded and no trailing slash. */

@@ -39,17 +39,22 @@ export async function anyOnAzureDevOps(repos: readonly { repo: string }[], env: 
 
 /** Whether an origin URL is on Azure DevOps: dev.azure.com, its ssh host, or an older *.visualstudio.com organization. */
 export function onAzureDevOps(url: string): boolean {
-  const host = url.match(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)/i)?.[1]?.toLowerCase() ?? '';
+  const host = originHost(url);
   return host === 'dev.azure.com' || host.endsWith('.dev.azure.com') || host.endsWith('.visualstudio.com');
 }
 
-interface Checkout { id: string; folder: string; origin: string | null }
+/** An https or ssh origin URL's host, lowercased. */
+export function originHost(url: string): string {
+  return url.match(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)/i)?.[1]?.toLowerCase() ?? '';
+}
+
+interface Checkout { id: string; title: string; folder: string; origin: string | null }
 
 /** T3's live projects with each one's `origin` URL, null for a worktree or a checkout without one; throws when T3's projects can't be read. */
-async function checkouts(env: NodeJS.ProcessEnv): Promise<Checkout[]> {
+export async function checkouts(env: NodeJS.ProcessEnv): Promise<Checkout[]> {
   const projects = liveProjects(statsDbPath(env), env.HOME ?? '');
   const origins = await Promise.all(projects.map((p) => mainCheckout(p.folder) ? originUrl(p.folder) : null));
-  return projects.map((p, i) => ({ id: p.id, folder: p.folder, origin: origins[i] ?? null }));
+  return projects.map((p, i) => ({ ...p, origin: origins[i] ?? null }));
 }
 
 /** Reads T3's live projects and their checkouts' origins once, and finds a repository's project among them. */
@@ -79,12 +84,12 @@ async function originUrl(folder: string): Promise<string | null> {
 }
 
 /** `owner/repo` from an https or ssh GitHub URL, with or without `.git`. */
-function githubRepo(url: string | null): string | null {
+export function githubRepo(url: string | null): string | null {
   return url?.match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?\/?$/)?.[1] ?? null;
 }
 
 /** `project/repo` from an https or ssh Azure DevOps URL, whose https URLs put `_git` between them. */
-function azureRepo(url: string): string | null {
+export function azureRepo(url: string): string | null {
   return githubRepo(url.replace('/_git/', '/'));
 }
 

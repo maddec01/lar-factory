@@ -6,8 +6,8 @@
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, clock, day, repoName, type BoardData, type BundledSkill, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
-import type { ClaudeProfile } from '@lar-factory/shared/install-skills';
+import { GH_FLOOR, blockedBy, clock, day, repoName, type BoardData, type BundledSkill, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
+import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/button';
 import { RepoTag } from '../items/item-parts.tsx';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
@@ -102,8 +102,29 @@ function InstallState({ status }: { status: BundledSkill['status'] }) {
   const [text, tone, title]: [string, ComponentProps<typeof ToolState>['tone'], string] =
     status.state === 'matching' ? ['Installed', 'success', 'Matches this version of Lar Factory.']
     : status.state === 'restored' ? [`Restored ${day(status.restoredAt, undefined)}, ${clock(status.restoredAt, undefined)}`, 'warning', 'Lar Factory put back its copy, which had changed.']
-    : ['Blocked', 'error', 'A folder Lar Factory didn’t install has this name, so it left that folder alone.'];
+    : ['Blocked', 'error', `${capitalise(blockedBy(status.paths).join(''))}. ${moveAway(status.paths)}`];
   return <span title={title}><ToolState text={text} tone={tone} /></span>;
+}
+
+/**
+ * What clears a blocked skill, the end of its tooltip and line: moving the paths away, which installs the skill when
+ * one is in ~/.agents/skills, or, when every path is in a Claude profile, unticking the profile.
+ */
+function moveAway(paths: readonly BlockingPath[]): string {
+  const move = `Move ${paths.length === 1 ? 'that path' : 'each path'} away`;
+  if (paths.some((blocking) => blocking.place === 'agents')) return `${move} to install this skill.`;
+  const profiles = new Set(paths.flatMap((blocking) => blocking.place === 'profile' ? [blocking.profile] : []));
+  return paths.every((blocking) => blocking.place === 'profile') ? `${move}, or untick the ${profiles.size === 1 ? 'profile' : 'profiles'}.` : `${move}.`;
+}
+const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** What blocks a skill, where it leaves the skill missing and what to do, as a line under its credit; nothing for a skill nothing blocks. */
+function BlockedReason({ status }: { status: BundledSkill['status'] }) {
+  if (status?.state !== 'blocked') return null;
+  const [opening, ...rest] = blockedBy(status.paths, (path) => <code key={path} className="break-all">{path}</code>);
+  return <span className="block text-(--destructive-foreground)">
+    {capitalise(opening)}{rest}. {moveAway(status.paths)}
+  </span>;
 }
 
 /**
@@ -116,7 +137,7 @@ function bundledGroup({ data, version }: PagesInput): Group {
   const updated = (skill: BundledSkill) => skill.date ? <> · <span className="whitespace-nowrap">updated {day(skill.date, 'UTC')}</span></>
     : skill.author === 'Lar' && version ? <> · <span className="whitespace-nowrap">updated in Lar Factory {version}</span></> : null;
   const rows: Row[] = skills.length ? skills.map((skill) => ({
-    id: `bundled-${skill.name}`, title: skill.name, description: <>{skill.author} · {skill.licence}{updated(skill)}</>,
+    id: `bundled-${skill.name}`, title: skill.name, description: <>{skill.author} · {skill.licence}{updated(skill)}<BlockedReason status={skill.status} /></>,
     control: custom(() => <span className="flex items-center gap-2">
       <InstallState status={skill.status} />
       <Button variant="outline" size="xs" aria-label={`${skill.name} source`} render={<a href={skill.source} target="_blank" rel="noopener" />}><ExternalLink /> Source</Button>

@@ -56,7 +56,7 @@ test('a fresh install copies every skill and checklist and writes the manifest',
   const home = temporary();
   const result = installSkills(home, bundle(v1), '1.0.0');
 
-  assert.deepEqual(result, { installed: true, version: '1.0.0', skills: ['lar-work', 'tdd'], conflicts: [], warn: false });
+  assert.deepEqual(result, { installed: true, version: '1.0.0', skills: ['lar-work', 'tdd'], conflicts: [], blocked: [], warn: false });
   for (const [path, content] of Object.entries(v1)) {
     assert.equal(readFileSync(join(home, '.agents', path), 'utf8'), content);
     assert.ok(lstatSync(join(home, '.agents', path)).isFile(), `${path} is a real file`);
@@ -297,7 +297,7 @@ test('an upgrade whose bundle drops a skill removes its copy and manifest entry'
 
   const result = installSkills(home, bundle(withoutTdd), '2.0.0');
 
-  assert.deepEqual(result, { installed: true, version: '2.0.0', skills: ['lar-work'], conflicts: [], warn: false });
+  assert.deepEqual(result, { installed: true, version: '2.0.0', skills: ['lar-work'], conflicts: [], blocked: [], warn: false });
   assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'other']);
   assert.deepEqual(manifest(home), { version: '2.0.0', skills: ['lar-work'], status: matching('lar-work'), profiles: {} });
   assert.equal(read(home, 'skills/other/SKILL.md'), 'other');
@@ -389,12 +389,14 @@ test('after the first install, a same-named folder the engine did not install is
   const result = installSkills(home, bundle({ ...v2, 'skills/grill/SKILL.md': 'grill v2' }), '2.0.0');
 
   assert.deepEqual(result, {
-    installed: true, version: '2.0.0', skills: ['lar-work', 'tdd'], conflicts: [join(home, '.agents/skills/grill')], warn: true,
+    installed: true, version: '2.0.0', skills: ['lar-work', 'tdd'], conflicts: [join(home, '.agents/skills/grill')],
+    blocked: [{ skill: 'grill', paths: [{ place: 'agents', path: join(home, '.agents/skills/grill') }] }], warn: true,
   });
   assert.equal(read(home, 'skills/grill/SKILL.md'), 'grill from the skills CLI');
   assert.equal(read(home, 'skills/tdd/SKILL.md'), 'tdd v2');
   assert.deepEqual(manifest(home), {
-    version: '2.0.0', skills: ['lar-work', 'tdd'], status: { grill: { state: 'blocked' }, ...matching('lar-work', 'tdd') }, warned: '2.0.0', profiles: {},
+    version: '2.0.0', skills: ['lar-work', 'tdd'], status: { grill: { state: 'blocked', paths: [{ place: 'agents', path: join(home, '.agents/skills/grill') }] }, ...matching('lar-work', 'tdd') },
+    warned: '2.0.0', profiles: {},
   });
   assert.equal(read(home, '.skill-lock.json'), lock);
 });
@@ -551,6 +553,13 @@ test('an entry the engine did not make is left in place and reported as a confli
   const result = installSkills(home, bundle(linked), '1.0.0');
 
   assert.deepEqual(result.conflicts, [join(home, '.claude/skills/tdd'), join(home, '.claude-work/skills/lar-work')]);
+  assert.deepEqual(result.blocked, [
+    { skill: 'lar-work', paths: [{ place: 'profile', profile: '.claude-work', path: join(home, '.claude-work/skills/lar-work') }] }, { skill: 'tdd', paths: [{ place: 'profile', profile: '.claude', path: join(home, '.claude/skills/tdd') }] },
+  ]);
+  assert.deepEqual((manifest(home) as { status: unknown }).status, {
+    'lar-work': { state: 'blocked', paths: [{ place: 'profile', profile: '.claude-work', path: join(home, '.claude-work/skills/lar-work') }] },
+    tdd: { state: 'blocked', paths: [{ place: 'profile', profile: '.claude', path: join(home, '.claude/skills/tdd') }] },
+  });
   assert.deepEqual(entries(home, '.claude'), { 'lar-work': ownLinks['lar-work'], tdd: 'folder' });
   assert.equal(readFileSync(join(home, '.claude/skills/tdd/SKILL.md'), 'utf8'), 'hand-made');
   assert.deepEqual(entries(home, '.claude-work'), { 'lar-work': '../../elsewhere/lar-work', tdd: ownLinks.tdd });
@@ -727,7 +736,9 @@ test('conflicts warn on the first install of each version only, and stay blocked
   assert.equal(installSkills(home, bundle(withGrill), '3.0.0').warn, true);
 
   assert.equal(read(home, 'skills/grill/SKILL.md'), 'grill from the skills CLI');
-  assert.deepEqual((manifest(home) as { status: unknown }).status, { grill: { state: 'blocked' }, ...matching('lar-work', 'tdd') });
+  assert.deepEqual((manifest(home) as { status: unknown }).status, {
+    grill: { state: 'blocked', paths: [{ place: 'agents', path: join(home, '.agents/skills/grill') }] }, ...matching('lar-work', 'tdd'),
+  });
 });
 
 test('manifest statuses of the wrong shape are dropped', () => {
@@ -735,7 +746,11 @@ test('manifest statuses of the wrong shape are dropped', () => {
   installSkills(home, bundle(v1), '1.0.0');
   writeFileSync(join(home, '.agents', INSTALL_MANIFEST), JSON.stringify({
     version: '1.0.0', skills: ['lar-work', 'tdd'], warned: 3,
-    status: { 'lar-work': { state: 'restored' }, tdd: { state: 'restored', restoredAt: 'then' }, '../x': { state: 'matching' } },
+    status: {
+      'lar-work': { state: 'restored' }, tdd: { state: 'restored', restoredAt: 'then' }, '../x': { state: 'matching' },
+      grill: { state: 'blocked' }, other: { state: 'blocked', paths: [3] }, older: { state: 'blocked', paths: ['/home/.agents/skills/older'] },
+      odd: { state: 'blocked', paths: [{ place: 'profile', path: '/home/.claude/skills/odd' }] },
+    },
   }));
 
   installSkills(home, bundle(v1), '1.0.0');
@@ -758,7 +773,7 @@ test('an install copies every skill into both Antigravity folders when ~/.gemini
   const home = geminiHome();
   const result = installSkills(home, bundle(v1), '1.0.0');
 
-  assert.deepEqual(result, { installed: true, version: '1.0.0', skills: ['lar-work', 'tdd'], conflicts: [], warn: false });
+  assert.deepEqual(result, { installed: true, version: '1.0.0', skills: ['lar-work', 'tdd'], conflicts: [], blocked: [], warn: false });
   for (const folder of antigravity) {
     assert.ok(!lstatSync(join(home, folder, 'tdd')).isSymbolicLink(), `${folder}/tdd is a copy`);
     assert.equal(readFileSync(join(home, folder, 'lar-work/scripts/status.sh'), 'utf8'), 'status v1');
@@ -813,7 +828,11 @@ test('a folder in an Antigravity skills folder the engine did not make stays and
   const result = installSkills(home, bundle(v1), '1.0.0');
 
   assert.deepEqual(result.conflicts, [join(app, 'tdd')]);
+  assert.deepEqual(result.blocked, [{ skill: 'tdd', paths: [{ place: 'antigravity', path: join(app, 'tdd') }] }]);
   assert.equal(result.warn, true);
+  assert.deepEqual((manifest(home) as { status: unknown }).status, {
+    'lar-work': { state: 'matching' }, tdd: { state: 'blocked', paths: [{ place: 'antigravity', path: join(app, 'tdd') }] },
+  });
   assert.equal(readFileSync(join(app, 'tdd/SKILL.md'), 'utf8'), 'tdd from the skills CLI');
   assert.equal(readFileSync(join(home, '.gemini/antigravity-cli/skills/tdd/SKILL.md'), 'utf8'), 'tdd v1');
   assert.deepEqual((manifest(home) as { antigravity: unknown }).antigravity, {

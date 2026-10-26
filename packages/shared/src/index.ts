@@ -3,6 +3,7 @@
 
 export * from './model.ts';
 export * from './format.ts';
+export * from './blocked-skill.ts';
 export * from './brand-mark.ts';
 export * from './board-view.ts';
 export * from './start-menu.ts';

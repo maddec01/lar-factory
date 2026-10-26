@@ -241,8 +241,16 @@ The service that hosts a repository and its tickets: GitHub or Azure DevOps.
 _Avoid_: platform, board provider, host
 
 **Item source**:
-Where the board finds one repository's items: a GitHub Project, the repository's issues, an Azure DevOps team's current sprint, or that team's backlog. It decides only which items show.
+Where the board finds one repository's items: a GitHub Project, the repository's issues, an Azure DevOps team's current sprint, or that team's backlog. It lists the items that can show.
 _Avoid_: list source, board source, project
+
+**Show setting**:
+A repository's choice of which items the board shows: All items, every open item its item source lists, or Opted-in items, only those that carry a status.
+_Avoid_: filter, visibility
+
+**Opt-in**:
+A repository's choice to show only items that carry a status, instead of every open item its item source lists.
+_Avoid_: filter, allowlist
 
 **Platform**:
 The short name `config.json` gives a repository, such as Apple or Server; the sidebar groups by it and the Scope picks one.

@@ -1,7 +1,7 @@
 # Lar Factory
 
 Lar Factory takes ideas through shaping, building and review to a PR that
-Pedro merges. This vocabulary describes its work, roles and board statuses.
+the user merges. This vocabulary describes its work, roles and board statuses.
 
 ## Language
 
@@ -9,7 +9,7 @@ Pedro merges. This vocabulary describes its work, roles and board statuses.
 
 **Brief**:
 The issue's build handover: what to change, how to tell it is done, confirmed
-assumptions, builder notes, domain docs drafts and whether Pedro needs to
+assumptions, builder notes, domain docs drafts and whether the user needs to
 verify it.
 _Avoid_: Specification (when referring to the factory's brief)
 
@@ -19,8 +19,8 @@ the builder writes them in the build PR.
 
 **Prototype**:
 A throwaway variant built by a Prototype child task to answer one design
-question. The thread that asked for it shows it to Pedro inside T3, in the
-integrated browser or the Device panel, so he can pick one.
+question. The thread that asked for it shows it to the user inside T3, in the
+integrated browser or the Device panel, so they can pick one.
 _Avoid_: Mockup, draft
 
 **Passing brief**:
@@ -28,7 +28,7 @@ A brief that has passed the shaping gate and can be handed to a build thread.
 
 **Gate**:
 The check before a brief becomes Ready, combining a fresh-context doubt review
-with Pedro's answers to remaining assumptions or findings.
+with the user's answers to remaining assumptions or findings.
 
 **Concept**:
 Work too broad or unclear for a single brief, represented by a map issue with
@@ -87,6 +87,14 @@ _Avoid_: Source of truth (for the overlay)
 
 ### Threads and roles
 
+**User**:
+The person who installs the board app and runs the factory on their own repositories.
+_Avoid_: owner
+
+**Maintainer**:
+The person who keeps lar-factory itself: syncs the skill Copies with upstream and starts Releases.
+_Avoid_: owner, author
+
 **Shaping thread**:
 The conversation in the issue's repository project that resolves an issue's open
 decisions and produces a passing brief, then stops at Ready.
@@ -129,7 +137,7 @@ _Avoid_: Review pass, re-review
 
 **Approver**:
 The agent that opens the reviewed change's PR and recommends Verify or Ready
-to merge; Pedro remains the person who merges it.
+to merge; the user remains the person who merges it.
 _Avoid_: Merger (for the approver)
 
 ### Board statuses
@@ -139,7 +147,7 @@ Captured work that has not yet been selected to start.
 _Avoid_: Queued (for unselected work)
 
 **Queued**:
-Work selected for pickup by lar-work, by Pedro or by its concept's shaping,
+Work selected for pickup by lar-work, by the user or by its concept's shaping,
 awaiting a start from the board.
 _Avoid_: In progress (for work awaiting pickup)
 
@@ -148,7 +156,7 @@ Work whose scope or decisions are being resolved before a build, including a
 concept while its decisions remain open.
 
 **Needs you**:
-Work waiting for Pedro's input or intervention, such as an answer, a prototype
+Work waiting for the user's input or intervention, such as an answer, a prototype
 choice or help with a blocked check.
 
 **Ready**:
@@ -163,13 +171,13 @@ Work undergoing review and any fixes, including the wait for its PR's required
 checks before the recommended status takes effect.
 
 **Verify**:
-Reviewed work whose required checks have passed and which needs Pedro's hand
+Reviewed work whose required checks have passed and which needs the user's hand
 check because it is visible, risky or not fully verified by agents.
 _Avoid_: Ready to merge (when a hand check remains)
 
 **Ready to merge**:
 Reviewed work whose required checks have passed, with no outstanding findings
-or hand checks, awaiting Pedro's merge.
+or hand checks, awaiting the user's merge.
 
 **Done**:
 Completed work, reached when its issue closes or its PR merges.
@@ -182,11 +190,11 @@ _Avoid_: Cancel, Close (for discarded work)
 ### Item stats
 
 **Agent time**:
-The sum of the work every agent did on an item, with parallel agents added up but a parent's wait on its own subagent counted once, excluding time waiting on Pedro.
+The sum of the work every agent did on an item, with parallel agents added up but a parent's wait on its own subagent counted once, excluding time waiting on the user.
 _Avoid_: duration, elapsed time
 
 **Wall time**:
-The time during which at least one of an item's agents was working, with parallel work counted once, excluding time waiting on Pedro.
+The time during which at least one of an item's agents was working, with parallel work counted once, excluding time waiting on the user.
 _Avoid_: elapsed time, calendar time, active time
 
 **Item stats**:
@@ -237,7 +245,7 @@ The platform whose repository the board shows, picked in the title bar or the si
 _Avoid_: project, filter
 
 **Desk**:
-The row of items only Pedro can move on: Ready, Needs you, Verify and Ready to merge. Each card has the button for its next action.
+The row of items only the user can move on: Ready, Needs you, Verify and Ready to merge. Each card has the button for its next action.
 _Avoid_: inbox, queue
 
 **Line**:
@@ -294,9 +302,9 @@ A published version of the board app, made by CI from a commit on main whose che
 _Avoid_: build, version
 
 **Nightly**:
-A Release marked as a prerelease, which Pedro publishes by hand from main's head once its checks pass; the name comes from T3 Code.
+A Release marked as a prerelease, which the maintainer publishes by hand from main's head once its checks pass; the name comes from T3 Code.
 _Avoid_: nightly build, preview
 
 **Stable Release**:
-A Release Pedro publishes by hand from the latest Nightly's commit, which the app's latest channel follows.
+A Release the maintainer publishes by hand from the latest Nightly's commit, which the app's latest channel follows.
 _Avoid_: production release

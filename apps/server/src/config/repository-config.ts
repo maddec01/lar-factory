@@ -4,12 +4,12 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { SHOW_SETTINGS, isRecord, sameRepo, type OnboardingProgress, type OnboardingRepository, type RepositoryConfigProblem, type ShowSetting } from '@lar-factory/shared';
+import {
+  PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigProblem, type RepositoryItemSource,
+  type SetupAnswers, type ShowSetting,
+} from '@lar-factory/shared';
 import { readDefaultBranchFile } from '../github/github.ts';
 import { boardDataDir } from '../port/board-record.ts';
-
-/** Where a repository's items come from: a GitHub Project, which other repositories may name too, or its own issues. */
-type RepositoryItemSource = { kind: 'github-project'; owner: string; number: number } | { kind: 'issues' };
 
 /** One repository's Repository config, with each field its file leaves out filled in. */
 export interface RepositoryConfig {
@@ -44,10 +44,19 @@ function readJson(file: string): unknown {
 
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
+/** Whether the Provider and item source step's answers have their shape. */
+function isSetup(value: unknown): value is SetupAnswers {
+  return isRecord(value) && (value.itemSource === 'github-project' || value.itemSource === 'issues')
+    && typeof value.projectOwner === 'string' && typeof value.projectNumber === 'string' && SHOW_SETTINGS.includes(value.show as ShowSetting)
+    && typeof value.showPicked === 'boolean' && typeof value.role === 'string';
+}
+
 /** Whether an entry's onboarding is progress the dialog can resume from. */
 export function isProgress(value: unknown): value is OnboardingProgress {
   return isRecord(value) && typeof value.step === 'string' && strings(value.done) && isRecord(value.answers)
-    && typeof value.answers.projectId === 'string' && (value.prUrl === undefined || typeof value.prUrl === 'string');
+    && (value.answers.provider === undefined || PROVIDERS.includes(value.answers.provider as Provider))
+    && typeof value.answers.projectId === 'string' && (value.answers.setup === undefined || isSetup(value.answers.setup))
+    && (value.prUrl === undefined || typeof value.prUrl === 'string');
 }
 
 /** repositories.json's entries as the file holds them, checked; none when there is no file. */
@@ -64,7 +73,7 @@ function readListFile(file: string): { raw: Record<string, unknown> & { reposito
     }
     const { onboarding } = entry as { onboarding?: unknown };
     if (onboarding === undefined) return { repo };
-    if (!isProgress(onboarding)) throw new Error(`${file}: repositories[${index}] has an onboarding without its step, done steps and T3 project.`);
+    if (!isProgress(onboarding)) throw new Error(`${file}: repositories[${index}] has an onboarding without its step, done steps and T3 project, or with answers it can't use.`);
     return { repo, onboarding };
   });
   return { raw: raw as { repositories: Record<string, unknown>[] }, list };
@@ -150,21 +159,32 @@ class RepositoryConfigError extends Error {
   }
 }
 
-/** The repository's .lar-factory.json from its default branch, never a checkout, with defaults filled in; throws why it can't. */
-export async function readRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>): Promise<RepositoryConfig> {
+/**
+ * The repository's .lar-factory.json from its default branch, never a checkout, with defaults filled in; null when it
+ * has none, or why the one it has is wrong. Throws any other failure, such as a logged-out gh.
+ */
+export async function findRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>): Promise<RepositoryConfig | { problem: string } | null> {
   const text = await readDefaultBranchFile(repo, '.lar-factory.json', run);
-  if (text === null) throw new RepositoryConfigError(repo, 'no .lar-factory.json on its default branch.');
+  if (text === null) return null;
   let raw: unknown;
   try { raw = JSON.parse(text); }
-  catch { throw new RepositoryConfigError(repo, ".lar-factory.json isn't valid JSON."); }
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new RepositoryConfigError(repo, ".lar-factory.json isn't a JSON object.");
+  catch { return { problem: ".lar-factory.json isn't valid JSON." }; }
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { problem: ".lar-factory.json isn't a JSON object." };
   const wrong = problem(raw as Record<string, unknown>);
-  if (wrong) throw new RepositoryConfigError(repo, `.lar-factory.json ${wrong}.`);
+  if (wrong) return { problem: `.lar-factory.json ${wrong}.` };
   const file = raw as Partial<RepositoryConfig> & { role: string };
   const itemSource: RepositoryItemSource = file.itemSource?.kind === 'github-project'
     ? { kind: 'github-project', owner: file.itemSource.owner, number: file.itemSource.number }
     : { kind: 'issues' };
   return { repo, version: file.version ?? 1, role: file.role, itemSource, show: file.show ?? 'all', labels: file.labels ?? [] };
+}
+
+/** The repository's .lar-factory.json from its default branch, as findRepositoryConfig reads it; throws why it can't. */
+export async function readRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>): Promise<RepositoryConfig> {
+  const found = await findRepositoryConfig(repo, run);
+  if (!found) throw new RepositoryConfigError(repo, 'no .lar-factory.json on its default branch.');
+  if ('problem' in found) throw new RepositoryConfigError(repo, found.problem);
+  return found;
 }
 
 /** The onboarded repositories' configs, and why each repository left off the board couldn't be read. */

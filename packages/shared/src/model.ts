@@ -19,8 +19,6 @@ export type Status = (typeof STATUSES)[number];
 /** Statuses only the user can move on from. */
 export const AMBER_STATUSES: readonly Status[] = ['Needs you', 'Verify'];
 
-export type ContentType = 'Issue' | 'PullRequest' | 'DraftIssue';
-
 /** A pull request's checks, and whether GitHub lets it merge. */
 export interface Pipeline {
   /** The head commit's checks; null when it has none. */
@@ -34,7 +32,8 @@ export type MergeState = 'can merge' | 'checking' | 'blocked' | 'conflicts';
 export interface LinkedPr extends Pipeline {
   number: number;
   url: string;
-  state: string;
+  /** A merged PR is `merged`, not `closed`. */
+  state: 'open' | 'closed' | 'merged';
   isDraft: boolean;
   /** The PR's description, for its item stats block; absent when not read (sample data). */
   body?: string;
@@ -63,14 +62,14 @@ export interface IssueRef {
   title: string;
   url: string;
   repo: string;
-  state: 'OPEN' | 'CLOSED';
+  state: 'open' | 'closed';
 }
 
 /** An issue blocking an item, by GitHub's blocked-by link. */
 export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'>;
 
 /** The issues the item is blocked by that are still open: what holds its start, its badge and Start after. */
-export const openBlockers = (item: Pick<Item, 'blockers'>): Blocker[] => item.blockers.filter((b) => b.state === 'OPEN');
+export const openBlockers = (item: Pick<Item, 'blockers'>): Blocker[] => item.blockers.filter((b) => b.state === 'open');
 
 /** A blocker as `#n`, or as `owner/repo#n` when another repository's; `short` drops the owner, to fit on a button. */
 export const blockerRef = (item: Pick<Item, 'repo'>, b: Pick<Blocker, 'number' | 'repo'>, short = false): string =>
@@ -188,14 +187,17 @@ export interface Item {
   id: string;
   /** Status column. Items without one are treated as List. */
   status: Status;
-  type: ContentType;
+  /** A ticket is an issue or work item; a Project draft is a ticket whose `repo` and `number` are null. */
+  content: 'ticket' | 'pr';
   number: number | null;
   title: string;
   url: string | null;
   repo: string | null;
   labels: string[];
-  /** OPEN, CLOSED or MERGED; null for drafts. */
-  state: string | null;
+  /** A draft is open. */
+  state: 'open' | 'closed';
+  /** How a closed item closed: `done` when completed or merged, `not-planned` otherwise; null while open. */
+  closedAs: 'done' | 'not-planned' | null;
   parent: IssueRef | null;
   /** GitHub's sub-issue counts; a build counts only its `build` sub-issues, not its slices. */
   subIssues: { total: number; completed: number };
@@ -361,8 +363,8 @@ export function kindOf(item: Item): Kind {
   if (has('feature')) return 'feature';
   if (has('improvement')) return 'improvement';
   if (has('build')) return 'build';
-  if (item.type === 'DraftIssue') return 'draft';
-  if (item.type === 'PullRequest') return 'pr';
+  if (item.content === 'pr') return 'pr';
+  if (isDraft(item)) return 'draft';
   return 'issue';
 }
 
@@ -395,8 +397,8 @@ interface ItemPr {
 }
 
 /** The item's pull request: itself when it is one, else the first PR it links; null when it links none. */
-export function itemPr(item: Pick<Item, 'type' | 'url' | 'linkedPrs' | 'pipeline'>): ItemPr | null {
-  if (item.type === 'PullRequest') return { url: item.url, pipeline: item.pipeline ?? null };
+export function itemPr(item: Pick<Item, 'content' | 'url' | 'linkedPrs' | 'pipeline'>): ItemPr | null {
+  if (item.content === 'pr') return { url: item.url, pipeline: item.pipeline ?? null };
   const pr = item.linkedPrs[0];
   return pr ? { url: pr.url, pipeline: pr } : null;
 }
@@ -422,13 +424,17 @@ export function platformOf(item: Item, repos: readonly RepoConfig[]): string {
   return repos.find((r) => r.repo === item.repo)?.platform ?? item.repo.split('/')[1] ?? item.repo;
 }
 
+/** A ticket with no repository yet, such as a Project draft. */
+export const isDraft = (item: Pick<Item, 'content' | 'repo' | 'number'>): boolean =>
+  item.content === 'ticket' && (item.repo === null || item.number === null);
+
 export function ref(item: Item): string {
   return item.number === null ? 'draft' : `#${item.number}`;
 }
 
 /** Abandon deletes a List or Queued issue, or removes such a draft. Pull requests stay. */
 export function canAbandon(item: Item): boolean {
-  return (item.status === 'List' || item.status === 'Queued') && (item.type === 'DraftIssue' || (item.type === 'Issue' && item.number !== null && item.repo !== null));
+  return (item.status === 'List' || item.status === 'Queued') && item.content === 'ticket';
 }
 
 /** Line 1 of the work message, which T3 titles the thread from. Null for a draft. */

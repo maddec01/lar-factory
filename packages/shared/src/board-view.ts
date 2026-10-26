@@ -1,7 +1,7 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
 // Abandon asks.
 
-import { STATUSES, isRecentlyDone, kindOf, platformOf, ref } from './model.ts';
+import { STATUSES, isDraft, isRecentlyDone, kindOf, platformOf, ref } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
 import { slug } from './format.ts';
 
@@ -71,8 +71,7 @@ export function conceptChildren(concept: Item, items: readonly Item[]): Item[] {
         i.parent.repo === concept.repo &&
         i.parent.number === concept.number &&
         i.status !== 'Done' &&
-        i.state !== 'CLOSED' &&
-        i.state !== 'MERGED',
+        i.state === 'open',
     )
     .sort(byFlowOrder);
 }
@@ -85,14 +84,14 @@ export const HINTS: Partial<Record<Status, string>> = {
 
 /** An open PR's link text: its number, and draft or its state when not open. */
 export function prLabel(pr: LinkedPr): string {
-  return `PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'OPEN' ? '' : ` (${pr.state.toLowerCase()})`}`;
+  return `PR #${pr.number}${pr.isDraft ? ' (draft)' : pr.state === 'open' ? '' : ` (${pr.state})`}`;
 }
 
 export const UNREADABLE = 'The T3 Code database could not be read';
 
 /** What Abandon asks before it deletes, and what it says after. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
-  return item.type === 'DraftIssue'
+  return isDraft(item)
     ? { question: `Remove draft ${item.title}?`, detail: "This removes the draft from the project. It can't be undone.",
         confirm: 'Remove draft', done: `Removed draft ${item.title}.` }
     : { question: `Delete ${ref(item)} ${item.title}?`, detail: `This permanently deletes the issue from ${item.repo} on GitHub. It can't be undone.`,

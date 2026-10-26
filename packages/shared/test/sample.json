@@ -25,7 +25,7 @@
     {
       "id": "PVTI_sample01",
       "status": "List",
-      "type": "Issue",
+      "content": "ticket",
       "number": 61,
       "title": "Arr instances, catalog bindings and content requests",
       "url": "https://github.com/maddec01/lar-server/issues/61",
@@ -35,7 +35,8 @@
         "area: server",
         "area: web"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -50,7 +51,7 @@
     {
       "id": "PVTI_sample02",
       "status": "List",
-      "type": "Issue",
+      "content": "ticket",
       "number": 114,
       "title": "Verify VideoToolbox 8-bit HEVC decoding during hardware detection",
       "url": "https://github.com/maddec01/lar-server/issues/114",
@@ -59,7 +60,8 @@
         "bug",
         "area: server"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -74,7 +76,7 @@
     {
       "id": "PVTI_sample03",
       "status": "List",
-      "type": "Issue",
+      "content": "ticket",
       "number": 12,
       "title": "Remember the last subtitle language per show",
       "url": "https://github.com/maddec01/lar-apple/issues/12",
@@ -85,7 +87,8 @@
         "os: ios",
         "os: macos"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -100,13 +103,14 @@
     {
       "id": "PVTI_sample04",
       "status": "List",
-      "type": "DraftIssue",
+      "content": "ticket",
       "number": null,
       "title": "Shared playback history across devices",
       "url": null,
       "repo": null,
       "labels": [],
-      "state": null,
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -121,7 +125,7 @@
     {
       "id": "PVTI_sample05",
       "status": "Queued",
-      "type": "Issue",
+      "content": "ticket",
       "number": 129,
       "title": "Run more than one 4K HDR to 1080p stream at a time",
       "url": "https://github.com/maddec01/lar-server/issues/129",
@@ -129,7 +133,8 @@
       "labels": [
         "improvement"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -144,7 +149,7 @@
     {
       "id": "PVTI_sample06",
       "status": "Queued",
-      "type": "Issue",
+      "content": "ticket",
       "number": 20,
       "title": "Player controls stay visible after scrubbing <on tvOS>",
       "url": "https://github.com/maddec01/lar-apple/issues/20",
@@ -152,7 +157,8 @@
       "labels": [
         "bug"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -167,13 +173,14 @@
     {
       "id": "PVTI_sample21",
       "status": "Queued",
-      "type": "DraftIssue",
+      "content": "ticket",
       "number": null,
       "title": "Offline downloads on watchOS",
       "url": null,
       "repo": null,
       "labels": [],
-      "state": null,
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -188,7 +195,7 @@
     {
       "id": "PVTI_sample07",
       "status": "Shaping",
-      "type": "Issue",
+      "content": "ticket",
       "number": 130,
       "title": "Show cold bitmap subtitles within 3 s before preparation finishes",
       "url": "https://github.com/maddec01/lar-server/issues/130",
@@ -196,7 +203,8 @@
       "labels": [
         "bug"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -225,7 +233,7 @@
     {
       "id": "PVTI_sample08",
       "status": "Shaping",
-      "type": "Issue",
+      "content": "ticket",
       "number": 22,
       "title": "Continue watching row on the home screen",
       "url": "https://github.com/maddec01/lar-apple/issues/22",
@@ -233,13 +241,14 @@
       "labels": [
         "feature"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": {
         "number": 9,
         "title": "Home screen refresh",
         "url": "https://github.com/maddec01/lar-apple/issues/9",
         "repo": "maddec01/lar-apple",
-        "state": "OPEN"
+        "state": "open"
       },
       "subIssues": {
         "total": 0,
@@ -268,7 +277,7 @@
     {
       "id": "PVTI_sample09",
       "status": "Shaping",
-      "type": "Issue",
+      "content": "ticket",
       "number": 200,
       "title": "lar cloud: website sign-in and relay",
       "url": "https://github.com/maddec01/lar-server/issues/200",
@@ -276,7 +285,8 @@
       "labels": [
         "concept"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 6,
@@ -311,7 +321,7 @@
     {
       "id": "PVTI_sample10",
       "status": "Shaping",
-      "type": "Issue",
+      "content": "ticket",
       "number": 201,
       "title": "Relay: broker only or full TURN?",
       "url": "https://github.com/maddec01/lar-server/issues/201",
@@ -319,13 +329,14 @@
       "labels": [
         "decision: grill"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": {
         "number": 200,
         "title": "lar cloud: website sign-in and relay",
         "url": "https://github.com/maddec01/lar-server/issues/200",
         "repo": "maddec01/lar-server",
-        "state": "OPEN"
+        "state": "open"
       },
       "subIssues": {
         "total": 0,
@@ -335,7 +346,7 @@
         {
           "number": 203,
           "repo": "maddec01/lar-server",
-          "state": "CLOSED"
+          "state": "closed"
         }
       ],
       "updatedAt": "2026-10-21T09:20:00Z",
@@ -360,7 +371,7 @@
     {
       "id": "PVTI_sample11",
       "status": "Needs you",
-      "type": "Issue",
+      "content": "ticket",
       "number": 23,
       "title": "Faster library sync on large collections",
       "url": "https://github.com/maddec01/lar-apple/issues/23",
@@ -368,13 +379,14 @@
       "labels": [
         "improvement"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": {
         "number": 9,
         "title": "Home screen refresh",
         "url": "https://github.com/maddec01/lar-apple/issues/9",
         "repo": "maddec01/lar-apple",
-        "state": "OPEN"
+        "state": "open"
       },
       "subIssues": {
         "total": 0,
@@ -395,7 +407,7 @@
     {
       "id": "PVTI_sample12",
       "status": "Needs you",
-      "type": "Issue",
+      "content": "ticket",
       "number": 202,
       "title": "Sign-in screen",
       "url": "https://github.com/maddec01/lar-server/issues/202",
@@ -403,13 +415,14 @@
       "labels": [
         "decision: prototype"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": {
         "number": 200,
         "title": "lar cloud: website sign-in and relay",
         "url": "https://github.com/maddec01/lar-server/issues/200",
         "repo": "maddec01/lar-server",
-        "state": "OPEN"
+        "state": "open"
       },
       "subIssues": {
         "total": 0,
@@ -438,7 +451,7 @@
     {
       "id": "PVTI_sample13",
       "status": "Ready",
-      "type": "Issue",
+      "content": "ticket",
       "number": 140,
       "title": "Owner accounts",
       "url": "https://github.com/maddec01/lar-server/issues/140",
@@ -446,13 +459,14 @@
       "labels": [
         "build"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": {
         "number": 200,
         "title": "lar cloud: website sign-in and relay",
         "url": "https://github.com/maddec01/lar-server/issues/200",
         "repo": "maddec01/lar-server",
-        "state": "OPEN"
+        "state": "open"
       },
       "subIssues": {
         "total": 0,
@@ -462,7 +476,7 @@
         {
           "number": 202,
           "repo": "maddec01/lar-server",
-          "state": "OPEN"
+          "state": "open"
         }
       ],
       "updatedAt": "2026-10-21T08:30:00Z",
@@ -474,7 +488,7 @@
           "title": "Owner table and sign-up",
           "url": "https://github.com/maddec01/lar-server/issues/144",
           "repo": "maddec01/lar-server",
-          "state": "CLOSED",
+          "state": "closed",
           "progress": "done"
         },
         {
@@ -482,7 +496,7 @@
           "title": "Sign-in sessions",
           "url": "https://github.com/maddec01/lar-server/issues/145",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "active"
         },
         {
@@ -490,7 +504,7 @@
           "title": "Owner settings page",
           "url": "https://github.com/maddec01/lar-server/issues/146",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "waiting"
         }
       ],
@@ -506,7 +520,7 @@
     {
       "id": "PVTI_sample22",
       "status": "In progress",
-      "type": "Issue",
+      "content": "ticket",
       "number": 150,
       "title": "Relay for streaming away from home",
       "url": "https://github.com/maddec01/lar-server/issues/150",
@@ -515,7 +529,8 @@
         "feature",
         "build"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -531,7 +546,7 @@
           "title": "Relay protocol framing",
           "url": "https://github.com/maddec01/lar-server/issues/160",
           "repo": "maddec01/lar-server",
-          "state": "CLOSED",
+          "state": "closed",
           "progress": "done"
         },
         {
@@ -539,7 +554,7 @@
           "title": "Relay auth handshake",
           "url": "https://github.com/maddec01/lar-server/issues/161",
           "repo": "maddec01/lar-server",
-          "state": "CLOSED",
+          "state": "closed",
           "progress": "done"
         },
         {
@@ -547,7 +562,7 @@
           "title": "Session keys rotation",
           "url": "https://github.com/maddec01/lar-server/issues/162",
           "repo": "maddec01/lar-server",
-          "state": "CLOSED",
+          "state": "closed",
           "progress": "done"
         },
         {
@@ -555,7 +570,7 @@
           "title": "Device pairing codes",
           "url": "https://github.com/maddec01/lar-server/issues/163",
           "repo": "maddec01/lar-server",
-          "state": "CLOSED",
+          "state": "closed",
           "progress": "done"
         },
         {
@@ -563,7 +578,7 @@
           "title": "Pairing screen on Apple TV",
           "url": "https://github.com/maddec01/lar-server/issues/164",
           "repo": "maddec01/lar-server",
-          "state": "CLOSED",
+          "state": "closed",
           "progress": "done"
         },
         {
@@ -571,7 +586,7 @@
           "title": "Relay health endpoint",
           "url": "https://github.com/maddec01/lar-server/issues/165",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "active"
         },
         {
@@ -579,7 +594,7 @@
           "title": "Reconnect with backoff",
           "url": "https://github.com/maddec01/lar-server/issues/166",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "active"
         },
         {
@@ -587,7 +602,7 @@
           "title": "Bandwidth probe before streaming",
           "url": "https://github.com/maddec01/lar-server/issues/167",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "blocked"
         },
         {
@@ -595,7 +610,7 @@
           "title": "Fallback to direct connection",
           "url": "https://github.com/maddec01/lar-server/issues/168",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "waiting"
         },
         {
@@ -603,7 +618,7 @@
           "title": "Relay metrics dashboard",
           "url": "https://github.com/maddec01/lar-server/issues/169",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "waiting"
         },
         {
@@ -611,7 +626,7 @@
           "title": "Rate limits per owner",
           "url": "https://github.com/maddec01/lar-server/issues/170",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "waiting"
         },
         {
@@ -619,7 +634,7 @@
           "title": "Abuse report endpoint",
           "url": "https://github.com/maddec01/lar-server/issues/171",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "waiting"
         },
         {
@@ -627,7 +642,7 @@
           "title": "Relay load test",
           "url": "https://github.com/maddec01/lar-server/issues/172",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "waiting"
         },
         {
@@ -635,7 +650,7 @@
           "title": "Docs for self-hosting the relay",
           "url": "https://github.com/maddec01/lar-server/issues/173",
           "repo": "maddec01/lar-server",
-          "state": "OPEN",
+          "state": "open",
           "progress": "waiting"
         }
       ],
@@ -657,7 +672,7 @@
     {
       "id": "PVTI_sample14",
       "status": "In progress",
-      "type": "Issue",
+      "content": "ticket",
       "number": 30,
       "title": "Chapter markers in the scrubber",
       "url": "https://github.com/maddec01/lar-apple/issues/30",
@@ -665,7 +680,8 @@
       "labels": [
         "feature"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -678,7 +694,7 @@
         {
           "number": 33,
           "url": "https://github.com/maddec01/lar-apple/pull/33",
-          "state": "OPEN",
+          "state": "open",
           "isDraft": true,
           "checks": {
             "passed": 1,
@@ -709,7 +725,7 @@
     {
       "id": "PVTI_sample23",
       "status": "In progress",
-      "type": "Issue",
+      "content": "ticket",
       "number": 180,
       "title": "Resume playback across devices",
       "url": "https://github.com/maddec01/lar-server/issues/180",
@@ -717,7 +733,8 @@
       "labels": [
         "feature"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 2,
@@ -730,7 +747,7 @@
         {
           "number": 41,
           "url": "https://github.com/maddec01/lar-apple/pull/41",
-          "state": "MERGED",
+          "state": "merged",
           "isDraft": false,
           "mergedAt": "2026-10-20T14:00:00Z",
           "checks": {
@@ -778,7 +795,7 @@
     {
       "id": "PVTI_sample15",
       "status": "Review",
-      "type": "Issue",
+      "content": "ticket",
       "number": 141,
       "title": "Transcoder leaks a file handle on cancel",
       "url": "https://github.com/maddec01/lar-server/issues/141",
@@ -786,7 +803,8 @@
       "labels": [
         "bug"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -799,7 +817,7 @@
         {
           "number": 190,
           "url": "https://github.com/maddec01/lar-server/pull/190",
-          "state": "OPEN",
+          "state": "open",
           "isDraft": false,
           "checks": {
             "passed": 3,
@@ -830,7 +848,7 @@
     {
       "id": "PVTI_sample16",
       "status": "Verify",
-      "type": "Issue",
+      "content": "ticket",
       "number": 31,
       "title": "New artwork grid layout",
       "url": "https://github.com/maddec01/lar-apple/issues/31",
@@ -838,7 +856,8 @@
       "labels": [
         "feature"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -851,7 +870,7 @@
         {
           "number": 32,
           "url": "https://github.com/maddec01/lar-apple/pull/32",
-          "state": "OPEN",
+          "state": "open",
           "isDraft": false,
           "checks": {
             "passed": 1,
@@ -869,13 +888,14 @@
     {
       "id": "PVTI_sample26",
       "status": "Verify",
-      "type": "PullRequest",
+      "content": "pr",
       "number": 210,
       "title": "Bump FFmpeg to 7.1",
       "url": "https://github.com/maddec01/lar-server/pull/210",
       "repo": "maddec01/lar-server",
       "labels": [],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -900,7 +920,7 @@
     {
       "id": "PVTI_sample27",
       "status": "Verify",
-      "type": "Issue",
+      "content": "ticket",
       "number": 34,
       "title": "Swipe between episodes",
       "url": "https://github.com/maddec01/lar-apple/issues/34",
@@ -908,7 +928,8 @@
       "labels": [
         "feature"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -921,7 +942,7 @@
         {
           "number": 35,
           "url": "https://github.com/maddec01/lar-apple/pull/35",
-          "state": "OPEN",
+          "state": "open",
           "isDraft": false,
           "checks": {
             "passed": 3,
@@ -938,7 +959,7 @@
     {
       "id": "PVTI_sample28",
       "status": "Verify",
-      "type": "Issue",
+      "content": "ticket",
       "number": 147,
       "title": "Fall back to software transcoding when the GPU is busy",
       "url": "https://github.com/maddec01/lar-server/issues/147",
@@ -946,7 +967,8 @@
       "labels": [
         "improvement"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -959,7 +981,7 @@
         {
           "number": 148,
           "url": "https://github.com/maddec01/lar-server/pull/148",
-          "state": "OPEN",
+          "state": "open",
           "isDraft": false,
           "checks": null,
           "mergeState": "conflicts"
@@ -970,7 +992,7 @@
     {
       "id": "PVTI_sample17",
       "status": "Ready to merge",
-      "type": "Issue",
+      "content": "ticket",
       "number": 142,
       "title": "Cache probe results between restarts",
       "url": "https://github.com/maddec01/lar-server/issues/142",
@@ -978,7 +1000,8 @@
       "labels": [
         "improvement"
       ],
-      "state": "OPEN",
+      "state": "open",
+      "closedAs": null,
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -991,7 +1014,7 @@
         {
           "number": 151,
           "url": "https://github.com/maddec01/lar-server/pull/151",
-          "state": "OPEN",
+          "state": "open",
           "isDraft": false,
           "checks": {
             "passed": 4,
@@ -1013,7 +1036,7 @@
     {
       "id": "PVTI_sample18",
       "status": "Done",
-      "type": "Issue",
+      "content": "ticket",
       "number": 203,
       "title": "Hosting cost of the relay",
       "url": "https://github.com/maddec01/lar-server/issues/203",
@@ -1021,13 +1044,14 @@
       "labels": [
         "decision: research"
       ],
-      "state": "CLOSED",
+      "state": "closed",
+      "closedAs": "done",
       "parent": {
         "number": 200,
         "title": "lar cloud: website sign-in and relay",
         "url": "https://github.com/maddec01/lar-server/issues/200",
         "repo": "maddec01/lar-server",
-        "state": "OPEN"
+        "state": "open"
       },
       "subIssues": {
         "total": 0,
@@ -1056,7 +1080,7 @@
     {
       "id": "PVTI_sample19",
       "status": "Done",
-      "type": "Issue",
+      "content": "ticket",
       "number": 5,
       "title": "Crash when a server goes offline mid-playback",
       "url": "https://github.com/maddec01/lar-apple/issues/5",
@@ -1065,7 +1089,8 @@
         "bug",
         "os: watchos"
       ],
-      "state": "CLOSED",
+      "state": "closed",
+      "closedAs": "done",
       "parent": null,
       "subIssues": {
         "total": 0,
@@ -1078,7 +1103,7 @@
         {
           "number": 6,
           "url": "https://github.com/maddec01/lar-apple/pull/6",
-          "state": "MERGED",
+          "state": "merged",
           "isDraft": false,
           "checks": {
             "passed": 1,
@@ -1100,7 +1125,7 @@
     {
       "id": "PVTI_sample24",
       "status": "Done",
-      "type": "Issue",
+      "content": "ticket",
       "number": 181,
       "title": "Store the playback position per device",
       "url": "https://github.com/maddec01/lar-server/issues/181",
@@ -1108,13 +1133,14 @@
       "labels": [
         "build"
       ],
-      "state": "CLOSED",
+      "state": "closed",
+      "closedAs": "done",
       "parent": {
         "number": 180,
         "title": "Resume playback across devices",
         "url": "https://github.com/maddec01/lar-server/issues/180",
         "repo": "maddec01/lar-server",
-        "state": "OPEN"
+        "state": "open"
       },
       "subIssues": {
         "total": 0,
@@ -1127,7 +1153,7 @@
         {
           "number": 182,
           "url": "https://github.com/maddec01/lar-server/pull/182",
-          "state": "MERGED",
+          "state": "merged",
           "isDraft": false,
           "mergedAt": "2026-10-18T11:00:00Z",
           "checks": {
@@ -1160,7 +1186,7 @@
     {
       "id": "PVTI_sample25",
       "status": "Done",
-      "type": "Issue",
+      "content": "ticket",
       "number": 40,
       "title": "Resume from the stored position",
       "url": "https://github.com/maddec01/lar-apple/issues/40",
@@ -1168,13 +1194,14 @@
       "labels": [
         "build"
       ],
-      "state": "CLOSED",
+      "state": "closed",
+      "closedAs": "done",
       "parent": {
         "number": 180,
         "title": "Resume playback across devices",
         "url": "https://github.com/maddec01/lar-server/issues/180",
         "repo": "maddec01/lar-server",
-        "state": "OPEN"
+        "state": "open"
       },
       "subIssues": {
         "total": 0,
@@ -1184,7 +1211,7 @@
         {
           "number": 181,
           "repo": "maddec01/lar-server",
-          "state": "CLOSED"
+          "state": "closed"
         }
       ],
       "updatedAt": "2026-10-20T14:00:00Z",
@@ -1193,7 +1220,7 @@
         {
           "number": 41,
           "url": "https://github.com/maddec01/lar-apple/pull/41",
-          "state": "MERGED",
+          "state": "merged",
           "isDraft": false,
           "mergedAt": "2026-10-20T14:00:00Z",
           "checks": {
@@ -1226,7 +1253,7 @@
     {
       "id": "PVTI_sample20",
       "status": "Done",
-      "type": "Issue",
+      "content": "ticket",
       "number": 100,
       "title": "Old cleanup task",
       "url": "https://github.com/maddec01/lar-server/issues/100",
@@ -1234,7 +1261,8 @@
       "labels": [
         "improvement"
       ],
-      "state": "CLOSED",
+      "state": "closed",
+      "closedAs": "done",
       "parent": null,
       "subIssues": {
         "total": 0,

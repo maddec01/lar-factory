@@ -70,7 +70,7 @@ test('Open thread opens the latest thread in T3, and Open PR the pull request th
 });
 
 test('a pull request on Verify opens itself', async () => {
-  await mountPage(withItem('PVTI_sample16', { type: 'PullRequest', url: 'https://github.com/maddec01/lar-apple/pull/40' }));
+  await mountPage(withItem('PVTI_sample16', { content: 'pr', url: 'https://github.com/maddec01/lar-apple/pull/40' }));
   expect(card('PVTI_sample16').querySelector('[data-pr-link]')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-apple/pull/40');
 });
 

@@ -248,7 +248,7 @@ test('Back to List from the dialog takes the item off the Queue', async () => {
 });
 
 test('the dialog gives Queued issues and drafts Back to List and Abandon, but not pull requests', async () => {
-  const pr: Item = { ...sample05, id: 'PVTI_pr', type: 'PullRequest', number: 300, title: 'A queued pull request' };
+  const pr: Item = { ...sample05, id: 'PVTI_pr', content: 'pr', number: 300, title: 'A queued pull request' };
   await mountPage({ ...sample, items: [...sample.items, pr] });
   await settle(() => row('PVTI_sample21').click());
   expect(dialog()!.querySelector('[data-back-to-list]')!.getAttribute('aria-label')).toBe('Back to List draft Offline downloads on watchOS');

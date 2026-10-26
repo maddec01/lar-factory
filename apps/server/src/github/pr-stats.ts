@@ -64,8 +64,8 @@ function blockStats(body: string): ItemStats | null {
  * that isn't a build, whose linked PR carries a build's figures.
  */
 export function mergedStats(item: Item): ItemStats | null {
-  if (!isBuild(item) || item.linkedPrs.some((pr) => pr.state === 'OPEN')) return null;
-  const merged = item.linkedPrs.filter((pr) => pr.state === 'MERGED')
+  if (!isBuild(item) || item.linkedPrs.some((pr) => pr.state === 'open')) return null;
+  const merged = item.linkedPrs.filter((pr) => pr.state === 'merged')
     .sort((a, b) => (b.mergedAt ?? '').localeCompare(a.mergedAt ?? ''));
   for (const pr of merged) {
     const stats = pr.body === undefined ? null : blockStats(pr.body);
@@ -130,7 +130,7 @@ export function prStatsEdits(items: readonly Item[]): PrBodyEdit[] {
     const stats = item.stats;
     if (!isBuild(item) || !stats || stats === 'unavailable') continue;
     for (const pr of item.linkedPrs) {
-      if (pr.state !== 'OPEN' || pr.body === undefined || seen.has(pr.url)) continue;
+      if (pr.state !== 'open' || pr.body === undefined || seen.has(pr.url)) continue;
       if (!repos.has(prRepo(pr.url))) continue;
       seen.add(pr.url);
       const block = statsBlock(stats);

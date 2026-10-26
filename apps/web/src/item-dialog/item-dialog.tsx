@@ -40,7 +40,7 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
 function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   const startHolds = useStartHolds(item, data);
   if (item.status === 'List') return <AbandonButton item={item} data={data} />;
-  if (item.status !== 'Queued' || item.type === 'PullRequest' || startHolds || hasLiveThread(item)) return null;
+  if (item.status !== 'Queued' || item.content === 'pr' || startHolds || hasLiveThread(item)) return null;
   return <><BackToListButton item={item} data={data} /><AbandonButton item={item} data={data} /></>;
 }
 

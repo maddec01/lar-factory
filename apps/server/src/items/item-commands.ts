@@ -4,8 +4,8 @@
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { blockedText, buildBranch, buildMessage, canAbandon, isBuild, validateDraft, workMessage } from '@lar-factory/shared';
-import type { BoardData, ContentType, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
+import { blockedText, buildBranch, buildMessage, canAbandon, isBuild, isDraft, validateDraft, workMessage } from '@lar-factory/shared';
+import type { BoardData, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { loadConfig } from '../config/config.ts';
 import { issueLabels } from '../github/github.ts';
@@ -71,7 +71,8 @@ type Start = StartResult & { refused?: true };
 
 const REQUEST_ID = /^[a-f0-9-]{36}$/;
 const GONE = 'That item is no longer on the board.';
-const A_TYPE: Record<ContentType, string> = { Issue: 'an issue', PullRequest: 'a pull request', DraftIssue: 'a draft' };
+/** What the item is, for Abandon's refusal. */
+const aType = (item: Item) => (item.content === 'pr' ? 'a pull request' : isDraft(item) ? 'a draft' : 'an issue');
 
 /** Keeps `work` in `inFlight` under `key` until it settles, or for good when `keep` says so. */
 function track<T>(inFlight: Map<string, Promise<T>>, key: string, work: Promise<T>, keep: (result: T) => boolean = () => false): Promise<T> {
@@ -175,7 +176,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
   /** Moves the item's parent to In progress, unless it's a build or there already; returns the error, or null. */
   async function parentInProgress({ parent }: Item): Promise<string | null> {
     if (!parent) return null;
-    const onBoard = board.snapshot().items.find((i) => i.type === 'Issue' && i.number === parent.number &&
+    const onBoard = board.snapshot().items.find((i) => i.content === 'ticket' && i.number === parent.number &&
       i.repo?.toLowerCase() === parent.repo.toLowerCase());
     if (onBoard) {
       if (isBuild(onBoard) || onBoard.status === 'In progress') return null;
@@ -266,7 +267,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
         // A second press after the delete finished has nothing left to do.
         if (!item && board.removed(itemId)) return withBoard(200, { error: null });
         if (!item) return withBoard(404, { error: GONE });
-        if (!canAbandon(item)) return reply(409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${A_TYPE[item.type]} in ${item.status}.` });
+        if (!canAbandon(item)) return reply(409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${aType(item)} in ${item.status}.` });
         const busy = busyReason(itemId, 'abandon');
         if (busy) return withBoard(409, { error: busy });
         const work = items.abandon(item).then((error) => {

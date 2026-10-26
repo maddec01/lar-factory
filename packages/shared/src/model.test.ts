@@ -10,13 +10,14 @@ function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}):
   return {
     id: 'x',
     status,
-    type: 'Issue',
+    content: 'ticket',
     number: 7,
     title: 't',
     url: 'https://github.com/maddec01/lar-server/issues/7',
     repo: 'maddec01/lar-server',
     labels,
-    state: 'OPEN',
+    state: 'open',
+    closedAs: null,
     parent: null,
     subIssues: { total: 0, completed: 0 },
     blockers: [],
@@ -46,7 +47,7 @@ test('a slice is done once closed as completed, blocked or active while open wit
 
 test('kinds come from labels', () => {
   assert.equal(kindOf(item('List', ['bug', 'concept'])), 'concept');
-  assert.equal(kindOf(item('List', [], { type: 'DraftIssue' })), 'draft');
+  assert.equal(kindOf(item('List', [], { repo: null, number: null })), 'draft');
   assert.equal(kindOf(item('List', [])), 'issue');
   assert.equal(kindOf(item('List', ['improvement', 'build'])), 'improvement', 'build only switches on slices');
   assert.equal(kindOf(item('List', ['build', 'bug'])), 'bug');
@@ -63,16 +64,16 @@ test('the build label makes a build whatever the kind, except on a concept', () 
 });
 
 test("an item's open blockers are the blocked-by issues still open", () => {
-  const blockers = [{ number: 3, repo: 'maddec01/lar-server', state: 'CLOSED' as const }, { number: 4, repo: 'maddec01/lar-apple', state: 'OPEN' as const }];
+  const blockers = [{ number: 3, repo: 'maddec01/lar-server', state: 'closed' as const }, { number: 4, repo: 'maddec01/lar-apple', state: 'open' as const }];
   assert.deepEqual(openBlockers(item('Ready', [], { blockers })), [blockers[1]]);
 });
 
 test('the blocked text names the open blockers, with the repository when it is another', () => {
-  const blocker = (number: number, repo: string, state: 'OPEN' | 'CLOSED') => ({ number, repo, state });
-  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'OPEN')] })), 'Blocked by #3 until it closes');
-  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'OPEN'), blocker(4, 'maddec01/lar-apple', 'OPEN')] })),
+  const blocker = (number: number, repo: string, state: 'open' | 'closed') => ({ number, repo, state });
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'open')] })), 'Blocked by #3 until it closes');
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'open'), blocker(4, 'maddec01/lar-apple', 'open')] })),
     'Blocked by #3, maddec01/lar-apple#4 until they close');
-  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'CLOSED')] })), null);
+  assert.equal(blockedText(item('Ready', [], { blockers: [blocker(3, 'maddec01/lar-server', 'closed')] })), null);
 });
 
 test("a blocker's ref is #n for the item's repository, and names another repository in full, or without its owner when short", () => {
@@ -99,7 +100,7 @@ test('Done counts for 7 days after closing', () => {
 test('the work message titles the thread, then runs lar-work on the issue', () => {
   assert.equal(workMessage(item('Queued')), '#7 t\n$lar-work maddec01/lar-server#7');
   assert.equal(workTitle(item('Queued')), '#7 t');
-  const draft = item('Queued', [], { type: 'DraftIssue', repo: null, number: null });
+  const draft = item('Queued', [], { repo: null, number: null });
   assert.equal(workMessage(draft), null);
   assert.equal(workTitle(draft), null);
 });
@@ -128,18 +129,18 @@ test('a build branch slug takes up to five words of the title, lowercase, with w
   assert.equal(branch('Café crème über naïve'), 'fix/7-cafe-creme-uber-naive');
   assert.equal(branch('日本語 title 🚀 here'), 'fix/7-title-here');
   assert.equal(branch('日本語 🚀'), 'fix/7');
-  assert.equal(buildBranch(item('Ready', [], { type: 'DraftIssue', repo: null, number: null })), null);
+  assert.equal(buildBranch(item('Ready', [], { repo: null, number: null })), null);
 });
 
 test('the build message names the build and the builder agent of the installed lar-work', () => {
   assert.equal(buildMessage(item('Ready'), '/Users/me/.agents/skills/lar-work'),
     'Build maddec01/lar-server#7. Read /Users/me/.agents/skills/lar-work/agents/builder.md and follow it.');
-  assert.equal(buildMessage(item('Ready', [], { type: 'DraftIssue', repo: null, number: null }), '/x'), null);
+  assert.equal(buildMessage(item('Ready', [], { repo: null, number: null }), '/x'), null);
 });
 
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {
   const repo = 'maddec01/lar-server';
-  const under = (n: number) => ({ number: n, title: 't', url: `https://github.com/${repo}/issues/${n}`, repo: 'Maddec01/Lar-Server', state: 'OPEN' as const });
+  const under = (n: number) => ({ number: n, title: 't', url: `https://github.com/${repo}/issues/${n}`, repo: 'Maddec01/Lar-Server', state: 'open' as const });
   const parent = item('In progress', [], { id: 'p', number: 7, stats: { agentMs: 10, wallMs: 1, tokens: 100, costUsd: 0.5 } });
   const build = item('Done', ['build'], { id: 'b', number: 8, parent: under(7), stats: { agentMs: 20, wallMs: 2, tokens: 200, costUsd: 3, frozen: true } });
   const nested = item('Done', ['build'], { id: 'n', number: 9, parent: under(8), stats: { agentMs: 40, tokens: 400, costUsd: 5, frozen: true } });
@@ -195,7 +196,7 @@ test('the desk holds Ready, Needs you, Verify and Ready to merge, in flow order,
 test('the sample has a Verify item in each merge state', () => {
   const verify = sample.items.filter((i) => i.status === 'Verify');
   assert.deepEqual(new Set(verify.map((i) => itemPr(i)?.pipeline?.mergeState)), new Set(['can merge', 'checking', 'blocked', 'conflicts']));
-  assert.ok(verify.some((i) => i.type === 'PullRequest'), 'one is itself a pull request');
+  assert.ok(verify.some((i) => i.content === 'pr'), 'one is itself a pull request');
   assert.ok(verify.some((i) => itemPr(i)?.pipeline && !itemPr(i)!.pipeline!.checks), 'one has no checks');
 });
 
@@ -217,10 +218,10 @@ test('a short age rounds each unit down, and a future time reads 0s ago', () => 
 
 test("an item's PR is the one Open PR opens: its first linked PR, or itself when it is a pull request", () => {
   const pipeline = { checks: null, mergeState: 'blocked' as const };
-  const linked = (number: number, mergeState: 'can merge' | 'conflicts') => ({ number, url: `u${number}`, state: 'OPEN', isDraft: false, checks: null, mergeState });
+  const linked = (number: number, mergeState: 'can merge' | 'conflicts') => ({ number, url: `u${number}`, state: 'open' as const, isDraft: false, checks: null, mergeState });
   assert.deepEqual(itemPr(item('Verify', [], { linkedPrs: [linked(1, 'conflicts'), linked(2, 'can merge')] })), { url: 'u1', pipeline: linked(1, 'conflicts') });
   assert.equal(itemPr(item('Verify')), null, 'no PR, no link and no pipeline');
-  const pr = item('Verify', [], { type: 'PullRequest', url: 'https://github.com/maddec01/lar-server/pull/7', pipeline, linkedPrs: [linked(1, 'conflicts')] });
+  const pr = item('Verify', [], { content: 'pr', url: 'https://github.com/maddec01/lar-server/pull/7', pipeline, linkedPrs: [linked(1, 'conflicts')] });
   assert.deepEqual(itemPr(pr), { url: 'https://github.com/maddec01/lar-server/pull/7', pipeline });
   assert.deepEqual(itemPr({ ...pr, pipeline: undefined }), { url: 'https://github.com/maddec01/lar-server/pull/7', pipeline: null }, 'a PR whose pipeline was not read');
 });
@@ -239,11 +240,11 @@ test('a running badge wins over failures until every check finishes, and turns s
 });
 
 test('canAbandon takes List and Queued issues and drafts, never pull requests or other statuses', () => {
-  const draft = { type: 'DraftIssue', number: null, repo: null } as const;
+  const draft = { number: null, repo: null };
   for (const status of ['List', 'Queued'] as const) {
     assert.ok(canAbandon(item(status)), `${status} issue`);
     assert.ok(canAbandon(item(status, [], draft)), `${status} draft`);
-    assert.ok(!canAbandon(item(status, [], { type: 'PullRequest' })), `${status} pull request`);
+    assert.ok(!canAbandon(item(status, [], { content: 'pr' })), `${status} pull request`);
   }
   for (const status of ['Shaping', 'In progress', 'Done'] as const) assert.ok(!canAbandon(item(status)), status);
 });

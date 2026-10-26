@@ -30,7 +30,7 @@ new build or `src/` change.
 
 - **Board** shows what needs you first (Needs you, Verify, Ready to merge), then
   what's in flight, concepts with their sub-issues, Queued items, List counts per
-  platform, and the last 7 days of Done. Every card has a step bar showing where
+  repository, and the last 7 days of Done. Every card has a step bar showing where
   it is in the flow.
 - **Queue** on a List row sets the item's Status to Queued. The board shows it
   in Queued at once and keeps it there until GitHub reports the change.

@@ -52,5 +52,5 @@ function checkRepo(entry: RepoConfig, url: URL): RepoConfig {
   if (entry.show !== undefined && !SHOW_SETTINGS.includes(entry.show)) {
     throw new Error(`${fileURLToPath(url)}: ${name} has "show": ${JSON.stringify(entry.show)}; use "all" or "opted-in"`);
   }
-  return { repo: entry.repo, platform: entry.platform, role: entry.role, ...(entry.items ? { items: entry.items } : {}), ...(entry.show ? { show: entry.show } : {}) };
+  return { repo: entry.repo, role: entry.role, ...(entry.items ? { items: entry.items } : {}), ...(entry.show ? { show: entry.show } : {}) };
 }

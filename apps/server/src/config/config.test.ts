@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CONFIG_URL, configUrl, loadConfig } from './config.ts';
 
-const server = { repo: 'maddec01/lar-server', platform: 'Server', role: 'Backend API server' };
+const server = { repo: 'maddec01/lar-server', role: 'Backend API server' };
 
 async function configWith(t: TestContext, repos: unknown[], extra: object = {}): Promise<URL> {
   const dir = await mkdtemp(join(tmpdir(), 'lar config test '));

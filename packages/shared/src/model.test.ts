@@ -1,9 +1,10 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repositoryProjectHint, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repoKey, repoName, repositoryProjectHint, sameRepo, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
+import { applicability, validateDraft } from './add-item.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
@@ -176,7 +177,7 @@ test('stale when the last read failed or is too old', () => {
   assert.equal(isStale({ ...sample, error: 'HTTP 502', fetchedAt: null }, Date.parse('2026-10-21T10:30:00Z')), true);
 });
 
-test('sample covers every status and both platforms', () => {
+test('sample covers every status and both repositories', () => {
   const statuses = new Set(sample.items.map((i) => i.status));
   assert.equal(statuses.size, 10);
   const repos = new Set(sample.items.map((i) => i.repo));
@@ -275,7 +276,7 @@ test('gh blocks every read while missing or logged out, and only Project reads w
   }
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'project'), true);
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'issues'), false);
-  assert.equal(itemSource({ repo: 'maddec01/lar', platform: 'Apple', role: 'app' }), 'project');
+  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app' }), 'project');
 });
 
 test("a status's label is status- and its name in lowercase with hyphens for spaces", () => {
@@ -296,4 +297,44 @@ test('an item carrying more than one status moves only once one is kept, and say
   assert.equal(carriesTwoStatuses({ statuses: ['Ready', 'Verify'], state: 'closed' }), false, 'a closed item is Done, whatever labels it kept');
   assert.equal(keepOneText(['Ready', 'Verify']), 'This issue carries Ready and Verify. Keep one to move it again.');
   assert.equal(keepOneText(['Shaping', 'Ready', 'Review']), 'This issue carries Shaping, Ready and Review. Keep one to move it again.');
+});
+
+test('a repository goes by its name, or by owner/name when another board repository shares the name; Draft stays Draft', () => {
+  const repos = [{ repo: 'maddec01/lar-server', role: 'api' }, { repo: 'maddec01/lar', role: 'app' }, { repo: 'fabrikam/lar', role: 'app' }];
+  assert.equal(repoName('maddec01/lar-server', repos), 'lar-server');
+  assert.equal(repoName('maddec01/lar', repos), 'maddec01/lar');
+  assert.equal(repoName('fabrikam/lar', repos), 'fabrikam/lar');
+  assert.equal(repoName('someone/elsewhere', repos), 'elsewhere', 'a repository off the board still goes by its name');
+  assert.equal(repoName(repoKey(item('List', [], { repo: null })), repos), 'Draft');
+  assert.equal(repoKey(item('List')), 'maddec01/lar-server');
+});
+
+test('the board groups the List by repository, keyed by owner/name and named by name, then Draft', () => {
+  const repos = [{ repo: 'maddec01/lar', role: 'app' }, { repo: 'fabrikam/lar', role: 'app' }];
+  const items = [item('List', [], { id: 'a', repo: 'fabrikam/lar' }), item('List', [], { id: 'b', repo: null }), item('List', [], { id: 'c', repo: 'maddec01/lar' })];
+  const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
+  assert.deepEqual(groups.map((g) => [g.repo, g.name, g.items.map((i) => i.id)]), [
+    ['maddec01/lar', 'maddec01/lar', ['c']], ['fabrikam/lar', 'fabrikam/lar', ['a']], ['Draft', 'Draft', ['b']],
+  ]);
+});
+
+test("a repository's owner/name matches whatever its case, as GitHub's does, so a hand-written spelling still finds its items", () => {
+  assert.equal(sameRepo('Maddec01/Lar-Factory', 'maddec01/lar-factory'), true);
+  assert.equal(sameRepo('maddec01/lar-factory', 'maddec01/lar-server'), false);
+  const repos = [{ repo: 'Maddec01/lar', role: 'app' }, { repo: 'fabrikam/lar', role: 'app' }];
+  assert.equal(repoName('maddec01/lar', repos), 'maddec01/lar', 'the same repository in another case is not a second one');
+  assert.equal(repoName('maddec01/lar', [{ repo: 'Maddec01/lar', role: 'app' }]), 'lar');
+  const items = [item('List', [], { id: 'a', repo: 'maddec01/lar' }), item('List', [], { id: 'b', repo: 'fabrikam/lar' })];
+  const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
+  assert.deepEqual(groups.map((g) => [g.repo, g.items.map((i) => i.id)]), [['Maddec01/lar', ['a']], ['fabrikam/lar', ['b']]]);
+});
+
+test('Add item offers apps and OSes for lar-apple, areas for lar-server and nothing for any other repository', () => {
+  assert.deepEqual(applicability('maddec01/lar-apple').map((g) => g.title), ['Apps', 'Operating systems']);
+  assert.deepEqual(applicability('maddec01/lar-server').map((g) => g.title), ['Areas']);
+  assert.deepEqual(applicability('fabrikam/lar-apple'), []);
+  assert.deepEqual(applicability('maddec01/lar-factory'), []);
+  const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 't', description: '', labels: ['area: web'] };
+  assert.deepEqual(validateDraft(draft, sample.repos).labels, ['area: web']);
+  assert.throws(() => validateDraft({ ...draft, labels: ['app: music'] }, sample.repos), /applicability/);
 });

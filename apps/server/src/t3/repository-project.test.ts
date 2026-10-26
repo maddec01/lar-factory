@@ -32,7 +32,7 @@ function t3Home(t: TestContext, origins: Record<string, string>): NodeJS.Process
 
 test('a listed repository on Azure DevOps needs az; GitHub ones and unlisted Azure checkouts do not', async (t) => {
   const env = t3Home(t, { 'lar-factory': GITHUB[0]!, 'lar-api': AZURE[0]! });
-  const repo = (name: string) => ({ repo: name, role: 'server', platform: 'Server' });
+  const repo = (name: string) => ({ repo: name, role: 'server' });
   assert.equal(await anyOnAzureDevOps([repo('maddec01/lar-factory')], env), false);
   assert.equal(await anyOnAzureDevOps([repo('maddec01/lar-factory'), repo('fabrikam/lar-api')], env), true);
   assert.equal(await anyOnAzureDevOps([repo('maddec01/lar-factory')], { ...env, T3_STATE_DB: '/nowhere/state.sqlite' }), false);
@@ -41,13 +41,13 @@ test('a listed repository on Azure DevOps needs az; GitHub ones and unlisted Azu
 test('every Azure DevOps origin form names its project/repo', async (t) => {
   for (const url of AZURE) {
     const env = t3Home(t, { 'lar-api': url });
-    assert.equal(await anyOnAzureDevOps([{ repo: 'fabrikam/lar-api', role: 'server', platform: 'Server' }], env), true, url);
+    assert.equal(await anyOnAzureDevOps([{ repo: 'fabrikam/lar-api', role: 'server' }], env), true, url);
   }
 });
 
 test('Start build finds only GitHub checkouts; Azure DevOps naming waits for build #386', async (t) => {
   const env = t3Home(t, { 'lar-factory': GITHUB[0]!, 'lar-api': AZURE[0]! });
-  const repo = (name: string) => ({ repo: name, role: 'server', platform: 'Server' });
+  const repo = (name: string) => ({ repo: name, role: 'server' });
   assert.deepEqual(await repositoryProjectHints([repo('maddec01/lar-factory'), repo('Fabrikam/lar-api')], env), {
     'maddec01/lar-factory': null,
     'Fabrikam/lar-api': 'No T3 project is a checkout of Fabrikam/lar-api; add the checkout in T3 Code',

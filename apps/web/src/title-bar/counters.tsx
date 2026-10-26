@@ -6,7 +6,7 @@
 
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
-import { boardSections, formatUsd, platformOf, plural, shortAgo, slug } from '@lar-factory/shared';
+import { boardSections, formatUsd, plural, repoKey, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Popover, PopoverClose, PopoverPopup, PopoverTrigger } from '@lar-factory/ui/popover';
@@ -14,7 +14,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
-import { ItemTitle } from '../items/item-parts.tsx';
+import { ItemTitle, repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph, STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? item.stats.costUsd ?? 0 : 0);
@@ -71,7 +71,7 @@ function Row({ item, data, now, trailing }: { item: Item; data: BoardData; now: 
         <span className="min-w-0 flex-1 truncate"><ItemTitle item={item} /></span>
         <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-(--muted-foreground) tabular-nums">
           {trailing ?? <>
-            <span className={`plat-${slug(platformOf(item, data.repos))} size-1.5 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
+            <span className={`${repoTone(repoKey(item), data.repos)} size-1.5 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
             <span className="min-w-7 whitespace-nowrap text-right">{shortAgo(item.closedAt ?? item.updatedAt, now)}</span>
           </>}
         </span>

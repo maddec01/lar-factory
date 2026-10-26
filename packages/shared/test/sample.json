@@ -5,13 +5,11 @@
   "repos": [
     {
       "repo": "maddec01/lar-server",
-      "platform": "Server",
       "path": "~/test/lar-server",
       "role": "Backend API server"
     },
     {
       "repo": "maddec01/lar-apple",
-      "platform": "Apple",
       "path": "~/test/lar-apple",
       "role": "Apple client app"
     }

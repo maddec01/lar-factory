@@ -51,13 +51,13 @@ test('the header shows the kind, status, parts done and repositories, the title,
   await mountPage();
   const [title, track, agent, side] = header();
   expect([...title!.children].map(text)).toEqual([
-    'ConceptShaping · 1/4 parts done · Server', '#200 lar cloud: website sign-in and relay', '4 T3 threads · 1 running · 1 need you',
+    'ConceptShaping · 1/4 parts done · lar-server', '#200 lar cloud: website sign-in and relay', '4 T3 threads · 1 running · 1 need you',
   ]);
   expect(title!.className.split(' '), 'one column as wide as the cell, so the lines truncate at 840 px, not overflow').toContain('grid-cols-[minmax(0,1fr)]');
   expect(track!.getAttribute('title')).toBe('Shaping');
   expect([...agent!.children].map(text), "#200's parts' figures").toEqual(['1h 31m', '6.23M · $9.11']);
   expect(text(side)).toBe('#202 waits on you');
-  expect(text(header(C180)[0]!.firstElementChild)).toBe('Coupled workIn progress · 2/2 parts done · Server + Apple');
+  expect(text(header(C180)[0]!.firstElementChild)).toBe('Coupled workIn progress · 2/2 parts done · lar-server + lar-apple');
   expect([text(header(C180)[0]!.lastElementChild), text(header(C180)[3])]).toEqual(['3 T3 threads · 1 running · 0 need you', 'Nothing waits on you']);
 });
 
@@ -94,12 +94,12 @@ test("in the map, #n opens the issue in the concept's repository, and owner/repo
 
 test('the checklist runs Decide, then Build per repository, then Check, the done parts folded', async () => {
   await mountPage();
-  expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build Server', 'Checkthe agents run it once every build lands']);
+  expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build lar-server', 'Checkthe agents run it once every build lands']);
   expect([...phases()[0]!.querySelectorAll('[data-part]')].map((s) => s.getAttribute('data-part'))).toEqual(['I_sample10', 'I_sample12']);
   const fold = button(phases()[0]!, '1 done');
   await press(fold);
   expect([fold.getAttribute('aria-expanded'), phases()[0]!.querySelectorAll('[data-part]').length]).toEqual(['true', 3]);
-  expect(phases(C180).map((p) => text(p.querySelector('h4'))), 'which repository goes first').toEqual(['Build Servergoes first', 'Build Appleafter Server', 'Checkthe agents run it once every build lands']);
+  expect(phases(C180).map((p) => text(p.querySelector('h4'))), 'which repository goes first').toEqual(['Build lar-servergoes first', 'Build lar-appleafter lar-server', 'Checkthe agents run it once every build lands']);
 });
 
 test('each step shows its kind, what it waits on, its figures and its own thread', async () => {
@@ -231,10 +231,18 @@ test('a map with no End-to-end check section has no Check phase, and its map say
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   const { check: _, ...map } = c200.map!;
   await mountPage(withItem(C200, { map }));
-  expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build Server']);
+  expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build lar-server']);
   expect(dossier().querySelector('[data-check]')).toBeNull();
   await press(button(dossier(), 'Map'));
   expect(text(dossier().querySelector('[data-work-map]'))).toContain('No end-to-end check written yet');
+});
+
+test('a Map lane named owner/name shows it once', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  await mountPage({ ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork' }] });
+  await press(button(dossier(), 'Map'));
+  const lanes = [...dossier().querySelectorAll('[data-work-map] .sticky')];
+  expect(lanes.map(text)).toEqual(['Decisionsgrill, prototype, research', 'maddec01/lar-server']);
 });
 
 test('the Map view draws a lane per repository and Decisions, its parts by wave, and arrows for what waits on what', async () => {
@@ -246,7 +254,9 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   const map = dossier().querySelector('[data-work-map]')!;
   expect(dossier().querySelector('[data-checklist]'), 'the map takes the checklist\'s place').toBeNull();
   expect(dossier().querySelector('[data-about]'), 'the map\'s sections stay under it').not.toBeNull();
-  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research', 'Serverlar-server']);
+  expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research', 'lar-servermaddec01/lar-server']);
+  const subtitle = map.querySelectorAll('.sticky')[1]!.lastElementChild!;
+  expect([subtitle.className.split(' ').includes('truncate'), subtitle.getAttribute('title')], 'owner/name stays on one line').toEqual([true, 'maddec01/lar-server']);
   expect([...map.querySelectorAll('.h-7\\.5')].map(text)).toEqual(['Wave 1· 2 in parallel', 'Wave 2· 2 in parallel', 'Check']);
   expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part'))).toEqual(['I_sample18', 'I_sample12', 'I_sample10', 'I_sample13']);
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
@@ -280,6 +290,6 @@ test('an item with sub-issues on the board is coupled work; with no map, it says
 
 test('the dossiers take the main area\'s scope', async () => {
   await mountPage();
-  await press($$('button.scope').find((b) => text(b).includes('Apple'))!);
+  await press($$('button.scope').find((b) => text(b).includes('lar-apple'))!);
   expect($$('[data-dossier]').map((d) => d.getAttribute('data-dossier')), '#180 through its Apple build').toEqual([C180]);
 });

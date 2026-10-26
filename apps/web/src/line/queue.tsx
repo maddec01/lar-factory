@@ -5,13 +5,13 @@
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { carriesTwoStatuses, openBlockers, platformOf, repositoryProjectHint, shortAgo, slug, workMessage } from '@lar-factory/shared';
+import { carriesTwoStatuses, openBlockers, repoKey, repoName, repositoryProjectHint, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
-import { ItemTitle } from '../items/item-parts.tsx';
+import { ItemTitle, repoTone } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
@@ -41,7 +41,7 @@ function RowAction({ item, data, first }: { item: Item; data: BoardData; first: 
 /** `first` marks the row Start next starts, whose Start is the primary one. */
 function Row({ item, n, data, now, first, waits }: { item: Item; n: number; data: BoardData; now: number; first: boolean; waits: boolean }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
-  const platform = platformOf(item, data.repos);
+  const repo = repoKey(item);
   const labels = item.labels.filter((l) => !l.includes(':'));
   return (
     <li data-item={item.id} onClick={() => useItemDialogStore.getState().open(item.id)}
@@ -50,11 +50,11 @@ function Row({ item, n, data, now, first, waits }: { item: Item; n: number; data
         <GripVertical className="size-3.5" />
       </button>
       <span className="queue-n w-4 shrink-0 text-right text-[11px] font-medium tabular-nums text-(--muted-foreground)">{n + 1}</span>
-      <span className={`plat-${slug(platform)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
+      <span className={`${repoTone(repo, data.repos)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
       {/* With no room for the action beside a readable title, it wraps under it, at the right. */}
       <button type="button" className="grid min-w-28 flex-1 gap-0.5 text-left">
         <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><TwoStatusesMark item={item} className="size-3" /><span className="truncate"><ItemTitle item={item} /></span></span>
-        <span className="queue-meta truncate text-[11px] text-(--muted-foreground)">{platform} · queued {shortAgo(item.updatedAt, now)}{labels.length > 0 && ` · ${labels.join(', ')}`}</span>
+        <span className="queue-meta truncate text-[11px] text-(--muted-foreground)">{repoName(repo, data.repos)} · queued {shortAgo(item.updatedAt, now)}{labels.length > 0 && ` · ${labels.join(', ')}`}</span>
       </button>
       {waits && <span className="shrink-0 text-[11px] text-(--muted-foreground)">next when a build slot frees</span>}
       <span className="ml-auto min-w-0 max-w-full" onClick={stop}><RowAction item={item} data={data} first={first} /></span>

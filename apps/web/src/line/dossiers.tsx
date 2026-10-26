@@ -6,12 +6,12 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, CircleHelp, FlaskConical, GitPullRequest, ListChecks, Map as MapIcon } from 'lucide-react';
-import { carriesTwoStatuses, duration, formatTokens, formatUsd, itemTotal, kindOf, platformOf, plural, prLabel, ref } from '@lar-factory/shared';
+import { carriesTwoStatuses, duration, formatTokens, formatUsd, itemTotal, kindOf, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Blocker, EndToEndCheck, Item, ItemThread } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ItemTitle, PlatformTag, SliceBar } from '../items/item-parts.tsx';
+import { ItemTitle, RepoTag, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
@@ -248,13 +248,12 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
   const decisions = parts.filter((p) => p.kind !== 'build');
   const builds = parts.filter((p) => p.kind === 'build');
   const repos = [...new Set(builds.map((p) => p.item.repo ?? ''))];
-  const platformName = (repo: string) => platformOf(builds.find((b) => b.item.repo === repo)!.item, data.repos);
   // The other repositories whose builds this repository's builds wait on.
   const after = (repo: string) => [...new Set(builds.filter((b) => b.item.repo === repo).flatMap((b) => b.waitsOn)
     .flatMap((w) => builds.filter((o) => o.item.number === w.number && o.item.repo === w.repo && o.item.repo !== repo).map((o) => o.item.repo ?? '')))];
   const repoHint = (repo: string) => repos.length < 2 ? undefined
-    : after(repo).length ? `after ${after(repo).map(platformName).join(', ')}` : repos.some((r) => after(r).includes(repo)) ? 'goes first' : 'runs in parallel';
-  const platforms = [...new Set(items.map((i) => platformOf(i, data.repos)))];
+    : after(repo).length ? `after ${after(repo).map((r) => repoName(r, data.repos)).join(', ')}` : repos.some((r) => after(r).includes(repo)) ? 'goes first' : 'runs in parallel';
+  const names = [...new Set(items.map((i) => repoName(repoKey(i), data.repos)))];
   const done = items.filter(isDone).length;
   const threads = [parent, ...items].flatMap(threadsOf);
   const total = itemTotal(parent, data.items) ?? parent.stats;
@@ -267,7 +266,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
         <span className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-left">
           <span className="flex items-center gap-2 text-[11px] text-(--muted-foreground)">
             <span className="rounded border border-(--input) px-1.5 font-medium text-(--foreground)">{kindOf(parent) === 'concept' ? 'Concept' : 'Coupled work'}</span>
-            <span className="truncate">{parent.status} · {done}/{items.length} parts done · {platforms.join(' + ')}</span>
+            <span className="truncate">{parent.status} · {done}/{items.length} parts done · {names.join(' + ')}</span>
           </span>
           <span className="truncate text-base font-medium tracking-tight"><ItemTitle item={parent} /></span>
           <span className="truncate text-[11px] text-(--muted-foreground)">
@@ -295,7 +294,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
             <Heading>Parts, in order</Heading>
             {decisions.length > 0 && <Phase title="Decide" hint={`${decisions.filter((p) => isDone(p.item)).length}/${decisions.length} answered`} parts={decisions} data={data} />}
             {repos.map((repo) => (
-              <Phase key={repo} title={<>Build <PlatformTag platform={platformName(repo)} /></>} hint={repoHint(repo)} parts={builds.filter((b) => b.item.repo === repo)} data={data} />
+              <Phase key={repo} title={<>Build <RepoTag repo={repo || 'Draft'} repos={data.repos} /></>} hint={repoHint(repo)} parts={builds.filter((b) => b.item.repo === repo)} data={data} />
             ))}
             {check && <CheckPhase check={check} parent={parent} builds={builds} data={data} />}
           </div>

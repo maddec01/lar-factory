@@ -5,7 +5,7 @@ import { $, $$, addStylesheet, fetchMock, mountPage, sample, settle } from '../.
 import type { BoardData } from '@lar-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [
-  ...sample.repos, { repo: 'maddec01/lar-factory', platform: 'Factory', role: 'The factory' },
+  ...sample.repos, { repo: 'maddec01/lar-factory', role: 'The factory' },
 ] };
 const addButton = () => $<HTMLButtonElement>('.add-item')!;
 const dialog = () => $('#add-item-dialog');
@@ -48,7 +48,7 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
   expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Add item');
   expect(document.activeElement, 'focus starts on the repo select').toBe(field('item-repo'));
   expect($$<HTMLOptionElement>('#item-repo option').map((o) => [o.value, o.textContent])).toEqual([
-    ['maddec01/lar-server', 'Server'], ['maddec01/lar-apple', 'Apple'], ['maddec01/lar-factory', 'Factory']]);
+    ['maddec01/lar-server', 'lar-server'], ['maddec01/lar-apple', 'lar-apple'], ['maddec01/lar-factory', 'lar-factory']]);
   expect($$<HTMLOptionElement>('#item-kind option').map((o) => o.value)).toEqual(['', 'bug', 'feature', 'improvement']);
   expect($('label[for="item-title"]')!.textContent).toBe('Title (required)');
   expect(field('item-title').required).toBe(true);

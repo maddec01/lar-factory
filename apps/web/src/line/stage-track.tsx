@@ -4,10 +4,10 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { duration, formatTokens, formatUsd, openBlockers, platformOf, ref, shortAgo, slug } from '@lar-factory/shared';
+import { duration, formatTokens, formatUsd, openBlockers, ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats, Status } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ItemTitle, SliceBar, SliceList } from '../items/item-parts.tsx';
+import { ItemTitle, SliceBar, SliceList, repoTone } from '../items/item-parts.tsx';
 import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
 
 const STAGES: { name: string; short: string; statuses: Status[] }[] = [
@@ -119,19 +119,19 @@ export function Row({ item, data, now, side, waiting, nested, children }: {
 }) {
   const [slices, setSlices] = useState(false);
   const isPicked = useItemDialogStore((state) => state.itemId === item.id);
-  const platform = platformOf(item, data.repos);
+  const repo = repoKey(item);
   const blocked = openBlockers(item).length;
   return (
     <div className="border-b border-(--border) last:border-b-0">
       <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id} className={`${GRID} cursor-pointer py-2 hover:bg-(--accent) ${picked(isPicked)}`}>
         <span title={`${ref(item)} ${item.title}`} className="flex min-w-0 items-start gap-2 text-left">
           {nested && <span className="mb-auto ml-1 h-3 w-2.5 shrink-0 rounded-bl border-b border-l border-(--input)" />}
-          <span className={`plat-${slug(platform)} mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
+          <span className={`${repoTone(repo, data.repos)} mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
           <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-1">
             <span className="truncate text-[13px]"><ItemTitle item={item} /></span>
             <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-(--muted-foreground)">
               <TwoStatusesMark item={item} className="size-3" />
-              <span className="truncate">{item.status} · {platform} · {shortAgo(item.updatedAt, now)}</span>
+              <span className="truncate">{item.status} · {repoName(repo, data.repos)} · {shortAgo(item.updatedAt, now)}</span>
               {blocked > 0 && <span className="shrink-0 rounded bg-(--error-surface) px-1 text-(--error-foreground)">blocked by {blocked}</span>}
             </span>
             {item.slices.length > 0 && <SliceSummary item={item} open={slices} onToggle={() => setSlices(!slices)} />}

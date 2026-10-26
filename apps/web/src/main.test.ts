@@ -118,7 +118,7 @@ test("the lost server's banner closes, and the next failure after the server ans
 
 test('new data keeps focus and the groups the user collapsed', async () => {
   await mountPage(fresh);
-  const chevron = () => $<HTMLButtonElement>('.list-group[data-platform="Server"] button[aria-expanded]')!;
+  const chevron = () => $<HTMLButtonElement>('.list-group[data-repo="maddec01/lar-server"] button[aria-expanded]')!;
   await settle(() => chevron().click());
   $('.add-item')!.focus();
 

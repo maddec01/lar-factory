@@ -27,7 +27,7 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   await openItem('I_sample13');
   expect(dialog()!.getAttribute('role')).toBe('dialog');
   const meta = inDialog('[data-slot="dialog-header"] > div')!;
-  expect(text(meta)).toBe('Server Ready · updated 1h agoblocked by 1');
+  expect(text(meta)).toBe('lar-server Ready · updated 1h agoblocked by 1');
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('#140 Owner accounts');
   const parent = inDialog<HTMLAnchorElement>('[data-slot="dialog-description"] a')!;
   expect([text(parent), parent.href]).toEqual(['#200 lar cloud: website sign-in and relay', 'https://github.com/maddec01/lar-server/issues/200']);
@@ -55,7 +55,7 @@ test('the slice rows are 13px with the status word at 11px', async () => {
 test('the dialog shows the hint, each pull request with its checks, and the agent work figures', async () => {
   await mountPage();
   await openItem('I_sample14');
-  expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/^Apple In progress · updated 25m ago$/);
+  expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/^lar-apple In progress · updated 25m ago$/);
   const pr = inDialog('section li')!;
   expect([text(pr), pr.querySelector('a')!.getAttribute('href')]).toEqual(['PR #33 (draft)checks running', 'https://github.com/maddec01/lar-apple/pull/33']);
   expect($$('[data-item-dialog] dl > div').map(text)).toEqual(['Agent time2h 14m', 'Wall time1h 20m', 'Tokens16.6M', 'Cost$24.18']);
@@ -187,7 +187,7 @@ test('an issue with two statuses shows in the first with a warning mark, and its
   expect($('[data-item="I_sample07"] [data-two-statuses]')!.getAttribute('aria-label')).toBe('Carries Shaping and Review; keep one');
   expect($('[data-item="I_sample06"] [data-two-statuses]'), 'one status, no mark').toBeNull();
   await openItem('I_sample07');
-  expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/^\w+ Shaping · /);
+  expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/^[\w-]+ Shaping · /);
   expect(inDialog('[data-slot="dialog-header"] [data-two-statuses]')).not.toBeNull();
   expect(text(inDialog('[data-slot="dialog-panel"] > div:nth-child(2)'))).toBe('This issue carries Shaping and Review. Keep one to move it again.');
   expect(footerControls()).toEqual(['GitHub', 'Keep Shaping', 'Keep Review']);

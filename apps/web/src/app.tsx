@@ -3,7 +3,7 @@
 // replaces the main area's content and the sidebar shows only its brand and Settings. Settings takes the main area's
 // place, hiding the board rather than closing it, so Back finds it as it was.
 
-import { boardSections, failedCheck, platformOf } from '@lar-factory/shared';
+import { boardSections, failedCheck, repoKey, sameRepo } from '@lar-factory/shared';
 import { useBoardStore } from './board/board-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
@@ -22,7 +22,7 @@ import { TitleBar } from './title-bar/title-bar.tsx';
 function Content() {
   const { data, now } = useBoardStore();
   const scope = useSidebarStore((state) => state.scope);
-  const items = scope ? data.items.filter((i) => platformOf(i, data.repos) === scope) : data.items;
+  const items = scope ? data.items.filter((i) => sameRepo(repoKey(i), scope)) : data.items;
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="grid gap-7 px-6 py-5">

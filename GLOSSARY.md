@@ -256,13 +256,9 @@ _Avoid_: filter, visibility
 A repository's choice to show only items that carry a status, instead of every open item its item source lists.
 _Avoid_: filter, allowlist
 
-**Platform**:
-The short name `config.json` gives a repository, such as Apple or Server; the sidebar groups by it and the Scope picks one.
-_Avoid_: project, repo type
-
 **Scope**:
-The platform whose repository the board shows, picked in the title bar or the sidebar, or all repositories.
-_Avoid_: project, filter
+The repository the board shows, picked in the title bar or the sidebar, or all repositories.
+_Avoid_: project, filter, platform
 
 **Desk**:
 The row of items only the user can move on: Ready, Needs you, Verify and Ready to merge. Each card has the button for its next action.

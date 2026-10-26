@@ -45,6 +45,14 @@ export function writeRepositoryList(home: string, repos: readonly string[]): voi
   writeFileSync(join(dir, 'repositories.json'), JSON.stringify({ repositories: repos.map((repo) => ({ repo })) }));
 }
 
+/** Lists TEST_REPOSITORIES under `home` with `repo` still onboarding, its PR open. */
+export function writeOnboarding(home: string, repo: string): void {
+  const progress = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'project-factory' }, prUrl: `https://github.com/${repo}/pull/1` };
+  writeRepositoryList(home, TEST_REPOSITORIES);
+  const file = join(home, 'Library/Application Support/Lar Factory/repositories.json');
+  writeFileSync(file, JSON.stringify({ repositories: TEST_REPOSITORIES.map((r) => (r === repo ? { repo: r, onboarding: progress } : { repo: r })) }));
+}
+
 /**
  * Starts a board on the fake gh, whose state `options` holds. Its home lists TEST_REPOSITORIES as onboarded, or
  * `options.repositories` (null for no list file), unless the home already has a list. `skillCheck`, when given, plays

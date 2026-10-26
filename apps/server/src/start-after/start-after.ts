@@ -1,10 +1,11 @@
 // Start after: the blocked parts whose start is armed, kept in a JSON file in the board server's data folder so they
 // survive a restart. After each read the board starts every armed part whose blockers have all closed, on the model
-// choice it was armed with: Start build for a Ready build, today's Start for a Queued item.
+// choice it was armed with: Start build for a Ready build, today's Start for a Queued item. A part whose repository is
+// still onboarding waits for onboarding's PR to merge.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { isRecord, openBlockers, repositoryProjectHint } from '@lar-factory/shared';
+import { isOnboarding, isRecord, openBlockers, startHold } from '@lar-factory/shared';
 import type { ArmedStart, Item, ModelGroup } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
@@ -17,7 +18,7 @@ export interface StartAfter {
   arm(itemId: string, model: unknown): Reply;
   /** Disarms the item's start and clears the error its last one left. */
   disarm(itemId: string): Reply;
-  /** Starts every armed part whose blockers have all closed; a started or failed one is disarmed. */
+  /** Starts every armed part whose blockers have all closed and whose repository is done onboarding; a started or failed one is disarmed. */
   startUnblocked(): Promise<void>;
 }
 
@@ -103,9 +104,9 @@ export function createStartAfter({ board, commands, offerModelChoices, file, ren
       }
       if (!item.repo || item.number === null) return withBoard(409, { error: 'This item needs an issue before it can start.' });
       if (!isOpen(item)) return withBoard(409, { error: 'Nothing blocks this item now. Start it instead.' });
-      // Its start would fail without the repository's T3 project, so the hint shows now, not once its blockers close.
-      const hint = repositoryProjectHint(board.snapshot(), item.repo);
-      if (hint) return withBoard(409, { error: hint });
+      // Its start would fail while its repository is onboarding or has no T3 project, so the hold shows now, not once its blockers close.
+      const hold = startHold(board.snapshot(), item.repo);
+      if (hold) return withBoard(409, { error: hold });
       let entry: ArmedStart = {};
       if (model !== undefined) {
         const choice = findModelChoice(offerModelChoices(), model);
@@ -131,7 +132,8 @@ export function createStartAfter({ board, commands, offerModelChoices, file, ren
           if (error) log(error);
           return [];
         }
-        return isOpen(item) ? [] : [startNow(item, entry)];
+        // A part whose repository is still onboarding stays armed until onboarding's PR merges.
+        return isOpen(item) || isOnboarding(board.snapshot(), item.repo) ? [] : [startNow(item, entry)];
       });
       await Promise.all(runs);
     },

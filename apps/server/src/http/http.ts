@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, type ProjectChoice } from '@lar-factory/shared';
+import { pageWithData, type OnboardingRepository, type ProjectChoice } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -29,6 +29,8 @@ export interface HttpDeps {
   ready(): Promise<void> | undefined;
   /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
   projectChoices(): Promise<ProjectChoice[]>;
+  /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
+  keepOnboarding(input: Record<string, unknown>): { onboarding: OnboardingRepository[] } | { status: number; error: string };
 }
 
 export interface BoardServer {
@@ -103,7 +105,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices }: HttpDeps): BoardServer {
+export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -156,6 +158,16 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       what: 'the item to abandon', disabled: 'Abandoning is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),
       run: forItem('Name the item to abandon.', (itemId) => commands.abandon(itemId)),
+    },
+    '/api/onboarding/repositories': {
+      what: 'the onboarding to keep', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const kept = keepOnboarding(input);
+        if ('error' in kept) return { status: kept.status, body: { error: kept.error } };
+        board.update({ onboarding: kept.onboarding });
+        board.push();
+        return { status: 200, body: withBoard({ error: null }) };
+      },
     },
     // Looks the tools up again for the notices' Recheck button.
     '/api/recheck': {

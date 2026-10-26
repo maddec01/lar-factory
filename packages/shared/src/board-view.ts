@@ -39,10 +39,10 @@ export interface BoardSections {
   done: Item[];
 }
 
-/** Whether no repository is known to be onboarded. Before the first read, beside a read error or a repository left
- * off the board, an empty repos isn't known to mean none. */
+/** Whether no repository is known to be onboarded or onboarding. Before the first read, beside a read error or a
+ * repository left off the board, an empty repos isn't known to mean none. */
 export function noneOnboarded(data: BoardData): boolean {
-  return !data.repos.length && !data.repositoryConfigProblems?.length && !data.error && data.fetchedAt !== null;
+  return !data.repos.length && !data.onboarding?.length && !data.repositoryConfigProblems?.length && !data.error && data.fetchedAt !== null;
 }
 
 export function boardSections(data: BoardData, now: number): BoardSections {

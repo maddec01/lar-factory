@@ -2,9 +2,9 @@
 // and each repository's Repository config, its .lar-factory.json read from its default branch.
 // skills/lar-work/scripts/repo-config.sh reads the same files, with the same shapes, defaults and wording.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { SHOW_SETTINGS, type RepositoryConfigProblem, type ShowSetting } from '@lar-factory/shared';
+import { SHOW_SETTINGS, isRecord, sameRepo, type OnboardingProgress, type OnboardingRepository, type RepositoryConfigProblem, type ShowSetting } from '@lar-factory/shared';
 import { readDefaultBranchFile } from '../github/github.ts';
 import { boardDataDir } from '../port/board-record.ts';
 
@@ -27,9 +27,10 @@ export interface BoardSettings {
   problem?: string;
 }
 
-/** An onboarded repository, an entry of repositories.json's `repositories`. */
+/** An onboarded repository, an entry of repositories.json's `repositories`, with where it stopped while it is still onboarding. */
 export interface OnboardedRepository {
   repo: string;
+  onboarding?: OnboardingProgress;
 }
 
 /** owner/name, each part of letters, digits, ".", "_" or "-", and neither "." nor ".."; repo-config.sh's repo_form. */
@@ -41,22 +42,69 @@ function readJson(file: string): unknown {
   catch { throw new Error(`${file} isn't valid JSON.`); }
 }
 
-/** repositories.json's entries, `{ "repositories": [{ "repo": "owner/name" }] }`; none when there is no file. */
-export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] {
-  const file = join(dir, 'repositories.json');
-  if (!existsSync(file)) return [];
+const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
+
+/** Whether an entry's onboarding is progress the dialog can resume from. */
+export function isProgress(value: unknown): value is OnboardingProgress {
+  return isRecord(value) && typeof value.step === 'string' && strings(value.done) && isRecord(value.answers)
+    && typeof value.answers.projectId === 'string' && (value.prUrl === undefined || typeof value.prUrl === 'string');
+}
+
+/** repositories.json's entries as the file holds them, checked; none when there is no file. */
+function readListFile(file: string): { raw: Record<string, unknown> & { repositories: Record<string, unknown>[] }; list: OnboardedRepository[] } {
+  if (!existsSync(file)) return { raw: { repositories: [] }, list: [] };
   const raw = readJson(file) as { repositories?: unknown } | null;
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || !Array.isArray(raw.repositories)) {
     throw new Error(`${file}: expected an object with a repositories array, like {"repositories": [{"repo": "owner/name"}]}.`);
   }
-  return raw.repositories.map((entry: unknown, index) => {
+  const list = raw.repositories.map((entry: unknown, index): OnboardedRepository => {
     const repo = (entry as { repo?: unknown } | null)?.repo;
     if (typeof entry !== 'object' || typeof repo !== 'string' || !REPO.test(repo)) {
       throw new Error(`${file}: repositories[${index}] needs a repo of the form owner/name.`);
     }
-    return { repo };
+    const { onboarding } = entry as { onboarding?: unknown };
+    if (onboarding === undefined) return { repo };
+    if (!isProgress(onboarding)) throw new Error(`${file}: repositories[${index}] has an onboarding without its step, done steps and T3 project.`);
+    return { repo, onboarding };
   });
+  return { raw: raw as { repositories: Record<string, unknown>[] }, list };
 }
+
+/**
+ * repositories.json's entries, `{ "repositories": [{ "repo": "owner/name" }] }`, where an entry still onboarding
+ * carries its progress as `onboarding`; none when there is no file.
+ */
+export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] {
+  return readListFile(join(dir, 'repositories.json')).list;
+}
+
+/**
+ * Stores where an onboarding stopped in its repository's entry, adding the entry when there is none, and drops the
+ * onboarding entry of `replaces`, the repository it was saved under before it picked another T3 project. Keeps every
+ * other entry as the file has it, and returns the list. Throws for a repository that is onboarded already.
+ */
+export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
+  if (!REPO.test(repo)) throw new Error(`${repo} isn't a repository of the form owner/name.`);
+  const file = join(dir, 'repositories.json');
+  const { raw, list } = readListFile(file);
+  const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces)));
+  if (onboarded) throw new Error(`${onboarded.repo} is onboarded already.`);
+  const entry = { repo, onboarding: progress };
+  const at = list.findIndex((e) => sameRepo(e.repo, repo));
+  const dropped = (e: OnboardedRepository) => sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces);
+  const repositories = raw.repositories.flatMap((e, i) => i === at ? [entry] : dropped(list[i]!) ? [] : [e]);
+  if (at < 0) repositories.push(entry);
+  mkdirSync(dir, { recursive: true });
+  // Written beside it, then renamed over it, so repo-config.sh never reads half a file.
+  const temp = `${file}.${process.pid}.tmp`;
+  writeFileSync(temp, `${JSON.stringify({ ...raw, repositories }, null, 2)}\n`);
+  renameSync(temp, file);
+  return readListFile(file).list;
+}
+
+/** The list's repositories that are still onboarding, each with where it stopped. */
+export const stillOnboarding = (list: readonly OnboardedRepository[]): OnboardingRepository[] =>
+  list.flatMap(({ repo, onboarding }) => onboarding ? [{ repo, progress: onboarding }] : []);
 
 /** settings.json, with each missing field, or the whole file, taking its default; a file it can't use takes them all, with the problem. */
 export function readBoardSettings(dir = boardDataDir()): BoardSettings {

@@ -8,13 +8,14 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
-import { readBoardSettings, readOnboardedConfigs, readRepositoryList, type OnboardedRepository } from './config/repository-config.ts';
+import { readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { onboardedSources, repoView } from './items/item-sources.ts';
 import { log } from './log.ts';
+import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import { projectChoices } from './onboarding/project-choices.ts';
 import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
@@ -61,11 +62,12 @@ const items = onboardedSources(async () => {
   try { list = readRepositoryList(); }
   catch (err) {
     // A list the board can't read onboards nothing, so no repository or notice of the last good read stays beside its error.
-    board.update({ repos: [], repositoryConfigProblems: [] });
+    board.update({ repos: [], repositoryConfigProblems: [], onboarding: [] });
     throw err;
   }
-  const read = await readOnboardedConfigs(list);
-  board.update({ repos: read.configs.map(repoView), repositoryConfigProblems: read.problems });
+  // A repository still onboarding has no Repository config on its default branch until its PR merges.
+  const read = await readOnboardedConfigs(list.filter((e) => !e.onboarding));
+  board.update({ repos: read.configs.map(repoView), repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list) });
   return read;
 });
 let refreshing = false;
@@ -270,6 +272,7 @@ const startAfter = createStartAfter({ board, commands, offerModelChoices, file: 
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: () => projectChoices(onboarded()),
+  keepOnboarding: (input) => keepOnboarding(input),
 });
 
 /** Logs why the board can't start and exits. */
@@ -295,6 +298,8 @@ reportListening(port);
 if (!fixture) process.on('exit', recordBoard(port));
 // Sample mode runs no tools, so it looks none up. The check starts the first read once gh works.
 if (!fixture) firstToolCheck = recheckTools();
+// The repositories still onboarding show before the first read, which waits for gh.
+if (!fixture) board.update({ onboarding: stillOnboarding(onboarded()) });
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).

@@ -21,6 +21,7 @@ test('normalizes an issue item from the GraphQL response', () => {
     status: { name: 'Needs you' },
     content: {
       __typename: 'Issue',
+      id: 'I_61',
       number: 61,
       title: 'Arr instances',
       url: 'https://github.com/maddec01/lar-server/issues/61',
@@ -40,6 +41,7 @@ test('normalizes an issue item from the GraphQL response', () => {
     },
   };
   const item = normalizeItem(raw);
+  assert.equal(item?.id, 'I_61', "an item's id is its content's node id, not the Project item id");
   assert.equal(item?.status, 'Needs you');
   assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
   assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/lar-server', state: 'CLOSED' });
@@ -57,7 +59,7 @@ test('normalizes an issue item from the GraphQL response', () => {
 
 test('an item blocked by nothing has no blockers, and a draft has none either', () => {
   assert.deepEqual(normalizeItem(rawIssue('PVTI_4', 4, 'List', ['feature']))?.blockers, []);
-  assert.deepEqual(normalizeItem({ id: 'PVTI_5', updatedAt: '', status: null, content: { __typename: 'DraftIssue', title: 'Idea', updatedAt: '' } })?.blockers, []);
+  assert.deepEqual(normalizeItem({ id: 'PVTI_5', updatedAt: '', status: null, content: { __typename: 'DraftIssue', id: 'DI_5', title: 'Idea', updatedAt: '' } })?.blockers, []);
 });
 
 test("a concept's body becomes its map, and no other item keeps the body", () => {
@@ -81,9 +83,9 @@ test('an item with sub-issues on the board takes its map from its body, as a con
     rawIssue('PVTI_14', 14, 'In progress', ['feature'], { body }),
   ]);
   const map = (id: string) => items.find((i) => i.id === id)?.map;
-  assert.deepEqual(map('PVTI_10'), { destination: 'There.', decisions: [], fog: [], check: { title: 'It works', steps: ['Try it'] } });
-  assert.equal(map('PVTI_12'), undefined, 'a parent whose body has no map sections has no map yet');
-  assert.equal(map('PVTI_14'), undefined, 'no sub-issue on the board, so no dossier and no map');
+  assert.deepEqual(map('I_10'), { destination: 'There.', decisions: [], fog: [], check: { title: 'It works', steps: ['Try it'] } });
+  assert.equal(map('I_12'), undefined, 'a parent whose body has no map sections has no map yet');
+  assert.equal(map('I_14'), undefined, 'no sub-issue on the board, so no dossier and no map');
   assert.ok(items.every((i) => !('body' in i)));
 });
 
@@ -103,8 +105,9 @@ test('drafts, unknown statuses and hidden content', () => {
     id: 'PVTI_2',
     updatedAt: '2026-10-21T08:00:00Z',
     status: null,
-    content: { __typename: 'DraftIssue', title: 'Idea', updatedAt: '2026-10-20T08:00:00Z' },
+    content: { __typename: 'DraftIssue', id: 'DI_2', title: 'Idea', updatedAt: '2026-10-20T08:00:00Z' },
   });
+  assert.equal(draft?.id, 'DI_2');
   assert.equal(draft?.status, 'List');
   assert.equal(draft?.number, null);
   assert.equal(draft?.repo, null);
@@ -116,7 +119,7 @@ test("GitHub's content type, state and close reason become the item's content, s
     const item = normalizeItem({ id: 'PVTI_8', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'Done' }, content });
     return item && [item.content, item.state, item.closedAs];
   };
-  const issue = { __typename: 'Issue', number: 8, title: 'T', updatedAt: '2026-10-21T08:00:00Z' } as const;
+  const issue = { __typename: 'Issue', id: 'I_8', number: 8, title: 'T', updatedAt: '2026-10-21T08:00:00Z' } as const;
   const pr = { ...issue, __typename: 'PullRequest' } as const;
   assert.deepEqual(read({ ...issue, state: 'OPEN', stateReason: 'REOPENED' }), ['ticket', 'open', null]);
   assert.deepEqual(read({ ...issue, state: 'CLOSED', stateReason: 'COMPLETED' }), ['ticket', 'closed', 'done']);
@@ -126,7 +129,7 @@ test("GitHub's content type, state and close reason become the item's content, s
   assert.deepEqual(read({ ...pr, state: 'OPEN' }), ['pr', 'open', null]);
   assert.deepEqual(read({ ...pr, state: 'MERGED' }), ['pr', 'closed', 'done']);
   assert.deepEqual(read({ ...pr, state: 'CLOSED' }), ['pr', 'closed', 'not-planned']);
-  assert.deepEqual(read({ __typename: 'DraftIssue', title: 'Idea', updatedAt: '2026-10-21T08:00:00Z' }), ['ticket', 'open', null]);
+  assert.deepEqual(read({ __typename: 'DraftIssue', id: 'DI_8', title: 'Idea', updatedAt: '2026-10-21T08:00:00Z' }), ['ticket', 'open', null]);
 });
 
 test("a linked PR's state is open, closed or merged", () => {
@@ -139,7 +142,7 @@ test("a linked PR's check rollup becomes counts over all checks and the earliest
   const counts = (pairs: Record<string, number>) => Object.entries(pairs).map(([state, count]) => ({ state, count }));
   const pr = (statusCheckRollup: RawLinkedPr['statusCheckRollup']) => normalizeItem({
     id: 'PVTI_4', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'Review' },
-    content: { __typename: 'Issue', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
+    content: { __typename: 'Issue', id: 'I_4', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
       closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false,
         statusCheckRollup }] } },
   })?.linkedPrs[0];
@@ -179,14 +182,14 @@ test("a linked PR carries its merge state, and a pull request item its own check
   const rollup = { contexts: { checkRunCountsByState: [{ state: 'SUCCESS', count: 2 }], statusContextCountsByState: [], nodes: [] } };
   const issue = normalizeItem({
     id: 'PVTI_6', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'Verify' },
-    content: { __typename: 'Issue', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
+    content: { __typename: 'Issue', id: 'I_6', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
       closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false, mergeStateStatus: 'DIRTY' }] } },
   });
   assert.equal(issue?.linkedPrs[0]?.mergeState, 'conflicts');
   assert.equal(issue?.pipeline, undefined, 'an issue has no pipeline of its own');
   const pr = normalizeItem({
     id: 'PVTI_7', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'Verify' },
-    content: { __typename: 'PullRequest', number: 7, title: 'P', updatedAt: '2026-10-21T08:00:00Z', isDraft: false,
+    content: { __typename: 'PullRequest', id: 'PR_7', number: 7, title: 'P', updatedAt: '2026-10-21T08:00:00Z', isDraft: false,
       mergeStateStatus: 'CLEAN', statusCheckRollup: rollup },
   });
   assert.deepEqual(pr?.pipeline, { checks: { passed: 2, failed: 0, running: 0, total: 2, since: null }, mergeState: 'can merge' });
@@ -212,7 +215,7 @@ test("a build's slices come from the board query, open and closed, in GitHub's o
 test('a slice closed as not planned is still no board item', () => {
   const dropped: RawIssueRef = { ...sliceRef(45, 'CLOSED'), stateReason: 'NOT_PLANNED' };
   const items = normalizeItems([withSubIssues('PVTI_build', 59, ['build'], [dropped]), withSubIssues('PVTI_45', 45, ['improvement'])]);
-  assert.deepEqual(items.map((i) => i.id), ['PVTI_build']);
+  assert.deepEqual(items.map((i) => i.id), ['I_59']);
   assert.deepEqual(items[0]?.slices, []);
 });
 
@@ -223,7 +226,7 @@ test('a build sub-issue the `build` search found is a board item and counts as a
     withSubIssues('PVTI_101', 101, ['improvement']),
     withSubIssues('PVTI_102', 102, ['build', 'improvement']),
   ], { builds });
-  assert.deepEqual(items.map((i) => i.id), ['PVTI_parent', 'PVTI_102'], 'the slice is dropped, the build sub-issue stays');
+  assert.deepEqual(items.map((i) => i.id), ['I_100', 'I_102'], 'the slice is dropped, the build sub-issue stays');
   assert.deepEqual(items[0]?.slices.map((s) => s.number), [101]);
   assert.deepEqual(items[0]?.subIssues, { total: 1, completed: 0 }, "a build's sub-issue counter counts only its build sub-issues");
   assert.deepEqual(normalizeItems([withSubIssues('PVTI_p', 100, ['build'], [sliceRef(102, 'CLOSED')])], { builds })[0]?.subIssues, { total: 1, completed: 1 });

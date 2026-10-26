@@ -35,8 +35,8 @@ export interface Searched {
 
 interface RawContent {
   __typename: 'Issue' | 'PullRequest' | 'DraftIssue';
-  /** An issue's node id, to read a concept's body by. */
-  id?: string;
+  /** The issue's, pull request's or draft's node id: the board's Item.id, and what a dossier's body is read by. */
+  id: string;
   /** Read for concepts only, in a query of its own. */
   body?: string;
   title: string;
@@ -90,6 +90,7 @@ export interface RawLinkedPr {
 }
 
 export interface RawItem {
+  /** The Project item id, which only the Project adapter's writes use. */
   id: string;
   updatedAt: string;
   status: { name?: string } | null;
@@ -211,7 +212,7 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
   if (!c) return null;
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
   const item: Item = {
-    id: raw.id,
+    id: c.id,
     status: toStatus(raw.status?.name),
     content: c.__typename === 'PullRequest' ? 'pr' : 'ticket',
     number: c.number ?? null,

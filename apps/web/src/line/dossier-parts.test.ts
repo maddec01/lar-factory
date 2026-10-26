@@ -9,7 +9,7 @@ import { dossiersOf, inDossiers, openWaits, partKind, partsOf } from './dossier-
 const items = (sampleJson as unknown as { items: Item[] }).items;
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
 const child = (number: number, parent: Item, change: Partial<Item> = {}): Item => ({
-  ...byNumber(129), id: `PVTI_c${number}`, number, status: 'Shaping', labels: [],
+  ...byNumber(129), id: `I_c${number}`, number, status: 'Shaping', labels: [],
   parent: { number: parent.number!, repo: parent.repo!, title: parent.title, url: parent.url!, state: 'OPEN' }, ...change,
 });
 

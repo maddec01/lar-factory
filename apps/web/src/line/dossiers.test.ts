@@ -7,8 +7,8 @@ import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 
-const C200 = 'PVTI_sample09';
-const C180 = 'PVTI_sample23';
+const C200 = 'I_sample09';
+const C180 = 'I_sample23';
 const dossier = (id = C200) => $(`[data-dossier="${id}"]`)!;
 /** The header's four cells: title, track, agent and side. */
 const header = (id = C200) => [...dossier(id).firstElementChild!.children] as HTMLElement[];
@@ -26,11 +26,11 @@ const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): 
 const writable = (data: BoardData = sample): BoardData =>
   ({ ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 /** #140 with its blocker #202 closed, on a board whose writes are on. */
-const unblocked = () => writable(withItem('PVTI_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }] }));
+const unblocked = () => writable(withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }] }));
 const c200 = sample.items.find((i) => i.id === C200)!;
 /** A Queued grill under #200, blocked by `blockers`. */
 const decision = (blockers: Item['blockers'] = []): Item => ({
-  ...sample.items.find((i) => i.id === 'PVTI_sample05')!, id: 'PVTI_d204', number: 204, title: 'Pick the relay host', labels: ['decision: grill'],
+  ...sample.items.find((i) => i.id === 'I_sample05')!, id: 'I_d204', number: 204, title: 'Pick the relay host', labels: ['decision: grill'],
   repo: c200.repo, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'OPEN' },
   blockers,
 });
@@ -81,8 +81,8 @@ test("the map shows the destination, decisions so far and open questions, each #
 });
 
 test("in the map, #n opens the issue in the concept's repository, and owner/repo#n the one in that repository", async () => {
-  const s10 = sample.items.find((i) => i.id === 'PVTI_sample10')!;
-  const twin: Item = { ...s10, id: 'PVTI_twin', repo: 'maddec01/lar-apple', url: 'https://github.com/maddec01/lar-apple/issues/201', title: 'Apple twin' };
+  const s10 = sample.items.find((i) => i.id === 'I_sample10')!;
+  const twin: Item = { ...s10, id: 'I_twin', repo: 'maddec01/lar-apple', url: 'https://github.com/maddec01/lar-apple/issues/201', title: 'Apple twin' };
   const map = { ...c200.map!, decisions: [...c200.map!.decisions, 'The apps follow maddec01/lar-apple#201.'] };
   await mountPage({ ...sample, items: [twin, ...sample.items.map((i) => (i.id === C200 ? { ...i, map } : i))] });
   const about = dossier().querySelector('[data-about]')!;
@@ -95,7 +95,7 @@ test("in the map, #n opens the issue in the concept's repository, and owner/repo
 test('the checklist runs Decide, then Build per repository, then Check, the done parts folded', async () => {
   await mountPage();
   expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build Server', 'Checkthe agents run it once every build lands']);
-  expect([...phases()[0]!.querySelectorAll('[data-part]')].map((s) => s.getAttribute('data-part'))).toEqual(['PVTI_sample10', 'PVTI_sample12']);
+  expect([...phases()[0]!.querySelectorAll('[data-part]')].map((s) => s.getAttribute('data-part'))).toEqual(['I_sample10', 'I_sample12']);
   const fold = button(phases()[0]!, '1 done');
   await press(fold);
   expect([fold.getAttribute('aria-expanded'), phases()[0]!.querySelectorAll('[data-part]').length]).toEqual(['true', 3]);
@@ -105,28 +105,28 @@ test('the checklist runs Decide, then Build per repository, then Check, the done
 test('each step shows its kind, what it waits on, its figures and its own thread', async () => {
   await mountPage();
   const lines = (id: string) => [...step(id).children].map(text);
-  expect(lines('PVTI_sample10')).toEqual(['#201 Relay: broker only or full TURN?grillOpen thread', 'Shaping28m · 1.87M · $2.71waits on #203', 'T3 · Grill: relay broker only or full TURN· running']);
-  expect(lines('PVTI_sample12')).toEqual(['#202 Sign-in screenprototypeon your desk', 'Needs you41m · 2.95M · $4.35', 'T3 · Prototype: sign-in screen· needs you']);
-  expect(lines('PVTI_sample13')).toEqual(['#140 Owner accountsbuildStart buildStart after #202 ▾', 'Ready1/3 sliceswaits on #202', '', 'T3 · Shape: owner accounts· done']);
-  const chip = button(step('PVTI_sample13'), '#202');
+  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?grillOpen thread', 'Shaping28m · 1.87M · $2.71waits on #203', 'T3 · Grill: relay broker only or full TURN· running']);
+  expect(lines('I_sample12')).toEqual(['#202 Sign-in screenprototypeon your desk', 'Needs you41m · 2.95M · $4.35', 'T3 · Prototype: sign-in screen· needs you']);
+  expect(lines('I_sample13')).toEqual(['#140 Owner accountsbuildStart buildStart after #202 ▾', 'Ready1/3 sliceswaits on #202', '', 'T3 · Shape: owner accounts· done']);
+  const chip = button(step('I_sample13'), '#202');
   expect(chip.className, 'an open blocker').toContain('text-(--warning-foreground)');
-  expect(button(step('PVTI_sample10'), '#203').querySelector('.lucide-check'), 'a closed one is ticked').not.toBeNull();
+  expect(button(step('I_sample10'), '#203').querySelector('.lucide-check'), 'a closed one is ticked').not.toBeNull();
   await press(chip);
   expect(dialogTitle()).toBe('#202 Sign-in screen');
 });
 
 test('a step with no thread yet says when its thread starts', async () => {
-  await mountPage(withItem('PVTI_sample13', { threads: [] }));
-  expect(text(step('PVTI_sample13').lastElementChild)).toBe('Thread starts when #202 is done');
+  await mountPage(withItem('I_sample13', { threads: [] }));
+  expect(text(step('I_sample13').lastElementChild)).toBe('Thread starts when #202 is done');
 });
 
 test('the progress rows sit on the stage track, done parts folded, each side saying what it waits on', async () => {
   await mountPage();
   expect(text(dossier().lastElementChild!.firstElementChild!.firstElementChild)).toBe('Progress · 4 parts');
-  expect(progress().map((r) => r.dataset.item)).toEqual(['PVTI_sample10', 'PVTI_sample12', 'PVTI_sample13']);
+  expect(progress().map((r) => r.dataset.item)).toEqual(['I_sample10', 'I_sample12', 'I_sample13']);
   const side = (id: string) => text(row(id).lastElementChild);
-  expect([side('PVTI_sample10'), side('PVTI_sample12'), side('PVTI_sample13')]).toEqual(['running', 'on your desk', 'waits on #202']);
-  expect(row('PVTI_sample13').children[1]!.getAttribute('title'), 'a waiting part is dashed').toBe('Ready, waiting');
+  expect([side('I_sample10'), side('I_sample12'), side('I_sample13')]).toEqual(['running', 'on your desk', 'waits on #202']);
+  expect(row('I_sample13').children[1]!.getAttribute('title'), 'a waiting part is dashed').toBe('Ready, waiting');
   await press(button(dossier(C180), '2 done'));
   expect(progress(C180).map((r) => text(r.lastElementChild))).toEqual(['PR #182 (merged)', 'PR #41 (merged)']);
   expect(button(dossier(C180), 'Hide 2 done')).toBeDefined();
@@ -134,20 +134,20 @@ test('the progress rows sit on the stage track, done parts folded, each side say
 
 test('Start build on a blocked build is disabled, its title naming the blocker, and Start after joins it', async () => {
   await mountPage();
-  const start = startIn(step('PVTI_sample13'))!;
+  const start = startIn(step('I_sample13'))!;
   expect([text(start), start.disabled, start.title]).toEqual(['Start build', true, 'Blocked by #202 until it closes']);
-  expect(text(step('PVTI_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
+  expect(text(step('I_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
   expect(text(header()[3]), 'the header offers no start while a part waits on you').toBe('#202 waits on you');
 });
 
 test('once its blockers close, Start build sends the build, and the header offers it too', async () => {
   holdPosts(unblocked());
-  await mountPage(withItem('PVTI_sample12', { status: 'Shaping' }, unblocked()));
+  await mountPage(withItem('I_sample12', { status: 'Shaping' }, unblocked()));
   expect(text(startIn(header()[3]!))).toBe('Start #140 ▾');
-  await press(startIn(step('PVTI_sample13'))!);
+  await press(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
   await press(entries()[1]!);
-  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'PVTI_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   await answer({ thread: null, error: 'T3 is down.' }, 502);
   expect(text(dossier().querySelector('p.start [role="alert"]')), 'its error shows under its row').toBe('T3 is down.');
 });
@@ -155,10 +155,10 @@ test('once its blockers close, Start build sends the build, and the header offer
 test("Start on a Queued decision is today's Start", async () => {
   holdPosts(withDecision());
   await mountPage(withDecision());
-  expect(text(step('PVTI_d204'))).toMatch(/^#204 Pick the relay hostgrillStart ▾/);
-  await press(startIn(step('PVTI_d204'))!);
+  expect(text(step('I_d204'))).toMatch(/^#204 Pick the relay hostgrillStart ▾/);
+  await press(startIn(step('I_d204'))!);
   await press(entries()[0]!);
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'PVTI_d204' }]]);
+  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_d204' }]]);
 });
 
 test('Start on a Queued decision is disabled while a blocker is open, its title naming it, and Start after names the last open one', async () => {
@@ -166,36 +166,36 @@ test('Start on a Queued decision is disabled while a blocker is open, its title 
     { number: 140, repo: 'maddec01/lar-server', state: 'OPEN' }]);
   holdPosts(data);
   await mountPage(data);
-  const start = startIn(step('PVTI_d204'))!;
+  const start = startIn(step('I_d204'))!;
   expect([text(start), start.disabled, start.title]).toEqual(['Start', true, 'Blocked by #201, #140 until they close']);
-  const after = step('PVTI_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Starts by itself once #201, #140 close']);
   await press(after);
   await press(entries()[0]!);
-  expect(posted(), 'T3 default arms it with no model').toEqual([['/api/arm', { session: 's1', itemId: 'PVTI_d204' }]]);
-  await answer({ error: null, board: { ...data, armed: { PVTI_d204: {} } } });
-  expect(text(step('PVTI_d204').querySelector('[data-start-after]'))).toBe('Starts after #140 ✓');
+  expect(posted(), 'T3 default arms it with no model').toEqual([['/api/arm', { session: 's1', itemId: 'I_d204' }]]);
+  await answer({ error: null, board: { ...data, armed: { I_d204: {} } } });
+  expect(text(step('I_d204').querySelector('[data-start-after]'))).toBe('Starts after #140 ✓');
 });
 
 test('in the map, a part waiting on something that is neither Ready nor Queued starts by itself after it', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('PVTI_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'OPEN' }] }));
+  await mountPage(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'OPEN' }] }));
   await press(button(dossier(), 'Map'));
-  expect(text(dossier().querySelector('[data-map-part="PVTI_sample10"]'))).toContain('starts by itself after #203');
+  expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('starts by itself after #203');
 });
 
 test("in the map, a part waiting on another repository's issue names it without its owner", async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage(withItem('PVTI_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' }] }));
+  await mountPage(withItem('I_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' }] }));
   await press(button(dossier(), 'Map'));
-  expect(text(dossier().querySelector('[data-map-part="PVTI_sample10"]'))).toContain('starts by itself after lar-apple#12');
+  expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('starts by itself after lar-apple#12');
 });
 
 test('Open thread takes Start\'s place while a part has a live thread', async () => {
   const data = withDecision();
-  await mountPage(withItem('PVTI_d204', { threads: [thread('t1', 'running')] }, data));
-  expect(startIn(step('PVTI_d204'))).toBeNull();
-  expect(step('PVTI_d204').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/t1');
+  await mountPage(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
+  expect(startIn(step('I_d204'))).toBeNull();
+  expect(step('I_d204').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/t1');
 });
 
 test("the end-to-end check comes from the map: its title, numbered steps and waiting, with running it not built yet", async () => {
@@ -231,16 +231,16 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   expect(dossier().querySelector('[data-about]'), 'the map\'s sections stay under it').not.toBeNull();
   expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research', 'Serverlar-server']);
   expect([...map.querySelectorAll('.h-7\\.5')].map(text)).toEqual(['Wave 1· 2 in parallel', 'Wave 2· 2 in parallel', 'Check']);
-  expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part'))).toEqual(['PVTI_sample18', 'PVTI_sample12', 'PVTI_sample10', 'PVTI_sample13']);
+  expect([...map.querySelectorAll('[data-map-part]')].map((n) => n.getAttribute('data-map-part'))).toEqual(['I_sample18', 'I_sample12', 'I_sample10', 'I_sample13']);
   expect([...map.querySelectorAll('path[data-edge]')].map((p) => p.getAttribute('data-edge'))).toEqual([
     'maddec01/lar-server#203 maddec01/lar-server#201', 'maddec01/lar-server#202 maddec01/lar-server#140', 'maddec01/lar-server#140 e2e',
   ]);
   expect(text(map.querySelector('[data-map-check]'))).toBe('end-to-end checkSign in on the website, then stream from a phone off Wi-Fiwaiting · 3 stepsagents run it once #140 land');
   const node = (id: string) => map.querySelector(`[data-map-part="${id}"]`)!;
-  expect(startIn(node('PVTI_sample13')), 'a blocked part offers Start after alone').toBeNull();
-  expect(text(node('PVTI_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
-  expect(text(node('PVTI_sample12').querySelector('[data-open-thread]'))).toBe('Answer in T3');
-  await press(node('PVTI_sample10').querySelector('button')!);
+  expect(startIn(node('I_sample13')), 'a blocked part offers Start after alone').toBeNull();
+  expect(text(node('I_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
+  expect(text(node('I_sample12').querySelector('[data-open-thread]'))).toBe('Answer in T3');
+  await press(node('I_sample10').querySelector('button')!);
   expect(dialogTitle()).toBe('#201 Relay: broker only or full TURN?');
 });
 
@@ -253,12 +253,12 @@ test('an item with sub-issues on the board is coupled work; with no map, it says
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
   await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });
-  const d = dossier('PVTI_parent');
-  expect(text(header('PVTI_parent')[0]!.firstElementChild)).toBe('Coupled workIn progress · 0/1 parts done · lar-factory');
+  const d = dossier('I_100');
+  expect(text(header('I_100')[0]!.firstElementChild)).toBe('Coupled workIn progress · 0/1 parts done · lar-factory');
   expect(text(d.querySelector('[data-checklist]')!.previousElementSibling)).toBe("No map yet: the parts come from GitHub's sub-issues.");
-  expect(progress('PVTI_parent').map((r) => r.dataset.item), 'its build sub-issue is a part; its slice is not').toEqual(['PVTI_102']);
-  expect(phases('PVTI_parent').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build lar-factory']);
-  expect($('[data-in-flight] [data-item="PVTI_102"]'), 'out of the rest of the line').toBeNull();
+  expect(progress('I_100').map((r) => r.dataset.item), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
+  expect(phases('I_100').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build lar-factory']);
+  expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();
 });
 
 test('the dossiers take the main area\'s scope', async () => {

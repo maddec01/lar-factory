@@ -19,4 +19,6 @@ export interface ItemSource {
   /** Sets the status of a child's parent that isn't on the board, adding it to the item source first. */
   setParentStatus(parent: NonNullable<Item['parent']>, status: Status): Promise<string | null>;
   abandon(item: Item): Promise<string | null>;
+  /** The Item.id now of an item a record saved under an id from before Item.id was the content's node id; undefined when none is. */
+  renamedId?(savedId: string): string | undefined;
 }

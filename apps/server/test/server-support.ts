@@ -130,7 +130,7 @@ export async function until(board: Board, check: (data: BoardData) => boolean): 
 
 /** A draft project item, as the fake gh returns it. */
 export const draftItem = (status: string) => ({ id: 'PVTI_draft', updatedAt: '2026-10-21T09:00:00Z', status: { name: status },
-  content: { __typename: 'DraftIssue', title: 'Idea', updatedAt: '2026-10-21T09:00:00Z' } });
+  content: { __typename: 'DraftIssue', id: 'DI_draft', title: 'Idea', updatedAt: '2026-10-21T09:00:00Z' } });
 
 /** Environment for a board that can Start maddec01/lar-factory items: a temporary home holding its
  * checkout, and a T3 database with a live project there. */

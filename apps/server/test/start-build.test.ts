@@ -33,13 +33,13 @@ const writes = async (board: Board) => (await board.calls())
 
 test('Start build labels the build, moves its parent to In progress and starts the build thread in a new worktree', async (t) => {
   const { board, home } = await buildBoard(t, [readyIssue(12, ['feature'], 40), projectIssue(40, 'Ready', undefined, ['concept'])]);
-  const response = await startBuild(board, 'PVTI_12');
+  const response = await startBuild(board, 'I_12');
   assert.equal(response.status, 200);
   const answer = await response.json();
   assert.equal(answer.thread.threadId, 'thread-1');
-  assert.equal(answer.board.startedBuilds.PVTI_12.threadId, 'thread-1');
-  assert.deepEqual(answer.board.items.find((i: { id: string }) => i.id === 'PVTI_12').labels, ['feature', 'build']);
-  assert.equal(answer.board.items.find((i: { id: string }) => i.id === 'PVTI_40').status, 'In progress');
+  assert.equal(answer.board.startedBuilds.I_12.threadId, 'thread-1');
+  assert.deepEqual(answer.board.items.find((i: { id: string }) => i.id === 'I_12').labels, ['feature', 'build']);
+  assert.equal(answer.board.items.find((i: { id: string }) => i.id === 'I_40').status, 'In progress');
   assert.deepEqual(await writes(board), [
     ['issue', 'edit', '12', '-R', 'maddec01/lar-factory', '--add-label', 'build'],
     statusEdit('PVTI_40', 'IN_PROGRESS_1'),
@@ -51,13 +51,13 @@ test('Start build labels the build, moves its parent to In progress and starts t
 
 test('Start build runs the thread on the picked model choice', async (t) => {
   const { board, home } = await buildBoard(t, [readyIssue(12, ['bug', 'build'])], {}, SAMPLE_MODELS);
-  const response = await startBuild(board, 'PVTI_12', { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
+  const response = await startBuild(board, 'I_12', { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' });
   assert.equal(response.status, 200);
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', message(home, 12), '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5',
       '--worktree', 'main', '--branch', 'fix/12-issue-12', '--json'],
   ]);
-  assert.match((await (await startBuild(board, 'PVTI_12', { instanceId: 'codex', model: '--help' })).json()).error, /isn't offered/);
+  assert.match((await (await startBuild(board, 'I_12', { instanceId: 'codex', model: '--help' })).json()).error, /isn't offered/);
 });
 
 test('Start build leaves a labelled build, a parent build and a parent already In progress alone', async (t) => {
@@ -65,7 +65,7 @@ test('Start build leaves a labelled build, a parent build and a parent already I
     readyIssue(12, ['build'], 40), projectIssue(40, 'In progress', undefined, ['build']),
     readyIssue(13, ['build'], 41), projectIssue(41, 'In progress', undefined, ['concept']),
     readyIssue(14, ['improvement', 'build'])]);
-  for (const id of ['PVTI_12', 'PVTI_13', 'PVTI_14']) assert.equal((await startBuild(board, id)).status, 200);
+  for (const id of ['I_12', 'I_13', 'I_14']) assert.equal((await startBuild(board, id)).status, 200);
   assert.deepEqual(await writes(board), []);
   assert.deepEqual((await board.t3Calls()).map((args) => args[args.indexOf('--branch') + 1]),
     ['chore/12-issue-12', 'chore/13-issue-13', 'feat/14-issue-14']);
@@ -75,8 +75,8 @@ test("Start build reads the labels of a parent that isn't on the board, and adds
   const { board } = await buildBoard(t, [readyIssue(12, ['build'], 40), readyIssue(13, ['build'], 41)], {
     issues: { 'maddec01/lar-factory/issues/40': { labels: [{ name: 'concept' }] }, 'maddec01/lar-factory/issues/41': { labels: [{ name: 'build' }] } },
   });
-  assert.equal((await startBuild(board, 'PVTI_12')).status, 200);
-  assert.equal((await startBuild(board, 'PVTI_13')).status, 200);
+  assert.equal((await startBuild(board, 'I_12')).status, 200);
+  assert.equal((await startBuild(board, 'I_13')).status, 200);
   assert.deepEqual(await writes(board), [
     ['api', 'repos/maddec01/lar-factory/issues/40'],
     ['project', 'item-add', '1', '--owner', 'maddec01', '--url', 'https://github.com/maddec01/lar-factory/issues/40', '--format', 'json'],
@@ -93,12 +93,12 @@ for (const [name, fail, error] of [
   test(`a failed write to ${name} starts no thread, and Start build can be pressed again`, async (t) => {
     const items = [readyIssue(12, ['feature'], 40), projectIssue(40, 'Ready', undefined, ['concept'])];
     const { board } = await buildBoard(t, items, { fail });
-    const failed = await startBuild(board, 'PVTI_12');
+    const failed = await startBuild(board, 'I_12');
     assert.equal(failed.status, 502);
     assert.match((await failed.json()).error, error);
     assert.deepEqual(await board.t3Calls(), []);
     await board.update({ items });
-    assert.equal((await startBuild(board, 'PVTI_12')).status, 200);
+    assert.equal((await startBuild(board, 'I_12')).status, 200);
     assert.equal((await board.t3Calls()).length, 1);
   });
 }
@@ -106,7 +106,7 @@ for (const [name, fail, error] of [
 test('a refused repository project writes nothing to GitHub and runs no t3', async (t) => {
   const { board } = await buildBoard(t, [rawIssue('PVTI_30', 30, 'Ready', ['feature'],
     { url: 'https://github.com/maddec01/lar-server/issues/30', repository: { nameWithOwner: 'maddec01/lar-server' } })]);
-  const response = await startBuild(board, 'PVTI_30');
+  const response = await startBuild(board, 'I_30');
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code');
   assert.deepEqual(await writes(board), []);
@@ -118,51 +118,51 @@ test('Start build is refused while an issue the build is blocked by is open, and
     blockedBy: { nodes: [{ number: 5, state, repository: { nameWithOwner: 'maddec01/lar-factory' } }] },
   });
   const { board } = await buildBoard(t, [blocked('OPEN')]);
-  const refused = await startBuild(board, 'PVTI_12');
+  const refused = await startBuild(board, 'I_12');
   assert.equal(refused.status, 409);
   assert.equal((await refused.json()).error, 'Blocked by #5 until it closes; use Start after to start it then.');
   assert.deepEqual([...await writes(board), ...await board.t3Calls()], []);
   await board.update({ items: [blocked('CLOSED')] });
   await board.post({}, board.url, '/api/read');
   await until(board, (d) => d.items[0]?.blockers[0]?.state === 'CLOSED');
-  assert.equal((await startBuild(board, 'PVTI_12')).status, 200);
+  assert.equal((await startBuild(board, 'I_12')).status, 200);
 });
 
 test("a started build shows in the board data's started builds, apart from the item's refining thread", async (t) => {
   const { board } = await buildBoard(t, [readyIssue(12, ['build'])]);
-  const answer = await (await startBuild(board, 'PVTI_12')).json();
-  assert.equal(answer.board.startedBuilds.PVTI_12.threadId, 'thread-1');
-  assert.equal(answer.board.started?.PVTI_12, undefined);
+  const answer = await (await startBuild(board, 'I_12')).json();
+  assert.equal(answer.board.startedBuilds.I_12.threadId, 'thread-1');
+  assert.equal(answer.board.started?.I_12, undefined);
 });
 
 test('a double press, a retry or another page starts no second build thread', async (t) => {
   const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { t3: { delay: 100 } });
-  const responses = await Promise.all([startBuild(board, 'PVTI_12'), startBuild(board, 'PVTI_12')]);
+  const responses = await Promise.all([startBuild(board, 'I_12'), startBuild(board, 'I_12')]);
   assert.deepEqual(responses.map((r) => r.status), [200, 200]);
-  assert.equal((await startBuild(board, 'PVTI_12')).status, 200);
+  assert.equal((await startBuild(board, 'I_12')).status, 200);
   assert.equal((await board.t3Calls()).length, 1);
 });
 
 for (const fail of ['killed', 'garbage']) {
   test(`an unconfirmed build start (${fail}) is never retried as a new thread`, async (t) => {
     const { board } = await buildBoard(t, [readyIssue(12, ['build'])], { t3: { fail } });
-    assert.equal((await (await startBuild(board, 'PVTI_12')).json()).uncertain, true);
-    assert.equal((await (await startBuild(board, 'PVTI_12')).json()).uncertain, true);
+    assert.equal((await (await startBuild(board, 'I_12')).json()).uncertain, true);
+    assert.equal((await (await startBuild(board, 'I_12')).json()).uncertain, true);
     assert.equal((await board.t3Calls()).length, 1);
   });
 }
 
 test('Start build only runs for Ready issues from this board page and session', async (t) => {
   const { board } = await buildBoard(t, [projectIssue(12, 'Queued'), { ...draftItem('Ready') }]);
-  assert.match((await (await startBuild(board, 'PVTI_12')).json()).error, /^Only Ready items can start a build; this one is in Queued\.$/);
-  assert.match((await (await startBuild(board, 'PVTI_draft')).json()).error, /needs an issue/);
-  assert.equal((await startBuild(board, 'PVTI_missing')).status, 404);
-  const restarted = await board.post({ session: 'old', itemId: 'PVTI_12' }, board.url, '/api/start-build');
+  assert.match((await (await startBuild(board, 'I_12')).json()).error, /^Only Ready items can start a build; this one is in Queued\.$/);
+  assert.match((await (await startBuild(board, 'DI_draft')).json()).error, /needs an issue/);
+  assert.equal((await startBuild(board, 'I_missing')).status, 404);
+  const restarted = await board.post({ session: 'old', itemId: 'I_12' }, board.url, '/api/start-build');
   assert.equal(restarted.status, 409);
   assert.match((await restarted.json()).error, /Press Start build again/);
-  assert.equal((await startBuild(board, 'PVTI_12', undefined, 'https://evil.example')).status, 403);
+  assert.equal((await startBuild(board, 'I_12', undefined, 'https://evil.example')).status, 403);
   const sample = await startBoard(t, {}, true);
-  assert.equal((await startBuild(sample, 'PVTI_sample05')).status, 403);
+  assert.equal((await startBuild(sample, 'I_sample05')).status, 403);
   assert.deepEqual([...await writes(board), ...await board.t3Calls(), ...await sample.t3Calls()], []);
 });
 

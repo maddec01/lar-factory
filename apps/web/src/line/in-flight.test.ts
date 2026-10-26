@@ -15,7 +15,7 @@ const numberOf = (id: string) => sample.items.find((i) => i.id === id)!.number;
 /** The row's four cells: title, track, agent and side. */
 const cells = (id: string) => [...row(id).children] as HTMLElement[];
 const side = (id: string) => cells(id)[3]!;
-const startBuild = (id = 'PVTI_sample13') => $<HTMLButtonElement>(`[data-in-flight] [data-start="${id}"]`)!;
+const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-in-flight] [data-start="${id}"]`)!;
 const press = (el: Element) => settle(() => (el as HTMLElement).click());
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
@@ -26,9 +26,9 @@ const boardOf = (raws: RawItem[], keys: { active?: number[]; blocked?: number[] 
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData =>
   ({ ...data, items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)) });
 /** The sample with #140 out of its concept's dossier, so it has a row in the table. */
-const loose = withItem('PVTI_sample13', { parent: null });
+const loose = withItem('I_sample13', { parent: null });
 /** #140 with its blocker closed, so its Start build runs, on a board whose writes are on. */
-const unblocked = (data: BoardData = loose): BoardData => withItem('PVTI_sample13', {
+const unblocked = (data: BoardData = loose): BoardData => withItem('I_sample13', {
   blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }],
 }, { ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
@@ -64,24 +64,24 @@ test('the table takes the main area\'s scope', async () => {
 
 test('a row shows its numbered title, status, repository and age, and a red badge while it is blocked', async () => {
   await mountPage(loose);
-  const [title] = cells('PVTI_sample13');
+  const [title] = cells('I_sample13');
   expect(title!.getAttribute('title')).toBe('#140 Owner accounts');
   const [name, meta] = [...title!.querySelectorAll('.grid > span')].map(text);
   expect([name, meta]).toEqual(['#140 Owner accounts', 'Ready · Server · 1h agoblocked by 1']);
   const badge = [...title!.querySelectorAll('span')].find((s) => text(s) === 'blocked by 1')!;
   expect(badge.className).toContain('text-(--error-foreground)');
   expect(title!.querySelector('.grid')!.className.split(' '), 'one column as wide as the cell, so the lines truncate at 840 px, not overflow').toContain('grid-cols-[minmax(0,1fr)]');
-  expect(cells('PVTI_sample14')[0]!.textContent).not.toContain('blocked by');
+  expect(cells('I_sample14')[0]!.textContent).not.toContain('blocked by');
 });
 
 test('the badge counts the blocked-by issues still open', async () => {
-  await mountPage(withItem('PVTI_sample13', { blockers: [
+  await mountPage(withItem('I_sample13', { blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' },
   ] }, loose));
-  expect(text(cells('PVTI_sample13')[0]!)).toContain('blocked by 1');
+  expect(text(cells('I_sample13')[0]!)).toContain('blocked by 1');
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
-    .receive(withItem('PVTI_sample13', { blockers: [] }, loose)));
-  expect(cells('PVTI_sample13')[0]!.textContent, 'with no open issue listed, nothing blocks').not.toContain('blocked by');
+    .receive(withItem('I_sample13', { blockers: [] }, loose)));
+  expect(cells('I_sample13')[0]!.textContent, 'with no open issue listed, nothing blocks').not.toContain('blocked by');
   expect(text(startBuild())).toBe('Start build ▾');
 });
 
@@ -89,69 +89,69 @@ test('the track fills the stages behind, marks the current one with its glyph, a
   await mountPage(loose);
   const track = (id: string) => cells(id)[1]!;
   const at = (id: string) => [...track(id).children].findIndex((li) => li.querySelector('svg'));
-  expect(['PVTI_sample07', 'PVTI_sample13', 'PVTI_sample22', 'PVTI_sample15', 'PVTI_sample16', 'PVTI_sample17'].map(at)).toEqual([0, 1, 2, 3, 4, 4]);
-  expect([track('PVTI_sample13').getAttribute('title'), track('PVTI_sample22').getAttribute('title')]).toEqual(['Ready, waiting', 'In progress']);
-  expect(track('PVTI_sample13').querySelector('.border-dashed'), 'a blocked item waits').not.toBeNull();
-  expect(track('PVTI_sample22').querySelector('.border-dashed')).toBeNull();
+  expect(['I_sample07', 'I_sample13', 'I_sample22', 'I_sample15', 'I_sample16', 'I_sample17'].map(at)).toEqual([0, 1, 2, 3, 4, 4]);
+  expect([track('I_sample13').getAttribute('title'), track('I_sample22').getAttribute('title')]).toEqual(['Ready, waiting', 'In progress']);
+  expect(track('I_sample13').querySelector('.border-dashed'), 'a blocked item waits').not.toBeNull();
+  expect(track('I_sample22').querySelector('.border-dashed')).toBeNull();
 });
 
 test('the Agent column shows agent time over tokens and cost, or a dash before any thread worked on it', async () => {
   const stats = { agentMs: (3 * 60 + 20) * 60_000, wallMs: 70 * 60_000, tokens: 12_436_000, costUsd: 41.197 };
-  let data = withItem('PVTI_sample14', { stats }, loose);
-  data = withItem('PVTI_sample15', { stats: { agentMs: 45 * 60_000, tokens: 980 } }, data);
-  data = withItem('PVTI_sample16', { stats: { ...stats, costUsd: 41, frozen: true } }, data);
-  data = withItem('PVTI_sample07', { stats: 'unavailable' }, data);
+  let data = withItem('I_sample14', { stats }, loose);
+  data = withItem('I_sample15', { stats: { agentMs: 45 * 60_000, tokens: 980 } }, data);
+  data = withItem('I_sample16', { stats: { ...stats, costUsd: 41, frozen: true } }, data);
+  data = withItem('I_sample07', { stats: 'unavailable' }, data);
   await mountPage(data);
   const agent = (id: string) => cells(id)[2]!;
-  expect([...agent('PVTI_sample14').children].map(text)).toEqual(['3h 20m', '12.4M · $41.20']);
-  expect(agent('PVTI_sample14').title).toBe('Agent time · tokens · cost');
-  expect(text(agent('PVTI_sample15').lastElementChild), 'nothing priced').toBe('980 · –');
-  expect(agent('PVTI_sample16').title).toBe('As it stood at merge');
-  expect([text(agent('PVTI_sample13')), text(agent('PVTI_sample07'))]).toEqual(['–', '–']);
+  expect([...agent('I_sample14').children].map(text)).toEqual(['3h 20m', '12.4M · $41.20']);
+  expect(agent('I_sample14').title).toBe('Agent time · tokens · cost');
+  expect(text(agent('I_sample15').lastElementChild), 'nothing priced').toBe('980 · –');
+  expect(agent('I_sample16').title).toBe('As it stood at merge');
+  expect([text(agent('I_sample13')), text(agent('I_sample07'))]).toEqual(['–', '–']);
 });
 
 test('a row opens the item dialog and stays marked while it shows', async () => {
   await mountPage(loose);
-  await press(row('PVTI_sample14'));
+  await press(row('I_sample14'));
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('#30 Chapter markers in the scrubber');
-  expect(row('PVTI_sample14').className).toContain('ring-(--primary)');
-  expect(row('PVTI_sample15').className).not.toContain('ring-(--primary)');
+  expect(row('I_sample14').className).toContain('ring-(--primary)');
+  expect(row('I_sample15').className).not.toContain('ring-(--primary)');
 });
 
 test('the side says where the item waits on you, or shows its thread and its next action', async () => {
   await mountPage(loose);
   const say = (id: string) => [text(side(id).firstElementChild), [...side(id).querySelectorAll('button, a')].map((b) => text(b))];
-  expect(say('PVTI_sample16')).toEqual(['on your desk', []]);
-  expect(say('PVTI_sample17')).toEqual(['on your desk', []]);
-  expect(say('PVTI_sample11')).toEqual(['on your desk', []]);
-  expect(say('PVTI_sample07')).toEqual(['shaping thread running', ['Open thread']]);
-  expect(say('PVTI_sample14')).toEqual(['build thread running', ['Open thread']]);
-  expect(say('PVTI_sample15')).toEqual(['reviewers running', ['Open thread']]);
-  expect(say('PVTI_sample13')).toEqual(['blocked by 1', ['Start build', 'Start after #202 ▾']]);
+  expect(say('I_sample16')).toEqual(['on your desk', []]);
+  expect(say('I_sample17')).toEqual(['on your desk', []]);
+  expect(say('I_sample11')).toEqual(['on your desk', []]);
+  expect(say('I_sample07')).toEqual(['shaping thread running', ['Open thread']]);
+  expect(say('I_sample14')).toEqual(['build thread running', ['Open thread']]);
+  expect(say('I_sample15')).toEqual(['reviewers running', ['Open thread']]);
+  expect(say('I_sample13')).toEqual(['blocked by 1', ['Start build', 'Start after #202 ▾']]);
 });
 
 test('Start after on a blocked Ready row arms its start on the picked model, then reads Starts after until pressed again', async () => {
   const blocked = { ...loose, capture: { session: 's1', enabled: true }, modelChoices: unblocked().modelChoices };
   holdPosts(blocked);
   await mountPage(blocked);
-  const after = () => side('PVTI_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  const after = () => side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
   await press(after());
   expect(dialog(), 'the menu opens without the dialog').toBeNull();
   await press(entries()[1]!);
-  expect(posted()).toEqual([['/api/arm', { session: 's1', itemId: 'PVTI_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
-  await answer({ error: null, board: { ...blocked, armed: { PVTI_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } } });
+  expect(posted()).toEqual([['/api/arm', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+  await answer({ error: null, board: { ...blocked, armed: { I_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } } });
   expect([text(after()), after().getAttribute('aria-pressed')]).toEqual(['Starts after #202 ✓', 'true']);
   await press(after());
-  expect(posted().at(-1)).toEqual(['/api/disarm', { session: 's1', itemId: 'PVTI_sample13' }]);
+  expect(posted().at(-1)).toEqual(['/api/disarm', { session: 's1', itemId: 'I_sample13' }]);
   await answer({ error: null, board: { ...blocked, armed: {} } });
   expect(text(after())).toBe('Start after #202 ▾');
 });
 
 test("Start after names the last open blocker, another repository's without its owner, and its title and label name it in full", async () => {
-  await mountPage(withItem('PVTI_sample13', { blockers: [
+  await mountPage(withItem('I_sample13', { blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' },
   ] }, loose));
-  const after = side('PVTI_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([text(after), after.title]).toEqual(['Start after lar-apple#12 ▾', 'Starts by itself once #202, maddec01/lar-apple#12 close']);
   expect(after.getAttribute('aria-label')).toBe('Start #140 Owner accounts after maddec01/lar-apple#12');
 });
@@ -160,41 +160,41 @@ test("a blocked build whose repository has no T3 project offers no Start after: 
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   await mountPage({ ...loose, repositoryProjects: { 'maddec01/lar-server': hint } });
   expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
-  expect(side('PVTI_sample13').querySelector('[data-start-after]')).toBeNull();
+  expect(side('I_sample13').querySelector('[data-start-after]')).toBeNull();
 });
 
 test('a start armed before its repository lost its T3 project still shows Starts after, so it can be disarmed', async () => {
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   const armed = { ...loose, capture: { session: 's1', enabled: true }, repositoryProjects: { 'maddec01/lar-server': hint },
-    armed: { PVTI_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } };
+    armed: { I_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } };
   holdPosts(armed);
   await mountPage(armed);
   expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
-  const after = side('PVTI_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([text(after), after.getAttribute('aria-pressed')]).toEqual(['Starts after #202 ✓', 'true']);
   await press(after);
-  expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'PVTI_sample13' }]]);
+  expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'I_sample13' }]]);
   await answer({ error: null, board: { ...armed, armed: {} } });
-  expect(side('PVTI_sample13').querySelector('[data-start-after]'), 'once disarmed, none can be armed again').toBeNull();
+  expect(side('I_sample13').querySelector('[data-start-after]'), 'once disarmed, none can be armed again').toBeNull();
 });
 
 test("a start the board ran by itself and that failed shows its error under the row, and dismissing it clears it", async () => {
-  const failed = { ...unblocked(), armedErrors: { PVTI_sample13: 'T3 is down.' } };
+  const failed = { ...unblocked(), armedErrors: { I_sample13: 'T3 is down.' } };
   holdPosts(failed);
   await mountPage(failed);
-  const error = table().querySelector('[data-start-after-error="PVTI_sample13"]')!;
+  const error = table().querySelector('[data-start-after-error="I_sample13"]')!;
   expect(text(error.querySelector('[role="alert"]'))).toBe('Start after failed: T3 is down.');
   await press(error.querySelector('button')!);
-  expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'PVTI_sample13' }]]);
+  expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'I_sample13' }]]);
 });
 
 test('Open thread on a row opens the latest thread, as an outline button, without opening the dialog', async () => {
-  await mountPage(withItem('PVTI_sample14', { threads: [thread('t1', 'running')] }, withItem('PVTI_sample15', { threads: [] })));
-  const open = side('PVTI_sample14').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+  await mountPage(withItem('I_sample14', { threads: [thread('t1', 'running')] }, withItem('I_sample15', { threads: [] })));
+  const open = side('I_sample14').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
   expect([open.getAttribute('href'), open.className.includes('border-input')]).toEqual(['t3code://threads/sample-environment/t1', true]);
   await press(open);
   expect(dialog()).toBeNull();
-  const none = side('PVTI_sample15').querySelector<HTMLButtonElement>('[data-open-thread]')!;
+  const none = side('I_sample15').querySelector<HTMLButtonElement>('[data-open-thread]')!;
   expect([none.disabled, none.title]).toEqual([true, 'No T3 thread has worked on this yet']);
 });
 
@@ -203,7 +203,7 @@ test('Start build is disabled while a blocker is open, its title naming it, and 
   expect([text(startBuild()), startBuild().disabled, startBuild().title]).toEqual(['Start build', true, 'Blocked by #202 until it closes']);
   expect(startBuild().className).toContain('disabled:pointer-events-auto');
   expect(startBuild().className, 'an outline button, as the line draws a held action').toContain('border-input');
-  const many = withItem('PVTI_sample13', { blockers: [
+  const many = withItem('I_sample13', { blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' },
     { number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' },
   ] }, loose);
@@ -221,13 +221,13 @@ test('Start build is disabled with the hint while T3 has no project for the repo
 });
 
 test.each(['running', 'needs you'] as const)('Open thread takes Start build\'s place while the item has a %s thread', async (state) => {
-  await mountPage(withItem('PVTI_sample13', { threads: [thread('t1', state)] }, unblocked()));
+  await mountPage(withItem('I_sample13', { threads: [thread('t1', state)] }, unblocked()));
   expect(startBuild()).toBeNull();
-  expect(side('PVTI_sample13').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/t1');
+  expect(side('I_sample13').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/t1');
 });
 
 test('a done thread leaves Start build', async () => {
-  await mountPage(withItem('PVTI_sample13', { threads: [thread('t1', 'done')] }, unblocked()));
+  await mountPage(withItem('I_sample13', { threads: [thread('t1', 'done')] }, unblocked()));
   expect(text(startBuild())).toBe('Start build ▾');
 });
 
@@ -239,11 +239,11 @@ test('Start build sends the build with the chosen model, then shows the thread i
   expect(entries().map(text)).toEqual(['T3 default', 'GPT-5.5']);
   await press(entries()[1]!);
   expect(dialog(), 'picking an entry does not open the dialog').toBeNull();
-  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'PVTI_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
   expect([text(startBuild()), startBuild().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
   const started = { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' };
   await answer({ thread: started, error: null });
-  const tag = row('PVTI_sample13').querySelector('[data-start-result]')!;
+  const tag = row('I_sample13').querySelector('[data-start-result]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread thread-1']);
   expect(startBuild()).toBeNull();
   expect(text(toast())).toBe('Started T3 thread Build maddec01/lar-server#140 thread-1 for #140 Owner accounts.');
@@ -255,13 +255,13 @@ test('a failed Start build shows its error under the row and offers Retry start;
   await mountPage(unblocked());
   await press(startBuild());
   await press(entries()[0]!);
-  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'PVTI_sample13' }]]);
+  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13' }]]);
   await answer({ thread: null, error: 'T3 is down.' }, 502);
   expect(text(startBuild())).toBe('Retry start ▾');
-  const message = row('PVTI_sample13').parentElement!.querySelector('p.start')!;
+  const message = row('I_sample13').parentElement!.querySelector('p.start')!;
   expect(text(message.querySelector('[role="alert"]'))).toBe('T3 is down.');
   await press(message.querySelector('button.dismiss')!);
-  expect(row('PVTI_sample13').parentElement!.querySelector('p.start')).toBeNull();
+  expect(row('I_sample13').parentElement!.querySelector('p.start')).toBeNull();
   expect(text(startBuild())).toBe('Start build ▾');
   expect(dialog(), 'closing the error does not open the dialog').toBeNull();
 });
@@ -273,14 +273,14 @@ test('a Start build that may have run hides Start build; closing its message lea
   await press(entries()[0]!);
   await answer({ thread: null, uncertain: true, error: 'Check T3.' });
   expect(startBuild()).toBeNull();
-  const message = row('PVTI_sample13').parentElement!.querySelector<HTMLElement>('p.start[data-start-result]')!;
+  const message = row('I_sample13').parentElement!.querySelector<HTMLElement>('p.start[data-start-result]')!;
   expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
   await press(message.querySelector('button.dismiss')!);
-  expect(text(row('PVTI_sample13').querySelector('.started-tag.unsure'))).toBe('May have started');
+  expect(text(row('I_sample13').querySelector('.started-tag.unsure'))).toBe('May have started');
 });
 
 test('a thread Start refining opened this board run is not taken for the build\'s', async () => {
-  await mountPage({ ...unblocked(), started: { PVTI_sample13: { threadId: 'shaping-1', title: 'Shape #140' } } });
+  await mountPage({ ...unblocked(), started: { I_sample13: { threadId: 'shaping-1', title: 'Shape #140' } } });
   expect(text(startBuild())).toBe('Start build ▾');
 });
 
@@ -301,12 +301,12 @@ const build = (count: number) => rawIssue('PVTI_build', 59, 'In progress', ['bui
   subIssues: { nodes: Array.from({ length: count }, (_, i) => sliceRef(100 + i, i ? 'OPEN' : 'CLOSED')) },
 });
 /** The build row's slice bar segments' colours and its count button's text. */
-const slices = (id = 'PVTI_build') => {
+const slices = (id = 'I_59') => {
   const bar = cells(id)[0]!.querySelector('.grid.gap-1 > ol')!;
   return { segments: [...bar.children].map((li) => (li as HTMLElement).style.background), count: text(cells(id)[0]!.querySelector('button')) };
 };
-const count = (id = 'PVTI_build') => cells(id)[0]!.querySelector<HTMLButtonElement>('button')!;
-const list = (id = 'PVTI_build') => row(id).parentElement!.querySelector(':scope > div:last-child ul');
+const count = (id = 'I_59') => cells(id)[0]!.querySelector<HTMLButtonElement>('button')!;
+const list = (id = 'I_59') => row(id).parentElement!.querySelector(':scope > div:last-child ul');
 
 test('a build shows its slice bar and its count, naming the blocked slices before the active ones', async () => {
   const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
@@ -318,8 +318,8 @@ test('a build shows its slice bar and its count, naming the blocked slices befor
     segments: ['var(--st-done)', 'var(--st-now)', 'var(--st-review)', 'var(--soft)'],
     count: '1/4 slices· blocked #67 Issue 67, active #66 Issue 66',
   });
-  expect(cells('PVTI_build')[0]!.querySelector('ol > li.status-pulse'), 'the active slice pulses').not.toBeNull();
-  expect(rows().map((r) => r.dataset.item), 'slices are no rows of their own').toEqual(['PVTI_build']);
+  expect(cells('I_59')[0]!.querySelector('ol > li.status-pulse'), 'the active slice pulses').not.toBeNull();
+  expect(rows().map((r) => r.dataset.item), 'slices are no rows of their own').toEqual(['I_59']);
 });
 
 test('a build\'s count leaves out slices closed as not planned, and names none while none is active or blocked', async () => {
@@ -339,26 +339,26 @@ test('an open slice the project auto-added is no row of its own', async () => {
     subIssuesSummary: { total: 3, completed: 1 }, subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
   });
   await mountPage(boardOf([slice, raw, rawIssue('PVTI_other', 70, 'In progress', ['bug'])]));
-  expect(rows().map((r) => r.dataset.item)).toEqual(['PVTI_build', 'PVTI_other']);
+  expect(rows().map((r) => r.dataset.item)).toEqual(['I_59', 'I_70']);
 });
 
 test('the count unfolds the slice list under the row and folds it again, without opening the dialog', async () => {
   await mountPage(loose);
-  expect([count('PVTI_sample13').getAttribute('aria-expanded'), list('PVTI_sample13')]).toEqual(['false', null]);
-  await press(count('PVTI_sample13'));
-  expect(count('PVTI_sample13').getAttribute('aria-expanded')).toBe('true');
-  expect([...list('PVTI_sample13')!.querySelectorAll('li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
+  expect([count('I_sample13').getAttribute('aria-expanded'), list('I_sample13')]).toEqual(['false', null]);
+  await press(count('I_sample13'));
+  expect(count('I_sample13').getAttribute('aria-expanded')).toBe('true');
+  expect([...list('I_sample13')!.querySelectorAll('li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
   expect(dialog()).toBeNull();
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive({ ...loose, fetchedAt: '2026-10-21T09:59:00.000Z' }));
-  expect(list('PVTI_sample13'), 'new data keeps it open').not.toBeNull();
-  await press(count('PVTI_sample13'));
-  expect(list('PVTI_sample13')).toBeNull();
+  expect(list('I_sample13'), 'new data keeps it open').not.toBeNull();
+  await press(count('I_sample13'));
+  expect(list('I_sample13')).toBeNull();
 });
 
 test('a 3-slice and a 14-slice build render the same row structure', async () => {
   // Tags only, with the slice bar's segments dropped.
   const shape = () => {
-    const copy = row('PVTI_build').cloneNode(true) as Element;
+    const copy = row('I_59').cloneNode(true) as Element;
     copy.querySelectorAll('.grid.gap-1 > ol > li').forEach((li) => li.remove());
     return [...copy.querySelectorAll('*')].map((e) => `${e.tagName}.${e.className}`).join(' ');
   };

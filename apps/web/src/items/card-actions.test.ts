@@ -21,15 +21,15 @@ async function openItem(itemId: string): Promise<void> {
 test('Queue shows the action in flight and holds Abandon without relabelling it, then says so', async () => {
   holdPosts();
   await mountPage();
-  await openItem('PVTI_sample01');
-  await press(button('queue', 'PVTI_sample01'));
-  const queuing = button('queue', 'PVTI_sample01');
+  await openItem('I_sample01');
+  await press(button('queue', 'I_sample01'));
+  const queuing = button('queue', 'I_sample01');
   expect([text(queuing), queuing.getAttribute('aria-disabled'), queuing.getAttribute('aria-label')]).toEqual(['Queuing…', 'true', `Queuing… #61 ${sample.items[0]!.title}`]);
-  expect(button('abandon', 'PVTI_sample01').getAttribute('aria-disabled'), 'the item is held').toBe('true');
-  expect(text(button('abandon', 'PVTI_sample01')), 'Abandon is not relabelled').toBe('Abandon');
+  expect(button('abandon', 'I_sample01').getAttribute('aria-disabled'), 'the item is held').toBe('true');
+  expect(text(button('abandon', 'I_sample01')), 'Abandon is not relabelled').toBe('Abandon');
 
-  await answer({ error: null, board: moved('PVTI_sample01', 'Queued') });
-  expect($('.sidebar [data-item="PVTI_sample01"]'), 'it leaves the List').toBeNull();
+  await answer({ error: null, board: moved('I_sample01', 'Queued') });
+  expect($('.sidebar [data-item="I_sample01"]'), 'it leaves the List').toBeNull();
   expect([toast()!.getAttribute('role'), text(toast())]).toEqual(['status', `Moved #61 ${sample.items[0]!.title} to Queued. View item`]);
   expect(toast()!.querySelector('button.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Moved #61');
 });
@@ -37,8 +37,8 @@ test('Queue shows the action in flight and holds Abandon without relabelling it,
 test("a server that can't be reached is a Queue error too", async () => {
   fetchMock.mockImplementation(async () => { throw new TypeError('Failed to fetch'); });
   await mountPage();
-  await openItem('PVTI_sample01');
-  await press(button('queue', 'PVTI_sample01'));
+  await openItem('I_sample01');
+  await press(button('queue', 'I_sample01'));
   expect(text($('[data-item-dialog] .action-error [role="alert"]'))).toBe("Can't reach the board server. Try again.");
   expect(toast(), 'no toast').toBeNull();
 });
@@ -46,39 +46,39 @@ test("a server that can't be reached is a Queue error too", async () => {
 test('Back to List shows only its own pending state', async () => {
   holdPosts();
   await mountPage();
-  await openItem('PVTI_sample05');
-  const back = button('back-to-list', 'PVTI_sample05');
+  await openItem('I_sample05');
+  const back = button('back-to-list', 'I_sample05');
   await press(back);
   expect([text(back), back.getAttribute('aria-label')!.split(' ').slice(0, 2).join(' '), back.getAttribute('aria-disabled')]).toEqual(['← Moving to List…', 'Moving #129', 'true']);
-  expect(text(button('abandon', 'PVTI_sample05')), 'Abandon is not relabelled').toBe('Abandon');
-  expect(text(button('start', 'PVTI_sample05')), 'Start is not relabelled').toBe('Start refining ▾');
+  expect(text(button('abandon', 'I_sample05')), 'Abandon is not relabelled').toBe('Abandon');
+  expect(text(button('start', 'I_sample05')), 'Start is not relabelled').toBe('Start refining ▾');
 });
 
 test('a failed Back to List shows as a toast naming the item, which stays until closed and hands focus back', async () => {
   holdPosts();
   await mountPage();
-  await openItem('PVTI_sample05');
-  await press(button('back-to-list', 'PVTI_sample05'));
+  await openItem('I_sample05');
+  await press(button('back-to-list', 'I_sample05'));
   await answer({ error: 'Could not set List. GitHub is down.' }, 502);
   expect(toast()!.getAttribute('role')).toBe('alert');
   expect(toast()!.dataset.tone, 'a failure\'s dot is red').toBe('error');
   expect(text(toast())).toMatch(/^Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
   expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
   expect($('[data-item-dialog] .action-error'), 'the dialog shows no inline error').toBeNull();
-  expect(text(button('back-to-list', 'PVTI_sample05')), 'the footer goes back to its links').toBe('← Back to List');
+  expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('← Back to List');
   await settle(() => vi.advanceTimersByTime(60_000));
   expect(toast(), 'a failure stays').not.toBeNull();
   const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;
   expect(close.getAttribute('aria-label')).toBe('Dismiss: error for #129');
   await press(close);
   expect(toast()).toBeNull();
-  expect(document.activeElement, 'back to the button that failed').toBe(button('back-to-list', 'PVTI_sample05'));
+  expect(document.activeElement, 'back to the button that failed').toBe(button('back-to-list', 'I_sample05'));
 });
 
 test('Abandon asks first, naming the issue it deletes or the draft it removes; Cancel returns focus', async () => {
   await mountPage();
-  await openItem('PVTI_sample01');
-  await press(button('abandon', 'PVTI_sample01'));
+  await openItem('I_sample01');
+  await press(button('abandon', 'I_sample01'));
   const dialog = $('#abandon-dialog')!;
   expect(dialog.getAttribute('role')).toBe('alertdialog');
   expect(text($('#abandon-heading'))).toBe(`Delete #61 ${sample.items[0]!.title}?`);
@@ -89,11 +89,11 @@ test('Abandon asks first, naming the issue it deletes or the draft it removes; C
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[0]!.click());
   await settle(() => vi.advanceTimersByTime(100));
   expect($('#abandon-dialog')).toBeNull();
-  expect(document.activeElement).toBe(button('abandon', 'PVTI_sample01'));
+  expect(document.activeElement).toBe(button('abandon', 'I_sample01'));
   expect(fetchMock, 'nothing posted').not.toHaveBeenCalled();
 
-  await openItem('PVTI_sample04');
-  await press(button('abandon', 'PVTI_sample04'));
+  await openItem('I_sample04');
+  await press(button('abandon', 'I_sample04'));
   expect(text($('#abandon-heading'))).toMatch(/^Remove draft Shared playback history across devices\?$/);
   expect($$('#abandon-dialog button').map(text)).toEqual(['Cancel', 'Remove draft']);
   await settle(() => vi.advanceTimersByTime(100));
@@ -105,8 +105,8 @@ test('Abandon asks first, naming the issue it deletes or the draft it removes; C
 
 test('Abandon opens centred on T3\'s backdrop and glass panel, nothing over the title bar drags, and a click outside leaves it open', async () => {
   await mountPage();
-  await openItem('PVTI_sample01');
-  await press(button('abandon', 'PVTI_sample01'));
+  await openItem('I_sample01');
+  await press(button('abandon', 'I_sample01'));
   const { noDrag } = addStylesheet();
   const dialog = $('#abandon-dialog')!;
   const viewport = dialog.closest('[data-slot="alert-dialog-viewport"]')!;
@@ -127,24 +127,24 @@ test('confirming Abandon holds Queue without relabelling it, and announces the d
   holdPosts();
   const data: BoardData = { ...sample, capture: { enabled: true, session: 'session-1' } as BoardData['capture'] };
   await mountPage(data);
-  await openItem('PVTI_sample01');
-  await press(button('abandon', 'PVTI_sample01'));
+  await openItem('I_sample01');
+  await press(button('abandon', 'I_sample01'));
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
-  const abandoning = button('abandon', 'PVTI_sample01');
+  const abandoning = button('abandon', 'I_sample01');
   expect([text(abandoning), abandoning.getAttribute('aria-disabled')]).toEqual(['Abandoning…', 'true']);
-  expect(button('queue', 'PVTI_sample01').getAttribute('aria-disabled')).toBe('true');
-  expect(text(button('queue', 'PVTI_sample01')), 'Queue is not relabelled').toBe('Queue');
+  expect(button('queue', 'I_sample01').getAttribute('aria-disabled')).toBe('true');
+  expect(text(button('queue', 'I_sample01')), 'Queue is not relabelled').toBe('Queue');
 
-  await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'PVTI_sample01') } });
-  expect($('.sidebar [data-item="PVTI_sample01"]')).toBeNull();
+  await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample01') } });
+  expect($('.sidebar [data-item="I_sample01"]')).toBeNull();
   expect(toast()!.querySelector('a, .view-item'), 'nothing to link to').toBeNull();
-  expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'PVTI_sample01' }]]);
+  expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
 });
 
 test('in sample mode Back to List is disabled too', async () => {
   await mountPage({ ...sample, capture: { enabled: false } as BoardData['capture'] });
-  await openItem('PVTI_sample05');
-  for (const b of [button('back-to-list', 'PVTI_sample05'), button('abandon', 'PVTI_sample05')]) {
+  await openItem('I_sample05');
+  for (const b of [button('back-to-list', 'I_sample05'), button('abandon', 'I_sample05')]) {
     expect([b.disabled, b.title]).toEqual([true, 'Disabled in sample mode']);
   }
 });

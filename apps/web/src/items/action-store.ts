@@ -1,5 +1,5 @@
 // What this page is doing for an item: a Queue, Back to List or Abandon in flight, or the error
-// it left. Keyed by project item id, since a draft has no number.
+// it left. Keyed by item id, since a draft has no number.
 
 import { create } from 'zustand';
 

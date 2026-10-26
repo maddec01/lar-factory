@@ -1,17 +1,24 @@
 // The body of each onboarding step, which the dialog shows one at a time. Each field sits on its own row with its
-// label and one line of help. The T3 project and Provider and item source steps are filled in; the later steps'
-// slices fill in theirs.
+// label and one line of help. The T3 project, Provider and item source, and Checks steps are filled in; the Pull
+// request step's slice fills in its own.
 
 import type { ReactNode } from 'react';
-import { CircleAlert, FolderPlus, Info, LoaderCircle, RotateCw } from 'lucide-react';
-import type { ProjectChoice, RepositoryItemSource, SetupAnswers, ShowSetting } from '@lar-factory/shared';
+import { Check, CircleAlert, FolderPlus, Info, LoaderCircle, RotateCw, X } from 'lucide-react';
+import { SETUP_CHECKS, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { Input } from '@lar-factory/ui/input';
+import { Progress } from '@lar-factory/ui/progress';
 import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
-import { type Creating, type Run, type StepId, asksSetup, pickedProject, suggestedShow, unpickable, useWizardStore } from './wizard-store.ts';
+import { useBoardStore } from '../board/board-store.ts';
+import { CopyButton } from '../copy/copy-button.tsx';
+import { toolDescription, toolState } from '../settings/settings-pages.tsx';
+import {
+  COMMAND_CHECKS, type Checks, type Creating, type Run, type StepId, asksSetup, commandPasses, itemSourceOf, pickedProject, suggestedShow, unpickable,
+  useWizardStore,
+} from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
 function Choice({ value, title, children, disabled }: { value: string; title: ReactNode; children?: ReactNode; disabled?: boolean }) {
@@ -200,8 +207,111 @@ function SetupStep({ run }: { run: Run }) {
   );
 }
 
+type CheckStatus = 'waiting' | 'running' | 'passed' | 'failed';
+
+function StatusIcon({ status }: { status: CheckStatus }) {
+  switch (status) {
+    case 'passed': return <span className="grid size-5 shrink-0 place-items-center rounded-full bg-success/16 text-success"><Check className="size-3.5" /></span>;
+    case 'failed': return <span className="grid size-5 shrink-0 place-items-center rounded-full bg-destructive/16 text-destructive"><X className="size-3.5" /></span>;
+    case 'running': return <LoaderCircle className="size-5 shrink-0 animate-spin text-info" />;
+    default: return <span className="size-5 shrink-0 rounded-full border border-dashed" />;
+  }
+}
+
+/** One check's row: its state and title, what it found, and for a failure its problem, fix and Retry. */
+interface CheckRow {
+  id: string;
+  title: string;
+  status: CheckStatus;
+  detail?: string;
+  problem?: string;
+  fix?: ReactNode;
+  command?: string;
+  retry?: () => void;
+}
+
+const STATUS_TEXT: Record<CheckStatus, string> = { waiting: 'Waiting', running: 'Checking…', passed: 'Passed', failed: 'Failed' };
+
+function CheckList({ title, rows }: { title: string; rows: CheckRow[] }) {
+  return (
+    <div className="grid gap-1">
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
+      <ul className="m-0 grid list-none divide-y rounded-lg border p-0">
+        {rows.map((row) => (
+          <li key={row.id} data-check={row.id} data-status={row.status} className="grid gap-2 px-3 py-2">
+            <div className="flex items-center gap-2.5 text-sm">
+              <StatusIcon status={row.status} />
+              <span className="font-medium">{row.title}</span>
+              <span className="ml-auto text-xs text-muted-foreground">{row.status === 'passed' && row.detail || STATUS_TEXT[row.status]}</span>
+            </div>
+            {row.status === 'failed' && (
+              <Alert variant="error"><CircleAlert /><AlertTitle>{row.problem}</AlertTitle>
+                <AlertDescription><span>{row.fix}</span>
+                  {row.command && <span className="flex items-center gap-2"><code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{row.command}</code>
+                    <CopyButton text={row.command} label={`Copy ${row.command}`} /></span>}
+                </AlertDescription>
+                {row.retry && <AlertAction><Button size="xs" variant="outline" onClick={row.retry}><RotateCw /> Retry</Button></AlertAction>}
+              </Alert>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const COMMAND_TITLES: Record<(typeof COMMAND_CHECKS)[number], string> = { gh: 'gh login', t3: 't3 and T3 Code', git: 'git', jq: 'jq', curl: 'curl' };
+const SETUP_TITLES: Record<SetupCheckId, string> = { checkout: 'T3 project is the main checkout', source: 'Item source can be read', push: 'gh can push to the repository' };
+
+function ChecksStep({ run }: { run: Run }) {
+  const { projects, checks, runChecks, retryCheck } = useWizardStore();
+  const tools = useBoardStore((s) => s.data.tools);
+  if (projects.state !== 'loaded') return <ProjectsPending />;
+  const project = pickedProject(run, projects);
+  if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  if (!checks) return null;
+  const source = itemSourceOf(run, project);
+  const retryAll = () => void runChecks();
+  const commands = COMMAND_CHECKS.map((name): CheckRow => {
+    const check = tools?.[name];
+    if (checks.commands.state === 'running') return { id: name, title: COMMAND_TITLES[name], status: 'running' };
+    if (commandPasses(name, tools, source)) return { id: name, title: COMMAND_TITLES[name], status: 'passed', detail: toolState(check, name === 'gh').text };
+    return { id: name, title: COMMAND_TITLES[name], status: 'failed', problem: `${name}: ${toolState(check).text}`, fix: toolDescription('', check), retry: retryAll };
+  });
+  const setup = SETUP_CHECKS.map((id): CheckRow => {
+    const check = checks.setup[id];
+    if (check.state !== 'done') return { id, title: SETUP_TITLES[id], status: check.state };
+    const { result } = check;
+    return result.passed ? { id, title: SETUP_TITLES[id], status: 'passed', detail: result.detail }
+      : { id, title: SETUP_TITLES[id], status: 'failed', problem: result.problem, fix: result.fix, command: result.command, retry: () => void retryCheck(id) };
+  });
+  const rows = [...commands, ...setup];
+  const passed = rows.filter((r) => r.status === 'passed').length;
+  const failed = rows.filter((r) => r.status === 'failed').length;
+  const caption = `${passed} of ${rows.length} passed${failed ? ` · ${failed} need you` : ''}`;
+  return (
+    <div className="grid gap-4">
+      <Progress value={passed} max={rows.length} caption={caption} aria-label={caption} />
+      {checks.commands.state === 'failed' && (
+        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t check the commands</AlertTitle><AlertDescription>{checks.commands.error}</AlertDescription>
+          <AlertAction><Button size="xs" variant="outline" onClick={retryAll}><RotateCw /> Retry</Button></AlertAction></Alert>
+      )}
+      <CheckList title="Required commands" rows={commands} />
+      <CheckList title="Setup" rows={setup} />
+      <FinishProblem checks={checks} />
+    </div>
+  );
+}
+
+/** Why Finish couldn't put the repository on the board. */
+function FinishProblem({ checks }: { checks: Checks }) {
+  if (!checks.finishError) return null;
+  return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t finish onboarding</AlertTitle><AlertDescription>{checks.finishError}</AlertDescription></Alert>;
+}
+
 export function StepBody({ run, step }: { run: Run; step: StepId }) {
   if (step === 'project') return <ProjectStep run={run} />;
   if (step === 'setup') return <SetupStep run={run} />;
+  if (step === 'checks') return <ChecksStep run={run} />;
   return <p className="m-0 text-sm text-muted-foreground">This step comes in a later part of build #382.</p>;
 }

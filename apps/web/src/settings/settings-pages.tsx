@@ -44,7 +44,7 @@ const ONLY_APP_UPDATES = 'Only the board app updates itself';
  * Not checked before the first check, in sample mode, and for an az no listed repository needs.
  * A `login` row says Signed in or Signed out instead, and Signed in beside a gh too old.
  */
-function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
+export function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
   if (!check) return { text: 'Not checked', tone: 'muted' };
   const unread = 'scopes' in check ? ", couldn't read scopes" : '';
   const older = (version: string) => `${version}, older than ${GH_FLOOR}`;
@@ -317,7 +317,7 @@ export function pages(input: PagesInput): Page[] {
 }
 
 /** What the command does, or why its check failed and how to fix it. */
-function toolDescription(does: string, check: ToolCheck | undefined): ReactNode {
+export function toolDescription(does: string, check: ToolCheck | undefined): ReactNode {
   if (!check || check.result === 'ok') return does;
   if (check.result === 'not-running') return 'Open T3 Code.';
   const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';

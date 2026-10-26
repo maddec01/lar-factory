@@ -7,11 +7,10 @@
 
 # Board
 
-A local board for the lar project. It reads the project through your `gh` login
-every 45 seconds (`config.json`) and serves it on the first free port from
-4317 to 4416, which it logs; `BOARD_PORT` pins the port. The board app's board
-usually gets 4317. `BOARD_CONFIG_FILE`, an absolute path, makes it read that file in
-place of the checkout's `config.json`; the board app sets it to its own copy.
+A local board for the lar project. It reads the onboarded repositories through your
+`gh` login every 45 seconds (see [Adding a repository](#adding-a-repository)) and
+serves the board on the first free port from 4317 to 4416, which it logs;
+`BOARD_PORT` pins the port. The board app's board usually gets 4317.
 `BOARD_APP_SECRET`, which the board app sets on each launch, makes every write
 except `/api/read` answer 403 unless the request carries it in `X-Board-Secret`.
 Before it installs an update, the app posts that secret to `/api/drain`: the board
@@ -45,7 +44,7 @@ new build or `src/` change.
   one other than line 1; every board page marks the card Started. While the
   board runs, a double press, a retry or another tab starts no second thread.
   A queued draft needs an issue first. Before starting, Start checks that the
-  repository is in `config.json`, then reads T3 Code's live projects from its
+  repository is in `repositories.json`, then reads T3 Code's live projects from its
   database (read-only) and keeps those whose folder exists, has a `.git`
   directory (so a worktree doesn't count) and has the repository as its git
   `origin`. The folder can have any name and live anywhere. With no such
@@ -93,6 +92,53 @@ shows. A broken override is named in its notice. A missing `az` shows nothing.
 If `gh` can't reach GitHub for another reason, the board keeps the last data it
 read and shows a stale warning. `pnpm run sample` serves `packages/shared/test/sample.json` instead of GitHub;
 adding, queuing and starting are disabled in sample mode.
+
+## Adding a repository
+
+Until the board can onboard a repository itself, you add one by hand. The board
+reads two files in the board app's data folder, `~/Library/Application Support/Lar Factory/`:
+
+- `repositories.json` lists the onboarded repositories. Without it, the board
+  shows no repository.
+- `settings.json` holds the board-wide settings. Today that is `refreshSeconds`,
+  how often the board reads GitHub, 45 when the file or the field is missing.
+
+Each onboarded repository keeps its Repository config in `.lar-factory.json` at its
+root. The board reads it with `gh` from the repository's default branch on each
+refresh, never from a checkout, so a change shows once it merges to the default
+branch. Its fields:
+
+- `version`: the file's shape, `1`. A missing `version` counts as `1`.
+- `role`: what the repository is for, which lar-work reads. Required.
+- `itemSource`: where the repository's items come from, either
+  `{ "kind": "github-project", "owner": "<owner>", "number": <n> }` for a GitHub
+  Project or `{ "kind": "issues" }` for the repository's own issues, the default.
+- `show`: `"all"`, the default, or `"opted-in"`.
+- `labels`: an array of strings, empty by default.
+
+To add lar-factory, write `repositories.json`:
+
+```json
+{ "repositories": [{ "repo": "maddec01/lar-factory" }] }
+```
+
+and merge this `.lar-factory.json` to lar-factory's default branch, which reads its
+items from the lar Project, `maddec01`'s Project number 1:
+
+```json
+{
+  "version": 1,
+  "role": "The factory: board, lar-work skill and process docs",
+  "itemSource": { "kind": "github-project", "owner": "maddec01", "number": 1 }
+}
+```
+
+On its next refresh the board shows lar-factory. If `repositories.json` isn't valid
+or has the wrong shape, the board shows the read error with the file's path. If a
+repository's `.lar-factory.json` is missing or wrong, the board leaves that
+repository off and names it in a notice.
+`bash skills/lar-work/scripts/repo-config.sh maddec01/lar-factory` prints the
+config the board reads, with defaults filled in.
 
 To use the board every day, install the board app from
 [GitHub Releases](https://github.com/maddec01/lar-factory/releases) (see the

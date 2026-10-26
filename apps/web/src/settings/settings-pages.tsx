@@ -1,7 +1,7 @@
 // The Settings sections and their grouped rows, from the control room prototype. Most rows aren't built yet: they
 // show the prototype's value, disabled. The working rows are the Claude profiles, the update channel, version and
-// Check now, the command check rows, and the GitHub Project and repositories, read-only. In a browser the profiles and
-// updates, which only the board app has, show the prototype's values, disabled with that reason.
+// Check now, the command check rows, the gh and az logins, and the GitHub Project and repositories, read-only. In a
+// browser the profiles and updates, which only the board app has, show the prototype's values, disabled with that reason.
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
@@ -36,20 +36,24 @@ export interface PagesInput {
 const ONLY_APP_PROFILES = 'Only the board app links skills into Claude profiles';
 const ONLY_APP_UPDATES = 'Only the board app updates itself';
 
-/** A command's state: `ok`, else the version it printed, else OK, noting scopes gh couldn't read; or the problem its check found. */
-function toolState(check: ToolCheck | undefined, ok?: string): ComponentProps<typeof ToolState> {
+/**
+ * A command's state: the version it printed, else OK, noting scopes gh couldn't read; or the problem its check found.
+ * A `login` row says Signed in or Signed out instead.
+ */
+function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
   const unread = check && 'scopes' in check ? ", couldn't read scopes" : '';
   switch (check?.result) {
-    case undefined: case 'ok': return { text: `${ok ?? (check?.version || 'OK')}${unread}`, tone: 'success' };
-    case 'logged-out': return { text: 'Logged out', tone: 'warning' };
+    case undefined: case 'ok': return { text: `${login ? 'Signed in' : check?.version || 'OK'}${unread}`, tone: 'success' };
+    case 'logged-out': return { text: login ? 'Signed out' : 'Logged out', tone: 'warning' };
     case 'outdated': return { text: `${check.version}, older than ${GH_FLOOR}${unread}`, tone: 'warning' };
     case 'no-project-scope': return { text: 'No project scope', tone: 'warning' };
+    case 'no-extension': return { text: 'No azure-devops extension', tone: 'warning' };
     case 'missing': return { text: 'Not found', tone: 'error' };
   }
 }
 
-/** The commands Diagnostics › Tools lists, with what each does. */
-const DIAGNOSED: [CheckedTool, string][] = [
+/** The commands Diagnostics › Tools lists, with what each does; az follows, as it can be skipped. */
+const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
   ['gh', 'Reads the GitHub Project and its issues.'],
   ['t3', 'Starts the lar-work threads in T3 Code.'],
   ['git', 'lar-work’s agents branch, commit and push with it.'],
@@ -58,6 +62,14 @@ const DIAGNOSED: [CheckedTool, string][] = [
 ];
 
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
+
+/** Why az isn't checked, while no listed repository is on Azure DevOps. */
+const AZ_SKIPPED = 'no listed repository is on Azure DevOps';
+
+/** az's state: not checked while no listed repository is on Azure DevOps, else what its check found. */
+function azState(data: BoardData, login = false): ComponentProps<typeof ToolState> {
+  return data.tools?.az ? toolState(data.tools.az, login) : { text: login ? 'Not checked' : 'Skipped', tone: 'muted' };
+}
 
 const REFRESH_OPTIONS = ['15 seconds', '30 seconds', '45 seconds', '1 minute', '5 minutes'];
 
@@ -141,7 +153,12 @@ export function pages(input: PagesInput): Page[] {
     { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, groups: [
       { title: 'GitHub Project', rows: [
         { id: 'project', title: data.project.title, description: 'The Project the board reads and moves items on.', control: custom(() => <ReadOnlyText label="GitHub Project" value={project} />) },
-        { id: 'gh', title: 'GitHub CLI', description: 'Reads through your gh login. The board never stores a token.', control: custom(() => <ToolState {...toolState(data.tools?.gh, 'Signed in')} />) },
+      ] },
+      { title: 'Command line tools', description: 'The board reads each provider through your own login and never stores a token.', rows: [
+        { id: 'gh', title: 'GitHub CLI', description: toolDescription('gh, for repositories on GitHub.', data.tools?.gh),
+          control: custom(() => <ToolState {...toolState(data.tools?.gh, true)} />) },
+        { id: 'az', title: 'Azure CLI', description: toolDescription(`az with the azure-devops extension, for repositories on Azure DevOps.${data.tools?.az ? '' : ` Not checked: ${AZ_SKIPPED}.`}`, data.tools?.az),
+          control: custom(() => <ToolState {...azState(data, true)} />) },
       ] },
       { title: 'Repositories', description: 'Each repo’s platform names its List group and colour; its role goes to lar-work.', rows: data.repos.map((r) => ({
         id: `repo-${r.repo}`, title: r.repo, description: r.role,
@@ -202,6 +219,8 @@ export function pages(input: PagesInput): Page[] {
         ...DIAGNOSED.map(([name, does]): Row => ({
           id: `d-${name}`, title: name, description: toolDescription(does, data.tools?.[name]), control: custom(() => <ToolState {...toolState(data.tools?.[name])} />),
         })),
+        { id: 'd-az', title: 'az', description: toolDescription(data.tools?.az ? 'Reads repositories on Azure DevOps.' : `Skipped: ${AZ_SKIPPED}.`, data.tools?.az),
+          control: custom(() => <ToolState {...azState(data)} />) },
         { id: 'd-server', title: 'Board server', description: `127.0.0.1:4317 · last read ${data.fetchedAt ? 'OK' : 'never'}`, control: { type: 'button', label: 'Open logs' }, reason: notBuilt('Open logs') },
       ] },
     ] },

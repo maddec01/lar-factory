@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
-import { TOOL_NAMES, checkTools, findTools, lookUpTools, mergePaths, probeGh, readLoginPath, versionOf } from './tools.ts';
+import { TOOL_NAMES, checkTools, findTools, lookUpTools, mergePaths, probeAz, probeGh, readLoginPath, versionOf } from './tools.ts';
 
 /** A temp folder with `bin` holding runnable files of the given names, and a login shell whose PATH starts with `bin`. */
 async function machine(t: TestContext, names: string[]) {
@@ -100,7 +100,7 @@ test('the checks report each command: its version, missing with the override and
   // A command that runs passes, even when it prints no version.
   await script('curl', 'exit 2');
   await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, JQ_PATH: join(dir, 'nowhere/jq') });
-  const { tools, ghError } = await checkTools();
+  const { tools, ghError } = await checkTools(false);
   assert.deepEqual(tools, {
     t3: { result: 'ok', version: '0.1.3-nightly.1' },
     gh: { result: 'logged-out', version: '2.96.1', fix: 'gh auth login' },
@@ -162,6 +162,42 @@ test('a missing or logged-out gh still blocks reading', async (t) => {
   const { shell } = await machine(t, []);
   await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, GH_PATH: '/nowhere/gh' });
   assert.deepEqual((await probeGh()).check, { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' });
+});
+
+/** Probes an az whose `account show` and `extension show` exit with these codes. */
+async function probeAzWith(t: TestContext, account: number, extension: number) {
+  const { bin, shell } = await machine(t, []);
+  await writeFile(join(bin, 'az'), `#!/bin/sh
+[ "$1" = --version ] && printf 'azure-cli                         2.67.0\\n\\ncore                              2.67.0\\n' && exit 0
+[ "$1 $2" = "account show" ] && { [ ${account} = 0 ] && echo '{}' || echo "Please run 'az login' to setup account." >&2; exit ${account}; }
+[ "$*" = "extension show --name azure-devops" ] && exit ${extension}
+exit 9
+`);
+  await chmod(join(bin, 'az'), 0o755);
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
+  return probeAz();
+}
+
+test('an az signed in with the azure-devops extension passes, with its version', async (t) => {
+  assert.deepEqual(await probeAzWith(t, 0, 0), { result: 'ok', version: '2.67.0' });
+});
+
+test('az names its fix: az login when signed out, else az extension add without the extension', async (t) => {
+  assert.deepEqual(await probeAzWith(t, 1, 1), { result: 'logged-out', version: '2.67.0', fix: 'az login' });
+  assert.deepEqual(await probeAzWith(t, 0, 1), { result: 'no-extension', version: '2.67.0', fix: 'az extension add --name azure-devops' });
+});
+
+test('a missing az has brew install azure-cli as its fix', async (t) => {
+  const { shell } = await machine(t, []);
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, AZ_PATH: '/nowhere/az' });
+  assert.deepEqual(await probeAz(), { result: 'missing', override: 'AZ_PATH=/nowhere/az', fix: 'brew install azure-cli' });
+});
+
+test('the checks probe az only when asked to', async (t) => {
+  const { shell } = await machine(t, []);
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, AZ_PATH: '/nowhere/az' });
+  assert.equal('az' in (await checkTools(false)).tools, false);
+  assert.equal((await checkTools(true)).tools.az?.result, 'missing');
 });
 
 test('the login shell PATH goes before the inherited one, then the Homebrew folders, without duplicates', () => {

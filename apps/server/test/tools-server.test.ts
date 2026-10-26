@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { checkouts } from './repo-support.ts';
 import { startBoard, until } from './server-support.ts';
+import { projectsDb } from './stats-db.ts';
 import type { Board } from './server-support.ts';
 import type { BoardData, ToolCheck } from '@lar-factory/shared';
 
@@ -130,6 +132,28 @@ test('a missing jq, git or curl has its check but doesn\'t stop the board readin
     jq: { result: 'missing', override: 'JQ_PATH=/nowhere/jq', fix: 'brew install jq' },
     curl: { result: 'missing', override: 'CURL_PATH=/nowhere/curl', fix: 'brew install curl' } });
   assert.match(board.logs(), /git was not found at GIT_PATH=\/nowhere\/git; jq was not found at JQ_PATH=\/nowhere\/jq; curl was not found/);
+});
+
+test('a listed repository on Azure DevOps gets an az check, which Recheck reruns, and az never stops the read', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-azure-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  checkouts(home, { 'lar-api': 'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api' });
+  const config = join(home, 'config.json');
+  writeFileSync(config, JSON.stringify({ project: { owner: 'maddec01', title: 'lar' },
+    repos: [{ repo: 'maddec01/lar-factory', platform: 'Factory', role: 'factory' }, { repo: 'Fabrikam/lar-api', platform: 'Server', role: 'api' }] }));
+  const az = join(home, 'az');
+  const fakeAz = (account: number) => {
+    writeFileSync(az, `#!/bin/sh\n[ "$1" = --version ] && echo 'azure-cli 2.67.0' && exit 0\n[ "$1" = account ] && exit ${account}\nexit 0\n`);
+    chmodSync(az, 0o755);
+  };
+  fakeAz(1);
+  const board = await startBoard(t, {}, false, false, { HOME: home, BOARD_CONFIG_FILE: config, AZ_PATH: az,
+    T3_STATE_DB: projectsDb(t, [{ id: 'project-api', root: join(home, 'Developer/lar/lar-api') }]) });
+  const data = await afterRead(board);
+  assert.ok(data.fetchedAt, 'the board reads GitHub');
+  assert.deepEqual(results(data.tools), { ...allOk, az: { result: 'logged-out', version: '2.67.0', fix: 'az login' } });
+  fakeAz(0);
+  assert.deepEqual((await (await recheck(board)).json()).board.tools.az, { result: 'ok', version: '2.67.0' });
 });
 
 test('sample mode looks no tools up', async (t) => {

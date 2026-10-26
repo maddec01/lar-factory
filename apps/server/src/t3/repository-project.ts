@@ -1,6 +1,7 @@
 // Finds the repository project Start opens a card's thread in: the T3 project whose
 // folder is a main checkout with the repository as its git origin. Each failure is a
-// hint that names the fix; the board never adds or changes T3 projects.
+// hint that names the fix; the board never adds or changes T3 projects. The same checkouts
+// tell whether a listed repository is on Azure DevOps, which only then needs az.
 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -27,16 +28,38 @@ export async function repositoryProjectHints(repos: readonly RepoConfig[],
   return Object.fromEntries(repos.map(({ repo }) => [repo, find(repo).error ?? null]));
 }
 
+/** Whether a listed repository's checkout has its origin on Azure DevOps; false when T3's projects can't be read. */
+export async function anyOnAzureDevOps(repos: readonly RepoConfig[], env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  let found;
+  try { found = await checkouts(env); }
+  catch { return false; }
+  const listed = new Set(repos.map(({ repo }) => repo.toLowerCase()));
+  return found.some(({ origin }) => origin !== null && onAzureDevOps(origin) && listed.has(azureRepo(origin)?.toLowerCase() ?? ''));
+}
+
+/** Whether an origin URL is on Azure DevOps: dev.azure.com, its ssh host, or an older *.visualstudio.com organization. */
+export function onAzureDevOps(url: string): boolean {
+  const host = url.match(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)/i)?.[1]?.toLowerCase() ?? '';
+  return host === 'dev.azure.com' || host.endsWith('.dev.azure.com') || host.endsWith('.visualstudio.com');
+}
+
+interface Checkout { id: string; folder: string; origin: string | null }
+
+/** T3's live projects with each one's `origin` URL, null for a worktree or a checkout without one; throws when T3's projects can't be read. */
+async function checkouts(env: NodeJS.ProcessEnv): Promise<Checkout[]> {
+  const projects = liveProjects(statsDbPath(env), env.HOME ?? '');
+  const origins = await Promise.all(projects.map((p) => mainCheckout(p.folder) ? originUrl(p.folder) : null));
+  return projects.map((p, i) => ({ id: p.id, folder: p.folder, origin: origins[i] ?? null }));
+}
+
 /** Reads T3's live projects and their checkouts' origins once, and finds a repository's project among them. */
 async function projectFinder(env: NodeJS.ProcessEnv): Promise<(repo: string) => RepositoryProject> {
-  const db = statsDbPath(env);
   const home = env.HOME ?? '';
-  let projects;
-  try { projects = liveProjects(db, home); }
-  catch { return () => ({ error: `Can't read T3 Code's projects at ${db}` }); }
-  const origins = await Promise.all(projects.map((p) => mainCheckout(p.folder) ? originUrl(p.folder) : null));
+  let projects: Checkout[];
+  try { projects = await checkouts(env); }
+  catch { return () => ({ error: `Can't read T3 Code's projects at ${statsDbPath(env)}` }); }
   return (repo) => {
-    const matches = projects.filter((_, i) => githubRepo(origins[i] ?? null)?.toLowerCase() === repo.toLowerCase());
+    const matches = projects.filter((p) => githubRepo(p.origin)?.toLowerCase() === repo.toLowerCase());
     if (matches.length === 1) return { projectId: matches[0]!.id };
     if (!matches.length) return { error: `No T3 project is a checkout of ${repo}; add the checkout in T3 Code` };
     const folders = matches.map((p) => tilde(p.folder, home)).sort().join(', ');
@@ -58,6 +81,11 @@ async function originUrl(folder: string): Promise<string | null> {
 /** `owner/repo` from an https or ssh GitHub URL, with or without `.git`. */
 function githubRepo(url: string | null): string | null {
   return url?.match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?\/?$/)?.[1] ?? null;
+}
+
+/** `project/repo` from an https or ssh Azure DevOps URL, whose https URLs put `_git` between them. */
+function azureRepo(url: string): string | null {
+  return githubRepo(url.replace('/_git/', '/'));
 }
 
 /** `folder` with the home folder shown as `~`. */

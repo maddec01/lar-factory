@@ -12,7 +12,7 @@ export type ToolName = typeof TOOL_NAMES[number];
 
 const OVERRIDES: Record<ToolName, string> = { t3: 'T3_PATH', gh: 'GH_PATH', az: 'AZ_PATH', git: 'GIT_PATH', jq: 'JQ_PATH', curl: 'CURL_PATH' };
 /** The command that installs a missing tool; T3 Code installs t3. */
-const INSTALL: Partial<Record<ToolName, string>> = { gh: 'brew install gh', git: 'brew install git', jq: 'brew install jq', curl: 'brew install curl' };
+const INSTALL: Partial<Record<ToolName, string>> = { gh: 'brew install gh', az: 'brew install azure-cli', git: 'brew install git', jq: 'brew install jq', curl: 'brew install curl' };
 const FALLBACK_DIRS = ['/opt/homebrew/bin', '/usr/local/bin'];
 const START = '__LAR_BOARD_PATH_START__';
 const END = '__LAR_BOARD_PATH_END__';
@@ -206,10 +206,31 @@ export async function probeGh(): Promise<GhProbe> {
   return failed(status, ['auth', 'status'], version);
 }
 
-/** Checks every command the board needs from the last lookup, together; `ghError` is the gh probe's error for the Stale banner. */
-export async function checkTools(): Promise<{ tools: ToolChecks; ghError?: string }> {
+/**
+ * Probes az: `az --version`, then `az account show` and `az extension show --name azure-devops`, 10 s each,
+ * as az is slow to start. A signed-out az names `az login`, which comes before a missing extension.
+ */
+export async function probeAz(): Promise<ToolCheck> {
+  const command = toolCommand('az');
+  if (!command) return missingCheck('az');
+  const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 10_000 });
+  const versionRun = await run(['--version']);
+  // A string code is a spawn error: az went away or can't run since the lookup.
+  if (typeof versionRun.code === 'string') return missingCheck('az');
+  const version = versionRun.code === 0 ? versionOf(versionRun.stdout) : undefined;
+  const [account, extension] = await Promise.all([run(['account', 'show']), run(['extension', 'show', '--name', 'azure-devops'])]);
+  if (account.code !== 0) return { result: 'logged-out', ...(version && { version }), fix: 'az login' };
+  if (extension.code !== 0) return { result: 'no-extension', ...(version && { version }), fix: 'az extension add --name azure-devops' };
+  return { result: 'ok', ...(version && { version }) };
+}
+
+/**
+ * Checks every command the board needs from the last lookup, together, and az only when `withAz` is set, as
+ * only a repository on Azure DevOps needs it. `ghError` is the gh probe's error for the Stale banner.
+ */
+export async function checkTools(withAz: boolean): Promise<{ tools: ToolChecks; ghError?: string }> {
   const others = ['t3', 'git', 'jq', 'curl'] as const satisfies readonly CheckedTool[];
-  const [gh, ...checks] = await Promise.all([probeGh(), ...others.map(checkVersion)]);
-  const tools = { gh: gh.check, ...Object.fromEntries(others.map((name, i) => [name, checks[i]!])) } as ToolChecks;
+  const [gh, az, ...checks] = await Promise.all([probeGh(), withAz ? probeAz() : undefined, ...others.map(checkVersion)]);
+  const tools = { gh: gh.check, ...Object.fromEntries(others.map((name, i) => [name, checks[i]!])), ...(az && { az }) } as ToolChecks;
   return { tools, ...(gh.error && { ghError: gh.error }) };
 }

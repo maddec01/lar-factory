@@ -20,10 +20,12 @@ export default defineConfig({
       entry: ["src/main.ts"],
       clean: true,
       plugins: [compiledCss()],
-      // The skills and checklists of the commit being built, which the app installs on launch.
+      // The skills and checklists of the commit being built, which the app installs on launch, and
+      // UPSTREAM.md, which credits them in Settings > Skills.
       copy: [
         { from: "../../skills", to: "dist-electron/bundle" },
         { from: "../../references", to: "dist-electron/bundle" },
+        { from: "../../UPSTREAM.md", to: "dist-electron/bundle" },
       ],
       deps: {
         alwaysBundle: (id) => !id.startsWith("node:") && !electronOnly(id),

@@ -35,16 +35,25 @@ describe("locate", () => {
     });
   });
 
-  it("runs the bundled server, with config.json, from the packaged app's Resources", () => {
+  it("runs the bundled server, with config.json and the skills bundle, from the packaged app's Resources", () => {
     assert.deepStrictEqual(BoardServer.locate("/Applications/Board.app/Contents/Resources/app.asar", true), {
       serverDir: "/Applications/Board.app/Contents/Resources/server",
       serverFile: "/Applications/Board.app/Contents/Resources/server/dist/server.mjs",
       configFile: "/Applications/Board.app/Contents/Resources/config.json",
+      bundleDir: "/Applications/Board.app/Contents/Resources/bundle",
     });
   });
 });
 
 describe("makeStartConfig", () => {
+  it("names the skills bundle when the app has one", () => {
+    const config = BoardServer.makeStartConfig({
+      executablePath: "/Board", serverDir: "/server", serverFile: "/server/dist/server.mjs", configFile: "/config.json",
+      bundleDir: "/bundle", env: {}, secret: "launch-secret",
+    });
+    assert.equal(config.env.BOARD_BUNDLE_DIR, "/bundle");
+  });
+
   it("runs the server file with the given executable in Node mode, the config file and the launch secret", () => {
     const config = BoardServer.makeStartConfig({
       executablePath: "/Applications/Board.app/Contents/MacOS/Board",

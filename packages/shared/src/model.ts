@@ -293,6 +293,16 @@ export const ITEM_SOURCE_KINDS = ['project', 'issues'] as const;
 
 export type ItemSourceKind = (typeof ITEM_SOURCE_KINDS)[number];
 
+/** A skill or checklist the board app bundles: who wrote it, its licence and its source on GitHub. */
+export interface BundledSkill {
+  /** The folder name in `skills/`, or `references/<file>` for a checklist. */
+  name: string;
+  author: string;
+  licence: string;
+  /** The URL of its folder or file on GitHub. */
+  source: string;
+}
+
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
@@ -324,6 +334,8 @@ export interface BoardData {
    * the hint that says how to add it in T3. Absent until the first read, and in sample mode.
    */
   repositoryProjects?: Record<string, string | null>;
+  /** The bundle's skills and checklists, read once at startup; empty when the server can't read them. */
+  bundledSkills?: BundledSkill[];
 }
 
 /** The hint for adding the repository's T3 project when a start can't find it, whatever the case; null when it can, or before the first read. */

@@ -5,7 +5,7 @@
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import type { BoardData, CheckedTool, ToolCheck } from '@lar-factory/shared';
+import { GH_FLOOR, type BoardData, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
 import type { ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { PlatformTag } from '../items/item-parts.tsx';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
@@ -36,10 +36,16 @@ export interface PagesInput {
 const ONLY_APP_PROFILES = 'Only the board app links skills into Claude profiles';
 const ONLY_APP_UPDATES = 'Only the board app updates itself';
 
-/** A command's state: `ok`, else the version it printed, else OK; or the problem its check found. */
+/** A command's state: `ok`, else the version it printed, else OK, noting scopes gh couldn't read; or the problem its check found. */
 function toolState(check: ToolCheck | undefined, ok?: string): ComponentProps<typeof ToolState> {
-  if (!check || check.result === 'ok') return { text: ok ?? (check?.version || 'OK'), tone: 'success' };
-  return check.result === 'logged-out' ? { text: 'Logged out', tone: 'warning' } : { text: 'Not found', tone: 'error' };
+  const unread = check && 'scopes' in check ? ", couldn't read scopes" : '';
+  switch (check?.result) {
+    case undefined: case 'ok': return { text: `${ok ?? (check?.version || 'OK')}${unread}`, tone: 'success' };
+    case 'logged-out': return { text: 'Logged out', tone: 'warning' };
+    case 'outdated': return { text: `${check.version}, older than ${GH_FLOOR}${unread}`, tone: 'warning' };
+    case 'no-project-scope': return { text: 'No project scope', tone: 'warning' };
+    case 'missing': return { text: 'Not found', tone: 'error' };
+  }
 }
 
 /** The commands Diagnostics › Tools lists, with what each does. */

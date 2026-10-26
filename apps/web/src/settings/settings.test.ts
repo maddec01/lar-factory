@@ -154,6 +154,30 @@ test('Diagnostics shows what the lookup found wrong with gh and t3', async () =>
   expect(text(row('d-gh'))).toContain('Fix: gh auth login');
 });
 
+test('Diagnostics shows a gh older than 2.94.0 with its fix', async () => {
+  await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }) });
+  expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● 2.93.1, older than 2.94.0');
+  expect(text(row('d-gh'))).toContain('Fix: brew upgrade gh');
+});
+
+test('Diagnostics shows a gh login without the project scope with its fix', async () => {
+  await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'no-project-scope', version: '2.102.0', fix: 'gh auth refresh -s project' } }) });
+  expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● No project scope');
+  expect(text(row('d-gh'))).toContain('Fix: gh auth refresh -s project');
+});
+
+const unreadScopes = { ...sample, tools: toolChecks({ gh: { result: 'ok', version: '2.102.0', scopes: 'unread' } }) };
+
+test('Diagnostics says when the board couldn\'t read gh\'s scopes', async () => {
+  await open('Diagnostics', unreadScopes);
+  expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● 2.102.0, couldn\'t read scopes');
+});
+
+test('Repositories says when the board couldn\'t read gh\'s scopes', async () => {
+  await open('Repositories', unreadScopes);
+  expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in, couldn\'t read scopes');
+});
+
 test('Diagnostics shows a missing git, jq or curl with its fix', async () => {
   await open('Diagnostics', { ...sample, tools: toolChecks({ jq: { result: 'missing', override: 'JQ_PATH=/nowhere/jq', fix: 'brew install jq' } }) });
   expect(text(row('d-jq').querySelector('.tool-state'))).toBe('● Not found');

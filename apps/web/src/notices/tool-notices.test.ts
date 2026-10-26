@@ -1,4 +1,4 @@
-// The notices for a missing t3, a missing or logged-out gh, or a missing git, jq or curl, and their Recheck.
+// The notices for a missing t3, a gh that's missing, logged out, too old or without the project scope, or a missing git, jq or curl, and their Recheck.
 // Ported from the tool notice cases of test/render.test.ts and its saved copies.
 
 import { expect, test } from 'vite-plus/test';
@@ -64,6 +64,31 @@ test('a missing or logged-out gh shows its own notice, and other read failures s
 
   await push(withTools({}, failed));
   expect(banners(), 'a failed read is the title bar\'s to show').toEqual([]);
+});
+
+test('a gh older than 2.94.0 shows its banner with brew upgrade gh, and the board still shows', async () => {
+  await mountPage(withTools({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }));
+  expect($$('.banners .banner').map(bannerText)).toEqual([['GitHub CLI is older than 2.94.0.', 'lar-work’s scripts need the --parent, '
+    + '--add-sub-issue and --blocked-by flags that gh 2.94.0 added, and this gh is 2.93.1. Run brew upgrade gh Copy in a terminal, '
+    + 'then press Recheck. The board also looks again every 10 seconds. Recheck']]);
+  expect($('.desk')).not.toBeNull();
+});
+
+test('a login without the project scope shows its banner with gh auth refresh -s project', async () => {
+  holdRecheck();
+  const noScope = withTools({ gh: { result: 'no-project-scope', fix: 'gh auth refresh -s project' } });
+  await mountPage(noScope);
+  expect($$('.banners .banner').map(bannerText)).toEqual([['GitHub CLI can\'t read Projects.', 'The board reads the GitHub Project through gh, '
+    + 'and your gh login has no project scope. Run gh auth refresh -s project Copy in a terminal, '
+    + 'then press Recheck. The board also looks again every 10 seconds. Recheck']]);
+  await settle(() => recheckButton().click());
+  await answer(board(noScope));
+  expect(note()!.textContent).toBe("Still can't read Projects.");
+});
+
+test('scopes the board couldn\'t read show no banner', async () => {
+  await mountPage(withTools({ gh: { result: 'ok', version: '2.102.0', scopes: 'unread' } }));
+  expect($$('.banners .banner')).toEqual([]);
 });
 
 test('Recheck posts, shows Checking…, then the board once the tool is found, and keeps focus', async () => {

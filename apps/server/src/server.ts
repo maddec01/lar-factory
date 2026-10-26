@@ -56,7 +56,7 @@ let checkingTools: Promise<void> | null = null;
 let firstToolCheck: Promise<void> | undefined;
 let toolRetry: NodeJS.Timeout | undefined;
 let toolLog = '';
-/** How often the board looks again for a missing t3 or gh, or a logged-out gh. Tests shorten it with BOARD_TOOL_RETRY_MS. */
+/** How often the board looks again while a check fails that retriesTools names. Tests shorten it with BOARD_TOOL_RETRY_MS. */
 const TOOL_RETRY_MS = Number(process.env.BOARD_TOOL_RETRY_MS) || 10_000;
 
 /** Logs `whenSet` or `whenCleared` each time the condition it's given flips; it starts cleared. */
@@ -137,12 +137,20 @@ function logTools(): void {
   toolLog = message;
 }
 
-/** Shows the checks, whose failures have notices, and looks again in TOOL_RETRY_MS while one fails. */
+/**
+ * Whether the board looks again by itself: while gh is missing, logged out or without the project scope, which stop
+ * reads, while t3 is missing or T3 Code isn't running. An old gh, a missing git, jq or curl and az wait for Recheck.
+ */
+function retriesTools(checks: ToolChecks): boolean {
+  return ['missing', 'logged-out', 'no-project-scope'].includes(checks.gh.result) || checks.t3.result !== 'ok';
+}
+
+/** Shows the checks, whose failures have notices, and looks again in TOOL_RETRY_MS while retriesTools says so. */
 function showToolChecks(checks: ToolChecks): void {
   board.update({ tools: checks });
   logTools();
   clearTimeout(toolRetry);
-  if (Object.values(checks).some((check) => check.result !== 'ok')) toolRetry = setTimeout(() => void recheckTools(false), TOOL_RETRY_MS);
+  if (retriesTools(checks)) toolRetry = setTimeout(() => void recheckTools(false), TOOL_RETRY_MS);
 }
 
 /**

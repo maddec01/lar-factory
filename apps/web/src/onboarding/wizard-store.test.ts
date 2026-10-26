@@ -3,11 +3,13 @@
 
 import { expect, test } from 'vite-plus/test';
 import { fetchMock, sample, settle } from '../../test/support.ts';
-import type { BoardData, ProjectChoice } from '@lar-factory/shared';
+import type { BoardData, ProjectChoice, SetupAnswers } from '@lar-factory/shared';
 
 const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
 });
+/** The setup step's answers before any is given: a GitHub Project of the repository's owner, with All items suggested. */
+const SETUP: SetupAnswers = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '', show: 'all', showPicked: false, role: '' };
 const PROJECTS = [project('lar-web'), project('lar-server', { onBoard: true }), project('notes', { repo: null, provider: null, hasConfig: null })];
 
 /** The store, fresh, with T3's projects answered by `reply`; each onboarding it keeps is kept. */
@@ -25,7 +27,7 @@ test('the steps are the T3 project, Provider and item source, Checks, then Pull 
 test("starting a run opens it on the T3 project step and reads T3's projects", async () => {
   const wizard = await store();
   await settle(() => wizard.getState().start());
-  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: null, repo: null, savedAs: null });
+  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: null, repo: null, savedAs: null, setup: null });
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/onboarding/projects']);
   expect(wizard.getState().projects).toEqual({ state: 'loaded', projects: PROJECTS });
 });
@@ -55,8 +57,8 @@ test('Next waits for a project that can be picked, then moves on; Back returns',
   wizard.getState().pick('lar-web');
   expect(ready()).toBe(true);
   wizard.getState().next();
-  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: null });
-  expect(ready(), 'a later step waits for its slice').toBe(false);
+  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: null, setup: SETUP });
+  expect(ready(), 'the step waits for its answers').toBe(false);
   wizard.getState().back();
   expect(wizard.getState().run!.step).toBe('project');
 });
@@ -80,7 +82,59 @@ test('closing once a project is picked keeps the repository as onboarding, with 
   wizard.getState().next();
   await settle(() => wizard.getState().close());
   expect(wizard.getState().run).toBeNull();
-  expect(kept()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } } }]);
+  expect(kept()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web', setup: SETUP } } }]);
+});
+
+/** The store with lar-web picked and its setup step open, and whether Next can move past it. */
+async function onSetup(projects = PROJECTS) {
+  const wizard = await store(() => new Response(JSON.stringify({ projects })));
+  const { stepReady } = await import('./wizard-store.ts');
+  await settle(() => wizard.getState().start());
+  wizard.getState().pick('lar-web');
+  wizard.getState().next();
+  return { wizard, ready: () => stepReady(wizard.getState().run!, wizard.getState().projects) };
+}
+
+test('the suggested show setting follows the item source until one is picked', async () => {
+  const { wizard } = await onSetup();
+  const setup = () => wizard.getState().run!.setup!;
+  wizard.getState().answer({ itemSource: 'issues' });
+  expect(setup()).toMatchObject({ itemSource: 'issues', show: 'opted-in', showPicked: false });
+  wizard.getState().answer({ itemSource: 'github-project' });
+  expect(setup().show).toBe('all');
+  wizard.getState().answer({ show: 'opted-in' });
+  wizard.getState().answer({ itemSource: 'issues' });
+  wizard.getState().answer({ itemSource: 'github-project' });
+  expect(setup()).toMatchObject({ itemSource: 'github-project', show: 'opted-in', showPicked: true });
+});
+
+test("Next needs a role, and for a GitHub Project an owner's login and a number", async () => {
+  const { wizard, ready } = await onSetup();
+  wizard.getState().answer({ role: '  ' });
+  expect(ready(), 'a blank role').toBe(false);
+  wizard.getState().answer({ role: 'Web client' });
+  expect(ready(), 'no Project number').toBe(false);
+  for (const [projectOwner, projectNumber] of [['maddec01', '0'], ['maddec01', '3.5'], ['-maddec01', '3'], ['', '3']]) {
+    wizard.getState().answer({ projectOwner, projectNumber });
+    expect(ready(), `${projectOwner} #${projectNumber}`).toBe(false);
+  }
+  wizard.getState().answer({ projectOwner: 'maddec01', projectNumber: '3' });
+  expect(ready()).toBe(true);
+  wizard.getState().answer({ itemSource: 'issues', projectNumber: '' });
+  expect(ready(), "the repository's issues need no Project").toBe(true);
+  wizard.getState().next();
+  expect(wizard.getState().run).toMatchObject({ step: 'checks', done: ['project', 'setup'] });
+});
+
+test(".lar-factory.json's values pass the step with no answers; an Azure DevOps origin or a file that can't be reused can't", async () => {
+  const config = { itemSource: { kind: 'issues' as const }, show: 'opted-in' as const, role: 'Web client' };
+  expect((await onSetup([project('lar-web', { hasConfig: true, config })])).ready()).toBe(true);
+  for (const parts of [{ provider: 'Azure DevOps' as const, repo: 'Fabrikam/lar-web', hasConfig: null },
+    { hasConfig: true, configProblem: '.lar-factory.json isn’t valid JSON.' }, { hasConfig: null }]) {
+    const { wizard, ready } = await onSetup([project('lar-web', parts)]);
+    wizard.getState().answer({ itemSource: 'issues', role: 'Web client' });
+    expect(ready(), JSON.stringify(parts)).toBe(false);
+  }
 });
 
 const onboardingBoard = (step: string): BoardData => ({ ...sample,
@@ -89,9 +143,11 @@ const onboardingBoard = (step: string): BoardData => ({ ...sample,
 test('Resume reopens the run on its step with its answers, and its own project can be picked again', async () => {
   const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-web', { onBoard: true }), project('lar-apple')] })));
   const { useBoardStore } = await import('../board/board-store.ts');
-  useBoardStore.getState().receive(onboardingBoard('setup'));
+  const setup: SetupAnswers = { ...SETUP, itemSource: 'issues', show: 'all', showPicked: true, role: 'Web client' };
+  useBoardStore.getState().receive({ ...sample,
+    onboarding: [{ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web', setup } } }] });
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
-  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: 'maddec01/lar-web' });
+  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: 'maddec01/lar-web', setup });
   expect(wizard.getState().projects.state, "T3's projects are read again").toBe('loaded');
   wizard.getState().back();
   wizard.getState().pick('lar-apple');

@@ -6,11 +6,11 @@
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, Plus, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, type BoardData, type BundledSkill, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
+import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/button';
 import { RepoTag } from '../items/item-parts.tsx';
-import { STEPS, useWizardStore } from '../onboarding/wizard-store.ts';
+import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, SmallButton, ToolState, notBuilt } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
@@ -96,8 +96,19 @@ const editAndReset = <><SmallButton reason="Editing a repository arrives in buil
   <SmallButton reason="Resetting a repository arrives in build #385">Reset</SmallButton></>;
 
 /**
+ * A repository still onboarding: its provider, its item source and show setting once it has passed the step that asks
+ * them, and the step it stopped at or its PR's wait for the merge.
+ */
+function onboardingDescription(progress: OnboardingProgress): string {
+  const { done, answers: { provider, setup } } = progress;
+  const answered = setup && done.includes('setup') ? [setup.itemSource === 'github-project'
+    ? sourceName('project', { owner: setup.projectOwner, number: setup.projectNumber }) : ITEM_SOURCES.issues, SHOWN[setup.show]] : [];
+  return [provider, ...answered, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
+}
+
+/**
  * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting,
- * one still onboarding with the step it stopped at and Resume. Add repository opens the onboarding dialog. The board
+ * one still onboarding with what it has answered, the step it stopped at and Resume. Add repository opens the onboarding dialog. The board
  * reads only GitHub repositories until build #386.
  */
 function repositoryGroup(data: BoardData): Group {
@@ -106,7 +117,7 @@ function repositoryGroup(data: BoardData): Group {
     control: custom(() => <span className="flex items-center gap-2">{editAndReset}</span>),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
-    id: `repo-${repo}`, title: repo, description: `Onboarding · stopped at ${(STEPS.find((s) => s.id === progress.step) ?? STEPS[0]).label}`,
+    id: `repo-${repo}`, title: repo, description: onboardingDescription(progress),
     control: custom(() => <span className="flex items-center gap-2">
       <Button size="xs" onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>{editAndReset}
     </span>),

@@ -27,7 +27,7 @@ test('Next is disabled until a project is picked, then shows the next step, and 
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('Provider and item source');
   expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 4');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('1');
-  expect(button('Next')!.disabled, 'the later steps wait for their slices').toBe(true);
+  expect(button('Next')!.disabled, 'the step waits for its answers').toBe(true);
   await settle(() => button('Back')!.click());
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('T3 project');
   expect(radio('lar-web').getAttribute('aria-checked'), 'the pick stays').toBe('true');

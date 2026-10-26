@@ -50,7 +50,7 @@ test('Resume reopens the dialog on the stored step with the stored project', asy
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Provider and item source');
   expect(text(dialog()!.querySelector('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 4');
   await settle(() => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).includes('Back'))!.click());
-  const radio = dialog()!.querySelector('[data-project="lar-web"] [role="radio"]')!;
+  const radio = dialog()!.querySelector('[data-choice="lar-web"] [role="radio"]')!;
   expect(radio.getAttribute('aria-checked')).toBe('true');
   expect(radio.hasAttribute('data-disabled'), 'its own project stays pickable').toBe(false);
 });

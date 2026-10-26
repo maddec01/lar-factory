@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type ModelGroup, type ToolCheck, type ToolChecks } from '@lar-factory/shared';
+import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { loadConfig } from './config/config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
@@ -166,7 +166,7 @@ async function recheckTools(rereadLoginPath = true): Promise<void> {
 }
 
 /** Whether gh's check stops the read: it blocks every repository the board lists, or the Project when it lists none. */
-function ghStopsRead(check: ToolCheck | undefined): boolean {
+function ghStopsRead(check: GhCheck | undefined): boolean {
   const sources: ItemSource[] = config.repos.length ? config.repos.map(itemSource) : ['project'];
   return sources.every((source) => ghBlocksRead(check, source));
 }

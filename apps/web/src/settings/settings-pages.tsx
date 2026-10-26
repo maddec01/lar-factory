@@ -233,5 +233,5 @@ function toolDescription(does: string, check: ToolCheck | undefined): ReactNode 
   if (!check || check.result === 'ok') return does;
   if (check.result === 'not-running') return 'Open T3 Code.';
   const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';
-  return check.fix ? <>{where}Fix: <code>{check.fix}</code></> : `${where}Install T3 Code.`;
+  return 'fix' in check ? <>{where}Fix: <code>{check.fix}</code></> : `${where}Install T3 Code.`;
 }

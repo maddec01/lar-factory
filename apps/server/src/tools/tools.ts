@@ -4,7 +4,7 @@
 import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
-import { GH_FLOOR, type CheckedTool, type ToolCheck, type ToolChecks } from '@lar-factory/shared';
+import { GH_FLOOR, type AzCheck, type CommandCheck, type GhCheck, type T3Check, type ToolChecks } from '@lar-factory/shared';
 import { serverRuntimePath, t3Running } from '../t3/t3-settings.ts';
 import { type RunResult, runTool } from './run-tool.ts';
 
@@ -12,8 +12,8 @@ export const TOOL_NAMES = ['t3', 'gh', 'az', 'git', 'jq', 'curl'] as const;
 export type ToolName = typeof TOOL_NAMES[number];
 
 const OVERRIDES: Record<ToolName, string> = { t3: 'T3_PATH', gh: 'GH_PATH', az: 'AZ_PATH', git: 'GIT_PATH', jq: 'JQ_PATH', curl: 'CURL_PATH' };
-/** The command that installs a missing tool; T3 Code installs t3. */
-const INSTALL: Partial<Record<ToolName, string>> = { gh: 'brew install gh', az: 'brew install azure-cli', git: 'brew install git', jq: 'brew install jq', curl: 'brew install curl' };
+/** The command that installs each missing tool but t3, which T3 Code installs. */
+const INSTALL: Record<Exclude<ToolName, 't3'>, string> = { gh: 'brew install gh', az: 'brew install azure-cli', git: 'brew install git', jq: 'brew install jq', curl: 'brew install curl' };
 const FALLBACK_DIRS = ['/opt/homebrew/bin', '/usr/local/bin'];
 const START = '__LAR_BOARD_PATH_START__';
 const END = '__LAR_BOARD_PATH_END__';
@@ -121,11 +121,15 @@ export function missingTool(name: ToolName): string {
 }
 
 /** The failed check for a tool the last lookup didn't find, naming the override that pointed nowhere, if one did. */
-function missingCheck(name: ToolName): ToolCheck {
+function missingCheck(name: ToolName): { result: 'missing'; override?: string } {
   const lookup = current?.[name];
   const override = lookup && lookup.path === null ? lookup.override : undefined;
-  const fix = INSTALL[name];
-  return { result: 'missing', ...(override && { override }), ...(fix && { fix }) };
+  return { result: 'missing', ...(override && { override }) };
+}
+
+/** missingCheck with the command that installs the tool. */
+function missingWithFix(name: Exclude<ToolName, 't3'>): { result: 'missing'; override?: string; fix: string } {
+  return { ...missingCheck(name), fix: INSTALL[name] };
 }
 
 /** The first version number on the first line of a `--version` output, else that line; undefined when it's empty. */
@@ -134,20 +138,25 @@ export function versionOf(stdout: string): string | undefined {
   return line.match(/\d+\.\d+[\w.+-]*/)?.[0] ?? (line || undefined);
 }
 
-/** Runs `<tool> --version`: the tool passes when it runs, with the version if it printed one with status 0. */
-async function checkVersion(name: ToolName): Promise<ToolCheck> {
+/** Runs `<tool> --version`: the tool passes when it runs, with the version if it printed one with status 0; else it's missing. */
+async function checkVersion<M>(name: ToolName, missing: () => M): Promise<{ result: 'ok'; version?: string } | M> {
   const command = toolCommand(name);
-  if (!command) return missingCheck(name);
+  if (!command) return missing();
   const { code, stdout } = await runTool(command.file, ['--version'], { env: command.env, timeout: 5_000 });
   // A string code is a spawn error: the binary went away or can't run since the lookup.
-  if (typeof code === 'string') return missingCheck(name);
+  if (typeof code === 'string') return missing();
   const version = code === 0 ? versionOf(stdout) : undefined;
   return { result: 'ok', ...(version && { version }) };
 }
 
+/** Checks git, jq or curl runs. */
+function checkCommand(name: 'git' | 'jq' | 'curl'): Promise<CommandCheck> {
+  return checkVersion(name, () => missingWithFix(name));
+}
+
 /** What the gh probe found: gh's check, and gh's error for the Stale banner when a probe failed without a notice of its own. */
 export interface GhProbe {
-  check: ToolCheck;
+  check: GhCheck;
   error?: string;
 }
 
@@ -174,7 +183,7 @@ function scopesOf(status: string): string[] | null {
 }
 
 /** What a logged-in gh's version and scopes say: a missing project scope first, as it blocks reading. */
-function loggedInCheck(version: string | undefined, scopes: string[] | null): ToolCheck {
+function loggedInCheck(version: string | undefined, scopes: string[] | null): GhCheck {
   if (scopes && !scopes.includes('project')) return { result: 'no-project-scope', ...(version && { version }), fix: 'gh auth refresh -s project' };
   const unread = scopes ? {} : { scopes: 'unread' as const };
   if (olderThanFloor(version)) return { result: 'outdated', version: version!, fix: 'brew upgrade gh', ...unread };
@@ -187,11 +196,11 @@ function loggedInCheck(version: string | undefined, scopes: string[] | null): To
  */
 export async function probeGh(): Promise<GhProbe> {
   const command = toolCommand('gh');
-  if (!command) return { check: missingCheck('gh') };
+  if (!command) return { check: missingWithFix('gh') };
   const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 5_000 });
   /** A failed run's probe: missing on a spawn error, which means gh went away or can't run since the lookup; else gh's error. */
   const failed = ({ code, detail }: RunResult, args: string[], version?: string): GhProbe => {
-    if (typeof code === 'string') return { check: missingCheck('gh') };
+    if (typeof code === 'string') return { check: missingWithFix('gh') };
     // No code means a signal, which here is the timeout.
     return { check: { result: 'ok', ...(version && { version }) }, error: `gh ${args.join(' ')} failed: ${code === null ? 'timed out after 5 s' : detail}` };
   };
@@ -211,13 +220,13 @@ export async function probeGh(): Promise<GhProbe> {
  * Probes az: `az --version`, then `az account show` and `az extension show --name azure-devops`, 10 s each,
  * as az is slow to start. A signed-out az names `az login`, which comes before a missing extension.
  */
-export async function probeAz(): Promise<ToolCheck> {
+export async function probeAz(): Promise<AzCheck> {
   const command = toolCommand('az');
-  if (!command) return missingCheck('az');
+  if (!command) return missingWithFix('az');
   const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 10_000 });
   const versionRun = await run(['--version']);
   // A string code is a spawn error: az went away or can't run since the lookup.
-  if (typeof versionRun.code === 'string') return missingCheck('az');
+  if (typeof versionRun.code === 'string') return missingWithFix('az');
   const version = versionRun.code === 0 ? versionOf(versionRun.stdout) : undefined;
   const [account, extension] = await Promise.all([run(['account', 'show']), run(['extension', 'show', '--name', 'azure-devops'])]);
   if (account.code !== 0) return { result: 'logged-out', ...(version && { version }), fix: 'az login' };
@@ -226,8 +235,8 @@ export async function probeAz(): Promise<ToolCheck> {
 }
 
 /** Checks t3 runs, then that T3 Code is running, as its runtime file at `runtime` says. */
-async function checkT3(runtime: string): Promise<ToolCheck> {
-  const check = await checkVersion('t3');
+async function checkT3(runtime: string): Promise<T3Check> {
+  const check = await checkVersion('t3', () => missingCheck('t3'));
   if (check.result !== 'ok' || t3Running(runtime)) return check;
   return { result: 'not-running', ...(check.version && { version: check.version }) };
 }
@@ -238,8 +247,8 @@ async function checkT3(runtime: string): Promise<ToolCheck> {
  * `t3Runtime` tells. `ghError` is the gh probe's error for the Stale banner.
  */
 export async function checkTools(withAz: boolean, t3Runtime = serverRuntimePath()): Promise<{ tools: ToolChecks; ghError?: string }> {
-  const others = ['git', 'jq', 'curl'] as const satisfies readonly CheckedTool[];
-  const [gh, az, t3, ...checks] = await Promise.all([probeGh(), withAz ? probeAz() : undefined, checkT3(t3Runtime), ...others.map(checkVersion)]);
-  const tools = { gh: gh.check, t3, ...Object.fromEntries(others.map((name, i) => [name, checks[i]!])), ...(az && { az }) } as ToolChecks;
+  const [gh, az, t3, git, jq, curl] = await Promise.all([probeGh(), withAz ? probeAz() : undefined, checkT3(t3Runtime),
+    checkCommand('git'), checkCommand('jq'), checkCommand('curl')]);
+  const tools: ToolChecks = { gh: gh.check, t3, git, jq, curl, ...(az && { az }) };
   return { tools, ...(gh.error && { ghError: gh.error }) };
 }

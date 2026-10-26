@@ -335,34 +335,51 @@ export function repositoryProjectHint(data: Pick<BoardData, 'repositoryProjects'
 /** The commands the board checks; az only while a listed repository is on Azure DevOps. */
 export type CheckedTool = 'gh' | 't3' | 'git' | 'jq' | 'curl' | 'az';
 
+/** A check that passed: the command runs, with the version it printed if it did. */
+type Passed = { result: 'ok'; version?: string };
+/** A missing command, naming the override that pointed nowhere if one did. */
+type Missing = { result: 'missing'; override?: string };
+
 /**
- * A command's check: it runs, with the version it printed if it did; it's missing, naming the override
- * that pointed nowhere if one did; it's logged out (gh or az); (gh only) it's older than GH_FLOOR or its login
- * has no `project` scope; (az only) it has no `azure-devops` extension; or (t3 only) T3 Code isn't running, so `t3` can't start threads.
+ * gh's check: it runs; it's missing; it's logged out; it's older than GH_FLOOR; or its login has no `project` scope.
  * `scopes: 'unread'` marks a gh whose scopes the board couldn't read, which blocks nothing.
- * `fix` is the command that fixes a failed check; t3 has none, since the fix is to install or open T3 Code.
  */
-export type ToolCheck =
-  | { result: 'ok'; version?: string; scopes?: 'unread' }
-  | { result: 'missing'; override?: string; fix?: string }
+export type GhCheck =
+  | Passed & { scopes?: 'unread' }
+  | Missing & { fix: string }
   | { result: 'logged-out'; version?: string; fix: string }
   | { result: 'outdated'; version: string; fix: string; scopes?: 'unread' }
-  | { result: 'no-project-scope'; version?: string; fix: string }
-  | { result: 'no-extension'; version?: string; fix: string }
-  | { result: 'not-running'; version?: string };
+  | { result: 'no-project-scope'; version?: string; fix: string };
+
+/** t3's check: it runs, it's missing, or T3 Code isn't running, so `t3` can't start threads. Its fix is to install or open T3 Code. */
+export type T3Check = Passed | Missing | { result: 'not-running'; version?: string };
+
+/** git's, jq's or curl's check: it runs, or it's missing. */
+export type CommandCheck = Passed | Missing & { fix: string };
+
+/** az's check: it runs, it's missing, it's logged out, or it has no `azure-devops` extension. */
+export type AzCheck =
+  | Passed
+  | Missing & { fix: string }
+  | { result: 'logged-out'; version?: string; fix: string }
+  | { result: 'no-extension'; version?: string; fix: string };
 
 /** The oldest gh lar-work's scripts run with: 2.94.0 added `--parent`, `--add-sub-issue` and `--blocked-by`. */
 export const GH_FLOOR = '2.94.0';
 
-export type FailedCheck = Exclude<ToolCheck, { result: 'ok' }>;
+/** Every check from one lookup; `az` is absent when no listed repository is on Azure DevOps, as then it isn't checked. `fix` is the command that fixes a failed check. */
+export interface ToolChecks { gh: GhCheck; t3: T3Check; git: CommandCheck; jq: CommandCheck; curl: CommandCheck; az?: AzCheck }
 
-/** Every check from one lookup; `az` is absent when no listed repository is on Azure DevOps, as then it isn't checked. */
-export type ToolChecks = Record<Exclude<CheckedTool, 'az'>, ToolCheck> & { az?: ToolCheck };
+/** Any command's check. */
+export type ToolCheck = NonNullable<ToolChecks[CheckedTool]>;
+/** A check that failed, of one command or of any. */
+export type FailedCheck<C extends ToolCheck = ToolCheck> = Exclude<C, { result: 'ok' }>;
 
 /** The tool's check if it failed; undefined when it passed, before the first check and in sample mode. */
-export function failedCheck(tools: ToolChecks | undefined, name: CheckedTool): FailedCheck | undefined {
+export function failedCheck<N extends CheckedTool>(tools: ToolChecks | undefined, name: N): FailedCheck<NonNullable<ToolChecks[N]>> | undefined {
   const check = tools?.[name];
-  return check && check.result !== 'ok' ? check : undefined;
+  // TypeScript can't narrow a generic indexed access (ToolChecks[N]) by `result`, so the cast restates it.
+  return check && check.result !== 'ok' ? check as FailedCheck<NonNullable<ToolChecks[N]>> : undefined;
 }
 
 /** Where a repository's items come from: its GitHub Project, or its issues. */
@@ -377,7 +394,7 @@ export function itemSource(_repo: RepoConfig): ItemSource {
  * Whether gh's check stops the board reading a repository whose items come from `source`: before the first
  * check, while gh is missing or logged out, and for a Project while the login has no `project` scope.
  */
-export function ghBlocksRead(check: ToolCheck | undefined, source: ItemSource): boolean {
+export function ghBlocksRead(check: GhCheck | undefined, source: ItemSource): boolean {
   if (!check || check.result === 'missing' || check.result === 'logged-out') return true;
   return check.result === 'no-project-scope' && source === 'project';
 }

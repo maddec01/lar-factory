@@ -209,7 +209,8 @@ const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
 const commands = createItemCommands({ board, items, repos: config.repos, offerModelChoices });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
-const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
+const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json'),
+  renamedId: items.renamedId });
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   recheck: recheckTools, readSoon, ready: () => firstToolCheck,

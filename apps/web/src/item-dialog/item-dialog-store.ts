@@ -6,7 +6,7 @@ import { create } from 'zustand';
 export const OPEN_ITEM_DIALOG = '[data-item-dialog][data-open]';
 
 interface ItemDialogState {
-  /** The project item id of the item on show, or `null` while the dialog is closed. */
+  /** The id of the item on show, or `null` while the dialog is closed. */
   itemId: string | null;
   open: (itemId: string) => void;
   close: () => void;

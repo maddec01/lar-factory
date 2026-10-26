@@ -55,19 +55,19 @@ test('the stream sends the board at once with the same headers as other endpoint
 test('the stream pushes each read of GitHub as soon as it finishes', async (t) => {
   const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
   const stream = await openStream(t, board);
-  await stream.next((d) => statusOf(d, 'PVTI_1') === 'List');
+  await stream.next((d) => statusOf(d, 'I_1') === 'List');
   await board.update({ items: [projectIssue(1, 'Ready')] });
   assert.equal((await askRead(board)).status, 202);
-  await stream.next((d) => statusOf(d, 'PVTI_1') === 'Ready');
+  await stream.next((d) => statusOf(d, 'I_1') === 'Ready');
 });
 
 test('a change made through the board reaches every open stream', async (t) => {
   const board = await startBoard(t, { items: [projectIssue(12, 'List')] });
   const first = await openStream(t, board);
   const second = await openStream(t, board);
-  for (const stream of [first, second]) await stream.next((d) => statusOf(d, 'PVTI_12') === 'List');
-  assert.equal((await board.post({ itemId: 'PVTI_12' }, board.url, '/api/queue')).status, 200);
-  for (const stream of [first, second]) await stream.next((d) => statusOf(d, 'PVTI_12') === 'Queued');
+  for (const stream of [first, second]) await stream.next((d) => statusOf(d, 'I_12') === 'List');
+  assert.equal((await board.post({ itemId: 'I_12' }, board.url, '/api/queue')).status, 200);
+  for (const stream of [first, second]) await stream.next((d) => statusOf(d, 'I_12') === 'Queued');
 });
 
 test('the stream refuses a foreign Host', async (t) => {

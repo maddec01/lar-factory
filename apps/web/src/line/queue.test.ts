@@ -16,7 +16,7 @@ const CHOICE_KEY = 'lar-board:model-choice';
 const queue = () => $('.queue')!;
 const rows = () => $$<HTMLLIElement>('.queue ol > li');
 const row = (id: string) => $<HTMLLIElement>(`.queue li[data-item="${id}"]`)!;
-const start = (id = 'PVTI_sample05') => row(id).querySelector<HTMLButtonElement>(`[data-start="${id}"]`)!;
+const start = (id = 'I_sample05') => row(id).querySelector<HTMLButtonElement>(`[data-start="${id}"]`)!;
 const startNext = () => queue().querySelector<HTMLButtonElement>('header [data-start]')!;
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
@@ -24,7 +24,7 @@ const press = async (el: HTMLElement) => {
   el.focus();
   await settle(() => el.click());
 };
-const sample05 = sample.items.find((i) => i.id === 'PVTI_sample05')!;
+const sample05 = sample.items.find((i) => i.id === 'I_sample05')!;
 /** A Queued decision under `parent`, a sample item's number. */
 const decision = (id: string, parent: number): Item => ({
   ...sample05, id, number: 300 + parent, title: `Decide under #${parent}`, labels: ['decision: grill'],
@@ -35,23 +35,23 @@ beforeEach(() => localStorage.clear());
 
 test('the Queue lists Queued items in the scope as numbered rows, each with its repository, age and labels', async () => {
   await mountPage();
-  expect(rows().map((r) => r.dataset.item)).toEqual(['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21']);
+  expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample05', 'I_sample06', 'I_sample21']);
   expect(text(queue().querySelector('#queue-h'))).toBe('Queue 3');
   expect(rows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
-  expect(text(row('PVTI_sample05').querySelector('.queue-title'))).toBe(`#129 ${sample05.title}`);
-  expect(text(row('PVTI_sample05').querySelector('.queue-meta'))).toBe('Server · queued 2h ago · improvement');
-  expect(text(row('PVTI_sample21').querySelector('.queue-meta'))).toBe('Draft · queued 24h ago');
+  expect(text(row('I_sample05').querySelector('.queue-title'))).toBe(`#129 ${sample05.title}`);
+  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('Server · queued 2h ago · improvement');
+  expect(text(row('I_sample21').querySelector('.queue-meta'))).toBe('Draft · queued 24h ago');
 
   const { useSidebarStore } = await import('../sidebar/sidebar-store.ts');
   await settle(() => useSidebarStore.getState().setScope('Apple'));
-  expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['PVTI_sample06']);
+  expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['I_sample06']);
 });
 
 test("a dossier's parts are left out and show in the dossier; a Queued parent stays, and an item whose parent isn't on the board stays", async () => {
-  await mountPage({ ...sample, items: [...sample.items, decision('PVTI_d200', 200), decision('PVTI_d129', 129), decision('PVTI_d999', 999)] });
-  expect(rows().map((r) => r.dataset.item)).toEqual(['PVTI_sample05', 'PVTI_sample06', 'PVTI_sample21', 'PVTI_d999']);
-  expect($('[data-dossier="PVTI_sample05"] [data-part="PVTI_d129"]'), "#129's sub-issue, in its dossier").not.toBeNull();
-  expect($('[data-dossier="PVTI_sample09"] [data-part="PVTI_d200"]'), "concept #200's decision, in its dossier").not.toBeNull();
+  await mountPage({ ...sample, items: [...sample.items, decision('I_d200', 200), decision('I_d129', 129), decision('I_d999', 999)] });
+  expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample05', 'I_sample06', 'I_sample21', 'I_d999']);
+  expect($('[data-dossier="I_sample05"] [data-part="I_d129"]'), "#129's sub-issue, in its dossier").not.toBeNull();
+  expect($('[data-dossier="I_sample09"] [data-part="I_d200"]'), "concept #200's decision, in its dossier").not.toBeNull();
 });
 
 test('an empty Queue says where items come from, and has no Start next', async () => {
@@ -62,18 +62,18 @@ test('an empty Queue says where items come from, and has no Start next', async (
 
 test('a row opens the item dialog and stays marked while it shows', async () => {
   await mountPage();
-  await settle(() => row('PVTI_sample06').querySelector<HTMLButtonElement>('.queue-title')!.click());
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe(`#20 ${sample.items.find((i) => i.id === 'PVTI_sample06')!.title}`);
-  expect(row('PVTI_sample06').className).toContain('ring-2');
+  await settle(() => row('I_sample06').querySelector<HTMLButtonElement>('.queue-title')!.click());
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe(`#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`);
+  expect(row('I_sample06').className).toContain('ring-2');
 });
 
 test('while the slots are full, the row Start next starts waits for one, not a draft before it', async () => {
-  const draftFirst = [sample.items.find((i) => i.id === 'PVTI_sample21')!, ...sample.items.filter((i) => i.id !== 'PVTI_sample21')];
+  const draftFirst = [sample.items.find((i) => i.id === 'I_sample21')!, ...sample.items.filter((i) => i.id !== 'I_sample21')];
   await mountPage({ ...withChoices, items: draftFirst });
-  expect(rows()[0]!.dataset.item).toBe('PVTI_sample21');
+  expect(rows()[0]!.dataset.item).toBe('I_sample21');
   expect(text(rows()[0]!), 'the draft can\'t start').not.toContain('next when a build slot frees');
-  expect(text(row('PVTI_sample05'))).toContain('next when a build slot frees');
-  expect(startNext().getAttribute('data-start')).toBe('PVTI_sample05');
+  expect(text(row('I_sample05'))).toContain('next when a build slot frees');
+  expect(startNext().getAttribute('data-start')).toBe('I_sample05');
   expect(start().className, 'the primary Start is on the row Start next starts').toContain('bg-primary');
 });
 
@@ -82,20 +82,20 @@ test('the header shows the build slots; while they are full the first row waits 
   const slots = queue().querySelector('.build-slots')!;
   expect(text(slots), 'three builds in progress, past the limit').toBe('3/2 building');
   expect(slots.querySelectorAll('.slot'), 'a bar per build past the limit').toHaveLength(3);
-  expect(text(row('PVTI_sample05')), 'the first row').toContain('next when a build slot frees');
-  expect(text(row('PVTI_sample06'))).not.toContain('next when a build slot frees');
+  expect(text(row('I_sample05')), 'the first row').toContain('next when a build slot frees');
+  expect(text(row('I_sample06'))).not.toContain('next when a build slot frees');
   expect(start().getAttribute('aria-disabled')).toBeNull();
   expect(startNext().getAttribute('aria-disabled')).toBeNull();
 });
 
 test('a Queued item blocked by an open issue has its Start refining disabled, with Start after, and Start next passes over it', async () => {
-  const blocked = { ...withChoices, items: sample.items.map((i) => (i.id === 'PVTI_sample05'
+  const blocked = { ...withChoices, items: sample.items.map((i) => (i.id === 'I_sample05'
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'OPEN' as const }] } : i)) };
   await mountPage(blocked);
   expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, 'Blocked by #202 until it closes']);
-  expect(text(row('PVTI_sample05').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
-  expect(startNext().getAttribute('data-start')).toBe('PVTI_sample06');
-  expect(start('PVTI_sample06').className, 'the primary Start follows Start next').toContain('bg-primary');
+  expect(text(row('I_sample05').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
+  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
+  expect(start('I_sample06').className, 'the primary Start follows Start next').toContain('bg-primary');
   expect(start().className).not.toContain('bg-primary');
 });
 
@@ -103,12 +103,12 @@ test("a Queued item whose repository has no T3 project has its Start refining di
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   await mountPage({ ...withChoices, repositoryProjects: { 'maddec01/lar-server': hint } });
   expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, hint]);
-  expect(row('PVTI_sample05').querySelector('[data-start-after]'), 'nothing blocks it, so no Start after').toBeNull();
-  expect(startNext().getAttribute('data-start')).toBe('PVTI_sample06');
+  expect(row('I_sample05').querySelector('[data-start-after]'), 'nothing blocks it, so no Start after').toBeNull();
+  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
 test('when no queued item can start, Start next shows disabled and says why', async () => {
-  const held = { ...withChoices, items: sample.items.map((i) => (['PVTI_sample05', 'PVTI_sample06'].includes(i.id)
+  const held = { ...withChoices, items: sample.items.map((i) => (['I_sample05', 'I_sample06'].includes(i.id)
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'OPEN' as const }] } : i)) };
   await mountPage(held);
   const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
@@ -118,12 +118,12 @@ test('when no queued item can start, Start next shows disabled and says why', as
 });
 
 test('a concept in progress takes no build slot', async () => {
-  await mountPage(moved('PVTI_sample09', 'In progress'));
+  await mountPage(moved('I_sample09', 'In progress'));
   expect(text(queue().querySelector('.build-slots'))).toBe('3/2 building');
 });
 
 test('with a build slot free, nothing waits', async () => {
-  await mountPage({ ...sample, items: sample.items.map((i) => (['PVTI_sample14', 'PVTI_sample23'].includes(i.id) ? { ...i, status: 'Review' as const } : i)) });
+  await mountPage({ ...sample, items: sample.items.map((i) => (['I_sample14', 'I_sample23'].includes(i.id) ? { ...i, status: 'Review' as const } : i)) });
   expect(text(queue().querySelector('.build-slots'))).toBe('1/2 building');
   expect(text(queue())).not.toContain('next when a build slot frees');
 });
@@ -140,30 +140,30 @@ test('the drag handles and Auto-start are disabled and say they are not built ye
 
 test('Start refining sits on Queued issues, primary on the row Start next starts; a queued draft asks for an issue instead', async () => {
   await mountPage();
-  expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['PVTI_sample05', 'PVTI_sample06']);
+  expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['I_sample05', 'I_sample06']);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-label')])
     .toEqual(['Start refining ▾', 'menu', `Start refining #129 ${sample05.title}`]);
   expect(start().className).toContain('bg-primary');
-  expect(start('PVTI_sample06').className, 'later rows are outlined').not.toContain('bg-primary');
-  expect(text(row('PVTI_sample21').querySelector('.queue-hint'))).toBe('Needs an issue to start');
-  expect(row('PVTI_sample21').querySelector<HTMLElement>('.queue-hint')!.title).toBe('This draft needs an issue before it can start. Convert it to an issue in a repo.');
+  expect(start('I_sample06').className, 'later rows are outlined').not.toContain('bg-primary');
+  expect(text(row('I_sample21').querySelector('.queue-hint'))).toBe('Needs an issue to start');
+  expect(row('I_sample21').querySelector<HTMLElement>('.queue-hint')!.title).toBe('This draft needs an issue before it can start. Convert it to an issue in a repo.');
 });
 
 test("Start refining opens its menu without opening the dialog, and starts its row's item with the picked model", async () => {
   holdPosts(withChoices);
   await mountPage(withChoices);
-  await press(start('PVTI_sample06'));
+  await press(start('I_sample06'));
   expect(entries().map(text)).toEqual(['T3 default', 'GPT-5.5', 'Opus 5.5']);
   await press(entries()[2]!);
   expect(dialog(), 'neither the button nor the menu opens the dialog').toBeNull();
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'PVTI_sample06', model: { instanceId: 'claudeAgent', model: 'claude-opus-5-5' } }]]);
-  expect([text(start('PVTI_sample06')), start('PVTI_sample06').getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
+  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample06', model: { instanceId: 'claudeAgent', model: 'claude-opus-5-5' } }]]);
+  expect([text(start('I_sample06')), start('I_sample06').getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
 
-  const title = `#20 ${sample.items.find((i) => i.id === 'PVTI_sample06')!.title}`;
+  const title = `#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`;
   await answer({ thread: { threadId: 'thread-1', title }, error: null });
-  const tag = row('PVTI_sample06').querySelector('[data-start-result]')!;
+  const tag = row('I_sample06').querySelector('[data-start-result]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread thread-1']);
-  expect(row('PVTI_sample06').querySelector('[data-start]')).toBeNull();
+  expect(row('I_sample06').querySelector('[data-start]')).toBeNull();
   expect(text(toast())).toBe(`Started T3 thread thread-1 for ${title}.`);
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({ instanceId: 'claudeAgent', model: 'claude-opus-5-5' });
 });
@@ -174,24 +174,24 @@ test('Start next starts the first row that can start, with its model menu', asyn
   expect([text(startNext()), startNext().getAttribute('aria-label')]).toEqual(['Start next ▾', `Start next #129 ${sample05.title}`]);
   await press(startNext());
   await press(entries()[1]!);
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'PVTI_sample05', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
 });
 
 test('Start next passes over a draft and an item with a live thread', async () => {
-  const live = (i: Item): Item => (i.id === 'PVTI_sample05' ? { ...i, threads: [{ id: 't1', title: 'x', state: 'running' }] } as Item : i);
-  const draftFirst = [sample.items.find((i) => i.id === 'PVTI_sample21')!, ...sample.items.filter((i) => i.id !== 'PVTI_sample21').map(live)];
+  const live = (i: Item): Item => (i.id === 'I_sample05' ? { ...i, threads: [{ id: 't1', title: 'x', state: 'running' }] } as Item : i);
+  const draftFirst = [sample.items.find((i) => i.id === 'I_sample21')!, ...sample.items.filter((i) => i.id !== 'I_sample21').map(live)];
   await mountPage({ ...withChoices, items: draftFirst });
-  expect(startNext().getAttribute('data-start')).toBe('PVTI_sample06');
+  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
 test('while an item has a running or needs-you thread, its row has Open thread in place of Start refining', async () => {
   const threads = (state: string) => [{ id: 't1', title: 'x', state }];
-  const items = sample.items.map((i) => (i.id === 'PVTI_sample05' ? { ...i, threads: threads('running') } : i.id === 'PVTI_sample06' ? { ...i, threads: threads('needs you') } : i)) as Item[];
+  const items = sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, threads: threads('running') } : i.id === 'I_sample06' ? { ...i, threads: threads('needs you') } : i)) as Item[];
   await mountPage({ ...sample, items, t3EnvironmentId: 'env-1' });
   expect(queue().querySelector('li [data-start]')).toBeNull();
-  const open = row('PVTI_sample05').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
+  const open = row('I_sample05').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
   expect([text(open), open.getAttribute('href')]).toEqual(['Open thread', expect.stringContaining('t1')]);
-  expect(row('PVTI_sample06').querySelector('[data-open-thread]')).not.toBeNull();
+  expect(row('I_sample06').querySelector('[data-open-thread]')).not.toBeNull();
 });
 
 test("a failed Start shows on its row with Retry start; closing the error doesn't open the dialog", async () => {
@@ -201,9 +201,9 @@ test("a failed Start shows on its row with Retry start; closing the error doesn'
   await press(entries()[0]!);
   await answer({ thread: null, error: 'T3 is down.' }, 502);
   expect(text(start())).toBe('Retry start ▾');
-  expect(text(row('PVTI_sample05').querySelector('p.start [role="alert"]'))).toBe('T3 is down.');
-  await press(row('PVTI_sample05').querySelector<HTMLButtonElement>('p.start button.dismiss')!);
-  expect(row('PVTI_sample05').querySelector('p.start')).toBeNull();
+  expect(text(row('I_sample05').querySelector('p.start [role="alert"]'))).toBe('T3 is down.');
+  await press(row('I_sample05').querySelector<HTMLButtonElement>('p.start button.dismiss')!);
+  expect(row('I_sample05').querySelector('p.start')).toBeNull();
   expect(dialog()).toBeNull();
   expect(text(start())).toBe('Start refining ▾');
 });
@@ -214,17 +214,17 @@ test('a Start that may have run hides Start refining; closing its message leaves
   await press(start());
   await press(entries()[0]!);
   await answer({ thread: null, uncertain: true, error: 'Check T3.' });
-  expect(row('PVTI_sample05').querySelector('[data-start]')).toBeNull();
-  const message = row('PVTI_sample05').querySelector<HTMLElement>('p.start[data-start-result]')!;
+  expect(row('I_sample05').querySelector('[data-start]')).toBeNull();
+  const message = row('I_sample05').querySelector<HTMLElement>('p.start[data-start-result]')!;
   expect(text(message.querySelector('[role="alert"]'))).toBe('Check T3.');
   await settle(() => message.querySelector<HTMLButtonElement>('button.dismiss')!.click());
-  expect(text(row('PVTI_sample05').querySelector('.started-tag.unsure'))).toBe('May have started');
+  expect(text(row('I_sample05').querySelector('.started-tag.unsure'))).toBe('May have started');
 });
 
 test('a thread another page started shows on its row in place of Start refining', async () => {
-  await mountPage({ ...sample, started: { PVTI_sample06: { threadId: 'thread-9', title: 'x' } } });
-  expect(row('PVTI_sample06').querySelector('.started-tag')?.getAttribute('title')).toBe('T3 thread thread-9');
-  expect(row('PVTI_sample06').querySelector('[data-start]')).toBeNull();
+  await mountPage({ ...sample, started: { I_sample06: { threadId: 'thread-9', title: 'x' } } });
+  expect(row('I_sample06').querySelector('.started-tag')?.getAttribute('title')).toBe('T3 thread thread-9');
+  expect(row('I_sample06').querySelector('[data-start]')).toBeNull();
 });
 
 test('in sample mode Start refining still opens its menu, which starts nothing', async () => {
@@ -239,21 +239,21 @@ test('in sample mode Start refining still opens its menu, which starts nothing',
 test('Back to List from the dialog takes the item off the Queue', async () => {
   holdPosts();
   await mountPage();
-  await settle(() => row('PVTI_sample05').click());
-  await press(dialog()!.querySelector<HTMLButtonElement>('[data-back-to-list="PVTI_sample05"]')!);
-  expect(posted()).toEqual([['/api/back-to-list', { itemId: 'PVTI_sample05' }]]);
-  await answer({ error: null, board: moved('PVTI_sample05', 'List') });
-  expect(rows().map((r) => r.dataset.item)).toEqual(['PVTI_sample06', 'PVTI_sample21']);
+  await settle(() => row('I_sample05').click());
+  await press(dialog()!.querySelector<HTMLButtonElement>('[data-back-to-list="I_sample05"]')!);
+  expect(posted()).toEqual([['/api/back-to-list', { itemId: 'I_sample05' }]]);
+  await answer({ error: null, board: moved('I_sample05', 'List') });
+  expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21']);
   expect(text(toast())).toMatch(/^Moved #129 .* to List\. View item$/);
 });
 
 test('the dialog gives Queued issues and drafts Back to List and Abandon, but not pull requests', async () => {
-  const pr: Item = { ...sample05, id: 'PVTI_pr', content: 'pr', number: 300, title: 'A queued pull request' };
+  const pr: Item = { ...sample05, id: 'I_pr', content: 'pr', number: 300, title: 'A queued pull request' };
   await mountPage({ ...sample, items: [...sample.items, pr] });
-  await settle(() => row('PVTI_sample21').click());
+  await settle(() => row('I_sample21').click());
   expect(dialog()!.querySelector('[data-back-to-list]')!.getAttribute('aria-label')).toBe('Back to List draft Offline downloads on watchOS');
-  expect(dialog()!.querySelector('[data-abandon="PVTI_sample21"]')).not.toBeNull();
-  await settle(() => row('PVTI_pr').click());
+  expect(dialog()!.querySelector('[data-abandon="I_sample21"]')).not.toBeNull();
+  await settle(() => row('I_pr').click());
   expect(dialog()!.querySelector('[data-back-to-list], [data-abandon]')).toBeNull();
 });
 
@@ -261,15 +261,15 @@ test('Abandon from the dialog takes the item off the Queue; a failed one is a to
   holdPosts();
   const data: BoardData = { ...sample, capture: { enabled: true, session: 's1' } as BoardData['capture'] };
   await mountPage(data);
-  await settle(() => row('PVTI_sample06').click());
-  await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="PVTI_sample06"]')!);
+  await settle(() => row('I_sample06').click());
+  await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="I_sample06"]')!);
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
   await answer({ error: 'Could not delete #20.' }, 502);
   expect(text(toast())).toMatch(/^Couldn't abandon #20 .*\. Could not delete #20\.$/);
-  expect(rows().map((r) => r.dataset.item)).toContain('PVTI_sample06');
+  expect(rows().map((r) => r.dataset.item)).toContain('I_sample06');
 
-  await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="PVTI_sample06"]')!);
+  await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="I_sample06"]')!);
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
-  await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'PVTI_sample06') } });
-  expect(rows().map((r) => r.dataset.item)).toEqual(['PVTI_sample05', 'PVTI_sample21']);
+  await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample06') } });
+  expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample05', 'I_sample21']);
 });

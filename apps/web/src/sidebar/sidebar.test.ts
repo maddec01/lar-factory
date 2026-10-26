@@ -23,7 +23,7 @@ async function type(value: string): Promise<void> {
 
 /** The sample with `count` more List items in the Server repository. */
 function withServerList(count: number): BoardData {
-  const extra = Array.from({ length: count }, (_, n): Item => ({ ...sample.items[0]!, id: `PVTI_extra${n}`, number: 900 + n, title: `Extra ${n}` }));
+  const extra = Array.from({ length: count }, (_, n): Item => ({ ...sample.items[0]!, id: `I_extra${n}`, number: 900 + n, title: `Extra ${n}` }));
   return { ...sample, items: [...sample.items, ...extra] };
 }
 
@@ -245,7 +245,7 @@ test('the sidebar holds the brand, search and Add item, then a group per reposit
   expect(search().placeholder).toBe('Search List');
   expect($('.sidebar .add-item')!.getAttribute('aria-label')).toBe('Add item');
   expect($$('.list-group').map((g) => [g.dataset.platform, text(g.querySelector('.count'))])).toEqual([['Server', '2'], ['Apple', '1'], ['Draft', '1']]);
-  expect(rows('Server'), 'in board order, as in the prototype').toEqual(['PVTI_sample01', 'PVTI_sample02']);
+  expect(rows('Server'), 'in board order, as in the prototype').toEqual(['I_sample01', 'I_sample02']);
   expect(text(group('Server').querySelector('button.scope'))).toBe('SServerlar-server');
   const row = group('Apple').querySelector<HTMLButtonElement>('button[data-item]')!;
   expect([...row.querySelectorAll('span > span')].map(text), 'the title over its ref and age').toEqual(['Remember the last subtitle language per show', '#12 · 19h ago']);
@@ -260,7 +260,7 @@ test('a draft\'s second line says draft and its age', async () => {
 });
 
 test('a repository with nothing in List says so', async () => {
-  await mountPage({ ...sample, items: sample.items.filter((i) => i.id !== 'PVTI_sample03') });
+  await mountPage({ ...sample, items: sample.items.filter((i) => i.id !== 'I_sample03') });
   expect(text(group('Apple').querySelector('p'))).toBe('Nothing in List');
   expect(text(group('Apple').querySelector('.count'))).toBe('0');
 });
@@ -293,7 +293,7 @@ test('search filters List items only, opens every group that matches, and clears
   expect($$('.list-group').map((g) => g.dataset.platform), 'groups without a match hide').toEqual(['Server']);
   expect(rows('Server'), 'a collapsed group opens, and shows every match').toHaveLength(6);
   await type('#12');
-  expect(rows('Apple')).toEqual(['PVTI_sample03']);
+  expect(rows('Apple')).toEqual(['I_sample03']);
   await type('Run more than one 4K');
   expect(text($('.sidebar nav > p')), 'a Queued item is not in List').toBe('Nothing in List matches.');
   await settle(() => $<HTMLButtonElement>('.sidebar button[aria-label="Clear search"]')!.click());
@@ -306,7 +306,7 @@ test('a group\'s name scopes the main area to its repository; pressing it again 
   const scope = group('Apple').querySelector<HTMLButtonElement>('button.scope')!;
   await settle(() => scope.click());
   expect(scope.getAttribute('aria-pressed')).toBe('true');
-  expect($$('.desk-card').map((c) => c.dataset.item)).toEqual(['PVTI_sample11', 'PVTI_sample16', 'PVTI_sample27']);
+  expect($$('.desk-card').map((c) => c.dataset.item)).toEqual(['I_sample11', 'I_sample16', 'I_sample27']);
   await settle(() => scope.click());
   expect(scope.getAttribute('aria-pressed')).toBe('false');
   expect($$('.desk-card')).toHaveLength(8);
@@ -314,7 +314,7 @@ test('a group\'s name scopes the main area to its repository; pressing it again 
 
 test('a row opens the item dialog and stays marked while it shows', async () => {
   await mountPage();
-  const row = () => group('Server').querySelector<HTMLButtonElement>('[data-item="PVTI_sample02"]')!;
+  const row = () => group('Server').querySelector<HTMLButtonElement>('[data-item="I_sample02"]')!;
   await settle(() => row().click());
   expect($('[data-item-dialog]')!.textContent).toContain('Verify VideoToolbox');
   expect(row().className).toContain('bg-(--sidebar-row-selected)');

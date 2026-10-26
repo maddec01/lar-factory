@@ -109,7 +109,7 @@ const main = async () => {
   if (args[0] === 'api') {
     if (options.createDelay) await new Promise((r) => setTimeout(r, options.createDelay));
     const repo = args[3].slice('repos/'.length, -'/issues'.length);
-    return output({ number: 900001, html_url: `https://github.com/${repo}/issues/900001`, updated_at: '2026-10-21T10:00:00Z' });
+    return output({ number: 900001, node_id: 'I_900001', html_url: `https://github.com/${repo}/issues/900001`, updated_at: '2026-10-21T10:00:00Z' });
   }
   if (args[1] === 'item-add') return output({ id: 'PVTI_900001' });
   if (args[1] === 'item-edit') {

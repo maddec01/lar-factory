@@ -42,7 +42,7 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
           }
           content {
             __typename
-            ... on DraftIssue { title updatedAt }
+            ... on DraftIssue { id title updatedAt }
             ... on Issue {
               id number title url state stateReason closedAt updatedAt
               repository { nameWithOwner }
@@ -59,7 +59,7 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
               }
             }
             ... on PullRequest {
-              number title url state closedAt updatedAt isDraft mergeStateStatus
+              id number title url state closedAt updatedAt isDraft mergeStateStatus
               repository { nameWithOwner }
               labels(first: 20) { nodes { name } }
               ${CHECKS}
@@ -185,7 +185,7 @@ async function searchLabels(raws: RawItem[]): Promise<Searched> {
 
 /** Puts each dossier's body on its raw item, for its map. */
 async function readDossierBodies(raws: RawItem[], searched: Searched): Promise<void> {
-  const dossiers = new Map(rawDossiers(raws, searched).flatMap((raw) => (raw.content?.id ? [[raw.content.id, raw.content]] : [])));
+  const dossiers = new Map(rawDossiers(raws, searched).flatMap((raw) => (raw.content ? [[raw.content.id, raw.content]] : [])));
   const ids = [...dossiers.keys()];
   for (let start = 0; start < ids.length; start += PAGE_SIZE) {
     const { nodes } = (await graphql<RawBodies>(DOSSIER_BODIES_QUERY, { ids: ids.slice(start, start + PAGE_SIZE) })).data;
@@ -196,7 +196,12 @@ async function readDossierBodies(raws: RawItem[], searched: Searched): Promise<v
   }
 }
 
-export async function fetchProject(owner: string, number: number): Promise<ItemsRead> {
+/** A Project read: its items, and the Project item id of each by its Item.id, for the Project adapter's writes. */
+export interface ProjectRead extends ItemsRead {
+  projectItemIds: Map<string, string>;
+}
+
+export async function fetchProject(owner: string, number: number): Promise<ProjectRead> {
   const raws: RawItem[] = [];
   let title = '';
   await readPages(MAX_PAGES, `Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`, async (after) => {
@@ -210,7 +215,8 @@ export async function fetchProject(owner: string, number: number): Promise<Items
   // decide which sub-issues are slices, so they run before the dossiers, items with sub-issues on the board, are known.
   const searched = await searchLabels(raws);
   await readDossierBodies(raws, searched);
-  return { title, items: normalizeItems(raws, searched) };
+  const projectItemIds = new Map(raws.flatMap((raw) => (raw.content ? [[raw.content.id, raw.id]] : [])));
+  return { title, items: normalizeItems(raws, searched), projectItemIds };
 }
 
 /** An error's message, for a write's error text. */
@@ -300,16 +306,18 @@ export async function editPrBody(url: string, body: string, run: (args: string[]
   await run(['api', '--method', 'PATCH', pullPath(url), '-f', `body=${body}`]);
 }
 
-/** Deletes an issue for good, or removes a draft from the project; returns the error, or null when GitHub accepted it. */
+/** Deletes an issue for good, or removes a draft from the project by its Project item id; returns the error, or null when GitHub accepted it. */
 export async function abandonItem(
   config: BoardConfig,
   item: Item,
+  projectItemId: string | undefined,
   run: (args: string[]) => Promise<string> = gh,
 ): Promise<string | null> {
   try {
     if (isDraft(item)) {
+      if (!projectItemId) throw new Error('The board has not read this draft from the project.');
       const number = await projectNumber(config);
-      await run(['project', 'item-delete', String(number), '--owner', config.owner, '--id', item.id]);
+      await run(['project', 'item-delete', String(number), '--owner', config.owner, '--id', projectItemId]);
     } else await run(['issue', 'delete', String(item.number), '-R', item.repo!, '--yes']);
     return null;
   } catch (err) {
@@ -341,7 +349,7 @@ export async function addProjectItem(
       const issue = JSON.parse(await run(['api', '--method', 'POST', `repos/${draft.repo}/issues`,
         '-f', `title=${draft.title}`, '-f', `body=${draft.description}`,
         ...labels.flatMap((label) => ['-f', `labels[]=${label}`])])) as NonNullable<CreationProgress['issue']>;
-      if (!Number.isSafeInteger(issue.number) || issue.html_url !== `https://github.com/${draft.repo}/issues/${issue.number}`) {
+      if (!Number.isSafeInteger(issue.number) || !issue.node_id || issue.html_url !== `https://github.com/${draft.repo}/issues/${issue.number}`) {
         throw new Error('GitHub did not return an issue identity.');
       }
       progress.issue = issue;
@@ -359,7 +367,7 @@ export async function addProjectItem(
     step = 'List status';
     await setStatus(progress.itemId);
     progress.item = {
-      id: progress.itemId, status: 'List', content: 'ticket', number: issue.number,
+      id: issue.node_id, status: 'List', content: 'ticket', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'open', closedAs: null,
       parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
       updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],

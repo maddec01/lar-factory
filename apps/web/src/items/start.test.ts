@@ -12,7 +12,7 @@ const MODEL_CHOICES: ModelGroup[] = [
 const withChoices: BoardData = { ...sample, capture: { session: 's1', enabled: true }, modelChoices: MODEL_CHOICES };
 const CHOICE_KEY = 'lar-board:model-choice';
 
-const start = (id = 'PVTI_sample05') => $<HTMLButtonElement>(`[data-item-dialog] [data-start="${id}"]`)!;
+const start = (id = 'I_sample05') => $<HTMLButtonElement>(`[data-item-dialog] [data-start="${id}"]`)!;
 const card = () => $('[data-item-dialog]')!;
 /** The dialog's Back to List and Abandon. */
 const footer = () => card().querySelector('[data-back-to-list], [data-abandon]');
@@ -36,11 +36,11 @@ async function openItem(id: string): Promise<void> {
   await settle(() => useItemDialogStore.getState().open(id));
 }
 /** Mounts the page with `data` and opens the dialog on the Queued #129. */
-async function mountItem(data?: BoardData, id = 'PVTI_sample05'): Promise<void> {
+async function mountItem(data?: BoardData, id = 'I_sample05'): Promise<void> {
   await mountPage(data);
   await openItem(id);
 }
-const open = async (id = 'PVTI_sample05') => {
+const open = async (id = 'I_sample05') => {
   start(id).focus();
   await press(start(id));
 };
@@ -53,16 +53,16 @@ beforeEach(() => {
 test("Start refining opens a menu: 'T3 default' first, then each provider instance with its models", async () => {
   await mountItem(withChoices);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-expanded'), start().getAttribute('aria-label')])
-    .toEqual(['Start refining ▾', 'menu', 'false', `Start refining #129 ${sample.items.find((i) => i.id === 'PVTI_sample05')!.title}`]);
+    .toEqual(['Start refining ▾', 'menu', 'false', `Start refining #129 ${sample.items.find((i) => i.id === 'I_sample05')!.title}`]);
   expect(menu()).toBeNull();
   await open();
   expect(start().getAttribute('aria-expanded')).toBe('true');
   expect(menu()!.getAttribute('aria-label')).toBe('Start #129 with');
   expect(entries().map((e) => [text(e), e.getAttribute('aria-checked'), e.dataset.startPick, e.dataset.instanceId, e.dataset.model])).toEqual([
-    ['T3 default', 'true', 'PVTI_sample05', undefined, undefined],
-    ['GPT-5.5', 'false', 'PVTI_sample05', 'codex', 'gpt-5.5'],
-    ['Opus 5.5', 'false', 'PVTI_sample05', 'claudeAgent', 'claude-opus-5-5'],
-    ['claude-opus-5-5[1m]', 'false', 'PVTI_sample05', 'claudeAgent', 'claude-opus-5-5[1m]'],
+    ['T3 default', 'true', 'I_sample05', undefined, undefined],
+    ['GPT-5.5', 'false', 'I_sample05', 'codex', 'gpt-5.5'],
+    ['Opus 5.5', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5'],
+    ['claude-opus-5-5[1m]', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5[1m]'],
   ]);
   const label = (g: Element) => text(document.getElementById(g.getAttribute('aria-labelledby')!));
   expect(label($('[role="menu"] > * > [role="group"]')!), 'the entries are a group, headed "Start with"').toBe('Start with');
@@ -121,7 +121,7 @@ test('Escape closes the menu and returns focus to Start', async () => {
 test('a click outside closes the menu; a control it lands on keeps focus', async () => {
   await mountItem(withChoices);
   await open();
-  const other = card().querySelector<HTMLButtonElement>('[data-back-to-list="PVTI_sample05"]')!;
+  const other = card().querySelector<HTMLButtonElement>('[data-back-to-list="I_sample05"]')!;
   await pressOutside(other);
   other.focus();
   expect(menu()).toBeNull();
@@ -132,7 +132,7 @@ test('picking an entry starts the item with that model, shows the thread, and re
   await mountItem(withChoices);
   await open();
   await press(entries()[2]!);
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'PVTI_sample05', model: { instanceId: 'claudeAgent', model: 'claude-opus-5-5' } }]]);
+  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'claudeAgent', model: 'claude-opus-5-5' } }]]);
   expect(menu()).toBeNull();
   expect([text(start()), start().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
   expect(document.activeElement, 'focus is back on Start').toBe(start());
@@ -151,8 +151,8 @@ test('picking an entry starts the item with that model, shows the thread, and re
   expect(text(toast()), 'the toast does not repeat a title that is the work message title').toBe(`Started T3 thread thread-1 for ${thread.title}.`);
   expect(toast()!.querySelector('code.thread-id')).not.toBeNull();
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({ instanceId: 'claudeAgent', model: 'claude-opus-5-5' });
-  await openItem('PVTI_sample06');
-  await open('PVTI_sample06');
+  await openItem('I_sample06');
+  await open('I_sample06');
   expect(checked(), 'the next menu highlights it').toEqual(['Opus 5.5']);
 });
 
@@ -160,7 +160,7 @@ test('a title T3 chose differently is in the toast', async () => {
   await mountItem(withChoices);
   await open();
   await press(entries()[0]!);
-  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'PVTI_sample05' }]]);
+  expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05' }]]);
   await answer({ thread: { threadId: 'thread-1', title: 'Renamed' }, error: null });
   expect(toast()!.querySelector('b')?.textContent).toBe('Renamed');
   expect(localStorage.getItem(CHOICE_KEY), '"T3 default" stores as null').toBe('null');
@@ -205,7 +205,7 @@ test('a Start that may have run hides Start, Back to List and Abandon; closing i
 });
 
 test('a thread another page started shows on every page', async () => {
-  await mountItem({ ...withChoices, started: { PVTI_sample06: { threadId: 'thread-9', title: 'x' } } }, 'PVTI_sample06');
+  await mountItem({ ...withChoices, started: { I_sample06: { threadId: 'thread-9', title: 'x' } } }, 'I_sample06');
   expect(card().querySelector('.started-tag')?.getAttribute('title')).toBe('T3 thread thread-9');
   expect(card().querySelector('[data-start]')).toBeNull();
   expect(footer()).toBeNull();

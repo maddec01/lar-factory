@@ -75,7 +75,7 @@ test('building lists the items in progress, its slots and what the limit means',
 });
 
 test('a concept in progress takes no build slot', async () => {
-  await mountPage(moved('PVTI_sample09', 'In progress'));
+  await mountPage(moved('I_sample09', 'In progress'));
   expect(text(counter('building'))).toBe('3/2building');
   const pop = await openCounter('building');
   expect(rows().map((r) => r.split(' ')[0])).not.toContain('#200');

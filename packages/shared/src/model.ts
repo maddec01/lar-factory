@@ -183,7 +183,7 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 }
 
 export interface Item {
-  /** Project item id. */
+  /** The node id of the issue, pull request or draft the item holds. */
   id: string;
   /** Status column. Items without one are treated as List. */
   status: Status;

@@ -74,14 +74,14 @@ test('View item opens the item in the item dialog and closes the toast', async (
   await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
   await settle(() => toast()!.querySelector<HTMLButtonElement>('.view-item')!.click());
   const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
-  expect(useItemDialogStore.getState().itemId).toBe('PVTI_sample01');
+  expect(useItemDialogStore.getState().itemId).toBe('I_sample01');
   expect($('[data-item-dialog]')!.textContent).toContain(sample.items[0]!.title);
   expect(toast()).toBeNull();
 });
 
 test('View item does nothing once the item has left the board', async () => {
   await mountPage();
-  await notify({ verb: 'Added', item: { ...sample.items[0]!, id: 'PVTI_gone' }, to: 'List' });
+  await notify({ verb: 'Added', item: { ...sample.items[0]!, id: 'I_gone' }, to: 'List' });
   await settle(() => toast()!.querySelector<HTMLButtonElement>('.view-item')!.click());
   expect($('[data-item-dialog]')).toBeNull();
   expect(toast(), 'the toast stays').not.toBeNull();
@@ -109,13 +109,13 @@ test("a poll that started before the page's own write doesn't bring back older d
   let answerPoll!: () => void;
   fetchMock.mockImplementation(async (url: string) => {
     if (url === '/api/board') return new Promise<Response>((resolve) => (answerPoll = () => resolve(new Response(JSON.stringify(sample)))));
-    return new Response(JSON.stringify({ error: null, board: moved('PVTI_sample01', 'Queued') }));
+    return new Response(JSON.stringify({ error: null, board: moved('I_sample01', 'Queued') }));
   });
   await settle(() => vi.advanceTimersByTime(15_000));
   const { useItemDialogStore } = await import('../item-dialog/item-dialog-store.ts');
-  await settle(() => useItemDialogStore.getState().open('PVTI_sample01'));
-  await settle(() => $<HTMLButtonElement>('[data-item-dialog] [data-queue="PVTI_sample01"]')!.click());
-  const inList = () => $('.sidebar [data-item="PVTI_sample01"]');
+  await settle(() => useItemDialogStore.getState().open('I_sample01'));
+  await settle(() => $<HTMLButtonElement>('[data-item-dialog] [data-queue="I_sample01"]')!.click());
+  const inList = () => $('.sidebar [data-item="I_sample01"]');
   expect(inList()).toBeNull();
   await settle(() => answerPoll());
   expect(inList(), 'still Queued').toBeNull();

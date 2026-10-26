@@ -26,31 +26,31 @@ test('the desk shows what only you can move, counted, as cards in one row that s
 
 test('a desk card shows its status, repository, age, numbered title, hint and status track', async () => {
   await mountPage();
-  const [meta, title, hint] = [...card('PVTI_sample16').querySelector('button')!.children].map(text);
+  const [meta, title, hint] = [...card('I_sample16').querySelector('button')!.children].map(text);
   expect([meta, title, hint]).toEqual(['Verify· Apple · 1h ago', '#31 New artwork grid layout', 'Test it with the steps in the PR, then merge']);
-  expect(card('PVTI_sample16').querySelectorAll('ol > li')).toHaveLength(10);
+  expect(card('I_sample16').querySelectorAll('ol > li')).toHaveLength(10);
 });
 
 test('a desk card opens the item dialog and stays marked while it shows', async () => {
   await mountPage();
-  await settle(() => card('PVTI_sample17').click());
+  await settle(() => card('I_sample17').click());
   expect(dialog()!.textContent).toContain('Cache probe results between restarts');
-  expect(card('PVTI_sample17').className).toContain('ring-2');
+  expect(card('I_sample17').className).toContain('ring-2');
 });
 
 test('a desk card is no button wrapping buttons: its summary is the button, and pressing it opens the item dialog', async () => {
   await mountPage();
   expect($$('.desk-card button button, button.desk-card')).toHaveLength(0);
-  await settle(() => card('PVTI_sample16').querySelector<HTMLButtonElement>(':scope > button')!.click());
+  await settle(() => card('I_sample16').querySelector<HTMLButtonElement>(':scope > button')!.click());
   expect(dialog()!.textContent).toContain('New artwork grid layout');
 });
 
 test.each([
-  ['Needs you with no thread', 'PVTI_sample11', ['Open thread (disabled: No T3 thread has worked on this yet)']],
-  ['Needs you', 'PVTI_sample12', ['Open thread']],
-  ['blocked Ready', 'PVTI_sample13', ['Open thread', 'Start build (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']],
-  ['Verify', 'PVTI_sample16', ['Open thread (disabled: No T3 thread has worked on this yet)', 'Open PR']],
-  ['Ready to merge', 'PVTI_sample17', ['Open thread (disabled: No T3 thread has worked on this yet)', 'Open PR']],
+  ['Needs you with no thread', 'I_sample11', ['Open thread (disabled: No T3 thread has worked on this yet)']],
+  ['Needs you', 'I_sample12', ['Open thread']],
+  ['blocked Ready', 'I_sample13', ['Open thread', 'Start build (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']],
+  ['Verify', 'I_sample16', ['Open thread (disabled: No T3 thread has worked on this yet)', 'Open PR']],
+  ['Ready to merge', 'I_sample17', ['Open thread (disabled: No T3 thread has worked on this yet)', 'Open PR']],
 ])('a %s card has the buttons for its next action', async (_status, id, buttons) => {
   await mountPage();
   expect(controls(id)).toEqual(buttons);
@@ -58,34 +58,34 @@ test.each([
 
 test('a Ready card with a thread at work on it has Open thread alone, not a second one in Start build’s place', async () => {
   const threads = [{ id: 't1', title: 'Build', state: 'running' as const, updated: '2026-10-21T09:00:00.000Z' }];
-  await mountPage(withItem('PVTI_sample13', { threads }));
-  expect(controls('PVTI_sample13')).toEqual(['Open thread']);
+  await mountPage(withItem('I_sample13', { threads }));
+  expect(controls('I_sample13')).toEqual(['Open thread']);
 });
 
 test('Open thread opens the latest thread in T3, and Open PR the pull request the item dialog links, in a new tab', async () => {
   await mountPage();
-  expect(card('PVTI_sample12').querySelector('[data-open-thread]')!.getAttribute('href')).toMatch(/^t3code:\/\//);
-  const pr = card('PVTI_sample16').querySelector<HTMLAnchorElement>('[data-pr-link]')!;
+  expect(card('I_sample12').querySelector('[data-open-thread]')!.getAttribute('href')).toMatch(/^t3code:\/\//);
+  const pr = card('I_sample16').querySelector<HTMLAnchorElement>('[data-pr-link]')!;
   expect([pr.getAttribute('href'), pr.target]).toEqual(['https://github.com/maddec01/lar-apple/pull/32', '_blank']);
 });
 
 test('a pull request on Verify opens itself', async () => {
-  await mountPage(withItem('PVTI_sample16', { content: 'pr', url: 'https://github.com/maddec01/lar-apple/pull/40' }));
-  expect(card('PVTI_sample16').querySelector('[data-pr-link]')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-apple/pull/40');
+  await mountPage(withItem('I_sample16', { content: 'pr', url: 'https://github.com/maddec01/lar-apple/pull/40' }));
+  expect(card('I_sample16').querySelector('[data-pr-link]')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-apple/pull/40');
 });
 
 test('with no pull request linked, Open PR is disabled, saying why', async () => {
-  await mountPage(withItem('PVTI_sample17', { linkedPrs: [] }));
-  expect(controls('PVTI_sample17').at(-1)).toBe('Open PR (disabled: No pull request is linked to this item yet)');
+  await mountPage(withItem('I_sample17', { linkedPrs: [] }));
+  expect(controls('I_sample17').at(-1)).toBe('Open PR (disabled: No pull request is linked to this item yet)');
 });
 
 const pipeline = (id: string) => [...card(id).querySelector('.desk-pipeline')!.children].map(text);
 
 test.each([
-  ['an issue whose PR can merge', 'PVTI_sample16', ['1 passed · 0 running · 0 failed', 'can merge']],
-  ['a pull request GitHub is still checking', 'PVTI_sample26', ['4 passed · 2 running · 0 failed', 'checking']],
-  ['an issue whose PR is blocked', 'PVTI_sample27', ['3 passed · 0 running · 1 failed', 'blocked']],
-  ['an issue whose PR has no checks and conflicts', 'PVTI_sample28', ['no checks', 'conflicts']],
+  ['an issue whose PR can merge', 'I_sample16', ['1 passed · 0 running · 0 failed', 'can merge']],
+  ['a pull request GitHub is still checking', 'I_sample26', ['4 passed · 2 running · 0 failed', 'checking']],
+  ['an issue whose PR is blocked', 'I_sample27', ['3 passed · 0 running · 1 failed', 'blocked']],
+  ['an issue whose PR has no checks and conflicts', 'I_sample28', ['no checks', 'conflicts']],
 ])('a Verify card for %s shows its checks and merge state', async (_what, id, lines) => {
   await mountPage();
   expect(pipeline(id)).toEqual(lines);
@@ -93,31 +93,31 @@ test.each([
 
 test('a Verify card reads the PR Open PR opens, its first linked one', async () => {
   const linkedPrs = (id: string) => sample.items.find((i) => i.id === id)!.linkedPrs;
-  await mountPage(withItem('PVTI_sample16', { linkedPrs: [...linkedPrs('PVTI_sample16'), { ...linkedPrs('PVTI_sample27')[0]!, number: 99 }] }));
-  expect(pipeline('PVTI_sample16')).toEqual(['1 passed · 0 running · 0 failed', 'can merge']);
+  await mountPage(withItem('I_sample16', { linkedPrs: [...linkedPrs('I_sample16'), { ...linkedPrs('I_sample27')[0]!, number: 99 }] }));
+  expect(pipeline('I_sample16')).toEqual(['1 passed · 0 running · 0 failed', 'can merge']);
 });
 
 test('a Verify card with no PR linked shows no pipeline, and only Verify cards show one', async () => {
-  await mountPage(withItem('PVTI_sample16', { linkedPrs: [] }));
-  expect(card('PVTI_sample16').querySelector('.desk-pipeline')).toBeNull();
-  expect(card('PVTI_sample17').querySelector('.desk-pipeline')).toBeNull();
+  await mountPage(withItem('I_sample16', { linkedPrs: [] }));
+  expect(card('I_sample16').querySelector('.desk-pipeline')).toBeNull();
+  expect(card('I_sample17').querySelector('.desk-pipeline')).toBeNull();
 });
 
 test('clicks on a card’s buttons, in the menu one opens, or in its start message open no item dialog', async () => {
   await mountPage();
-  await settle(() => card('PVTI_sample12').querySelector<HTMLElement>('[data-open-thread]')!.click());
-  await settle(() => card('PVTI_sample16').querySelector<HTMLElement>('[data-pr-link]')!.click());
-  await settle(() => card('PVTI_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!.click());
+  await settle(() => card('I_sample12').querySelector<HTMLElement>('[data-open-thread]')!.click());
+  await settle(() => card('I_sample16').querySelector<HTMLElement>('[data-pr-link]')!.click());
+  await settle(() => card('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!.click());
   const entry = $('[role="menu"] [role="menuitemradio"]');
   expect(entry).not.toBeNull();
   await settle(() => entry!.click());
-  await settle(() => card('PVTI_sample13').querySelector<HTMLElement>('.desk-start')!.click());
+  await settle(() => card('I_sample13').querySelector<HTMLElement>('.desk-start')!.click());
   expect(dialog()).toBeNull();
 });
 
 test('a click on a card beside its buttons opens the item dialog', async () => {
   await mountPage();
-  await settle(() => card('PVTI_sample12').querySelector<HTMLElement>('.desk-actions')!.click());
+  await settle(() => card('I_sample12').querySelector<HTMLElement>('.desk-actions')!.click());
   expect(dialog()).not.toBeNull();
 });
 

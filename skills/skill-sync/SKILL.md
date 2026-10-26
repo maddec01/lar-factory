@@ -48,7 +48,8 @@ and copied files follow their own rules.
      `THIRD_PARTY_NOTICES.md` section only if they still say yes.
    - **Drop**: name what goes (the folder, its `UPSTREAM.md` row, the
      Overrides in that row's "Overridden in" column, and the source's full
-     commit and notice if no other row uses that source) and wait for their yes.
+     commit, "Authors" entry and notice if no other row uses that source) and
+     wait for their yes.
 5. Apply exactly what they confirmed:
    - **Take a change**: make the Copy's folder or file match upstream's path
      at the new commit. Copy every upstream file whole. Delete each file
@@ -68,13 +69,15 @@ and copied files follow their own rules.
      with the 12-character commit and that commit's date as YYYY-MM-DD, and
      the source's full commit to the "Full commits" line. When the source is
      new, add its licence to `THIRD_PARTY_NOTICES.md` under a
-     `## <owner/repo>` heading with its URL.
+     `## <owner/repo>` heading with its URL, and add
+     `<owner/repo> by <author> (<licence>)` to the "Authors" line, with the
+     author and licence its licence file names, such as `Matt Pocock (MIT)`.
    - **Drop**: delete the copy and its `UPSTREAM.md` row, and remove each
      Override that row lists from its lar file. Deleting a folder deletes its
      `LICENSE`; delete `references/LICENSE` once no row lists a file under
      `references/`. When no row uses its
-     source any more, also remove that source's full commit and its
-     `THIRD_PARTY_NOTICES.md` section. Tell the maintainer the installed copies in
+     source any more, also remove that source's full commit, its "Authors"
+     entry and its `THIRD_PARTY_NOTICES.md` section. Tell the maintainer the installed copies in
      `~/.agents/skills` and `~/.claude/skills` stay, since they use them in
      projects outside the factory; they remove them by hand if they want them gone.
 

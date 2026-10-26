@@ -182,3 +182,19 @@ test('an az that fails its check shows a banner with its fix, and the board stil
   await push(withTools({}));
   expect(banners(), 'an az nobody needs is not checked and shows nothing').toEqual([]);
 });
+
+test('T3 Code not running shows a banner with its fix and Recheck, and the board still shows', async () => {
+  holdRecheck();
+  const closed = withTools({ t3: { result: 'not-running', version: '0.1.3-nightly.1' } });
+  await mountPage(closed);
+  expect($$('.banners .banner').map(bannerText)).toEqual([['T3 Code is not running.', 'The board starts threads through T3 Code, which has to be open. '
+    + 'Open T3 Code, then press Recheck. The board also looks again every 10 seconds. Recheck']]);
+  expect($('.tool-missing'), 'only a missing t3 fills the main area').toBeNull();
+  expect($('.desk')).not.toBeNull();
+  expect($('.title-bar h1')).not.toBeNull();
+  await settle(() => recheckButton().click());
+  await answer(board(closed));
+  expect(note()!.textContent).toBe('Still not running.');
+  await push(withTools({}));
+  expect($$('.banners .banner')).toEqual([]);
+});

@@ -43,6 +43,9 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   // T3 settings whose built-in Claude instance has no transcripts, so tests never read real ones.
   const settingsFile = join(dir, 't3-settings.json');
   await writeFile(settingsFile, JSON.stringify({ providerInstances: { claudeAgent: { driver: 'claudeAgent', config: { homePath: join(dir, 'no-claude') } } } }));
+  // T3 Code's runtime file, naming this test's process, so T3 Code counts as running.
+  const runtimeFile = join(dir, 't3-runtime.json');
+  await writeFile(runtimeFile, JSON.stringify({ version: 1, pid: process.pid, port: 3773, origin: 'http://127.0.0.1:3773' }));
   // Each test gets a spare port; BOARD_PORT '' leaves the board to pick one from its range.
   const port = 'BOARD_PORT' in env ? env.BOARD_PORT : String(await freePort());
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
@@ -51,7 +54,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     // A home of its own keeps a live board's record out of the real one.
     env: { ...testEnv(), HOME: dir, BOARD_PORT: port, GH_PATH: new URL('./fake-gh.cjs', import.meta.url).pathname,
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname, SHELL: new URL('./fake-shell.sh', import.meta.url).pathname,
-      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, BOARD_DATA_FILE: fixture ? SAMPLE_DATA : '',
+      FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, T3_SERVER_RUNTIME: runtimeFile, BOARD_DATA_FILE: fixture ? SAMPLE_DATA : '',
       ...(fixture ? SAMPLE_MODELS : {}), ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
     // The board leads its own process group, which the gh it runs joins.

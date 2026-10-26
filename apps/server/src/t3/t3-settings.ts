@@ -2,6 +2,8 @@
 // read-only (docs/adr/0005). The settings parts follow pingdotgg/t3code main at
 // f054d1b8018721bd997d99cbb918a7b17bf098a4: apps/server/src/usage/UsageService.ts,
 // claudeUsageReader and codexUsageReader (with CodexHomeLayout's shared home).
+// Whether T3 Code runs follows main at 1c1050eb7fddeedb80cc624dcd834e2a04377b1c:
+// apps/server/src/serverRuntimeState.ts.
 
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
@@ -43,6 +45,27 @@ export function readEnvironmentId(path: string): string | undefined {
     return readFileSync(path, 'utf8').trim() || undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** T3's runtime file, which its server writes on start and removes on stop: `T3_SERVER_RUNTIME`, or `server-runtime.json` in its userdata folder. */
+export function serverRuntimePath(env: NodeJS.ProcessEnv = process.env): string {
+  return env.T3_SERVER_RUNTIME || `${userdata(env)}/server-runtime.json`;
+}
+
+/**
+ * Whether T3 Code runs: the runtime file at `path` names a pid whose process is alive, as T3's
+ * isProcessAlive checks it. `t3 thread start` needs that file; a crash can leave it behind, naming a dead pid.
+ */
+export function t3Running(path: string): boolean {
+  const pid = readJsonRecord(path)?.pid;
+  if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // Signal 0 only asks whether the process exists; EPERM means it does, under another user.
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 

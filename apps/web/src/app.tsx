@@ -36,13 +36,15 @@ function Content() {
 
 export function App() {
   const t3 = useBoardStore((state) => failedCheck(state.data.tools, 't3'));
+  // T3 Code not running is a banner; only a missing t3 replaces the main area.
+  const missing = t3?.result === 'missing' ? t3 : undefined;
   const settings = useSettingsStore((state) => state.open);
   return (
-    <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)" board={!t3}>
+    <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)" board={!missing}>
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="contents" hidden={settings}>
           <TitleBar />
-          {t3 ? <T3Missing check={t3} /> : <Content />}
+          {missing ? <T3Missing check={missing} /> : <Content />}
         </div>
         {settings && <SettingsMain />}
       </main>

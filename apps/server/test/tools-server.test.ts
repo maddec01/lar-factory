@@ -156,6 +156,19 @@ test('a listed repository on Azure DevOps gets an az check, which Recheck reruns
   assert.deepEqual((await (await recheck(board)).json()).board.tools.az, { result: 'ok', version: '2.67.0' });
 });
 
+test('T3 Code not running has its check but doesn\'t stop the board reading GitHub, and Recheck finds it running', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'lar-t3-closed-'));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const runtime = join(dir, 'server-runtime.json');
+  const board = await startBoard(t, {}, false, false, { T3_SERVER_RUNTIME: runtime });
+  const data = await afterRead(board);
+  assert.ok(data.fetchedAt, 'the board reads GitHub');
+  assert.deepEqual(results(data.tools), { ...allOk, t3: { result: 'not-running', version: '0.1.4-nightly.1' } });
+  assert.match(board.logs(), /T3 Code is not running/);
+  writeFileSync(runtime, JSON.stringify({ version: 1, pid: process.pid, port: 3773, origin: 'http://127.0.0.1:3773' }));
+  assert.deepEqual((await (await recheck(board)).json()).board.tools.t3, { result: 'ok', version: '0.1.4-nightly.1' });
+});
+
 test('sample mode looks no tools up', async (t) => {
   const board = await startBoard(t, {}, true);
   assert.equal((await board.board()).tools, undefined);

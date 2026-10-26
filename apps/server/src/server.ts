@@ -127,6 +127,7 @@ function logTools(): void {
   if (gh === 'logged-out') lines.push('gh is logged out');
   if (gh === 'outdated') lines.push(`gh is older than ${GH_FLOOR}`);
   if (gh === 'no-project-scope') lines.push("gh can't read Projects");
+  if (board.snapshot().tools?.t3.result === 'not-running') lines.push('T3 Code is not running');
   const az = board.snapshot().tools?.az?.result;
   if (az === 'logged-out') lines.push('az is logged out');
   if (az === 'no-extension') lines.push('az has no azure-devops extension');

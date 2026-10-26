@@ -48,6 +48,7 @@ function toolState(check: ToolCheck | undefined, login = false): ComponentProps<
     case 'outdated': return { text: `${check.version}, older than ${GH_FLOOR}${unread}`, tone: 'warning' };
     case 'no-project-scope': return { text: 'No project scope', tone: 'warning' };
     case 'no-extension': return { text: 'No azure-devops extension', tone: 'warning' };
+    case 'not-running': return { text: 'Not running', tone: 'warning' };
     case 'missing': return { text: 'Not found', tone: 'error' };
   }
 }
@@ -230,6 +231,7 @@ export function pages(input: PagesInput): Page[] {
 /** What the command does, or why its check failed and how to fix it. */
 function toolDescription(does: string, check: ToolCheck | undefined): ReactNode {
   if (!check || check.result === 'ok') return does;
+  if (check.result === 'not-running') return 'Open T3 Code.';
   const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';
   return check.fix ? <>{where}Fix: <code>{check.fix}</code></> : `${where}Install T3 Code.`;
 }

@@ -338,8 +338,9 @@ export type CheckedTool = 'gh' | 't3' | 'git' | 'jq' | 'curl' | 'az';
 /**
  * A command's check: it runs, with the version it printed if it did; it's missing, naming the override
  * that pointed nowhere if one did; it's logged out (gh or az); (gh only) it's older than GH_FLOOR or its login
- * has no `project` scope; or (az only) it has no `azure-devops` extension. `scopes: 'unread'` marks a gh whose scopes the board couldn't read, which blocks nothing.
- * `fix` is the command that fixes a failed check; a missing t3 has none, since T3 Code installs it.
+ * has no `project` scope; (az only) it has no `azure-devops` extension; or (t3 only) T3 Code isn't running, so `t3` can't start threads.
+ * `scopes: 'unread'` marks a gh whose scopes the board couldn't read, which blocks nothing.
+ * `fix` is the command that fixes a failed check; t3 has none, since the fix is to install or open T3 Code.
  */
 export type ToolCheck =
   | { result: 'ok'; version?: string; scopes?: 'unread' }
@@ -347,7 +348,8 @@ export type ToolCheck =
   | { result: 'logged-out'; version?: string; fix: string }
   | { result: 'outdated'; version: string; fix: string; scopes?: 'unread' }
   | { result: 'no-project-scope'; version?: string; fix: string }
-  | { result: 'no-extension'; version?: string; fix: string };
+  | { result: 'no-extension'; version?: string; fix: string }
+  | { result: 'not-running'; version?: string };
 
 /** The oldest gh lar-work's scripts run with: 2.94.0 added `--parent`, `--add-sub-issue` and `--blocked-by`. */
 export const GH_FLOOR = '2.94.0';

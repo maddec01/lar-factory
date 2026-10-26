@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { ITEM_SOURCE_KINDS } from '@lar-factory/shared';
+import { ITEM_SOURCE_KINDS, SHOW_SETTINGS } from '@lar-factory/shared';
 import type { RepoConfig } from '@lar-factory/shared';
 
 export interface BoardConfig {
@@ -42,12 +42,15 @@ export function loadConfig(url: URL = configUrl()): BoardConfig {
   };
 }
 
-/** A repos entry with a role, and its item source when it names one; an older entry's checkout `path` is dropped. */
+/** A repos entry with a role, and its item source and show setting when it names them; an older entry's checkout `path` is dropped. */
 function checkRepo(entry: RepoConfig, url: URL): RepoConfig {
   const name = entry.repo ?? 'a repos entry';
   if (typeof entry.role !== 'string' || !entry.role.trim()) throw new Error(`${fileURLToPath(url)}: ${name} needs a "role"`);
   if (entry.items !== undefined && !ITEM_SOURCE_KINDS.includes(entry.items)) {
     throw new Error(`${fileURLToPath(url)}: ${name} has "items": ${JSON.stringify(entry.items)}; use "project" or "issues"`);
   }
-  return { repo: entry.repo, platform: entry.platform, role: entry.role, ...(entry.items ? { items: entry.items } : {}) };
+  if (entry.show !== undefined && !SHOW_SETTINGS.includes(entry.show)) {
+    throw new Error(`${fileURLToPath(url)}: ${name} has "show": ${JSON.stringify(entry.show)}; use "all" or "opted-in"`);
+  }
+  return { repo: entry.repo, platform: entry.platform, role: entry.role, ...(entry.items ? { items: entry.items } : {}), ...(entry.show ? { show: entry.show } : {}) };
 }

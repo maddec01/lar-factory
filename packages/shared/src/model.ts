@@ -292,6 +292,8 @@ export interface RepoConfig {
   role: string;
   /** Its item source: the GitHub Project config.json names, the default, or the repository's issues. */
   items?: ItemSourceKind;
+  /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
+  show?: ShowSetting;
 }
 
 export const ITEM_SOURCE_KINDS = ['project', 'issues'] as const;
@@ -307,6 +309,10 @@ export interface BundledSkill {
   /** The URL of its folder or file on GitHub. */
   source: string;
 }
+
+export const SHOW_SETTINGS = ['all', 'opted-in'] as const;
+
+export type ShowSetting = (typeof SHOW_SETTINGS)[number];
 
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */

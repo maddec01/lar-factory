@@ -40,6 +40,20 @@ test('a repository entry with any other items is refused, naming the repo', asyn
   await assert.rejects(async () => loadConfig(await configWith(t, [{ ...server, items: 'sprint' }])), /maddec01\/lar-server.*"items"/);
 });
 
+test('a repository entry shows all items unless it names opted-in items', async (t) => {
+  const config = loadConfig(await configWith(t, [server, { ...server, repo: 'maddec01/lar-apple', show: 'opted-in' }, { ...server, repo: 'maddec01/lar-factory', show: 'all' }]));
+  assert.deepEqual(config.repos.map((r) => r.show), [undefined, 'opted-in', 'all']);
+});
+
+test('a repository entry with any other show is refused, naming the repo and the allowed values', async (t) => {
+  await assert.rejects(async () => loadConfig(await configWith(t, [{ ...server, show: 'some' }])), /maddec01\/lar-server.*"show".*"all" or "opted-in"/);
+});
+
+test('the factory config names no show setting', () => {
+  const shipped = JSON.parse(readFileSync(CONFIG_URL, 'utf8')) as { repos: object[] };
+  for (const repo of shipped.repos) assert.equal('show' in repo, false, JSON.stringify(repo));
+});
+
 test('the factory config gives every repository a role and no checkout path', () => {
   for (const repo of loadConfig().repos) assert.ok(repo.role.trim(), repo.repo);
   const shipped = JSON.parse(readFileSync(CONFIG_URL, 'utf8')) as { repos: object[] };

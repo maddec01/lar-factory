@@ -34,6 +34,24 @@ test("a read lists every source's items under the Project's title, an item two s
   assert.deepEqual(read.items.map((i) => [i.id, i.status]), [['I_1', 'In progress'], ['I_2', 'List']]);
 });
 
+test("with Opted-in items, an issue shows only while it carries a status, closed or not; a Project item shows once closed", async () => {
+  const bare = (id: string, repo: string, state: Item['state'] = 'open'): Item => ({ ...item(id, repo), statuses: [], state, closedAs: state === 'closed' ? 'done' : null });
+  const closed = (id: string, repo: string, status: Status): Item => ({ ...item(id, repo, status), state: 'closed', closedAs: 'done' });
+  const project = fakeSource('lar', [bare('I_1', 'maddec01/lar-server'), bare('I_2', 'maddec01/lar-factory'), item('I_3', 'maddec01/lar-factory', 'Queued'),
+    bare('I_4', 'maddec01/lar-factory', 'closed')], []);
+  const issues = fakeSource('apple', [bare('I_5', 'maddec01/lar-apple'), item('I_6', 'maddec01/lar-apple', 'List'), bare('I_7', 'maddec01/lar-apple', 'closed'),
+    closed('I_8', 'maddec01/lar-apple', 'Verify')], []);
+  const read = await mergeSources(project, new Map([['maddec01/lar-apple', issues]]), ['maddec01/lar-apple', 'Maddec01/Lar-Factory']).read();
+  assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_3', 'I_4', 'I_6', 'I_8']);
+});
+
+test('a source with no opted-in repositories lists every item it read', async () => {
+  const project = fakeSource('lar', [{ ...item('I_1', 'maddec01/lar-server'), statuses: [] }], []);
+  const issues = fakeSource('apple', [{ ...item('I_2', 'maddec01/lar-apple'), statuses: [] }], []);
+  const read = await mergeSources(project, new Map([['maddec01/lar-apple', issues]])).read();
+  assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_2']);
+});
+
 test('a write goes to the source that listed the item, or else to the source its repository names', async () => {
   const writes: string[] = [];
   const project = fakeSource('lar', [item('I_1', 'maddec01/lar-apple')], writes);

@@ -16,6 +16,9 @@ export const STATUSES = [
 
 export type Status = (typeof STATUSES)[number];
 
+/** A status kept on an issue as a label: `status-` and its name in lowercase, with hyphens for spaces. Done has no label. */
+export const statusLabel = (status: Exclude<Status, 'Done'>): string => `status-${status.toLowerCase().replaceAll(' ', '-')}`;
+
 /** Statuses only the user can move on from. */
 export const AMBER_STATUSES: readonly Status[] = ['Needs you', 'Verify'];
 
@@ -185,8 +188,10 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 export interface Item {
   /** The node id of the issue, pull request or draft the item holds. */
   id: string;
-  /** Status column. Items without one are treated as List. */
+  /** The status the board places it by: Done once it closed as done, else the first of `statuses` in flow order, else List. */
   status: Status;
+  /** Every status the item carries on its provider, in flow order; empty when it has none. Never Done, which is never stored. */
+  statuses: Status[];
   /** A ticket is an issue or work item; a Project draft is a ticket whose `repo` and `number` are null. */
   content: 'ticket' | 'pr';
   number: number | null;

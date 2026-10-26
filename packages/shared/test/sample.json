@@ -25,6 +25,9 @@
     {
       "id": "I_sample01",
       "status": "List",
+      "statuses": [
+        "List"
+      ],
       "content": "ticket",
       "number": 61,
       "title": "Arr instances, catalog bindings and content requests",
@@ -51,6 +54,9 @@
     {
       "id": "I_sample02",
       "status": "List",
+      "statuses": [
+        "List"
+      ],
       "content": "ticket",
       "number": 114,
       "title": "Verify VideoToolbox 8-bit HEVC decoding during hardware detection",
@@ -76,6 +82,9 @@
     {
       "id": "I_sample03",
       "status": "List",
+      "statuses": [
+        "List"
+      ],
       "content": "ticket",
       "number": 12,
       "title": "Remember the last subtitle language per show",
@@ -103,6 +112,9 @@
     {
       "id": "I_sample04",
       "status": "List",
+      "statuses": [
+        "List"
+      ],
       "content": "ticket",
       "number": null,
       "title": "Shared playback history across devices",
@@ -125,6 +137,9 @@
     {
       "id": "I_sample05",
       "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
       "content": "ticket",
       "number": 129,
       "title": "Run more than one 4K HDR to 1080p stream at a time",
@@ -149,6 +164,9 @@
     {
       "id": "I_sample06",
       "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
       "content": "ticket",
       "number": 20,
       "title": "Player controls stay visible after scrubbing <on tvOS>",
@@ -173,6 +191,9 @@
     {
       "id": "I_sample21",
       "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
       "content": "ticket",
       "number": null,
       "title": "Offline downloads on watchOS",
@@ -195,6 +216,9 @@
     {
       "id": "I_sample07",
       "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
       "content": "ticket",
       "number": 130,
       "title": "Show cold bitmap subtitles within 3 s before preparation finishes",
@@ -233,6 +257,9 @@
     {
       "id": "I_sample08",
       "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
       "content": "ticket",
       "number": 22,
       "title": "Continue watching row on the home screen",
@@ -277,6 +304,9 @@
     {
       "id": "I_sample09",
       "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
       "content": "ticket",
       "number": 200,
       "title": "lar cloud: website sign-in and relay",
@@ -321,6 +351,9 @@
     {
       "id": "I_sample10",
       "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
       "content": "ticket",
       "number": 201,
       "title": "Relay: broker only or full TURN?",
@@ -371,6 +404,9 @@
     {
       "id": "I_sample11",
       "status": "Needs you",
+      "statuses": [
+        "Needs you"
+      ],
       "content": "ticket",
       "number": 23,
       "title": "Faster library sync on large collections",
@@ -407,6 +443,9 @@
     {
       "id": "I_sample12",
       "status": "Needs you",
+      "statuses": [
+        "Needs you"
+      ],
       "content": "ticket",
       "number": 202,
       "title": "Sign-in screen",
@@ -451,6 +490,9 @@
     {
       "id": "I_sample13",
       "status": "Ready",
+      "statuses": [
+        "Ready"
+      ],
       "content": "ticket",
       "number": 140,
       "title": "Owner accounts",
@@ -520,6 +562,9 @@
     {
       "id": "I_sample22",
       "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
       "content": "ticket",
       "number": 150,
       "title": "Relay for streaming away from home",
@@ -672,6 +717,9 @@
     {
       "id": "I_sample14",
       "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
       "content": "ticket",
       "number": 30,
       "title": "Chapter markers in the scrubber",
@@ -725,6 +773,9 @@
     {
       "id": "I_sample23",
       "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
       "content": "ticket",
       "number": 180,
       "title": "Resume playback across devices",
@@ -795,6 +846,9 @@
     {
       "id": "I_sample15",
       "status": "Review",
+      "statuses": [
+        "Review"
+      ],
       "content": "ticket",
       "number": 141,
       "title": "Transcoder leaks a file handle on cancel",
@@ -848,6 +902,9 @@
     {
       "id": "I_sample16",
       "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
       "content": "ticket",
       "number": 31,
       "title": "New artwork grid layout",
@@ -888,6 +945,9 @@
     {
       "id": "I_sample26",
       "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
       "content": "pr",
       "number": 210,
       "title": "Bump FFmpeg to 7.1",
@@ -920,6 +980,9 @@
     {
       "id": "I_sample27",
       "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
       "content": "ticket",
       "number": 34,
       "title": "Swipe between episodes",
@@ -959,6 +1022,9 @@
     {
       "id": "I_sample28",
       "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
       "content": "ticket",
       "number": 147,
       "title": "Fall back to software transcoding when the GPU is busy",
@@ -992,6 +1058,9 @@
     {
       "id": "I_sample17",
       "status": "Ready to merge",
+      "statuses": [
+        "Ready to merge"
+      ],
       "content": "ticket",
       "number": 142,
       "title": "Cache probe results between restarts",
@@ -1036,6 +1105,7 @@
     {
       "id": "I_sample18",
       "status": "Done",
+      "statuses": [],
       "content": "ticket",
       "number": 203,
       "title": "Hosting cost of the relay",
@@ -1080,6 +1150,7 @@
     {
       "id": "I_sample19",
       "status": "Done",
+      "statuses": [],
       "content": "ticket",
       "number": 5,
       "title": "Crash when a server goes offline mid-playback",
@@ -1125,6 +1196,7 @@
     {
       "id": "I_sample24",
       "status": "Done",
+      "statuses": [],
       "content": "ticket",
       "number": 181,
       "title": "Store the playback position per device",
@@ -1186,6 +1258,7 @@
     {
       "id": "I_sample25",
       "status": "Done",
+      "statuses": [],
       "content": "ticket",
       "number": 40,
       "title": "Resume from the stored position",
@@ -1253,6 +1326,7 @@
     {
       "id": "I_sample20",
       "status": "Done",
+      "statuses": [],
       "content": "ticket",
       "number": 100,
       "title": "Old cleanup task",

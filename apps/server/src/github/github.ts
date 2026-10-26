@@ -1,7 +1,7 @@
 // Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
 import { DONE_WINDOW_MS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@lar-factory/shared';
-import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, Searched, Status } from '@lar-factory/shared';
+import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, Searched, Status, StatusSource } from '@lar-factory/shared';
 import type { BoardConfig } from '../config/config.ts';
 import type { ItemsRead } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -231,17 +231,17 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
 }
 
 /** The board's items from raw items, once all are read, without slices and with each dossier's map. */
-async function boardItems(raws: RawItem[]): Promise<Item[]> {
+async function boardItems(raws: RawItem[], from: StatusSource = 'field'): Promise<Item[]> {
   // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
   // decide which sub-issues are slices, so they run before the dossiers, items with sub-issues on the board, are known.
   const searched = await searchLabels(raws);
   await readDossierBodies(raws, searched);
-  return normalizeItems(raws, searched);
+  return normalizeItems(raws, searched, from);
 }
 
 /**
- * A repository's open issues as List, and those closed in the last DONE_WINDOW_MS as Done, without slices. Until
- * status labels come, every open issue is List.
+ * A repository's open issues, each placed by its `status-<name>` labels, and those closed in the last DONE_WINDOW_MS,
+ * without slices.
  */
 export async function fetchRepoIssues(repo: string, now = Date.now()): Promise<Item[]> {
   const [owner, name] = repo.split('/');
@@ -261,9 +261,8 @@ export async function fetchRepoIssues(repo: string, now = Date.now()): Promise<I
   // An issue updated since the window began may have closed before it.
   const recent = closed.filter((issue) => issue.closedAt && Date.parse(issue.closedAt) >= now - DONE_WINDOW_MS);
   // Not on a Project, so an issue's own node id stands in for the Project item id normalizeItems never shows.
-  const raws = [...open, ...recent].map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt,
-    status: { name: content.state === 'CLOSED' ? 'Done' : 'List' }, content }));
-  return boardItems(raws);
+  const raws = [...open, ...recent].map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, status: null, content }));
+  return boardItems(raws, 'labels');
 }
 
 /** An error's message, for a write's error text. */
@@ -451,7 +450,7 @@ export async function createIssue(
       await next.run(issue);
     }
     progress.item = {
-      id: issue.node_id, status: 'List', content: 'ticket', number: issue.number,
+      id: issue.node_id, status: 'List', statuses: [], content: 'ticket', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'open', closedAs: null,
       parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
       updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],

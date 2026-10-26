@@ -2,11 +2,12 @@
 // has given, with T3's projects as the server lists them and the folder Create a new T3 project adds. Closing before a
 // project is picked drops the run; closing after keeps its repository on this Mac's list as onboarding, with where it
 // stopped, and Resume reopens it there. The Checks step runs the command checks, then the setup checks, and holds Next
-// until each passes; a run that reuses its .lar-factory.json finishes there, with no PR.
+// until each passes; a run that reuses its .lar-factory.json finishes there, with no PR. Any other run opens the
+// onboarding PR on the Pull request step, then waits for the board to finish the onboarding once the PR merges.
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, sameRepo, type CheckedTool, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type RepositoryItemSource,
+  SETUP_CHECKS, isOnboarding, sameRepo, type BoardData, type CheckedTool, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type RepositoryConfigAnswers, type RepositoryItemSource,
   type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -39,6 +40,8 @@ export interface Run {
   savedAs: string | null;
   /** The Provider and item source step's answers; null until that step first shows. */
   setup: SetupAnswers | null;
+  /** The onboarding PR, once it is open. */
+  prUrl: string | null;
 }
 
 export type Projects = { state: 'loading' } | { state: 'loaded'; projects: ProjectChoice[] } | { state: 'failed'; error: string };
@@ -83,6 +86,15 @@ export function itemSourceOf(run: Run, project: ProjectChoice): RepositoryItemSo
   if (!setupAnswered(run.setup)) return null;
   return run.setup!.itemSource === 'issues' ? { kind: 'issues' } : { kind: 'github-project', owner: run.setup!.projectOwner, number: Number(run.setup!.projectNumber) };
 }
+
+/** The .lar-factory.json values the onboarding PR writes, from the setup step's answers; null until they are whole. */
+export function configOf(run: Run, project: ProjectChoice): RepositoryConfigAnswers | null {
+  const itemSource = itemSourceOf(run, project);
+  return itemSource && run.setup && { itemSource, show: run.setup.show, role: run.setup.role.trim() };
+}
+
+/** Whether the run's onboarding finished: its PR is open and the board no longer has its repository onboarding, as the PR merged. */
+export const onboarded = (run: Run, data: Pick<BoardData, 'onboarding'>): boolean => !!run.prUrl && !isOnboarding(data, run.repo);
 
 /** The commands the Checks step checks for a GitHub repository; az waits for Azure DevOps in build #386. */
 export const COMMAND_CHECKS = ['gh', 't3', 'git', 'jq', 'curl'] as const satisfies readonly CheckedTool[];
@@ -155,6 +167,10 @@ interface WizardState {
   retryCheck: (id: SetupCheckId) => Promise<void>;
   /** Finishes a run that reuses its .lar-factory.json once its checks pass, so its repository goes on the board. */
   finish: () => Promise<void>;
+  /** Opening the onboarding PR, and why the board couldn't. */
+  pr: { opening: boolean; error: string | null };
+  /** Opens the onboarding PR, which the board keeps with the run's progress. */
+  openPr: () => Promise<void>;
 }
 
 /** Counts project reads, so one answered after a newer read or a close is dropped. */
@@ -169,7 +185,7 @@ const isStep = (id: string): id is StepId => STEPS.some((s) => s.id === id);
 /** The run a kept onboarding resumes; a step this dialog doesn't have, as a newer board's, resumes on the T3 project step. */
 function resumed(repo: string, progress: OnboardingProgress): Run {
   return { step: isStep(progress.step) ? progress.step : 'project', done: progress.done.filter(isStep), projectId: progress.answers.projectId, repo,
-    savedAs: repo, setup: progress.answers.setup ?? null };
+    savedAs: repo, setup: progress.answers.setup ?? null, prUrl: progress.prUrl ?? null };
 }
 
 /** The setup step's answers before any is given: a GitHub Project of the repository's owner, with its suggested show setting. */
@@ -177,10 +193,17 @@ const firstSetup = (repo: string | null): SetupAnswers => ({
   itemSource: 'github-project', projectOwner: repo?.split('/')[0] ?? '', projectNumber: '', show: suggestedShow('github-project'), showPicked: false, role: '',
 });
 
+/** Where the run stopped, as the board keeps it. */
+const progressOf = (run: Run & { projectId: string }): OnboardingProgress => ({ step: run.step, done: run.done,
+  answers: { projectId: run.projectId, ...run.setup && { setup: run.setup } }, ...run.prUrl && { prUrl: run.prUrl } });
+
+/** The onboarding a run kept under another repository replaces, to send with its repository. */
+const replacing = (run: Run & { repo: string }) => run.savedAs && !sameRepo(run.savedAs, run.repo) ? { replaces: run.savedAs } : {};
+
 /** Asks the server to keep the run's repository as onboarding; a refusal shows in a toast. */
 async function keep(run: Run & { projectId: string; repo: string }): Promise<void> {
-  const progress: OnboardingProgress = { step: run.step, done: run.done, answers: { projectId: run.projectId, ...run.setup && { setup: run.setup } } };
-  const replaces = run.savedAs && !sameRepo(run.savedAs, run.repo) ? { replaces: run.savedAs } : {};
+  const progress = progressOf(run);
+  const replaces = replacing(run);
   const result = await postAction('/api/onboarding/repositories', { repo: run.repo, progress, ...replaces });
   receive(result);
   if (result.error) showToast({ slot: 'onboarding', failed: true, what: ` error for onboarding ${run.repo}`,
@@ -189,8 +212,9 @@ async function keep(run: Run & { projectId: string; repo: string }): Promise<voi
 
 export const useWizardStore = create<WizardState>()((set, get) => {
   const move = (by: 1 | -1) => {
-    const { run, projects } = get();
-    if (!run || (by === 1 && !stepReady(run, projects))) return;
+    const { run, projects, checks } = get();
+    // Once its PR is open, the run stays on the Pull request step.
+    if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools))) return;
     const to = STEPS[STEPS.findIndex((s) => s.id === run.step) + by]?.id;
     if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done,
       setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo) : null) } });
@@ -219,17 +243,18 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     projects: { state: 'loading' },
     creating: null,
     checks: null,
+    pr: { opening: false, error: null },
     start: (offer) => {
       checkRuns++;
-      set({ run: { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, savedAs: null, setup: null }, creating: null,
-        checks: null });
+      set({ run: { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, savedAs: null, setup: null, prUrl: null },
+        creating: null, checks: null, pr: { opening: false, error: null } });
       void get().loadProjects();
     },
     resume: (repo) => {
       const kept = useBoardStore.getState().data.onboarding?.find((o) => sameRepo(o.repo, repo));
       if (!kept) return;
       checkRuns++;
-      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null });
+      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, pr: { opening: false, error: null } });
       // The checks read the picked project, so they wait for T3's projects.
       void get().loadProjects().then(() => { if (get().run?.step === 'checks') void get().runChecks(); });
     },
@@ -238,7 +263,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       reads++;
       checkRuns++;
       set({ run: null, checks: null });
-      if (run?.projectId && run.repo) void keep({ ...run, projectId: run.projectId, repo: run.repo });
+      // A run whose PR merged is onboarded, so there's no onboarding left to keep.
+      if (run?.projectId && run.repo && !onboarded(run, useBoardStore.getState().data)) void keep({ ...run, projectId: run.projectId, repo: run.repo });
     },
     loadProjects: async () => {
       const read = ++reads;
@@ -309,8 +335,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
         || !stepReady(run, projects, checks, useBoardStore.getState().data.tools)) return;
       const runId = checkRuns;
       set({ checks: { ...checks, finishing: true, finishError: null } });
-      const replaces = run.savedAs && !sameRepo(run.savedAs, run.repo) ? { replaces: run.savedAs } : {};
-      const result = await postAction('/api/onboarding/finish', { repo: run.repo, ...replaces });
+      const result = await postAction('/api/onboarding/finish', { repo: run.repo, ...replacing({ ...run, repo: run.repo }) });
       receive(result);
       const now = current(runId);
       if (!now) return;
@@ -318,6 +343,21 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       checkRuns++;
       set({ run: null, checks: null });
       showToast({ slot: 'onboarding', what: `Onboarded ${run.repo}`, body: `Onboarded ${run.repo}. Its items show once the board reads them.` });
+    },
+    openPr: async () => {
+      const { run, projects, pr } = get();
+      const project = run && pickedProject(run, projects);
+      const config = run && project && configOf(run, project);
+      if (!run?.repo || !run.projectId || run.step !== 'pr' || run.prUrl || pr.opening || !config) return;
+      set({ pr: { opening: true, error: null } });
+      const body = { repo: run.repo, progress: progressOf({ ...run, projectId: run.projectId }), config, ...replacing({ ...run, repo: run.repo }) };
+      const result = await postAction<{ prUrl: string }>('/api/onboarding/pr', body);
+      receive(result);
+      const now = get().run;
+      // The run closed while gh ran; the board kept the PR with its onboarding, which Resume reopens.
+      if (!now || now.repo !== run.repo) return;
+      if (result.error || !result.prUrl) return set({ pr: { opening: false, error: result.error ?? 'The board sent no PR.' } });
+      set({ run: { ...now, prUrl: result.prUrl, savedAs: run.repo }, pr: { opening: false, error: null } });
     },
   };
 });

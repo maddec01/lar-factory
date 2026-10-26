@@ -1,7 +1,8 @@
 // The T3 project step: T3's projects, each with its provider and whether its repository has .lar-factory.json, and
 // the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
 // and role, or the values of a .lar-factory.json it reuses. The Checks step: each check with its state, a failure's
-// fix with Retry, and Finish for a reused .lar-factory.json.
+// fix with Retry, and Finish for a reused .lar-factory.json. The Pull request step: the file it adds, Open the PR,
+// gh's message with Retry, and the wait for the merge.
 
 import { expect, test, vi } from 'vite-plus/test';
 import type { ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
@@ -273,4 +274,71 @@ test('with a reused .lar-factory.json the Checks step ends in Finish, which puts
   await settle();
   expect(dialog()).toBeNull();
   expect(fetchMock.mock.calls.some(([url]) => url === '/api/onboarding/repositories'), 'a finished run is not kept as onboarding').toBe(false);
+});
+
+const PR = 'https://github.com/maddec01/lar-web/pull/14';
+const prStep = () => dialog()!.querySelector<HTMLElement>('[data-pr-step]')!;
+const button = (within: HTMLElement, label: string) => [...within.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b).trim().startsWith(label));
+
+/** Answers Open the PR with `answer`, a PR's URL or the board's problem. */
+function answerPr(answer: { prUrl: string } | { error: string }): void {
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url !== '/api/onboarding/pr') return served(url, init);
+    const onboarding = 'prUrl' in answer ? [{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' }, prUrl: PR } }] : [];
+    return new Response(JSON.stringify('prUrl' in answer ? { ...answer, board: { ...sample, tools: toolChecks(), onboarding }, error: null } : answer));
+  });
+}
+
+/** Answers the setup step with the repository's issues and a role, passes Checks and opens the Pull request step. */
+async function openPrStep(): Promise<void> {
+  await openSetup(project('lar-web'));
+  await settle(() => choice('issues').querySelector<HTMLElement>('[role="radio"]')!.click());
+  await type(input('role')!, 'Web client');
+  answerChecks();
+  await openChecks();
+  await settle(() => nextButton().click());
+}
+
+test('the Pull request step shows the branch and the .lar-factory.json it adds, then Open the PR waits for the merge', async () => {
+  await openPrStep();
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Pull request');
+  expect(text(prStep())).toContain('lar-factory/onboarding');
+  expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: [] });
+  answerPr({ prUrl: PR });
+  await settle(() => button(prStep(), 'Open the PR')!.click());
+  await settle();
+  expect(prStep().querySelector<HTMLAnchorElement>(`a[href="${PR}"]`)).not.toBeNull();
+  expect(text(prStep())).toContain('Waiting for its merge');
+  expect(footerButton('Back'), 'an open PR keeps the step').toBeUndefined();
+  await settle(() => footerButton('Close and wait')!.click());
+  expect(dialog()).toBeNull();
+});
+
+test("a PR the board can't open shows gh's message with Retry, and the step stays put", async () => {
+  await openPrStep();
+  answerPr({ error: "Can't open maddec01/lar-web's onboarding PR: gh pr create failed: HTTP 403" });
+  await settle(() => button(prStep(), 'Open the PR')!.click());
+  await settle();
+  expect(text(prStep())).toContain('gh pr create failed: HTTP 403');
+  answerPr({ prUrl: PR });
+  await settle(() => button(prStep(), 'Retry')!.click());
+  await settle();
+  expect(prStep().querySelector(`a[href="${PR}"]`)).not.toBeNull();
+});
+
+test('once the PR merges the step says the repository is onboarded, and Go to the board closes with nothing to keep', async () => {
+  await openPrStep();
+  answerPr({ prUrl: PR });
+  await settle(() => button(prStep(), 'Open the PR')!.click());
+  await settle();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [] }));
+  expect(text(prStep())).toContain('maddec01/lar-web is onboarded');
+  const bar = dialog()!.querySelector('[data-slot="dialog-header"] [data-slot="progress"]')!;
+  expect([bar.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow'), text(bar.querySelector('[data-slot="progress-caption"]'))], 'the Pull request step is done too').toEqual(['4', 'Onboarded']);
+  fetchMock.mockClear();
+  await settle(() => footerButton('Go to the board')!.click());
+  expect(dialog()).toBeNull();
+  expect(fetchMock.mock.calls.some(([url]) => url === '/api/onboarding/repositories')).toBe(false);
 });

@@ -27,7 +27,7 @@ test('the steps are the T3 project, Provider and item source, Checks, then Pull 
 test("starting a run opens it on the T3 project step and reads T3's projects", async () => {
   const wizard = await store();
   await settle(() => wizard.getState().start());
-  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: null, repo: null, savedAs: null, setup: null });
+  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: null, repo: null, savedAs: null, setup: null, prUrl: null });
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/onboarding/projects']);
   expect(wizard.getState().projects).toEqual({ state: 'loaded', projects: PROJECTS });
 });
@@ -36,7 +36,7 @@ test('starting a run from an offer opens it with the offered project picked', as
   const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-web', { hasConfig: true })] })));
   const { stepReady } = await import('./wizard-store.ts');
   await settle(() => wizard.getState().start({ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }));
-  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: null, setup: null });
+  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: null, setup: null, prUrl: null });
   expect(stepReady(wizard.getState().run!, wizard.getState().projects)).toBe(true);
 });
 
@@ -65,7 +65,7 @@ test('Next waits for a project that can be picked, then moves on; Back returns',
   wizard.getState().pick('lar-web');
   expect(ready()).toBe(true);
   wizard.getState().next();
-  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: null, setup: SETUP });
+  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: null, setup: SETUP, prUrl: null });
   expect(ready(), 'the step waits for its answers').toBe(false);
   wizard.getState().back();
   expect(wizard.getState().run!.step).toBe('project');
@@ -155,7 +155,7 @@ test('Resume reopens the run on its step with its answers, and its own project c
   useBoardStore.getState().receive({ ...sample,
     onboarding: [{ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web', setup } } }] });
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
-  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: 'maddec01/lar-web', setup });
+  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: 'maddec01/lar-web', setup, prUrl: null });
   expect(wizard.getState().projects.state, "T3's projects are read again").toBe('loaded');
   wizard.getState().back();
   wizard.getState().pick('lar-apple');
@@ -348,4 +348,68 @@ test('Resume on the Checks step runs the checks again once it has read the proje
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
   await vi.waitFor(() => expect(wizard.getState().checks?.setup.push.state).toBe('done'));
   expect(checkPosts()[0]).toBe('recheck');
+});
+
+const PR = 'https://github.com/maddec01/lar-web/pull/14';
+const SETUP_DONE = { ...SETUP, itemSource: 'issues' as const, show: 'opted-in' as const, role: 'Web client' };
+/** lar-web still onboarding, kept on the Pull request step with its PR. */
+const ON_PR = { repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web', setup: SETUP_DONE }, prUrl: PR } };
+
+/** The store on the Pull request step of lar-web, with the PR opening answered by `opened`. */
+async function onPr(opened: object = { prUrl: PR, board: { ...sample, onboarding: [ON_PR] }, error: null }) {
+  const wizard = await checkingStore([project('lar-web')]);
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr' ? json(opened) : served(url, init));
+  await toChecks(wizard, 'lar-web');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks() }));
+  wizard.getState().next();
+  return { wizard, useBoardStore };
+}
+
+const prPosts = () => (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/onboarding/pr')
+  .map(([, init]) => JSON.parse(String(init.body)) as object);
+
+test("passing Checks with a new file moves to the Pull request step, and Open the PR sends the run's progress and .lar-factory.json's values", async () => {
+  const { wizard } = await onPr();
+  expect(wizard.getState().run!.step).toBe('pr');
+  await settle(() => wizard.getState().openPr());
+  expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web', setup: SETUP_DONE } },
+    config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' } }]);
+  expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR, savedAs: 'maddec01/lar-web' });
+  expect(wizard.getState().pr).toEqual({ opening: false, error: null });
+});
+
+test("a PR the board can't open keeps the step with gh's message, and Retry opens it", async () => {
+  const { wizard } = await onPr({ error: "Can't open maddec01/lar-web's onboarding PR: gh pr create failed: HTTP 403" });
+  await settle(() => wizard.getState().openPr());
+  expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: null });
+  expect(wizard.getState().pr).toEqual({ opening: false, error: "Can't open maddec01/lar-web's onboarding PR: gh pr create failed: HTTP 403" });
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr'
+    ? json({ prUrl: PR, board: { ...sample, onboarding: [ON_PR] }, error: null }) : served(url, init));
+  await settle(() => wizard.getState().openPr());
+  expect(wizard.getState().run!.prUrl).toBe(PR);
+  expect(prPosts()).toHaveLength(2);
+});
+
+test('closing with the PR open keeps it, and Resume reopens the step with its PR', async () => {
+  const { wizard, useBoardStore } = await onPr();
+  await settle(() => wizard.getState().openPr());
+  await settle(() => wizard.getState().close());
+  expect(kept()).toEqual([ON_PR]);
+  useBoardStore.getState().receive({ ...sample, onboarding: [ON_PR] });
+  await settle(() => wizard.getState().resume('maddec01/lar-web'));
+  expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR });
+});
+
+test('once the board finishes the onboarding its PR merged, the run is onboarded and closing keeps nothing', async () => {
+  const { wizard, useBoardStore } = await onPr();
+  const { onboarded } = await import('./wizard-store.ts');
+  await settle(() => wizard.getState().openPr());
+  expect(onboarded(wizard.getState().run!, useBoardStore.getState().data)).toBe(false);
+  useBoardStore.getState().receive({ ...sample, onboarding: [] });
+  expect(onboarded(wizard.getState().run!, useBoardStore.getState().data)).toBe(true);
+  await settle(() => wizard.getState().close());
+  expect(kept()).toEqual([]);
 });

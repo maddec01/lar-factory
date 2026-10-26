@@ -21,7 +21,8 @@ const unlisted: ItemSource = {
 
 /** A repository's config as the page sees it: its role, item source and show setting. */
 export function repoView({ repo, role, itemSource, show }: RepositoryConfig): RepoConfig {
-  return { repo, role, items: itemSource.kind === 'issues' ? 'issues' : 'project', show };
+  return itemSource.kind === 'issues' ? { repo, role, items: 'issues', show }
+    : { repo, role, items: 'project', project: { owner: itemSource.owner, number: itemSource.number }, show };
 }
 
 /**

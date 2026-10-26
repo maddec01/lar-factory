@@ -1,15 +1,16 @@
 // The Settings sections and their grouped rows, from the control room prototype. Most rows aren't built yet: they
 // show the prototype's value, disabled. The working rows are the Claude profiles, the update channel, version and
-// Check now, the command check rows, the gh and az logins, the GitHub Project and repositories, read-only, and the
+// Check now, the command check rows, the gh and az logins, each repository with Resume and Add repository, which open the onboarding dialog, and the
 // bundled skills with their authors, licences, last updates, install states and sources. In a browser the profiles
 // and updates, which only the board app has, show the prototype's values, disabled with that reason.
 
 import type { ComponentProps, ReactNode } from 'react';
-import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, blockedBy, clock, day, repoName, type BoardData, type BundledSkill, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
+import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, Plus, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
+import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, type BoardData, type BundledSkill, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/button';
 import { RepoTag } from '../items/item-parts.tsx';
+import { STEPS, useWizardStore } from '../onboarding/wizard-store.ts';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, SmallButton, ToolState, notBuilt } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
@@ -81,6 +82,38 @@ function refreshEvery(seconds: number): Control {
   const minutes = seconds / 60;
   const value = seconds < 60 || !Number.isInteger(minutes) ? `${seconds} seconds` : `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
   return { type: 'select', options: REFRESH_OPTIONS.includes(value) ? REFRESH_OPTIONS : [...REFRESH_OPTIONS, value], value };
+}
+
+const ITEM_SOURCES = { project: 'GitHub Project', issues: 'Issues' } as const;
+
+/** An item source as Settings names it, with a GitHub Project's owner and number when it has them, like `GitHub Project maddec01 #3`. */
+const sourceName = (kind: keyof typeof ITEM_SOURCES, project?: { owner: string; number: number | string }) =>
+  kind === 'project' && project ? `${ITEM_SOURCES.project} ${project.owner} #${project.number}` : ITEM_SOURCES[kind];
+const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
+
+/** Edit and Reset, which wait for build #385. */
+const editAndReset = <><SmallButton reason="Editing a repository arrives in build #385">Edit</SmallButton>
+  <SmallButton reason="Resetting a repository arrives in build #385">Reset</SmallButton></>;
+
+/**
+ * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting,
+ * one still onboarding with the step it stopped at and Resume. Add repository opens the onboarding dialog. The board
+ * reads only GitHub repositories until build #386.
+ */
+function repositoryGroup(data: BoardData): Group {
+  const onboarded: Row[] = data.repos.map((r) => ({
+    id: `repo-${r.repo}`, title: r.repo, description: `GitHub · ${sourceName(itemSource(r), r.project)} · ${SHOWN[r.show ?? 'all']}`,
+    control: custom(() => <span className="flex items-center gap-2">{editAndReset}</span>),
+  }));
+  const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
+    id: `repo-${repo}`, title: repo, description: `Onboarding · stopped at ${(STEPS.find((s) => s.id === progress.step) ?? STEPS[0]).label}`,
+    control: custom(() => <span className="flex items-center gap-2">
+      <Button size="xs" onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>{editAndReset}
+    </span>),
+  }));
+  return { title: 'Repositories', description: 'Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list.',
+    rows: [...onboarded, ...onboarding],
+    footer: <Button variant="outline" size="xs" onClick={() => useWizardStore.getState().start()}><Plus /> Add repository</Button> };
 }
 
 function profileGroup({ app, profiles }: PagesInput): Group {
@@ -211,10 +244,7 @@ export function pages(input: PagesInput): Page[] {
         { id: 'az', title: 'Azure CLI', description: toolDescription(`az with the azure-devops extension, for repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),
           control: custom(() => <ToolState {...toolState(data.tools?.az, true)} />) },
       ] },
-      { title: 'Repositories', description: 'Each repo’s name heads its List group; its role goes to lar-work.', rows: data.repos.map((r) => ({
-        id: `repo-${r.repo}`, title: r.repo, description: r.role,
-        control: custom(() => <span className="flex items-center gap-2"><RepoTag repo={r.repo} repos={data.repos} /><SmallButton reason={notBuilt('Edit')}>Edit</SmallButton></span>),
-      })), footer: <SmallButton reason={notBuilt('Add repository')}>Add repository</SmallButton> },
+      repositoryGroup(data),
     ] },
     { id: 't3', label: 'T3 Code', icon: <Plug />, groups: [
       { title: 'Connection', rows: [

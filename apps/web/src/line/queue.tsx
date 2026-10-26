@@ -5,7 +5,7 @@
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { openBlockers, platformOf, repositoryProjectHint, shortAgo, slug, workMessage } from '@lar-factory/shared';
+import { carriesTwoStatuses, openBlockers, platformOf, repositoryProjectHint, shortAgo, slug, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
@@ -15,7 +15,7 @@ import { ItemTitle } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
-import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
 import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
 
 const DRAFT_HINT = 'This draft needs an issue before it can start. Convert it to an issue in a repo.';
@@ -24,9 +24,12 @@ const NONE_STARTS = 'Every queued item is blocked, needs an issue or a T3 projec
 /** Keeps a click on a row's controls from opening the item dialog. */
 const stop = (e: MouseEvent) => e.stopPropagation();
 
-/** Whether Start can run on the item: an issue nothing open blocks, in a repository T3 has a project for, with no item thread running or waiting on you. */
+/**
+ * Whether Start can run on the item: an issue carrying one status that nothing open blocks, in a repository T3 has a
+ * project for, with no item thread running or waiting on you.
+ */
 const canStart = (data: BoardData) => (item: Item) => Boolean(workMessage(item)) && !openBlockers(item).length
-  && !repositoryProjectHint(data, item.repo) && !hasLiveThread(item);
+  && !repositoryProjectHint(data, item.repo) && !hasLiveThread(item) && !carriesTwoStatuses(item);
 
 /** A row's action: Start refining, Open thread while the item has a live thread, or why a draft can't start. */
 function RowAction({ item, data, first }: { item: Item; data: BoardData; first: boolean }) {
@@ -50,7 +53,7 @@ function Row({ item, n, data, now, first, waits }: { item: Item; n: number; data
       <span className={`plat-${slug(platform)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
       {/* With no room for the action beside a readable title, it wraps under it, at the right. */}
       <button type="button" className="grid min-w-28 flex-1 gap-0.5 text-left">
-        <span className="queue-title truncate text-[13px]"><ItemTitle item={item} /></span>
+        <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><TwoStatusesMark item={item} className="size-3" /><span className="truncate"><ItemTitle item={item} /></span></span>
         <span className="queue-meta truncate text-[11px] text-(--muted-foreground)">{platform} · queued {shortAgo(item.updatedAt, now)}{labels.length > 0 && ` · ${labels.join(', ')}`}</span>
       </button>
       {waits && <span className="shrink-0 text-[11px] text-(--muted-foreground)">next when a build slot frees</span>}

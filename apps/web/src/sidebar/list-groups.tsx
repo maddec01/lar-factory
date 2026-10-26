@@ -10,7 +10,7 @@ import { boardSections, ref, shortAgo, slug } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { useSidebarStore } from './sidebar-store.ts';
 
 const PREVIEW = 6;
@@ -21,7 +21,7 @@ function Row({ item, now }: { item: Item; now: number }) {
   return (
     <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id} title={item.title}
       className={`flex w-full items-center gap-2 rounded-md py-1 pl-6 pr-2 text-left hover:bg-(--sidebar-row-hover) ${on ? 'bg-(--sidebar-row-selected) text-(--sidebar-foreground)' : 'text-(--sidebar-foreground)/80'}`}>
-      <StatusGlyph status={item.status} />
+      <ItemStatusGlyph item={item} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-[18px]">{item.title}</span>
         <span className="block truncate text-xs leading-4 tabular-nums text-(--sidebar-muted-foreground)">{ref(item)} · {shortAgo(item.updatedAt, now)}</span>

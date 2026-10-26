@@ -8,7 +8,7 @@ import { duration, formatTokens, formatUsd, openBlockers, platformOf, ref, short
 import type { BoardData, Item, ItemStats, Status } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, SliceBar, SliceList } from '../items/item-parts.tsx';
-import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
 
 const STAGES: { name: string; short: string; statuses: Status[] }[] = [
   { name: 'Refining', short: 'Refine', statuses: ['Shaping', 'Needs you'] },
@@ -130,6 +130,7 @@ export function Row({ item, data, now, side, waiting, nested, children }: {
           <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-1">
             <span className="truncate text-[13px]"><ItemTitle item={item} /></span>
             <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-(--muted-foreground)">
+              <TwoStatusesMark item={item} className="size-3" />
               <span className="truncate">{item.status} · {platform} · {shortAgo(item.updatedAt, now)}</span>
               {blocked > 0 && <span className="shrink-0 rounded bg-(--error-surface) px-1 text-(--error-foreground)">blocked by {blocked}</span>}
             </span>

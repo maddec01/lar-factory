@@ -152,6 +152,23 @@ test('once its blockers close, Start build sends the build, and the header offer
   expect(text(dossier().querySelector('p.start [role="alert"]')), 'its error shows under its row').toBe('T3 is down.');
 });
 
+/** #140, Ready, also carrying Verify. */
+const twice = (data: BoardData = sample) => withItem('I_sample13', { statuses: ['Ready', 'Verify'] }, data);
+
+test('a part that carries two statuses offers no Start build in its step or the header', async () => {
+  await mountPage(twice(withItem('I_sample12', { status: 'Shaping' }, unblocked())));
+  expect(startIn(step('I_sample13'))).toBeNull();
+  expect(startIn(header()[3]!)).toBeNull();
+});
+
+test('a blocked part that carries two statuses offers no Start after in its step or its map node', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  await mountPage(twice());
+  expect(step('I_sample13').querySelector('[data-start], [data-start-after]')).toBeNull();
+  await press(button(dossier(), 'Map'));
+  expect(dossier().querySelector('[data-map-part="I_sample13"] :is([data-start], [data-start-after])')).toBeNull();
+});
+
 test("Start on a Queued decision is today's Start", async () => {
   holdPosts(withDecision());
   await mountPage(withDecision());

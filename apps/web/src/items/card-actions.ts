@@ -1,9 +1,9 @@
-// Queue, Back to List and Abandon from the item dialog: each posts to the board server, shows the result, and keeps
+// Queue, Back to List, Keep and Abandon from the item dialog: each posts to the board server, shows the result, and keeps
 // keyboard focus in the dialog.
 
 import { flushSync } from 'react-dom';
 import { writeHeaders } from '@lar-factory/shared';
-import type { BoardData } from '@lar-factory/shared';
+import type { BoardData, Status } from '@lar-factory/shared';
 import { useAbandonStore } from './abandon-store.ts';
 import { useActionStore } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
@@ -47,16 +47,17 @@ const ready = (itemId: string, attr: string) => Boolean(document.querySelector(`
 
 /**
  * Marks the item pending, posts `body` to `/api/<kind>`, then in one render shows the board the server sent and runs
- * `show`, which returns the error to keep on the item, if any.
+ * `show`, which returns the error to keep on the item, if any. Keep names the `status` it picked.
  */
-async function runAction(itemId: string, kind: ItemAction['kind'], body: object, show: (result: ActionResult) => string | undefined): Promise<ActionResult> {
+async function runAction(itemId: string, kind: ItemAction['kind'], body: object, show: (result: ActionResult) => string | undefined,
+  status?: Status): Promise<ActionResult> {
   const actions = useActionStore.getState();
-  actions.set(itemId, { phase: 'pending', kind });
+  actions.set(itemId, { phase: 'pending', kind, status });
   const result = await postAction(`/api/${kind}`, body);
   flushSync(() => {
     receive(result);
     const message = show(result);
-    actions.set(itemId, message === undefined ? undefined : { phase: 'error', kind, message });
+    actions.set(itemId, message === undefined ? undefined : { phase: 'error', kind, status, message });
   });
   return result;
 }
@@ -80,6 +81,18 @@ export async function backToList(itemId: string): Promise<void> {
     notify(result.error ? { verb: 'Failed', item, to: 'List', message: result.error } : { verb: 'Moved', item, to: 'List' });
   });
   refocus([by(result.error ? 'data-back-to-list' : 'data-queue', itemId)]);
+}
+
+/** Keeps one of the statuses an issue carrying more than one has; the server drops the others. */
+export async function pickStatus(itemId: string, status: Status): Promise<void> {
+  if (!ready(status, 'data-pick-status') || pending(itemId) || !itemOf(itemId)) return;
+  const result = await runAction(itemId, 'pick-status', { itemId, status }, (result) => {
+    const item = itemOf(itemId);
+    if (result.error || !item) return result.error ?? 'The item left the board.';
+    notify({ verb: 'Kept', item, status });
+  }, status);
+  // Both buttons go once the pick shows, so focus stays in the dialog.
+  refocus(result.error ? [`${OPEN_ITEM_DIALOG} ${by('data-pick-status', status)}`] : [OPEN_ITEM_DIALOG]);
 }
 
 /** Opens Abandon's confirm dialog for the item. */

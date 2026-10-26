@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Check, ChevronDown, ChevronRight, CircleHelp, FlaskConical, GitPullRequest, ListChecks, Map as MapIcon } from 'lucide-react';
-import { duration, formatTokens, formatUsd, itemTotal, kindOf, platformOf, plural, prLabel, ref } from '@lar-factory/shared';
+import { carriesTwoStatuses, duration, formatTokens, formatUsd, itemTotal, kindOf, platformOf, plural, prLabel, ref } from '@lar-factory/shared';
 import type { BoardData, Blocker, EndToEndCheck, Item, ItemThread } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
@@ -15,7 +15,7 @@ import { ItemTitle, PlatformTag, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
-import { StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
 import { THREAD_GLYPH, dossiersOf, isDone, openWaits, started, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
@@ -89,7 +89,7 @@ function Step({ part, data }: { part: Part; data: BoardData }) {
     <li onClick={() => open(item)} data-part={item.id} className={`grid cursor-pointer gap-1 rounded-md px-2 py-1.5 hover:bg-(--accent) ${picked(isPicked)}`}>
       {/* With no room for the action beside a readable title, it wraps under it, at the right. */}
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <StatusGlyph status={item.status} />
+        <ItemStatusGlyph item={item} />
         <span className="min-w-40 flex-1 truncate text-[13px]"><ItemTitle item={item} /></span>
         <span className="shrink-0 rounded border border-(--border) px-1 text-[10px] text-(--muted-foreground)">{part.kind}</span>
         {!yours && <span className="ml-auto min-w-0 max-w-full empty:hidden" onClick={stop}><PartAction part={part} data={data} /></span>}
@@ -226,7 +226,7 @@ function About({ parent, find }: { parent: Item; find: FindRef }) {
 /** The header's side: the part that waits on you, else the first part that can start, else that nothing waits on you. */
 function HeaderSide({ parts, data }: { parts: Part[]; data: BoardData }) {
   const yours = parts.find((p) => YOURS.includes(p.item.status));
-  const startable = parts.find((p) => p.item.status === 'Ready' && !openWaits(p).length);
+  const startable = parts.find((p) => p.item.status === 'Ready' && !openWaits(p).length && !carriesTwoStatuses(p.item));
   if (yours) {
     return (
       <button type="button" onClick={(e) => { e.stopPropagation(); open(yours.item); }} className="inline-flex items-center gap-1 rounded px-1 text-(--warning-foreground) hover:bg-(--accent)">

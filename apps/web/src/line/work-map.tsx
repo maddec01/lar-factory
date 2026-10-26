@@ -9,7 +9,7 @@ import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
-import { StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
 import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, waitText } from './dossier-parts.ts';
 import type { Part, PartKind } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
@@ -110,7 +110,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
       <span className="pointer-events-none relative line-clamp-2 text-[13px] font-medium leading-snug"><ItemTitle item={item} /></span>
       {item.slices.length > 0 && <span className="pointer-events-none relative"><SliceBar item={item} /></span>}
       <span className="pointer-events-none relative mt-auto flex items-center gap-1.5 text-xs">
-        <StatusGlyph status={item.status} className="size-3" />{item.status}
+        <ItemStatusGlyph item={item} className="size-3" />{item.status}
         {thread && <span className="truncate text-(--muted-foreground)">· {thread.state}</span>}
       </span>
       {action && <span className="relative flex min-h-6 min-w-0 items-center">{action}</span>}

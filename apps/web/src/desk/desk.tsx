@@ -3,7 +3,7 @@
 // its next action: Open thread on every card, Start build on a Ready one, Open PR on Verify and Ready to merge. A Verify
 // card also shows that PR's pipeline: its checks and whether GitHub lets it merge.
 
-import { HINTS, itemPr, platformOf, shortAgo } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, itemPr, platformOf, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -14,12 +14,15 @@ import { PrLink } from '../items/pr-link.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
-import { StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 
-/** Open thread, then what the status asks next. A Ready item with a thread at work gets no Start build, so Open thread shows once. */
+/**
+ * Open thread, then what the status asks next. A Ready item with a thread at work gets no Start build, so Open thread
+ * shows once, and neither does one carrying another status until the user keeps one.
+ */
 function Actions({ item, data }: { item: Item; data: BoardData }) {
   // StartBuild shows Open thread itself for a live thread, which would put it on the card twice.
-  const next = item.status === 'Ready' ? !hasLiveThread(item) && <StartBuild item={item} data={data} />
+  const next = item.status === 'Ready' ? !hasLiveThread(item) && !carriesTwoStatuses(item) && <StartBuild item={item} data={data} />
     : item.status === 'Verify' || item.status === 'Ready to merge' ? <PrLink item={item} label="Open PR" size="xs" />
     : null;
   return (
@@ -57,7 +60,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
       className={`desk-card grid w-70 shrink-0 cursor-pointer content-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
       <button type="button" className="grid gap-2.5 text-left">
         <span className="flex items-center gap-2 text-xs">
-          <StatusGlyph status={item.status} /><span className="font-semibold text-(--warning-foreground)">{item.status}</span>
+          <ItemStatusGlyph item={item} /><span className="font-semibold text-(--warning-foreground)">{item.status}</span>
           <span className="truncate text-(--muted-foreground)">· {platformOf(item, data.repos)} · {shortAgo(item.updatedAt, now)}</span>
         </span>
         <span className="line-clamp-2 font-medium leading-snug"><ItemTitle item={item} /></span>

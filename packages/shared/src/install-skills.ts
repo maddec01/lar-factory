@@ -1,5 +1,6 @@
 // Installs a bundle's skills and checklists into a home's ~/.agents, restoring any installed copy that differs,
-// and links them into the ticked Claude profiles (~/.claude and each ~/.claude-*).
+// links them into the ticked Claude profiles (~/.claude and each ~/.claude-*), and copies the skills into
+// Antigravity's skill folders in ~/.gemini.
 
 import { cpSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
@@ -7,6 +8,13 @@ import { isRecord } from './is-record.ts';
 
 /** The manifest's file name in ~/.agents. The skills CLI owns .skill-lock.json, so this never touches it. */
 export const INSTALL_MANIFEST = '.lar-factory-install.json';
+
+/**
+ * Antigravity's skill folders, relative to the home: the app's and the CLI's. Antigravity reads neither
+ * ~/.agents/skills nor Claude's folders, so each gets a copy of every skill. Copies, not links: T3 shows Antigravity
+ * follows a linked skills folder, but nothing shows it follows a link per skill inside one.
+ */
+const ANTIGRAVITY_FOLDERS = ['.gemini/config/skills', '.gemini/antigravity-cli/skills'];
 
 export interface InstallResult {
   /** False when everything already matched the bundle and nothing was written. */
@@ -50,6 +58,8 @@ interface Manifest {
   warned?: string;
   /** Every profile the engine has seen. Missing until the first install that handles profiles. */
   profiles?: Record<string, ProfileState>;
+  /** The skills whose copy the engine made in each Antigravity folder. Missing when ~/.gemini doesn't exist. */
+  antigravity?: Record<string, string[]>;
 }
 
 /** Why an install stopped. `changed` is false when it stopped before replacing any file. */
@@ -65,6 +75,8 @@ export class InstallError extends Error {
 /** One folder to copy, staged next to its target before the swap. */
 interface Copy {
   label: string;
+  /** The bundled skill whose status a restore of this copy marks, if any. */
+  skill?: string;
   source: string;
   target: string;
 }
@@ -72,13 +84,16 @@ interface Copy {
 /**
  * Copies every folder in `<bundle>/skills` to `<home>/.agents/skills/<name>` and `<bundle>/references`
  * to `<home>/.agents/references`, whatever version the manifest names. A folder whose files, contents and file
- * modes all match the bundle is left alone; one that differs is replaced whole, with no merge. A copy that
- * differs while the manifest already names `version` is a restore, recorded with `now` in the skill's status.
+ * modes all match the bundle is left alone; one that differs is replaced whole, with no merge. Putting back an
+ * earlier copy or ticked profile link while the manifest already names `version` is a restore, recorded with `now`
+ * in the skill's status; a skill's first copy, such as after the folder that blocked it moved away, is an install.
  * An install that finds everything matching writes nothing, not even the manifest.
  * The manifest lists the skills this engine owns. The first install adopts any folder named like a bundled
  * skill; later installs skip such a folder unless the manifest lists it, and return its path in `conflicts`. `warn` is
  * true for the first install of a version that has conflicts.
  * An upgrade removes owned skills the bundle no longer has. Other folders are never touched.
+ * When ~/.gemini exists, each Antigravity folder gets the same copies, checked and restored the same way. There a
+ * path the engine didn't make is a conflict, unless it already matches the bundle, so the engine adopts it.
  * Each install then refreshes the ticked Claude profiles (see `setProfileTick`). The first install that sees
  * profiles ticks all of them and takes over each profile's `references/` folder; later profiles start unticked.
  * Any failure throws an `InstallError` and leaves the manifest as it was. If it fails before the first copy moves
@@ -109,8 +124,26 @@ function install(home: string, bundle: string, version: string, now: () => Date,
   const conflicting = bundled.filter((name) => !owned.has(name) && exists(join(agents, 'skills', name)));
   const skills = bundled.filter((name) => !conflicting.includes(name));
   const dropped = [...owned].filter((name) => !bundled.includes(name));
+  const conflicts = conflicting.map((name) => join(agents, 'skills', name));
+  const antigravity = isFolder(join(home, '.gemini'))
+    ? Object.fromEntries(ANTIGRAVITY_FOLDERS.map((folder) => [folder, skills.filter((name) => {
+      const target = join(home, folder, name);
+      if (current?.antigravity?.[folder]?.includes(name) || !exists(target) || sameTree(join(bundle, 'skills', name), target)) return true;
+      conflicts.push(target);
+      return false;
+    })]))
+    : undefined;
   const copies: Copy[] = [
-    ...skills.map((name) => ({ label: `skill ${name}`, source: join(bundle, 'skills', name), target: join(agents, 'skills', name) })),
+    // A first copy of a skill into a folder is an install, not a restore.
+    ...skills.map((name) => ({
+      label: `skill ${name}`, ...(current?.skills.includes(name) && { skill: name }),
+      source: join(bundle, 'skills', name), target: join(agents, 'skills', name),
+    })),
+    ...Object.entries(antigravity ?? {}).flatMap(([folder, names]) => names.map((name) => ({
+      label: `skill ${name} for Antigravity`,
+      ...(current?.antigravity?.[folder]?.includes(name) && { skill: name }),
+      source: join(bundle, 'skills', name), target: join(home, folder, name),
+    }))),
     { label: 'references', source: join(bundle, 'references'), target: join(agents, 'references') },
   ].filter((copy) => !sameTree(copy.source, copy.target));
 
@@ -126,36 +159,40 @@ function install(home: string, bundle: string, version: string, now: () => Date,
   } finally {
     for (const { temporary } of staged) rmSync(temporary, { recursive: true, force: true });
   }
-  for (const name of dropped) {
-    const path = join(agents, 'skills', name);
-    if (!exists(path)) continue;
+  // An Antigravity copy goes only while it is still a folder, so a link or file put in its place survives.
+  const removals = [
+    ...dropped.map((name) => join(agents, 'skills', name)).filter(exists),
+    ...Object.entries(current?.antigravity ?? {}).flatMap(([folder, names]) =>
+      names.filter((name) => !antigravity?.[folder]?.includes(name)).map((name) => join(home, folder, name))).filter(isRealFolder),
+  ];
+  for (const path of removals) {
     rmSync(path, { recursive: true, force: true });
     progress.changed = true;
   }
 
   const first = !current?.profiles;
   const profiles = { ...current?.profiles };
-  const conflicts = conflicting.map((name) => join(agents, 'skills', name));
   for (const name of listProfileFolders(home)) {
     profiles[name] ??= { ticked: first, links: [], references: false };
   }
+  // The skills whose earlier copy or profile link this install put back.
+  const putBack = new Set(copies.flatMap((copy) => copy.skill ?? []));
   for (const [name, state] of Object.entries(profiles)) {
     if (!exists(join(home, name))) continue;
-    if (state.ticked) profiles[name] = linkProfile(home, name, state, skills, first, conflicts, progress);
+    if (state.ticked) profiles[name] = linkProfile(home, name, state, skills, first, conflicts, progress, putBack);
   }
 
-  const copied = new Set(copies.map((copy) => copy.target));
   const restoring = current?.version === version;
   const restoredAt = now().toISOString();
   const status = Object.fromEntries(bundled.map((name): [string, SkillStatus] => {
     if (conflicting.includes(name)) return [name, { state: 'blocked' }];
-    if (copied.has(join(agents, 'skills', name))) return [name, restoring ? { state: 'restored', restoredAt } : { state: 'matching' }];
+    if (putBack.has(name)) return [name, restoring ? { state: 'restored', restoredAt } : { state: 'matching' }];
     const previous = current?.status?.[name];
     return [name, previous && previous.state !== 'blocked' ? previous : { state: 'matching' }];
   }));
   const warn = conflicts.length > 0 && current?.warned !== version;
   const warned = warn ? version : current?.warned;
-  const manifest: Manifest = { version, skills, status, ...(warned !== undefined && { warned }), profiles };
+  const manifest: Manifest = { version, skills, status, ...(warned !== undefined && { warned }), profiles, ...(antigravity && { antigravity }) };
   const wroteManifest = writeManifest(manifestPath, manifest);
   return { installed: progress.changed || wroteManifest, version, skills, conflicts, warn };
 }
@@ -190,7 +227,7 @@ export function setProfileTick(home: string, name: string, ticked: boolean): Tic
   const state = { ...(profiles[name] ?? { links: [], references: false }), ticked };
   const conflicts: string[] = [];
   const removed = { links: [] as string[], checklists: false };
-  profiles[name] = ticked ? linkProfile(home, name, state, manifest.skills, false, conflicts, { changed: false }) : unlinkProfile(home, name, state, removed);
+  profiles[name] = ticked ? linkProfile(home, name, state, manifest.skills, false, conflicts, { changed: false }, new Set()) : unlinkProfile(home, name, state, removed);
   writeManifest(manifestPath, { ...manifest, profiles });
   return { conflicts, removed };
 }
@@ -212,10 +249,11 @@ export function isProfileName(name: string): boolean {
  * its links to skills no longer installed. A link that already points at the right skill folder is adopted, and an
  * engine link that points anywhere else is replaced. Any other path the engine didn't make is a conflict and stays,
  * except `references/`: with `adopt`, the engine replaces whatever is there with its checklist copy.
- * Each write sets `progress.changed`.
+ * Each write sets `progress.changed`, and each skill whose engine link it puts back joins `putBack`.
  */
 function linkProfile(
   home: string, name: string, state: ProfileState, skills: string[], adopt: boolean, conflicts: string[], progress: { changed: boolean },
+  putBack: Set<string>,
 ): ProfileState {
   const folder = join(home, name, 'skills');
   const links = state.links.filter((skill) => skills.includes(skill));
@@ -227,17 +265,19 @@ function linkProfile(
   for (const skill of skills) {
     const path = join(folder, skill);
     const target = join(home, '.agents/skills', skill);
+    const made = links.includes(skill);
     if (exists(path)) {
       if (pointsAt(path, target)) {
-        if (!links.includes(skill)) links.push(skill);
+        if (!made) links.push(skill);
         continue;
       }
-      if (!links.includes(skill) || !removeLink(path)) {
+      if (!made || !removeLink(path)) {
         conflicts.push(path);
-        if (links.includes(skill)) links.splice(links.indexOf(skill), 1);
+        if (made) links.splice(links.indexOf(skill), 1);
         continue;
       }
-    } else if (!links.includes(skill)) links.push(skill);
+    } else if (!made) links.push(skill);
+    if (made) putBack.add(skill);
     symlinkSync(relative(folder, target), path);
     progress.changed = true;
   }
@@ -276,6 +316,12 @@ function pointsAt(path: string, target: string): boolean {
   if (!lstatSync(path).isSymbolicLink()) return false;
   try { return realpathSync(path) === realpathSync(target); }
   catch { return false; }
+}
+
+/** True when `path` itself is a folder, not a link to one. */
+function isRealFolder(path: string): boolean {
+  try { return lstatSync(path).isDirectory(); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
 }
 
 function isFolder(path: string): boolean {
@@ -339,12 +385,16 @@ function readManifest(path: string): Manifest | null {
     }])) : undefined;
   const status = isRecord(manifest.status) ? Object.fromEntries(Object.entries<unknown>(manifest.status)
     .filter((entry): entry is [string, SkillStatus] => isFolderName(entry[0]) && isSkillStatus(entry[1]))) : undefined;
+  const antigravity = isRecord(manifest.antigravity) ? Object.fromEntries(Object.entries<unknown>(manifest.antigravity)
+    .filter((entry): entry is [string, unknown[]] => ANTIGRAVITY_FOLDERS.includes(entry[0]) && Array.isArray(entry[1]))
+    .map(([folder, names]) => [folder, names.filter(isFolderName)])) : undefined;
   return {
     version: manifest.version,
     skills: (Array.isArray(manifest.skills) ? manifest.skills : []).filter(isFolderName),
     ...(status && { status }),
     ...(typeof manifest.warned === 'string' && { warned: manifest.warned }),
     ...(profiles && { profiles }),
+    ...(antigravity && { antigravity }),
   };
 }
 

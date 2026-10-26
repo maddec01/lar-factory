@@ -1,7 +1,7 @@
 // The board app's main process: starts the board server as a child with the login
 // shell's PATH, shows its page in a window, starts the server again if it crashes,
-// installs the bundled skills, removes the old launch agent, answers the settings
-// screen's profile calls, checks Releases for updates, drains and stops the server
+// checks the bundled skills at launch and before each Start build, removes the old
+// launch agent, answers the settings screen's profile calls, checks Releases for updates, drains and stops the server
 // before it installs one and stops the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
@@ -138,20 +138,24 @@ const openBoardWindow = (secret: string) => {
   return { window, events, origin: () => origin, forgetOrigin, showStarting: load(StartingPage.url()) };
 };
 
-/** Installs the bundled skills and shows the user an error or conflicts. */
-const installSkills = SkillInstall.onLaunch({
+/** The launch's skill checks, or undefined when this run checks nothing: a dev run without the install flag. */
+const makeSkillChecks = SkillInstall.makeChecks({
   isPackaged: Electron.app.isPackaged,
   version: Electron.app.getVersion(),
   home: NodeOS.homedir(),
   bundle: SkillInstall.locateBundle(Electron.app.getAppPath(), Electron.app.isPackaged),
   argv: process.argv,
   env: process.env,
-}).pipe(
-  Effect.match({ onFailure: SkillInstall.notice, onSuccess: (result) => result && SkillInstall.notice(result) }),
-  Effect.flatMap((notice) =>
-    notice ? Effect.promise(() => Electron.dialog.showMessageBox({ ...notice, buttons: ["OK"] })) : Effect.void,
-  ),
-);
+});
+
+/** Checks the skills at launch and shows the user an error or conflicts. */
+const checkSkillsAtLaunch = (check: SkillInstall.Check) =>
+  check.pipe(
+    Effect.match({ onFailure: SkillInstall.notice, onSuccess: SkillInstall.notice }),
+    Effect.flatMap((notice) =>
+      notice ? Effect.promise(() => Electron.dialog.showMessageBox({ ...notice, buttons: ["OK"] })) : Effect.void,
+    ),
+  );
 
 /** Throws for a call from any page but the current board server's, and while no server is ready. */
 const boardPageOnly = (boardOrigin: () => string, refusal: string) => (event: Electron.IpcMainInvokeEvent) => {
@@ -236,14 +240,23 @@ const program = Effect.gen(function* () {
   yield* board.showStarting;
   // Read once: a restarted server keeps the PATH the first one got.
   const env = yield* ShellEnvironment.childEnvironment(process.env);
+  // One pair of checks for the whole run, so the launch's check and each Start build's take turns.
+  const skillChecks = yield* makeSkillChecks;
   const config = BoardServer.makeStartConfig({
     ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
     executablePath: process.execPath,
     env,
     secret,
+    checksSkills: skillChecks !== undefined,
   });
+  const checkSkills = skillChecks && (() => Effect.runPromise(skillChecks.beforeBuild.pipe(Effect.match({
+    onFailure: SkillInstall.buildRefusal,
+    onSuccess: SkillInstall.buildRefusal,
+  }))));
   // Quitting closes the scope, which stops the server or cancels a pending restart.
-  const supervisor = yield* BoardSupervisor.makeControl(BoardSupervisor.supervise(BoardServer.start(config), board.events));
+  const supervisor = yield* BoardSupervisor.makeControl(
+    BoardSupervisor.supervise(BoardServer.start(config, { checkSkills }), board.events),
+  );
   const http = yield* HttpClient.HttpClient;
   const stopBoard = Effect.suspend(() => {
     const origin = board.origin();
@@ -262,7 +275,7 @@ const program = Effect.gen(function* () {
   yield* supervisor.start;
   // Starts after the board server. The copy is synchronous, so it blocks the main
   // process briefly after start.
-  yield* Effect.forkScoped(installSkills);
+  if (skillChecks) yield* Effect.forkScoped(checkSkillsAtLaunch(skillChecks.atLaunch));
   // The app replaces the launch agent that ran the board before it.
   yield* Effect.forkScoped(
     LaunchAgentCleanup.onLaunch({

@@ -44,6 +44,12 @@ describe("locate", () => {
 });
 
 describe("makeStartConfig", () => {
+  it("tells the server that the app checks skills when it does", () => {
+    const input = { executablePath: "/Board", serverDir: "/server", serverFile: "/server/dist/server.mjs", configFile: "/config.json", env: {}, secret: "s" };
+    assert.equal(BoardServer.makeStartConfig({ ...input, checksSkills: true }).env.BOARD_SKILL_CHECK, "1");
+    assert.equal(BoardServer.makeStartConfig(input).env.BOARD_SKILL_CHECK, undefined);
+  });
+
   it("names the skills bundle when the app has one", () => {
     const config = BoardServer.makeStartConfig({
       executablePath: "/Board", serverDir: "/server", serverFile: "/server/dist/server.mjs",
@@ -80,6 +86,38 @@ describe("start", () => {
       const hits = yield* Effect.promise(() => fetch(new URL("/hits", board.url)).then((res) => res.json()));
       assert.strictEqual(hits, 4);
       assert.match(board.url.href, /^http:\/\/127\.0\.0\.1:\d+\/$/);
+    }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
+  );
+
+  /** The fake server's answer to its skill check, once it comes. */
+  const skillAnswer = (url: URL) =>
+    Effect.promise(async () => {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const body = await fetch(new URL("/answer", url)).then((res) => res.json());
+        if (body) return body;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      return null;
+    });
+
+  it.live("answers the server's skill check over its IPC channel", () =>
+    Effect.gen(function* () {
+      const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: "1" }), {
+        checkSkills: () => Promise.resolve("tdd is blocked"),
+      });
+      assert.deepStrictEqual(yield* skillAnswer(board.url), { type: "skills-checked", id: 7, refusal: "tdd is blocked" });
+    }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
+  );
+
+  it.live("refuses the build when the skill check itself fails", () =>
+    Effect.gen(function* () {
+      const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: "1" }), {
+        checkSkills: () => Promise.reject(new Error("the check died")),
+      });
+      const answer = yield* skillAnswer(board.url);
+      assert.strictEqual(answer?.id, 7);
+      assert.include(answer?.refusal, "couldn't check its skills");
+      assert.include(answer?.refusal, "the check died");
     }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
   );
 

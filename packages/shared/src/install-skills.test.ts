@@ -741,6 +741,18 @@ test('conflicts warn on the first install of each version only, and stay blocked
   });
 });
 
+test('an install that does not record its warning leaves it for the next install of the version', () => {
+  const home = temporary();
+  installSkills(home, bundle(v1), '1.0.0');
+  writeSkill(home, 'grill', 'grill from the skills CLI');
+  const withGrill = bundle({ ...v1, 'skills/grill/SKILL.md': 'grill v1' });
+
+  assert.equal(installSkills(home, withGrill, '2.0.0', { recordWarning: false }).warn, true);
+  assert.equal((manifest(home) as { warned?: string }).warned, undefined);
+  assert.equal(installSkills(home, withGrill, '2.0.0').warn, true);
+  assert.equal(installSkills(home, withGrill, '2.0.0', { recordWarning: false }).warn, false);
+});
+
 test('manifest statuses of the wrong shape are dropped', () => {
   const home = temporary();
   installSkills(home, bundle(v1), '1.0.0');

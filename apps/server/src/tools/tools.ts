@@ -182,11 +182,16 @@ function scopesOf(status: string): string[] | null {
   return scopes.length ? scopes : null;
 }
 
-/** What a logged-in gh's version and scopes say: a missing project scope first, as it blocks reading. */
+const GH_UPGRADE = 'brew upgrade gh';
+
+/** What a logged-in gh's version and scopes say: a missing project scope first, as it blocks reading, noting a gh also too old. */
 function loggedInCheck(version: string | undefined, scopes: string[] | null): GhCheck {
-  if (scopes && !scopes.includes('project')) return { result: 'no-project-scope', ...(version && { version }), fix: 'gh auth refresh -s project' };
+  const outdated = olderThanFloor(version);
+  if (scopes && !scopes.includes('project')) {
+    return { result: 'no-project-scope', ...(version && { version }), fix: 'gh auth refresh -s project', ...(outdated && { upgrade: GH_UPGRADE }) };
+  }
   const unread = scopes ? {} : { scopes: 'unread' as const };
-  if (olderThanFloor(version)) return { result: 'outdated', version: version!, fix: 'brew upgrade gh', ...unread };
+  if (outdated) return { result: 'outdated', version: version!, fix: GH_UPGRADE, ...unread };
   return { result: 'ok', ...(version && { version }), ...unread };
 }
 

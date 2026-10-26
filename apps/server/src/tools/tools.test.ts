@@ -151,12 +151,12 @@ test('a gh at 2.94.0 or newer with the project scope passes', async (t) => {
   assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', authStatus(withProject)), { result: 'ok', version: '2.102.0' });
 });
 
-test('a login without the project scope has gh auth refresh -s project as its fix, even on an old gh', async (t) => {
+test('a login without the project scope has gh auth refresh -s project as its fix, and an old gh also names its upgrade', async (t) => {
   const noProject = authStatus("'gist', 'read:org', 'repo', 'workflow'");
   assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', noProject),
     { result: 'no-project-scope', version: '2.102.0', fix: 'gh auth refresh -s project' });
   assert.deepEqual(await probeWith(t, 'gh version 2.93.2 (2026-06-01)', noProject),
-    { result: 'no-project-scope', version: '2.93.2', fix: 'gh auth refresh -s project' });
+    { result: 'no-project-scope', version: '2.93.2', fix: 'gh auth refresh -s project', upgrade: 'brew upgrade gh' });
 });
 
 test('scopes the board can\'t read block nothing', async (t) => {

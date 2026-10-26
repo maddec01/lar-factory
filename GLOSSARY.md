@@ -269,6 +269,10 @@ _Avoid_: UI kit, component library, theme
 A file taken unchanged from an upstream source and recorded in its folder's record (UPSTREAM.md for skills and checklists, the copy record for design system components); it changes only through a fresh copy from upstream.
 _Avoid_: vendored file, dependency
 
+**Override**:
+A lar rule, written in one of lar's own skills, that replaces or sets aside part of a Copy's instructions.
+_Avoid_: patch, tweak, local change
+
 **Port**:
 A file adapted from upstream code that names its source and commit in its header; we edit it freely.
 _Avoid_: copy, vendored file

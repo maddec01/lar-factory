@@ -213,7 +213,7 @@ _Avoid_: cost, price
 ### Board server and page
 
 **Board server**:
-The local process that reads GitHub and T3 and serves the board.
+The local process that reads each repository's provider and T3 and serves the board.
 _Avoid_: board process, backend
 
 **Board page**:
@@ -235,6 +235,14 @@ _Avoid_: toolbar, top bar
 **Sidebar**:
 The resizable column on the left of the board, beside the main area. The brand sits in its top row; Settings and the Update button sit in its foot.
 _Avoid_: drawer, nav, side panel
+
+**Provider**:
+The service that hosts a repository and its tickets: GitHub or Azure DevOps.
+_Avoid_: platform, board provider, host
+
+**Item source**:
+Where the board finds one repository's items: a GitHub Project, the repository's issues, an Azure DevOps team's current sprint, or that team's backlog. It decides only which items show.
+_Avoid_: list source, board source, project
 
 **Platform**:
 The short name `config.json` gives a repository, such as Apple or Server; the sidebar groups by it and the Scope picks one.

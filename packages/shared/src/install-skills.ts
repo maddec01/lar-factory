@@ -32,6 +32,16 @@ export interface InstallResult {
   warn: boolean;
 }
 
+export interface InstallOptions {
+  /** The time a restore records; the clock by default. */
+  now?: () => Date;
+  /**
+   * False for an install whose caller doesn't show `warn` to the user, such as the check before a build, so the next
+   * install of this version still warns. True by default.
+   */
+  recordWarning?: boolean;
+}
+
 /**
  * One bundled skill's install state. `matching` is a copy installed with a Release; `restored` is a copy the
  * engine overwrote because it no longer matched the Release, at `restoredAt` (an ISO time); `blocked` is a skill
@@ -113,7 +123,7 @@ interface Copy {
  * An install that finds everything matching writes nothing, not even the manifest.
  * The manifest lists the skills this engine owns. The first install adopts any folder named like a bundled
  * skill; later installs skip such a folder unless the manifest lists it, and return its path in `conflicts`. `warn` is
- * true for the first install of a version that has conflicts.
+ * true for the first install of a version that has conflicts, and stays true until one with `recordWarning` reports them.
  * An upgrade removes owned skills the bundle no longer has. Other folders are never touched.
  * When ~/.gemini exists, each Antigravity folder gets the same copies, checked and restored the same way. There a
  * path the engine didn't make is a conflict, unless it already matches the bundle, so the engine adopts it.
@@ -125,10 +135,10 @@ interface Copy {
  * into place, such as while staging the copies, the files stay the previous version and `changed` is false.
  * If a swap fails partway, some files may be the new version and some the old.
  */
-export function installSkills(home: string, bundle: string, version: string, options: { now?: () => Date } = {}): InstallResult {
+export function installSkills(home: string, bundle: string, version: string, options: InstallOptions = {}): InstallResult {
   const progress = { changed: false };
   try {
-    return install(home, bundle, version, options.now ?? (() => new Date()), progress);
+    return install(home, bundle, version, { now: options.now ?? (() => new Date()), recordWarning: options.recordWarning ?? true }, progress);
   } catch (error) {
     if (error instanceof InstallError) throw error;
     throw new InstallError((error as Error).message, progress.changed, { cause: error });
@@ -136,7 +146,7 @@ export function installSkills(home: string, bundle: string, version: string, opt
 }
 
 /** `installSkills` without the error wrapping. Every write sets `progress.changed`, `swap` once the copy is in place. */
-function install(home: string, bundle: string, version: string, now: () => Date, progress: { changed: boolean }): InstallResult {
+function install(home: string, bundle: string, version: string, options: Required<InstallOptions>, progress: { changed: boolean }): InstallResult {
   const agents = join(home, '.agents');
   const manifestPath = join(agents, INSTALL_MANIFEST);
   const current = readManifest(manifestPath);
@@ -217,7 +227,7 @@ function install(home: string, bundle: string, version: string, now: () => Date,
   }
 
   const restoring = current?.version === version;
-  const restoredAt = now().toISOString();
+  const restoredAt = options.now().toISOString();
   const status = Object.fromEntries(bundled.map((name): [string, SkillStatus] => {
     const paths = blocking.get(name);
     if (paths) return [name, { state: 'blocked', paths }];
@@ -226,7 +236,7 @@ function install(home: string, bundle: string, version: string, now: () => Date,
     return [name, previous && previous.state !== 'blocked' ? previous : { state: 'matching' }];
   }));
   const warn = conflicts.length > 0 && current?.warned !== version;
-  const warned = warn ? version : current?.warned;
+  const warned = warn && options.recordWarning ? version : current?.warned;
   const manifest: Manifest = { version, skills, status, ...(warned !== undefined && { warned }), profiles, ...(antigravity && { antigravity }) };
   const wroteManifest = writeManifest(manifestPath, manifest);
   return { installed: progress.changed || wroteManifest, version, skills, conflicts, blocked: bundled.flatMap((skill) => {

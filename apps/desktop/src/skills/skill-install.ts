@@ -1,12 +1,14 @@
-// Installs the skills and checklists bundled in the app on launch, with the engine in
-// packages/shared/src/install-skills.ts. A packaged app checks them on every launch and restores
-// any that differ from its bundle; a dev run does so only when started with INSTALL_FLAG.
+// Installs the skills and checklists bundled in the app, with the engine in packages/shared/src/install-skills.ts.
+// A packaged app checks them at launch and before each Start build, and restores any that differ from its bundle;
+// a dev run does so only when started with INSTALL_FLAG. The main process runs every check one at a time.
 
 import * as NodePath from "node:path";
 
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import * as Semaphore from "effect/Semaphore";
 
+import { blockedBy } from "@lar-factory/shared";
 import { InstallError, installSkills, type InstallResult } from "@lar-factory/shared/install-skills";
 
 /** Starts a dev run's install. A packaged app ignores it and installs on every launch. */
@@ -54,22 +56,48 @@ export const plan = (input: LaunchInput): Plan | undefined => {
   return { home: installHome(input.home, input.env), bundle: input.bundle, version: input.version };
 };
 
+/** One check of the installed skills against the bundle, which restores any that differ. */
+export type Check = Effect.Effect<InstallResult, SkillInstallError>;
+
+/** A lock that makes the checks it wraps run one at a time: one that starts while another runs waits for it to finish. */
+export const oneAtATime = Semaphore.make(1).pipe(Effect.map((semaphore) => semaphore.withPermits(1)));
+
+/** This launch's two checks, which take turns. */
+export interface Checks {
+  /** The launch's check, which records that it reported its conflicts, so their dialog shows once per Release. */
+  readonly atLaunch: Check;
+  /** The check before each Start build, which leaves that dialog to the launch. */
+  readonly beforeBuild: Check;
+}
+
 /**
- * Runs this launch's install. A failed install doesn't write the manifest, so the next
- * launch tries again.
+ * This launch's checks, which check the installed skills and restore any that differ from the bundle, one run at a
+ * time; undefined when the launch checks nothing. A failed check doesn't write the manifest, so the next one tries again.
  */
-export const onLaunch = Effect.fn("SkillInstall.onLaunch")(function* (input: LaunchInput) {
+export const makeChecks = (input: LaunchInput): Effect.Effect<Checks | undefined> => {
   const install = plan(input);
-  if (!install) return undefined;
-  return yield* Effect.try({
-    try: () => installSkills(install.home, install.bundle, install.version),
+  if (!install) return Effect.succeed(undefined);
+  const check = (recordWarning: boolean): Check => Effect.try({
+    try: () => installSkills(install.home, install.bundle, install.version, { recordWarning }),
     catch: (cause) =>
       new SkillInstallError({
         message: cause instanceof Error ? cause.message : String(cause),
         changed: cause instanceof InstallError ? cause.changed : true,
       }),
   });
-});
+  return oneAtATime.pipe(Effect.map((serial) => ({ atLaunch: serial(check(true)), beforeBuild: serial(check(false)) })));
+};
+
+/** Why Start build can't run after a check: a failed restore, or a skill a path the app didn't install blocks. */
+export const buildRefusal = (outcome: InstallResult | SkillInstallError): string | null => {
+  if (outcome instanceof SkillInstallError) {
+    return `Lar Factory couldn't restore its skills, so the build can't start: ${outcome.message}`;
+  }
+  if (outcome.blocked.length === 0) return null;
+  const skills = outcome.blocked.map(({ skill, paths }) => `${skill} is ${blockedBy(paths).join("")}.`);
+  const one = outcome.blocked.length === 1 && outcome.blocked[0]!.paths.length === 1;
+  return `The build can't start while a skill is blocked. ${skills.join(" ")} Move ${one ? "that path" : "each path"} away, then start the build again.`;
+};
 
 /** A message box for the user. */
 export interface Notice {
@@ -85,8 +113,8 @@ export const notice = (outcome: InstallResult | SkillInstallError): Notice | und
       type: "error",
       message: "Lar Factory couldn't install its skills",
       detail: outcome.changed
-        ? `${outcome.message}\n\nThe install stopped partway, so some skills may be the new version and some the old. The next launch tries again.`
-        : `${outcome.message}\n\nThe previous skills are still in place. The next launch tries again.`,
+        ? `${outcome.message}\n\nThe install stopped partway, so some skills may be the new version and some the old. The next Start build or launch tries again.`
+        : `${outcome.message}\n\nThe previous skills are still in place. The next Start build or launch tries again.`,
     };
   }
   if (!outcome.warn) return undefined;

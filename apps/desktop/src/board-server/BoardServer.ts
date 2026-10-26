@@ -16,6 +16,8 @@ import * as Schedule from "effect/Schedule";
 import type * as Scope from "effect/Scope";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
+import { SKILL_CHECK_ENV, isSkillCheckRequest, type SkillCheckAnswer } from "@lar-factory/shared";
+
 const DEFAULT_PORT_TIMEOUT = Duration.seconds(30);
 const READINESS_TIMEOUT = Duration.minutes(1);
 const READINESS_INTERVAL = Duration.millis(100);
@@ -80,11 +82,13 @@ export const locate = (appPath: string, isPackaged: boolean): BoardLocation => {
  * Runs `serverFile` with `executablePath` in Node mode. In the app that is the
  * Electron binary, whose Node strips the types when the server runs as source.
  * The server reads `bundleDir`, and refuses guarded writes that don't carry `secret`.
+ * With `checksSkills` it asks the app to check the installed skills before each Start build.
  */
 export const makeStartConfig = (input: BoardLocation & {
   readonly executablePath: string;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly secret: string;
+  readonly checksSkills?: boolean;
 }): StartConfig => ({
   executablePath: input.executablePath,
   args: ["--disable-warning=ExperimentalWarning", input.serverFile],
@@ -94,18 +98,21 @@ export const makeStartConfig = (input: BoardLocation & {
     ELECTRON_RUN_AS_NODE: "1",
     BOARD_APP_SECRET: input.secret,
     ...(input.bundleDir && { BOARD_BUNDLE_DIR: input.bundleDir }),
+    ...(input.checksSkills && { [SKILL_CHECK_ENV]: "1" }),
   },
 });
 
 /**
- * Starts the server, reads the port it reports and waits for `/healthz` to answer.
+ * Starts the server, reads the port it reports and waits for `/healthz` to answer. `checkSkills` answers each skill
+ * check the server asks for with why Start build can't run, or null; if it rejects, the answer is that reason.
  * Closing the scope stops the server: SIGTERM, then SIGKILL after a grace period.
  */
 export const start = Effect.fn("BoardServer.start")(function* (
   config: StartConfig,
-  options?: { readonly portTimeout?: Duration.Input },
+  options?: { readonly portTimeout?: Duration.Input; readonly checkSkills?: (() => Promise<string | null>) | undefined },
 ): Effect.fn.Return<RunningBoard, BoardServerError, Scope.Scope | HttpClient.HttpClient> {
   const child = yield* Effect.acquireRelease(spawn(config), stop);
+  if (options?.checkSkills) answerSkillChecks(child, options.checkSkills);
   const port = yield* reportedPort(child, options?.portTimeout ?? DEFAULT_PORT_TIMEOUT);
   const url = new URL(`http://${HOST}:${port}/`);
   yield* waitForHealthz(url);
@@ -138,6 +145,18 @@ const spawn = (config: StartConfig) =>
         stdio: ["ignore", "inherit", "inherit", "ipc"],
       }),
     catch: (cause) => new BoardServerError({ message: `could not start the board server: ${String(cause)}` }),
+  });
+
+const answerSkillChecks = (child: NodeChildProcess.ChildProcess, checkSkills: () => Promise<string | null>) =>
+  child.on("message", (message) => {
+    if (!isSkillCheckRequest(message)) return;
+    // A check that throws refuses the build too, so Start build never waits for an answer that won't come.
+    void checkSkills().catch((cause: unknown) =>
+      `Lar Factory couldn't check its skills, so the build can't start: ${cause instanceof Error ? cause.message : String(cause)}`,
+    ).then((refusal) => {
+      // A server that exited meanwhile has no one to read the answer.
+      if (child.connected) child.send({ type: "skills-checked", id: message.id, refusal } satisfies SkillCheckAnswer);
+    });
   });
 
 const exited = (child: NodeChildProcess.ChildProcess) =>

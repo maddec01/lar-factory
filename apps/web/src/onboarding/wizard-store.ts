@@ -4,7 +4,7 @@
 // stopped, and Resume reopens it there.
 
 import { create } from 'zustand';
-import { sameRepo, type OnboardingProgress, type ProjectChoice, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
+import { sameRepo, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
@@ -88,7 +88,8 @@ interface WizardState {
   projects: Projects;
   /** Create a new T3 project's form; null while a listed project is the choice. */
   creating: Creating | null;
-  start: () => void;
+  /** Opens a new run, with the offered T3 project picked when it comes from an offer. */
+  start: (offer?: OnboardingOffer) => void;
   /** Reopens the onboarding the board keeps for `repo`, on its step with its answers. */
   resume: (repo: string) => void;
   close: () => void;
@@ -145,8 +146,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     run: null,
     projects: { state: 'loading' },
     creating: null,
-    start: () => {
-      set({ run: { step: 'project', done: [], projectId: null, repo: null, savedAs: null, setup: null }, creating: null });
+    start: (offer) => {
+      set({ run: { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, savedAs: null, setup: null }, creating: null });
       void get().loadProjects();
     },
     resume: (repo) => {

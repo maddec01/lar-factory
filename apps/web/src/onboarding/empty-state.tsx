@@ -1,8 +1,10 @@
-// The board's main area while no repository is on this Mac's list: it says so and offers Onboard a repository.
+// The board's main area while no repository is on this Mac's list: it says so and offers Onboard a repository, and
+// the offers for T3 projects that have a Repository config.
 
 import { Plus } from 'lucide-react';
 import { Button } from '@lar-factory/ui/button';
 import { BrandMark } from '../brand/brand-mark.tsx';
+import { OnboardingOffers } from './onboarding-offers.tsx';
 import { useWizardStore } from './wizard-store.ts';
 
 export function EmptyState() {
@@ -13,7 +15,8 @@ export function EmptyState() {
         <span className="grid size-12 place-items-center rounded-xl border bg-card"><BrandMark className="h-6" /></span>
         <h2 className="m-0 text-lg font-semibold">No repository is onboarded yet</h2>
         <p className="m-0 text-sm text-muted-foreground">Onboarding connects a repository and its T3 project to the board: it picks the item source, checks the commands the factory runs, and opens one PR that adds the Repository config.</p>
-        <Button onClick={start} data-onboard><Plus /> Onboard a repository</Button>
+        <Button onClick={() => start()} data-onboard><Plus /> Onboard a repository</Button>
+        <OnboardingOffers />
       </div>
     </div>
   );

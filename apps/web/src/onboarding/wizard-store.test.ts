@@ -32,6 +32,14 @@ test("starting a run opens it on the T3 project step and reads T3's projects", a
   expect(wizard.getState().projects).toEqual({ state: 'loaded', projects: PROJECTS });
 });
 
+test('starting a run from an offer opens it with the offered project picked', async () => {
+  const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-web', { hasConfig: true })] })));
+  const { stepReady } = await import('./wizard-store.ts');
+  await settle(() => wizard.getState().start({ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }));
+  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: 'lar-web', repo: 'maddec01/lar-web', savedAs: null, setup: null });
+  expect(stepReady(wizard.getState().run!, wizard.getState().projects)).toBe(true);
+});
+
 test("a project read that fails keeps the server's problem, and Retry reads again", async () => {
   const wizard = await store(() => new Response(JSON.stringify({ error: "Can't read T3 Code's projects at /x" }), { status: 502 }));
   await settle(() => wizard.getState().start());

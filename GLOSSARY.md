@@ -80,6 +80,10 @@ _Avoid_: lar project, factory project (for where threads run)
 A one-line description of what a repository is to the others, such as the API server a client app uses.
 _Avoid_: relationship, repo type
 
+**Repository config**:
+One repository's factory settings (its role, item source, show setting and labels), kept in that repository so everyone who onboards it gets the same setup.
+_Avoid_: onboarding config, project config, board config
+
 **Overlay**:
 The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.

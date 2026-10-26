@@ -17,14 +17,15 @@ function t3Home(t: TestContext, origins: Record<string, string | null>): { home:
   return { home, env: { ...process.env, HOME: home, T3_STATE_DB: db } };
 }
 
-/** A gh that answers each repository's .lar-factory.json read: a file, a 404, or a failure. */
-const gh = (files: Record<string, 'file' | 'none' | 'fails'>) => async (args: string[]) => {
+/** A gh that answers each repository's .lar-factory.json read: a file, a wrong file, a 404, or a failure. */
+const gh = (files: Record<string, 'file' | 'wrong' | 'none' | 'fails'>) => async (args: string[]) => {
   const repo = args[1]!.match(/^repos\/(.+)\/contents\/\.lar-factory\.json$/)![1]!;
-  if (files[repo] === 'file') return '{"role":"x"}';
+  if (files[repo] === 'file') return '{"role":"Web client","itemSource":{"kind":"github-project","owner":"maddec01","number":3}}';
+  if (files[repo] === 'wrong') return '{"itemSource":{"kind":"issues"}}';
   throw new Error(files[repo] === 'none' ? 'gh: Not Found (HTTP 404)' : 'HTTP 502: Bad Gateway');
 };
 
-test('each T3 project shows its provider, whether its repository has .lar-factory.json, and whether it is on the board', async (t) => {
+test('each T3 project shows its provider, whether its repository has .lar-factory.json with its values, and whether it is on the board', async (t) => {
   const { home, env } = t3Home(t, {
     'lar-web': 'git@github.com:maddec01/lar-web.git',
     'lar-server': 'https://github.com/maddec01/lar-server.git',
@@ -35,12 +36,21 @@ test('each T3 project shows its provider, whether its repository has .lar-factor
     gh({ 'maddec01/lar-web': 'file', 'maddec01/lar-server': 'none', 'maddec01/lar-cli': 'fails' }));
   const folder = (name: string) => join(home, 'Developer/lar', name);
   assert.deepEqual(choices, [
-    { id: 'lar-web', name: 'lar-web', folder: folder('lar-web'), repo: 'maddec01/lar-web', provider: 'GitHub', hasConfig: true, onBoard: false },
+    { id: 'lar-web', name: 'lar-web', folder: folder('lar-web'), repo: 'maddec01/lar-web', provider: 'GitHub', hasConfig: true, onBoard: false,
+      config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } },
     { id: 'lar-server', name: 'lar-server', folder: folder('lar-server'), repo: 'maddec01/lar-server', provider: 'GitHub', hasConfig: false, onBoard: true },
     // Reading an Azure DevOps repository's file waits for build #386.
     { id: 'lar-api', name: 'lar-api', folder: folder('lar-api'), repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: null, onBoard: false },
     { id: 'lar-cli', name: 'lar-cli', folder: folder('lar-cli'), repo: 'maddec01/lar-cli', provider: 'GitHub', hasConfig: null, onBoard: false },
   ]);
+});
+
+test("a .lar-factory.json that is wrong carries its problem in place of its values", async (t) => {
+  const { env } = t3Home(t, { 'lar-web': 'git@github.com:maddec01/lar-web.git' });
+  const [choice] = await projectChoices([], env, gh({ 'maddec01/lar-web': 'wrong' }));
+  assert.equal(choice!.hasConfig, true);
+  assert.equal(choice!.config, undefined);
+  assert.equal(choice!.configProblem, '.lar-factory.json field role is missing or not a string.');
 });
 
 test('a project with no origin, another host or a worktree folder names no repository', async (t) => {

@@ -621,12 +621,39 @@ export function isStale(data: BoardData, now: number): boolean {
 }
 
 /** The service that hosts a repository, from its origin's host. */
-export type Provider = 'GitHub' | 'Azure DevOps';
+export const PROVIDERS = ['GitHub', 'Azure DevOps'] as const;
+
+export type Provider = (typeof PROVIDERS)[number];
+
+/** Where a repository's items come from: a GitHub Project, which other repositories may name too, or its own issues. */
+export type RepositoryItemSource = { kind: 'github-project'; owner: string; number: number } | { kind: 'issues' };
+
+/** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
+export interface RepositoryConfigAnswers {
+  itemSource: RepositoryItemSource;
+  show: ShowSetting;
+  role: string;
+}
+
+/** What the Provider and item source step has answered so far, as typed; the GitHub Project's fields count only for a Project. */
+export interface SetupAnswers {
+  itemSource: RepositoryItemSource['kind'];
+  projectOwner: string;
+  projectNumber: string;
+  show: ShowSetting;
+  /** Whether the show setting was picked, so a new item source no longer changes it to the one suggested. */
+  showPicked: boolean;
+  role: string;
+}
 
 /** What an onboarding has answered so far. Later steps add theirs. */
 export interface OnboardingAnswers {
   /** The picked T3 project's id. */
   projectId: string;
+  /** The picked T3 project's provider, from its origin's host; absent while the dialog hasn't read it. */
+  provider?: Provider;
+  /** The Provider and item source step's answers, once it has shown. */
+  setup?: SetupAnswers;
 }
 
 /** Where an onboarding stopped when its dialog closed, so Resume reopens it there. */
@@ -657,6 +684,10 @@ export interface ProjectChoice {
   provider: Provider | null;
   /** Whether the repository has `.lar-factory.json` on its default branch; null when that couldn't be read. */
   hasConfig: boolean | null;
+  /** The values of the `.lar-factory.json` it has, which onboarding reuses. */
+  config?: RepositoryConfigAnswers;
+  /** Why the `.lar-factory.json` it has can't be reused, in place of `config`. */
+  configProblem?: string;
   /** Whether the repository is on this Mac's list already. */
   onBoard: boolean;
 }

@@ -127,7 +127,9 @@ label. Anything Pedro adds or corrects is another open question. Then:
   panel belong to the thread that opens them. Pedro never receives a file
   path, URL or run command, and nothing opens outside T3. This overrides the
   `prototype` skill where it tells the agent to hand Pedro a file, URL or
-  command (`LOGIC.md` lines 37, 54 and 66, `UI.md` line 96, `SKILL.md` line 22).
+  command: `LOGIC.md` "3. Build the shareable HTML file", "4. Hand it over"
+  and "Anti-patterns", `UI.md` "5. Hand it over" and `SKILL.md` "Rules that
+  apply to both".
   - Run the variants from the child task's worktree. Start each server on a
     port where `lsof -ti tcp:<port> -sTCP:LISTEN` prints nothing, bound to
     `127.0.0.1`, and note the PID that holds the port, not a launcher's.

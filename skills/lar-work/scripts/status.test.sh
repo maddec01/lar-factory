@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests status.sh's read request to the board against a fake gh and local
-# listeners on 127.0.0.1. No network.
+# Tests status.sh's status writes and its read request to the board against a
+# fake gh and local listeners on 127.0.0.1. No network.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -10,19 +10,47 @@ failures=0
 pass() { printf 'ok   %s\n' "$1"; }
 fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 
-# A fake gh that answers the project calls status.sh makes. A fake curl logs
-# its arguments, then runs the real curl unless FAKE_CURL_OFF is set.
+# A fake gh that answers the calls status.sh makes. lar-factory's config.json
+# gives maddec01/lar-factory, spelled as FAKE_CONFIG_REPO when set, the item
+# source FAKE_ITEMS (none when unset). The issue carries the labels in
+# FAKE_LABELS and the repository has those in FAKE_REPO_LABELS, both
+# space-separated. A label lookup fails with FAKE_LABEL_ERROR when set. A fake curl logs its arguments, then
+# runs the real curl unless FAKE_CURL_OFF is set.
 bin=$(mktemp -d)
 log="$bin/log"
 real_curl=$(command -v curl)
 cat >"$bin/gh" <<'GH'
 #!/bin/bash
+# answer <json> <args>: prints the JSON, through --jq when the call passes it.
+answer() {
+    local json=$1
+    shift
+    while (($#)); do
+        if [[ $1 == --jq ]]; then jq -r "$2" <<<"$json"; return; fi
+        shift
+    done
+    echo "$json"
+}
 case "$1 $2" in
 "project view") echo PVT_1 ;;
-"project field-list") echo '{"fields":[{"id":"FIELD_1","name":"Status","options":[{"id":"OPT_1","name":"Ready to merge"}]}]}' ;;
+"project field-list") echo '{"fields":[{"id":"FIELD_1","name":"Status","options":[{"id":"OPT_1","name":"Ready to merge"},{"id":"OPT_2","name":"Done"}]}]}' ;;
 "project item-add") echo PVTI_1 ;;
 "project item-edit") echo "edit ${*:3}" >>"$FAKE_GH_LOG" ;;
-*) echo "fake gh: unexpected $*" >&2; exit 1 ;;
+"issue view")
+    answer "$(jq -n --arg labels "${FAKE_LABELS:-}" '{labels: [$labels | splits(" ") | select(. != "") | {name: .}]}')" "$@" ;;
+"issue edit") echo "issue-edit ${*:3}" >>"$FAKE_GH_LOG" ;;
+"label create") echo "label-create ${*:3}" >>"$FAKE_GH_LOG" ;;
+*)
+    if [[ $1 == api && " $* " == *" repos/maddec01/lar-factory/contents/config.json?ref=main "* ]]; then
+        jq -n --arg items "${FAKE_ITEMS:-}" --arg repo "${FAKE_CONFIG_REPO:-maddec01/lar-factory}" \
+            '{repos: [{repo: "maddec01/lar-server"}, {repo: $repo} + (if $items == "" then {} else {items: $items} end)]}'
+    elif [[ $1 == api && $2 =~ ^repos/maddec01/lar-factory/labels/(.+)$ ]]; then
+        if [[ -n ${FAKE_LABEL_ERROR:-} ]]; then echo "$FAKE_LABEL_ERROR" >&2; exit 1; fi
+        [[ " ${FAKE_REPO_LABELS:-} " == *" ${BASH_REMATCH[1]} "* ]] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+    else
+        echo "fake gh: unexpected $*" >&2
+        exit 1
+    fi ;;
 esac
 GH
 cat >"$bin/curl" <<CURL
@@ -187,6 +215,114 @@ if same_as_today; then
     pass "another listener on the port changes nothing"
 else
     fail "another listener on the port changes nothing: $status $output / $errors"
+fi
+
+# set <ref> <Status>: runs status.sh with fresh logs and no board to ask, sets
+# $output, $errors, $status and $writes (the logged gh writes).
+set_status() {
+    : >"$log"
+    status=0
+    output=$(env -u LAR_BOARD_PORT bash "$status_sh" "$1" "$2" 2>"$bin/err") || status=$?
+    errors=$(cat "$bin/err")
+    writes=$(grep -v '^curl' "$log" || true)
+}
+
+export FAKE_ITEMS=issues FAKE_LABELS="status-shaping build" FAKE_REPO_LABELS="status-shaping status-ready-to-merge"
+set_status maddec01/lar-factory#7 "Ready to merge"
+if ((status == 0)) && [[ $output == "$expected" && -z $errors &&
+    $writes == "issue-edit 7 --repo maddec01/lar-factory --add-label status-ready-to-merge --remove-label status-shaping" ]]; then
+    pass "on a repository's issues, swaps the status label in one edit"
+else
+    fail "on a repository's issues, swaps the status label in one edit: $status $output / $errors / $writes"
+fi
+
+FAKE_LABELS=build
+set_status "$url" "Ready to merge"
+if ((status == 0)) && [[ $writes == "issue-edit 7 --repo maddec01/lar-factory --add-label status-ready-to-merge" ]]; then
+    pass "an issue with no status label gets the new one"
+else
+    fail "an issue with no status label gets the new one: $status $output / $errors / $writes"
+fi
+
+FAKE_LABELS="status-ready-to-merge"
+set_status "$url" "Ready to merge"
+if ((status == 0)) && [[ $writes == "issue-edit 7 --repo maddec01/lar-factory --add-label status-ready-to-merge" ]]; then
+    pass "an issue that already has the status keeps its label"
+else
+    fail "an issue that already has the status keeps its label: $status $output / $errors / $writes"
+fi
+
+FAKE_LABELS="status-shaping" FAKE_REPO_LABELS="status-shaping"
+set_status "$url" "Needs you"
+if ((status == 0)) && [[ $output == "$url → Needs you" && $writes == "label-create status-needs-you --repo maddec01/lar-factory "*$'\n'"issue-edit 7 --repo maddec01/lar-factory --add-label status-needs-you --remove-label status-shaping" ]]; then
+    pass "creates a missing status label before adding it"
+else
+    fail "creates a missing status label before adding it: $status $output / $errors / $writes"
+fi
+
+FAKE_LABELS="status-shaping" FAKE_REPO_LABELS="status-shaping"
+FAKE_LABEL_ERROR="gh: Bad credentials (HTTP 401)" set_status "$url" "Needs you"
+if ((status != 0)) && [[ -z $writes && $errors == *"Could not look up the status-needs-you label in maddec01/lar-factory."*"Bad credentials (HTTP 401)"* ]]; then
+    pass "a label lookup that fails for another reason than a missing label stops before any write"
+else
+    fail "a label lookup that fails for another reason than a missing label stops before any write: $status $output / $errors / $writes"
+fi
+
+FAKE_LABELS="status-shaping" FAKE_REPO_LABELS="status-shaping status-ready-to-merge"
+FAKE_CONFIG_REPO=Maddec01/Lar-Factory set_status "$url" "Ready to merge"
+if ((status == 0)) && [[ $writes == "issue-edit 7 --repo maddec01/lar-factory --add-label status-ready-to-merge --remove-label status-shaping" ]]; then
+    pass "finds the repository's config.json entry whatever its case"
+else
+    fail "finds the repository's config.json entry whatever its case: $status $output / $errors / $writes"
+fi
+
+FAKE_LABELS="status-shaping status-verify"
+set_status "$url" "Ready to merge"
+if ((status != 0)) && [[ -z $writes && $errors == *status-shaping* && $errors == *status-verify* && $errors == *"all but one"* ]]; then
+    pass "refuses an issue with two status labels, naming them"
+else
+    fail "refuses an issue with two status labels, naming them: $status $output / $errors / $writes"
+fi
+
+FAKE_LABELS="status-shaping"
+set_status "$url" "Shipping"
+if ((status != 0)) && [[ -z $writes && $errors == *'Unknown status "Shipping"'* ]]; then
+    pass "refuses an unknown status on a repository's issues"
+else
+    fail "refuses an unknown status on a repository's issues: $status $output / $errors / $writes"
+fi
+
+for items in issues project; do
+    FAKE_ITEMS=$items
+    set_status "$url" Done
+    if ((status != 0)) && [[ -z $writes && $errors == *"Closing the issue makes it Done"* ]]; then
+        pass "refuses Done on $items"
+    else
+        fail "refuses Done on $items: $status $output / $errors / $writes"
+    fi
+done
+
+FAKE_ITEMS=issues
+set_status https://github.com/maddec01/lar-factory/pull/9 "Ready to merge"
+if ((status == 0)) && [[ $writes == "edit "*"--single-select-option-id OPT_1" ]]; then
+    pass "a PR on a repository that reads its issues sets the Project's Status"
+else
+    fail "a PR on a repository that reads its issues sets the Project's Status: $status $output / $errors / $writes"
+fi
+
+set_status maddec01/lar-other#7 "Ready to merge"
+if ((status == 0)) && [[ $writes == "edit "*"--single-select-option-id OPT_1" ]]; then
+    pass "a repository config.json doesn't list sets the Project's Status"
+else
+    fail "a repository config.json doesn't list sets the Project's Status: $status $output / $errors / $writes"
+fi
+
+FAKE_ITEMS=project
+set_status "$url" "Ready to merge"
+if ((status == 0)) && [[ $output == "$expected" && $writes == "edit --project-id PVT_1 --id PVTI_1 --field-id FIELD_1 --single-select-option-id OPT_1" ]]; then
+    pass "on a Project, sets the Status field"
+else
+    fail "on a Project, sets the Status field: $status $output / $errors / $writes"
 fi
 
 ((failures == 0))

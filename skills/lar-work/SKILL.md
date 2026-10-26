@@ -23,7 +23,7 @@ verifies visible changes and merges every PR; the rest is yours.
 - Move the issue's Status on the "lar" board at every step:
   `bash <this skill>/scripts/status.sh <owner/repo#n> "<Status>"`. Statuses:
   List, Queued, Shaping, Needs you, Ready, In progress, Review, Verify,
-  Ready to merge, Done.
+  Ready to merge. `status.sh` refuses Done: closing the issue makes it Done.
 - Facts are yours to find; decisions are the user's. Read code, docs and history
   in **subagents**. Every factory subagent reports in ≤300 words, never whole
   files, logs or screenshots. Ask the user only what a subagent can't answer.

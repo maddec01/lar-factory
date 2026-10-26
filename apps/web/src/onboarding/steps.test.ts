@@ -6,8 +6,8 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import type { ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
-import { $, fetchMock, sample, settle, text, toolChecks } from '../../test/support.ts';
-import { dialog, openOnboarding, project } from './onboarding-support.ts';
+import { $, fetchMock, mountPage, sample, settle, text, toolChecks } from '../../test/support.ts';
+import { dialog, openOnboarding, project, serve } from './onboarding-support.ts';
 
 const rows = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-choice]')];
 const row = (name: string) => rows().find((r) => r.dataset.choice === name)!;
@@ -41,6 +41,16 @@ test("a repository already on the board, or a folder with no provider's origin, 
     await settle(() => radio(name).click());
     expect(radio(name).getAttribute('aria-checked'), name).toBe('false');
   }
+});
+
+test('a repository still onboarding shows as onboarding, with its Resume to use instead', async () => {
+  const data = { ...sample, repos: [], onboarding: [{ repo: 'maddec01/lar-cli', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-cli' } } }] };
+  serve(data, [project('lar-cli', { onBoard: true })]);
+  await mountPage(data);
+  const { useWizardStore } = await import('./wizard-store.ts');
+  await settle(() => useWizardStore.getState().start());
+  expect(badges('lar-cli')).toEqual(['GitHub', 'no .lar-factory.json', 'onboarding']);
+  expect(text(row('lar-cli'))).toContain('maddec01/lar-cli · It’s onboarding already: close this and press its Resume.');
 });
 
 test("a step that can't read T3's projects shows the problem with Retry", async () => {

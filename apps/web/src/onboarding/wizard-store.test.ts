@@ -86,6 +86,14 @@ test('Next waits for a project that can be picked, then moves on; Back returns',
   expect(wizard.getState().run!.step).toBe('project');
 });
 
+test('a project whose repository is onboarding already says to use its Resume', async () => {
+  const { unpickable } = await import('./wizard-store.ts');
+  const run = { step: 'project' as const, done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, prUrl: null };
+  const data = { onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-server' } } }] };
+  expect(unpickable(project('lar-server', { onBoard: true }), run, data)).toBe('It’s onboarding already: close this and press its Resume.');
+  expect(unpickable(project('lar-server', { onBoard: true }), run, { onboarding: [] })).toBe('Its repository is on the board already.');
+});
+
 test('closing before a project is picked drops the run and keeps nothing', async () => {
   const wizard = await store();
   await settle(() => wizard.getState().start());

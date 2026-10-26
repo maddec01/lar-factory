@@ -75,6 +75,18 @@ test("a settings file that isn't valid JSON leaves the board on its defaults, wi
   assert.deepEqual(data.items.map((i) => i.number), [1]);
 });
 
+test("a list that stops being valid JSON clears the repositories and notices of the last read", async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-list-breaks-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  const options = { repositories: [FACTORY, APPLE], repoConfigs: { [FACTORY]: { role: 'The factory', itemSource: LAR }, [APPLE]: null },
+    items: [projectIssue(1, 'Queued', FACTORY)] };
+  const board = await startBoard(t, options, false, true, { HOME: home });
+  await until(board, (d) => d.repos.length === 1 && !!d.repositoryConfigProblems?.length);
+  writeFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), '{ broken');
+  const data = await until(board, (d) => d.error !== null);
+  assert.deepEqual([data.repos, data.repositoryConfigProblems], [[], []]);
+});
+
 test('a change to a .lar-factory.json shows on the next refresh', async (t) => {
   const options = { repositories: [APPLE], repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: LAR } },
     items: [projectIssue(1, 'Queued', APPLE)], repoIssues: { [APPLE]: [appleIssue(7)] } };
@@ -83,4 +95,28 @@ test('a change to a .lar-factory.json shows on the next refresh', async (t) => {
   await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } } });
   const data: BoardData = await until(board, (d) => d.items.map((i) => i.number).join() === '7');
   assert.deepEqual(data.repos, [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all' }]);
+});
+
+test("a repository whose .lar-factory.json is missing, doesn't parse or has a wrong field stays off the board with a notice, the others still show", async (t) => {
+  const broken = { 'no file': null, 'unparsable': '{ broken', 'wrong field': { role: 'Apple client', itemSource: { kind: 'sprint' } } };
+  const problems = { 'no file': 'no .lar-factory.json on its default branch.', 'unparsable': ".lar-factory.json isn't valid JSON.",
+    'wrong field': '.lar-factory.json field itemSource.kind must be "issues" or "github-project".' };
+  for (const [name, config] of Object.entries(broken)) {
+    const board = await startBoard(t, { repositories: [FACTORY, APPLE], repoConfigs: { [FACTORY]: { role: 'The factory', itemSource: LAR }, [APPLE]: config },
+      items: [projectIssue(1, 'Queued', FACTORY), projectIssue(2, 'Queued', APPLE)], repoIssues: { [APPLE]: [appleIssue(7)] } });
+    const data = await until(board, (d) => d.fetchedAt !== null);
+    assert.equal(data.error, null, name);
+    assert.deepEqual(data.items.map((i) => [i.repo, i.number]), [[FACTORY, 1]], name);
+    assert.deepEqual(data.repos.map((r) => r.repo), [FACTORY], name);
+    assert.deepEqual(data.repositoryConfigProblems, [{ repo: APPLE, problem: problems[name as keyof typeof problems] }], name);
+  }
+});
+
+test('the notice clears on the first refresh that reads the file', async (t) => {
+  const options = { repositories: [APPLE], repoConfigs: { [APPLE]: null }, items: [projectIssue(1, 'Queued', APPLE)] };
+  const board = await startBoard(t, options, false, true);
+  await until(board, (d) => !!d.repositoryConfigProblems?.length);
+  await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: LAR } } });
+  const data = await until(board, (d) => d.items.length === 1);
+  assert.deepEqual([data.repositoryConfigProblems, data.repos.map((r) => r.repo)], [[], [APPLE]]);
 });

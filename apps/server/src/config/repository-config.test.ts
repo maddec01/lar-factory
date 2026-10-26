@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readBoardSettings, readRepositoryConfig, readRepositoryList } from './repository-config.ts';
+import { readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList } from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar repository config test '));
@@ -88,4 +88,23 @@ test("a repository without the file, or with a file that doesn't parse or has a 
 test('a gh failure other than a 404 passes through', async () => {
   const gh = async () => { throw new Error('gh api failed: To get started with GitHub CLI, please run:  gh auth login'); };
   await assert.rejects(readRepositoryConfig('maddec01/lar-factory', gh), /gh auth login/);
+});
+
+test("an onboarded repository whose config can't be read is left out with its problem, and the others still read", async (t) => {
+  const list = { repositories: [{ repo: 'maddec01/missing' }, { repo: 'maddec01/lar-factory' }, { repo: 'maddec01/broken' }, { repo: 'maddec01/some' }] };
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify(list) });
+  const gh = ghWith({ 'maddec01/lar-factory': { role: 'The factory' }, 'maddec01/broken': '{ broken', 'maddec01/some': { role: 'x', show: 'some' } });
+  const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), gh);
+  assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
+  assert.deepEqual(problems, [
+    { repo: 'maddec01/missing', problem: 'no .lar-factory.json on its default branch.' },
+    { repo: 'maddec01/broken', problem: ".lar-factory.json isn't valid JSON." },
+    { repo: 'maddec01/some', problem: '.lar-factory.json field show must be "all" or "opted-in".' },
+  ]);
+});
+
+test('a gh failure other than a 404 still fails the whole read', async (t) => {
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory' }] }) });
+  const gh = async () => { throw new Error('gh api failed: To get started with GitHub CLI, please run:  gh auth login'); };
+  await assert.rejects(readOnboardedConfigs(readRepositoryList(dir), gh), /gh auth login/);
 });

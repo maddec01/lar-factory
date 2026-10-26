@@ -329,12 +329,20 @@ export const SHOW_SETTINGS = ['all', 'opted-in'] as const;
 
 export type ShowSetting = (typeof SHOW_SETTINGS)[number];
 
+/** Why a repository's .lar-factory.json couldn't be read, in repo-config.sh's words after `owner/name: `. */
+export interface RepositoryConfigProblem {
+  repo: string;
+  problem: string;
+}
+
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
   /** The first item source's title: the first GitHub Project's when a repository reads one, else a repository's owner/name. */
   project: { title: string };
   repos: RepoConfig[];
+  /** Each onboarded repository the latest read left off the board because its .lar-factory.json couldn't be read, and why. */
+  repositoryConfigProblems?: RepositoryConfigProblem[];
   refreshSeconds: number;
   /** Time of the last successful read, or null if there has never been one. */
   fetchedAt: string | null;

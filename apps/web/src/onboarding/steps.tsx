@@ -334,7 +334,7 @@ function PrStep({ run }: { run: Run }) {
   return (
     <div data-pr-step className="grid gap-4">
       <div className="grid gap-1">
-        <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">One PR on {repo}, branch lar-factory/onboarding</h4>
+        <h4 className="m-0 text-xs font-medium text-muted-foreground">One PR on {repo}, branch lar-factory/onboarding</h4>
         <p className="m-0 text-xs text-muted-foreground">It adds .lar-factory.json, made on GitHub from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
         <pre className="m-0 overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>
       </div>

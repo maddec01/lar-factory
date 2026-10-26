@@ -1,7 +1,7 @@
 // The onboarding run the dialog shows: its step, the steps it has passed, the T3 project it picked and the answers it
 // has given, with T3's projects as the server lists them and the folder Create a new T3 project adds. Closing before a
-// project is picked drops the run; closing after keeps its repository on this Mac's list as onboarding, with where it
-// stopped, and Resume reopens it there. The Checks step runs the command checks, then the setup checks, and holds Next
+// project is picked, or an offered run before Next or any change, drops the run; closing after keeps its repository on
+// this Mac's list as onboarding, with where it stopped, and Resume reopens it there. The Checks step runs the command checks, then the setup checks, and holds Next
 // until each passes; a run that reuses its .lar-factory.json finishes there, with no PR. Any other run opens the
 // onboarding PR on the Pull request step, then waits for the board to finish the onboarding once the PR merges. A PR
 // the board finds closed without merging offers Reopen PR, or Start over, which opens a new one.
@@ -195,6 +195,8 @@ interface WizardState {
 let reads = 0;
 /** Counts check runs, so a check answered after a newer run or a close is dropped. */
 let checkRuns = 0;
+/** The run an offer opened, until Next or a change replaces it; closing it then keeps nothing. */
+let untouchedOffer: Run | null = null;
 
 const IDLE: WizardState['pr'] = { opening: false, reopening: false, checking: false, checkedAt: null, error: null };
 
@@ -291,8 +293,10 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     start: (offer) => {
       checkRuns++;
       // The board offers only GitHub repositories until build #386.
-      set({ run: { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer ? 'GitHub' : null, savedAs: null, setup: null, prUrl: null },
-        creating: null, checks: null, pr: IDLE });
+      const run: Run = { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer ? 'GitHub' : null,
+        savedAs: null, setup: null, prUrl: null };
+      untouchedOffer = offer ? run : null;
+      set({ run, creating: null, checks: null, pr: IDLE });
       void get().loadProjects();
     },
     resume: (repo) => {
@@ -309,7 +313,9 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       checkRuns++;
       set({ run: null, checks: null });
       // A run whose PR merged is onboarded, so there's no onboarding left to keep.
-      if (run?.projectId && run.repo && !onboarded(run, useBoardStore.getState().data)) void keep({ ...run, projectId: run.projectId, repo: run.repo });
+      if (run?.projectId && run.repo && run !== untouchedOffer && !onboarded(run, useBoardStore.getState().data)) {
+        void keep({ ...run, projectId: run.projectId, repo: run.repo });
+      }
     },
     loadProjects: async () => {
       const read = ++reads;

@@ -40,6 +40,21 @@ test('starting a run from an offer opens it with the offered project picked', as
   expect(stepReady(wizard.getState().run!, wizard.getState().projects)).toBe(true);
 });
 
+test('closing an offered run untouched keeps nothing; once Next moves it or a change, closing keeps it', async () => {
+  const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-web', { hasConfig: true }), project('lar-cli')] })));
+  const offer = { projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' };
+  await settle(() => wizard.getState().start(offer));
+  await settle(() => wizard.getState().close());
+  expect(kept(), 'nothing kept').toEqual([]);
+  await settle(() => wizard.getState().start(offer));
+  wizard.getState().next();
+  await settle(() => wizard.getState().close());
+  await settle(() => wizard.getState().start(offer));
+  wizard.getState().pick('lar-cli');
+  await settle(() => wizard.getState().close());
+  expect(kept().map((body) => (body as { repo: string }).repo)).toEqual(['maddec01/lar-web', 'maddec01/lar-cli']);
+});
+
 test("a project read that fails keeps the server's problem, and Retry reads again", async () => {
   const wizard = await store(() => new Response(JSON.stringify({ error: "Can't read T3 Code's projects at /x" }), { status: 502 }));
   await settle(() => wizard.getState().start());

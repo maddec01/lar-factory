@@ -1,6 +1,6 @@
 // Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
-import { buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@lar-factory/shared';
 import type { BoardConfig } from '../config/config.ts';
 import type { ItemsRead } from '../items/item-source.ts';
@@ -28,6 +28,21 @@ const CHECKS = `statusCheckRollup {
     }
   }`;
 
+/** The fields the board reads of an issue, on the Project or in a repository. */
+const ISSUE_FIELDS = `id number title url state stateReason closedAt updatedAt
+  repository { nameWithOwner }
+  labels(first: 20) { nodes { name } }
+  parent { number title url state repository { nameWithOwner } }
+  subIssuesSummary { total completed }
+  subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state stateReason repository { nameWithOwner } } }
+  blockedBy(first: ${BLOCKER_LIMIT}) { nodes { number state repository { nameWithOwner } } }
+  closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
+    nodes {
+      number url state isDraft body mergedAt mergeStateStatus
+      ${CHECKS}
+    }
+  }`;
+
 export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String) {
   user(login: $owner) {
     projectV2(number: $number) {
@@ -43,21 +58,7 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
           content {
             __typename
             ... on DraftIssue { id title updatedAt }
-            ... on Issue {
-              id number title url state stateReason closedAt updatedAt
-              repository { nameWithOwner }
-              labels(first: 20) { nodes { name } }
-              parent { number title url state repository { nameWithOwner } }
-              subIssuesSummary { total completed }
-              subIssues(first: ${SLICE_LIMIT}) { nodes { number title url state stateReason repository { nameWithOwner } } }
-              blockedBy(first: ${BLOCKER_LIMIT}) { nodes { number state repository { nameWithOwner } } }
-              closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
-                nodes {
-                  number url state isDraft body mergedAt mergeStateStatus
-                  ${CHECKS}
-                }
-              }
-            }
+            ... on Issue { ${ISSUE_FIELDS} }
             ... on PullRequest {
               id number title url state closedAt updatedAt isDraft mergeStateStatus
               repository { nameWithOwner }
@@ -67,6 +68,16 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
           }
         }
       }
+    }
+  }
+}`;
+
+/** One page of a repository's issues in the given states, updated since `since` when it is set. */
+const REPO_ISSUES_QUERY = `query($owner: String!, $name: String!, $states: [IssueState!], $since: DateTime, $after: String) {
+  repository(owner: $owner, name: $name) {
+    issues(first: ${PAGE_SIZE}, after: $after, states: $states, filterBy: { since: $since }) {
+      pageInfo { hasNextPage endCursor }
+      nodes { __typename ${ISSUE_FIELDS} }
     }
   }
 }`;
@@ -106,6 +117,10 @@ interface RawIssueSearch {
 
 interface RawBodies {
   data: { nodes: ({ id?: string; body?: string } | null)[] };
+}
+
+interface RawRepoIssuesPage {
+  data: { repository: { issues: { pageInfo: PageInfo; nodes: NonNullable<RawItem['content']>[] } } | null };
 }
 
 interface RawItemsPage {
@@ -211,12 +226,44 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
     raws.push(...project.items.nodes);
     return project.items.pageInfo;
   });
+  const projectItemIds = new Map(raws.flatMap((raw) => (raw.content ? [[raw.content.id, raw.id]] : [])));
+  return { title, items: await boardItems(raws), projectItemIds };
+}
+
+/** The board's items from raw items, once all are read, without slices and with each dossier's map. */
+async function boardItems(raws: RawItem[]): Promise<Item[]> {
   // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
   // decide which sub-issues are slices, so they run before the dossiers, items with sub-issues on the board, are known.
   const searched = await searchLabels(raws);
   await readDossierBodies(raws, searched);
-  const projectItemIds = new Map(raws.flatMap((raw) => (raw.content ? [[raw.content.id, raw.id]] : [])));
-  return { title, items: normalizeItems(raws, searched), projectItemIds };
+  return normalizeItems(raws, searched);
+}
+
+/**
+ * A repository's open issues as List, and those closed in the last DONE_WINDOW_MS as Done, without slices. Until
+ * status labels come, every open issue is List.
+ */
+export async function fetchRepoIssues(repo: string, now = Date.now()): Promise<Item[]> {
+  const [owner, name] = repo.split('/');
+  const since = new Date(now - DONE_WINDOW_MS).toISOString();
+  const read = async (state: 'OPEN' | 'CLOSED') => {
+    const issues: NonNullable<RawItem['content']>[] = [];
+    await readPages(MAX_PAGES, `${repo} has more than ${PAGE_SIZE * MAX_PAGES} ${state.toLowerCase()} issues to show; stopped paging`, async (after) => {
+      const page = (await graphql<RawRepoIssuesPage>(REPO_ISSUES_QUERY,
+        { owner: owner!, name: name!, states: [state], since: state === 'CLOSED' ? since : null, after })).data.repository?.issues;
+      if (!page) throw new Error(`Repository ${repo} not found`);
+      issues.push(...page.nodes);
+      return page.pageInfo;
+    });
+    return issues;
+  };
+  const [open, closed] = await Promise.all([read('OPEN'), read('CLOSED')]);
+  // An issue updated since the window began may have closed before it.
+  const recent = closed.filter((issue) => issue.closedAt && Date.parse(issue.closedAt) >= now - DONE_WINDOW_MS);
+  // Not on a Project, so an issue's own node id stands in for the Project item id normalizeItems never shows.
+  const raws = [...open, ...recent].map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt,
+    status: { name: content.state === 'CLOSED' ? 'Done' : 'List' }, content }));
+  return boardItems(raws);
 }
 
 /** An error's message, for a write's error text. */

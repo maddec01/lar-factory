@@ -7,13 +7,14 @@ import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, Dia
 import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
 import { useBoardStore } from '../board/board-store.ts';
-import { type Run, STEPS, finishesOnChecks, onboarded, pickedProject, stepReady, useWizardStore } from './wizard-store.ts';
+import { type Run, STEPS, finishesOnChecks, onboarded, pickedProject, prClosed, stepReady, useWizardStore } from './wizard-store.ts';
 
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
 /**
  * Back, and Next, which is Finish on the Checks step of a run that reuses its .lar-factory.json. Once the PR is open
- * the run stays on its step, with Close and wait, then Go to the board once it merged.
+ * the run stays on its step, with Close and wait, then Go to the board once it merged, or Close once it closed without
+ * merging.
  */
 function Nav({ run }: { run: Run }) {
   const { projects, checks, next, back, finish, close } = useWizardStore();
@@ -21,7 +22,7 @@ function Nav({ run }: { run: Run }) {
   const ready = stepReady(run, projects, checks, data.tools);
   if (run.prUrl) {
     return onboarded(run, data) ? <Button size="sm" onClick={close}><Check /> Go to the board</Button>
-      : <Button variant="outline" size="sm" onClick={close}>Close and wait</Button>;
+      : <Button variant="outline" size="sm" onClick={close}>{prClosed(run, data) ? 'Close' : 'Close and wait'}</Button>;
   }
   if (run.step === 'pr') return <Button variant="outline" size="sm" onClick={back}><ArrowLeft /> Back</Button>;
   return (

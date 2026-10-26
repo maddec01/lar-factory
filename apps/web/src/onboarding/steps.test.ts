@@ -2,7 +2,7 @@
 // the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
 // and role, or the values of a .lar-factory.json it reuses. The Checks step: each check with its state, a failure's
 // fix with Retry, and Finish for a reused .lar-factory.json. The Pull request step: the file it adds, Open the PR,
-// gh's message with Retry, and the wait for the merge.
+// gh's message with Retry, the wait for the merge, and Reopen PR and Start over for a PR closed without merging.
 
 import { expect, test, vi } from 'vite-plus/test';
 import type { ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
@@ -311,8 +311,87 @@ test('the Pull request step shows the branch and the .lar-factory.json it adds, 
   expect(prStep().querySelector<HTMLAnchorElement>(`a[href="${PR}"]`)).not.toBeNull();
   expect(text(prStep())).toContain('Waiting for its merge');
   expect(footerButton('Back'), 'an open PR keeps the step').toBeUndefined();
+  fetchMock.mockClear();
+  await settle(() => button(prStep(), 'Check now')!.click());
+  expect((fetchMock.mock.calls as unknown as [string, RequestInit][]).map(([url, init]) => [url, init.method]), 'a read now, not on the next refresh').toEqual([['/api/read', 'POST']]);
   await settle(() => footerButton('Close and wait')!.click());
   expect(dialog()).toBeNull();
+});
+
+/** Opens the PR, so the step waits for its merge. */
+async function openWaiting(): Promise<void> {
+  await openPrStep();
+  answerPr({ prUrl: PR });
+  await settle(() => button(prStep(), 'Open the PR')!.click());
+  await settle();
+}
+
+test('Check now is busy until the board reads GitHub, then says when it checked and that the PR is still open', async () => {
+  await openWaiting();
+  await settle(() => button(prStep(), 'Check now')!.click());
+  await settle();
+  const checking = button(prStep(), 'Checking')!;
+  expect(checking.disabled, 'busy until the next board update').toBe(true);
+  expect(checking.querySelector('svg.animate-spin')).not.toBeNull();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [ON_PR], fetchedAt: new Date(Date.now()).toISOString(), error: null }));
+  expect(button(prStep(), 'Check now')!.disabled).toBe(false);
+  const at = new Date(Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  expect(text(prStep())).toContain(`Checked ${at}: still open`);
+});
+
+test("a Check now the board can't run shows why with Retry", async () => {
+  await openWaiting();
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/read'
+    ? new Response(JSON.stringify({ error: 'The board is shutting down.' }), { status: 503 }) : served(url, init));
+  await settle(() => button(prStep(), 'Check now')!.click());
+  await settle();
+  const alert = prStep().querySelector('[role="alert"]')!;
+  expect(text(alert)).toContain('The board is shutting down.');
+  expect(button(alert as HTMLElement, 'Retry')).toBeDefined();
+  expect(button(prStep(), 'Check now')!.disabled).toBe(false);
+});
+
+test("a Check now whose read couldn't follow the PR shows gh's message with Retry, not that it's still open", async () => {
+  await openWaiting();
+  await settle(() => button(prStep(), 'Check now')!.click());
+  await settle();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [{ ...ON_PR, followProblem: 'gh pr view failed: HTTP 502' }],
+    fetchedAt: new Date(Date.now()).toISOString(), error: null }));
+  const alert = prStep().querySelector('[role="alert"]')!;
+  expect(text(alert)).toContain('gh pr view failed: HTTP 502');
+  expect(button(alert as HTMLElement, 'Retry')).toBeDefined();
+  expect(text(prStep())).not.toContain('still open');
+});
+
+test('a read error the board had before Check now waits for a new read, not an update that keeps it', async () => {
+  await openWaiting();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const before = { ...useBoardStore.getState().data, error: "gh can't reach GitHub." };
+  await settle(() => useBoardStore.getState().receive(before));
+  await settle(() => button(prStep(), 'Check now')!.click());
+  await settle();
+  await settle(() => useBoardStore.getState().receive({ ...before, tools: toolChecks() }));
+  expect(button(prStep(), 'Checking'), 'the same error and read time is no new read').toBeDefined();
+  await settle(() => useBoardStore.getState().receive({ ...before, fetchedAt: new Date(Date.now() + 1000).toISOString() }));
+  expect(text(prStep().querySelector('[role="alert"]'))).toContain("gh can't reach GitHub.");
+});
+
+test("a Check now the board can't run stops waiting for the board's read", async () => {
+  await openWaiting();
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/read'
+    ? new Response(JSON.stringify({ error: 'The board is shutting down.' }), { status: 503 }) : served(url, init));
+  const setTimer = vi.spyOn(globalThis, 'setTimeout');
+  const clearTimer = vi.spyOn(globalThis, 'clearTimeout');
+  await settle(() => button(prStep(), 'Check now')!.click());
+  await settle();
+  const wait = setTimer.mock.results[setTimer.mock.calls.findIndex(([, ms]) => ms === 60_000)]!.value;
+  expect(clearTimer).toHaveBeenCalledWith(wait);
+  setTimer.mockRestore();
+  clearTimer.mockRestore();
 });
 
 test("a PR the board can't open shows gh's message with Retry, and the step stays put", async () => {
@@ -341,4 +420,51 @@ test('once the PR merges the step says the repository is onboarded, and Go to th
   await settle(() => footerButton('Go to the board')!.click());
   expect(dialog()).toBeNull();
   expect(fetchMock.mock.calls.some(([url]) => url === '/api/onboarding/repositories')).toBe(false);
+});
+
+const ON_PR = { repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' }, prUrl: PR } };
+
+/** Opens the PR, then has the board find it closed without merging; `reopened` answers Reopen PR. */
+async function closePr(reopened: object): Promise<void> {
+  await openPrStep();
+  answerPr({ prUrl: PR });
+  await settle(() => button(prStep(), 'Open the PR')!.click());
+  await settle();
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr/reopen'
+    ? new Response(JSON.stringify(reopened)) : served(url, init));
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [{ ...ON_PR, progress: { ...ON_PR.progress, prClosed: true } }] }));
+}
+
+test('a PR closed without merging says so with Reopen PR, which waits for the merge again once the board reopens it', async () => {
+  await closePr({ board: { ...sample, tools: toolChecks(), onboarding: [ON_PR] }, error: null });
+  expect(text(prStep().querySelector('[data-pr-closed]'))).toContain('maddec01/lar-web#14 closed without merging');
+  expect(text(prStep())).not.toContain('Waiting for its merge');
+  expect(text(footerButton('Close')).trim(), 'nothing to wait for').toBe('Close');
+  await settle(() => button(prStep(), 'Reopen PR')!.click());
+  await settle();
+  expect(prStep().querySelector('[data-pr-closed]')).toBeNull();
+  expect(text(prStep())).toContain('Waiting for its merge');
+});
+
+test("a Reopen PR the board refuses shows gh's message and keeps Reopen PR and Start over", async () => {
+  await closePr({ error: "Can't reopen maddec01/lar-web's onboarding PR: gh pr reopen failed: HTTP 403" });
+  await settle(() => button(prStep(), 'Reopen PR')!.click());
+  await settle();
+  expect(text(prStep().querySelector('[data-pr-closed]'))).toContain('gh pr reopen failed: HTTP 403');
+  expect(button(prStep(), 'Start over')).toBeDefined();
+});
+
+test('Start over opens a new PR and waits for its merge', async () => {
+  await closePr({ error: null });
+  const NEXT = 'https://github.com/maddec01/lar-web/pull/15';
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr'
+    ? new Response(JSON.stringify({ prUrl: NEXT, board: { ...sample, tools: toolChecks(), onboarding: [{ ...ON_PR, progress: { ...ON_PR.progress, prUrl: NEXT } }] }, error: null }))
+    : served(url, init));
+  await settle(() => button(prStep(), 'Start over')!.click());
+  await settle();
+  expect(prStep().querySelector(`a[href="${NEXT}"]`)).not.toBeNull();
+  expect(text(prStep())).toContain('Waiting for its merge');
 });

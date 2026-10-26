@@ -15,7 +15,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import {
-  COMMAND_CHECKS, type Checks, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, onboarded, pickedProject, suggestedShow,
+  COMMAND_CHECKS, type Checks, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, onboarded, pickedProject, prClosed, suggestedShow,
   unpickable, useWizardStore,
 } from './wizard-store.ts';
 
@@ -311,9 +311,12 @@ function FinishProblem({ checks }: { checks: Checks }) {
 /** The PR's place, `owner/name#n`, from its URL. */
 const prName = (url: string) => url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
 
-/** The PR that adds .lar-factory.json: what it adds, Open the PR, then the wait for its merge, which the board finishes. */
+/**
+ * The PR that adds .lar-factory.json: what it adds, Open the PR, then the wait for its merge, which the board finishes.
+ * A PR closed without merging offers Reopen PR and Start over.
+ */
 function PrStep({ run }: { run: Run }) {
-  const { projects, pr, openPr } = useWizardStore();
+  const { projects, pr, openPr, reopenPr, startOver, checkMerge } = useWizardStore();
   const data = useBoardStore((s) => s.data);
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
@@ -332,16 +335,36 @@ function PrStep({ run }: { run: Run }) {
     <div data-pr-step className="grid gap-4">
       <div className="grid gap-1">
         <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">One PR on {repo}, branch lar-factory/onboarding</h4>
-        <p className="m-0 text-xs text-muted-foreground">It adds .lar-factory.json, made on GitHub from the default branch, so your checkout stays as it is.</p>
+        <p className="m-0 text-xs text-muted-foreground">It adds .lar-factory.json, made on GitHub from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
         <pre className="m-0 overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>
       </div>
-      {run.prUrl ? (
+      {run.prUrl && prClosed(run, data) ? (
+        <Alert variant="warning" data-pr-closed><CircleAlert /><AlertTitle>{prName(run.prUrl)} closed without merging</AlertTitle>
+          <AlertDescription>
+            <span>Reopen PR reopens it and waits for its merge again. Start over opens a new PR.</span>
+            {pr.error && <span className="text-destructive-foreground">{pr.error}</span>}
+          </AlertDescription>
+          <AlertAction>
+            <Button size="xs" variant="outline" disabled={pr.reopening || pr.opening} onClick={() => void reopenPr()}>
+              {pr.reopening ? <LoaderCircle className="animate-spin" /> : <RotateCw />} Reopen PR</Button>
+            <Button size="xs" variant="outline" disabled={pr.reopening || pr.opening} onClick={() => void startOver()}><GitPullRequest /> Start over</Button>
+          </AlertAction></Alert>
+      ) : run.prUrl ? (
         <div className="grid gap-3 rounded-lg border p-3">
           <div className="flex items-center gap-2.5 text-sm">
             <LoaderCircle className="size-4 animate-spin text-info" />
             <span><a className="font-medium underline" href={run.prUrl} target="_blank" rel="noreferrer">{prName(run.prUrl)}</a> is open. Waiting for its merge.</span>
+            <Button size="xs" variant="outline" className="ml-auto" disabled={pr.checking} onClick={() => void checkMerge()}>
+              {pr.checking ? <><LoaderCircle className="animate-spin" /> Checking…</> : <><RotateCw /> Check now</>}</Button>
           </div>
-          <p className="m-0 text-xs text-muted-foreground">You can close this dialog: {repo} stays on the board as onboarding, with Resume, and Start build and Start refining stay disabled for its items. The board finishes onboarding on its next check after the merge.</p>
+          {pr.checkedAt !== null && !pr.checking && !pr.error && (
+            <p data-checked className="m-0 text-xs text-muted-foreground" role="status">Checked {new Date(pr.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: still open.</p>
+          )}
+          {pr.error && (
+            <Alert variant="error"><CircleAlert /><AlertTitle>Can’t check the PR</AlertTitle><AlertDescription>{pr.error}</AlertDescription>
+              <AlertAction><Button size="xs" variant="outline" disabled={pr.checking} onClick={() => void checkMerge()}><RotateCw /> Retry</Button></AlertAction></Alert>
+          )}
+          <p className="m-0 text-xs text-muted-foreground">You can close this dialog: {repo} stays on the board as onboarding, with Resume, and Start build and Start refining stay disabled for its items. The board finishes onboarding on its next check after the merge; Check now checks at once.</p>
         </div>
       ) : pr.error ? (
         <Alert variant="error"><CircleAlert /><AlertTitle>Can’t open the PR</AlertTitle><AlertDescription>{pr.error}</AlertDescription>

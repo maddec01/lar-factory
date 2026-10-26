@@ -377,14 +377,14 @@ test("passing Checks with a new file moves to the Pull request step, and Open th
   expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web', setup: SETUP_DONE } },
     config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' } }]);
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR, savedAs: 'maddec01/lar-web' });
-  expect(wizard.getState().pr).toEqual({ opening: false, error: null });
+  expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error: null });
 });
 
 test("a PR the board can't open keeps the step with gh's message, and Retry opens it", async () => {
   const { wizard } = await onPr({ error: "Can't open maddec01/lar-web's onboarding PR: gh pr create failed: HTTP 403" });
   await settle(() => wizard.getState().openPr());
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: null });
-  expect(wizard.getState().pr).toEqual({ opening: false, error: "Can't open maddec01/lar-web's onboarding PR: gh pr create failed: HTTP 403" });
+  expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error: "Can't open maddec01/lar-web's onboarding PR: gh pr create failed: HTTP 403" });
   const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr'
     ? json({ prUrl: PR, board: { ...sample, onboarding: [ON_PR] }, error: null }) : served(url, init));
@@ -412,4 +412,60 @@ test('once the board finishes the onboarding its PR merged, the run is onboarded
   expect(onboarded(wizard.getState().run!, useBoardStore.getState().data)).toBe(true);
   await settle(() => wizard.getState().close());
   expect(kept()).toEqual([]);
+});
+
+/** ON_PR as the board has it once it found the PR closed without merging. */
+const CLOSED = { ...ON_PR, progress: { ...ON_PR.progress, prClosed: true as const } };
+
+/** The store on lar-web's Pull request step with its PR open, then found closed; `reopened` answers Reopen PR. */
+async function closedPr(reopened: object = { board: { ...sample, onboarding: [ON_PR] }, error: null }) {
+  const { wizard, useBoardStore } = await onPr();
+  await settle(() => wizard.getState().openPr());
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr/reopen' ? json(reopened) : served(url, init));
+  const { prClosed } = await import('./wizard-store.ts');
+  expect(prClosed(wizard.getState().run!, useBoardStore.getState().data)).toBe(false);
+  useBoardStore.getState().receive({ ...sample, onboarding: [CLOSED] });
+  expect(prClosed(wizard.getState().run!, useBoardStore.getState().data)).toBe(true);
+  return { wizard, useBoardStore, prClosed };
+}
+
+test('Reopen PR asks the board to reopen the closed PR, which then waits for its merge again', async () => {
+  const { wizard, useBoardStore, prClosed } = await closedPr();
+  await settle(() => wizard.getState().reopenPr());
+  const posts = (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/onboarding/pr/reopen');
+  expect(posts.map(([, init]) => JSON.parse(String(init.body)))).toEqual([{ repo: 'maddec01/lar-web' }]);
+  expect(prClosed(wizard.getState().run!, useBoardStore.getState().data)).toBe(false);
+  expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR });
+  expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error: null });
+});
+
+test("a Reopen PR the board refuses keeps the PR closed with gh's message", async () => {
+  const error = "Can't reopen maddec01/lar-web's onboarding PR: gh pr reopen failed: HTTP 403";
+  const { wizard, useBoardStore, prClosed } = await closedPr({ error });
+  await settle(() => wizard.getState().reopenPr());
+  expect(prClosed(wizard.getState().run!, useBoardStore.getState().data)).toBe(true);
+  expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error });
+});
+
+test('Start over drops the closed PR and opens a new one, sending no PR with the progress', async () => {
+  const { wizard } = await closedPr();
+  const NEXT = 'https://github.com/maddec01/lar-web/pull/15';
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr'
+    ? json({ prUrl: NEXT, board: { ...sample, onboarding: [{ ...ON_PR, progress: { ...ON_PR.progress, prUrl: NEXT } }] }, error: null }) : served(url, init));
+  await settle(() => wizard.getState().startOver());
+  expect(prPosts().at(-1)).toMatchObject({ repo: 'maddec01/lar-web', progress: { step: 'pr', answers: { projectId: 'lar-web' } } });
+  expect(prPosts().at(-1)).not.toHaveProperty('progress.prUrl');
+  expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: NEXT });
+});
+
+test('Reopen PR and Start over do nothing while the PR is open', async () => {
+  const { wizard } = await onPr();
+  await settle(() => wizard.getState().openPr());
+  fetchMock.mockClear();
+  await settle(() => wizard.getState().reopenPr());
+  await settle(() => wizard.getState().startOver());
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(wizard.getState().run!.prUrl).toBe(PR);
 });

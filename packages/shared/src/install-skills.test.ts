@@ -147,6 +147,7 @@ test('an install that already matches writes nothing, not even the manifest', ()
   const home = temporary();
   profile(home, '.claude');
   profile(home, '.claude-off');
+  mkdirSync(join(home, '.gemini'));
   const source = bundle(linked);
   installSkills(home, source, '1.0.0');
   setProfileTick(home, '.claude-off', false);
@@ -664,10 +665,13 @@ test('an install restores a ticked profile missing or wrong link and its changed
   mkdirSync(join(home, '.claude-off/references'));
   writeFileSync(join(home, '.claude-off/references/review.md'), 'mine');
 
-  const result = installSkills(home, source, '1.0.0');
+  const result = installSkills(home, source, '1.0.0', { now });
 
   assert.equal(result.installed, true);
   assert.deepEqual(result.conflicts, []);
+  assert.deepEqual((manifest(home) as { status: unknown }).status, {
+    'lar-work': { state: 'restored', restoredAt: restoredAt.toISOString() }, tdd: { state: 'restored', restoredAt: restoredAt.toISOString() },
+  });
   assert.deepEqual(entries(home, '.claude'), ownLinks);
   assert.deepEqual(readdirSync(join(home, '.claude/references')).sort(), ['pr-checklist.md', 'review.md']);
   assert.equal(readFileSync(join(home, '.claude/references/review.md'), 'utf8'), 'review v1');
@@ -687,6 +691,21 @@ test('a folder that replaced an engine link stays and becomes a conflict', () =>
   assert.deepEqual(result.conflicts, [join(home, '.claude/skills/tdd')]);
   assert.deepEqual(entries(home, '.claude'), { 'lar-work': ownLinks['lar-work'], tdd: 'folder' });
   assert.deepEqual((manifest(home) as { profiles: Record<string, { links: string[] }> }).profiles['.claude']!.links, ['lar-work']);
+});
+
+test('a skill installed once the folder that blocked it moves away is matching, not restored', () => {
+  const home = temporary();
+  installSkills(home, bundle(v1), '1.0.0');
+  writeSkill(home, 'grill', 'grill from the skills CLI');
+  const withGrill = bundle({ ...v1, 'skills/grill/SKILL.md': 'grill v1' });
+  installSkills(home, withGrill, '2.0.0');
+  rmSync(join(home, '.agents/skills/grill'), { recursive: true });
+
+  const result = installSkills(home, withGrill, '2.0.0', { now });
+
+  assert.deepEqual(result.skills, ['grill', 'lar-work', 'tdd']);
+  assert.equal(read(home, 'skills/grill/SKILL.md'), 'grill v1');
+  assert.deepEqual((manifest(home) as { status: unknown }).status, matching('grill', 'lar-work', 'tdd'));
 });
 
 test('conflicts warn on the first install of each version only, and stay blocked in the manifest', () => {
@@ -716,5 +735,156 @@ test('manifest statuses of the wrong shape are dropped', () => {
 
   assert.deepEqual(manifest(home), {
     version: '1.0.0', skills: ['lar-work', 'tdd'], status: { 'lar-work': { state: 'matching' }, tdd: { state: 'restored', restoredAt: 'then' } }, profiles: {},
+  });
+});
+
+/** Antigravity's skill folders in a home: the app's and the CLI's. */
+const antigravity = ['.gemini/config/skills', '.gemini/antigravity-cli/skills'];
+
+function geminiHome(): string {
+  const home = temporary();
+  mkdirSync(join(home, '.gemini'));
+  return home;
+}
+
+test('an install copies every skill into both Antigravity folders when ~/.gemini exists', () => {
+  const home = geminiHome();
+  const result = installSkills(home, bundle(v1), '1.0.0');
+
+  assert.deepEqual(result, { installed: true, version: '1.0.0', skills: ['lar-work', 'tdd'], conflicts: [], warn: false });
+  for (const folder of antigravity) {
+    assert.ok(!lstatSync(join(home, folder, 'tdd')).isSymbolicLink(), `${folder}/tdd is a copy`);
+    assert.equal(readFileSync(join(home, folder, 'lar-work/scripts/status.sh'), 'utf8'), 'status v1');
+    assert.deepEqual(readdirSync(join(home, folder)).sort(), ['lar-work', 'tdd']);
+  }
+  assert.deepEqual((manifest(home) as { antigravity: unknown }).antigravity, {
+    '.gemini/config/skills': ['lar-work', 'tdd'], '.gemini/antigravity-cli/skills': ['lar-work', 'tdd'],
+  });
+  assert.equal(installSkills(home, bundle(v1), '1.0.0').installed, false);
+});
+
+test('without ~/.gemini an install creates nothing for Antigravity', () => {
+  const home = temporary();
+  installSkills(home, bundle(v1), '1.0.0');
+
+  assert.ok(!existsSync(join(home, '.gemini')));
+  assert.equal((manifest(home) as { antigravity?: unknown }).antigravity, undefined);
+});
+
+const antigravityRestores = {
+  'an edited file': (path: string) => writeFileSync(join(path, 'SKILL.md'), 'edited'),
+  'a deleted file': (path: string) => rmSync(join(path, 'SKILL.md')),
+  'an added file': (path: string) => writeFileSync(join(path, 'extra.md'), 'extra'),
+  'a deleted folder': (path: string) => rmSync(path, { recursive: true }),
+};
+
+for (const [change, make] of Object.entries(antigravityRestores)) {
+  for (const folder of antigravity) {
+    test(`the same version restores ${folder}/tdd with ${change} and records when`, () => {
+      const home = geminiHome();
+      installSkills(home, bundle(v1), '1.0.0');
+      make(join(home, folder, 'tdd'));
+
+      const result = installSkills(home, bundle(v1), '1.0.0', { now });
+
+      assert.equal(result.installed, true);
+      assert.deepEqual(readdirSync(join(home, folder, 'tdd')), ['SKILL.md']);
+      assert.equal(readFileSync(join(home, folder, 'tdd/SKILL.md'), 'utf8'), 'tdd v1');
+      assert.deepEqual((manifest(home) as { status: unknown }).status, {
+        'lar-work': { state: 'matching' }, tdd: { state: 'restored', restoredAt: restoredAt.toISOString() },
+      });
+    });
+  }
+}
+
+test('a folder in an Antigravity skills folder the engine did not make stays and is a conflict', () => {
+  const home = geminiHome();
+  const app = join(home, '.gemini/config/skills');
+  mkdirSync(join(app, 'tdd'), { recursive: true });
+  writeFileSync(join(app, 'tdd/SKILL.md'), 'tdd from the skills CLI');
+
+  const result = installSkills(home, bundle(v1), '1.0.0');
+
+  assert.deepEqual(result.conflicts, [join(app, 'tdd')]);
+  assert.equal(result.warn, true);
+  assert.equal(readFileSync(join(app, 'tdd/SKILL.md'), 'utf8'), 'tdd from the skills CLI');
+  assert.equal(readFileSync(join(home, '.gemini/antigravity-cli/skills/tdd/SKILL.md'), 'utf8'), 'tdd v1');
+  assert.deepEqual((manifest(home) as { antigravity: unknown }).antigravity, {
+    '.gemini/config/skills': ['lar-work'], '.gemini/antigravity-cli/skills': ['lar-work', 'tdd'],
+  });
+
+  installSkills(home, bundle(v2), '2.0.0');
+  assert.equal(readFileSync(join(app, 'tdd/SKILL.md'), 'utf8'), 'tdd from the skills CLI');
+});
+
+test('a link in an Antigravity skills folder is a conflict, even one to the installed skill', () => {
+  const home = geminiHome();
+  const app = join(home, '.gemini/config/skills');
+  mkdirSync(join(home, '.agents/skills'), { recursive: true });
+  mkdirSync(app, { recursive: true });
+  symlinkSync(join(home, '.agents/skills/tdd'), join(app, 'tdd'));
+
+  const result = installSkills(home, bundle(v1), '1.0.0');
+
+  assert.deepEqual(result.conflicts, [join(app, 'tdd')]);
+  assert.equal(readlinkSync(join(app, 'tdd')), join(home, '.agents/skills/tdd'));
+});
+
+test('a first install adopts a copy in an Antigravity skills folder that already matches the bundle', () => {
+  const home = geminiHome();
+  const app = join(home, '.gemini/config/skills');
+  mkdirSync(join(app, 'tdd'), { recursive: true });
+  writeFileSync(join(app, 'tdd/SKILL.md'), 'tdd v1');
+
+  assert.deepEqual(installSkills(home, bundle(v1), '1.0.0').conflicts, []);
+  installSkills(home, bundle(v2), '2.0.0');
+  assert.equal(readFileSync(join(app, 'tdd/SKILL.md'), 'utf8'), 'tdd v2');
+});
+
+test('an upgrade whose bundle drops a skill removes its Antigravity copies, and an existing install gains them', () => {
+  const home = temporary();
+  installSkills(home, bundle(v1), '1.0.0');
+  mkdirSync(join(home, '.gemini'));
+  installSkills(home, bundle(v1), '1.0.0');
+  for (const folder of antigravity) assert.deepEqual(readdirSync(join(home, folder)).sort(), ['lar-work', 'tdd']);
+  assert.deepEqual((manifest(home) as { status: unknown }).status, matching('lar-work', 'tdd'));
+
+  const { 'skills/tdd/SKILL.md': _, ...withoutTdd } = v2;
+  installSkills(home, bundle(withoutTdd), '2.0.0');
+
+  for (const folder of antigravity) assert.deepEqual(readdirSync(join(home, folder)), ['lar-work']);
+  assert.deepEqual((manifest(home) as { antigravity: unknown }).antigravity, {
+    '.gemini/config/skills': ['lar-work'], '.gemini/antigravity-cli/skills': ['lar-work'],
+  });
+});
+
+test('an upgrade that drops a skill leaves a link or file put in place of its Antigravity copy', () => {
+  const home = geminiHome();
+  installSkills(home, bundle(v1), '1.0.0');
+  const [app, cli] = antigravity.map((folder) => join(home, folder, 'tdd'));
+  rmSync(app!, { recursive: true });
+  symlinkSync(join(home, 'elsewhere/tdd'), app!);
+  rmSync(cli!, { recursive: true });
+  writeFileSync(cli!, 'mine');
+
+  const { 'skills/tdd/SKILL.md': _, ...withoutTdd } = v2;
+  installSkills(home, bundle(withoutTdd), '2.0.0');
+
+  assert.equal(readlinkSync(app!), join(home, 'elsewhere/tdd'));
+  assert.equal(readFileSync(cli!, 'utf8'), 'mine');
+});
+
+test('manifest Antigravity entries for other folders or with names that are not one folder name are dropped', () => {
+  const home = geminiHome();
+  installSkills(home, bundle(v1), '1.0.0');
+  writeFileSync(join(home, '.agents', INSTALL_MANIFEST), JSON.stringify({
+    ...(manifest(home) as object),
+    antigravity: { '.gemini/config/skills': ['lar-work', 'tdd', '../x'], '.gemini/other': ['tdd'], '.gemini/antigravity-cli/skills': 'tdd' },
+  }));
+
+  installSkills(home, bundle(v1), '1.0.0');
+
+  assert.deepEqual((manifest(home) as { antigravity: unknown }).antigravity, {
+    '.gemini/config/skills': ['lar-work', 'tdd'], '.gemini/antigravity-cli/skills': ['lar-work', 'tdd'],
   });
 });

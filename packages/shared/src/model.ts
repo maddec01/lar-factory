@@ -16,7 +16,7 @@ export const STATUSES = [
 
 export type Status = (typeof STATUSES)[number];
 
-/** Statuses only Pedro can move on from. */
+/** Statuses only the user can move on from. */
 export const AMBER_STATUSES: readonly Status[] = ['Needs you', 'Verify'];
 
 export type ContentType = 'Issue' | 'PullRequest' | 'DraftIssue';
@@ -131,9 +131,9 @@ export function sliceProgress(state: 'OPEN' | 'CLOSED', stateReason: string | nu
 
 /** An item's agent time, wall time, tokens and API cost, over every thread that worked on it. */
 export interface ItemStats {
-  /** Agent time: every agent's work, a child's only outside its direct parent's work, less waits on Pedro. */
+  /** Agent time: every agent's work, a child's only outside its direct parent's work, less waits on the user. */
   agentMs: number;
-  /** Wall time: the time any of the item's agents was working, less waits on Pedro; absent in figures frozen before it existed. */
+  /** Wall time: the time any of the item's agents was working, less waits on the user; absent in figures frozen before it existed. */
   wallMs?: number;
   /** Total tokens from the threads' transcripts, counted as T3 Code's usage page counts them. */
   tokens: number;

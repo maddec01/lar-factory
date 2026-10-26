@@ -77,7 +77,7 @@ export function agentTime(rows: ThreadRows, now: number): AgentTimeReader {
     const end = run.completedAt ? Date.parse(run.completedAt) : (lastMessage.get(run.thread) ?? start);
     if (Number.isFinite(start) && Number.isFinite(end)) add(runsByThread, run.thread, [start, end]);
   }
-  // A thread's work: its turns less waits on Pedro, or, with no turns, its subagent runs.
+  // A thread's work: its turns less waits on the user, or, with no turns, its subagent runs.
   const work = (thread: string): Interval[] => {
     const own = turnsByThread.get(thread);
     if (!own) return merged(runsByThread.get(thread) ?? []);

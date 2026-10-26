@@ -1,10 +1,11 @@
 // The banners above the desk: an unreachable server, which closes, then T3 Code not running, then a gh the board can't use,
-// then a missing git, jq or curl, then an az that fails its check.
+// then a missing git, jq or curl, then an az that fails its check, then each repository whose .lar-factory.json can't be read.
 
 import { failedCheck, itemSource } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { CLIENT_ERROR } from '../board/live-data.ts';
 import { ClosableBanner } from './banner.tsx';
+import { RepositoryConfigBanner } from './repository-config-banner.tsx';
 import { AzBanner, CommandBanner, GhBanner, T3NotRunningBanner } from './tool-notices.tsx';
 
 export function Banners() {
@@ -27,6 +28,7 @@ export function Banners() {
         return check && <CommandBanner key={name} name={name} check={check} />;
       })}
       {az && <AzBanner check={az} />}
+      {data.repositoryConfigProblems?.map((p) => <RepositoryConfigBanner key={p.repo} {...p} />)}
     </div>
   );
 }

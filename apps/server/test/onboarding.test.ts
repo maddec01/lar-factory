@@ -28,6 +28,32 @@ test("the onboarding T3 project step reads T3's projects with each repository's 
   assert.deepEqual(projects.map((p) => [p.name, p.hasConfig, p.onBoard]), [['lar-web', false, false], ['lar-factory', true, true]]);
 });
 
+test('the board offers each T3 project whose repository has .lar-factory.json, reading each answer once until Recheck', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  const origins = { 'lar-web': 'git@github.com:maddec01/lar-web.git', 'lar-docs': 'git@github.com:maddec01/lar-docs.git',
+    'lar-cli': 'git@github.com:maddec01/lar-cli.git', 'lar-factory': 'git@github.com:maddec01/lar-factory.git',
+    'lar-api': 'https://contoso@dev.azure.com/contoso/Fabrikam/_git/lar-api' };
+  checkouts(home, origins);
+  const db = projectsDb(t, Object.keys(origins).map((id) => ({ id, root: `${home}/Developer/lar/${id}` })));
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], repoConfigs: { 'maddec01/lar-docs': false, 'maddec01/lar-cli': null } },
+    false, true, { HOME: home, T3_STATE_DB: db });
+  const data = await until(board, (d) => !!d.onboardingOffers);
+  assert.deepEqual(data.onboardingOffers, [{ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }]);
+  const reads = async (repo: string) => (await board.calls()).filter((args) => readsRepositoryConfig(args) && args[1] === `repos/${repo}/contents/.lar-factory.json`).length;
+  // More refreshes read lar-factory's items, but no answer they have already.
+  const refreshed = await reads('maddec01/lar-factory');
+  for (let i = 0; i < 40 && await reads('maddec01/lar-factory') < refreshed + 2; i++) await new Promise((r) => setTimeout(r, 25));
+  assert.deepEqual([await reads('maddec01/lar-web'), await reads('maddec01/lar-cli')], [1, 1]);
+  // A failed check offers nothing, logs once, and is tried again on the next refresh.
+  for (let i = 0; i < 40 && await reads('maddec01/lar-docs') < 2; i++) await new Promise((r) => setTimeout(r, 25));
+  assert.ok(await reads('maddec01/lar-docs') > 1);
+  assert.equal(board.logs().split("can't tell whether maddec01/lar-docs has .lar-factory.json: ").length, 2);
+  await board.post({}, board.url, '/api/recheck');
+  for (let i = 0; i < 40 && await reads('maddec01/lar-web') < 2; i++) await new Promise((r) => setTimeout(r, 25));
+  assert.equal(await reads('maddec01/lar-web'), 2);
+});
+
 test("T3's projects that can't be read answer with the problem", async (t) => {
   const board = await startBoard(t);
   const response = await fetch(`${board.url}/api/onboarding/projects`);

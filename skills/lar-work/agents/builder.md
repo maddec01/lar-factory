@@ -85,7 +85,7 @@ scan-and-rewrite pass. Code is out of scope.
    All must pass.
 7. Push the branch. Don't open the PR yet.
 
-Ordinary questions to Pedro follow `<lar-work>/questions.md`: Needs you,
+Ordinary questions to the user follow `<lar-work>/questions.md`: Needs you,
 `AskUserQuestion`, answers on the issue, status back. Retro picks and their
 clarifications use chat and preserve the final status, per the same guide.
 
@@ -108,16 +108,16 @@ failed check or a failed Verify) becomes a build there, and this build carries
 on. Write its short brief per **3. Brief** in `<lar-work>/SKILL.md`, with that
 repository's Domain docs only, as a sub-issue of this build that blocks it
 (reuse an open issue that covers the work); run its **4. Gate** Doubt, set it
-**Ready** and tell Pedro in chat that it waits for the board's Start build
-(**5. Start the build**). Ask Pedro only a product question he hasn't
+**Ready** and tell the user in chat that it waits for the board's Start build
+(**5. Start the build**). Ask the user only a product question they haven't
 confirmed. A slice holding that work
 loses `active` and closes as not planned, its text moving into the new brief.
 A failed Verify is fixed in this build, or by a new blocking build when
 another repository must change; a merged build is never reopened.
 
 If the brief is wrong or a decision is missing, stop: comment on the issue with
-what you found and your recommendation, ask Pedro and continue when he
-answers. Whenever the build stops (this, a handoff, or Pedro saying stop),
+what you found and your recommendation, ask the user and continue when they
+answer. Whenever the build stops (this, a handoff, or the user saying stop),
 remove `active` from every slice still carrying it.
 
 ## Review
@@ -176,9 +176,9 @@ Set **Needs you** when the CI fixer returns `infrastructure` or `not fixed`, or
 a required check fails or the branch conflicts after two CI fixer runs (every
 run counts, merge conflicts included). Comment on the issue with the failing
 job's name and run link (or "merge conflict") and the CI fixer's report,
-`unwatch_pull_request`, and ask Pedro how to go on (rerun the job, start a CI
-fixer, or stop). When he answers, set **Review**, do it, `watch_pull_request`
-and restart **Checks**. If he says stop, set **Needs you** and go to
+`unwatch_pull_request`, and ask the user how to go on (rerun the job, start a CI
+fixer, or stop). When they answer, set **Review**, do it, `watch_pull_request`
+and restart **Checks**. If they say stop, set **Needs you** and go to
 **Retro**.
 
 ## Retro

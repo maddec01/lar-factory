@@ -1,6 +1,6 @@
 # Question UI
 
-Ask Pedro ordinary questions with the question UI (`AskUserQuestion`), so T3
+Ask the user ordinary questions with the question UI (`AskUserQuestion`), so T3
 shows the thread as waiting: Size up, grilling rounds, the prototype pick,
 Gate assumptions, Doubt findings, Concepts,
 `decision: grill`, and the builder's stops. Retro picks and their
@@ -25,7 +25,7 @@ Map the `grilling` format onto the call instead of repeating it in chat:
   stays for free text. Without an honest recommendation (a prototype pick),
   mark nothing `(Recommended)`;
 - at least 2 options. A confirmation like Size up gets "Confirm" and
-  "Correct it"; if he picks "Correct it" without text, ask what to correct in
+  "Correct it"; if they pick "Correct it" without text, ask what to correct in
   a follow-up call of the same batch;
 - `header` ≤12 characters; option labels 1–5 words plus `(Recommended)`;
 - ≤4 questions per call. Split a longer batch (a grilling round, Gate
@@ -39,8 +39,8 @@ its name and full description, even for more than four suggestions or long
 descriptions. Keep selection and any clarification entirely in chat; question
 UI option limits must neither split nor truncate the list.
 
-Ask Pedro to reply with numbers, names, free-text descriptions, “all” or
-“none”, then wait for his reply using normal chat waiting. Add no notification
+Ask the user to reply with numbers, names, free-text descriptions, “all” or
+“none”, then wait for their reply using normal chat waiting. Add no notification
 feature. With no suggestions, skip the selection question.
 
 Follow [Retro capture](retro-capture.md#select-and-route) to resolve the reply

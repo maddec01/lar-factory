@@ -5,7 +5,7 @@ argument-hint: "<owner/repo#n or issue URL>"
 disable-model-invocation: true
 ---
 
-You run one Lar Factory item. Pedro answers questions, picks prototypes,
+You run one Lar Factory item. The user answers questions, picks prototypes,
 verifies visible changes and merges every PR; the rest is yours.
 
 ## Rules
@@ -24,13 +24,13 @@ verifies visible changes and merges every PR; the rest is yours.
   `bash <this skill>/scripts/status.sh <owner/repo#n> "<Status>"`. Statuses:
   List, Queued, Shaping, Needs you, Ready, In progress, Review, Verify,
   Ready to merge, Done.
-- Facts are yours to find; decisions are Pedro's. Read code, docs and history
+- Facts are yours to find; decisions are the user's. Read code, docs and history
   in **subagents**. Every factory subagent reports in ≤300 words, never whole
-  files, logs or screenshots. Ask Pedro only what a subagent can't answer.
+  files, logs or screenshots. Ask the user only what a subagent can't answer.
 - **Tools**: `gh issue view <ref> --comments` and `gh issue comment` for
   issues; `t3_thread_launch` for a handoff thread; a native subagent or a
   `delegate_task` child task per [Orchestration](orchestration.md) for
-  delegated work; `AskUserQuestion` for ordinary questions to Pedro, following
+  delegated work; `AskUserQuestion` for ordinary questions to the user, following
   the [question guide](questions.md). Retro picks and their clarifications
   stay in chat. Call `orchestrator_capabilities` only to change a model or to
   read `inheritedOptions` before delegating; never search the tool catalogue.
@@ -60,7 +60,7 @@ verifies visible changes and merges every PR; the rest is yours.
 
 Wherever this skill grills (open questions in **2. Size up**,
 [Concepts](concepts.md) step 1, `decision: grill`), load `grilling` and
-`domain-modeling`, as upstream `grill-with-docs` does. Challenge Pedro's terms
+`domain-modeling`, as upstream `grill-with-docs` does. Challenge the user's terms
 against the repo's `GLOSSARY.md` and ADRs; capture each resolved term and
 ADR-worthy decision the moment it settles.
 
@@ -95,7 +95,7 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
 
 ## 2. Size up
 
-Pick the route yourself; never ask Pedro to pick one by name. Ask him to
+Pick the route yourself; never ask the user to pick one by name. Ask them to
 confirm it ([question UI](questions.md)) in a few lines: what you understood
 the item to be; the repositories that change, named from the repository
 roles; the open questions, or "none";
@@ -103,11 +103,11 @@ and what happens next in plain
 words ("I'll ask you three questions, then write the brief"; "a subagent
 reproduces the bug first; I only ask you if the expected behaviour is
 unclear"; "this is too big for one session, so I'll turn it into a concept
-map"). Shaping ends at Ready, with Pedro starting each build from the board.
+map"). Shaping ends at Ready, with the user starting each build from the board.
 
 Add the kind label (`bug`, `feature`, `improvement`, `concept`), first running
 [label setup](issue-tracker.md#label-setup) in the issue's repo if it lacks the
-label. Anything Pedro adds or corrects is another open question. Then:
+label. Anything the user adds or corrects is another open question. Then:
 
 - **Bug**: first a **Diagnose subagent** with `diagnosing-bugs` returns the
   cause, the evidence and a failing test to write; its open questions join the
@@ -119,14 +119,14 @@ label. Anything Pedro adds or corrects is another open question. Then:
   that question; a logic or state question gets an HTML page. It keeps its
   screenshots in its own context and returns each variant's start command (or
   HTML path), the worktree path, the branch, a preferred port and a short
-  description. Show the variants as below, ask for Pedro's pick, and record it
+  description. Show the variants as below, ask for the user's pick, and record it
   and the branch on the issue.
 
   **Showing prototypes.** This thread, or the thread of a `decision: prototype`
   sub-issue, shows every variant inside T3 itself, since the preview and Device
-  panel belong to the thread that opens them. Pedro never receives a file
+  panel belong to the thread that opens them. The user never receives a file
   path, URL or run command, and nothing opens outside T3. This overrides the
-  `prototype` skill where it tells the agent to hand Pedro a file, URL or
+  `prototype` skill where it tells the agent to hand the user a file, URL or
   command: `LOGIC.md` "3. Build the shareable HTML file", "4. Hand it over"
   and "Anti-patterns", `UI.md` "5. Hand it over" and `SKILL.md` "Rules that
   apply to both".
@@ -141,10 +141,10 @@ label. Anything Pedro adds or corrects is another open question. Then:
     `device_open` (`device_list` finds the device id).
   - Say in chat which variant is showing. For another round, send the request
     to a Prototype child task.
-  - When Pedro picks, or the thread ends without a pick, stop exactly the
+  - When the user picks, or the thread ends without a pick, stop exactly the
     noted PIDs. An app left installed on the simulator stays.
   - If `preview_open` or `device_open` is unavailable or fails, stop, tell
-    Pedro why and ask how to go on per [Questions](questions.md). Never fall
+    the user why and ask how to go on per [Questions](questions.md). Never fall
     back to anything outside T3.
 - **Another repository changes** (its role says it serves or uses what this
   item changes): that work becomes a build there, a
@@ -158,18 +158,18 @@ label. Anything Pedro adds or corrects is another open question. Then:
 
 ## 3. Brief
 
-Replace the issue body with the brief; Pedro's original text goes in a
+Replace the issue body with the brief; the user's original text goes in a
 collapsed `<details>` block at the end.
 
 ```markdown
 ## What
-<the change, in Pedro's domain language>
+<the change, in the user's domain language>
 
 ## Done when
 - <observable result a reviewer can check>
 
 ## Confirmed
-- <each assumption Pedro confirmed, and each decision with a link>
+- <each assumption the user confirmed, and each decision with a link>
 
 ## Notes for the builder
 <where the code is, the failing test to start from, prototype branch to follow>
@@ -187,19 +187,19 @@ collapsed `<details>` block at the end.
 1. A **Doubt subagent** gets only the path of
    [`agents/doubt.md`](agents/doubt.md), the brief and the repo path, no
    conversation. Fix what it finds.
-2. In one batch, ask Pedro every assumption he hasn't confirmed and every
+2. In one batch, ask the user every assumption they haven't confirmed and every
    Doubt finding you can't fix.
 3. Set **Ready** on each build: this issue if it's a build, and each build
-   sub-issue found while shaping. Tell Pedro in chat which builds are Ready and
-   which issue each waits on. This shaping thread is done; Pedro starts each
+   sub-issue found while shaping. Tell the user in chat which builds are Ready and
+   which issue each waits on. This shaping thread is done; the user starts each
    build from the board (**5. Start the build**).
 
 ## 5. Start the build
 
-The board's **Start build** on a Ready build is Pedro's Go. A build blocked by
+The board's **Start build** on a Ready build is the user's Go. A build blocked by
 another issue starts only once that issue closes, by hand or through the
 board's **Start after**. With no repository project for the build's repo,
-Start build stays disabled until Pedro adds the project in T3. Start build:
+Start build stays disabled until the user adds the project in T3. Start build:
 
 1. adds the `build` label, so the board shows the build's sub-issues as slices;
 2. sets a parent that isn't a build to In progress, where it stays until a

@@ -8,7 +8,7 @@ clarification questions and failures. On resume, reuse the existing plan and IDs
 ## Select and route
 
 1. Resolve replies against the numbered list per [Retro picks](questions.md#retro-picks).
-   Capture only Pedro's explicit picks; “all” selects the whole list. Clarify
+   Capture only the user's explicit picks; “all” selects the whole list. Clarify
    ambiguous, conflicting or partly unclear replies in chat before creating
    or updating any destination issue, even when other picks are clear. Wait
    for clarification; uncertainty or silence never means “none”. An explicit
@@ -102,6 +102,6 @@ than repeat a possibly successful mutation.
    confirmed List placement, edit the heading to `Retro capture: complete` and
    clear the remaining steps. Otherwise leave it pending with the exact
    unfinished steps and errors. Report created/reused links (respecting
-   visibility) and pending failures to Pedro. Resume with
+   visibility) and pending failures to the user. Resume with
    `/lar-work <source-owner/repo#n>`; Pick up finishes capture only, even when
    the source already has a passing brief.

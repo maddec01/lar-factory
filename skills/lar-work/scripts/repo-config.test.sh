@@ -67,12 +67,12 @@ run --list
 check "with no repositories.json, --list prints []" '[]'
 
 mkdir -p "$data"
-echo '{"repositories":[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":true}]}' >"$list_file"
+echo '{"repositories":[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":{"step":"setup","done":["project"],"answers":{"projectId":"lar-server"}}}]}' >"$list_file"
 run --list
-check "--list prints the repositories array" '[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":true}]'
+check "--list prints the repositories array, an entry still onboarding with its progress" '[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":{"step":"setup","done":["project"],"answers":{"projectId":"lar-server"}}}]'
 
 FAKE_LOGGED_OUT=1 run --list
-check "--list doesn't need gh" '[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":true}]'
+check "--list doesn't need gh" '[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":{"step":"setup","done":["project"],"answers":{"projectId":"lar-server"}}}]'
 
 echo '{"repositories": [' >"$list_file"
 run --list

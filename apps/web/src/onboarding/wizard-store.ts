@@ -8,7 +8,7 @@
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, isOnboarding, sameRepo, type BoardData, type CheckedTool, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type RepositoryConfigAnswers, type RepositoryItemSource,
+  SETUP_CHECKS, isOnboarding, sameRepo, type BoardData, type CheckedTool, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
   type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -37,6 +37,8 @@ export interface Run {
   projectId: string | null;
   /** The picked T3 project's repository. */
   repo: string | null;
+  /** The picked T3 project's provider, from its origin's host; null until one is picked. */
+  provider: Provider | null;
   /** The repository the run was kept under when it was last closed; null for a run never kept. */
   savedAs: string | null;
   /** The Provider and item source step's answers; null until that step first shows. */
@@ -227,7 +229,7 @@ const isStep = (id: string): id is StepId => STEPS.some((s) => s.id === id);
 /** The run a kept onboarding resumes; a step this dialog doesn't have, as a newer board's, resumes on the T3 project step. */
 function resumed(repo: string, progress: OnboardingProgress): Run {
   return { step: isStep(progress.step) ? progress.step : 'project', done: progress.done.filter(isStep), projectId: progress.answers.projectId, repo,
-    savedAs: repo, setup: progress.answers.setup ?? null, prUrl: progress.prUrl ?? null };
+    provider: progress.answers.provider ?? null, savedAs: repo, setup: progress.answers.setup ?? null, prUrl: progress.prUrl ?? null };
 }
 
 /** The setup step's answers before any is given: a GitHub Project of the repository's owner, with its suggested show setting. */
@@ -237,7 +239,7 @@ const firstSetup = (repo: string | null): SetupAnswers => ({
 
 /** Where the run stopped, as the board keeps it. */
 const progressOf = (run: Run & { projectId: string }): OnboardingProgress => ({ step: run.step, done: run.done,
-  answers: { projectId: run.projectId, ...run.setup && { setup: run.setup } }, ...run.prUrl && { prUrl: run.prUrl } });
+  answers: { projectId: run.projectId, ...run.provider && { provider: run.provider }, ...run.setup && { setup: run.setup } }, ...run.prUrl && { prUrl: run.prUrl } });
 
 /** The onboarding a run kept under another repository replaces, to send with its repository. */
 const replacing = (run: Run & { repo: string }) => run.savedAs && !sameRepo(run.savedAs, run.repo) ? { replaces: run.savedAs } : {};
@@ -288,7 +290,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     pr: IDLE,
     start: (offer) => {
       checkRuns++;
-      set({ run: { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, savedAs: null, setup: null, prUrl: null },
+      // The board offers only GitHub repositories until build #386.
+      set({ run: { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer ? 'GitHub' : null, savedAs: null, setup: null, prUrl: null },
         creating: null, checks: null, pr: IDLE });
       void get().loadProjects();
     },
@@ -324,11 +327,11 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     pick: (projectId) => {
       const { run, projects } = get();
       const project = projects.state === 'loaded' ? projects.projects.find((p) => p.id === projectId) : undefined;
-      if (run && project && !unpickable(project, run)) set({ run: { ...run, projectId, repo: project.repo }, creating: null });
+      if (run && project && !unpickable(project, run)) set({ run: { ...run, projectId, repo: project.repo, provider: project.provider }, creating: null });
     },
     chooseNew: () => {
       const { run, creating } = get();
-      if (run) set({ run: { ...run, projectId: null, repo: null }, creating: creating ?? { folder: '', adding: false, error: null } });
+      if (run) set({ run: { ...run, projectId: null, repo: null, provider: null }, creating: creating ?? { folder: '', adding: false, error: null } });
     },
     setFolder: (folder) => {
       const { creating } = get();

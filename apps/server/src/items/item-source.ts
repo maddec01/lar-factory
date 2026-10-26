@@ -9,6 +9,9 @@ export interface ItemsRead {
   items: Item[];
 }
 
+/** The error every item source gives a Done write: Done is never stored, and an item is Done once it closes. */
+export const DONE_REFUSED = 'Could not set Done. The board never stores Done. Close the item to make it Done.';
+
 /** Every write returns the error to show, or null when the provider accepted it. */
 export interface ItemSource {
   read(): Promise<ItemsRead>;

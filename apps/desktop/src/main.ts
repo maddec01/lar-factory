@@ -4,7 +4,7 @@
 // screen's profile calls, checks Releases for updates, drains and stops the server
 // before it installs one and stops the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";

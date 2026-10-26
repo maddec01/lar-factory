@@ -3,7 +3,7 @@
 // apps/desktop/src/window/DesktopWindow.ts. On other systems the window keeps the system's title bar,
 // and the page's top row sits below it.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import type * as Electron from "electron";
 

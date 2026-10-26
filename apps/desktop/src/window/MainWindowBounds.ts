@@ -4,7 +4,7 @@
 // apps/desktop/src/window/DesktopWindow.ts, and the mainWindowBounds and mainWindowMaximized settings in
 // apps/desktop/src/settings/DesktopAppSettings.ts.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";

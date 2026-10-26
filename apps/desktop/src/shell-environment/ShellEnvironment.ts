@@ -5,7 +5,7 @@
 // keeping macOS only, returning a new environment instead of changing process.env,
 // and adding the Homebrew folders apps/server/src/tools/tools.ts adds.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";

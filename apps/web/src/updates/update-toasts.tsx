@@ -2,7 +2,7 @@
 // toast calls in apps/web/src/components/sidebar/SidebarUpdatePill.tsx at 9a391eb, shown through the board's
 // toasts. Without the downloaded toast's link to the Release, as the board app's state has no release URLs.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import { showToast } from '../notices/toasts.tsx';
 

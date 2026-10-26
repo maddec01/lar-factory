@@ -4,7 +4,7 @@
 // profiles through it, it follows the window's full screen, it follows and drives the app's updates,
 // and asks before restarting to install one (packages/shared/src/board-app.ts holds the bridge contract).
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import { contextBridge, ipcRenderer } from "electron";
 

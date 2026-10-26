@@ -2,7 +2,7 @@
 // It first fetches Electron's binary if the install skipped it (pnpm runs no
 // install scripts for electron).
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodePath from "node:path";

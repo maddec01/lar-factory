@@ -1,6 +1,6 @@
 // Copied unchanged from T3 Code, apps/desktop/scripts/ensure-electron-runtime.mjs
 // (https://github.com/pingdotgg/t3code, commit eb1510d2).
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import * as NodeFS from "node:fs";
 import * as NodeModule from "node:module";

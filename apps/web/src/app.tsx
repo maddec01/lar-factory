@@ -1,7 +1,7 @@
 // The page, the control room: the window controls, the sidebar with the List, and the main area with the title bar,
-// the banners, Your desk and the line, scoped to the repository the sidebar picked. While no t3 is found, the notice
-// replaces the main area's content and the sidebar shows only its brand and Settings; while no repository is
-// onboarded, the empty state offering onboarding replaces it. Settings takes the main area's
+// a card for each repository still onboarding, the banners, Your desk and the line, scoped to the repository the
+// sidebar picked. While no t3 is found, the notice replaces the main area's content and the sidebar shows only its
+// brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces it. Settings takes the main area's
 // place, hiding the board rather than closing it, so Back finds it as it was.
 
 import { boardSections, failedCheck, noneOnboarded, repoKey, sameRepo } from '@lar-factory/shared';
@@ -15,6 +15,7 @@ import { Banners } from './notices/banners.tsx';
 import { Toasts } from './notices/toasts.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
 import { EmptyState } from './onboarding/empty-state.tsx';
+import { OnboardingCards } from './onboarding/onboarding-cards.tsx';
 import { WizardDialog } from './onboarding/wizard-dialog.tsx';
 import { SettingsMain } from './settings/settings.tsx';
 import { useSettingsStore } from './settings/settings-store.ts';
@@ -29,6 +30,7 @@ function Content() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="grid gap-7 px-6 py-5">
+        <OnboardingCards />
         <Banners />
         <Desk items={boardSections({ ...data, items }, now).needsYou} />
         <Line items={items} />

@@ -33,7 +33,7 @@ test('Next is disabled until a project is picked, then shows the next step, and 
   expect(radio('lar-web').getAttribute('aria-checked'), 'the pick stays').toBe('true');
 });
 
-test('closing the dialog drops the run, so reopening starts over', async () => {
+test('Onboard a repository after a close starts a new run', async () => {
   await openOnboarding([project('lar-web')]);
   await settle(() => radio('lar-web').click());
   await settle(() => inDialog<HTMLButtonElement>('[aria-label="Close"]')!.click());

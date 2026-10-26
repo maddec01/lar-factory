@@ -1,5 +1,5 @@
 // The onboarding dialog: 768px wide over the board, showing one step at a time with a progress bar, Back and Next.
-// The empty board opens it; closing it drops the run.
+// The empty board and Resume open it; closing it drops the run until a T3 project is picked, then keeps it to resume.
 
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@lar-factory/ui/button';
@@ -28,7 +28,7 @@ export function WizardDialog() {
       <DialogPopup className="max-w-3xl" data-onboarding-dialog>
         {run && step && (<>
           <DialogHeader>
-            <DialogDescription>Onboard {pickedProject(run, projects)?.name ?? 'a repository'} · step {indexOf(run) + 1} of {STEPS.length}</DialogDescription>
+            <DialogDescription>Onboard {pickedProject(run, projects)?.name ?? run.repo?.split('/')[1] ?? 'a repository'} · step {indexOf(run) + 1} of {STEPS.length}</DialogDescription>
             <DialogTitle>{step.label}</DialogTitle>
             <Progress value={run.done.length} max={STEPS.length} caption={`${run.done.length} of ${STEPS.length} done`} />
           </DialogHeader>

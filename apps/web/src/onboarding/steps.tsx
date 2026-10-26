@@ -53,7 +53,7 @@ function ProjectStep({ run }: { run: Run }) {
       {projects.projects.length === 0 && <p className="m-0 text-sm text-muted-foreground">T3 Code has no project yet.</p>}
       <RadioGroup value={run.projectId ?? ''} onValueChange={(id) => pick(id as string)} className="gap-2">
         {projects.projects.map((p) => {
-          const reason = unpickable(p);
+          const reason = unpickable(p, run);
           return (
             <Choice key={p.id} value={p.id} disabled={!!reason} title={<span className="flex flex-wrap items-center gap-2">{p.name}
               {p.provider && <Badge variant="outline" size="sm">{p.provider}</Badge>}

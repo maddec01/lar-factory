@@ -1,0 +1,64 @@
+// The board's card for each repository still onboarding, whose Resume reopens the dialog where it stopped.
+
+import { expect, test, vi } from 'vite-plus/test';
+import { $, $$, mountPage, sample, settle, text, toast } from '../../test/support.ts';
+import type { BoardData } from '@lar-factory/shared';
+import { dialog, empty, project, serve } from './onboarding-support.ts';
+
+const waiting = (data: BoardData, step = 'setup'): BoardData => ({ ...data,
+  onboarding: [{ repo: 'maddec01/lar-web', progress: { step, done: ['project'], answers: { projectId: 'lar-web' } } }] });
+
+const card = () => $('[data-onboarding-card="maddec01/lar-web"]');
+
+async function resume(): Promise<void> {
+  await settle(() => card()!.querySelector<HTMLButtonElement>('[data-resume]')!.click());
+  // Base UI moves focus on the next frame.
+  await settle(() => vi.advanceTimersByTime(50));
+}
+
+test('a repository still onboarding shows its card with its step instead of the empty state', async () => {
+  serve(waiting(empty), []);
+  await mountPage(waiting(empty));
+  expect($('[data-empty-state]')).toBeNull();
+  expect(text(card()!.querySelector('[data-repo]'))).toBe('maddec01/lar-web');
+  expect(text(card())).toContain('Onboarding');
+  expect(text(card())).toContain('Stopped at Provider and item source');
+  expect(text(card()!.querySelector('[data-resume]'))).toBe('Resume');
+});
+
+test('a card with an open PR says it waits for the merge, and one whose PR closed without merging says so', async () => {
+  const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' }, prUrl: 'https://github.com/maddec01/lar-web/pull/14' };
+  const data: BoardData = { ...empty, onboarding: [{ repo: 'maddec01/lar-web', progress: pr }, { repo: 'maddec01/lar-cli', progress: { ...pr, prClosed: true } }] };
+  serve(data, []);
+  await mountPage(data);
+  expect(text(card())).toContain('Waiting for its PR to merge');
+  expect(text($('[data-onboarding-card="maddec01/lar-cli"]'))).toContain('Its PR closed without merging');
+});
+
+test('the card sits above the board of the repositories onboarded already', async () => {
+  serve(waiting(sample), []);
+  await mountPage(waiting(sample));
+  expect(card()).not.toBeNull();
+  expect($('.desk')).not.toBeNull();
+  expect($$('[data-onboarding-card]')).toHaveLength(1);
+});
+
+test('Resume reopens the dialog on the stored step with the stored project', async () => {
+  serve(waiting(empty), [project('lar-web', { onBoard: true })]);
+  await mountPage(waiting(empty));
+  await resume();
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Provider and item source');
+  expect(text(dialog()!.querySelector('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 4');
+  await settle(() => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).includes('Back'))!.click());
+  const radio = dialog()!.querySelector('[data-project="lar-web"] [role="radio"]')!;
+  expect(radio.getAttribute('aria-checked')).toBe('true');
+  expect(radio.hasAttribute('data-disabled'), 'its own project stays pickable').toBe(false);
+});
+
+test("closing a run the server can't keep says why in a toast", async () => {
+  serve(waiting(empty), [project('lar-web', { onBoard: true })], { error: 'maddec01/lar-web is onboarded already.' }, 409);
+  await mountPage(waiting(empty));
+  await resume();
+  await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
+  expect(text(toast())).toContain("Couldn't keep onboarding maddec01/lar-web on the board. maddec01/lar-web is onboarded already.");
+});

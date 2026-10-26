@@ -1,14 +1,16 @@
-// The banners above the desk: an unreachable server, which closes, then a gh the board can't use, then a missing git, jq or curl.
+// The banners above the desk: an unreachable server, which closes, then a gh the board can't use, then a missing git, jq or curl,
+// then an az that fails its check.
 
 import { failedCheck } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { CLIENT_ERROR } from '../board/live-data.ts';
 import { ClosableBanner } from './banner.tsx';
-import { CommandBanner, GhBanner } from './tool-notices.tsx';
+import { AzBanner, CommandBanner, GhBanner } from './tool-notices.tsx';
 
 export function Banners() {
   const { data, clientError } = useBoardStore();
   const gh = failedCheck(data.tools, 'gh');
+  const az = failedCheck(data.tools, 'az');
   return (
     // Hidden while empty, so it takes no gap in the page's grid.
     <div className="banners grid gap-2.5 empty:hidden">
@@ -22,6 +24,7 @@ export function Banners() {
         const check = failedCheck(data.tools, name);
         return check && <CommandBanner key={name} name={name} check={check} />;
       })}
+      {az && <AzBanner check={az} />}
     </div>
   );
 }

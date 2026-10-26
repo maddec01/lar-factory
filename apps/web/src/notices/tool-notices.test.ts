@@ -160,3 +160,25 @@ test('a missing git, jq or curl shows a banner with its install command and Rech
     + 'Point GIT_PATH at git, or unset it and install it with brew install git Copy, then press Recheck. The board also looks again every 10 seconds. Recheck');
   expect(bannerText(banners()[1]!)[1]).toContain('lar-work’s scripts tell the board to refresh with curl. Install it with brew install curl Copy');
 });
+
+test('an az that fails its check shows a banner with its fix, and the board still shows', async () => {
+  holdRecheck();
+  const loggedOut = withTools({ az: { result: 'logged-out', version: '2.67.0', fix: 'az login' } });
+  await mountPage(loggedOut);
+  const banners = () => $$('.banners .banner');
+  expect(banners().map(bannerText)).toEqual([['Azure CLI is logged out.', 'The board reads repositories on Azure DevOps through az. '
+    + 'Run az login Copy in a terminal, then press Recheck. The board also looks again every 10 seconds. Recheck']]);
+  expect($('.desk')).not.toBeNull();
+  await settle(() => recheckButton().click());
+  await answer(board(loggedOut));
+  expect(note()!.textContent).toBe('Still logged out.');
+
+  await push(withTools({ az: { result: 'no-extension', fix: 'az extension add --name azure-devops' } }));
+  expect(bannerText(banners()[0]!)).toEqual(['Azure CLI has no azure-devops extension.', 'The board reads repositories on Azure DevOps through az. '
+    + 'Run az extension add --name azure-devops Copy in a terminal, then press Recheck. The board also looks again every 10 seconds. Recheck']);
+  await push(withTools({ az: { result: 'missing', fix: 'brew install azure-cli' } }));
+  expect(bannerText(banners()[0]!)[0]).toBe('Azure CLI not found.');
+  expect(bannerText(banners()[0]!)[1]).toContain('Install it with brew install azure-cli Copy, then press Recheck.');
+  await push(withTools({}));
+  expect(banners(), 'an az nobody needs is not checked and shows nothing').toEqual([]);
+});

@@ -332,13 +332,13 @@ export function repositoryProjectHint(data: Pick<BoardData, 'repositoryProjects'
   return Object.entries(data.repositoryProjects ?? {}).find(([r]) => r.toLowerCase() === key)?.[1] ?? null;
 }
 
-/** The commands the board checks. */
-export type CheckedTool = 'gh' | 't3' | 'git' | 'jq' | 'curl';
+/** The commands the board checks; az only while a listed repository is on Azure DevOps. */
+export type CheckedTool = 'gh' | 't3' | 'git' | 'jq' | 'curl' | 'az';
 
 /**
  * A command's check: it runs, with the version it printed if it did; it's missing, naming the override
- * that pointed nowhere if one did; or (gh only) it's logged out, older than GH_FLOOR, or its login has no
- * `project` scope. `scopes: 'unread'` marks a gh whose scopes the board couldn't read, which blocks nothing.
+ * that pointed nowhere if one did; it's logged out (gh or az); (gh only) it's older than GH_FLOOR or its login
+ * has no `project` scope; or (az only) it has no `azure-devops` extension. `scopes: 'unread'` marks a gh whose scopes the board couldn't read, which blocks nothing.
  * `fix` is the command that fixes a failed check; a missing t3 has none, since T3 Code installs it.
  */
 export type ToolCheck =
@@ -346,14 +346,16 @@ export type ToolCheck =
   | { result: 'missing'; override?: string; fix?: string }
   | { result: 'logged-out'; version?: string; fix: string }
   | { result: 'outdated'; version: string; fix: string; scopes?: 'unread' }
-  | { result: 'no-project-scope'; version?: string; fix: string };
+  | { result: 'no-project-scope'; version?: string; fix: string }
+  | { result: 'no-extension'; version?: string; fix: string };
 
 /** The oldest gh lar-work's scripts run with: 2.94.0 added `--parent`, `--add-sub-issue` and `--blocked-by`. */
 export const GH_FLOOR = '2.94.0';
 
 export type FailedCheck = Exclude<ToolCheck, { result: 'ok' }>;
 
-export type ToolChecks = Record<CheckedTool, ToolCheck>;
+/** Every check from one lookup; `az` is absent when no listed repository is on Azure DevOps, as then it isn't checked. */
+export type ToolChecks = Record<Exclude<CheckedTool, 'az'>, ToolCheck> & { az?: ToolCheck };
 
 /** The tool's check if it failed; undefined when it passed, before the first check and in sample mode. */
 export function failedCheck(tools: ToolChecks | undefined, name: CheckedTool): FailedCheck | undefined {

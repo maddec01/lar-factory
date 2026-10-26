@@ -21,7 +21,7 @@ import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
-import { repositoryProjectHints } from './t3/repository-project.ts';
+import { anyOnAzureDevOps, repositoryProjectHints } from './t3/repository-project.ts';
 import { loadT3Reads } from './t3/t3-reads.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
 import { TOOL_NAMES, checkTools, lookUpTools, missingTool, probeGh, tools } from './tools/tools.ts';
@@ -127,6 +127,9 @@ function logTools(): void {
   if (gh === 'logged-out') lines.push('gh is logged out');
   if (gh === 'outdated') lines.push(`gh is older than ${GH_FLOOR}`);
   if (gh === 'no-project-scope') lines.push("gh can't read Projects");
+  const az = board.snapshot().tools?.az?.result;
+  if (az === 'logged-out') lines.push('az is logged out');
+  if (az === 'no-extension') lines.push('az has no azure-devops extension');
   const message = lines.join('; ');
   if (message !== toolLog) log(message);
   toolLog = message;
@@ -141,7 +144,8 @@ function showToolChecks(checks: ToolChecks): void {
 }
 
 /**
- * Looks every tool up again and checks each command, then reads GitHub if gh works now and didn't before.
+ * Looks every tool up again and checks each command, az only while a listed repository is on Azure DevOps,
+ * then reads GitHub if gh works now and didn't before.
  * Startup and Recheck reread the login shell PATH; the timed retry passes false to keep the last one.
  * A check asked for during a running one waits for it, then runs.
  */
@@ -150,8 +154,8 @@ async function recheckTools(rereadLoginPath = true): Promise<void> {
   const { tools: before } = board.snapshot();
   const ghBlocked = ghStopsRead(before?.gh);
   checkingTools = (async () => {
-    await lookUpTools(process.env, rereadLoginPath);
-    const { tools: checks, ghError } = await checkTools();
+    const [, withAz] = await Promise.all([lookUpTools(process.env, rereadLoginPath), anyOnAzureDevOps(config.repos)]);
+    const { tools: checks, ghError } = await checkTools(withAz);
     showToolChecks(checks);
     if (ghError) log(`gh probe failed: ${ghError}`);
   })().finally(() => { checkingTools = null; });

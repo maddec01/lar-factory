@@ -4,7 +4,7 @@
 // the profiles and updates show disabled.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, answerRestart, mountPage, sample, settle, stubApp, text, toolChecks } from '../../test/support.ts';
+import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks } from '../../test/support.ts';
 import type { BoardData, ProfilesResult, UpdateChannel, UpdateState } from '@lar-factory/shared';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
@@ -123,10 +123,17 @@ test('the header drags the window, but not Restore defaults', async () => {
   expect(noDrag($('.settings-header button')!.parentElement!)).toBe(true);
 });
 
-test('Repositories shows the GitHub Project, gh\'s login and each repository with its role, read-only', async () => {
+/** Each Settings group's title with its rows' ids. */
+const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
+
+test('Repositories shows the GitHub Project, the command line tools\' logins and each repository with its role, read-only', async () => {
   await open('Repositories', { ...sample, project: { owner: 'maddec01', title: 'lar' } });
+  expect(groups()).toEqual([['GitHub Project', ['project']], ['Command line tools', ['gh', 'az']],
+    ['Repositories', sample.repos.map((r) => `repo-${r.repo}`)]]);
   expect(row('project').querySelector('input')!.value).toBe('maddec01 / lar');
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in');
+  expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
+  expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
   expect(sample.repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual(sample.repos.map((r) => `${r.repo}${r.role}${r.platform}Edit`));
   expect(row('project').querySelector('input')!.readOnly).toBe(true);
   expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
@@ -135,9 +142,32 @@ test('Repositories shows the GitHub Project, gh\'s login and each repository wit
 
 const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];
 
-test('Diagnostics shows every command OK before the first check', async () => {
+test('Diagnostics shows every command OK before the first check, and az skipped', async () => {
   await open('Diagnostics');
   expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● OK', '● OK', '● OK', '● OK', '● OK']);
+  expect(text(row('d-az').querySelector('.tool-state'))).toBe('● Skipped');
+  expect(text(row('d-az'))).toContain('Skipped: no listed repository is on Azure DevOps.');
+});
+
+test('the Command line tools rows show signed out, missing or the problem found, with the fix', async () => {
+  await open('Repositories', { ...sample, tools: toolChecks({ gh: { result: 'logged-out', fix: 'gh auth login' },
+    az: { result: 'no-extension', version: '2.67.0', fix: 'az extension add --name azure-devops' } }) });
+  expect(['gh', 'az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● Signed out', '● No azure-devops extension']);
+  expect(text(row('gh'))).toContain('Fix: gh auth login');
+  expect(text(row('az'))).toContain('Fix: az extension add --name azure-devops');
+  await push({ ...sample, tools: toolChecks({ az: { result: 'ok', version: '2.67.0' } }) });
+  expect(text(row('az').querySelector('.tool-state'))).toBe('● Signed in');
+  await push({ ...sample, tools: toolChecks({ az: { result: 'missing', fix: 'brew install azure-cli' } }) });
+  expect(text(row('az').querySelector('.tool-state'))).toBe('● Not found');
+  expect(text(row('az'))).toContain('Fix: brew install azure-cli');
+});
+
+test('Diagnostics shows az with its version or its problem and fix', async () => {
+  await open('Diagnostics', { ...sample, tools: toolChecks({ az: { result: 'ok', version: '2.67.0' } }) });
+  expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');
+  await push({ ...sample, tools: toolChecks({ az: { result: 'logged-out', version: '2.67.0', fix: 'az login' } }) });
+  expect(text(row('d-az').querySelector('.tool-state'))).toBe('● Logged out');
+  expect(text(row('d-az'))).toContain('Fix: az login');
 });
 
 test('Diagnostics shows the version each command printed', async () => {

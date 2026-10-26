@@ -15,7 +15,7 @@ export type Control =
   | { type: 'text'; value: string; mono?: boolean }
   | { type: 'kbd'; keys: string[] }
   | { type: 'button'; label: ReactNode }
-  | { type: 'status'; text: string; tone: 'success' | 'warning' | 'error' }
+  | { type: 'status'; text: string; tone: ToolTone }
   | { type: 'custom'; render: () => ReactNode };
 
 /** The tooltip of something that isn't built yet. */
@@ -70,8 +70,12 @@ export function SmallButton({ children, reason, onClick, className }: { children
   return <Button variant="outline" size="xs" className={className} disabled={!!reason} title={reason} onClick={onClick}>{children}</Button>;
 }
 
-export function ToolState({ text, tone }: { text: string; tone: 'success' | 'warning' | 'error' }) {
-  const color = { success: 'text-(--success-foreground)', warning: 'text-(--warning-foreground)', error: 'text-(--destructive-foreground)' }[tone];
+/** A state's colour; muted for a check that didn't run. */
+type ToolTone = 'success' | 'warning' | 'error' | 'muted';
+
+export function ToolState({ text, tone }: { text: string; tone: ToolTone }) {
+  const color = { success: 'text-(--success-foreground)', warning: 'text-(--warning-foreground)', error: 'text-(--destructive-foreground)',
+    muted: 'text-(--muted-foreground)' }[tone];
   return <span className={`tool-state whitespace-nowrap text-xs font-medium ${color}`}>● {text}</span>;
 }
 

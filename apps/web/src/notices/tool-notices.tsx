@@ -1,5 +1,6 @@
 // The notices for a failed command check: a missing t3 replaces the main area; a gh that's missing, logged
-// out, too old or without the project scope shows a banner, and so does a missing git, jq or curl.
+// out, too old or without the project scope shows a banner, and so do a missing git, jq or curl and an az that
+// fails its check.
 
 import type { ReactNode } from 'react';
 import { GH_FLOOR, type FailedCheck } from '@lar-factory/shared';
@@ -14,6 +15,7 @@ const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';
 /** What a Recheck that found the same problem says. */
 const STILL: Record<FailedCheck['result'], string> = {
   'missing': 'Still not found.', 'logged-out': 'Still logged out.', 'outdated': `Still older than ${GH_FLOOR}.`, 'no-project-scope': "Still can't read Projects.",
+  'no-extension': 'Still no azure-devops extension.',
 };
 
 /** The Recheck button and, once a Recheck answered with the notice still up, what it found. */
@@ -72,6 +74,9 @@ function ghNotice(check: FailedCheck): { title: string; body: ReactNode } {
     case 'no-project-scope':
       return { title: "GitHub CLI can't read Projects.", body: <>The board reads the GitHub Project through <code>gh</code>, and your gh login has no <code>project</code> scope.
         Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</> };
+    default:
+      // Only az has an extension to miss.
+      return { title: 'GitHub CLI failed its check.', body: <>Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</> };
   }
 }
 
@@ -81,6 +86,24 @@ export function GhBanner({ check }: { check: FailedCheck }) {
   return (
     <Banner title={title}>
       {body}
+      {' '}{LOOKS_AGAIN} <Recheck check={check} />
+    </Banner>
+  );
+}
+
+/** az's banner title by its check's result; az has no version floor or scopes. */
+const AZ_TITLES: Partial<Record<FailedCheck['result'], string>> = {
+  'missing': 'Azure CLI not found.', 'logged-out': 'Azure CLI is logged out.', 'no-extension': 'Azure CLI has no azure-devops extension.',
+};
+
+/** The banner for an az that fails its check, which shows only while a listed repository is on Azure DevOps and never stops the read. */
+export function AzBanner({ check }: { check: FailedCheck }) {
+  return (
+    <Banner title={AZ_TITLES[check.result] ?? 'Azure CLI failed its check.'}>
+      The board reads repositories on Azure DevOps through <code>az</code>.{' '}
+      {check.result === 'missing'
+        ? <Fix check={check} tool="az" what="az">Install it with <CopyableCommand command={check.fix ?? 'brew install azure-cli'} />, then press Recheck.</Fix>
+        : <>Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</>}
       {' '}{LOOKS_AGAIN} <Recheck check={check} />
     </Banner>
   );

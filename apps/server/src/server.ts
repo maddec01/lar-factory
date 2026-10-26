@@ -19,6 +19,7 @@ import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
 import { installHome, loadBundledSkills, withInstallState } from './skills/bundled-skills.ts';
+import { parentSkillCheck } from './skills/skill-check.ts';
 import { createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
@@ -261,7 +262,7 @@ function readSoon(): void {
 // Resources/server/dist/, beside Resources/web/dist/.
 const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
-const commands = createItemCommands({ board, items, repos: items.repos, offerModelChoices });
+const commands = createItemCommands({ board, items, repos: items.repos, offerModelChoices, checkSkills: parentSkillCheck() });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json'),
   renamedId: items.renamedId });

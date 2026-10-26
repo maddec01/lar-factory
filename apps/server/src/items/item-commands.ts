@@ -2,13 +2,13 @@
 // The maps of commands in flight are private here, so every rule about which command
 // blocks which lives in this file.
 
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDraft, validateDraft, workMessage } from '@lar-factory/shared';
 import type { BoardData, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
 import { issueLabels } from '../github/github.ts';
+import { installHome } from '../skills/bundled-skills.ts';
 import { repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
@@ -46,6 +46,11 @@ export interface ItemCommandsDeps {
   repos(): RepoConfig[];
   /** Reads the model choices T3 offers now into the board data. */
   offerModelChoices(): ModelGroup[];
+  /**
+   * Checks the installed skills against the bundle and restores any that differ, before Start build: resolves with
+   * why the build can't start, or null. Missing without a bundle, so Start build checks nothing.
+   */
+  checkSkills?: () => Promise<string | null>;
 }
 
 type Action = 'queue' | 'back to List' | 'pick' | 'start' | 'abandon';
@@ -86,8 +91,8 @@ function track<T>(inFlight: Map<string, Promise<T>>, key: string, work: Promise<
   return tracked;
 }
 
-/** Where lar-work is installed, for the build message. */
-const LAR_WORK = join(homedir(), '.agents/skills/lar-work');
+/** Where lar-work is installed, for the build message: under the board app's install root, else the home. */
+const larWork = () => join(installHome(), '.agents/skills/lar-work');
 
 /** The repository project for an onboarded repository as the list is now, so a repository onboarded after a refusal starts on the next Start. */
 async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
@@ -97,7 +102,7 @@ async function currentRepositoryProject(repo: string): Promise<RepositoryProject
   return repositoryProject(repo, repos);
 }
 
-export function createItemCommands({ board, items, repos, offerModelChoices }: ItemCommandsDeps): ItemCommands {
+export function createItemCommands({ board, items, repos, offerModelChoices, checkSkills }: ItemCommandsDeps): ItemCommands {
   const submissions = new Map<string, {
     draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
   }>();
@@ -271,12 +276,14 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
       if (busy) return withBoard(409, { error: busy });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
-      const message = buildMessage(item, LAR_WORK);
+      const message = buildMessage(item, larWork());
       const branch = buildBranch(item);
       if (!message || !branch || !item.repo || item.number === null) return reply(409, { error: 'This item needs an issue before it can start.' });
       const { repo } = item;
       return async () => {
         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
+        const skills = await checkSkills?.();
+        if (skills) return { thread: null, error: skills, refused: true };
         const repoProject = await currentRepositoryProject(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
         const parent = await parentInProgress(item);

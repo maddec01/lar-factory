@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import type { TestContext } from 'vite-plus/test';
-import type { BoardData } from '@lar-factory/shared';
+import { isSkillCheckRequest } from '@lar-factory/shared';
+import type { BoardData, SkillCheckAnswer } from '@lar-factory/shared';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
@@ -46,9 +47,11 @@ export function writeRepositoryList(home: string, repos: readonly string[]): voi
 
 /**
  * Starts a board on the fake gh, whose state `options` holds. Its home lists TEST_REPOSITORIES as onboarded, or
- * `options.repositories` (null for no list file), unless the home already has a list.
+ * `options.repositories` (null for no list file), unless the home already has a list. `skillCheck`, when given, plays
+ * the board app: the board gets an IPC channel, and each skill check it asks for gets `skillCheck`'s answer.
  */
-export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}, directory?: string) {
+export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}, directory?: string,
+  skillCheck?: () => string | null) {
   const dir = await mkdtemp(join(tmpdir(), 'lar-board-test-'));
   const stateFile = join(dir, 'github.json');
   await writeFile(stateFile, JSON.stringify(options));
@@ -73,7 +76,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
       T3_PATH: new URL('./fake-t3.cjs', import.meta.url).pathname, SHELL: new URL('./fake-shell.sh', import.meta.url).pathname,
       FAKE_GH_STATE: stateFile, T3_STATE_DB: join(dir, 'no-t3.sqlite'), T3_SETTINGS: settingsFile, T3_SERVER_RUNTIME: runtimeFile, BOARD_DATA_FILE: fixture ? SAMPLE_DATA : '',
       ...(fixture ? SAMPLE_MODELS : {}), ...env },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: skillCheck ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
     // The board leads its own process group, which the gh it runs joins.
     detached: true,
   });
@@ -84,9 +87,15 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     'watchdog', String(child.pid), dir], { stdio: ['pipe', 'ignore', 'ignore'] }) : undefined;
   watchdog?.unref();
   (watchdog?.stdin as Socket | undefined)?.unref();
+  let skillChecks = 0;
+  if (skillCheck) child.on('message', (message) => {
+    if (!isSkillCheckRequest(message)) return;
+    skillChecks += 1;
+    child.send({ type: 'skills-checked', id: message.id, refusal: skillCheck() } satisfies SkillCheckAnswer);
+  });
   let logs = '';
-  child.stdout.on('data', (data: Buffer) => { logs += data.toString(); });
-  child.stderr.on('data', (data: Buffer) => { logs += data.toString(); });
+  child.stdout!.on('data', (data: Buffer) => { logs += data.toString(); });
+  child.stderr!.on('data', (data: Buffer) => { logs += data.toString(); });
   const stop = async () => {
     // A board that failed to start has already exited, or never got a pid.
     if (child.pid && child.exitCode === null && child.signalCode === null) {
@@ -124,6 +133,8 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
         calls: () => readCalls(stateFile + '.calls'),
         t3Calls: () => readCalls(stateFile + '.t3calls'),
         logs: () => logs,
+        /** How many skill checks the board has asked for. */
+        skillChecks: () => skillChecks,
         board,
         post,
         /** Posts the body with the session the board serves now, as the page does. */

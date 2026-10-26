@@ -10,10 +10,10 @@ import type { BoardData, RawItem } from '@lar-factory/shared';
 const readyIssue = (number: number, labels: string[], parent?: number): RawItem =>
   rawIssue(`PVTI_${number}`, number, 'Ready', labels, parent ? { parent: sliceRef(parent, 'OPEN') } : {});
 
-/** A board that can start lar-factory builds, and the home it runs in. */
-async function buildBoard(t: TestContext, items: object[], options: object = {}, env: Record<string, string> = {}) {
+/** A board that can start lar-factory builds, and the home it runs in; `skillCheck` answers its skill checks as the board app. */
+async function buildBoard(t: TestContext, items: object[], options: object = {}, env: Record<string, string> = {}, skillCheck?: () => string | null) {
   const startable = startableEnv(t);
-  const board = await startBoard(t, { items, ...options }, false, false, { ...startable, ...env });
+  const board = await startBoard(t, { items, ...options }, false, false, { ...startable, ...env }, undefined, skillCheck);
   await until(board, (d) => d.items.length === items.length);
   return { board, home: startable.HOME! };
 }
@@ -47,6 +47,38 @@ test('Start build labels the build, moves its parent to In progress and starts t
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', message(home, 12), '--worktree', 'main', '--branch', 'feat/12-issue-12', '--json'],
   ]);
+});
+
+test('Start build asks the board app to check the skills before it starts the thread', async (t) => {
+  const { board, home } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { BOARD_SKILL_CHECK: '1' }, () => null);
+  assert.equal((await startBuild(board, 'I_12')).status, 200);
+  assert.equal(board.skillChecks(), 1);
+  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message(home, 12)]);
+});
+
+test('a refused skill check refuses Start build with its reason, writes nothing to GitHub and runs no t3', async (t) => {
+  let refusal: string | null = 'Lar Factory can\'t check the skill tdd: a folder it didn\'t install has its name.';
+  const { board } = await buildBoard(t, [readyIssue(12, ['feature'], 40), projectIssue(40, 'Ready', undefined, ['concept'])],
+    {}, { BOARD_SKILL_CHECK: '1' }, () => refusal);
+  const refused = await startBuild(board, 'I_12');
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, refusal);
+  assert.deepEqual([...await writes(board), ...await board.t3Calls()], []);
+  refusal = null;
+  assert.equal((await startBuild(board, 'I_12')).status, 200);
+  assert.equal(board.skillChecks(), 2);
+});
+
+test('without a bundle Start build asks for no skill check', async (t) => {
+  const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, {}, () => 'refused');
+  assert.equal((await startBuild(board, 'I_12')).status, 200);
+  assert.equal(board.skillChecks(), 0);
+});
+
+test('the build message names lar-work under LAR_FACTORY_INSTALL_ROOT when it is set', async (t) => {
+  const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { LAR_FACTORY_INSTALL_ROOT: '/tmp/lar-root' });
+  assert.equal((await startBuild(board, 'I_12')).status, 200);
+  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message('/tmp/lar-root', 12)]);
 });
 
 test('Start build runs the thread on the picked model choice', async (t) => {

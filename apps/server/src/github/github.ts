@@ -165,6 +165,11 @@ export async function readDefaultBranchFile(repo: string, path: string, run: (ar
   }
 }
 
+/** Whether gh's login can push to the repository, as the repository's `permissions.push` says. */
+export async function canPush(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<boolean> {
+  return (await run(['api', `repos/${repo}`, '--jq', '.permissions.push'])).trim() === 'true';
+}
+
 /** Reads up to `maxPages` pages, each after the cursor the one before ended at; throws `tooMany` when there are more. */
 async function readPages(maxPages: number, tooMany: string, readPage: (after: string | null) => Promise<PageInfo>): Promise<void> {
   let after: string | null = null;

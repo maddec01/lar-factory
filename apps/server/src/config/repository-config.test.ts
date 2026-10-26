@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarding } from './repository-config.ts';
+import { readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding } from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar repository config test '));
@@ -65,6 +65,16 @@ test('saving an onboarding makes the list file and its folder when there are non
   const dir = join(await dataDir(t), 'Lar Factory');
   saveOnboarding({ repo: 'maddec01/lar-apple', progress: progress() }, null, dir);
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-apple', onboarding: progress() }]);
+});
+
+test('finishing an onboarding leaves its entry with the repository alone, in place of the entry it was saved under', async (t) => {
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory' },
+    { repo: 'maddec01/lar-apple', onboarding: progress() }, { repo: 'maddec01/lar-cli', onboarding: progress() }] }) });
+  assert.deepEqual(saveOnboarded('maddec01/lar-apple', null, dir),
+    [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple' }, { repo: 'maddec01/lar-cli', onboarding: progress() }]);
+  assert.deepEqual(saveOnboarded('maddec01/lar-web', 'maddec01/lar-cli', dir),
+    [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple' }, { repo: 'maddec01/lar-web' }]);
+  assert.throws(() => saveOnboarded('maddec01/lar-apple', null, dir), { message: 'maddec01/lar-apple is onboarded already.' });
 });
 
 test('saving an onboarding for a repository that is onboarded already, or into a list that can\'t be read, is refused', async (t) => {

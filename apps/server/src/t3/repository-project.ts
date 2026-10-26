@@ -49,7 +49,7 @@ export function originHost(url: string): string {
   return url.match(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?([^/:]+)/i)?.[1]?.toLowerCase() ?? '';
 }
 
-interface Checkout { id: string; title: string; folder: string; origin: string | null }
+export interface Checkout { id: string; title: string; folder: string; origin: string | null }
 
 /** T3's live projects with each one's `origin` URL, null for a worktree or a checkout without one; throws when T3's projects can't be read. */
 export async function checkouts(env: NodeJS.ProcessEnv): Promise<Checkout[]> {

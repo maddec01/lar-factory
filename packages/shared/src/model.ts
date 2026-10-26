@@ -701,3 +701,13 @@ export interface ProjectChoice {
   /** Whether the repository is on this Mac's list already. */
   onBoard: boolean;
 }
+
+/**
+ * The checks onboarding's Checks step runs after the command checks: that the T3 project's folder is the main checkout
+ * of the repository's origin, that the item source can be read, and that gh's login can push to the repository.
+ */
+export const SETUP_CHECKS = ['checkout', 'source', 'push'] as const;
+export type SetupCheckId = (typeof SETUP_CHECKS)[number];
+
+/** A setup check's result: what it found, or the problem with its fix and the command that fixes it, when one does. */
+export type SetupCheckResult = { passed: true; detail: string } | { passed: false; problem: string; fix: string; command?: string };

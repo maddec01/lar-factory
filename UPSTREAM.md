@@ -37,10 +37,9 @@ it and flags each Override an upstream change touches.
 | `references/performance-checklist.md` | addyosmani/agent-skills | `references/performance-checklist.md` | `aeac41d4d005` | 2026-10-13 |  |
 | `references/orchestration-patterns.md` | addyosmani/agent-skills | `references/orchestration-patterns.md` | `aeac41d4d005` | 2026-10-13 |  |
 | `references/accessibility-checklist.md` | addyosmani/agent-skills | `references/accessibility-checklist.md` | `aeac41d4d005` | 2026-10-13 |  |
-| `developer-profile` | maddec01/developer-profile-skill | `developer-profile` | `18d4038414b4` | 2026-10-06 |  |
 | `unslop` | cursor/plugins | `pstack/skills/unslop` | `8b3326d99fd4` | 2026-10-22 |  |
 
-Full commits: mattpocock/skills `5beb35b040e3de97e54fa9e386d7e42d15c295c2`, addyosmani/agent-skills `aeac41d4d005999432bb7312f7ff06383a91d59d`, maddec01/developer-profile-skill `18d4038414b4ed1624a1ef408d58843da8188153`, cursor/plugins `8b3326d99fd4b993cb33a24dad8af03175c642c5`.
+Full commits: mattpocock/skills `5beb35b040e3de97e54fa9e386d7e42d15c295c2`, addyosmani/agent-skills `aeac41d4d005999432bb7312f7ff06383a91d59d`, cursor/plugins `8b3326d99fd4b993cb33a24dad8af03175c642c5`.
 
 Addy's skills link to `../../references/`, so the board app copies `references/`
 to `~/.agents/references/` and to each ticked Claude profile's `references/`, where

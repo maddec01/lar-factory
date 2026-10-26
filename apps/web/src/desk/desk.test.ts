@@ -27,7 +27,7 @@ test('the desk shows what only you can move, counted, as cards in one row that s
 test('a desk card shows its status, repository, age, numbered title, hint and status track', async () => {
   await mountPage();
   const [meta, title, hint] = [...card('I_sample16').querySelector('button')!.children].map(text);
-  expect([meta, title, hint]).toEqual(['Verify· Apple · 1h ago', '#31 New artwork grid layout', 'Test it with the steps in the PR, then merge']);
+  expect([meta, title, hint]).toEqual(['Verify· lar-apple · 1h ago', '#31 New artwork grid layout', 'Test it with the steps in the PR, then merge']);
   expect(card('I_sample16').querySelectorAll('ol > li')).toHaveLength(10);
 });
 

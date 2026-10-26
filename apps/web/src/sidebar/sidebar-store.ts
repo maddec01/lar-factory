@@ -5,7 +5,7 @@ import { create } from 'zustand';
 interface SidebarState {
   open: boolean;
   setOpen: (open: boolean) => void;
-  /** The platform the main area shows, or `null` for all repositories. */
+  /** The repository the main area shows, as `owner/name` or Draft, or `null` for all repositories. */
   scope: string | null;
   setScope: (scope: string | null) => void;
 }

@@ -22,7 +22,7 @@ and a small board app, so you can borrow them. Issues and ideas are welcome.
 
 ## How work moves
 
-Work lives in GitHub Issues, one repo per platform (`lar-server`, `lar-apple`),
+Work lives in GitHub Issues, one repo for each part of lar (`lar-server`, `lar-apple`),
 and on one GitHub Project, "lar", whose Status column is the board:
 
 ```
@@ -227,7 +227,7 @@ packages/shared/   types and logic the apps share; apps import it, never each ot
 references/        checklists Addy's skills link to
 scripts/setup-worktree.sh installs the workspace in a new worktree (.githooks, t3.json)
 scripts/release-secrets.sh stores the Release signing secrets on GitHub
-config.json        lar repos (platform, role), board refresh, pickup limits
+config.json        lar repos (role), board refresh, pickup limits
 UPSTREAM.md        source and commit of every copy
 docs/plan.md       how this was set up
 ```

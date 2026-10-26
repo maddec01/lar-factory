@@ -3,7 +3,7 @@
 // its next action: Open thread on every card, Start build on a Ready one, Open PR on Verify and Ready to merge. A Verify
 // card also shows that PR's pipeline: its checks and whether GitHub lets it merge.
 
-import { HINTS, carriesTwoStatuses, itemPr, platformOf, shortAgo } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, itemPr, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -61,7 +61,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
       <button type="button" className="grid gap-2.5 text-left">
         <span className="flex items-center gap-2 text-xs">
           <ItemStatusGlyph item={item} /><span className="font-semibold text-(--warning-foreground)">{item.status}</span>
-          <span className="truncate text-(--muted-foreground)">· {platformOf(item, data.repos)} · {shortAgo(item.updatedAt, now)}</span>
+          <span className="truncate text-(--muted-foreground)">· {repoName(repoKey(item), data.repos)} · {shortAgo(item.updatedAt, now)}</span>
         </span>
         <span className="line-clamp-2 font-medium leading-snug"><ItemTitle item={item} /></span>
         {hint && <span className="text-xs text-(--muted-foreground)">{hint}</span>}

@@ -1,7 +1,7 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
 // Abandon asks.
 
-import { STATUSES, isDraft, isRecentlyDone, kindOf, platformOf, ref } from './model.ts';
+import { STATUSES, isDraft, isRecentlyDone, kindOf, ref, repoKey, repoName, sameRepo } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
 import { slug } from './format.ts';
 
@@ -14,12 +14,14 @@ export function byFlowOrder(a: Item, b: Item): number {
   );
 }
 
-export function listGroupId(platform: string): string {
-  return `list-${slug(platform)}`;
+export function listGroupId(repo: string): string {
+  return `list-${slug(repo)}`;
 }
 
 export interface ListGroup {
-  platform: string;
+  /** The repository's `owner/name`, or Draft. */
+  repo: string;
+  name: string;
   id: string;
   items: Item[];
 }
@@ -31,7 +33,7 @@ export interface BoardSections {
   concepts: Item[];
   queued: Item[];
   list: Item[];
-  /** One per configured repo's platform, then any other platform a List item has; each group's items in board order. */
+  /** One per configured repository, then any other repository a List item has, then Draft; each group's items in board order. */
   listGroups: ListGroup[];
   /** Closed in the last 7 days, most recently closed first. */
   done: Item[];
@@ -41,11 +43,8 @@ export function boardSections(data: BoardData, now: number): BoardSections {
   const items = [...data.items].sort(byFlowOrder);
   const inStatus = (...s: Status[]) => items.filter((i) => s.includes(i.status));
   const list = inStatus('List');
-  const platforms = [...data.repos.map((r) => r.platform)];
-  for (const i of list) {
-    const p = platformOf(i, data.repos);
-    if (!platforms.includes(p)) platforms.push(p);
-  }
+  const repos = data.repos.map((r) => r.repo);
+  for (const i of list) if (!repos.some((r) => sameRepo(r, repoKey(i)))) repos.push(repoKey(i));
   const notConcept = (i: Item) => kindOf(i) !== 'concept';
   return {
     needsYou: inStatus('Ready', 'Needs you', 'Verify', 'Ready to merge').filter(notConcept),
@@ -53,8 +52,8 @@ export function boardSections(data: BoardData, now: number): BoardSections {
     concepts: items.filter((i) => kindOf(i) === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),
     list,
-    listGroups: platforms.map((platform) => ({
-      platform, id: listGroupId(platform), items: data.items.filter((i) => i.status === 'List' && platformOf(i, data.repos) === platform),
+    listGroups: repos.map((repo) => ({
+      repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && sameRepo(repoKey(i), repo)),
     })),
     done: items
       .filter((i) => isRecentlyDone(i, now))

@@ -303,7 +303,6 @@ export function offers(groups: readonly ModelGroup[], choice: ModelChoice): bool
 
 export interface RepoConfig {
   repo: string;
-  platform: string;
   /** Repository role: what this repository is to the others. */
   role: string;
   /** Its item source: the GitHub Project config.json names, the default, or the repository's issues. */
@@ -520,10 +519,17 @@ export function isRecentlyDone(item: Item, now: number): boolean {
   return Number.isFinite(at) && now - at <= DONE_WINDOW_MS;
 }
 
-/** Shown on the Board: anything not Done, and Done items closed in the last 7 days. */
-export function platformOf(item: Item, repos: readonly RepoConfig[]): string {
-  if (!item.repo) return 'Draft';
-  return repos.find((r) => r.repo === item.repo)?.platform ?? item.repo.split('/')[1] ?? item.repo;
+/** The key an item's repository has on the board: its `owner/name`, or Draft when it has none. */
+export const repoKey = (item: Pick<Item, 'repo'>): string => item.repo ?? 'Draft';
+
+/** Whether two `owner/name`s, or repository keys, are the same repository: GitHub ignores case, so the board does too. */
+export const sameRepo = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+/** A repository's shown name: the part after `owner/`, or all of `owner/name` when another of `repos` has the same name. */
+export function repoName(key: string, repos: readonly RepoConfig[]): string {
+  const name = key.split('/')[1];
+  if (!name) return key;
+  return repos.some((r) => !sameRepo(r.repo, key) && r.repo.split('/')[1] === name) ? key : name;
 }
 
 /** A ticket with no repository yet, such as a Project draft. */

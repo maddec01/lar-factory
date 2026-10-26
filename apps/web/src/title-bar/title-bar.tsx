@@ -1,16 +1,17 @@
-// The main area's title bar: a 52 px drag bar with the scope menu ("All repositories", or the platform the menu or
+// The main area's title bar: a 52 px drag bar with the scope menu ("All repositories", or the repository the menu or
 // the sidebar scoped it to), the Refreshed time, the counters and This week. While the sidebar is hidden it starts
 // T3's gap past the toggle. Clicks on its buttons and on the time never drag the window; the rest of the bar does.
 // Above the missing-t3 notice there's no board to scope or count, so the bar is empty.
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { boardSections, clock, failedCheck, isStale, shortAgo, slug } from '@lar-factory/shared';
+import { boardSections, clock, failedCheck, isStale, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Menu, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuSeparator, MenuTrigger } from '@lar-factory/ui/menu';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
+import { repoTone } from '../items/item-parts.tsx';
 import { useSidebarStore } from '../sidebar/sidebar-store.ts';
 import { useTitlebarInset } from '../sidebar/window-controls.tsx';
 import { Counters } from './counters.tsx';
@@ -18,17 +19,18 @@ import { Counters } from './counters.tsx';
 const NO_DRAG = '[-webkit-app-region:no-drag]';
 const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-(--ring) focus-visible:ring-offset-1 focus-visible:ring-offset-(--background)';
 
-/** The menu that sets the scope: All repositories, then a platform for each sidebar group, in the sidebar's order. */
+/** The menu that sets the scope: All repositories, then a repository for each sidebar group, in the sidebar's order. */
 function Scope() {
   const data = useBoardStore((state) => state.data);
   const now = useBoardStore((state) => state.now);
   const { scope, setScope } = useSidebarStore();
-  const platforms = boardSections(data, now).listGroups.map((group) => group.platform);
+  const groups = boardSections(data, now).listGroups;
+  const shown = scope ? repoName(scope, data.repos) : 'All repositories';
   return (
     <Menu modal={false}>
-      <MenuTrigger render={<button type="button" />} aria-label={`Scope: ${scope ?? 'All repositories'}`}
+      <MenuTrigger render={<button type="button" />} aria-label={`Scope: ${shown}`}
         className={`scope -ml-1.5 inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-sm font-medium hover:bg-(--accent) data-[popup-open]:bg-(--accent) ${FOCUS_RING} ${NO_DRAG}`}>
-        {scope ?? 'All repositories'}
+        {shown}
         <ChevronDown className="size-3.5 text-(--muted-foreground)" />
       </MenuTrigger>
       <MenuPopup align="start">
@@ -38,11 +40,11 @@ function Scope() {
             <span className="flex items-center gap-2"><span className="flex-1">All repositories</span><MenuRadioItemIndicator /></span>
           </MenuRadioItem>
           <MenuSeparator />
-          {platforms.map((platform) => (
-            <MenuRadioItem key={platform} value={platform} closeOnClick>
+          {groups.map(({ repo, name }) => (
+            <MenuRadioItem key={repo} value={repo} closeOnClick>
               <span className="flex items-center gap-2">
-                <span className={`plat-${slug(platform)} size-2 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} aria-hidden="true" />
-                <span className="flex-1">{platform}</span>
+                <span className={`${repoTone(repo, data.repos)} size-2 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} aria-hidden="true" />
+                <span className="flex-1">{name}</span>
                 <MenuRadioItemIndicator />
               </span>
             </MenuRadioItem>

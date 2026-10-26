@@ -6,17 +6,14 @@
   "repos": [
     {
       "repo": "maddec01/lar-server",
-      "platform": "Server",
       "role": "Backend API server used by lar-apple"
     },
     {
       "repo": "maddec01/lar-apple",
-      "platform": "Apple",
       "role": "Apple client app for lar-server"
     },
     {
       "repo": "maddec01/lar-factory",
-      "platform": "Factory",
       "role": "The factory: board, lar-work skill and process docs"
     }
   ],

@@ -81,11 +81,6 @@ export function ToolState({ text, tone }: { text: string; tone: ToolTone }) {
 
 const field = `h-7 rounded-(--control-radius) border border-(--input) bg-(--background) px-2 text-[13px] text-(--foreground) ${disabledLook}`;
 
-/** The prototype's mono text field, read-only. */
-export function ReadOnlyText({ label, value }: { label: string; value: string }) {
-  return <input className={`${field} w-48 font-mono text-xs`} aria-label={label} value={value} readOnly />;
-}
-
 /** A value-only control, disabled, with `reason` as its tooltip. */
 export function ShownControl({ control: c, label, reason }: { control: Exclude<Control, { type: 'custom' }>; label: string; reason: string }) {
   const shown = (() => {

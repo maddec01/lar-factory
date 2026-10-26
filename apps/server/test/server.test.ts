@@ -405,7 +405,7 @@ test('BOARD_CONFIG_FILE gives the board its project and repos from a file outsid
   const dir = mkdtempSync(join(tmpdir(), 'lar-config-file-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const file = join(dir, 'config.json');
-  const repos = [{ repo: 'maddec01/lar-elsewhere', platform: 'Server', role: 'A repo only this file names' }];
+  const repos = [{ repo: 'maddec01/lar-elsewhere', role: 'A repo only this file names' }];
   writeFileSync(file, JSON.stringify({ project: { owner: 'maddec01', title: 'Elsewhere' }, repos }));
   const board = await startBoard(t, {}, false, false, { BOARD_CONFIG_FILE: file });
   const state = await board.board() as { project: { title: string }; repos: unknown[] };

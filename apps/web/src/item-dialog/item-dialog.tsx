@@ -4,7 +4,7 @@
 
 import { useEffect, useRef } from 'react';
 import { ExternalLink, Play } from 'lucide-react';
-import { HINTS, carriesTwoStatuses, keepOneText, openBlockers, platformOf, shortAgo, workMessage } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, keepOneText, openBlockers, repoKey, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
@@ -12,7 +12,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { AbandonButton, ActionError, BackToListButton, PickStatusButtons, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
-import { ItemTitle, PlatformTag, PrList, SliceList, StatsGrid, StepTrack } from '../items/item-parts.tsx';
+import { ItemTitle, PrList, RepoTag, SliceList, StatsGrid, StepTrack } from '../items/item-parts.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
@@ -54,7 +54,7 @@ function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now:
     <>
       <DialogHeader>
         <div className="flex flex-wrap items-center gap-2 pr-8 text-xs text-(--muted-foreground)">
-          <PlatformTag platform={platformOf(item, data.repos)} />
+          <RepoTag repo={repoKey(item)} repos={data.repos} />
           <ItemStatusGlyph item={item} /> <span className="font-medium text-(--foreground)">{item.status}</span> · updated {shortAgo(item.updatedAt, now)}
           {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {openBlockers(item).length}</span>}
         </div>

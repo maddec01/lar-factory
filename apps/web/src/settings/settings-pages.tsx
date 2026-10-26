@@ -6,12 +6,12 @@
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, type BoardData, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
+import { GH_FLOOR, repoName, type BoardData, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
 import type { ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/button';
-import { PlatformTag } from '../items/item-parts.tsx';
+import { RepoTag } from '../items/item-parts.tsx';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
-import { type Control, ReadOnlyText, SmallButton, ToolState, notBuilt } from './controls.tsx';
+import { type Control, SmallButton, ToolState, notBuilt } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
 
 interface Row {
@@ -126,7 +126,6 @@ function updateRows({ app, version }: PagesInput): Row[] {
 export function pages(input: PagesInput): Page[] {
   const { data } = input;
   const models = ['T3 default', ...data.modelChoices.flatMap((g) => g.models.map((m) => `${g.name} · ${m.label}`))];
-  const project = data.project.owner ? `${data.project.owner} / ${data.project.title}` : data.project.title;
   return [
     { id: 'general', label: 'General', icon: <Settings2 />, groups: [
       { title: 'Board', rows: [
@@ -161,21 +160,20 @@ export function pages(input: PagesInput): Page[] {
         { id: 'show-stats', title: 'Agent time, tokens and cost', control: { type: 'switch', value: true } },
         { id: 'show-labels', title: 'Labels', control: { type: 'switch', value: false } },
       ] },
-      { title: 'Platform colours', rows: data.repos.map((r) => ({ id: `color-${r.platform}`, title: r.platform, description: r.repo, control: custom(() => <PlatformTag platform={r.platform} />) })) },
+      { title: 'Repository colours', rows: data.repos.map((r) => ({ id: `color-${r.repo}`, title: repoName(r.repo, data.repos),
+        // A title that already is owner/name needs no line repeating it.
+        description: repoName(r.repo, data.repos) === r.repo ? undefined : r.repo, control: custom(() => <RepoTag repo={r.repo} repos={data.repos} />) })) },
     ] },
     { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, groups: [
-      { title: 'GitHub Project', rows: [
-        { id: 'project', title: data.project.title, description: 'The Project the board reads and moves items on.', control: custom(() => <ReadOnlyText label="GitHub Project" value={project} />) },
-      ] },
       { title: 'Command line tools', description: 'The board reads each provider through your own login and never stores a token.', rows: [
         { id: 'gh', title: 'GitHub CLI', description: toolDescription('gh, for repositories on GitHub.', data.tools?.gh),
           control: custom(() => <ToolState {...toolState(data.tools?.gh, true)} />) },
         { id: 'az', title: 'Azure CLI', description: toolDescription(`az with the azure-devops extension, for repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),
           control: custom(() => <ToolState {...toolState(data.tools?.az, true)} />) },
       ] },
-      { title: 'Repositories', description: 'Each repo’s platform names its List group and colour; its role goes to lar-work.', rows: data.repos.map((r) => ({
+      { title: 'Repositories', description: 'Each repo’s name heads its List group; its role goes to lar-work.', rows: data.repos.map((r) => ({
         id: `repo-${r.repo}`, title: r.repo, description: r.role,
-        control: custom(() => <span className="flex items-center gap-2"><PlatformTag platform={r.platform} /><SmallButton reason={notBuilt('Edit')}>Edit</SmallButton></span>),
+        control: custom(() => <span className="flex items-center gap-2"><RepoTag repo={r.repo} repos={data.repos} /><SmallButton reason={notBuilt('Edit')}>Edit</SmallButton></span>),
       })), footer: <SmallButton reason={notBuilt('Add repository')}>Add repository</SmallButton> },
     ] },
     { id: 't3', label: 'T3 Code', icon: <Plug />, groups: [

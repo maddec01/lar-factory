@@ -4,10 +4,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BookOpen, FlaskConical, Hammer, Lightbulb, MessagesSquare, Shapes, Target } from 'lucide-react';
-import { platformOf, ref, refKey, shortAgo, slug } from '@lar-factory/shared';
+import { ref, refKey, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ItemTitle, SliceBar } from '../items/item-parts.tsx';
+import { ItemTitle, SliceBar, repoTone } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
 import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, waitText } from './dossier-parts.ts';
@@ -42,8 +42,8 @@ function layout(parts: Part[], data: BoardData, width: number) {
     return d;
   };
   parts.forEach((p) => at(p, []));
-  const laneOf = (p: Part) => (DECISION_KINDS.includes(p.kind) ? DECISIONS : platformOf(p.item, data.repos));
-  const named = [DECISIONS, ...data.repos.map((r) => r.platform), ...parts.map(laneOf)];
+  const laneOf = (p: Part) => (DECISION_KINDS.includes(p.kind) ? DECISIONS : repoKey(p.item));
+  const named = [DECISIONS, ...data.repos.map((r) => r.repo), ...parts.map(laneOf)];
   const lanes = [...new Set(named)].filter((l) => parts.some((p) => laneOf(p) === l));
   const cols = Math.max(0, ...depth.values()) + 2;
   const colW = Math.max(MIN_COL, Math.floor((width - LABEL_W) / cols));
@@ -146,9 +146,11 @@ export function WorkMap({ parts, check, data, now }: { parts: Part[]; check: End
           <div key={b.lane} className={`absolute left-0 border-t border-(--border) ${n % 2 ? 'bg-[color-mix(in_srgb,var(--muted)_50%,transparent)]' : ''}`} style={{ top: b.top, height: b.height, width: m.width }}>
             <div className="sticky left-0 flex h-full flex-col justify-center gap-0.5 bg-[color-mix(in_srgb,var(--background)_85%,transparent)] px-3" style={{ width: LABEL_W }}>
               <span className="flex items-center gap-1.5 text-xs font-medium">
-                {b.lane === DECISIONS ? <Lightbulb className="size-3.5 text-(--muted-foreground)" /> : <span className={`plat-${slug(b.lane)} size-2 rounded-full bg-[var(--k,var(--muted-foreground))]`} />}{b.lane}
+                {b.lane === DECISIONS ? <Lightbulb className="size-3.5 text-(--muted-foreground)" /> : <span className={`${repoTone(b.lane, data.repos)} size-2 rounded-full bg-[var(--k,var(--muted-foreground))]`} />}{b.lane === DECISIONS ? b.lane : repoName(b.lane, data.repos)}
               </span>
-              <span className="text-[11px] text-(--muted-foreground)">{b.lane === DECISIONS ? 'grill, prototype, research' : data.repos.find((r) => r.platform === b.lane)?.repo.split('/')[1]}</span>
+              {b.lane === DECISIONS
+                ? <span className="text-[11px] text-(--muted-foreground)">grill, prototype, research</span>
+                : repoName(b.lane, data.repos) !== b.lane && <span className="truncate text-[11px] text-(--muted-foreground)" title={b.lane}>{b.lane}</span>}
             </div>
           </div>
         ))}

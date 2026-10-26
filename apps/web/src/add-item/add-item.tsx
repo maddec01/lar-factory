@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { SquarePen } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { applicability, ITEM_KINDS } from '@lar-factory/shared';
+import { applicability, ITEM_KINDS, repoName } from '@lar-factory/shared';
 import type { RepoConfig } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Checkbox } from '@lar-factory/ui/checkbox';
@@ -24,7 +24,7 @@ import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 /** The applicability checkboxes of one repo, each group with the hint for choosing none. Base UI's checkboxes
  * don't follow a native fieldset's disabled, so they take it themselves. */
 function Applicability({ repo, disabled }: { repo: RepoConfig; disabled: boolean }) {
-  return applicability(repo.platform).map((group, g) => (
+  return applicability(repo.repo).map((group, g) => (
     <Fieldset className="applicability" aria-describedby={`item-hint-${g}`} key={group.title}>
       <FieldsetLegend>{group.title}</FieldsetLegend>
       <div className="choices">
@@ -74,7 +74,7 @@ function AddItemForm() {
               {/* Uncontrolled and read on input: the form's onInput re-renders before the select's change
                   event, and a controlled select would be set back to the old repo. */}
               <NativeSelect id="item-repo" name="repo" required defaultValue={repo} onInput={(event) => setRepo(event.currentTarget.value)}>
-                {data.repos.map((r) => <option value={r.repo} key={r.repo}>{r.platform}</option>)}
+                {data.repos.map((r) => <option value={r.repo} key={r.repo}>{repoName(r.repo, data.repos)}</option>)}
               </NativeSelect>
             </div>
             <div className="form-field">

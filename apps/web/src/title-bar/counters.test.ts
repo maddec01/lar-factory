@@ -11,7 +11,7 @@ const rows = () => [...popup()!.querySelectorAll('li')].map(text);
 /** The popover's head, its title and count, and its foot. */
 const head = (pop: HTMLElement) => text(pop.querySelector('.h-10'));
 const foot = (pop: HTMLElement) => text(pop.querySelector('.border-t'));
-const scopeButton = (platform: string) => $<HTMLButtonElement>(`.list-group[data-platform="${platform}"] button.scope`)!;
+const scopeButton = (repo: string) => $<HTMLButtonElement>(`.list-group[data-repo="${repo}"] button.scope`)!;
 
 async function openCounter(label: string): Promise<HTMLElement> {
   await settle(() => counter(label).click());
@@ -36,8 +36,8 @@ test('the counts are the whole factory\'s with a repository scoped', async () =>
   await openCounter('need you');
   const items = rows();
   await settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  await settle(() => scopeButton('Apple').click());
-  expect(text($('.title-bar .scope'))).toBe('Apple');
+  await settle(() => scopeButton('maddec01/lar-apple').click());
+  expect(text($('.title-bar .scope'))).toBe('lar-apple');
   expect(counters().map(text)).toEqual(before);
   await openCounter('need you');
   expect(rows()).toEqual(items);

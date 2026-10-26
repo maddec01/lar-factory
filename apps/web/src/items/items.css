@@ -1,4 +1,4 @@
-/* An item's parts: status colours, the title link, the platform tag's dot, the Start control and the item dialog's
+/* An item's parts: status colours, the title link, the repository tag's dot, the Start control and the item dialog's
    footer links. */
 
 /* Each status's colour, which StatusGlyph, the item dialog's track and its slices draw in. */
@@ -20,12 +20,18 @@
 .title:hover { text-decoration: underline; }
 .ref { color: var(--muted-foreground); font-weight: 500; font-variant-numeric: tabular-nums; }
 
-/* The dot T3's Badge doesn't draw, coloured by platform; the sidebar's group avatars take the same colour. */
-.plat::before { content: ""; width: --spacing(1.75); height: --spacing(1.75); border-radius: 50%; background: var(--k, var(--muted-foreground)); }
-.plat-server { --k: var(--color-sky-500); }
-.plat-apple { --k: var(--color-pink-500); }
-.plat-factory { --k: var(--color-teal-500); }
-.plat-draft { --k: var(--muted-foreground); }
+/* The dot T3's Badge doesn't draw, coloured by repository; the sidebar's group avatars take the same colour. Each
+   repository takes the next colour in the board's list order (repoTone); Draft and others keep the muted colour. */
+.repo-tag::before { content: ""; width: --spacing(1.75); height: --spacing(1.75); border-radius: 50%; background: var(--k, var(--muted-foreground)); }
+.repo-tone-0 { --k: var(--color-sky-500); }
+.repo-tone-1 { --k: var(--color-pink-500); }
+.repo-tone-2 { --k: var(--color-teal-500); }
+.repo-tone-3 { --k: var(--color-amber-500); }
+.repo-tone-4 { --k: var(--color-violet-500); }
+.repo-tone-5 { --k: var(--color-lime-500); }
+.repo-tone-6 { --k: var(--color-orange-500); }
+.repo-tone-7 { --k: var(--color-indigo-500); }
+.repo-tone-none { --k: var(--muted-foreground); }
 
 /* the Start control and the dialog's footer links */
 .start { margin: 0; font-size: var(--text-xs); }

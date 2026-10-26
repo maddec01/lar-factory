@@ -9,8 +9,8 @@ import { THREAD_SIDEBAR_WIDTH_STORAGE_KEY } from './threadSidebarWidth.ts';
 
 beforeEach(() => localStorage.clear());
 
-const group = (platform: string) => $(`.list-group[data-platform="${platform}"]`)!;
-const rows = (platform: string) => [...group(platform).querySelectorAll<HTMLButtonElement>('button[data-item]')].map((b) => b.dataset.item);
+const group = (repo: string) => $(`.list-group[data-repo="${repo}"]`)!;
+const rows = (repo: string) => [...group(repo).querySelectorAll<HTMLButtonElement>('button[data-item]')].map((b) => b.dataset.item);
 const sidebar = () => $('[data-slot="sidebar"]')!;
 const shown = () => sidebar().dataset.state === 'expanded' && !sidebar().hasAttribute('inert');
 const search = () => $<HTMLInputElement>('.sidebar input[type="search"]')!;
@@ -227,10 +227,10 @@ test('⌘N opens Add item', async () => {
 
 test('a closed sidebar stays mounted: ⌘N still opens Add item, and the search and collapsed groups survive', async () => {
   await mountPage();
-  await settle(() => group('Server').querySelector<HTMLButtonElement>('button[aria-expanded]')!.click());
+  await settle(() => group('maddec01/lar-server').querySelector<HTMLButtonElement>('button[aria-expanded]')!.click());
   await press('b');
   await press('b');
-  expect(group('Server').querySelector('button[aria-expanded]')!.getAttribute('aria-expanded')).toBe('false');
+  expect(group('maddec01/lar-server').querySelector('button[aria-expanded]')!.getAttribute('aria-expanded')).toBe('false');
   await type('subtitle');
   await press('b');
   await press('n');
@@ -244,10 +244,10 @@ test('the sidebar holds the brand, search and Add item, then a group per reposit
   expect(text($('.sidebar .brand'))).toBe('larFactoryforCode');
   expect(search().placeholder).toBe('Search List');
   expect($('.sidebar .add-item')!.getAttribute('aria-label')).toBe('Add item');
-  expect($$('.list-group').map((g) => [g.dataset.platform, text(g.querySelector('.count'))])).toEqual([['Server', '2'], ['Apple', '1'], ['Draft', '1']]);
-  expect(rows('Server'), 'in board order, as in the prototype').toEqual(['I_sample01', 'I_sample02']);
-  expect(text(group('Server').querySelector('button.scope'))).toBe('SServerlar-server');
-  const row = group('Apple').querySelector<HTMLButtonElement>('button[data-item]')!;
+  expect($$('.list-group').map((g) => [g.dataset.repo, text(g.querySelector('.count'))])).toEqual([['maddec01/lar-server', '2'], ['maddec01/lar-apple', '1'], ['Draft', '1']]);
+  expect(rows('maddec01/lar-server'), 'in board order, as in the prototype').toEqual(['I_sample01', 'I_sample02']);
+  expect(text(group('maddec01/lar-server').querySelector('button.scope'))).toBe('Llar-server');
+  const row = group('maddec01/lar-apple').querySelector<HTMLButtonElement>('button[data-item]')!;
   expect([...row.querySelectorAll('span > span')].map(text), 'the title over its ref and age').toEqual(['Remember the last subtitle language per show', '#12 · 19h ago']);
   expect(row.title, 'the full title on hover').toBe('Remember the last subtitle language per show');
   expect(row.querySelector('svg.lucide-circle'), 'the List glyph').not.toBeNull();
@@ -261,39 +261,39 @@ test('a draft\'s second line says draft and its age', async () => {
 
 test('a repository with nothing in List says so', async () => {
   await mountPage({ ...sample, items: sample.items.filter((i) => i.id !== 'I_sample03') });
-  expect(text(group('Apple').querySelector('p'))).toBe('Nothing in List');
-  expect(text(group('Apple').querySelector('.count'))).toBe('0');
+  expect(text(group('maddec01/lar-apple').querySelector('p'))).toBe('Nothing in List');
+  expect(text(group('maddec01/lar-apple').querySelector('.count'))).toBe('0');
 });
 
 test('a group collapses and expands', async () => {
   await mountPage();
-  const chevron = group('Server').querySelector<HTMLButtonElement>('button[aria-expanded]')!;
-  expect(chevron.getAttribute('aria-label')).toBe('Collapse Server');
+  const chevron = group('maddec01/lar-server').querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+  expect(chevron.getAttribute('aria-label')).toBe('Collapse lar-server');
   await settle(() => chevron.click());
-  expect(rows('Server')).toEqual([]);
-  expect([chevron.getAttribute('aria-label'), chevron.getAttribute('aria-expanded')]).toEqual(['Expand Server', 'false']);
+  expect(rows('maddec01/lar-server')).toEqual([]);
+  expect([chevron.getAttribute('aria-label'), chevron.getAttribute('aria-expanded')]).toEqual(['Expand lar-server', 'false']);
   await settle(() => chevron.click());
-  expect(rows('Server')).toHaveLength(2);
+  expect(rows('maddec01/lar-server')).toHaveLength(2);
 });
 
 test('a group shows its first six items, then "Show N more" shows the rest', async () => {
   await mountPage(withServerList(6));
-  expect(rows('Server')).toHaveLength(6);
-  const more = [...group('Server').querySelectorAll('button')].find((b) => text(b).startsWith('Show'))!;
+  expect(rows('maddec01/lar-server')).toHaveLength(6);
+  const more = [...group('maddec01/lar-server').querySelectorAll('button')].find((b) => text(b).startsWith('Show'))!;
   expect(text(more)).toBe('Show 2 more');
   await settle(() => more.click());
-  expect(rows('Server')).toHaveLength(8);
-  expect([...group('Server').querySelectorAll('button')].some((b) => text(b).startsWith('Show'))).toBe(false);
+  expect(rows('maddec01/lar-server')).toHaveLength(8);
+  expect([...group('maddec01/lar-server').querySelectorAll('button')].some((b) => text(b).startsWith('Show'))).toBe(false);
 });
 
 test('search filters List items only, opens every group that matches, and clears', async () => {
   await mountPage(withServerList(6));
-  await settle(() => group('Server').querySelector<HTMLButtonElement>('button[aria-expanded]')!.click());
+  await settle(() => group('maddec01/lar-server').querySelector<HTMLButtonElement>('button[aria-expanded]')!.click());
   await type('extra');
-  expect($$('.list-group').map((g) => g.dataset.platform), 'groups without a match hide').toEqual(['Server']);
-  expect(rows('Server'), 'a collapsed group opens, and shows every match').toHaveLength(6);
+  expect($$('.list-group').map((g) => g.dataset.repo), 'groups without a match hide').toEqual(['maddec01/lar-server']);
+  expect(rows('maddec01/lar-server'), 'a collapsed group opens, and shows every match').toHaveLength(6);
   await type('#12');
-  expect(rows('Apple')).toEqual(['I_sample03']);
+  expect(rows('maddec01/lar-apple')).toEqual(['I_sample03']);
   await type('Run more than one 4K');
   expect(text($('.sidebar nav > p')), 'a Queued item is not in List').toBe('Nothing in List matches.');
   await settle(() => $<HTMLButtonElement>('.sidebar button[aria-label="Clear search"]')!.click());
@@ -303,7 +303,7 @@ test('search filters List items only, opens every group that matches, and clears
 
 test('a group\'s name scopes the main area to its repository; pressing it again shows the whole factory', async () => {
   await mountPage();
-  const scope = group('Apple').querySelector<HTMLButtonElement>('button.scope')!;
+  const scope = group('maddec01/lar-apple').querySelector<HTMLButtonElement>('button.scope')!;
   await settle(() => scope.click());
   expect(scope.getAttribute('aria-pressed')).toBe('true');
   expect($$('.desk-card').map((c) => c.dataset.item)).toEqual(['I_sample11', 'I_sample16', 'I_sample27']);
@@ -312,9 +312,29 @@ test('a group\'s name scopes the main area to its repository; pressing it again 
   expect($$('.desk-card')).toHaveLength(8);
 });
 
+test('a repository written in another case than GitHub gives it keeps one group, with its items, and scopes to them', async () => {
+  const repos = sample.repos.map((r) => (r.repo === 'maddec01/lar-apple' ? { ...r, repo: 'Maddec01/Lar-Apple' } : r));
+  await mountPage({ ...sample, repos });
+  expect($$('.list-group')).toHaveLength(sample.repos.length + 1);
+  const scope = group('Maddec01/Lar-Apple').querySelector<HTMLButtonElement>('button.scope')!;
+  await settle(() => scope.click());
+  expect($$('.desk-card').map((c) => c.dataset.item)).toEqual(['I_sample11', 'I_sample16', 'I_sample27']);
+});
+
+test('two repositories that share a name both show as owner/name, with their owner\'s letter, and each scopes to itself', async () => {
+  const repos = [{ repo: 'maddec01/lar', role: 'app' }, { repo: 'fabrikam/lar', role: 'app' }];
+  const items = [{ ...sample.items[0]!, id: 'I_ours', repo: 'maddec01/lar' }, { ...sample.items[0]!, id: 'I_theirs', repo: 'fabrikam/lar' }];
+  await mountPage({ ...sample, repos, items });
+  expect($$('.list-group').map((g) => text(g.querySelector('button.scope')))).toEqual(['Mmaddec01/lar', 'Ffabrikam/lar']);
+  expect(rows('fabrikam/lar')).toEqual(['I_theirs']);
+  await settle(() => group('fabrikam/lar').querySelector<HTMLButtonElement>('button.scope')!.click());
+  expect(text($('.title-bar .scope'))).toBe('fabrikam/lar');
+  expect(group('maddec01/lar').querySelector('button.scope')!.getAttribute('aria-pressed')).toBe('false');
+});
+
 test('a row opens the item dialog and stays marked while it shows', async () => {
   await mountPage();
-  const row = () => group('Server').querySelector<HTMLButtonElement>('[data-item="I_sample02"]')!;
+  const row = () => group('maddec01/lar-server').querySelector<HTMLButtonElement>('[data-item="I_sample02"]')!;
   await settle(() => row().click());
   expect($('[data-item-dialog]')!.textContent).toContain('Verify VideoToolbox');
   expect(row().className).toContain('bg-(--sidebar-row-selected)');

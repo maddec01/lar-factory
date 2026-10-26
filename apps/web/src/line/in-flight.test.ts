@@ -57,7 +57,7 @@ test('with nothing in flight, the table says so', async () => {
 
 test('the table takes the main area\'s scope', async () => {
   await mountPage();
-  const scope = $$('button.scope').find((b) => text(b).includes('Apple'))!;
+  const scope = $$('button.scope').find((b) => text(b).includes('lar-apple'))!;
   await press(scope);
   expect(rows().map((r) => numberOf(r.dataset.item!))).toEqual([31, 34, 30, 22, 23]);
 });
@@ -67,7 +67,7 @@ test('a row shows its numbered title, status, repository and age, and a red badg
   const [title] = cells('I_sample13');
   expect(title!.getAttribute('title')).toBe('#140 Owner accounts');
   const [name, meta] = [...title!.querySelectorAll('.grid > span')].map(text);
-  expect([name, meta]).toEqual(['#140 Owner accounts', 'Ready · Server · 1h agoblocked by 1']);
+  expect([name, meta]).toEqual(['#140 Owner accounts', 'Ready · lar-server · 1h agoblocked by 1']);
   const badge = [...title!.querySelectorAll('span')].find((s) => text(s) === 'blocked by 1')!;
   expect(badge.className).toContain('text-(--error-foreground)');
   expect(title!.querySelector('.grid')!.className.split(' '), 'one column as wide as the cell, so the lines truncate at 840 px, not overflow').toContain('grid-cols-[minmax(0,1fr)]');

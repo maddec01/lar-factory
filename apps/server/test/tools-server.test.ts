@@ -158,7 +158,7 @@ test('a listed repository on Azure DevOps gets an az check, which Recheck reruns
   checkouts(home, { 'lar-api': 'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api' });
   const config = join(home, 'config.json');
   writeFileSync(config, JSON.stringify({ project: { owner: 'maddec01', title: 'lar' },
-    repos: [{ repo: 'maddec01/lar-factory', platform: 'Factory', role: 'factory' }, { repo: 'Fabrikam/lar-api', platform: 'Server', role: 'api' }] }));
+    repos: [{ repo: 'maddec01/lar-factory', role: 'factory' }, { repo: 'Fabrikam/lar-api', role: 'api' }] }));
   const az = join(home, 'az');
   const fakeAz = (account: number) => {
     writeFileSync(az, `#!/bin/sh\n[ "$1" = --version ] && echo 'azure-cli 2.67.0' && exit 0\n[ "$1" = account ] && exit ${account}\nexit 0\n`);

@@ -79,16 +79,16 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
 
 test('Back returns to the board with the sidebar as it was', async () => {
   await mountPage();
-  const collapse = $<HTMLButtonElement>('.list-group[data-platform="Server"] button[aria-expanded]')!;
+  const collapse = $<HTMLButtonElement>('.list-group[data-repo="maddec01/lar-server"] button[aria-expanded]')!;
   await settle(() => collapse.click());
-  await settle(() => $<HTMLButtonElement>('.list-group[data-platform="Apple"] .scope')!.click());
+  await settle(() => $<HTMLButtonElement>('.list-group[data-repo="maddec01/lar-apple"] .scope')!.click());
   await settle(() => settingsButton()!.click());
   await settle(() => back().click());
   expect($('.settings-nav')).toBeNull();
   expect($('.settings-body')).toBeNull();
   expect($('.list-group')!.closest('[hidden]')).toBeNull();
-  expect($('.list-group[data-platform="Server"] button[aria-expanded]')!.getAttribute('aria-expanded')).toBe('false');
-  expect(text($('.title-bar .scope'))).toBe('Apple');
+  expect($('.list-group[data-repo="maddec01/lar-server"] button[aria-expanded]')!.getAttribute('aria-expanded')).toBe('false');
+  expect(text($('.title-bar .scope'))).toBe('lar-apple');
 });
 
 test.each([[15, '15 seconds'], [60, '1 minute'], [300, '5 minutes'], [120, '2 minutes']])('Refresh every shows the board\'s %i s as %s', async (seconds, label) => {
@@ -96,6 +96,12 @@ test.each([[15, '15 seconds'], [60, '1 minute'], [300, '5 minutes'], [120, '2 mi
   const refresh = row('refresh').querySelector('select')!;
   expect(refresh.value).toBe(label);
   expect(refresh.selectedOptions[0]!.textContent).toBe(label);
+});
+
+test('a repository colour named owner/name shows it once; one named by its name shows owner/name under it', async () => {
+  await open('Appearance', { ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork' }] });
+  expect(text(row('color-maddec01/lar-server')).split('maddec01/lar-server').length - 1, 'the title and the tag, no description').toBe(2);
+  expect(text(row('color-maddec01/lar-apple'))).toContain('maddec01/lar-apple');
 });
 
 test('a row that isn\'t built yet shows the prototype\'s value, disabled, and says so', async () => {
@@ -126,11 +132,10 @@ test('the header drags the window, but not Restore defaults', async () => {
 /** Each Settings group's title with its rows' ids. */
 const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
 
-test('Repositories shows the GitHub Project, the command line tools\' logins and each repository with its role, read-only', async () => {
+test('Repositories shows the command line tools\' logins and each repository with its role, read-only', async () => {
   await open('Repositories', { ...sample, project: { owner: 'maddec01', title: 'lar' } });
-  expect(groups()).toEqual([['GitHub Project', ['project']], ['Command line tools', ['gh', 'az']],
+  expect(groups()).toEqual([['Command line tools', ['gh', 'az']],
     ['Repositories', sample.repos.map((r) => `repo-${r.repo}`)]]);
-  expect(row('project').querySelector('input')!.value).toBe('maddec01 / lar');
   expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).not.toContain('no listed repository');
@@ -138,8 +143,7 @@ test('Repositories shows the GitHub Project, the command line tools\' logins and
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
-  expect(sample.repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual(sample.repos.map((r) => `${r.repo}${r.role}${r.platform}Edit`));
-  expect(row('project').querySelector('input')!.readOnly).toBe(true);
+  expect(sample.repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual(sample.repos.map((r) => `${r.repo}${r.role}${r.repo.split('/')[1]}Edit`));
   expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
     ...sample.repos.map(() => ['Edit', true]), ['Add repository', true]]);
 });

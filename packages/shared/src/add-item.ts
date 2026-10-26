@@ -3,12 +3,13 @@ import type { Item, RepoConfig } from './model.ts';
 
 export const ITEM_KINDS = ['bug', 'feature', 'improvement'] as const;
 
-export function applicability(platform: string): { title: string; hint: string; labels: string[] }[] {
-  if (platform === 'Apple') return [
+/** The applicability label groups Add item offers for a repository, by its `owner/name`. */
+export function applicability(repo: string): { title: string; hint: string; labels: string[] }[] {
+  if (repo === 'maddec01/lar-apple') return [
     { title: 'Apps', hint: 'No apps selected means all apps.', labels: ['app: music', 'app: video', 'app: photos', 'app: books'] },
     { title: 'Operating systems', hint: 'No OSes selected means all OSes.', labels: ['os: ios', 'os: macos', 'os: tvos', 'os: watchos'] },
   ];
-  if (platform === 'Server') return [
+  if (repo === 'maddec01/lar-server') return [
     { title: 'Areas', hint: 'Selecting neither means both server and web.', labels: ['area: server', 'area: web'] },
   ];
   return [];
@@ -47,7 +48,7 @@ export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft {
   if (typeof value.description !== 'string' || value.description.length > 65_536) {
     throw new Error('Description must be text of at most 65,536 characters.');
   }
-  const allowed = applicability(repo.platform).flatMap((g) => g.labels);
+  const allowed = applicability(repo.repo).flatMap((g) => g.labels);
   if (!Array.isArray(value.labels) || value.labels.length > allowed.length ||
     value.labels.some((l: unknown) => typeof l !== 'string' || !allowed.includes(l))) {
     throw new Error('Choose applicability labels for the selected repository.');

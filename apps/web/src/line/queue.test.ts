@@ -39,11 +39,11 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(text(queue().querySelector('#queue-h'))).toBe('Queue 3');
   expect(rows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
   expect(text(row('I_sample05').querySelector('.queue-title'))).toBe(`#129 ${sample05.title}`);
-  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('Server · queued 2h ago · improvement');
+  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · improvement');
   expect(text(row('I_sample21').querySelector('.queue-meta'))).toBe('Draft · queued 24h ago');
 
   const { useSidebarStore } = await import('../sidebar/sidebar-store.ts');
-  await settle(() => useSidebarStore.getState().setScope('Apple'));
+  await settle(() => useSidebarStore.getState().setScope('maddec01/lar-apple'));
   expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['I_sample06']);
 });
 

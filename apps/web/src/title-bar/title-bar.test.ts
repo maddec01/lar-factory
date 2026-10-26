@@ -6,7 +6,7 @@ import { clock } from '@lar-factory/shared';
 import { $, $$, NOW, mountPage, push, sample, settle, stubApp, text, toolChecks } from '../../test/support.ts';
 
 const titleBar = () => $<HTMLElement>('.title-bar')!;
-const scopeButton = (platform: string) => $<HTMLButtonElement>(`.list-group[data-platform="${platform}"] button.scope`)!;
+const scopeButton = (repo: string) => $<HTMLButtonElement>(`.list-group[data-repo="${repo}"] button.scope`)!;
 const trigger = () => titleBar().querySelector<HTMLButtonElement>('button.scope')!;
 const refreshed = () => titleBar().querySelector<HTMLElement>('.refreshed')!;
 const dot = () => refreshed().querySelector<HTMLElement>('[data-dot]')!;
@@ -33,42 +33,42 @@ test('the title bar shows All repositories, when the data was last read, and Thi
   expect(titleBar().className.split(' ')).toContain('h-13');
 });
 
-test('a group\'s name scopes the title bar to its platform, and its name again clears it', async () => {
+test('a group\'s name scopes the title bar to its repository, and its name again clears it', async () => {
   await mountPage();
-  await settle(() => scopeButton('Apple').click());
-  expect(text(trigger())).toBe('Apple');
-  await settle(() => scopeButton('Apple').click());
+  await settle(() => scopeButton('maddec01/lar-apple').click());
+  expect(text(trigger())).toBe('lar-apple');
+  await settle(() => scopeButton('maddec01/lar-apple').click());
   expect(text(trigger())).toBe('All repositories');
   expect(titleBar().querySelector('button[aria-label="Show the whole factory"]'), 'the × is gone').toBeNull();
 });
 
-test('the scope menu is headed Show, then All repositories, a separator and a platform per sidebar group, checked at the scope', async () => {
+test('the scope menu is headed Show, then All repositories, a separator and a repository per sidebar group, checked at the scope', async () => {
   await mountPage();
   expect(menu()).toBeNull();
   await settle(() => trigger().click());
   expect(text($('[role="menu"] [data-slot="menu-label"]'))).toBe('Show');
-  expect(entries().map(text)).toEqual(['All repositories', 'Server', 'Apple', 'Draft']);
+  expect(entries().map(text)).toEqual(['All repositories', 'lar-server', 'lar-apple', 'Draft']);
   expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false', 'false']);
   expect($('[role="menu"] [role="separator"]')).not.toBeNull();
-  expect(entries()[1]!.querySelector('.plat-server')).not.toBeNull();
-  expect(entries()[2]!.querySelector('.plat-apple')).not.toBeNull();
-  expect(entries()[3]!.querySelector('.plat-draft')).not.toBeNull();
-  expect(entries()[0]!.querySelector('[class*="plat-"]'), 'All repositories has no dot').toBeNull();
+  expect(entries()[1]!.querySelector('.repo-tone-0')).not.toBeNull();
+  expect(entries()[2]!.querySelector('.repo-tone-1')).not.toBeNull();
+  expect(entries()[3]!.querySelector('.repo-tone-none')).not.toBeNull();
+  expect(entries()[0]!.querySelector('[class*="repo-tone-"]'), 'All repositories has no dot').toBeNull();
 });
 
-test('picking a platform sets the scope, closes the menu and marks the sidebar group; All repositories clears it', async () => {
+test('picking a repository sets the scope, closes the menu and marks the sidebar group; All repositories clears it', async () => {
   await mountPage();
   await settle(() => trigger().click());
   await settle(() => entries()[2]!.click());
-  expect(text(trigger())).toBe('Apple');
+  expect(text(trigger())).toBe('lar-apple');
   expect(menu()).toBeNull();
-  expect(scopeButton('Apple').getAttribute('aria-pressed')).toBe('true');
+  expect(scopeButton('maddec01/lar-apple').getAttribute('aria-pressed')).toBe('true');
   await settle(() => trigger().click());
   expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true', 'false']);
   await settle(() => entries()[0]!.click());
   expect(text(trigger())).toBe('All repositories');
   expect(menu()).toBeNull();
-  expect(scopeButton('Apple').getAttribute('aria-pressed')).toBe('false');
+  expect(scopeButton('maddec01/lar-apple').getAttribute('aria-pressed')).toBe('false');
 });
 
 test('the menu works from the keyboard', async () => {
@@ -77,7 +77,7 @@ test('the menu works from the keyboard', async () => {
   await settle(() => trigger().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
   expect(entries()).toHaveLength(4);
   await settle(() => entries()[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-  expect(text(trigger())).toBe('Server');
+  expect(text(trigger())).toBe('lar-server');
 });
 
 test('the bar drags the window, but its buttons and the time never do', async () => {

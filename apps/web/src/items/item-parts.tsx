@@ -1,16 +1,25 @@
 // The bits every view draws for an item: its numbered title, title link, status track and slice bar, and the item
-// dialog's platform tag, slices, pull requests with checks, and agent work. The tag is T3's Badge; the board's CSS
+// dialog's repository tag, slices, pull requests with checks, and agent work. The tag is T3's Badge; the board's CSS
 // adds the coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
-import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, slug } from '@lar-factory/shared';
-import type { Item, SliceProgress, Status } from '@lar-factory/shared';
+import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
+import type { Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/badge';
 import { STATUS_COLOR } from './status-glyph.tsx';
 
-/** The control room's platform badge, with a medium label. */
-export function PlatformTag({ platform }: { platform: string }) {
-  return <Badge variant="outline" size="sm" className={`plat plat-${slug(platform)} gap-1.5 font-medium`}>{platform}</Badge>;
+const REPO_TONES = 8;
+
+/** A repository's colour class: the palette entry for its place among the board's repositories, or the muted
+ *  colour for Draft and a repository the board doesn't list. `repo` is an `owner/name` or Draft. */
+export function repoTone(repo: string, repos: readonly RepoConfig[]): string {
+  const at = repos.findIndex((r) => sameRepo(r.repo, repo));
+  return at < 0 ? 'repo-tone-none' : `repo-tone-${at % REPO_TONES}`;
+}
+
+/** The control room's repository badge, with a medium label. */
+export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoConfig[] }) {
+  return <Badge variant="outline" size="sm" className={`repo-tag ${repoTone(repo, repos)} gap-1.5 font-medium`}>{repoName(repo, repos)}</Badge>;
 }
 
 export function TitleLink({ item, className = 'title' }: { item: Item; className?: string }) {

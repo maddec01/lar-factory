@@ -50,7 +50,7 @@ EOF
 ANSWERS=("" "<p12>" "" "$PASSWORD" "<p8>" "" "" issuer-uuid TEAM42 ABCDE12345 y)
 
 # run_wizard [args...] runs the wizard in a fresh empty directory with the files
-# Pedro exported, giving it $ANSWERS with <p12> and <p8> replaced by their paths.
+# the maintainer exported, giving it $ANSWERS with <p12> and <p8> replaced by their paths.
 # Sets $output, $status, $dir and $logs.
 run_wizard() {
   local bin files

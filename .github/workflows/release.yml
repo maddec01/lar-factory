@@ -5,7 +5,7 @@
 name: Release
 
 on:
-  # Pedro starts every Release by hand from Actions > Release > Run workflow on
+  # The maintainer starts every Release by hand from Actions > Release > Run workflow on
   # main. A Nightly builds main's head once CI passed on it; a Stable Release
   # rebuilds the latest Nightly's commit. Nothing starts a Release on merge.
   workflow_dispatch:

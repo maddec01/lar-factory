@@ -1,4 +1,4 @@
-// Plans a board app Release on the channel Pedro picked when he started the Release workflow.
+// Plans a board app Release on the channel the maintainer picked when they started the Release workflow.
 // The Nightly version scheme and the Stable Release's choice of the latest Nightly's
 // commit are adapted from T3 Code's scripts/resolve-nightly-release.ts and
 // .github/scripts/check-nightly-release.cjs (https://github.com/pingdotgg/t3code).

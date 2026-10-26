@@ -1,18 +1,19 @@
 #!/bin/bash
 # Usage: status.sh <owner/repo#number | issue or PR URL> <Status>
-# Sets the item's Status on the item. An issue from a repository whose config.json
-# entry on lar-factory's main has "items": "issues" swaps its status-<name> label
-# for the new one, creating the label when the repository lacks it. Any other item
-# is added to the "lar" project if it isn't there yet, and its Status field is set.
+# Sets the item's Status on the item, as the item's repository config from
+# repo-config.sh says. An issue from a repository that reads its issues swaps its
+# status-<name> label for the new one, creating the label when the repository lacks
+# it. An item from a repository that reads a GitHub Project is added to that Project
+# if it isn't there yet, and its Status field is set. A pull request from a
+# repository that reads its issues is refused: it has no Project to hold a Status.
 # Done is never stored: closing the issue makes it Done.
 # Then asks each running local board to read GitHub now: the one on LAR_BOARD_PORT when
 # that is set, else every board recorded in ~/Library/Application Support/Lar Factory/boards.
 set -euo pipefail
 
-# shellcheck source=project.sh
-source "$(dirname "$0")/project.sh"
-ref=${1:?usage: status.sh <owner/repo#n | url> <Status>}
-status=${2:?usage: status.sh <owner/repo#n | url> <Status>}
+usage="usage: status.sh <owner/repo#n | url> <Status>"
+ref=${1:?$usage}
+status=${2:?$usage}
 
 if [[ "$ref" =~ ^([^/#]+)/([^/#]+)#([0-9]+)$ ]]; then
     url="https://github.com/${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/issues/${BASH_REMATCH[3]}"
@@ -62,7 +63,7 @@ set_label() {
 }
 
 set_field() {
-    local project_id field_id option_id item_id
+    local owner=$1 project=$2 project_id field_id option_id item_id
     project_id=$(gh project view "$project" --owner "$owner" --format json --jq .id)
     read -r field_id option_id < <(gh project field-list "$project" --owner "$owner" --format json |
         jq -r --arg status "$status" '.fields[] | select(.name == "Status") | [.id, (.options[] | select(.name == $status) | .id)] | @tsv')
@@ -74,16 +75,20 @@ set_field() {
     gh project item-edit --project-id "$project_id" --id "$item_id" --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null
 }
 
-items=
-if [[ $url =~ ^https://github\.com/([^/]+/[^/]+)/issues/([0-9]+)$ ]]; then
-    repo=${BASH_REMATCH[1]} number=${BASH_REMATCH[2]}
-    items=$(gh api -H "Accept: application/vnd.github.raw" "repos/maddec01/lar-factory/contents/config.json?ref=main" |
-        jq -r --arg repo "$repo" '.repos[] | select((.repo | ascii_downcase) == ($repo | ascii_downcase)) | .items // empty')
+if [[ ! $url =~ ^https://github\.com/([^/]+/[^/]+)/(issues|pull)/([0-9]+)$ ]]; then
+    echo "$usage" >&2
+    exit 1
 fi
-if [[ $items == issues ]]; then
+repo=${BASH_REMATCH[1]} kind=${BASH_REMATCH[2]} number=${BASH_REMATCH[3]}
+# repo-config.sh names its failure on stderr, which passes straight through.
+config=$(bash "$(dirname "$0")/repo-config.sh" "$repo")
+if [[ $(jq -r .itemSource.kind <<<"$config") == github-project ]]; then
+    set_field "$(jq -r .itemSource.owner <<<"$config")" "$(jq -r .itemSource.number <<<"$config")"
+elif [[ $kind == issues ]]; then
     set_label "$repo" "$number"
 else
-    set_field
+    echo "$repo reads its issues, not a Project, so its pull request $url has no Status to set." >&2
+    exit 1
 fi
 echo "$url → $status"
 

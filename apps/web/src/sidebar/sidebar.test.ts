@@ -312,17 +312,9 @@ test('a group\'s name scopes the main area to its repository; pressing it again 
   expect($$('.desk-card')).toHaveLength(8);
 });
 
-test('with no repository onboarded the List says so and where to add one, but not before the first read or beside a read error', async () => {
-  const empty = { ...sample, repos: [], items: [], repositoryConfigProblems: [], error: null };
-  const hint = () => $('nav[aria-label="List"] .list-empty');
-  await mountPage(empty);
-  expect(hint()!.textContent).toBe('No repository is onboarded. See Adding a repository in apps/server/README.md.');
-  await push({ ...empty, error: 'gh: HTTP 502' });
-  expect(hint()).toBeNull();
-  await push({ ...empty, fetchedAt: null });
-  expect(hint()).toBeNull();
-  await push({ ...empty, repositoryConfigProblems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }] });
-  expect(hint()).toBeNull();
+test('with no repository onboarded the List stays empty, leaving Onboard a repository to the main area', async () => {
+  await mountPage({ ...sample, repos: [], items: [], repositoryConfigProblems: [], error: null });
+  expect($('nav[aria-label="List"]')!.textContent).toBe('');
 });
 
 test('a repository written in another case than GitHub gives it keeps one group, with its items, and scopes to them', async () => {

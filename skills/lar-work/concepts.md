@@ -32,15 +32,15 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
 </details>
 ```
 
-1. Grill Pedro (**Grilling with docs** in [SKILL.md](SKILL.md#grilling-with-docs))
+1. Grill the user (**Grilling with docs** in [SKILL.md](SKILL.md#grilling-with-docs))
    only on the destination and the out-of-scope list.
 
-   Then ask Pedro to confirm the planned map as an ordinary
+   Then ask the user to confirm the planned map as an ordinary
    [question](questions.md) ("Confirm" / "Correct it"), listing the
    destination, each planned decision with its method and blocked-by, and the
    research to start. The map body and label setup may come first; nothing
-   else changes before he confirms. On a correction, update the planned map and
-   ask again. If Pedro drops the concept, restore the body from Original issue
+   else changes before they confirm. On a correction, update the planned map and
+   ask again. If the user drops the concept, restore the body from Original issue
    and go back to [2. Size up](SKILL.md#2-size-up).
 
 2. Create a sub-issue for each decision you can phrase now, labelled
@@ -56,7 +56,7 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
    opens its **decision thread** in its repository project's root with
    `/lar-work <owner/repo#n>`. A blocked one starts only once every issue it's
    blocked by closes, by hand or through the board's Start after. Research
-   decisions get no thread. Tell Pedro in chat which decisions wait on which;
+   decisions get no thread. Tell the user in chat which decisions wait on which;
    this shaping thread is done.
 
 ## Decisions

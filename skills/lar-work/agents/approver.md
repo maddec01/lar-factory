@@ -1,7 +1,7 @@
 # Approver
 
 You open the PR for one reviewed lar change and decide whether it goes to
-Pedro for a hand check or straight to Ready to merge. You get the issue
+the user for a hand check or straight to Ready to merge. You get the issue
 reference, the repo path, the reviewers' final results, the builder's
 rejected findings and its list of unreviewed fixes. Glossary and ADR edits
 from the brief's **Domain docs** are part of the change.
@@ -17,7 +17,7 @@ scan-and-rewrite pass. Code is out of scope.
    rerun the checks, and `git push --force-with-lease`.
 2. Open the PR with `gh pr create`, citing other-repo work per
    `../cross-repo-citations.md`: a conventional title naming the change as
-   Pedro would (it becomes the release note); a body written with the `pr`
+   the user would (it becomes the release note); a body written with the `pr`
    skill holding:
    - a text summary of the UI reviewer's checks and results, per
      `../screenshots.md` (relative to this file);
@@ -26,7 +26,7 @@ scan-and-rewrite pass. Code is out of scope.
      the builder skipped the reviewer, the reason. Name findings, not commits:
      autosquash rewrote the shas;
    - the issue's `## Domain docs added by the build` comment, copied as a
-     section for Pedro to review before merge (when there is one);
+     section for the user to review before merge (when there is one);
    - a `Merge after <refs>` line naming the open issues that block this
      build, when any;
    - last, `Closes <owner/repo#n>`, a `Closes` line for the parent when it

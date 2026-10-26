@@ -5,7 +5,9 @@ disable-model-invocation: true
 ---
 
 The copied skills in `maddec01/lar-factory` change only through this skill.
-`UPSTREAM.md` records the upstream commit each copy matches.
+`UPSTREAM.md` records the upstream commit each copy matches. This is the
+maintainer's tool: Pedro runs it in the factory, and users get skills only
+through a Release.
 
 Before writing anything, read the `unslop` skill
 (`~/.claude/skills/unslop/SKILL.md` in Claude Code,
@@ -20,10 +22,11 @@ and copied files follow their own rules.
    copy, whether upstream changed since the recorded commit, the upstream commits
    and the diff.
 3. For each changed copy, summarise in two or three lines what changed and what
-   it would do to the factory, and give your recommendation (take, skip, or take
-   part). Ask Pedro to pick, using numbered questions so he can answer in one
-   message. In the same message ask whether he wants to add a copy (source repo,
-   path, commit; HEAD unless he names one) or drop one.
+   it would do to the factory, and give your recommendation: take or skip. A
+   change is taken whole or skipped whole. Ask Pedro to pick, using numbered
+   questions so he can answer in one message. In the same message ask whether
+   he wants to add a copy (source repo, path, commit; HEAD unless he names one)
+   or drop one.
 4. Confirm each add and drop with Pedro before step 5:
    - **Add**: run
      `bash <this skill>/scripts/preview-copy.sh <owner/repo> <path> [commit]`.
@@ -37,15 +40,20 @@ and copied files follow their own rules.
      source's full commit and notice if no other row uses that source) and
      wait for his yes.
 5. Apply exactly what he confirmed:
-   - **Take a change**: copy the upstream files over the copy (or apply the
-     chosen hunks), and set that row's commit in `UPSTREAM.md` to the upstream
-     commit you took. A skipped change keeps the old commit, so it shows up again
-     next time; say so.
+   - **Take a change**: make the Copy's folder or file match upstream's path
+     at the new commit. Copy every upstream file whole. Delete each file
+     upstream deleted there, inside the Copy's own folder under
+     `skills/<name>/` only; a single-file Copy changes only that file. In its `UPSTREAM.md` row, set the commit to the 12-character
+     upstream commit you took and the Date to that commit's date as YYYY-MM-DD
+     (`git log -1 --format=%cs <commit>` in a clone of the source).
+   - **Skip a change**: leave the copy and its row alone. The change shows up
+     again on the next sync; tell Pedro so. Skips are recorded nowhere.
    - **Add**: copy the folder at that commit unchanged into `skills/<name>` (a
      file under `references/` goes to `references/`). Add its `UPSTREAM.md` row
-     with the 12-character commit, and the source's full commit to the "Full
-     commits" line. When the source is new, add its licence to
-     `THIRD_PARTY_NOTICES.md` under a `## <owner/repo>` heading with its URL.
+     with the 12-character commit and that commit's date as YYYY-MM-DD, and
+     the source's full commit to the "Full commits" line. When the source is
+     new, add its licence to `THIRD_PARTY_NOTICES.md` under a
+     `## <owner/repo>` heading with its URL.
    - **Drop**: delete the copy and its `UPSTREAM.md` row. When no row uses its
      source any more, also remove that source's full commit and its
      `THIRD_PARTY_NOTICES.md` section. Tell Pedro the installed copies in

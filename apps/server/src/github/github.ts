@@ -391,6 +391,41 @@ export async function editPrBody(url: string, body: string, run: (args: string[]
   await run(['api', '--method', 'PATCH', pullPath(url), '-f', `body=${body}`]);
 }
 
+/** The repository's default branch and the commit at its head. */
+export async function defaultBranchHead(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<{ branch: string; sha: string }> {
+  const branch = (await run(['api', `repos/${repo}`, '--jq', '.default_branch'])).trim();
+  const sha = (await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha'])).trim();
+  return { branch, sha };
+}
+
+/** Makes a branch on GitHub at the commit, leaving every checkout alone. */
+export async function createBranch(repo: string, branch: string, sha: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  await run(['api', `repos/${repo}/git/refs`, '--method', 'POST', '-f', `ref=refs/heads/${branch}`, '-f', `sha=${sha}`]);
+}
+
+/** Adds a file to a branch on GitHub in a commit of its own. */
+export async function addFile(repo: string, branch: string, path: string, content: string, commit: string,
+  run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  await run(['api', `repos/${repo}/contents/${path}`, '--method', 'PUT', '-f', `message=${commit}`,
+    '-f', `content=${Buffer.from(content).toString('base64')}`, '-f', `branch=${branch}`]);
+}
+
+/** Opens a PR from `head` into `base` and returns its URL. */
+export async function createPr(repo: string, pr: { base: string; head: string; title: string; body: string },
+  run: (args: string[]) => Promise<string> = gh): Promise<string> {
+  const out = await run(['pr', 'create', '-R', repo, '--base', pr.base, '--head', pr.head, '--title', pr.title, '--body', pr.body]);
+  const url = out.trim().split('\n').at(-1) ?? '';
+  if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(url)) throw new Error(`gh pr create sent no PR URL: ${out.trim()}`);
+  return url;
+}
+
+/** Whether a PR, by its URL, is open, merged or closed without merging. */
+export async function prState(url: string, run: (args: string[]) => Promise<string> = gh): Promise<'OPEN' | 'MERGED' | 'CLOSED'> {
+  const state = (await run(['pr', 'view', url, '--json', 'state', '--jq', '.state'])).trim();
+  if (state !== 'OPEN' && state !== 'MERGED' && state !== 'CLOSED') throw new Error(`gh pr view sent no PR state for ${url}: ${state}`);
+  return state;
+}
+
 /** Deletes an issue for good, which needs admin rights on its repository; returns the error, or null when GitHub accepted it. */
 export async function deleteIssue(item: Item, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
   try {

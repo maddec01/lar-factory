@@ -37,6 +37,17 @@ export interface OnboardedRepository {
 const REPO = /^(?!\.\.?\/)[A-Za-z0-9._-]+\/(?!\.\.?$)[A-Za-z0-9._-]+$/;
 const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 
+/** Whether a value is a repository of the form owner/name. */
+export const isRepo = (value: unknown): value is string => typeof value === 'string' && REPO.test(value);
+
+/** Whether a value is an item source as .lar-factory.json holds it: a GitHub Project by owner and positive number, or the issues. */
+export function isItemSource(value: unknown): value is RepositoryItemSource {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'issues') return true;
+  return value.kind === 'github-project' && typeof value.owner === 'string' && GITHUB_LOGIN.test(value.owner)
+    && Number.isInteger(value.number) && (value.number as number) > 0;
+}
+
 function readJson(file: string): unknown {
   try { return JSON.parse(readFileSync(file, 'utf8')); }
   catch { throw new Error(`${file} isn't valid JSON.`); }
@@ -93,16 +104,30 @@ export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] 
  * other entry as the file has it, and returns the list. Throws for a repository that is onboarded already.
  */
 export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
+  return saveEntry({ repo, onboarding: progress }, replaces, dir);
+}
+
+/**
+ * Finishes an onboarding: its repository's entry keeps only the repository, in place of its onboarding entry and of
+ * the one saved under `replaces`, and is added when there is none. Throws for a repository that is onboarded already.
+ */
+export function saveOnboarded(repo: string, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
+  return saveEntry({ repo }, replaces, dir);
+}
+
+/** Writes `entry` over its repository's entry and drops the one of `replaces`, as saveOnboarding and saveOnboarded say. */
+function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: string): OnboardedRepository[] {
+  const { repo } = entry;
   if (!REPO.test(repo)) throw new Error(`${repo} isn't a repository of the form owner/name.`);
   const file = join(dir, 'repositories.json');
   const { raw, list } = readListFile(file);
   const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces)));
   if (onboarded) throw new Error(`${onboarded.repo} is onboarded already.`);
-  const entry = { repo, onboarding: progress };
   const at = list.findIndex((e) => sameRepo(e.repo, repo));
   const dropped = (e: OnboardedRepository) => sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces);
-  const repositories = raw.repositories.flatMap((e, i) => i === at ? [entry] : dropped(list[i]!) ? [] : [e]);
-  if (at < 0) repositories.push(entry);
+  const written: Record<string, unknown> = { ...entry };
+  const repositories = raw.repositories.flatMap((e, i) => i === at ? [written] : dropped(list[i]!) ? [] : [e]);
+  if (at < 0) repositories.push(written);
   mkdirSync(dir, { recursive: true });
   // Written beside it, then renamed over it, so repo-config.sh never reads half a file.
   const temp = `${file}.${process.pid}.tmp`;

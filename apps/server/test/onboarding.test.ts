@@ -137,3 +137,33 @@ test('the sample board keeps no onboarding', async (t) => {
   const response = await board.post({ repo: 'maddec01/lar-web', progress }, board.url, '/api/onboarding/repositories');
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }]);
 });
+
+test('an onboarding setup check answers with its result', async (t) => {
+  const board = await startBoard(t, { canPush: false });
+  const check = (body: object) => board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web', itemSource: { kind: 'issues' }, ...body }, board.url, '/api/onboarding/checks');
+  const push = await check({ check: 'push' });
+  assert.deepEqual([push.status, (await push.json() as { result: { passed: boolean } }).result.passed], [200, false]);
+  const unknown = await check({ check: 'labels' });
+  assert.deepEqual([unknown.status, await unknown.json()], [400, { error: 'Send the check to run, the repository, its T3 project and its item source.' }]);
+});
+
+test('finishing an onboarding that reuses .lar-factory.json puts its repository on the board', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  writeList(home, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: progress }]);
+  const board = await startBoard(t, {}, false, false, { HOME: home });
+  await until(board, (d) => d.fetchedAt !== null);
+  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/finish');
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json() as { board: BoardData }).board.onboarding, []);
+  const data = await until(board, (d) => d.repos.length === 2);
+  assert.deepEqual(data.repos.map((r) => r.repo), ['maddec01/lar-factory', 'maddec01/lar-web']);
+});
+
+test('the sample board runs no onboarding check and finishes no onboarding', async (t) => {
+  const board = await startBoard(t, {}, true);
+  for (const path of ['/api/onboarding/checks', '/api/onboarding/finish']) {
+    const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
+    assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
+  }
+});

@@ -38,6 +38,10 @@ const main = async () => {
     }
     return void process.stdout.write(typeof config === 'string' ? config : JSON.stringify(config));
   }
+  // Whether the login can push to a repository: options.canPush, true unless it says false.
+  if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.includes('.permissions.push')) {
+    return void process.stdout.write(`${options.canPush !== false}\n`);
+  }
   if (args[1] === 'graphql') {
     if (options.fail === 'read') {
       process.stderr.write('HTTP 502: Bad Gateway');

@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, type OnboardingRepository, type ProjectChoice } from '@lar-factory/shared';
+import { pageWithData, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -33,6 +33,10 @@ export interface HttpDeps {
   keepOnboarding(input: Record<string, unknown>): { onboarding: OnboardingRepository[] } | { status: number; error: string };
   /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
   createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | { status: number; error: string }>;
+  /** Runs one of onboarding's setup checks on the body's repository, T3 project and item source, or says why it can't. */
+  runSetupCheck(input: Record<string, unknown>): Promise<{ result: SetupCheckResult } | { status: number; error: string }>;
+  /** Finishes an onboarding that reuses its .lar-factory.json, returning the repositories still onboarding, or why it can't. */
+  finishOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
 }
 
 export interface BoardServer {
@@ -107,7 +111,8 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject }: HttpDeps): BoardServer {
+export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
+  runSetupCheck, finishOnboarding }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -175,6 +180,25 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         if ('error' in kept) return { status: kept.status, body: { error: kept.error } };
         board.update({ onboarding: kept.onboarding });
         board.push();
+        return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+    '/api/onboarding/checks': {
+      what: 'the check to run', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const checked = await runSetupCheck(input);
+        return 'error' in checked ? { status: checked.status, body: { error: checked.error } } : { status: 200, body: { ...checked, error: null } };
+      },
+    },
+    '/api/onboarding/finish': {
+      what: 'the onboarding to finish', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const finished = await finishOnboarding(input);
+        if ('error' in finished) return { status: finished.status, body: { error: finished.error } };
+        board.update({ onboarding: finished.onboarding });
+        board.push();
+        // The finished repository goes on the board with the next read, which reads its .lar-factory.json.
+        readSoon();
         return { status: 200, body: withBoard({ error: null }) };
       },
     },

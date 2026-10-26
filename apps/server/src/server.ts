@@ -17,8 +17,10 @@ import { onboardedSources, repoView } from './items/item-sources.ts';
 import { log } from './log.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
+import { finishOnboarding } from './onboarding/finish-onboarding.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
+import { runSetupCheck } from './onboarding/setup-checks.ts';
 import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
@@ -296,6 +298,7 @@ const { server, endStreams } = createBoardServer({
   recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
+  runSetupCheck: (input) => runSetupCheck(input), finishOnboarding: (input) => finishOnboarding(input),
 });
 
 /** Logs why the board can't start and exits. */

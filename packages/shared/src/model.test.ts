@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repoKey, repoName, repositoryProjectHint, sameRepo, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { applicability, validateDraft } from './add-item.ts';
@@ -366,4 +366,9 @@ test('Add item refuses an unlisted repository, an unknown kind, a blank title an
   ]) {
     assert.throws(() => validateDraft(input, sample.repos), /./, JSON.stringify(input));
   }
+});
+
+test(".lar-factory.json as onboarding writes it has the answers, version 1 and no labels until build #383's label step", () => {
+  assert.equal(onboardingConfigFile({ itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' }),
+    '{\n  "version": 1,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "show": "opted-in",\n  "labels": []\n}\n');
 });

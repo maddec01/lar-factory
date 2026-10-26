@@ -637,6 +637,10 @@ export interface RepositoryConfigAnswers {
   role: string;
 }
 
+/** The .lar-factory.json onboarding's PR adds; labels wait for build #383's label step. */
+export const onboardingConfigFile = ({ role, itemSource, show }: RepositoryConfigAnswers): string =>
+  `${JSON.stringify({ version: 1, role, itemSource, show, labels: [] }, null, 2)}\n`;
+
 /** What the Provider and item source step has answered so far, as typed; the GitHub Project's fields count only for a Project. */
 export interface SetupAnswers {
   itemSource: RepositoryItemSource['kind'];

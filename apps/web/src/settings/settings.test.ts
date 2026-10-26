@@ -1,11 +1,11 @@
 // The Settings page: the sidebar's section list with search and Back, the breadcrumb over each section's rows, the
-// Claude profiles with their switches and what a change did, the update channel, version and Check now, the tool
-// and repository rows, and the rows that aren't built yet. The bridge stands in for the app's preload; without it
+// Claude profiles with their switches and what a change did, the bundled skills with their last updates and install
+// states, the update channel, version and Check now, the tool and repository rows, and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the profiles and updates show disabled.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks } from '../../test/support.ts';
-import type { BoardData, ProfilesResult, UpdateChannel, UpdateState } from '@lar-factory/shared';
+import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
+import { clock, day, type BoardData, type BundledSkill, type ProfilesResult, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
 const listed: ProfilesResult = {
@@ -70,8 +70,8 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
   await open('General');
   await type(search(), 'dock');
   expect(sections().map(text)).toEqual(['General']);
-  await type(search(), 'up');
-  expect(sections().map(text)).toEqual(['Skills', 'Updates']);
+  await type(search(), 'claude');
+  expect(sections().map(text)).toEqual(['Skills']);
   search().blur();
   await settle(() => dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true })));
   expect(document.activeElement).toBe(search());
@@ -269,6 +269,56 @@ test('Skills credits each bundled skill and checklist, with a link to its source
   const link = rows[1]!.querySelector('a')!;
   expect([text(link).trim(), link.getAttribute('aria-label'), link.getAttribute('href'), link.target]).toEqual(
     ['Source', 'references/security-checklist.md source', 'https://github.com/addyosmani/agent-skills/blob/aeac41d4d005/references/security-checklist.md', '_blank']);
+});
+
+const larWork: BundledSkill = { name: 'lar-work', author: 'Lar', licence: 'MIT', source: 'https://github.com/maddec01/lar-factory/tree/main/skills/lar-work' };
+const tdd: BundledSkill = { name: 'tdd', author: 'Matt Pocock', licence: 'MIT', source: 'https://github.com/mattpocock/skills/tree/5beb35b040e3/skills/engineering/tdd', date: `${new Date().getUTCFullYear()}-10-19` };
+const restoredAt = '2026-10-26T09:30:00.000Z';
+/** Each bundled row's state, or null for none, and its tooltip. */
+const states = (...names: string[]) => names.map((name) => {
+  const state = row(`bundled-${name}`).querySelector('.tool-state');
+  return state && [text(state), state.closest('[title]')?.getAttribute('title') ?? null];
+});
+
+test('Skills shows each skill’s install state: matching, restored with its time, or blocked', async () => {
+  await open('Skills', { ...sample, bundledSkills: [
+    { ...larWork, status: { state: 'matching' } }, { ...tdd, status: { state: 'restored', restoredAt } }, { ...tdd, name: 'grill', status: { state: 'blocked' } },
+  ] });
+  expect(states('lar-work', 'tdd', 'grill')).toEqual([
+    ['● Installed', 'Matches this version of Lar Factory.'],
+    [`● Restored ${day(restoredAt, undefined)}, ${clock(restoredAt, undefined)}`, 'Lar Factory put back its copy, which had changed.'],
+    ['● Blocked', 'A folder Lar Factory didn’t install has this name, so it left that folder alone.'],
+  ]);
+});
+
+test('without a manifest, as on the Sample board, the rows show no state', async () => {
+  await open('Skills', { ...sample, bundledSkills: [larWork, tdd] });
+  expect(states('lar-work', 'tdd')).toEqual([null, null]);
+});
+
+test('Skills shows a Copy’s Date as its last update, in a browser too', async () => {
+  await open('Skills', { ...sample, bundledSkills: [larWork, tdd] });
+  expect([text(row('bundled-lar-work').querySelector('.text-xs')), text(row('bundled-tdd').querySelector('.text-xs'))]).toEqual([
+    'Lar · MIT', 'Matt Pocock · MIT · updated 19 Oct']);
+  expect(row('bundled-tdd').querySelector('.text-xs .whitespace-nowrap')?.textContent, 'the date stays on one line').toBe('updated 19 Oct');
+});
+
+test('in the board app, a Lar skill’s last update is the app’s version', async () => {
+  stubApp({ listProfiles: vi.fn(async () => listed), getUpdateState: vi.fn(async () => ({ ...updatesOff, currentVersion: '0.2.0' })) });
+  await open('Skills', { ...sample, bundledSkills: [larWork] });
+  expect(text(row('bundled-lar-work').querySelector('.text-xs'))).toBe('Lar · MIT · updated in Lar Factory 0.2.0');
+});
+
+test('a Date or restore from another year shows its year', async () => {
+  const lastYear = new Date().getUTCFullYear() - 1;
+  await open('Skills', { ...sample, bundledSkills: [{ ...tdd, date: `${lastYear}-10-19`, status: { state: 'restored', restoredAt: `${lastYear}-06-15T12:00:00Z` } }] });
+  expect(text(row('bundled-tdd').querySelector('.text-xs'))).toBe(`Matt Pocock · MIT · updated 19 Oct ${lastYear}`);
+  expect(text(row('bundled-tdd').querySelector('.tool-state'))).toMatch(new RegExp(`^● Restored 15 Jun ${lastYear}, `));
+});
+
+test('Skills has no Skill sync group', async () => {
+  await open('Skills', { ...sample, bundledSkills: [larWork] });
+  expect(groups().map(([title]) => title)).toEqual(['Claude profiles', 'Bundled skills']);
 });
 
 test('Skills says so in one row when it couldn’t read the bundled skills', async () => {

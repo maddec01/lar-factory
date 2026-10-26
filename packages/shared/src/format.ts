@@ -48,10 +48,12 @@ export function clock(iso: string, timeZone: string | undefined): string {
   );
 }
 
-export function day(iso: string, timeZone: string | undefined): string {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }).format(
-    new Date(iso),
-  );
+/** A day as `19 Oct`, with its year, `19 Oct 2025`, when that isn't the year at `now` in the same time zone. */
+export function day(iso: string, timeZone: string | undefined, now = Date.now()): string {
+  const date = new Date(iso);
+  const year = (time: Date | number) => new Intl.DateTimeFormat('en-GB', { year: 'numeric', timeZone }).format(time);
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', ...(year(date) !== year(now) && { year: 'numeric' }), timeZone })
+    .format(date);
 }
 
 export function ago(iso: string, now: number): string {

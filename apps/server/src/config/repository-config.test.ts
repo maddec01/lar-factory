@@ -1,9 +1,9 @@
 import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList } from './repository-config.ts';
+import { readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarding } from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar repository config test '));
@@ -23,11 +23,52 @@ function ghWith(files: Record<string, unknown>): (args: string[]) => Promise<str
   };
 }
 
-test('the list file names the onboarded repositories; a missing one names none', async (t) => {
-  const list = { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: true }] };
+const progress = (step = 'setup', projectId = 'lar-apple') => ({ step, done: ['project'], answers: { projectId } });
+
+test('the list file names the onboarded repositories, each still onboarding with its progress; a missing one names none', async (t) => {
+  const list = { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: { ...progress(), prUrl: 'https://github.com/maddec01/lar-apple/pull/4' } }] };
   assert.deepEqual(readRepositoryList(await dataDir(t, { 'repositories.json': JSON.stringify(list) })),
-    [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple' }]);
+    [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: { ...progress(), prUrl: 'https://github.com/maddec01/lar-apple/pull/4' } }]);
   assert.deepEqual(readRepositoryList(await dataDir(t)), []);
+});
+
+test("an onboarding that isn't progress is refused, naming its entry", async (t) => {
+  for (const onboarding of [true, { step: 'setup', done: ['project'] }, { step: 3, done: [], answers: { projectId: 'x' } },
+    { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} }, { ...progress(), prUrl: 4 }]) {
+    const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding }] }) });
+    assert.throws(() => readRepositoryList(dir), { message: `${join(dir, 'repositories.json')}: repositories[0] has an onboarding without its step, done steps and T3 project.` },
+      JSON.stringify(onboarding));
+  }
+});
+
+test('saving an onboarding adds its repository to the list, or updates its entry, and keeps the other entries as they are', async (t) => {
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory', note: 'kept' }] }) });
+  const file = join(dir, 'repositories.json');
+  assert.deepEqual(saveOnboarding({ repo: 'maddec01/lar-apple', progress: progress() }, null, dir),
+    [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: progress() }]);
+  saveOnboarding({ repo: 'maddec01/Lar-Apple', progress: progress('checks') }, null, dir);
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')),
+    { repositories: [{ repo: 'maddec01/lar-factory', note: 'kept' }, { repo: 'maddec01/Lar-Apple', onboarding: progress('checks') }] });
+});
+
+test('saving an onboarding that picked another project replaces the entry it was saved under', async (t) => {
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding: progress() }] }) });
+  assert.deepEqual(saveOnboarding({ repo: 'maddec01/lar-web', progress: progress('setup', 'lar-web') }, 'maddec01/lar-apple', dir),
+    [{ repo: 'maddec01/lar-web', onboarding: progress('setup', 'lar-web') }]);
+});
+
+test('saving an onboarding makes the list file and its folder when there are none', async (t) => {
+  const dir = join(await dataDir(t), 'Lar Factory');
+  saveOnboarding({ repo: 'maddec01/lar-apple', progress: progress() }, null, dir);
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-apple', onboarding: progress() }]);
+});
+
+test('saving an onboarding for a repository that is onboarded already, or into a list that can\'t be read, is refused', async (t) => {
+  const onboarded = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple' }] }) });
+  assert.throws(() => saveOnboarding({ repo: 'maddec01/lar-apple', progress: progress() }, null, onboarded), { message: 'maddec01/lar-apple is onboarded already.' });
+  assert.throws(() => saveOnboarding({ repo: 'maddec01/lar-web', progress: progress() }, 'maddec01/lar-apple', onboarded), { message: 'maddec01/lar-apple is onboarded already.' });
+  const broken = await dataDir(t, { 'repositories.json': '{ broken' });
+  assert.throws(() => saveOnboarding({ repo: 'maddec01/lar-apple', progress: progress() }, null, broken), { message: `${join(broken, 'repositories.json')} isn't valid JSON.` });
 });
 
 test("a list file that isn't JSON or has the wrong shape is refused, naming its path and the problem", async (t) => {

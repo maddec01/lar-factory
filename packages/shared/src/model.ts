@@ -349,6 +349,8 @@ export interface BoardData {
   repos: RepoConfig[];
   /** Each onboarded repository the latest read left off the board because its .lar-factory.json couldn't be read, and why. */
   repositoryConfigProblems?: RepositoryConfigProblem[];
+  /** The repositories on this Mac's list that are still onboarding, in the list's order. Absent in sample mode. */
+  onboarding?: OnboardingRepository[];
   refreshSeconds: number;
   /** Time of the last successful read, or null if there has never been one. */
   fetchedAt: string | null;
@@ -601,6 +603,29 @@ export function isStale(data: BoardData, now: number): boolean {
 
 /** The service that hosts a repository, from its origin's host. */
 export type Provider = 'GitHub' | 'Azure DevOps';
+
+/** What an onboarding has answered so far. Later steps add theirs. */
+export interface OnboardingAnswers {
+  /** The picked T3 project's id. */
+  projectId: string;
+}
+
+/** Where an onboarding stopped when its dialog closed, so Resume reopens it there. */
+export interface OnboardingProgress {
+  /** The step it was on, by id. */
+  step: string;
+  /** The steps it has passed, by id. */
+  done: string[];
+  answers: OnboardingAnswers;
+  /** The onboarding PR, once it is open. */
+  prUrl?: string;
+}
+
+/** A repository on this Mac's list that is still onboarding, with where it stopped. */
+export interface OnboardingRepository {
+  repo: string;
+  progress: OnboardingProgress;
+}
 
 /** A T3 project onboarding can offer, with what the T3 project step shows about its repository. */
 export interface ProjectChoice {

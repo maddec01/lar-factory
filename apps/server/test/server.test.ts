@@ -312,7 +312,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
     // Edits go in order, so once PR 40's lands, PR 43 was read and left alone.
     pr(43, 'PR 43'), pr(44, `PR 44\n\n${block}`), pr(40, 'PR 40'),
   ] } } }];
-  const liveBodies = { [url(40)]: 'PR 40, edited by Pedro', [url(43)]: `PR 43\n\n${block}` };
+  const liveBodies = { [url(40)]: 'PR 40, edited by hand', [url(43)]: `PR 43\n\n${block}` };
   const board = await startBoard(t, { items, liveBodies }, false, false, { T3_STATE_DB: db });
   const prCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && args[1] !== 'graphql');
   for (let attempt = 0; attempt < 80 && !(await prCalls()).some((args) => args[2] === 'PATCH'); attempt++) {
@@ -322,7 +322,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
   assert.deepEqual(calls.filter((args) => args[2] !== 'PATCH').map((args) => args[1]),
     ['repos/maddec01/lar-factory/pulls/43', 'repos/maddec01/lar-factory/pulls/40'], 'only PRs the board thinks need an edit are read');
   assert.deepEqual(calls.filter((args) => args[2] === 'PATCH').map((args) => [args[3], args[5]]),
-    [['repos/maddec01/lar-factory/pulls/40', `body=PR 40, edited by Pedro\n\n${block}`]]);
+    [['repos/maddec01/lar-factory/pulls/40', `body=PR 40, edited by hand\n\n${block}`]]);
 });
 
 test('PR edits run beside the refreshes without holding them up, and never two syncs at once', async (t) => {

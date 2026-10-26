@@ -143,7 +143,7 @@ test('a subagent under a child task has its time taken out of that child\'s work
   assert.equal(stats(REPO, 1)?.agentMs, (10 + 20 + 10) * MIN);
 });
 
-test('wall time is the time any of the item\'s agents worked: overlap once, no waits on Pedro, no idle gaps', (t) => {
+test('wall time is the time any of the item\'s agents worked: overlap once, no waits on the user, no idle gaps', (t) => {
   const stats = reader(statsDb(t, [
     root(1), subagent('left', 1, '09:10', '09:25'), subagent('right', 1, '09:15', '09:30'),
     { id: 'waits', messages: [`$lar-work ${REPO}#2`], turns: [
@@ -155,11 +155,11 @@ test('wall time is the time any of the item\'s agents worked: overlap once, no w
   ], [{ turnId: 'w', createdAt: '2026-10-20T09:10:00Z', resolvedAt: '2026-10-20T09:40:00Z' }]));
   assert.equal(stats(REPO, 1)?.agentMs, 40 * MIN);
   assert.equal(stats(REPO, 1)?.wallMs, 30 * MIN, 'parallel subagents count their overlap once');
-  assert.equal(stats(REPO, 2)?.wallMs, 30 * MIN, 'waits on Pedro are left out');
+  assert.equal(stats(REPO, 2)?.wallMs, 30 * MIN, 'waits on the user are left out');
   assert.equal(stats(REPO, 3)?.wallMs, 15 * MIN, 'the gap between threads isn\'t counted');
 });
 
-test('agent time leaves out waits on Pedro inside a turn, and a running turn or wait counts up to now', (t) => {
+test('agent time leaves out waits on the user inside a turn, and a running turn or wait counts up to now', (t) => {
   const stats = reader(statsDb(t, [
     { id: 'waits', messages: [`$lar-work ${REPO}#1`], turns: [
       { id: 't1', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T10:00:00Z' },
@@ -174,7 +174,7 @@ test('agent time leaves out waits on Pedro inside a turn, and a running turn or 
     { turnId: 't1', createdAt: '2026-10-20T09:10:00Z', resolvedAt: '2026-10-20T09:20:00Z' },
     { turnId: 't1', createdAt: '2026-10-20T09:15:00Z', resolvedAt: '2026-10-20T09:30:00Z' },
     { turnId: 't1', createdAt: '2026-10-20T09:50:00Z', resolvedAt: '2026-10-20T10:30:00Z' },
-    // Still waiting on Pedro since 11:45.
+    // Still waiting on the user since 11:45.
     { turnId: 't2', createdAt: '2026-10-20T11:45:00Z', resolvedAt: null },
   ]));
   assert.equal(stats(REPO, 1)?.agentMs, 30 * MIN);

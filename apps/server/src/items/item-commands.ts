@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDraft, validateDraft, workMessage } from '@lar-factory/shared';
 import type { BoardData, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
-import { loadConfig } from '../config/config.ts';
+import { readRepositoryList } from '../config/repository-config.ts';
 import { issueLabels } from '../github/github.ts';
 import { repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
@@ -42,8 +42,8 @@ export interface ItemCommandsDeps {
   board: BoardState;
   /** Where the commands write their changes. */
   items: ItemSource;
-  /** The repositories config.json lists, which Add item may create in. */
-  repos: RepoConfig[];
+  /** The onboarded repositories as the last read found them, which Add item may create in. */
+  repos(): RepoConfig[];
   /** Reads the model choices T3 offers now into the board data. */
   offerModelChoices(): ModelGroup[];
 }
@@ -89,11 +89,11 @@ function track<T>(inFlight: Map<string, Promise<T>>, key: string, work: Promise<
 /** Where lar-work is installed, for the build message. */
 const LAR_WORK = join(homedir(), '.agents/skills/lar-work');
 
-/** The repository project from config.json as it is now, so a path fixed after a refusal works on the next Start. */
+/** The repository project for an onboarded repository as the list is now, so a repository onboarded after a refusal starts on the next Start. */
 async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
   let repos;
-  try { repos = loadConfig().repos; }
-  catch (err) { return { error: `Can't read config.json: ${(err as Error).message}` }; }
+  try { repos = readRepositoryList(); }
+  catch (err) { return { error: `Can't read the onboarded repositories: ${(err as Error).message}` }; }
   return repositoryProject(repo, repos);
 }
 
@@ -226,7 +226,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
         return reply(400, { error: 'The submission needs a valid request ID.' });
       }
       let draft: ItemDraft;
-      try { draft = validateDraft(input.draft, repos); }
+      try { draft = validateDraft(input.draft, repos()); }
       catch (err) { return reply(422, { error: (err as Error).message }); }
       let entry = submissions.get(input.requestId);
       if (entry && JSON.stringify(entry.draft) !== JSON.stringify(draft)) {

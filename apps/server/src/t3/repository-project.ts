@@ -13,10 +13,10 @@ import type { RepoConfig } from '@lar-factory/shared';
 export type RepositoryProject = { projectId: string; error?: undefined } | { error: string };
 
 /** The repository project's id for `repo`, or why there isn't exactly one. */
-export async function repositoryProject(repo: string, repos: readonly RepoConfig[],
+export async function repositoryProject(repo: string, repos: readonly { repo: string }[],
   env: NodeJS.ProcessEnv = process.env): Promise<RepositoryProject> {
   if (!repos.some((r) => r.repo.toLowerCase() === repo.toLowerCase())) {
-    return { error: `${repo} isn't in config.json; add it with a role` };
+    return { error: `${repo} isn't onboarded; add it to the board's repositories` };
   }
   return (await projectFinder(env))(repo);
 }
@@ -29,7 +29,7 @@ export async function repositoryProjectHints(repos: readonly RepoConfig[],
 }
 
 /** Whether a listed repository's checkout has its origin on Azure DevOps; false when T3's projects can't be read. */
-export async function anyOnAzureDevOps(repos: readonly RepoConfig[], env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+export async function anyOnAzureDevOps(repos: readonly { repo: string }[], env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
   let found;
   try { found = await checkouts(env); }
   catch { return false; }

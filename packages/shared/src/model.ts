@@ -305,7 +305,7 @@ export interface RepoConfig {
   repo: string;
   /** Repository role: what this repository is to the others. */
   role: string;
-  /** Its item source: the GitHub Project config.json names, the default, or the repository's issues. */
+  /** Its item source: the GitHub Project its .lar-factory.json names, or the repository's issues. */
   items?: ItemSourceKind;
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
@@ -332,8 +332,8 @@ export type ShowSetting = (typeof SHOW_SETTINGS)[number];
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
-  /** The GitHub Project: its owner, absent from older boards, and its title. */
-  project: { owner?: string; title: string };
+  /** The first item source's title: the first GitHub Project's when a repository reads one, else a repository's owner/name. */
+  project: { title: string };
   repos: RepoConfig[];
   refreshSeconds: number;
   /** Time of the last successful read, or null if there has never been one. */
@@ -424,9 +424,9 @@ export function failedCheck<N extends CheckedTool>(tools: ToolChecks | undefined
 /** Where a repository's items come from: its GitHub Project, or its issues. */
 export type ItemSource = 'project' | 'issues';
 
-/** Every repository reads the GitHub Project until build #380 lets one read its issues. */
-export function itemSource(_repo: RepoConfig): ItemSource {
-  return 'project';
+/** Where a repository's items come from: the GitHub Project, unless its config says its issues. */
+export function itemSource(repo: RepoConfig): ItemSource {
+  return repo.items ?? 'project';
 }
 
 /**

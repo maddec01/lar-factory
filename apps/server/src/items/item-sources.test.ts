@@ -2,7 +2,8 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { Item, Status } from '@lar-factory/shared';
 import type { ItemSource } from './item-source.ts';
-import { mergeSources } from './item-sources.ts';
+import type { RepositoryConfig } from '../config/repository-config.ts';
+import { mergeSources, onboardedSources } from './item-sources.ts';
 
 const item = (id: string, repo: string, status: Status = 'List'): Item => ({
   id, status, statuses: [status], content: 'ticket', number: Number(id.slice(2)), title: id, url: `https://github.com/${repo}/issues/${id.slice(2)}`, repo,
@@ -29,7 +30,7 @@ test("a read lists every source's items under the Project's title, an item two s
   const writes: string[] = [];
   const project = fakeSource('lar', [item('I_1', 'maddec01/lar-server', 'In progress')], writes);
   const issues = fakeSource('maddec01/lar-apple', [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple')], writes);
-  const read = await mergeSources(project, new Map([['maddec01/lar-apple', issues]])).read();
+  const read = await mergeSources([project], new Map([['maddec01/lar-apple', issues]])).read();
   assert.equal(read.title, 'lar');
   assert.deepEqual(read.items.map((i) => [i.id, i.status]), [['I_1', 'In progress'], ['I_2', 'List']]);
 });
@@ -41,14 +42,14 @@ test("with Opted-in items, an issue shows only while it carries a status, closed
     bare('I_4', 'maddec01/lar-factory', 'closed')], []);
   const issues = fakeSource('apple', [bare('I_5', 'maddec01/lar-apple'), item('I_6', 'maddec01/lar-apple', 'List'), bare('I_7', 'maddec01/lar-apple', 'closed'),
     closed('I_8', 'maddec01/lar-apple', 'Verify')], []);
-  const read = await mergeSources(project, new Map([['maddec01/lar-apple', issues]]), ['maddec01/lar-apple', 'Maddec01/Lar-Factory']).read();
+  const read = await mergeSources([project], new Map([['maddec01/lar-apple', issues]]), ['maddec01/lar-apple', 'Maddec01/Lar-Factory']).read();
   assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_3', 'I_4', 'I_6', 'I_8']);
 });
 
 test('a source with no opted-in repositories lists every item it read', async () => {
   const project = fakeSource('lar', [{ ...item('I_1', 'maddec01/lar-server'), statuses: [] }], []);
   const issues = fakeSource('apple', [{ ...item('I_2', 'maddec01/lar-apple'), statuses: [] }], []);
-  const read = await mergeSources(project, new Map([['maddec01/lar-apple', issues]])).read();
+  const read = await mergeSources([project], new Map([['maddec01/lar-apple', issues]])).read();
   assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_2']);
 });
 
@@ -56,7 +57,7 @@ test('a write goes to the source that listed the item, or else to the source its
   const writes: string[] = [];
   const project = fakeSource('lar', [item('I_1', 'maddec01/lar-apple')], writes);
   const issues = fakeSource('apple', [item('I_1', 'maddec01/lar-apple'), item('I_2', 'maddec01/lar-apple')], writes);
-  const sources = mergeSources(project, new Map([['maddec01/lar-apple', issues]]));
+  const sources = mergeSources([project], new Map([['maddec01/lar-apple', issues]]));
   await sources.read();
   await sources.setStatus(item('I_1', 'maddec01/lar-apple'), 'Queued');
   await sources.addLabel(item('I_2', 'maddec01/lar-apple'), 'build');
@@ -71,7 +72,7 @@ test('a write goes to the source that listed the item, or else to the source its
 test('a status refusal comes from the source that listed the item, or else the source its repository names', async () => {
   const project = fakeSource('lar', [item('I_1', 'maddec01/lar-apple')], []);
   const issues = fakeSource('apple', [item('I_1', 'maddec01/lar-apple'), item('I_2', 'maddec01/lar-apple')], []);
-  const sources = mergeSources(project, new Map([['maddec01/lar-apple', issues]]));
+  const sources = mergeSources([project], new Map([['maddec01/lar-apple', issues]]));
   await sources.read();
   assert.equal(sources.statusRefusal(item('I_1', 'maddec01/lar-apple')), 'lar refuses I_1');
   assert.equal(sources.statusRefusal(item('I_2', 'maddec01/lar-apple')), 'apple refuses I_2');
@@ -80,7 +81,7 @@ test('a status refusal comes from the source that listed the item, or else the s
 });
 
 test('a saved id is renamed by whichever source knows it', () => {
-  const sources = mergeSources(fakeSource('lar', [], []), new Map([['maddec01/lar-apple', fakeSource('apple', [], [])]]));
+  const sources = mergeSources([fakeSource('lar', [], [])], new Map([['maddec01/lar-apple', fakeSource('apple', [], [])]]));
   assert.equal(sources.renamedId?.('PVTI_lar'), 'I_lar');
   assert.equal(sources.renamedId?.('PVTI_apple'), 'I_apple');
   assert.equal(sources.renamedId?.('PVTI_other'), undefined);
@@ -89,8 +90,59 @@ test('a saved id is renamed by whichever source knows it', () => {
 test("a read fails whole when a source fails, and another source's error starts with its repository", async () => {
   const failing = (message: string): ItemSource => ({ ...fakeSource('x', [], []), read: async () => { throw new Error(message); } });
   const project = fakeSource('lar', [item('I_1', 'maddec01/lar-server')], []);
-  const issues = mergeSources(project, new Map([['maddec01/lar-apple', failing('Could not resolve to a Repository')]]));
+  const issues = mergeSources([project], new Map([['maddec01/lar-apple', failing('Could not resolve to a Repository')]]));
   await assert.rejects(issues.read(), { message: 'maddec01/lar-apple: Could not resolve to a Repository' });
-  const projectFails = mergeSources(failing('gh: not logged in'), new Map([['maddec01/lar-apple', fakeSource('apple', [], [])]]));
+  const projectFails = mergeSources([failing('gh: not logged in')], new Map([['maddec01/lar-apple', fakeSource('apple', [], [])]]));
   await assert.rejects(projectFails.read(), { message: 'gh: not logged in' });
+});
+
+test('two Projects each write for their own repositories, and a repository no source names takes the first', async () => {
+  const writes: string[] = [];
+  const lar = fakeSource('lar', [], writes);
+  const other = fakeSource('other', [], writes);
+  const sources = mergeSources([lar, other], new Map([['maddec01/lar-server', lar], ['fabrikam/api', other]]));
+  assert.equal((await sources.read()).title, 'lar');
+  for (const repo of ['maddec01/lar-server', 'Fabrikam/API', 'maddec01/elsewhere']) await sources.create({ kind: 'feature', repo, title: 'New', description: '', labels: [] }, {});
+  assert.deepEqual(writes, ['lar create maddec01/lar-server', 'other create Fabrikam/API', 'lar create maddec01/elsewhere']);
+});
+
+test('with no source a read lists nothing and a write is refused', async () => {
+  const sources = mergeSources([], new Map());
+  assert.deepEqual(await sources.read(), { title: '', items: [] });
+  assert.equal(await sources.setStatus(item('I_1', 'maddec01/lar-server'), 'Queued'), "That item's repository isn't onboarded.");
+});
+
+const config = (repo: string, show: RepositoryConfig['show'] = 'all'): RepositoryConfig =>
+  ({ repo, version: 1, role: 'role', itemSource: { kind: 'issues' }, show, labels: [] });
+
+test('each read loads the configs first and builds the sources again only when they changed', async () => {
+  let configs = [config('maddec01/lar-apple')];
+  const built: string[][] = [];
+  const sources = onboardedSources(async () => configs, (read) => {
+    built.push(read.map((c) => `${c.repo} ${c.show}`));
+    return fakeSource(read.map((c) => c.repo).join(',') || 'none', [], []);
+  });
+  assert.deepEqual(sources.repos(), []);
+  assert.equal((await sources.read()).title, 'maddec01/lar-apple');
+  await sources.read();
+  configs = [config('maddec01/lar-apple', 'opted-in'), config('maddec01/lar-server')];
+  assert.equal((await sources.read()).title, 'maddec01/lar-apple,maddec01/lar-server');
+  assert.deepEqual(built, [[], ['maddec01/lar-apple all'], ['maddec01/lar-apple opted-in', 'maddec01/lar-server all']]);
+  assert.deepEqual(sources.repos(), [{ repo: 'maddec01/lar-apple', role: 'role', items: 'issues', show: 'opted-in' },
+    { repo: 'maddec01/lar-server', role: 'role', items: 'issues', show: 'all' }]);
+});
+
+test("a read whose configs can't be loaded fails, and writes keep going to the last sources", async () => {
+  const writes: string[] = [];
+  let fail = false;
+  const sources = onboardedSources(async () => {
+    if (fail) throw new Error('repositories.json isn\'t valid JSON.');
+    return [config('maddec01/lar-apple')];
+  }, () => fakeSource('apple', [], writes));
+  await sources.read();
+  fail = true;
+  await assert.rejects(sources.read(), /valid JSON/);
+  await sources.setStatus(item('I_1', 'maddec01/lar-apple'), 'Queued');
+  assert.deepEqual(writes, ['apple I_1 Queued']);
+  assert.equal(sources.repos().length, 1);
 });

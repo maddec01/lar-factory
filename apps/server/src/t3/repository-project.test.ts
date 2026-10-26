@@ -41,7 +41,7 @@ test('a listed repository on Azure DevOps needs az; GitHub ones and unlisted Azu
 test('every Azure DevOps origin form names its project/repo', async (t) => {
   for (const url of AZURE) {
     const env = t3Home(t, { 'lar-api': url });
-    assert.equal(await anyOnAzureDevOps([{ repo: 'fabrikam/lar-api', role: 'server' }], env), true, url);
+    assert.equal(await anyOnAzureDevOps([{ repo: 'fabrikam/lar-api' }], env), true, url);
   }
 });
 

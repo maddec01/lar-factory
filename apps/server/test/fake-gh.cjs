@@ -19,6 +19,20 @@ const main = async () => {
     process.exitCode = 1;
     return;
   }
+  // A repository's .lar-factory.json from its default branch: options.repoConfigs holds each one's, by owner/name,
+  // null for none (a 404); any other repository reads the lar Project.
+  const configPath = args[0] === 'api' && /^repos\/([\w.-]+\/[\w.-]+)\/contents\/\.lar-factory\.json$/.exec(args[1]);
+  if (configPath) {
+    const repo = configPath[1];
+    const config = options.repoConfigs && repo in options.repoConfigs ? options.repoConfigs[repo]
+      : { version: 1, role: `${repo}'s role`, itemSource: { kind: 'github-project', owner: 'maddec01', number: 1 } };
+    if (config === null) {
+      process.stderr.write('gh: Not Found (HTTP 404)\n');
+      process.exitCode = 1;
+      return;
+    }
+    return void process.stdout.write(typeof config === 'string' ? config : JSON.stringify(config));
+  }
   if (args[1] === 'graphql') {
     if (options.fail === 'read') {
       process.stderr.write('HTTP 502: Bad Gateway');

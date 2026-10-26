@@ -1,8 +1,5 @@
 import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { BoardData } from '@lar-factory/shared';
 import { randomUUID } from 'node:crypto';
 import { projectIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -16,16 +13,8 @@ const daysAgo = (days: number) => new Date(Date.now() - days * DAY).toISOString(
 /** A lar-apple issue as the repository issues query returns it. */
 const appleIssue = (number: number, extra: object = {}) => ({ ...projectIssue(number, 'List', APPLE).content!, ...extra });
 
-/** The checkout's config.json with lar-apple reading its issues. */
-async function issuesConfig(t: TestContext): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'lar-issues-config-'));
-  t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
-  const config = JSON.parse(await readFile(new URL('../../../config.json', import.meta.url), 'utf8')) as { repos: { repo: string }[] };
-  for (const entry of config.repos) if (entry.repo === APPLE) Object.assign(entry, { items: 'issues' });
-  const file = join(dir, 'config.json');
-  await writeFile(file, JSON.stringify(config));
-  return file;
-}
+/** lar-apple's .lar-factory.json naming its issues, for the fake gh; the other repositories read the lar Project. */
+const repoConfigs = { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } };
 
 test("a repository reading its issues places the open ones by their status labels, shows those closed this week as Done and hides those not planned, without slices; the Project's copy wins", async (t) => {
   const build = appleIssue(8, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [{ ...sliceRef(11, 'OPEN'), repository: { nameWithOwner: APPLE },
@@ -38,8 +27,7 @@ test("a repository reading its issues places the open ones by their status label
     appleIssue(13, { labels: { nodes: [{ name: 'status-shaping' }] } }),
     appleIssue(14, { state: 'CLOSED', stateReason: 'NOT_PLANNED', closedAt: daysAgo(1), updatedAt: daysAgo(1) }),
   ] };
-  const board = await startBoard(t, { items: [projectIssue(1, 'In progress', 'maddec01/lar-server'), projectIssue(7, 'Queued', APPLE)], repoIssues },
-    false, false, { BOARD_CONFIG_FILE: await issuesConfig(t) });
+  const board = await startBoard(t, { items: [projectIssue(1, 'In progress', 'maddec01/lar-server'), projectIssue(7, 'Queued', APPLE)], repoIssues, repoConfigs });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]),
     [['maddec01/lar-server', 1, 'In progress'], [APPLE, 7, 'Queued'], [APPLE, 8, 'List'], [APPLE, 13, 'Shaping'], [APPLE, 9, 'Done']]);
@@ -52,7 +40,7 @@ test("a repository reading its issues places the open ones by their status label
 async function issuesBoard(t: TestContext, options: { items?: object[]; repoIssues?: object; fail?: string } = {}, env: Record<string, string> = {}) {
   const items = options.items ?? [];
   const repoIssues = options.repoIssues ?? { [APPLE]: [appleIssue(8)] };
-  const board = await startBoard(t, { ...options, items, repoIssues }, false, false, { ...env, BOARD_CONFIG_FILE: await issuesConfig(t) });
+  const board = await startBoard(t, { ...options, items, repoIssues, repoConfigs }, false, false, env);
   await until(board, (d) => d.fetchedAt !== null);
   return board;
 }

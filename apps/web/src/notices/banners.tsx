@@ -1,7 +1,7 @@
 // The banners above the desk: an unreachable server, which closes, then T3 Code not running, then a gh the board can't use,
 // then a missing git, jq or curl, then an az that fails its check.
 
-import { failedCheck } from '@lar-factory/shared';
+import { failedCheck, itemSource } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { CLIENT_ERROR } from '../board/live-data.ts';
 import { ClosableBanner } from './banner.tsx';
@@ -21,7 +21,7 @@ export function Banners() {
         </ClosableBanner>
       )}
       {t3?.result === 'not-running' && <T3NotRunningBanner check={t3} />}
-      {gh && <GhBanner check={gh} />}
+      {gh && <GhBanner check={gh} readsProject={data.repos.some((r) => itemSource(r) === 'project')} />}
       {(['git', 'jq', 'curl'] as const).map((name) => {
         const check = failedCheck(data.tools, name);
         return check && <CommandBanner key={name} name={name} check={check} />;

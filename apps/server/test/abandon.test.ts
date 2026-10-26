@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { draftItem, startableEnv, startBoard, until } from './server-support.ts';
+import { draftItem, onboarded, startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectIssue } from '@lar-factory/shared/test/raw-items';
 import type { BoardData } from '@lar-factory/shared';
@@ -62,6 +62,7 @@ test('an abandoned item does not come back while GitHub still reports it', async
 
 test('an item this board just created does not come back after Abandon', async (t) => {
   const board = await startBoard(t, { items: [] }, false, true);
+  await onboarded(board);
   const created = await board.postSession({ requestId: '00000000-0000-4000-8000-000000000001',
     draft: { repo: 'maddec01/lar-server', kind: 'bug', title: 'Throwaway', description: '', labels: [] } }, '/api/items');
   assert.equal(created.status, 200);

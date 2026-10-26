@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { draftItem, SAMPLE_MODELS, startableEnv, startBoard, until } from './server-support.ts';
+import { draftItem, readsRepositoryConfig, SAMPLE_MODELS, startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, RawItem } from '@lar-factory/shared';
@@ -29,7 +29,7 @@ const statusEdit = (itemId: string, option: string) => ['project', 'item-edit', 
 
 /** The gh calls Start build makes: label and status writes and issue reads, not the board's project reads. */
 const writes = async (board: Board) => (await board.calls())
-  .filter((args) => ['edit', 'item-add', 'item-edit'].includes(args[1]!) || (args[0] === 'api' && args[1] !== 'graphql'));
+  .filter((args) => ['edit', 'item-add', 'item-edit'].includes(args[1]!) || (args[0] === 'api' && args[1] !== 'graphql' && !readsRepositoryConfig(args)));
 
 test('Start build labels the build, moves its parent to In progress and starts the build thread in a new worktree', async (t) => {
   const { board, home } = await buildBoard(t, [readyIssue(12, ['feature'], 40), projectIssue(40, 'Ready', undefined, ['concept'])]);

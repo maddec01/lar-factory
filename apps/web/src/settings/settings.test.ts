@@ -104,6 +104,11 @@ test('a repository colour named owner/name shows it once; one named by its name 
   expect(text(row('color-maddec01/lar-apple'))).toContain('maddec01/lar-apple');
 });
 
+test('Refresh every says the board reads each repository\'s items and .lar-factory.json', async () => {
+  await open('General');
+  expect(text(row('refresh'))).toContain("How often the board reads each repository's items and .lar-factory.json through gh.");
+});
+
 test('a row that isn\'t built yet shows the prototype\'s value, disabled, and says so', async () => {
   await open('General');
   const refresh = row('refresh').querySelector('select')!;
@@ -133,13 +138,13 @@ test('the header drags the window, but not Restore defaults', async () => {
 const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
 
 test('Repositories shows the command line tools\' logins and each repository with its role, read-only', async () => {
-  await open('Repositories', { ...sample, project: { owner: 'maddec01', title: 'lar' } });
+  await open('Repositories', sample);
   expect(groups()).toEqual([['Command line tools', ['gh', 'az']],
     ['Repositories', sample.repos.map((r) => `repo-${r.repo}`)]]);
   expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).not.toContain('no listed repository');
-  await push({ ...sample, project: { owner: 'maddec01', title: 'lar' }, tools: toolChecks() });
+  await push({ ...sample, tools: toolChecks() });
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');

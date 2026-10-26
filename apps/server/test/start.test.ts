@@ -1,14 +1,14 @@
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { draftItem, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
+import { draftItem, SAMPLE_MODELS, startBoard, until, writeRepositoryList } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectIssue, rawIssue } from '@lar-factory/shared/test/raw-items';
-import { checkouts, factoryRepo } from './repo-support.ts';
+import { checkouts } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
 import type { BoardData } from '@lar-factory/shared';
@@ -121,7 +121,7 @@ function worktree(dir: string): string {
 const refusals: { name: string; repo?: string; origins?: Record<string, string | null>;
   projects?: (home: string) => FixtureProject[]; db?: (home: string) => string; error: (home: string) => string }[] = [
   { name: 'an unlisted repository', repo: 'maddec01/other',
-    error: () => "maddec01/other isn't in config.json; add it with a role" },
+    error: () => "maddec01/other isn't onboarded; add it to the board's repositories" },
   { name: 'a project whose folder is gone', origins: {}, error: () => NO_PROJECT },
   { name: "another repository's checkout", origins: { 'lar-factory': 'https://github.com/maddec01/lar-server.git' },
     error: () => NO_PROJECT },
@@ -171,40 +171,34 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
   assert.deepEqual(await board.t3Calls(), []);
 });
 
-test("a card's repository matches its config.json entry whatever the case", async (t) => {
+test("a card's repository matches its entry in the list of onboarded repositories whatever the case", async (t) => {
   const board = await factoryBoard(t, [projectIssue(12, 'Queued', 'MADDEC01/Lar-Factory')]);
   const response = await start(board, 'I_12');
   assert.equal(response.status, 200);
   assert.equal((await board.t3Calls())[0]?.[2], 'project-factory');
 });
 
-test('Start reads config.json each time, so an added repository works without restarting the board', async (t) => {
-  const f = await factoryRepo(t);
-  const config = join(f.repo, 'config.json');
-  const original = readFileSync(config, 'utf8');
-  writeFileSync(config, original.replace('"maddec01/lar-factory"', '"maddec01/elsewhere"'));
+test('Start reads the list of onboarded repositories each time, so a repository onboarded later starts without restarting the board', async (t) => {
   const dir = home(t, ORIGINS);
-  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')] }, false, false,
-    { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'apps/server'));
+  writeRepositoryList(dir, ['maddec01/elsewhere']);
+  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')] }, false, false, { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) });
   await until(board, (d) => d.items.length === 1);
   const refused = await start(board, 'I_12');
-  assert.match((await refused.json()).error, /maddec01\/lar-factory isn't in config\.json/);
-  writeFileSync(config, original);
+  assert.match((await refused.json()).error, /maddec01\/lar-factory isn't onboarded/);
+  writeRepositoryList(dir, ['maddec01/elsewhere', 'maddec01/lar-factory']);
   const retried = await start(board, 'I_12');
   assert.equal(retried.status, 200);
   assert.equal((await board.t3Calls())[0]?.[2], 'project-factory');
 });
 
-test('Start refuses an unreadable config.json with a hint', async (t) => {
-  const f = await factoryRepo(t);
+test('Start refuses an unreadable list of onboarded repositories, naming the file', async (t) => {
   const dir = home(t, ORIGINS);
-  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')] }, false, false,
-    { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) }, join(f.repo, 'apps/server'));
+  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')] }, false, false, { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) });
   await until(board, (d) => d.items.length === 1);
-  writeFileSync(join(f.repo, 'config.json'), '{ broken');
+  writeFileSync(join(dir, 'Library/Application Support/Lar Factory/repositories.json'), '{ broken');
   const response = await start(board, 'I_12');
   assert.equal(response.status, 409);
-  assert.match((await response.json()).error, /config\.json/);
+  assert.match((await response.json()).error, /repositories\.json isn't valid JSON/);
   assert.deepEqual(await board.t3Calls(), []);
 });
 

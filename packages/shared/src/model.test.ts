@@ -277,6 +277,8 @@ test('gh blocks every read while missing or logged out, and only Project reads w
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'project'), true);
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'issues'), false);
   assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app' }), 'project');
+  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'project' }), 'project');
+  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'issues' }), 'issues');
 });
 
 test("a status's label is status- and its name in lowercase with hyphens for spaces", () => {
@@ -337,4 +339,15 @@ test('Add item offers apps and OSes for lar-apple, areas for lar-server and noth
   const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 't', description: '', labels: ['area: web'] };
   assert.deepEqual(validateDraft(draft, sample.repos).labels, ['area: web']);
   assert.throws(() => validateDraft({ ...draft, labels: ['app: music'] }, sample.repos), /applicability/);
+});
+
+test('Add item refuses an unlisted repository, an unknown kind, a blank title and labels from another repository', () => {
+  const draft = { repo: 'maddec01/lar-server', kind: 'feature', title: 'Index files', description: '', labels: [] };
+  for (const input of [
+    null, { ...draft, repo: 'other/repo' }, { ...draft, kind: 'concept' },
+    { ...draft, title: ' \n ' }, { ...draft, title: 12 }, { ...draft, description: {} },
+    { ...draft, labels: ['app: music'] }, { ...draft, labels: ['area: server', 'anything'] },
+  ]) {
+    assert.throws(() => validateDraft(input, sample.repos), /./, JSON.stringify(input));
+  }
 });

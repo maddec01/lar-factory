@@ -3,7 +3,7 @@
 // Settings and update button.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, fullScreen, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
+import { $, $$, fullScreen, mountPage, push, sample, settle, stubApp, text } from '../../test/support.ts';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { THREAD_SIDEBAR_WIDTH_STORAGE_KEY } from './threadSidebarWidth.ts';
 
@@ -310,6 +310,19 @@ test('a group\'s name scopes the main area to its repository; pressing it again 
   await settle(() => scope.click());
   expect(scope.getAttribute('aria-pressed')).toBe('false');
   expect($$('.desk-card')).toHaveLength(8);
+});
+
+test('with no repository onboarded the List says so and where to add one, but not before the first read or beside a read error', async () => {
+  const empty = { ...sample, repos: [], items: [], repositoryConfigProblems: [], error: null };
+  const hint = () => $('nav[aria-label="List"] .list-empty');
+  await mountPage(empty);
+  expect(hint()!.textContent).toBe('No repository is onboarded. See Adding a repository in apps/server/README.md.');
+  await push({ ...empty, error: 'gh: HTTP 502' });
+  expect(hint()).toBeNull();
+  await push({ ...empty, fetchedAt: null });
+  expect(hint()).toBeNull();
+  await push({ ...empty, repositoryConfigProblems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }] });
+  expect(hint()).toBeNull();
 });
 
 test('a repository written in another case than GitHub gives it keeps one group, with its items, and scopes to them', async () => {

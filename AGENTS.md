@@ -38,7 +38,7 @@ the flow and `docs/plan.md` for how it was set up.
   `bash skills/lar-work/scripts/status.test.sh` and
   `bash skills/lar-work/scripts/repo-config.test.sh`.
 - skill-sync script changes: run each `skills/skill-sync/scripts/*.test.sh` with `bash`.
-- A PR that no issue tracks goes on the lar board too: `bash ~/.agents/skills/lar-work/scripts/status.sh <pr-url> "Ready to merge"`.
+- A PR that no issue tracks goes on the lar board too, which works because lar-factory reads a Project (a repository that reads its issues gets no PR status): `bash ~/.agents/skills/lar-work/scripts/status.sh <pr-url> "Ready to merge"`.
 
 ## Domain docs
 

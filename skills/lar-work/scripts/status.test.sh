@@ -10,12 +10,13 @@ failures=0
 pass() { printf 'ok   %s\n' "$1"; }
 fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 
-# A fake gh that answers the calls status.sh makes. lar-factory's config.json
-# gives maddec01/lar-factory, spelled as FAKE_CONFIG_REPO when set, the item
-# source FAKE_ITEMS (none when unset). The issue carries the labels in
-# FAKE_LABELS and the repository has those in FAKE_REPO_LABELS, both
-# space-separated. A label lookup fails with FAKE_LABEL_ERROR when set. A fake curl logs its arguments, then
-# runs the real curl unless FAKE_CURL_OFF is set.
+# A fake gh that answers the calls status.sh and repo-config.sh make. Each
+# repository's .lar-factory.json reads its issues when FAKE_ITEMS is "issues",
+# reads Project 3 of lar-org when it is "project" (the default), and is missing
+# (GitHub's 404) when it is "none". The issue carries the labels in FAKE_LABELS
+# and the repository has those in FAKE_REPO_LABELS, both space-separated. A label
+# lookup fails with FAKE_LABEL_ERROR when set. Project calls log their Project.
+# A fake curl logs its arguments, then runs the real curl unless FAKE_CURL_OFF is set.
 bin=$(mktemp -d)
 log="$bin/log"
 real_curl=$(command -v curl)
@@ -32,18 +33,21 @@ answer() {
     echo "$json"
 }
 case "$1 $2" in
-"project view") echo PVT_1 ;;
-"project field-list") echo '{"fields":[{"id":"FIELD_1","name":"Status","options":[{"id":"OPT_1","name":"Ready to merge"},{"id":"OPT_2","name":"Done"}]}]}' ;;
-"project item-add") echo PVTI_1 ;;
+"project view") echo "project-view ${*:3}" >>"$FAKE_GH_LOG"; echo PVT_1 ;;
+"project field-list") echo "project-field-list ${*:3}" >>"$FAKE_GH_LOG"; echo '{"fields":[{"id":"FIELD_1","name":"Status","options":[{"id":"OPT_1","name":"Ready to merge"},{"id":"OPT_2","name":"Done"}]}]}' ;;
+"project item-add") echo "project-item-add ${*:3}" >>"$FAKE_GH_LOG"; echo PVTI_1 ;;
 "project item-edit") echo "edit ${*:3}" >>"$FAKE_GH_LOG" ;;
 "issue view")
     answer "$(jq -n --arg labels "${FAKE_LABELS:-}" '{labels: [$labels | splits(" ") | select(. != "") | {name: .}]}')" "$@" ;;
 "issue edit") echo "issue-edit ${*:3}" >>"$FAKE_GH_LOG" ;;
 "label create") echo "label-create ${*:3}" >>"$FAKE_GH_LOG" ;;
 *)
-    if [[ $1 == api && " $* " == *" repos/maddec01/lar-factory/contents/config.json?ref=main "* ]]; then
-        jq -n --arg items "${FAKE_ITEMS:-}" --arg repo "${FAKE_CONFIG_REPO:-maddec01/lar-factory}" \
-            '{repos: [{repo: "maddec01/lar-server"}, {repo: $repo} + (if $items == "" then {} else {items: $items} end)]}'
+    if [[ $1 == api && $* =~ \ repos/[^/]+/[^/]+/contents/\.lar-factory\.json$ ]]; then
+        case ${FAKE_ITEMS:-project} in
+        issues) echo '{"role": "factory", "itemSource": {"kind": "issues"}}' ;;
+        project) echo '{"role": "factory", "itemSource": {"kind": "github-project", "owner": "lar-org", "number": 3}}' ;;
+        *) echo 'gh: Not Found (HTTP 404)' >&2; exit 1 ;;
+        esac
     elif [[ $1 == api && $2 =~ ^repos/maddec01/lar-factory/labels/(.+)$ ]]; then
         if [[ -n ${FAKE_LABEL_ERROR:-} ]]; then echo "$FAKE_LABEL_ERROR" >&2; exit 1; fi
         [[ " ${FAKE_REPO_LABELS:-} " == *" ${BASH_REMATCH[1]} "* ]] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
@@ -130,13 +134,14 @@ run() {
     errors=$(cat "$bin/err")
 }
 same_as_today() { ((status == 0)) && [[ $output == "$expected" && -z $errors ]] && (($(grep -c '^edit' "$log") == 1)); }
+first_write() { grep -v '^project-' "$log" | sed -n 1p; }
 curls() { grep -c '^curl' "$log" || true; }
 
 listen board
 run "$port"
 for _ in $(seq 20); do [[ -s "$bin/request" ]] && break; python3 -c 'import time; time.sleep(0.05)'; done
 request=$(cat "$bin/request" 2>/dev/null || true)
-if same_as_today && (($(curls) == 1)) && [[ $(sed -n 1p "$log") == edit* ]] &&
+if same_as_today && (($(curls) == 1)) && [[ $(first_write) == edit* ]] &&
     [[ $request == "POST /api/read HTTP/1.1"* ]] && grep -qi "^Host: 127.0.0.1:$port" <<<"$request" &&
     grep -qi "^Origin: http://127.0.0.1:$port" <<<"$request" && grep -qi '^Content-Type: application/json' <<<"$request" &&
     grep -q -- '--max-time 1' "$log"; then
@@ -224,7 +229,8 @@ set_status() {
     status=0
     output=$(env -u LAR_BOARD_PORT bash "$status_sh" "$1" "$2" 2>"$bin/err") || status=$?
     errors=$(cat "$bin/err")
-    writes=$(grep -v '^curl' "$log" || true)
+    writes=$(grep -v '^curl\|^project-' "$log" || true)
+    projects=$(grep '^project-' "$log" || true)
 }
 
 export FAKE_ITEMS=issues FAKE_LABELS="status-shaping build" FAKE_REPO_LABELS="status-shaping status-ready-to-merge"
@@ -268,14 +274,6 @@ else
     fail "a label lookup that fails for another reason than a missing label stops before any write: $status $output / $errors / $writes"
 fi
 
-FAKE_LABELS="status-shaping" FAKE_REPO_LABELS="status-shaping status-ready-to-merge"
-FAKE_CONFIG_REPO=Maddec01/Lar-Factory set_status "$url" "Ready to merge"
-if ((status == 0)) && [[ $writes == "issue-edit 7 --repo maddec01/lar-factory --add-label status-ready-to-merge --remove-label status-shaping" ]]; then
-    pass "finds the repository's config.json entry whatever its case"
-else
-    fail "finds the repository's config.json entry whatever its case: $status $output / $errors / $writes"
-fi
-
 FAKE_LABELS="status-shaping status-verify"
 set_status "$url" "Ready to merge"
 if ((status != 0)) && [[ -z $writes && $errors == *status-shaping* && $errors == *status-verify* && $errors == *"all but one"* ]]; then
@@ -302,27 +300,59 @@ for items in issues project; do
     fi
 done
 
-FAKE_ITEMS=issues
-set_status https://github.com/maddec01/lar-factory/pull/9 "Ready to merge"
-if ((status == 0)) && [[ $writes == "edit "*"--single-select-option-id OPT_1" ]]; then
-    pass "a PR on a repository that reads its issues sets the Project's Status"
-else
-    fail "a PR on a repository that reads its issues sets the Project's Status: $status $output / $errors / $writes"
-fi
-
-set_status maddec01/lar-other#7 "Ready to merge"
-if ((status == 0)) && [[ $writes == "edit "*"--single-select-option-id OPT_1" ]]; then
-    pass "a repository config.json doesn't list sets the Project's Status"
-else
-    fail "a repository config.json doesn't list sets the Project's Status: $status $output / $errors / $writes"
-fi
+on_project() {
+    [[ $projects == *"project-view 3 --owner lar-org "* && $projects == *"project-field-list 3 --owner lar-org "* &&
+        $projects == *"project-item-add 3 --owner lar-org --url $1 "* ]]
+}
 
 FAKE_ITEMS=project
 set_status "$url" "Ready to merge"
-if ((status == 0)) && [[ $output == "$expected" && $writes == "edit --project-id PVT_1 --id PVTI_1 --field-id FIELD_1 --single-select-option-id OPT_1" ]]; then
-    pass "on a Project, sets the Status field"
+if ((status == 0)) && [[ $output == "$expected" && $writes == "edit --project-id PVT_1 --id PVTI_1 --field-id FIELD_1 --single-select-option-id OPT_1" ]] &&
+    on_project "$url"; then
+    pass "on a Project, sets the Status field on the Project its .lar-factory.json names"
 else
-    fail "on a Project, sets the Status field: $status $output / $errors / $writes"
+    fail "on a Project, sets the Status field on the Project its .lar-factory.json names: $status $output / $errors / $writes / $projects"
+fi
+
+pr=https://github.com/maddec01/lar-factory/pull/9
+set_status "$pr" "Ready to merge"
+if ((status == 0)) && [[ $writes == "edit "*"--single-select-option-id OPT_1" ]] && on_project "$pr"; then
+    pass "a PR sets the Status field on the Project its repository's .lar-factory.json names"
+else
+    fail "a PR sets the Status field on the Project its repository's .lar-factory.json names: $status $output / $errors / $writes / $projects"
+fi
+
+FAKE_ITEMS=issues
+set_status "$pr" "Ready to merge"
+if ((status != 0)) && [[ -z $writes && -z $projects && $errors == *"maddec01/lar-factory reads its issues"* ]]; then
+    pass "a PR on a repository that reads its issues is refused, with no Project touched"
+else
+    fail "a PR on a repository that reads its issues is refused, with no Project touched: $status $output / $errors / $writes / $projects"
+fi
+
+FAKE_LABELS="status-shaping" FAKE_REPO_LABELS="status-shaping status-ready-to-merge"
+set_status "$url" "Ready to merge"
+if ((status == 0)) && [[ -z $projects ]]; then
+    pass "on a repository's issues, never touches a Project"
+else
+    fail "on a repository's issues, never touches a Project: $status $output / $errors / $projects"
+fi
+
+for ref in "$url" "$pr"; do
+    FAKE_ITEMS=none
+    set_status "$ref" "Ready to merge"
+    if ((status != 0)) && [[ -z $writes && -z $projects && $errors == *"maddec01/lar-factory: no .lar-factory.json on its default branch."* ]]; then
+        pass "a failing lookup for $ref stops before any write and passes its message through"
+    else
+        fail "a failing lookup for $ref stops before any write and passes its message through: $status $output / $errors / $writes / $projects"
+    fi
+done
+
+set_status "maddec01/lar-factory" "Ready to merge"
+if ((status != 0)) && [[ -z $writes && $errors == *usage* ]]; then
+    pass "a ref that names no issue or PR prints usage"
+else
+    fail "a ref that names no issue or PR prints usage: $status $output / $errors / $writes"
 fi
 
 ((failures == 0))

@@ -6,6 +6,7 @@
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
 import { clock, day, type BoardData, type BundledSkill, type ProfilesResult, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
+import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
 const listed: ProfilesResult = {
@@ -282,12 +283,39 @@ const states = (...names: string[]) => names.map((name) => {
 
 test('Skills shows each skill’s install state: matching, restored with its time, or blocked', async () => {
   await open('Skills', { ...sample, bundledSkills: [
-    { ...larWork, status: { state: 'matching' } }, { ...tdd, status: { state: 'restored', restoredAt } }, { ...tdd, name: 'grill', status: { state: 'blocked' } },
+    { ...larWork, status: { state: 'matching' } }, { ...tdd, status: { state: 'restored', restoredAt } }, { ...tdd, name: 'grill', status: { state: 'blocked', paths: [{ place: 'agents', path: '/home/.agents/skills/grill' }] } },
   ] });
   expect(states('lar-work', 'tdd', 'grill')).toEqual([
     ['● Installed', 'Matches this version of Lar Factory.'],
     [`● Restored ${day(restoredAt, undefined)}, ${clock(restoredAt, undefined)}`, 'Lar Factory put back its copy, which had changed.'],
-    ['● Blocked', 'A folder Lar Factory didn’t install has this name, so it left that folder alone.'],
+    ['● Blocked', "Blocked by a path Lar Factory didn't install: /home/.agents/skills/grill (the skill isn't installed). Move that path away to install this skill."],
+  ]);
+});
+
+test('a blocked skill’s row says which paths block it, where each leaves it missing and to move them away', async () => {
+  const paths: BlockingPath[] = [
+    { place: 'agents', path: '/home/.agents/skills/grill' }, { place: 'profile', profile: '.claude', path: '/home/.claude/skills/grill' },
+    { place: 'antigravity', path: '/home/.gemini/config/skills/grill' },
+  ];
+  await open('Skills', { ...sample, bundledSkills: [{ ...tdd, name: 'grill', status: { state: 'blocked', paths } }, { ...tdd, status: { state: 'matching' } }] });
+  expect(text(row('bundled-grill').querySelector('.text-xs'))).toBe(
+    "Matt Pocock · MIT · updated 19 OctBlocked by paths Lar Factory didn't install: /home/.agents/skills/grill (the skill isn't installed), " +
+    "/home/.claude/skills/grill (the skill isn't linked into ~/.claude; unticking the profile also clears it), " +
+    "/home/.gemini/config/skills/grill (the skill isn't installed for Antigravity). Move each path away to install this skill.");
+  expect(states('grill')[0]?.[1]).toBe(text(row('bundled-grill').querySelector('.block')));
+  expect(text(row('bundled-tdd').querySelector('.text-xs'))).toBe('Matt Pocock · MIT · updated 19 Oct');
+});
+
+test('a skill only Antigravity or a profile blocks says to move the path away, or untick the profile', async () => {
+  const blocked = (name: string, paths: BlockingPath[]) => ({ ...tdd, name, status: { state: 'blocked' as const, paths } });
+  await open('Skills', { ...sample, bundledSkills: [
+    blocked('grill', [{ place: 'antigravity', path: '/home/.gemini/config/skills/grill' }]),
+    blocked('tdd', [{ place: 'profile', profile: '.claude-work', path: '/home/.claude-work/skills/tdd' }]),
+  ] });
+  expect(states('grill', 'tdd').map((state) => state?.[1])).toEqual([
+    "Blocked by a path Lar Factory didn't install: /home/.gemini/config/skills/grill (the skill isn't installed for Antigravity). Move that path away.",
+    "Blocked by a path Lar Factory didn't install: /home/.claude-work/skills/tdd (the skill isn't linked into ~/.claude-work; unticking the profile also " +
+    'clears it). Move that path away, or untick the profile.',
   ]);
 });
 

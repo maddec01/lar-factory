@@ -90,7 +90,7 @@ async function homeWith(t: TestContext, status: unknown): Promise<string> {
 
 test('each skill gets its state from the install manifest; a checklist and a skill it doesn’t name get none', async (t) => {
   const bundle = await bundleWith(t, ['grill', 'lar-work', 'tdd'], ['security-checklist.md']);
-  const home = await homeWith(t, { 'lar-work': { state: 'matching' }, tdd: { state: 'restored', restoredAt: '2026-10-26T09:30:00.000Z' }, unslop: { state: 'blocked' } });
+  const home = await homeWith(t, { 'lar-work': { state: 'matching' }, tdd: { state: 'restored', restoredAt: '2026-10-26T09:30:00.000Z' }, unslop: { state: 'blocked', paths: [{ place: 'agents', path: '/home/.agents/skills/unslop' }] } });
   assert.deepEqual(withInstallState(readBundledSkills(bundle), home).map((s) => [s.name, s.status]), [
     ['grill', undefined], ['lar-work', { state: 'matching' }], ['tdd', { state: 'restored', restoredAt: '2026-10-26T09:30:00.000Z' }],
     ['references/security-checklist.md', undefined]]);

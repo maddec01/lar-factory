@@ -21,7 +21,7 @@ const main = async () => {
   }
   // A repository's .lar-factory.json from its default branch: options.repoConfigs holds each one's, by owner/name,
   // null for none (a 404), false for a read that fails; any other repository reads the lar Project.
-  const configPath = args[0] === 'api' && /^repos\/([\w.-]+\/[\w.-]+)\/contents\/\.lar-factory\.json$/.exec(args[1]);
+  const configPath = args[0] === 'api' && !args.includes('PUT') && /^repos\/([\w.-]+\/[\w.-]+)\/contents\/\.lar-factory\.json$/.exec(args[1]);
   if (configPath) {
     const repo = configPath[1];
     const config = options.repoConfigs && repo in options.repoConfigs ? options.repoConfigs[repo]
@@ -42,6 +42,26 @@ const main = async () => {
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.includes('.permissions.push')) {
     return void process.stdout.write(`${options.canPush !== false}\n`);
   }
+  // Onboarding's PR: the default branch is main at commit abc123, and options.fail names the call that fails. An
+  // opened PR goes in options.prs, by URL, with its state, which a test changes to MERGED to merge it.
+  const fail = (call, text) => {
+    if (options.fail !== call) return false;
+    process.stderr.write(text);
+    process.exitCode = 1;
+    return true;
+  };
+  if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.includes('.default_branch')) return void process.stdout.write('main\n');
+  if (args[0] === 'api' && /\/git\/ref\/heads\/main$/.test(args[1])) return void process.stdout.write('abc123\n');
+  if (args[0] === 'api' && /\/git\/refs$/.test(args[1])) return void (fail('branch', 'gh: Reference already exists (HTTP 422)\n') || output({}));
+  if (args[0] === 'api' && args[1].endsWith('/contents/.lar-factory.json') && args.includes('PUT')) return void (fail('file', 'HTTP 409: Conflict\n') || output({}));
+  if (args[0] === 'pr' && args[1] === 'create') {
+    if (fail('pr-create', 'pull request create failed: GraphQL: No commits between main and lar-factory/onboarding\n')) return;
+    const url = `https://github.com/${args[args.indexOf('-R') + 1]}/pull/77`;
+    options.prs = { ...options.prs, [url]: 'OPEN' };
+    fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    return void process.stdout.write(`${url}\n`);
+  }
+  if (args[0] === 'pr' && args[1] === 'view') return void process.stdout.write(`${options.prs?.[args[2]] ?? 'OPEN'}\n`);
   if (args[1] === 'graphql') {
     if (options.fail === 'read') {
       process.stderr.write('HTTP 502: Bad Gateway');

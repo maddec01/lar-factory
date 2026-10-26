@@ -37,6 +37,8 @@ export interface HttpDeps {
   runSetupCheck(input: Record<string, unknown>): Promise<{ result: SetupCheckResult } | { status: number; error: string }>;
   /** Finishes an onboarding that reuses its .lar-factory.json, returning the repositories still onboarding, or why it can't. */
   finishOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
+  /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
+  openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | { status: number; error: string }>;
 }
 
 export interface BoardServer {
@@ -112,7 +114,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  runSetupCheck, finishOnboarding }: HttpDeps): BoardServer {
+  runSetupCheck, finishOnboarding, openOnboardingPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -200,6 +202,16 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         // The finished repository goes on the board with the next read, which reads its .lar-factory.json.
         readSoon();
         return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+    '/api/onboarding/pr': {
+      what: 'the onboarding whose PR to open', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const opened = await openOnboardingPr(input);
+        if ('error' in opened) return { status: opened.status, body: { error: opened.error } };
+        board.update({ onboarding: opened.onboarding });
+        board.push();
+        return { status: 200, body: withBoard({ prUrl: opened.prUrl, error: null }) };
       },
     },
     // Looks the tools up again for the notices' Recheck button.

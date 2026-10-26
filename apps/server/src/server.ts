@@ -19,6 +19,7 @@ import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { finishOnboarding } from './onboarding/finish-onboarding.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
+import { createPrOpener, finishMergedOnboardings } from './onboarding/onboarding-pr.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { runSetupCheck } from './onboarding/setup-checks.ts';
 import { loadBuild } from './page/page.ts';
@@ -69,6 +70,8 @@ const items = onboardedSources(async () => {
     board.update({ repos: [], repositoryConfigProblems: [], onboarding: [] });
     throw err;
   }
+  // An onboarding whose PR merged finishes here, so a merge made while the dialog is closed finishes too.
+  list = await finishMergedOnboardings(list, undefined, undefined, (repo, problem) => log(`can't tell whether ${repo}'s onboarding PR merged: ${problem}`));
   // A repository still onboarding has no Repository config on its default branch until its PR merges.
   const read = await readOnboardedConfigs(list.filter((e) => !e.onboarding));
   board.update({ repos: read.configs.map(repoView), repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list) });
@@ -299,6 +302,7 @@ const { server, endStreams } = createBoardServer({
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input), finishOnboarding: (input) => finishOnboarding(input),
+  openOnboardingPr: createPrOpener(),
 });
 
 /** Logs why the board can't start and exits. */

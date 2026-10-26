@@ -68,17 +68,17 @@ first needed.
 ## Status
 
 Status lives on the item. The statuses are List, Queued, Shaping, Needs you,
-Ready, In progress, Review, Verify, Ready to merge and Done. A GitHub Project
-keeps them in its Status field. A repository whose entry in lar-factory's
-`config.json` has `"items": "issues"` keeps them on its issues as
-`status-<name>` labels: the status lowercased with hyphens for spaces, such as
-`status-shaping` or `status-ready-to-merge`. An issue carries one. No write
+Ready, In progress, Review, Verify, Ready to merge and Done. A repository's
+`.lar-factory.json` names its item source. A repository that reads a GitHub
+Project keeps them in that Project's Status field. One that reads its issues
+keeps them on its issues as `status-<name>` labels: the status lowercased with
+hyphens for spaces, such as `status-shaping` or `status-ready-to-merge`. An issue carries one. No write
 stores Done: closing the issue makes it Done.
 
 Move an item with `bash <lar-work>/scripts/status.sh <issue-url> "<Status>"`
 as the workflow directs. It swaps the issue's label or sets the Project's
-field. It refuses Done, and an issue with two status labels until someone
-removes all but one.
+field. It refuses Done, a pull request on a repository that reads its issues,
+and an issue with two status labels until someone removes all but one.
 
 ## Native relationships
 
@@ -145,10 +145,11 @@ and [issue dependencies API](https://docs.github.com/en/rest/issues/issue-depend
 
 A slice is a native sub-issue of a `build` issue; a sub-issue labelled
 `build` is a build, never a slice. Create it only with `slice.sh`: it makes the
-sub-issue, prints its URL and deletes the item GitHub auto-adds to the lar
-Project, so slices stay off the board with no Status. Later label and body
-edits, closing and reopening never put it back. Put a build on the lar board
-before slicing it, since adding a build later pulls its slices onto the board.
+sub-issue and prints its URL. When the build's repository reads a GitHub
+Project, it also deletes the item GitHub auto-adds to that Project, so slices
+stay off the board with no Status. Later label and body edits, closing and
+reopening never put it back. Put a build on that Project before slicing it,
+since adding a build later pulls its slices onto the Project.
 Then add its blocked-by links with `--add-blocked-by`
 above.
 

@@ -88,10 +88,10 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
 - Anything else: set Shaping. An **Explore subagent** reads the repo's
   `AGENTS.md`, `GLOSSARY.md`, relevant ADRs and the code this issue touches,
   and returns ≤300 words in `domain-modeling` vocabulary: what exists, where,
-  and what the issue would change. It also returns each repository's **role**
-  from lar-factory's `config.json` on `main`, read with
-  `gh api -H "Accept: application/vnd.github.raw" "repos/maddec01/lar-factory/contents/config.json?ref=main"`
-  (this checkout may be another repo's).
+  and what the issue would change. It also returns each onboarded repository's **role**:
+  `bash <this skill>/scripts/repo-config.sh --list` lists the repositories, and
+  `bash <this skill>/scripts/repo-config.sh <owner/repo>` prints one's config,
+  read from its default branch (this checkout may be another repo's).
 
 ## 2. Size up
 

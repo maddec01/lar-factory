@@ -168,13 +168,23 @@ test('Edit and Reset wait for build #385, and Add repository opens the onboardin
   expect(body().closest('[hidden]'), 'Settings stays open under the dialog').toBeNull();
 });
 
-test('a repository still onboarding is listed with its step, and Resume reopens the dialog there', async () => {
-  const data: BoardData = { ...sample,
-    onboarding: [{ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } } }] };
+test('a repository still onboarding is listed with its provider, the answers it has passed and its step, and Resume reopens the dialog there', async () => {
+  const setup = { itemSource: 'issues' as const, projectOwner: 'maddec01', projectNumber: '', show: 'opted-in' as const, showPicked: false, role: 'Notes app' };
+  const data: BoardData = { ...sample, onboarding: [
+    { repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web', provider: 'GitHub', setup: { ...setup, role: '' } } } },
+    { repo: 'maddec01/lar-notes', progress: { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-notes', provider: 'GitHub', setup } } },
+  ] };
   serve(data, [project('lar-web', { onBoard: true })]);
   await open('Repositories', data);
-  expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web']]);
-  expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webOnboarding · stopped at Provider and item sourceResumeEditReset');
+  expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-maddec01/lar-notes']]);
+  expect(text(row('repo-maddec01/lar-web')), 'answers the step has not passed yet').toBe('maddec01/lar-webGitHub · Onboarding, stopped at Provider and item sourceResumeEditReset');
+  expect(text(row('repo-maddec01/lar-notes'))).toBe('maddec01/lar-notesGitHub · Issues · Opted-in items · Onboarding, stopped at ChecksResumeEditReset');
+  const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-notes', provider: 'GitHub' as const, setup }, prUrl: 'https://github.com/maddec01/lar-notes/pull/2' };
+  const onProject = { ...pr, answers: { ...pr.answers, setup: { ...setup, itemSource: 'github-project' as const, projectNumber: '3', show: 'all' as const } } };
+  await push({ ...data, onboarding: [{ repo: 'maddec01/lar-web', progress: onProject }, { repo: 'maddec01/lar-notes', progress: { ...pr, prClosed: true } }] });
+  expect(text(row('repo-maddec01/lar-web'))).toContain('GitHub · GitHub Project maddec01 #3 · All items · Onboarding, waiting for its PR to merge');
+  expect(text(row('repo-maddec01/lar-notes'))).toContain('Onboarding, its PR closed without merging');
+  await push(data);
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Provider and item source');

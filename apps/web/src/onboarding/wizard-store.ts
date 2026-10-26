@@ -1,9 +1,10 @@
-// The onboarding run the dialog shows: its step, the steps it has passed and the T3 project it picked, with T3's
-// projects as the server lists them and the folder Create a new T3 project adds. Closing before a project is picked drops the run; closing after keeps its
-// repository on this Mac's list as onboarding, with where it stopped, and Resume reopens it there.
+// The onboarding run the dialog shows: its step, the steps it has passed, the T3 project it picked and the answers it
+// has given, with T3's projects as the server lists them and the folder Create a new T3 project adds. Closing before a
+// project is picked drops the run; closing after keeps its repository on this Mac's list as onboarding, with where it
+// stopped, and Resume reopens it there.
 
 import { create } from 'zustand';
-import { sameRepo, type OnboardingProgress, type ProjectChoice } from '@lar-factory/shared';
+import { sameRepo, type OnboardingProgress, type ProjectChoice, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
@@ -32,6 +33,8 @@ export interface Run {
   repo: string | null;
   /** The repository the run was kept under when it was last closed; null for a run never kept. */
   savedAs: string | null;
+  /** The Provider and item source step's answers; null until that step first shows. */
+  setup: SetupAnswers | null;
 }
 
 export type Projects = { state: 'loading' } | { state: 'loaded'; projects: ProjectChoice[] } | { state: 'failed'; error: string };
@@ -55,9 +58,28 @@ export function pickedProject(run: Run, projects: Projects): ProjectChoice | nul
   return projects.state === 'loaded' ? projects.projects.find((p) => p.id === run.projectId) ?? null : null;
 }
 
+/** The show setting suggested for an item source: All items for a GitHub Project, Opted-in items for issues. */
+export const suggestedShow = (itemSource: SetupAnswers['itemSource']): ShowSetting => itemSource === 'github-project' ? 'all' : 'opted-in';
+
+/** Whether the setup step asks its questions: a GitHub repository with no .lar-factory.json to reuse. */
+export const asksSetup = (project: ProjectChoice): boolean => project.provider === 'GitHub' && project.hasConfig === false;
+
+/** A GitHub login, as .lar-factory.json's itemSource.owner takes it. */
+const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
+
+/** Whether the setup step's answers are whole: a role, and for a GitHub Project its owner and a positive whole number. */
+function setupAnswered(setup: SetupAnswers | null): boolean {
+  if (!setup?.role.trim()) return false;
+  return setup.itemSource === 'issues' || GITHUB_LOGIN.test(setup.projectOwner) && /^[1-9]\d*$/.test(setup.projectNumber);
+}
+
 /** Whether the run's step lets Next move past it. The later steps wait for the slices that fill them in. */
 export function stepReady(run: Run, projects: Projects): boolean {
-  return run.step === 'project' && !!pickedProject(run, projects);
+  const project = pickedProject(run, projects);
+  if (!project) return false;
+  if (run.step === 'project') return true;
+  if (run.step === 'setup') return !!project.config || asksSetup(project) && setupAnswered(run.setup);
+  return false;
 }
 
 interface WizardState {
@@ -78,6 +100,8 @@ interface WizardState {
   setFolder: (folder: string) => void;
   /** Adds the form's folder as a T3 project and picks it. */
   createProject: () => Promise<void>;
+  /** Changes the setup step's answers. A new item source brings its suggested show setting until one is picked. */
+  answer: (change: Partial<Omit<SetupAnswers, 'showPicked'>>) => void;
   next: () => void;
   back: () => void;
 }
@@ -89,12 +113,18 @@ const isStep = (id: string): id is StepId => STEPS.some((s) => s.id === id);
 
 /** The run a kept onboarding resumes; a step this dialog doesn't have, as a newer board's, resumes on the T3 project step. */
 function resumed(repo: string, progress: OnboardingProgress): Run {
-  return { step: isStep(progress.step) ? progress.step : 'project', done: progress.done.filter(isStep), projectId: progress.answers.projectId, repo, savedAs: repo };
+  return { step: isStep(progress.step) ? progress.step : 'project', done: progress.done.filter(isStep), projectId: progress.answers.projectId, repo,
+    savedAs: repo, setup: progress.answers.setup ?? null };
 }
+
+/** The setup step's answers before any is given: a GitHub Project of the repository's owner, with its suggested show setting. */
+const firstSetup = (repo: string | null): SetupAnswers => ({
+  itemSource: 'github-project', projectOwner: repo?.split('/')[0] ?? '', projectNumber: '', show: suggestedShow('github-project'), showPicked: false, role: '',
+});
 
 /** Asks the server to keep the run's repository as onboarding; a refusal shows in a toast. */
 async function keep(run: Run & { projectId: string; repo: string }): Promise<void> {
-  const progress: OnboardingProgress = { step: run.step, done: run.done, answers: { projectId: run.projectId } };
+  const progress: OnboardingProgress = { step: run.step, done: run.done, answers: { projectId: run.projectId, ...run.setup && { setup: run.setup } } };
   const replaces = run.savedAs && !sameRepo(run.savedAs, run.repo) ? { replaces: run.savedAs } : {};
   const result = await postAction('/api/onboarding/repositories', { repo: run.repo, progress, ...replaces });
   receive(result);
@@ -107,7 +137,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     const { run, projects } = get();
     if (!run || (by === 1 && !stepReady(run, projects))) return;
     const to = STEPS[STEPS.findIndex((s) => s.id === run.step) + by]?.id;
-    if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done } });
+    if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done,
+      setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo) : null) } });
   };
 
   return {
@@ -115,7 +146,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     projects: { state: 'loading' },
     creating: null,
     start: () => {
-      set({ run: { step: 'project', done: [], projectId: null, repo: null, savedAs: null }, creating: null });
+      set({ run: { step: 'project', done: [], projectId: null, repo: null, savedAs: null, setup: null }, creating: null });
       void get().loadProjects();
     },
     resume: (repo) => {
@@ -171,6 +202,14 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const reason = added ? unpickable(added, run) : 'T3 Code doesn’t list it.';
       if (reason) return set({ creating: { ...now, adding: false, error: `T3 Code added the project, but it can't be picked: ${reason}` } });
       get().pick(result.projectId);
+    },
+    answer: (change) => {
+      const { run } = get();
+      if (!run?.setup) return;
+      const setup = { ...run.setup, ...change };
+      if (change.show) setup.showPicked = true;
+      else if (change.itemSource && !setup.showPicked) setup.show = suggestedShow(change.itemSource);
+      set({ run: { ...run, setup } });
     },
     next: () => move(1),
     back: () => move(-1),

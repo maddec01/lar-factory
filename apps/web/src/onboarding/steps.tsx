@@ -1,21 +1,22 @@
 // The body of each onboarding step, which the dialog shows one at a time. Each field sits on its own row with its
-// label and one line of help. Only the T3 project step is filled in; the later steps' slices fill in theirs.
+// label and one line of help. The T3 project and Provider and item source steps are filled in; the later steps'
+// slices fill in theirs.
 
 import type { ReactNode } from 'react';
-import { CircleAlert, FolderPlus, LoaderCircle, RotateCw } from 'lucide-react';
-import type { ProjectChoice } from '@lar-factory/shared';
+import { CircleAlert, FolderPlus, Info, LoaderCircle, RotateCw } from 'lucide-react';
+import type { ProjectChoice, RepositoryItemSource, SetupAnswers, ShowSetting } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { Input } from '@lar-factory/ui/input';
 import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
-import { type Creating, type Run, type StepId, unpickable, useWizardStore } from './wizard-store.ts';
+import { type Creating, type Run, type StepId, asksSetup, pickedProject, suggestedShow, unpickable, useWizardStore } from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
 function Choice({ value, title, children, disabled }: { value: string; title: ReactNode; children?: ReactNode; disabled?: boolean }) {
   return (
-    <label data-project={value} className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 has-data-checked:border-ring has-data-checked:bg-accent/40 ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
+    <label data-choice={value} className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 has-data-checked:border-ring has-data-checked:bg-accent/40 ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
       <Radio value={value} disabled={disabled} className="mt-0.5" />
       <span className="grid min-w-0 flex-1 gap-0.5"><span className="text-sm font-medium">{title}</span>{children && <span className="text-xs text-muted-foreground">{children}</span>}</span>
     </label>
@@ -23,8 +24,8 @@ function Choice({ value, title, children, disabled }: { value: string; title: Re
 }
 
 /** One field on its own row: its label, the control, then one line of help. */
-function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
-  return <label className="grid gap-1.5"><span className="text-sm font-medium">{label}</span>{children}{hint && <span className="text-xs text-muted-foreground">{hint}</span>}</label>;
+function Field({ name, label, hint, children }: { name?: string; label: string; hint?: ReactNode; children: ReactNode }) {
+  return <label data-field={name} className="grid gap-1.5"><span className="text-sm font-medium">{label}</span>{children}{hint && <span className="text-xs text-muted-foreground">{hint}</span>}</label>;
 }
 
 /** A group of choices on its own row: its legend, one line of help, then the choices. */
@@ -43,6 +44,27 @@ function ConfigBadge({ project }: { project: ProjectChoice }) {
   if (project.hasConfig) return <Badge variant="info" size="sm">has .lar-factory.json</Badge>;
   if (project.hasConfig === false) return <Badge variant="outline" size="sm">no .lar-factory.json</Badge>;
   return project.provider === 'GitHub' && <Badge variant="outline" size="sm">couldn’t check .lar-factory.json</Badge>;
+}
+
+/** A problem with Retry, which reads T3's projects and their Repository configs again. */
+function Problem({ title, children }: { title: string; children: ReactNode }) {
+  const loadProjects = useWizardStore((s) => s.loadProjects);
+  return (
+    <Alert variant="error"><CircleAlert /><AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{children}</AlertDescription>
+      <AlertAction><Button size="xs" variant="outline" onClick={() => void loadProjects()}><RotateCw /> Retry</Button></AlertAction>
+    </Alert>
+  );
+}
+
+/** What a step shows while T3's projects are read, or when they can't be; null once they are. */
+function ProjectsPending() {
+  const projects = useWizardStore((s) => s.projects);
+  if (projects.state === 'loading') {
+    return <p data-reading-projects className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading T3 Code’s projects…</p>;
+  }
+  if (projects.state === 'failed') return <Problem title="Can’t list T3 Code’s projects">{projects.error}</Problem>;
+  return null;
 }
 
 /** Create a new T3 project's folder, which Add runs `t3 project add` on; a failure shows t3's message and keeps the step. */
@@ -66,14 +88,8 @@ function NewProject({ creating }: { creating: Creating }) {
 }
 
 function ProjectStep({ run }: { run: Run }) {
-  const { projects, creating, pick, chooseNew, loadProjects } = useWizardStore();
-  if (projects.state === 'loading') return <p className="m-0 text-sm text-muted-foreground">Reading T3 Code’s projects…</p>;
-  if (projects.state === 'failed') return (
-    <Alert variant="error"><CircleAlert /><AlertTitle>Can’t list T3 Code’s projects</AlertTitle>
-      <AlertDescription>{projects.error}</AlertDescription>
-      <AlertAction><Button size="xs" variant="outline" onClick={() => void loadProjects()}><RotateCw /> Retry</Button></AlertAction>
-    </Alert>
-  );
+  const { projects, creating, pick, chooseNew } = useWizardStore();
+  if (projects.state !== 'loaded') return <ProjectsPending />;
   return (
     <Group legend="T3 project" hint="Its threads run in this T3 project, whose folder is the repository’s main checkout.">
       {projects.projects.length === 0 && <p className="m-0 text-sm text-muted-foreground">T3 Code has no project yet.</p>}
@@ -96,7 +112,96 @@ function ProjectStep({ run }: { run: Run }) {
   );
 }
 
+const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opted-in': 'Opted-in items' };
+
+/** An item source as a line, like `GitHub Project maddec01 #3`. */
+const sourceLine = (source: RepositoryItemSource, repo: string) => source.kind === 'github-project' ? `GitHub Project ${source.owner} #${source.number}` : `${repo}’s issues`;
+
+/** The provider, from the origin's host, which onboarding can't change. */
+function ProviderRow({ project }: { project: ProjectChoice }) {
+  return (
+    <div data-field="provider" className="grid gap-1.5">
+      <span className="text-sm font-medium">Provider</span>
+      <Badge variant="outline" className="justify-self-start">{project.provider}</Badge>
+      <span className="text-xs text-muted-foreground">From the host of {project.repo}’s origin; it can’t be changed.</span>
+    </div>
+  );
+}
+
+/** The values of the .lar-factory.json onboarding reuses, which it doesn't ask again. */
+function ReusedConfig({ project, config }: { project: ProjectChoice; config: NonNullable<ProjectChoice['config']> }) {
+  return (
+    <div className="grid gap-3">
+      <Badge variant="info" className="justify-self-start">From .lar-factory.json on the default branch</Badge>
+      <dl data-reused-config className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 rounded-lg border p-3 text-sm">
+        <dt className="text-muted-foreground">Provider</dt><dd className="m-0">{project.provider}</dd>
+        <dt className="text-muted-foreground">Item source</dt><dd className="m-0">{sourceLine(config.itemSource, project.repo!)}</dd>
+        <dt className="text-muted-foreground">Show</dt><dd className="m-0">{SHOW_TITLES[config.show]}</dd>
+        <dt className="text-muted-foreground">Repository role</dt><dd className="m-0">{config.role}</dd>
+      </dl>
+      <p className="m-0 text-xs text-muted-foreground">Changing these waits for Edit in build #385.</p>
+    </div>
+  );
+}
+
+/** The questions: item source, show setting with the suggested one marked, and Repository role. */
+function SetupQuestions({ project, setup }: { project: ProjectChoice; setup: SetupAnswers }) {
+  const answer = useWizardStore((s) => s.answer);
+  const suggested = suggestedShow(setup.itemSource);
+  return (<>
+    <Group legend="Item source" hint="Where the board finds this repository’s items. It lists the items that can show.">
+      <RadioGroup value={setup.itemSource} onValueChange={(v) => answer({ itemSource: v as SetupAnswers['itemSource'] })} className="gap-2">
+        <Choice value="github-project" title="A GitHub Project">A Project named by its owner and number, which other repositories may name too.</Choice>
+        <Choice value="issues" title="The repository’s issues">{project.repo}’s own issues, with no extra fields.</Choice>
+      </RadioGroup>
+    </Group>
+    {setup.itemSource === 'github-project' && (<>
+      <Field name="project-owner" label="Project owner" hint="The GitHub user or organization that owns the Project.">
+        <Input font="mono" value={setup.projectOwner} onChange={(e) => answer({ projectOwner: e.target.value })} />
+      </Field>
+      <Field name="project-number" label="Project number" hint="The number in the Project’s URL, after /projects/.">
+        <Input font="mono" inputMode="numeric" placeholder="3" value={setup.projectNumber} onChange={(e) => answer({ projectNumber: e.target.value })} />
+      </Field>
+    </>)}
+    <Group legend="Show" hint="Which of the item source’s items show on the board.">
+      <RadioGroup value={setup.show} onValueChange={(v) => answer({ show: v as ShowSetting })} className="gap-2">
+        {(['all', 'opted-in'] as const).map((show) => (
+          <Choice key={show} value={show} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge variant="secondary" size="sm">Suggested</Badge>}</span>}>
+            {show === 'all' ? 'Every open item from the item source; an item with no status counts as List.'
+              : `Only items that carry a status show; someone opts an item in by giving it ${setup.itemSource === 'github-project' ? 'the List Status' : 'the status-list label'}.`}
+          </Choice>
+        ))}
+      </RadioGroup>
+    </Group>
+    <Field name="role" label="Repository role" hint="What this repository is to the others.">
+      <Input placeholder="Web client that talks to the API server" value={setup.role} onChange={(e) => answer({ role: e.target.value })} />
+    </Field>
+  </>);
+}
+
+function SetupStep({ run }: { run: Run }) {
+  const projects = useWizardStore((s) => s.projects);
+  if (projects.state !== 'loaded') return <ProjectsPending />;
+  const project = pickedProject(run, projects);
+  if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  if (project.config) return <ReusedConfig project={project} config={project.config} />;
+  return (
+    <div className="grid gap-6">
+      <ProviderRow project={project} />
+      {project.provider === 'Azure DevOps' ? (
+        <Alert variant="info"><Info /><AlertTitle>Azure DevOps arrives in build #386</AlertTitle>
+          <AlertDescription>Until then, onboarding offers no item source for a repository on Azure DevOps.</AlertDescription></Alert>
+      ) : project.configProblem ? (
+        <Problem title="Can’t reuse .lar-factory.json">{project.configProblem} Fix the file on {project.repo}’s default branch, then Retry.</Problem>
+      ) : !asksSetup(project) ? (
+        <Problem title="Can’t check .lar-factory.json">Couldn’t read whether {project.repo} has .lar-factory.json on its default branch.</Problem>
+      ) : run.setup && <SetupQuestions project={project} setup={run.setup} />}
+    </div>
+  );
+}
+
 export function StepBody({ run, step }: { run: Run; step: StepId }) {
   if (step === 'project') return <ProjectStep run={run} />;
+  if (step === 'setup') return <SetupStep run={run} />;
   return <p className="m-0 text-sm text-muted-foreground">This step comes in a later part of build #382.</p>;
 }

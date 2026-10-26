@@ -248,6 +248,28 @@ test('in a browser the profiles and updates show disabled, since only the board 
   expect(row('version').querySelector('.shown-control')!.getAttribute('title')).toBe('Only the board app updates itself');
 });
 
+test('Skills credits each bundled skill and checklist, with a link to its source, in a browser too', async () => {
+  await open('Skills', { ...sample, bundledSkills: [
+    { name: 'lar-work', author: 'Lar', licence: 'MIT', source: 'https://github.com/maddec01/lar-factory/tree/main/skills/lar-work' },
+    { name: 'references/security-checklist.md', author: 'Addy Osmani', licence: 'MIT', source: 'https://github.com/addyosmani/agent-skills/blob/aeac41d4d005/references/security-checklist.md' },
+  ] });
+  expect($$('.settings-group h3').map(text)).toContain('Bundled skills');
+  const rows = ['bundled-lar-work', 'bundled-references/security-checklist.md'].map(row);
+  expect(rows.map((r) => [text(r.querySelector('.font-medium')), text(r.querySelector('.text-xs'))])).toEqual([
+    ['lar-work', 'Lar · MIT'], ['references/security-checklist.md', 'Addy Osmani · MIT']]);
+  const link = rows[1]!.querySelector('a')!;
+  expect([text(link).trim(), link.getAttribute('aria-label'), link.getAttribute('href'), link.target]).toEqual(
+    ['Source', 'references/security-checklist.md source', 'https://github.com/addyosmani/agent-skills/blob/aeac41d4d005/references/security-checklist.md', '_blank']);
+});
+
+test('Skills says so in one row when it couldn’t read the bundled skills', async () => {
+  await open('Skills', { ...sample, bundledSkills: [] });
+  const group = $$('.settings-group').find((g) => text(g.querySelector('h3')) === 'Bundled skills')!;
+  expect([...group.querySelectorAll<HTMLElement>('.settings-row')].map((r) => [r.dataset.row, text(r.querySelector('.font-medium'))])).toEqual(
+    [['bundled-unread', 'Couldn’t read the bundled skills']]);
+  expect(group.querySelector('a, button, input')).toBeNull();
+});
+
 test('Skills lists every Claude profile with its tick', async () => {
   const bridge = stubBridge();
   await open();

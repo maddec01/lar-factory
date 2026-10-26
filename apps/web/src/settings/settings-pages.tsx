@@ -1,12 +1,14 @@
 // The Settings sections and their grouped rows, from the control room prototype. Most rows aren't built yet: they
 // show the prototype's value, disabled. The working rows are the Claude profiles, the update channel, version and
-// Check now, the command check rows, the gh and az logins, and the GitHub Project and repositories, read-only. In a
-// browser the profiles and updates, which only the board app has, show the prototype's values, disabled with that reason.
+// Check now, the command check rows, the gh and az logins, the GitHub Project and repositories, read-only, and the
+// bundled skills with their authors, licences and sources. In a browser the profiles and updates, which only the board
+// app has, show the prototype's values, disabled with that reason.
 
 import type { ComponentProps, ReactNode } from 'react';
-import { Archive, Bell, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
+import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
 import { GH_FLOOR, type BoardData, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
 import type { ClaudeProfile } from '@lar-factory/shared/install-skills';
+import { Button } from '@lar-factory/ui/button';
 import { PlatformTag } from '../items/item-parts.tsx';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, ReadOnlyText, SmallButton, ToolState, notBuilt } from './controls.tsx';
@@ -92,6 +94,16 @@ function profileGroup({ app, profiles }: PagesInput): Group {
     title: 'Claude profiles', description, note: <ProfilesNote />,
     rows: (profiles ?? []).map(({ name }) => ({ id: `profile-${name}`, title: profilePath(name), control: custom(() => <ProfileSwitch name={name} />) })),
   };
+}
+
+/** Who wrote each skill and checklist the app bundles, under which licence, with a link to its source. */
+function bundledGroup({ data }: PagesInput): Group {
+  const skills = data.bundledSkills ?? [];
+  const rows: Row[] = skills.length ? skills.map((skill) => ({
+    id: `bundled-${skill.name}`, title: skill.name, description: `${skill.author} · ${skill.licence}`,
+    control: custom(() => <Button variant="outline" size="xs" aria-label={`${skill.name} source`} render={<a href={skill.source} target="_blank" rel="noopener" />}><ExternalLink /> Source</Button>),
+  })) : [{ id: 'bundled-unread', title: 'Couldn’t read the bundled skills', description: 'The board server couldn’t read the app’s bundle, so it can’t credit them here.', control: custom(() => null) }];
+  return { title: 'Bundled skills', description: 'The skills and checklists the app installs, and who wrote them.', rows };
 }
 
 function updateRows({ app, version }: PagesInput): Row[] {
@@ -181,6 +193,7 @@ export function pages(input: PagesInput): Page[] {
     ] },
     { id: 'skills', label: 'Skills', icon: <Sparkles />, groups: [
       profileGroup(input),
+      bundledGroup(input),
       { title: 'Skill sync', rows: [
         { id: 'sync', title: 'Upstream skills', description: '14 skills · last synced 2 days ago', control: { type: 'button', label: <><RefreshCw /> Sync now</> }, reason: notBuilt('Sync now') },
         { id: 'sync-auto', title: 'Check upstream weekly', control: { type: 'switch', value: true } },

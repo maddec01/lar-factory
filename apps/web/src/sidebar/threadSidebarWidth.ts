@@ -2,7 +2,7 @@
 // names: at least 208 px or the brand row, at most what leaves the main area 640 px, and the width in localStorage.
 // The board's default is 300 px, not T3's 256 px, and the key is the board's own.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 export const THREAD_SIDEBAR_WIDTH_STORAGE_KEY = 'lar_board_sidebar_width';
 const THREAD_SIDEBAR_DEFAULT_WIDTH = 300;

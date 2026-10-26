@@ -2,7 +2,7 @@
 // apps/desktop/src/electron/ElectronUpdater.ts as a plain interface, without the feed URL
 // and differential download setters. Tests pass a fake in its place.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";

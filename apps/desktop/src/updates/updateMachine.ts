@@ -1,7 +1,7 @@
 // The update state's transitions, copied from T3 Code's apps/desktop/src/updates/updateMachine.ts
 // and updateChannels.ts, without the host and app architectures and the install record.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import type { UpdateChannel, UpdateReleaseNote, UpdateState } from "@lar-factory/shared";
 

@@ -2,7 +2,7 @@
 // it exits or fails to start, as T3 Code's apps/desktop/src/backend/DesktopBackendManager.ts
 // does (500 ms doubling to 10 s, reset once the server is ready).
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";

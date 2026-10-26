@@ -2,7 +2,7 @@
 // the new one, without HTML and Markdown, at most 6 Releases of 8 items each. Copied from T3 Code's
 // apps/desktop/src/updates/releaseNotes.ts, with the board's own types.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import type { UpdateChannel, UpdateReleaseNote } from "@lar-factory/shared";
 import { defaultChannel } from "./updateMachine.ts";

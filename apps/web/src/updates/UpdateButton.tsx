@@ -9,7 +9,7 @@
 // focus, closes 150 ms after the pointer leaves, a forward Tab moves into it, and a click runs the update. Both
 // open above the button, at the sidebar's foot, as T3's do.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see apps/desktop/LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ComponentProps } from 'react';
 import { flushSync } from 'react-dom';

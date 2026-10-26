@@ -1,7 +1,7 @@
 // Copied from T3 Code's apps/desktop/src/shell/DesktopShellEnvironment.test.ts, keeping
 // the macOS cases.
 //
-// Copyright (c) 2026 T3 Tools Inc. Licensed under the MIT License; see LICENSE.
+// Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";

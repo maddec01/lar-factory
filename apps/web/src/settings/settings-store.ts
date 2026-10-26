@@ -41,7 +41,7 @@ function untickText(where: string, removed: ProfilesResult['removed']): string {
   if (links && checklists) return `Removed the skill links and checklists from ${where}.`;
   if (links) return `Removed the skill links from ${where}.`;
   if (checklists) return `Removed the checklists from ${where}.`;
-  return `lar Factory had no skill links or checklists in ${where} to remove.`;
+  return `Lar Factory had no skill links or checklists in ${where} to remove.`;
 }
 
 /** Counts list calls, so only the latest one's answer shows. */
@@ -84,7 +84,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       const { profiles, installed, conflicts, removed, error } = await boardApp()!.setProfileTick(name, ticked);
       set({ profiles, installed });
       if (error) set({ result: { text: `Couldn't change ${where}: ${error}`, tone: 'error', from: 'profiles' } });
-      else if (conflicts.length) set({ result: { text: `Linked ${where}, but left these alone because lar Factory didn't make them:`, tone: 'warning', paths: conflicts, from: 'profiles' } });
+      else if (conflicts.length) set({ result: { text: `Linked ${where}, but left these alone because Lar Factory didn't make them:`, tone: 'warning', paths: conflicts, from: 'profiles' } });
       else set({ result: { text: ticked ? `Linked the skills and checklists into ${where}.` : untickText(where, removed), tone: 'success', from: 'profiles' } });
     } catch (error) {
       set({ result: { text: `Couldn't change ${where}: ${failure(error)}`, tone: 'error', from: 'profiles' } });

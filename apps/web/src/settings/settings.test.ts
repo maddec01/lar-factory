@@ -214,14 +214,14 @@ test('unticking says only what it removed', async () => {
     removed: { links: [], checklists: false } });
   await settle(() => switches()[1]!.click());
   expect(bridge.setProfileTick).toHaveBeenLastCalledWith('.claude-work', false);
-  expect(result().textContent).toBe('lar Factory had no skill links or checklists in ~/.claude-work to remove.');
+  expect(result().textContent).toBe('Lar Factory had no skill links or checklists in ~/.claude-work to remove.');
 });
 
 test('a tick that left paths alone names each one', async () => {
   stubBridge({ ...bothTicked, conflicts: ['~/.claude-work/skills/lar-work'] });
   await open();
   await settle(() => switches()[1]!.click());
-  expect(result().textContent).toContain('left these alone because lar Factory didn\'t make them');
+  expect(result().textContent).toContain('left these alone because Lar Factory didn\'t make them');
   expect($$('#settings-result li').map((li) => li.textContent)).toEqual(['~/.claude-work/skills/lar-work']);
   expect(result().dataset.variant).toBe('warning');
 });
@@ -292,7 +292,7 @@ test('before the first install the switches show disabled with the reason', asyn
   const bridge = stubBridge();
   bridge.listProfiles.mockResolvedValueOnce({ ...listed, installed: false });
   await open();
-  expect(text(body())).toContain('lar Factory hasn\'t installed its skills in ~/.agents yet');
+  expect(text(body())).toContain('Lar Factory hasn\'t installed its skills in ~/.agents yet');
   expect(switches().slice(0, 2).map((s) => s.disabled)).toEqual([true, true]);
   await settle(() => switches()[1]!.click());
   expect(bridge.setProfileTick).not.toHaveBeenCalled();
@@ -353,7 +353,7 @@ describe('updates', () => {
     expect($('.settings-body [role="radiogroup"]')!.getAttribute('aria-label')).toBe('Update channel');
     expect(radios().map((each) => [each.value, text(each)])).toEqual([['nightly', 'Nightly'], ['latest', 'Latest']]);
     expect(checked()).toBe('nightly');
-    expect(text(row('version'))).toContain('lar Factory 0.2.0-nightly.20261023.41');
+    expect(text(row('version'))).toContain('Lar Factory 0.2.0-nightly.20261023.41');
     expect(status()).toBe('Up to date on 0.2.0-nightly.20261023.41.');
   });
 

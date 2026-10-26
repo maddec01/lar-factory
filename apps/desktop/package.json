@@ -2,7 +2,7 @@
   "name": "@lar-factory/desktop",
   "private": true,
   "version": "0.1.0",
-  "description": "The board app: an Electron window that runs the lar factory board, copied from T3 Code's desktop app.",
+  "description": "The board app: an Electron window that runs the Lar Factory board, copied from T3 Code's desktop app.",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {

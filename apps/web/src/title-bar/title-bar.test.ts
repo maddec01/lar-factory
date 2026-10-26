@@ -114,7 +114,7 @@ test('screen readers skip the brand; the page keeps one h1, for screen readers o
   await mountPage();
   expect($('.brand')!.getAttribute('aria-hidden')).toBe('true');
   expect(titleBar().closest('[aria-hidden="true"]')).toBeNull();
-  expect($$('h1').map((h) => [h.className, text(h)])).toEqual([['sr-only', 'lar Factory']]);
+  expect($$('h1').map((h) => [h.className, text(h)])).toEqual([['sr-only', 'Lar Factory']]);
 });
 
 test('the time counts up each second, between the board\'s 15 s ticks, in muted 12 px digits of fixed width', async () => {

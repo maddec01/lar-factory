@@ -24,7 +24,7 @@ export function checkouts(home: string, origins: Record<string, string | null>, 
 
 /** Real, isolated Git histories; no network or user Git configuration. */
 export async function factoryRepo(t: TestContext) {
-  const dir = await mkdtemp(join(tmpdir(), 'lar factory test '));
+  const dir = await mkdtemp(join(tmpdir(), 'Lar Factory test '));
   // Runs before a board started later is killed, so its git fetch may still be writing: retry.
   t.onTestFinished(() => rm(dir, { recursive: true, force: true, maxRetries: 10 }));
   const repo = join(dir, 'factory');

@@ -69,7 +69,7 @@ function publishConfig(channel: UpdateChannel) {
 export function createBuildConfig({ version, signed, outputDir }: BuildOptions): Configuration {
   return {
     appId: "com.pedrogomes.lar.factory",
-    productName: "lar Factory",
+    productName: "Lar Factory",
     // GitHub renames release assets with spaces, which breaks the feed's links.
     artifactName: "lar-factory-${version}-${arch}.${ext}",
     extraMetadata: { version },

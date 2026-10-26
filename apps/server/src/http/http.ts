@@ -243,7 +243,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       return drainRequest(res);
     }
     if (write) {
-      if (draining) return json(res, 503, { error: 'The board is installing an update. Try again once lar Factory restarts.' });
+      if (draining) return json(res, 503, { error: 'The board is installing an update. Try again once Lar Factory restarts.' });
       return guardedWrite(req, res, write);
     }
     if (req.method === 'POST' && path === '/api/read') return readRequest(req, res);

@@ -86,7 +86,7 @@ export const notice = (outcome: InstallResult | SkillInstallError): Notice | und
   if (outcome instanceof SkillInstallError) {
     return {
       type: "error",
-      message: "lar Factory couldn't install its skills",
+      message: "Lar Factory couldn't install its skills",
       detail: outcome.changed
         ? `${outcome.message}\n\nThe install stopped partway, so some skills may be the new version and some the old. The next launch tries again.`
         : `${outcome.message}\n\nThe previous skills are still in place. The next launch tries again.`,
@@ -95,7 +95,7 @@ export const notice = (outcome: InstallResult | SkillInstallError): Notice | und
   if (outcome.conflicts.length === 0) return undefined;
   return {
     type: "warning",
-    message: "lar Factory left some skills alone",
-    detail: `These folders have a bundled skill's name but lar Factory didn't install them, so it didn't overwrite them:\n\n${outcome.conflicts.join("\n")}`,
+    message: "Lar Factory left some skills alone",
+    detail: `These folders have a bundled skill's name but Lar Factory didn't install them, so it didn't overwrite them:\n\n${outcome.conflicts.join("\n")}`,
   };
 };

@@ -1,5 +1,5 @@
 // The onboarding dialog: 768px wide over the board, showing one step at a time with a progress bar, Back and Next.
-// The empty board and Resume open it; closing it drops the run until a T3 project is picked, then keeps it to resume.
+// The empty board, an offer and Resume open it; closing it drops the run until a T3 project is picked, or an offered run until Next or a change, then keeps it to resume.
 
 import { ArrowLeft, ArrowRight, Check, LoaderCircle } from 'lucide-react';
 import { Button } from '@lar-factory/ui/button';

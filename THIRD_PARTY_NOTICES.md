@@ -1,12 +1,17 @@
 # Third-party notices
 
-The skills listed in `UPSTREAM.md` are copied from the projects below and keep
-their licences. Files under `references/` come from addyosmani/agent-skills.
+This file lists the notice of every upstream project lar copies from. The
+skills listed in `UPSTREAM.md` are copied from the projects below and keep
+their licences; `developer-profile` is lar's own and needs none. Files under
+`references/` come from addyosmani/agent-skills.
 `apps/desktop` and `apps/web` port code from pingdotgg/t3code; each Port says so in
 its header. `packages/ui` copies T3's base components and coss's toast unchanged and
 lists each one, with its upstream commit, in `packages/ui/UPSTREAM.md`.
 `.github/scripts/release-plan.cjs` and `.github/workflows/release.yml` adapt code
 from pingdotgg/t3code.
+
+`skills/pr/CREDITS.md` reuses Dex Horthy's `show-me` text from humanlayer/humanlayer.
+Matt Pocock credits it in that file, so it has no section here.
 
 ## mattpocock/skills
 
@@ -124,8 +129,10 @@ SOFTWARE.
 
 https://github.com/cosscom/ui
 
-`packages/ui/src/coss/toast.tsx` comes from `apps/ui/`, which the repository's
-`LICENSING.md` keeps under this MIT licence.
+This notice covers T3's base components in `packages/ui/src/components/ui/`
+as well as `packages/ui/src/coss/toast.tsx`. T3's components derive from coss's
+registry, and `toast.tsx` comes from it directly. Both come from `apps/ui/`,
+which the repository's `LICENSING.md` keeps under this MIT licence.
 
 ```
 MIT License

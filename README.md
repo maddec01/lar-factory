@@ -234,7 +234,14 @@ docs/plan.md       how this was set up
 
 ## Credits and licence
 
-MIT, see [LICENSE](LICENSE). The copied skills are by Matt Pocock and Addy
-Osmani, both MIT, and the board app copies code from T3 Code by T3 Tools Inc.,
-also MIT; their notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The factory idea draws on
-ZazenCodes' [Build Your Own AI Software Factory](https://www.youtube.com/watch?v=ctoaIC4LHmI).
+MIT, see [LICENSE](LICENSE). The copied skills and code come from:
+
+- [Matt Pocock](https://github.com/mattpocock/skills): most of the copied skills.
+- [Addy Osmani](https://github.com/addyosmani/agent-skills): the review and hardening skills and `references/`.
+- [Lauren Tan](https://github.com/cursor/plugins/tree/main/pstack): `unslop`, from `pstack` in cursor/plugins.
+- [T3 Tools](https://github.com/pingdotgg/t3code): T3 Code's desktop app, ported into the board app, and the base components in `packages/ui`.
+- [coss](https://github.com/cosscom/ui): the toast in `packages/ui`, and the registry T3's base components derive from.
+
+All five are MIT; their notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The factory idea draws on ZazenCodes'
+[Build Your Own AI Software Factory](https://www.youtube.com/watch?v=ctoaIC4LHmI).

@@ -1,7 +1,7 @@
 // Project items as GitHub's GraphQL API returns them, and the rules that turn them into the
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
-import { STATUSES, isBuild, isDraft, sliceProgress, statusLabel } from './model.ts';
+import { STATUSES, isBuild, isDraft, labelStatuses, sliceProgress } from './model.ts';
 import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice, Status } from './model.ts';
 import { parseConceptMap } from './concept-map.ts';
 
@@ -167,8 +167,7 @@ export type StatusSource = 'field' | 'labels';
 /** The statuses an item carries, in flow order. Done is never read from storage. */
 function storedStatuses(raw: RawItem, from: StatusSource): Status[] {
   if (from === 'field') return STATUSES.filter((s) => s !== 'Done' && s === raw.status?.name);
-  const labels = rawLabels(raw);
-  return STATUSES.filter((s) => s !== 'Done' && labels.includes(statusLabel(s)));
+  return labelStatuses(rawLabels(raw));
 }
 
 /** GitHub's issue state, as the board's provider-neutral one. */

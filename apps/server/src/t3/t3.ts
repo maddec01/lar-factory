@@ -1,4 +1,4 @@
-// Starts T3 Code threads through the local `t3` CLI.
+// Starts T3 Code threads, and adds onboarding's new T3 projects, through the local `t3` CLI.
 
 import type { ModelChoice, StartResult } from '@lar-factory/shared';
 import { runTool } from '../tools/run-tool.ts';
@@ -39,4 +39,17 @@ export async function startThread(project: string, message: string, choice?: Mod
   } catch {
     return UNCERTAIN;
   }
+}
+
+/** Runs `t3 project add <folder>`, returning null once T3 added it, else the problem. */
+export async function addProject(folder: string): Promise<string | null> {
+  const command = toolCommand('t3');
+  const missing = `${missingTool('t3')}. Install the T3 Code CLI or set T3_PATH.`;
+  if (!command) return missing;
+  const { code, detail } = await runTool(command.file, ['project', 'add', folder], { env: command.env, timeout: 60_000 });
+  if (code === 'ENOENT') return missing;
+  if (code === 0) return null;
+  // A signal, such as our timeout, leaves it unknown whether T3 added the folder.
+  if (code === null) return "t3 didn't answer in time. Check T3 Code's projects before adding the folder again.";
+  return `t3 could not add the project: ${detail}`;
 }

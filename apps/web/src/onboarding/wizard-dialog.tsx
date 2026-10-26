@@ -7,15 +7,23 @@ import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, Dia
 import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
 import { useBoardStore } from '../board/board-store.ts';
-import { type Run, STEPS, finishesOnChecks, pickedProject, stepReady, useWizardStore } from './wizard-store.ts';
+import { type Run, STEPS, finishesOnChecks, onboarded, pickedProject, stepReady, useWizardStore } from './wizard-store.ts';
 
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
-/** Back, and Next, which is Finish on the Checks step of a run that reuses its .lar-factory.json. */
+/**
+ * Back, and Next, which is Finish on the Checks step of a run that reuses its .lar-factory.json. Once the PR is open
+ * the run stays on its step, with Close and wait, then Go to the board once it merged.
+ */
 function Nav({ run }: { run: Run }) {
-  const { projects, checks, next, back, finish } = useWizardStore();
-  const tools = useBoardStore((s) => s.data.tools);
-  const ready = stepReady(run, projects, checks, tools);
+  const { projects, checks, next, back, finish, close } = useWizardStore();
+  const data = useBoardStore((s) => s.data);
+  const ready = stepReady(run, projects, checks, data.tools);
+  if (run.prUrl) {
+    return onboarded(run, data) ? <Button size="sm" onClick={close}><Check /> Go to the board</Button>
+      : <Button variant="outline" size="sm" onClick={close}>Close and wait</Button>;
+  }
+  if (run.step === 'pr') return <Button variant="outline" size="sm" onClick={back}><ArrowLeft /> Back</Button>;
   return (
     <>
       {indexOf(run) > 0 && <Button variant="outline" size="sm" onClick={back}><ArrowLeft /> Back</Button>}
@@ -29,10 +37,14 @@ function Nav({ run }: { run: Run }) {
 
 export function WizardDialog() {
   const { run, projects, close } = useWizardStore();
+  const data = useBoardStore((s) => s.data);
   const step = run && STEPS[indexOf(run)];
   // A run that reuses its .lar-factory.json finishes on the Checks step, with no PR to open.
   const steps = run && pickedProject(run, projects)?.config ? STEPS.length - 1 : STEPS.length;
-  const done = `${run?.done.length} of ${steps} done`;
+  // Once its PR merged, the Pull request step is done too.
+  const finished = !!run && onboarded(run, data);
+  const doneCount = finished ? steps : run?.done.length ?? 0;
+  const done = finished ? 'Onboarded' : `${doneCount} of ${steps} done`;
   return (
     <Dialog open={!!run} onOpenChange={(open) => !open && close()}>
       <DialogPopup className="max-w-3xl" data-onboarding-dialog>
@@ -40,7 +52,7 @@ export function WizardDialog() {
           <DialogHeader>
             <DialogDescription>Onboard {pickedProject(run, projects)?.name ?? run.repo?.split('/')[1] ?? 'a repository'} · step {indexOf(run) + 1} of {steps}</DialogDescription>
             <DialogTitle>{step.label}</DialogTitle>
-            <Progress value={run.done.length} max={steps} caption={done} aria-label={done} />
+            <Progress value={doneCount} max={steps} caption={done} aria-label={done} />
           </DialogHeader>
           <DialogPanel className="py-6"><StepBody run={run} step={run.step} /></DialogPanel>
           <DialogFooter><Nav run={run} /></DialogFooter>

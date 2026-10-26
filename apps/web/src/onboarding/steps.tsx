@@ -1,10 +1,9 @@
 // The body of each onboarding step, which the dialog shows one at a time. Each field sits on its own row with its
-// label and one line of help. The T3 project, Provider and item source, and Checks steps are filled in; the Pull
-// request step's slice fills in its own.
+// label and one line of help. The Pull request step opens the PR that adds .lar-factory.json, then waits for its merge.
 
 import type { ReactNode } from 'react';
-import { Check, CircleAlert, FolderPlus, Info, LoaderCircle, RotateCw, X } from 'lucide-react';
-import { SETUP_CHECKS, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting } from '@lar-factory/shared';
+import { Check, CircleAlert, FolderPlus, GitPullRequest, Info, LoaderCircle, RotateCw, X } from 'lucide-react';
+import { SETUP_CHECKS, onboardingConfigFile, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
@@ -16,8 +15,8 @@ import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import {
-  COMMAND_CHECKS, type Checks, type Creating, type Run, type StepId, asksSetup, commandPasses, itemSourceOf, pickedProject, suggestedShow, unpickable,
-  useWizardStore,
+  COMMAND_CHECKS, type Checks, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, onboarded, pickedProject, suggestedShow,
+  unpickable, useWizardStore,
 } from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
@@ -309,9 +308,55 @@ function FinishProblem({ checks }: { checks: Checks }) {
   return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t finish onboarding</AlertTitle><AlertDescription>{checks.finishError}</AlertDescription></Alert>;
 }
 
+/** The PR's place, `owner/name#n`, from its URL. */
+const prName = (url: string) => url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
+
+/** The PR that adds .lar-factory.json: what it adds, Open the PR, then the wait for its merge, which the board finishes. */
+function PrStep({ run }: { run: Run }) {
+  const { projects, pr, openPr } = useWizardStore();
+  const data = useBoardStore((s) => s.data);
+  if (projects.state !== 'loaded') return <ProjectsPending />;
+  const project = pickedProject(run, projects);
+  const config = project && configOf(run, project);
+  if (!project?.repo || !config) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  const { repo } = project;
+  if (run.prUrl && onboarded(run, data)) {
+    return (
+      <div data-pr-step>
+        <Alert variant="success"><Check /><AlertTitle>{repo} is onboarded</AlertTitle>
+          <AlertDescription>{prName(run.prUrl)} merged. The board reads {repo}’s items from its item source, and Start build and Start refining work for them.</AlertDescription></Alert>
+      </div>
+    );
+  }
+  return (
+    <div data-pr-step className="grid gap-4">
+      <div className="grid gap-1">
+        <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">One PR on {repo}, branch lar-factory/onboarding</h4>
+        <p className="m-0 text-xs text-muted-foreground">It adds .lar-factory.json, made on GitHub from the default branch, so your checkout stays as it is.</p>
+        <pre className="m-0 overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>
+      </div>
+      {run.prUrl ? (
+        <div className="grid gap-3 rounded-lg border p-3">
+          <div className="flex items-center gap-2.5 text-sm">
+            <LoaderCircle className="size-4 animate-spin text-info" />
+            <span><a className="font-medium underline" href={run.prUrl} target="_blank" rel="noreferrer">{prName(run.prUrl)}</a> is open. Waiting for its merge.</span>
+          </div>
+          <p className="m-0 text-xs text-muted-foreground">You can close this dialog: {repo} stays on the board as onboarding, with Resume, and Start build and Start refining stay disabled for its items. The board finishes onboarding on its next check after the merge.</p>
+        </div>
+      ) : pr.error ? (
+        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t open the PR</AlertTitle><AlertDescription>{pr.error}</AlertDescription>
+          <AlertAction><Button size="xs" variant="outline" disabled={pr.opening} onClick={() => void openPr()}><RotateCw /> Retry</Button></AlertAction></Alert>
+      ) : (
+        <Button className="justify-self-start" disabled={pr.opening} onClick={() => void openPr()}>
+          {pr.opening ? <><LoaderCircle className="animate-spin" /> Opening the PR…</> : <><GitPullRequest /> Open the PR</>}</Button>
+      )}
+    </div>
+  );
+}
+
 export function StepBody({ run, step }: { run: Run; step: StepId }) {
   if (step === 'project') return <ProjectStep run={run} />;
   if (step === 'setup') return <SetupStep run={run} />;
   if (step === 'checks') return <ChecksStep run={run} />;
-  return <p className="m-0 text-sm text-muted-foreground">This step comes in a later part of build #382.</p>;
+  return <PrStep run={run} />;
 }

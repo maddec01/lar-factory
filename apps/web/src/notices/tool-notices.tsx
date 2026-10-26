@@ -87,8 +87,8 @@ function ghNotice(check: FailedCheck<GhCheck>): { title: string; body: ReactNode
   }
 }
 
-/** The banner for a gh the board can't use as it is: missing or logged out, which stops the read, too old, or without the project scope. */
-export function GhBanner({ check }: { check: FailedCheck<GhCheck> }) {
+/** One gh banner, by its check's result. */
+function OneGhBanner({ check }: { check: FailedCheck<GhCheck> }) {
   const { title, body } = ghNotice(check);
   return (
     <Banner title={title}>
@@ -96,6 +96,16 @@ export function GhBanner({ check }: { check: FailedCheck<GhCheck> }) {
       {' '}{LOOKS_AGAIN} <Recheck check={check} />
     </Banner>
   );
+}
+
+/**
+ * The banner for a gh the board can't use as it is: missing or logged out, which stops the read, too old, or without
+ * the project scope; a login without the scope on a gh also too old shows the too-old banner as well.
+ */
+export function GhBanner({ check }: { check: FailedCheck<GhCheck> }) {
+  const outdated = check.result === 'no-project-scope' && check.upgrade && check.version
+    ? { result: 'outdated' as const, version: check.version, fix: check.upgrade } : null;
+  return <><OneGhBanner check={check} />{outdated && <OneGhBanner check={outdated} />}</>;
 }
 
 /** az's banner title by its check's result. */

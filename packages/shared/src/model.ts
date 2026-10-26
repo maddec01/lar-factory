@@ -341,7 +341,8 @@ type Passed = { result: 'ok'; version?: string };
 type Missing = { result: 'missing'; override?: string };
 
 /**
- * gh's check: it runs; it's missing; it's logged out; it's older than GH_FLOOR; or its login has no `project` scope.
+ * gh's check: it runs; it's missing; it's logged out; it's older than GH_FLOOR; or its login has no `project`
+ * scope, with `upgrade` set to the upgrade command when it's also older than GH_FLOOR.
  * `scopes: 'unread'` marks a gh whose scopes the board couldn't read, which blocks nothing.
  */
 export type GhCheck =
@@ -349,7 +350,7 @@ export type GhCheck =
   | Missing & { fix: string }
   | { result: 'logged-out'; version?: string; fix: string }
   | { result: 'outdated'; version: string; fix: string; scopes?: 'unread' }
-  | { result: 'no-project-scope'; version?: string; fix: string };
+  | { result: 'no-project-scope'; version?: string; fix: string; upgrade?: string };
 
 /** t3's check: it runs, it's missing, or T3 Code isn't running, so `t3` can't start threads. Its fix is to install or open T3 Code. */
 export type T3Check = Passed | Missing | { result: 'not-running'; version?: string };

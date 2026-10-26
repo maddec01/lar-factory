@@ -86,6 +86,13 @@ test('a login without the project scope shows its banner with gh auth refresh -s
   expect(note()!.textContent).toBe("Still can't read Projects.");
 });
 
+test('a login without the project scope on a gh older than 2.94.0 shows both banners', async () => {
+  await mountPage(withTools({ gh: { result: 'no-project-scope', version: '2.93.1', fix: 'gh auth refresh -s project', upgrade: 'brew upgrade gh' } }));
+  const banners = $$('.banners .banner').map(bannerText);
+  expect(banners.map(([title]) => title)).toEqual(["GitHub CLI can't read Projects.", 'GitHub CLI is older than 2.94.0.']);
+  expect(banners[1]![1]).toContain('this gh is 2.93.1. Run brew upgrade gh Copy in a terminal');
+});
+
 test('scopes the board couldn\'t read show no banner', async () => {
   await mountPage(withTools({ gh: { result: 'ok', version: '2.102.0', scopes: 'unread' } }));
   expect($$('.banners .banner')).toEqual([]);

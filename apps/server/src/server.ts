@@ -19,7 +19,7 @@ import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { finishOnboarding } from './onboarding/finish-onboarding.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
-import { createPrOpener, finishMergedOnboardings } from './onboarding/onboarding-pr.ts';
+import { createPrOpener, followOnboardingPrs, reopenOnboardingPr } from './onboarding/onboarding-pr.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { runSetupCheck } from './onboarding/setup-checks.ts';
 import { loadBuild } from './page/page.ts';
@@ -70,11 +70,20 @@ const items = onboardedSources(async () => {
     board.update({ repos: [], repositoryConfigProblems: [], onboarding: [] });
     throw err;
   }
-  // An onboarding whose PR merged finishes here, so a merge made while the dialog is closed finishes too.
-  list = await finishMergedOnboardings(list, undefined, undefined, (repo, problem) => log(`can't tell whether ${repo}'s onboarding PR merged: ${problem}`));
+  // An onboarding whose PR merged, or whose .lar-factory.json landed another way, finishes here, so a merge made while
+  // the dialog is closed finishes too; a PR closed without merging is marked for the Pull request step.
+  // Each refresh follows every PR again, so a problem from an earlier one goes once its PR reads.
+  const followProblems = new Map<string, string>();
+  list = await followOnboardingPrs(list, undefined, undefined, {
+    failed: (repo, problem) => {
+      log(`can't follow ${repo}'s onboarding PR: ${problem}`);
+      followProblems.set(repo, problem);
+    },
+    // A finished onboarding has its .lar-factory.json now, which the kept answer may not say.
+    finished: configChecks.forget });
   // A repository still onboarding has no Repository config on its default branch until its PR merges.
   const read = await readOnboardedConfigs(list.filter((e) => !e.onboarding));
-  board.update({ repos: read.configs.map(repoView), repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list) });
+  board.update({ repos: read.configs.map(repoView), repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list, followProblems) });
   return read;
 });
 /** Each repository's .lar-factory.json answer for onboarding, kept until Recheck. */
@@ -301,8 +310,8 @@ const { server, endStreams } = createBoardServer({
   recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
-  runSetupCheck: (input) => runSetupCheck(input), finishOnboarding: (input) => finishOnboarding(input),
-  openOnboardingPr: createPrOpener(),
+  runSetupCheck: (input) => runSetupCheck(input), finishOnboarding: (input) => finishOnboarding(input, undefined, undefined, configChecks.forget),
+  openOnboardingPr: createPrOpener(), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
 });
 
 /** Logs why the board can't start and exits. */

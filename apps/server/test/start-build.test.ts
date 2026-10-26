@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { draftItem, readsRepositoryConfig, SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { draftItem, NOT_LANDED, readsRepositoryConfig, SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, RawItem } from '@lar-factory/shared';
@@ -148,7 +148,7 @@ test('a refused repository project writes nothing to GitHub and runs no t3', asy
 test("Start build is refused while the build's repository is still onboarding, and writes nothing to GitHub and runs no t3", async (t) => {
   const env = startableEnv(t);
   writeOnboarding(env.HOME!, 'maddec01/lar-factory');
-  const board = await startBoard(t, { items: [readyIssue(12, ['feature'])] }, false, false, env);
+  const board = await startBoard(t, { items: [readyIssue(12, ['feature'])], ...NOT_LANDED }, false, false, env);
   await until(board, (d) => d.items.length === 1);
   const refused = await startBuild(board, 'I_12');
   assert.deepEqual([refused.status, (await refused.json()).error], [409, "Waits for onboarding's PR to merge"]);

@@ -671,12 +671,16 @@ export interface OnboardingProgress {
   answers: OnboardingAnswers;
   /** The onboarding PR, once it is open. */
   prUrl?: string;
+  /** Set by the board once it finds the PR closed without merging; a save with the same PR keeps it. */
+  prClosed?: true;
 }
 
 /** A repository on this Mac's list that is still onboarding, with where it stopped. */
 export interface OnboardingRepository {
   repo: string;
   progress: OnboardingProgress;
+  /** Why the board's last refresh couldn't read its PR or .lar-factory.json, with gh's message; absent when it could. */
+  followProblem?: string;
 }
 
 /** A T3 project the board offers to onboard with the Repository config its repository has. */

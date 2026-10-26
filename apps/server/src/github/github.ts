@@ -1,7 +1,7 @@
 // Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
 import { DONE_WINDOW_MS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@lar-factory/shared';
-import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@lar-factory/shared';
+import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, Searched, Status } from '@lar-factory/shared';
 import type { BoardConfig } from '../config/config.ts';
 import type { ItemsRead } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -353,6 +353,16 @@ export async function editPrBody(url: string, body: string, run: (args: string[]
   await run(['api', '--method', 'PATCH', pullPath(url), '-f', `body=${body}`]);
 }
 
+/** Deletes an issue for good, which needs admin rights on its repository; returns the error, or null when GitHub accepted it. */
+export async function deleteIssue(item: Item, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+  try {
+    await run(['issue', 'delete', String(item.number), '-R', item.repo!, '--yes']);
+    return null;
+  } catch (err) {
+    return `Could not delete #${item.number}. ${message(err)}`;
+  }
+}
+
 /** Deletes an issue for good, or removes a draft from the project by its Project item id; returns the error, or null when GitHub accepted it. */
 export async function abandonItem(
   config: BoardConfig,
@@ -360,34 +370,67 @@ export async function abandonItem(
   projectItemId: string | undefined,
   run: (args: string[]) => Promise<string> = gh,
 ): Promise<string | null> {
+  if (!isDraft(item)) return deleteIssue(item, run);
   try {
-    if (isDraft(item)) {
-      if (!projectItemId) throw new Error('The board has not read this draft from the project.');
-      const number = await projectNumber(config);
-      await run(['project', 'item-delete', String(number), '--owner', config.owner, '--id', projectItemId]);
-    } else await run(['issue', 'delete', String(item.number), '-R', item.repo!, '--yes']);
+    if (!projectItemId) throw new Error('The board has not read this draft from the project.');
+    const number = await projectNumber(config);
+    await run(['project', 'item-delete', String(number), '--owner', config.owner, '--id', projectItemId]);
     return null;
   } catch (err) {
-    const what = isDraft(item) ? `remove draft ${item.title}` : `delete #${item.number}`;
-    return `Could not ${what}. ${message(err)}`;
+    return `Could not remove draft ${item.title}. ${message(err)}`;
   }
 }
+
+/**
+ * How an item source takes in the issue Add item creates: `setup` runs before the issue exists, and returns the steps
+ * that follow its creation, each named for the error.
+ */
+type IssueHome = () => Promise<{ step: string; run: (issue: NonNullable<CreationProgress['issue']>) => Promise<void> }[]>;
+
+/** Add item's progress in the Project: the shared progress, and the new issue's Project item id once it has one. */
+export type ProjectCreationProgress = CreationProgress & { projectItemId?: string };
 
 /** Creates an issue, adds it to the configured project and explicitly assigns List. */
 export async function addProjectItem(
   config: BoardConfig,
   input: unknown,
-  progress: CreationProgress,
+  progress: ProjectCreationProgress,
   run: (args: string[]) => Promise<string> = gh,
 ): Promise<CreationResult> {
   const draft = validateDraft(input, config.repos);
+  return createIssue(draft, progress, run, async () => {
+    const { number, setStatus } = await statusWriter(config, 'List', run);
+    return [
+      { step: 'project membership', run: async (issue) => {
+        if (progress.projectItemId) return;
+        // GitHub item-add reuses membership when the issue is already on this project.
+        const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', config.owner,
+          '--url', issue.html_url, '--format', 'json'])) as { id: string };
+        if (!member.id) throw new Error('GitHub did not return a project item.');
+        progress.projectItemId = member.id;
+      } },
+      { step: 'List status', run: () => setStatus(progress.projectItemId!).then(() => undefined) },
+    ];
+  });
+}
+
+/**
+ * Creates the issue a draft describes, and nothing else, resuming from `progress` after a failed try; `home` adds the
+ * steps an item source needs around it. The issue shows as List.
+ */
+export async function createIssue(
+  draft: ItemDraft,
+  progress: CreationProgress,
+  run: (args: string[]) => Promise<string> = gh,
+  home: IssueHome = async () => [],
+): Promise<CreationResult> {
   let step = 'project setup';
   const uncertain = (): CreationResult => ({ item: null, issueUrl: null, uncertain: true,
     error: 'Issue creation could not be confirmed. Check the repository issues before starting a new item; this submission will not create another issue.' });
   if (progress.creationUncertain) return uncertain();
   try {
     if (progress.item) return { item: progress.item, issueUrl: progress.item.url, error: null };
-    const { number, setStatus } = await statusWriter(config, 'List', run);
+    const after = await home();
     const labels = [draft.kind, ...draft.labels];
     step = 'issue creation';
     if (!progress.issue) {
@@ -403,16 +446,10 @@ export async function addProjectItem(
       progress.creationUncertain = false;
     }
     const issue = progress.issue;
-    step = 'project membership';
-    if (!progress.itemId) {
-      // GitHub item-add reuses membership when the issue is already on this project.
-      const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', config.owner,
-        '--url', issue.html_url, '--format', 'json'])) as { id: string };
-      if (!member.id) throw new Error('GitHub did not return a project item.');
-      progress.itemId = member.id;
+    for (const next of after) {
+      step = next.step;
+      await next.run(issue);
     }
-    step = 'List status';
-    await setStatus(progress.itemId);
     progress.item = {
       id: issue.node_id, status: 'List', content: 'ticket', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'open', closedAs: null,

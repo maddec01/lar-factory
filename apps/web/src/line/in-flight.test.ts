@@ -29,7 +29,7 @@ const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): 
 const loose = withItem('I_sample13', { parent: null });
 /** #140 with its blocker closed, so its Start build runs, on a board whose writes are on. */
 const unblocked = (data: BoardData = loose): BoardData => withItem('I_sample13', {
-  blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'CLOSED' }],
+  blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }],
 }, { ...data, capture: { session: 's1', enabled: true }, modelChoices: [{ instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] }] });
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 
@@ -76,7 +76,7 @@ test('a row shows its numbered title, status, repository and age, and a red badg
 
 test('the badge counts the blocked-by issues still open', async () => {
   await mountPage(withItem('I_sample13', { blockers: [
-    { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' },
+    { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
   ] }, loose));
   expect(text(cells('I_sample13')[0]!)).toContain('blocked by 1');
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
@@ -149,7 +149,7 @@ test('Start after on a blocked Ready row arms its start on the picked model, the
 
 test("Start after names the last open blocker, another repository's without its owner, and its title and label name it in full", async () => {
   await mountPage(withItem('I_sample13', { blockers: [
-    { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' },
+    { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 12, repo: 'maddec01/lar-apple', state: 'open' },
   ] }, loose));
   const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([text(after), after.title]).toEqual(['Start after lar-apple#12 ▾', 'Starts by itself once #202, maddec01/lar-apple#12 close']);
@@ -204,8 +204,8 @@ test('Start build is disabled while a blocker is open, its title naming it, and 
   expect(startBuild().className).toContain('disabled:pointer-events-auto');
   expect(startBuild().className, 'an outline button, as the line draws a held action').toContain('border-input');
   const many = withItem('I_sample13', { blockers: [
-    { number: 202, repo: 'maddec01/lar-server', state: 'OPEN' }, { number: 203, repo: 'maddec01/lar-server', state: 'CLOSED' },
-    { number: 12, repo: 'maddec01/lar-apple', state: 'OPEN' },
+    { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
+    { number: 12, repo: 'maddec01/lar-apple', state: 'open' },
   ] }, loose);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(many));
   expect(startBuild().title, 'only the open ones, another repository\'s in full').toBe('Blocked by #202, maddec01/lar-apple#12 until they close');

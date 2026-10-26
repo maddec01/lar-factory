@@ -25,8 +25,6 @@ export interface ItemDraft {
 export interface CreationProgress {
   creationUncertain?: boolean;
   issue?: { number: number; node_id: string; html_url: string; updated_at: string };
-  /** The new issue's Project item id. */
-  itemId?: string;
   item?: Item;
 }
 

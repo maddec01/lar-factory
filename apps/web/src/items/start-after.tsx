@@ -6,7 +6,7 @@
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { blockedText, carriesTwoStatuses, openBlockerRefs, openBlockers, ref, repositoryProjectHint, startRequest } from '@lar-factory/shared';
+import { blockedText, carriesTwoStatuses, openBlockerRefs, openBlockers, ref, startHold, startRequest } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Menu, MenuPopup, MenuTrigger } from '@lar-factory/ui/menu';
@@ -79,30 +79,30 @@ function StartAfter({ item, data, size = 'xs', variant = 'outline' }: { item: It
 }
 
 /**
- * The item's Start, the StartControl named `label`, while nothing holds it. An open blocker holds it, and so does a
- * missing T3 project for its repository, where a refining thread and a build both start. A held start is disabled,
- * its title saying why: the hint for adding the project, else the open issues it's blocked by; `quiet` outlines it,
- * as the line draws a held action. While only a blocker holds it, Start after sits beside it, or stands alone with
- * `afterOnly`, as a dossier's map shows it. Without the project an armed start would fail, so none is offered; one
- * armed before the project went still shows, so it can be disarmed. An item carrying more than one status gets no
- * Start until the user keeps one.
+ * The item's Start, the StartControl named `label`, while nothing holds it. An open blocker holds it, and so does its
+ * repository, where a refining thread and a build both start, while it is still onboarding or T3 has no project for
+ * it. A held start is disabled, its title saying why: the repository's hold, else the open issues it's blocked by;
+ * `quiet` outlines it, as the line draws a held action. While only a blocker holds it, Start after sits beside it, or
+ * stands alone with `afterOnly`, as a dossier's map shows it. While the repository holds it an armed start would
+ * fail, so none is offered; one armed before the hold still shows, so it can be disarmed. An item carrying more than
+ * one status gets no Start until the user keeps one.
  */
 export function StartOrAfter({ item, data, label = 'Start', size = 'xs', variant, icon, kind = 'refine', quiet, afterOnly }: {
   item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; variant?: 'default' | 'outline'; icon?: ReactNode; kind?: StartKind;
   quiet?: boolean; afterOnly?: boolean;
 }) {
   if (carriesTwoStatuses(item)) return null;
-  const hint = repositoryProjectHint(data, item.repo);
+  const hold = startHold(data, item.repo);
   const blocked = openBlockers(item).length > 0;
-  if (!blocked && !hint) return <StartControl item={item} data={data} label={label} size={size} variant={variant} icon={icon} kind={kind} />;
+  if (!blocked && !hold) return <StartControl item={item} data={data} label={label} size={size} variant={variant} icon={icon} kind={kind} />;
   // Pointer events stay on while it's disabled, so its title says why.
   const start = (
     <Button size={size} variant={variant ?? (quiet ? 'outline' : undefined)} className="disabled:pointer-events-auto" data-start={item.id} disabled
-      title={hint ?? blockedText(item) ?? undefined}>
+      title={hold ?? blockedText(item) ?? undefined}>
       {icon}{label}
     </Button>
   );
-  if ((hint && !data.armed?.[item.id]) || !blocked) return start;
+  if ((hold && !data.armed?.[item.id]) || !blocked) return start;
   if (afterOnly) return <StartAfter item={item} data={data} size={size} />;
   // With no room for both, Start after wraps under Start, then truncates.
   return <span className="inline-flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">{start}<StartAfter item={item} data={data} size={size} /></span>;

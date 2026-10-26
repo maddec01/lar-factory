@@ -166,7 +166,7 @@ const lines = (records: (object | string)[]): string => records.map((r) => (type
  * in a temporary folder removed after the test.
  */
 export function claudeHome(t: TestContext, sessions: Record<string, FixtureTranscripts>, home = tempDir(t, 'lar-claude-home-')): string {
-  const project = join(home, 'projects', '-Users-pedro--t3-worktrees-lar-factory-feat-60');
+  const project = join(home, 'projects', '-Users-me--t3-worktrees-lar-factory-feat-60');
   mkdirSync(project, { recursive: true });
   for (const [session, { main, subagents }] of Object.entries(sessions)) {
     if (main) writeFileSync(join(project, `${session}.jsonl`), lines(main));

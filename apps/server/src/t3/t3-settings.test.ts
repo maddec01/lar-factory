@@ -7,11 +7,11 @@ import { environmentIdPath, readEnvironmentId, readT3Settings, statsDbPath, t3Se
 import { t3Settings, tempDir } from '../../test/stats-db.ts';
 
 test('T3\'s files are under its userdata folder unless the environment names them', () => {
-  const env = { HOME: '/Users/pedro' };
-  assert.equal(statsDbPath(env), '/Users/pedro/.t3/userdata/statev2.sqlite');
-  assert.equal(t3SettingsPath(env), '/Users/pedro/.t3/userdata/settings.json');
+  const env = { HOME: '/Users/me' };
+  assert.equal(statsDbPath(env), '/Users/me/.t3/userdata/statev2.sqlite');
+  assert.equal(t3SettingsPath(env), '/Users/me/.t3/userdata/settings.json');
   assert.equal(usageRatesPath({ ...env, T3_STATE_DB: '/tmp/t3/state.sqlite' }), '/tmp/t3/usage-model-rates.json');
-  assert.equal(environmentIdPath(env), '/Users/pedro/.t3/userdata/environment-id');
+  assert.equal(environmentIdPath(env), '/Users/me/.t3/userdata/environment-id');
   assert.equal(environmentIdPath({ ...env, T3_ENVIRONMENT_ID: '/tmp/t3/env' }), '/tmp/t3/env');
 });
 

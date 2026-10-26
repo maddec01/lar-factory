@@ -1,4 +1,4 @@
-# lar Factory plan
+# Lar Factory plan
 
 Written 2026-10-20. Nothing in this plan has been applied yet. Start once the
 open PRs (lar-server #126, lar-apple #89) are merged, so the new rules start

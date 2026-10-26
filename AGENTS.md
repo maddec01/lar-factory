@@ -1,4 +1,4 @@
-# lar Factory
+# Lar Factory
 
 Skills, build agents and a local board for working on lar. See the README for
 the flow and `docs/plan.md` for how it was set up.

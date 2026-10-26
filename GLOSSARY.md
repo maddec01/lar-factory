@@ -1,6 +1,6 @@
-# lar Factory
+# Lar Factory
 
-The lar factory takes ideas through shaping, building and review to a PR that
+Lar Factory takes ideas through shaping, building and review to a PR that
 Pedro merges. This vocabulary describes its work, roles and board statuses.
 
 ## Language

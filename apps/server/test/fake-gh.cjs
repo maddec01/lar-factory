@@ -7,11 +7,15 @@ fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '
 const output = (value) => process.stdout.write(JSON.stringify(value));
 const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued' }, { id: 'IN_PROGRESS_1', name: 'In progress' }];
 const main = async () => {
-  if (args[0] === '--version') return void process.stdout.write('gh version 2.80.0 (2026-09-01)\n');
+  if (args[0] === '--version') return void process.stdout.write(`gh version ${options.ghVersion ?? '2.96.0'} (2026-09-01)\n`);
   if (args[0] === 'auth' && args[1] === 'status') {
     if (options.ghAuth === 'logged-out') process.stderr.write('You are not logged into any GitHub hosts. To log in, run: gh auth login\n');
     else if (options.ghAuth === 'failed') process.stderr.write('error connecting to api.github.com\n');
-    else return void process.stdout.write('github.com\n  ✓ Logged in to github.com account maddec01\n');
+    else {
+      // ghScopes null prints no scopes line, as for GH_TOKEN.
+      const scopes = options.ghScopes === undefined ? "'project', 'repo'" : options.ghScopes;
+      return void process.stdout.write(`github.com\n  ✓ Logged in to github.com account maddec01\n${scopes === null ? '' : `  - Token scopes: ${scopes}\n`}`);
+    }
     process.exitCode = 1;
     return;
   }

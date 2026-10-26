@@ -14,7 +14,7 @@ const results = (tools: BoardData['tools']) => tools && Object.fromEntries(Objec
   [name, check.result === 'ok' ? 'ok' : check]));
 const allOk = { gh: 'ok', t3: 'ok', git: 'ok', jq: 'ok', curl: 'ok' };
 const ghMissing = { ...allOk, gh: { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' } };
-const ghLoggedOut = { ...allOk, gh: { result: 'logged-out', version: '2.80.0', fix: 'gh auth login' } };
+const ghLoggedOut = { ...allOk, gh: { result: 'logged-out', version: '2.96.0', fix: 'gh auth login' } };
 
 /** The board data once the first read has finished, or failed. */
 const afterRead = (board: Board) => until(board, (d) => Boolean(d.fetchedAt || d.error));
@@ -48,7 +48,7 @@ test('Recheck finds a t3 that appeared after startup', async (t) => {
   const { tools } = (await response.json()).board as BoardData;
   assert.deepEqual(results(tools), allOk);
   assert.deepEqual(tools?.t3, { result: 'ok', version: '0.1.4-nightly.1' });
-  assert.deepEqual(tools?.gh, { result: 'ok', version: '2.80.0' });
+  assert.deepEqual(tools?.gh, { result: 'ok', version: '2.96.0' });
 });
 
 test('a logged-out gh shows its notice and reads nothing until Recheck finds it logged in', async (t) => {
@@ -75,6 +75,32 @@ test('a logged-out gh that logs in is found by the timed retry, which keeps the 
   assert.equal(shellRuns(), 1, 'only startup reads the login shell PATH');
   await recheck(board);
   assert.equal(shellRuns(), 2, 'Recheck reads it again');
+});
+
+test('a gh older than 2.94.0 shows its notice and the board still reads GitHub', async (t) => {
+  const board = await startBoard(t, { ghVersion: '2.93.1' });
+  const data = await afterRead(board);
+  assert.ok(data.fetchedAt, 'the board reads GitHub');
+  assert.deepEqual(data.tools?.gh, { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' });
+  assert.match(board.logs(), /gh is older than 2\.94\.0/);
+});
+
+test('a login without the project scope reads no Project until Recheck finds the scope', async (t) => {
+  const board = await startBoard(t, { ghScopes: "'repo'" });
+  const data = await board.board();
+  assert.deepEqual(data.tools?.gh, { result: 'no-project-scope', version: '2.96.0', fix: 'gh auth refresh -s project' });
+  assert.equal(data.error, null);
+  assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0);
+  assert.match(board.logs(), /gh can't read Projects/);
+  await board.update({});
+  assert.deepEqual(results((await (await recheck(board)).json()).board.tools), allOk);
+  assert.ok((await afterRead(board)).fetchedAt, 'the board reads the Project once the login has the scope');
+});
+
+test('scopes the board can\'t read block nothing', async (t) => {
+  const data = await afterRead(await startBoard(t, { ghScopes: null }));
+  assert.ok(data.fetchedAt, 'the board reads GitHub');
+  assert.deepEqual(data.tools?.gh, { result: 'ok', version: '2.96.0', scopes: 'unread' });
 });
 
 test('a missing gh names its override', async (t) => {

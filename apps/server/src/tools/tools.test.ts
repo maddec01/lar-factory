@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
-import { TOOL_NAMES, checkTools, findTools, lookUpTools, mergePaths, readLoginPath, versionOf } from './tools.ts';
+import { TOOL_NAMES, checkTools, findTools, lookUpTools, mergePaths, probeGh, readLoginPath, versionOf } from './tools.ts';
 
 /** A temp folder with `bin` holding runnable files of the given names, and a login shell whose PATH starts with `bin`. */
 async function machine(t: TestContext, names: string[]) {
@@ -109,6 +109,59 @@ test('the checks report each command: its version, missing with the override and
     curl: { result: 'ok' },
   });
   assert.equal(ghError, undefined);
+});
+
+/** `gh auth status` for a classic token with these scopes, or with no scopes line when null. */
+const authStatus = (scopes: string | null) => ['github.com', '  ✓ Logged in to github.com account maddec01 (keyring)', '  - Active account: true',
+  '  - Token: gho_************************************', ...(scopes === null ? [] : [`  - Token scopes: ${scopes}`])].join('\n');
+
+/** Probes a gh that prints `version` for `--version` and `status` for `auth status`. */
+async function probeWith(t: TestContext, version: string, status: string) {
+  const { dir, bin, shell } = await machine(t, []);
+  await writeFile(join(dir, 'version'), `${version}\n`);
+  await writeFile(join(dir, 'status'), `${status}\n`);
+  await writeFile(join(bin, 'gh'), `#!/bin/sh\n[ "$1" = --version ] && exec cat ${join(dir, 'version')}\nexec cat ${join(dir, 'status')}\n`);
+  await chmod(join(bin, 'gh'), 0o755);
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
+  return (await probeGh()).check;
+}
+
+const withProject = "'gist', 'project', 'read:org', 'repo', 'workflow'";
+
+test('a gh older than 2.94.0 is outdated, with brew upgrade gh as its fix', async (t) => {
+  assert.deepEqual(await probeWith(t, 'gh version 2.93.2 (2026-06-01)\nhttps://github.com/cli/cli/releases/tag/v2.93.2', authStatus(withProject)),
+    { result: 'outdated', version: '2.93.2', fix: 'brew upgrade gh' });
+  assert.deepEqual(await probeWith(t, 'gh version 2.9.0 (2020-01-01)', authStatus(withProject)),
+    { result: 'outdated', version: '2.9.0', fix: 'brew upgrade gh' });
+});
+
+test('a gh at 2.94.0 or newer with the project scope passes', async (t) => {
+  assert.deepEqual(await probeWith(t, 'gh version 2.94.0 (2026-07-01)', authStatus(withProject)), { result: 'ok', version: '2.94.0' });
+  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', authStatus(withProject)), { result: 'ok', version: '2.102.0' });
+});
+
+test('a login without the project scope has gh auth refresh -s project as its fix, even on an old gh', async (t) => {
+  const noProject = authStatus("'gist', 'read:org', 'repo', 'workflow'");
+  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', noProject),
+    { result: 'no-project-scope', version: '2.102.0', fix: 'gh auth refresh -s project' });
+  assert.deepEqual(await probeWith(t, 'gh version 2.93.2 (2026-06-01)', noProject),
+    { result: 'no-project-scope', version: '2.93.2', fix: 'gh auth refresh -s project' });
+});
+
+test('scopes the board can\'t read block nothing', async (t) => {
+  // GH_TOKEN, a fine-grained token or several accounts: no scopes line, an empty one, or one per account.
+  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', authStatus(null)), { result: 'ok', version: '2.102.0', scopes: 'unread' });
+  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', authStatus('none')), { result: 'ok', version: '2.102.0', scopes: 'unread' });
+  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', `${authStatus("'repo'")}\n${authStatus(withProject)}`),
+    { result: 'ok', version: '2.102.0', scopes: 'unread' });
+  assert.deepEqual(await probeWith(t, 'gh version 2.93.2 (2026-06-01)', authStatus(null)),
+    { result: 'outdated', version: '2.93.2', fix: 'brew upgrade gh', scopes: 'unread' });
+});
+
+test('a missing or logged-out gh still blocks reading', async (t) => {
+  const { shell } = await machine(t, []);
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, GH_PATH: '/nowhere/gh' });
+  assert.deepEqual((await probeGh()).check, { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' });
 });
 
 test('the login shell PATH goes before the inherited one, then the Homebrew folders, without duplicates', () => {

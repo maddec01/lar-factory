@@ -337,13 +337,19 @@ export type CheckedTool = 'gh' | 't3' | 'git' | 'jq' | 'curl';
 
 /**
  * A command's check: it runs, with the version it printed if it did; it's missing, naming the override
- * that pointed nowhere if one did; or (gh only) it's logged out. `fix` is the command that fixes a failed
- * check; a missing t3 has none, since T3 Code installs it.
+ * that pointed nowhere if one did; or (gh only) it's logged out, older than GH_FLOOR, or its login has no
+ * `project` scope. `scopes: 'unread'` marks a gh whose scopes the board couldn't read, which blocks nothing.
+ * `fix` is the command that fixes a failed check; a missing t3 has none, since T3 Code installs it.
  */
 export type ToolCheck =
-  | { result: 'ok'; version?: string }
+  | { result: 'ok'; version?: string; scopes?: 'unread' }
   | { result: 'missing'; override?: string; fix?: string }
-  | { result: 'logged-out'; version?: string; fix: string };
+  | { result: 'logged-out'; version?: string; fix: string }
+  | { result: 'outdated'; version: string; fix: string; scopes?: 'unread' }
+  | { result: 'no-project-scope'; version?: string; fix: string };
+
+/** The oldest gh lar-work's scripts run with: 2.94.0 added `--parent`, `--add-sub-issue` and `--blocked-by`. */
+export const GH_FLOOR = '2.94.0';
 
 export type FailedCheck = Exclude<ToolCheck, { result: 'ok' }>;
 
@@ -353,6 +359,23 @@ export type ToolChecks = Record<CheckedTool, ToolCheck>;
 export function failedCheck(tools: ToolChecks | undefined, name: CheckedTool): FailedCheck | undefined {
   const check = tools?.[name];
   return check && check.result !== 'ok' ? check : undefined;
+}
+
+/** Where a repository's items come from: its GitHub Project, or its issues. */
+export type ItemSource = 'project' | 'issues';
+
+/** Every repository reads the GitHub Project until build #380 lets one read its issues. */
+export function itemSource(_repo: RepoConfig): ItemSource {
+  return 'project';
+}
+
+/**
+ * Whether gh's check stops the board reading a repository whose items come from `source`: before the first
+ * check, while gh is missing or logged out, and for a Project while the login has no `project` scope.
+ */
+export function ghBlocksRead(check: ToolCheck | undefined, source: ItemSource): boolean {
+  if (!check || check.result === 'missing' || check.result === 'logged-out') return true;
+  return check.result === 'no-project-scope' && source === 'project';
 }
 
 // ---------- kinds ----------

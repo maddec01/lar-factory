@@ -47,7 +47,7 @@ function Refs({ text, find }: { text: string; find: FindRef }) {
 function WaitChips({ waitsOn, data }: { waitsOn: Blocker[]; data: BoardData }) {
   return waitsOn.map((b) => {
     const it = data.items.find((i) => i.number === b.number && i.repo === b.repo);
-    const done = b.state !== 'OPEN';
+    const done = b.state !== 'open';
     return (
       <button key={`${b.repo}#${b.number}`} type="button" disabled={!it} onClick={(e) => { e.stopPropagation(); if (it) open(it); }} title={it ? `${it.title}: ${it.status}` : `${b.repo}#${b.number}`}
         className={`inline-flex items-center gap-1 rounded border px-1 tabular-nums hover:bg-(--accent) ${done ? 'border-(--border) text-(--muted-foreground)' : 'border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] text-(--warning-foreground)'}`}>
@@ -137,7 +137,7 @@ function Phase({ title, hint, parts, data }: { title: ReactNode; hint?: ReactNod
 
 /** The checklist's last phase: the end-to-end check, which waits on every build. Running and watching it aren't built yet. */
 function CheckPhase({ check, parent, builds, data }: { check: EndToEndCheck; parent: Item; builds: Part[]; data: BoardData }) {
-  const waitsOn: Blocker[] = builds.map((b) => ({ number: b.item.number!, repo: b.item.repo!, state: isDone(b.item) ? 'CLOSED' : 'OPEN' }));
+  const waitsOn: Blocker[] = builds.map((b) => ({ number: b.item.number!, repo: b.item.repo!, state: isDone(b.item) ? 'closed' : 'open' }));
   return (
     <section className="grid gap-1" data-phase="check">
       <PhaseTitle title="Check" hint="the agents run it once every build lands" />
@@ -158,7 +158,7 @@ function CheckPhase({ check, parent, builds, data }: { check: EndToEndCheck; par
           {builds.length > 0 && <span className="inline-flex flex-wrap items-center gap-1">waits on <WaitChips waitsOn={waitsOn} data={data} /></span>}
         </span>
         <span className="pl-5.5 text-[11px] text-(--muted-foreground) empty:hidden">
-          <ThreadLine thread={threadsOf(parent)[0]} waits={waitsOn.filter((w) => w.state === 'OPEN').map((w) => `#${w.number}`)} />
+          <ThreadLine thread={threadsOf(parent)[0]} waits={waitsOn.filter((w) => w.state === 'open').map((w) => `#${w.number}`)} />
         </span>
       </div>
     </section>

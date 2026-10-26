@@ -4,7 +4,7 @@ import type { BoardData, Item, Status } from '@lar-factory/shared';
 import { createBoardState } from './board-state.ts';
 
 const item = (id: string, status: Status): Item => ({
-  id, status, type: 'Issue', number: 1, title: id, url: null, repo: 'maddec01/lar-factory', labels: [], state: 'OPEN',
+  id, status, content: 'ticket', number: 1, title: id, url: null, repo: 'maddec01/lar-factory', labels: [], state: 'open', closedAs: null,
   parent: null, subIssues: { total: 0, completed: 0 }, blockers: [], updatedAt: '2026-10-21T09:00:00Z', closedAt: null,
   linkedPrs: [], slices: [],
 });

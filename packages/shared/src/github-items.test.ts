@@ -111,6 +111,30 @@ test('drafts, unknown statuses and hidden content', () => {
   assert.equal(normalizeItem({ id: 'PVTI_3', updatedAt: '', status: null, content: null }), null);
 });
 
+test("GitHub's content type, state and close reason become the item's content, state and closedAs", () => {
+  const read = (content: NonNullable<RawItem['content']>) => {
+    const item = normalizeItem({ id: 'PVTI_8', updatedAt: '2026-10-21T08:00:00Z', status: { name: 'Done' }, content });
+    return item && [item.content, item.state, item.closedAs];
+  };
+  const issue = { __typename: 'Issue', number: 8, title: 'T', updatedAt: '2026-10-21T08:00:00Z' } as const;
+  const pr = { ...issue, __typename: 'PullRequest' } as const;
+  assert.deepEqual(read({ ...issue, state: 'OPEN', stateReason: 'REOPENED' }), ['ticket', 'open', null]);
+  assert.deepEqual(read({ ...issue, state: 'CLOSED', stateReason: 'COMPLETED' }), ['ticket', 'closed', 'done']);
+  assert.deepEqual(read({ ...issue, state: 'CLOSED', stateReason: null }), ['ticket', 'closed', 'done'], 'closed before GitHub kept a reason');
+  assert.deepEqual(read({ ...issue, state: 'CLOSED', stateReason: 'NOT_PLANNED' }), ['ticket', 'closed', 'not-planned']);
+  assert.deepEqual(read({ ...issue, state: 'CLOSED', stateReason: 'DUPLICATE' }), ['ticket', 'closed', 'not-planned']);
+  assert.deepEqual(read({ ...pr, state: 'OPEN' }), ['pr', 'open', null]);
+  assert.deepEqual(read({ ...pr, state: 'MERGED' }), ['pr', 'closed', 'done']);
+  assert.deepEqual(read({ ...pr, state: 'CLOSED' }), ['pr', 'closed', 'not-planned']);
+  assert.deepEqual(read({ __typename: 'DraftIssue', title: 'Idea', updatedAt: '2026-10-21T08:00:00Z' }), ['ticket', 'open', null]);
+});
+
+test("a linked PR's state is open, closed or merged", () => {
+  const linked = (state: string) => normalizeItem(rawIssue('PVTI_9', 9, 'Review', [], {
+    closedByPullRequestsReferences: { nodes: [{ number: 10, url: 'p', state, isDraft: false }] } }))?.linkedPrs[0]?.state;
+  assert.deepEqual(['OPEN', 'CLOSED', 'MERGED'].map(linked), ['open', 'closed', 'merged']);
+});
+
 test("a linked PR's check rollup becomes counts over all checks and the earliest start", () => {
   const counts = (pairs: Record<string, number>) => Object.entries(pairs).map(([state, count]) => ({ state, count }));
   const pr = (statusCheckRollup: RawLinkedPr['statusCheckRollup']) => normalizeItem({
@@ -175,7 +199,7 @@ test("a build's slices come from the board query, open and closed, in GitHub's o
   const issue = (labels: string[]) => normalizeItem(withSubIssues('PVTI_5', 5, labels, subIssues),
     { active: new Set(['maddec01/lar-factory#47', 'maddec01/lar-factory#49']), blocked: new Set(['maddec01/lar-factory#49']) });
   const slice = (number: number, state: 'OPEN' | 'CLOSED', progress: string) =>
-    ({ number, title: `Issue ${number}`, url: sliceRef(number, state).url, repo: 'maddec01/lar-factory', state, progress });
+    ({ number, title: `Issue ${number}`, url: sliceRef(number, state).url, repo: 'maddec01/lar-factory', state: state.toLowerCase(), progress });
   assert.deepEqual(issue(['build'])?.slices, [
     slice(48, 'OPEN', 'waiting'),
     slice(46, 'CLOSED', 'done'),

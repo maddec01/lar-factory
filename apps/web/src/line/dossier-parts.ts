@@ -30,7 +30,7 @@ export const THREAD_GLYPH: Record<ThreadState, Status> = { running: 'In progress
 const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 'Done'];
 
 export const started = (item: Item) => STARTED.includes(item.status);
-export const isDone = (item: Item) => item.status === 'Done' || item.state === 'CLOSED' || item.state === 'MERGED';
+export const isDone = (item: Item) => item.status === 'Done' || item.state === 'closed';
 const childOf = (child: Item, parent: Item) => child.parent?.number === parent.number && child.parent.repo === parent.repo;
 export const threadsOf = (item: Item): ItemThread[] => (Array.isArray(item.threads) ? item.threads : []);
 

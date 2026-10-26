@@ -51,7 +51,7 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
   assert.deepEqual(map?.map, read);
   assert.deepEqual(parent?.map, read, 'an item with a sub-issue on the board is a dossier, with its map');
   assert.deepEqual(map?.blockers, []);
-  assert.deepEqual(plain?.blockers, [{ number: 1, repo: 'maddec01/lar-server', state: 'OPEN' }]);
+  assert.deepEqual(plain?.blockers, [{ number: 1, repo: 'maddec01/lar-server', state: 'open' }]);
   assert.ok(!('map' in plain!) && !('body' in plain!), 'a feature gets no map and no body');
   assert.ok(!('map' in child!) && !('body' in child!), 'nor does a part');
   const bodyReads = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:')));

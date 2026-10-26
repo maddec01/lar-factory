@@ -1,6 +1,6 @@
 // Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
-import { buildSubIssueSearch, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@lar-factory/shared';
+import { buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@lar-factory/shared';
 import type { BoardConfig } from '../config/config.ts';
 import type { ItemsRead } from '../items/item-source.ts';
@@ -44,7 +44,7 @@ export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String
             __typename
             ... on DraftIssue { title updatedAt }
             ... on Issue {
-              id number title url state closedAt updatedAt
+              id number title url state stateReason closedAt updatedAt
               repository { nameWithOwner }
               labels(first: 20) { nodes { name } }
               parent { number title url state repository { nameWithOwner } }
@@ -307,13 +307,13 @@ export async function abandonItem(
   run: (args: string[]) => Promise<string> = gh,
 ): Promise<string | null> {
   try {
-    if (item.type === 'DraftIssue') {
+    if (isDraft(item)) {
       const number = await projectNumber(config);
       await run(['project', 'item-delete', String(number), '--owner', config.owner, '--id', item.id]);
     } else await run(['issue', 'delete', String(item.number), '-R', item.repo!, '--yes']);
     return null;
   } catch (err) {
-    const what = item.type === 'DraftIssue' ? `remove draft ${item.title}` : `delete #${item.number}`;
+    const what = isDraft(item) ? `remove draft ${item.title}` : `delete #${item.number}`;
     return `Could not ${what}. ${message(err)}`;
   }
 }
@@ -359,8 +359,8 @@ export async function addProjectItem(
     step = 'List status';
     await setStatus(progress.itemId);
     progress.item = {
-      id: progress.itemId, status: 'List', type: 'Issue', number: issue.number,
-      title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'OPEN',
+      id: progress.itemId, status: 'List', content: 'ticket', number: issue.number,
+      title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'open', closedAs: null,
       parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
       updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],
     };

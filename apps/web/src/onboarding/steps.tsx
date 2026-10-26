@@ -2,14 +2,15 @@
 // label and one line of help. Only the T3 project step is filled in; the later steps' slices fill in theirs.
 
 import type { ReactNode } from 'react';
-import { CircleAlert, RotateCw } from 'lucide-react';
+import { CircleAlert, FolderPlus, LoaderCircle, RotateCw } from 'lucide-react';
 import type { ProjectChoice } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
+import { Input } from '@lar-factory/ui/input';
 import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
-import { type Run, type StepId, unpickable, useWizardStore } from './wizard-store.ts';
+import { type Creating, type Run, type StepId, unpickable, useWizardStore } from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
 function Choice({ value, title, children, disabled }: { value: string; title: ReactNode; children?: ReactNode; disabled?: boolean }) {
@@ -19,6 +20,11 @@ function Choice({ value, title, children, disabled }: { value: string; title: Re
       <span className="grid min-w-0 flex-1 gap-0.5"><span className="text-sm font-medium">{title}</span>{children && <span className="text-xs text-muted-foreground">{children}</span>}</span>
     </label>
   );
+}
+
+/** One field on its own row: its label, the control, then one line of help. */
+function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return <label className="grid gap-1.5"><span className="text-sm font-medium">{label}</span>{children}{hint && <span className="text-xs text-muted-foreground">{hint}</span>}</label>;
 }
 
 /** A group of choices on its own row: its legend, one line of help, then the choices. */
@@ -39,8 +45,28 @@ function ConfigBadge({ project }: { project: ProjectChoice }) {
   return project.provider === 'GitHub' && <Badge variant="outline" size="sm">couldn’t check .lar-factory.json</Badge>;
 }
 
+/** Create a new T3 project's folder, which Add runs `t3 project add` on; a failure shows t3's message and keeps the step. */
+function NewProject({ creating }: { creating: Creating }) {
+  const { setFolder, createProject } = useWizardStore();
+  const add = () => void createProject();
+  return (
+    <div className="grid gap-3 rounded-lg border p-4">
+      <Field label="Folder" hint="The repository’s main checkout on this Mac, as a full path. T3 Code adds it as a project.">
+        <span className="flex gap-2">
+          <Input data-new-folder font="mono" placeholder="~/Developer/lar-web" value={creating.folder} disabled={creating.adding}
+            onChange={(e) => setFolder(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+          <Button data-add-project variant="outline" disabled={creating.adding || !creating.folder.trim()} onClick={add}>
+            {creating.adding ? <><LoaderCircle className="animate-spin" /> Adding…</> : <><FolderPlus /> Add to T3 Code</>}
+          </Button>
+        </span>
+      </Field>
+      {creating.error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t create the T3 project</AlertTitle><AlertDescription>{creating.error}</AlertDescription></Alert>}
+    </div>
+  );
+}
+
 function ProjectStep({ run }: { run: Run }) {
-  const { projects, pick, loadProjects } = useWizardStore();
+  const { projects, creating, pick, chooseNew, loadProjects } = useWizardStore();
   if (projects.state === 'loading') return <p className="m-0 text-sm text-muted-foreground">Reading T3 Code’s projects…</p>;
   if (projects.state === 'failed') return (
     <Alert variant="error"><CircleAlert /><AlertTitle>Can’t list T3 Code’s projects</AlertTitle>
@@ -51,7 +77,7 @@ function ProjectStep({ run }: { run: Run }) {
   return (
     <Group legend="T3 project" hint="Its threads run in this T3 project, whose folder is the repository’s main checkout.">
       {projects.projects.length === 0 && <p className="m-0 text-sm text-muted-foreground">T3 Code has no project yet.</p>}
-      <RadioGroup value={run.projectId ?? ''} onValueChange={(id) => pick(id as string)} className="gap-2">
+      <RadioGroup value={run.projectId ?? (creating ? 'new' : '')} onValueChange={(id) => (id === 'new' ? chooseNew() : pick(id as string))} className="gap-2">
         {projects.projects.map((p) => {
           const reason = unpickable(p, run);
           return (
@@ -63,7 +89,9 @@ function ProjectStep({ run }: { run: Run }) {
             </Choice>
           );
         })}
+        <Choice value="new" title="Create a new T3 project">From a folder on this Mac that holds the repository’s main checkout.</Choice>
       </RadioGroup>
+      {creating && <NewProject creating={creating} />}
     </Group>
   );
 }

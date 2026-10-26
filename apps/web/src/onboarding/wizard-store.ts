@@ -1,5 +1,5 @@
 // The onboarding run the dialog shows: its step, the steps it has passed and the T3 project it picked, with T3's
-// projects as the server lists them. Closing before a project is picked drops the run; closing after keeps its
+// projects as the server lists them and the folder Create a new T3 project adds. Closing before a project is picked drops the run; closing after keeps its
 // repository on this Mac's list as onboarding, with where it stopped, and Resume reopens it there.
 
 import { create } from 'zustand';
@@ -36,6 +36,13 @@ export interface Run {
 
 export type Projects = { state: 'loading' } | { state: 'loaded'; projects: ProjectChoice[] } | { state: 'failed'; error: string };
 
+/** Create a new T3 project, while it's the T3 project step's choice: the folder to add, and how adding it went. */
+export interface Creating {
+  folder: string;
+  adding: boolean;
+  error: string | null;
+}
+
 /** Why a T3 project can't be picked, or null when it can. The repository a resumed run was kept under stays pickable. */
 export function unpickable(project: ProjectChoice, run: Run): string | null {
   if (project.onBoard && !(project.repo && run.savedAs && sameRepo(project.repo, run.savedAs))) return 'Its repository is on the board already.';
@@ -57,6 +64,8 @@ interface WizardState {
   /** The run the dialog shows; null while it's closed. */
   run: Run | null;
   projects: Projects;
+  /** Create a new T3 project's form; null while a listed project is the choice. */
+  creating: Creating | null;
   start: () => void;
   /** Reopens the onboarding the board keeps for `repo`, on its step with its answers. */
   resume: (repo: string) => void;
@@ -64,6 +73,11 @@ interface WizardState {
   /** Reads T3's projects again. */
   loadProjects: () => Promise<void>;
   pick: (projectId: string) => void;
+  /** Chooses Create a new T3 project, which unpicks the picked project. */
+  chooseNew: () => void;
+  setFolder: (folder: string) => void;
+  /** Adds the form's folder as a T3 project and picks it. */
+  createProject: () => Promise<void>;
   next: () => void;
   back: () => void;
 }
@@ -99,14 +113,15 @@ export const useWizardStore = create<WizardState>()((set, get) => {
   return {
     run: null,
     projects: { state: 'loading' },
+    creating: null,
     start: () => {
-      set({ run: { step: 'project', done: [], projectId: null, repo: null, savedAs: null } });
+      set({ run: { step: 'project', done: [], projectId: null, repo: null, savedAs: null }, creating: null });
       void get().loadProjects();
     },
     resume: (repo) => {
       const kept = useBoardStore.getState().data.onboarding?.find((o) => sameRepo(o.repo, repo));
       if (!kept) return;
-      set({ run: resumed(kept.repo, kept.progress) });
+      set({ run: resumed(kept.repo, kept.progress), creating: null });
       void get().loadProjects();
     },
     close: () => {
@@ -131,7 +146,31 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     pick: (projectId) => {
       const { run, projects } = get();
       const project = projects.state === 'loaded' ? projects.projects.find((p) => p.id === projectId) : undefined;
-      if (run && project && !unpickable(project, run)) set({ run: { ...run, projectId, repo: project.repo } });
+      if (run && project && !unpickable(project, run)) set({ run: { ...run, projectId, repo: project.repo }, creating: null });
+    },
+    chooseNew: () => {
+      const { run, creating } = get();
+      if (run) set({ run: { ...run, projectId: null, repo: null }, creating: creating ?? { folder: '', adding: false, error: null } });
+    },
+    setFolder: (folder) => {
+      const { creating } = get();
+      if (creating) set({ creating: { ...creating, folder } });
+    },
+    createProject: async () => {
+      const { creating } = get();
+      if (!creating || creating.adding) return;
+      set({ creating: { ...creating, adding: true, error: null } });
+      const result = await postAction<{ projects: ProjectChoice[]; projectId: string }>('/api/onboarding/projects', { folder: creating.folder });
+      const { run, creating: now } = get();
+      // The run closed, or the step chose a listed project, while t3 ran.
+      if (!run || !now) return;
+      if (result.error || !result.projects || !result.projectId) return set({ creating: { ...now, adding: false, error: result.error ?? 'The board sent no project.' } });
+      reads++;
+      set({ projects: { state: 'loaded', projects: result.projects } });
+      const added = result.projects.find((p) => p.id === result.projectId);
+      const reason = added ? unpickable(added, run) : 'T3 Code doesn’t list it.';
+      if (reason) return set({ creating: { ...now, adding: false, error: `T3 Code added the project, but it can't be picked: ${reason}` } });
+      get().pick(result.projectId);
     },
     next: () => move(1),
     back: () => move(-1),

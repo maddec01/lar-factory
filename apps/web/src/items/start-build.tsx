@@ -1,7 +1,7 @@
 // Start build on a Ready item, on the line and in the item dialog: today's Start with its model menu, posting to
 // /api/start-build. Open thread takes its place while the item has a running or needs-you thread, and it's disabled,
-// its title saying why, while an issue it's blocked by is open or T3 has no project for its repository. While only a
-// blocker holds it, Start after joins it.
+// its title saying why, while an issue it's blocked by is open, its repository is still onboarding or T3 has no
+// project for its repository. While only a blocker holds it, Start after joins it.
 
 import type { ReactNode } from 'react';
 import type { BoardData, Item } from '@lar-factory/shared';

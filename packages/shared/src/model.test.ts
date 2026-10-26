@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repoKey, repoName, repositoryProjectHint, sameRepo, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repoKey, repoName, repositoryProjectHint, sameRepo, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { applicability, validateDraft } from './add-item.ts';
@@ -90,6 +90,15 @@ test("a repository's project hint is found whatever the case, and is null once T
   assert.equal(repositoryProjectHint({ repositoryProjects }, 'MADDEC01/Lar-Server'), 'Add the checkout in T3 Code');
   assert.equal(repositoryProjectHint({ repositoryProjects }, 'maddec01/lar-factory'), null);
   assert.equal(repositoryProjectHint({}, 'maddec01/lar-server'), null);
+});
+
+test("a start in a repository still onboarding waits for its PR, whatever the case; else the project's hint holds it", () => {
+  const onboarding = [{ repo: 'maddec01/lar-docs', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }];
+  const repositoryProjects = { 'maddec01/lar-server': 'Add the checkout in T3 Code' };
+  assert.equal(startHold({ onboarding, repositoryProjects }, 'MADDEC01/Lar-Docs'), "Waits for onboarding's PR to merge");
+  assert.equal(startHold({ onboarding, repositoryProjects }, 'maddec01/lar-server'), 'Add the checkout in T3 Code');
+  assert.equal(startHold({ onboarding, repositoryProjects }, 'maddec01/lar-factory'), null);
+  assert.equal(startHold({}, null), null);
 });
 
 test('Done counts for 7 days after closing', () => {

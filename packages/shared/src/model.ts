@@ -388,6 +388,23 @@ export function repositoryProjectHint(data: Pick<BoardData, 'repositoryProjects'
   return Object.entries(data.repositoryProjects ?? {}).find(([r]) => r.toLowerCase() === key)?.[1] ?? null;
 }
 
+/** Why Start build and Start refining are held for a repository still onboarding. */
+export const WAITS_FOR_ONBOARDING = "Waits for onboarding's PR to merge";
+
+/** Whether the repository is on this Mac's list still onboarding, whatever the case. */
+export function isOnboarding(data: Pick<BoardData, 'onboarding'>, repo: string | null): boolean {
+  return repo !== null && Boolean(data.onboarding?.some((o) => sameRepo(o.repo, repo)));
+}
+
+/**
+ * Why a start in the repository is held, whatever the case: its onboarding's PR hasn't merged, or T3 has no project
+ * for it; null when nothing holds it.
+ */
+export function startHold(data: Pick<BoardData, 'onboarding' | 'repositoryProjects'>, repo: string | null): string | null {
+  if (isOnboarding(data, repo)) return WAITS_FOR_ONBOARDING;
+  return repositoryProjectHint(data, repo);
+}
+
 /** The commands the board checks; az only while a listed repository is on Azure DevOps. */
 export type CheckedTool = 'gh' | 't3' | 'git' | 'jq' | 'curl' | 'az';
 

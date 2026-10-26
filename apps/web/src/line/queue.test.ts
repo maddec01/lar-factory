@@ -107,6 +107,12 @@ test("a Queued item whose repository has no T3 project has its Start refining di
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
 });
 
+test("a Queued item whose repository is still onboarding has its Start refining disabled until onboarding's PR merges, and Start next passes over it", async () => {
+  await mountPage({ ...withChoices, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
+  expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, "Waits for onboarding's PR to merge"]);
+  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
+});
+
 test('a Queued issue that also carries Review has no Start refining or Start after, and Start next passes over it', async () => {
   const twice = { ...withChoices, items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, statuses: ['Queued', 'Review'] as Item['statuses'] } : i)) };
   await mountPage(twice);
@@ -120,7 +126,7 @@ test('when no queued item can start, Start next shows disabled and says why', as
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };
   await mountPage(held);
   const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
-  expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs an issue or a T3 project, or has a thread at work.']);
+  expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs an issue or a T3 project, waits for onboarding, or has a thread at work.']);
   expect(next.className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
   expect(text(queue()), 'no row waits for a slot').not.toContain('next when a build slot frees');
 });

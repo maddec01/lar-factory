@@ -163,6 +163,12 @@ test("a blocked build whose repository has no T3 project offers no Start after: 
   expect(side('I_sample13').querySelector('[data-start-after]')).toBeNull();
 });
 
+test("a blocked build whose repository is still onboarding offers no Start after: Start build waits for onboarding's PR", async () => {
+  await mountPage({ ...loose, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
+  expect([startBuild().disabled, startBuild().title]).toEqual([true, "Waits for onboarding's PR to merge"]);
+  expect(side('I_sample13').querySelector('[data-start-after]')).toBeNull();
+});
+
 test('a start armed before its repository lost its T3 project still shows Starts after, so it can be disarmed', async () => {
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   const armed = { ...loose, capture: { session: 's1', enabled: true }, repositoryProjects: { 'maddec01/lar-server': hint },

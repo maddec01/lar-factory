@@ -5,7 +5,7 @@ import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carries
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { applicability, validateDraft } from './add-item.ts';
-import { formatTokens, formatUsd, shortAgo } from './format.ts';
+import { day, formatTokens, formatUsd, shortAgo } from './format.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
   return {
@@ -209,6 +209,13 @@ test('token counts are compact as on T3 Code\'s usage page', () => {
 
 test('costs are shown as on T3 Code\'s usage page', () => {
   assert.deepEqual([0.004, 41.2, 1234.567].map(formatUsd), ['$0.00', '$41.20', '$1,234.57']);
+});
+
+test('a day shows its year only when that is not the current year, in the time zone it is read in', () => {
+  const now = Date.parse('2026-10-26T12:00:00Z');
+  assert.deepEqual([day('2026-10-19', 'UTC', now), day('2025-10-19', 'UTC', now), day('2027-01-02', 'UTC', now)],
+    ['19 Oct', '19 Oct 2025', '2 Jan 2027']);
+  assert.equal(day('2025-12-31T23:30:00Z', 'Europe/Amsterdam', Date.parse('2026-01-01T12:00:00Z')), '1 Jan');
 });
 
 test('a short age rounds each unit down, and a future time reads 0s ago', () => {

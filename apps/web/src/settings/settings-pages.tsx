@@ -1,12 +1,12 @@
 // The Settings sections and their grouped rows, from the control room prototype. Most rows aren't built yet: they
 // show the prototype's value, disabled. The working rows are the Claude profiles, the update channel, version and
 // Check now, the command check rows, the gh and az logins, the GitHub Project and repositories, read-only, and the
-// bundled skills with their authors, licences and sources. In a browser the profiles and updates, which only the board
-// app has, show the prototype's values, disabled with that reason.
+// bundled skills with their authors, licences, last updates, install states and sources. In a browser the profiles
+// and updates, which only the board app has, show the prototype's values, disabled with that reason.
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, repoName, type BoardData, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
+import { GH_FLOOR, clock, day, repoName, type BoardData, type BundledSkill, type CheckedTool, type ToolCheck } from '@lar-factory/shared';
 import type { ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/button';
 import { RepoTag } from '../items/item-parts.tsx';
@@ -96,12 +96,31 @@ function profileGroup({ app, profiles }: PagesInput): Group {
   };
 }
 
-/** Who wrote each skill and checklist the app bundles, under which licence, with a link to its source. */
-function bundledGroup({ data }: PagesInput): Group {
+/** A skill's install state, with what it means as its tooltip; nothing before an install records it. */
+function InstallState({ status }: { status: BundledSkill['status'] }) {
+  if (!status) return null;
+  const [text, tone, title]: [string, ComponentProps<typeof ToolState>['tone'], string] =
+    status.state === 'matching' ? ['Installed', 'success', 'Matches this version of Lar Factory.']
+    : status.state === 'restored' ? [`Restored ${day(status.restoredAt, undefined)}, ${clock(status.restoredAt, undefined)}`, 'warning', 'Lar Factory put back its copy, which had changed.']
+    : ['Blocked', 'error', 'A folder Lar Factory didn’t install has this name, so it left that folder alone.'];
+  return <span title={title}><ToolState text={text} tone={tone} /></span>;
+}
+
+/**
+ * Who wrote each skill and checklist the app bundles, under which licence, its last update, its install state and a
+ * link to its source. A Copy's last update is its Date in UPSTREAM.md; Lar's own skills update with the app.
+ */
+function bundledGroup({ data, version }: PagesInput): Group {
   const skills = data.bundledSkills ?? [];
+  // A Date is a day with no time zone, so it reads the same everywhere. Neither a date nor a version breaks across lines.
+  const updated = (skill: BundledSkill) => skill.date ? <> · <span className="whitespace-nowrap">updated {day(skill.date, 'UTC')}</span></>
+    : skill.author === 'Lar' && version ? <> · <span className="whitespace-nowrap">updated in Lar Factory {version}</span></> : null;
   const rows: Row[] = skills.length ? skills.map((skill) => ({
-    id: `bundled-${skill.name}`, title: skill.name, description: `${skill.author} · ${skill.licence}`,
-    control: custom(() => <Button variant="outline" size="xs" aria-label={`${skill.name} source`} render={<a href={skill.source} target="_blank" rel="noopener" />}><ExternalLink /> Source</Button>),
+    id: `bundled-${skill.name}`, title: skill.name, description: <>{skill.author} · {skill.licence}{updated(skill)}</>,
+    control: custom(() => <span className="flex items-center gap-2">
+      <InstallState status={skill.status} />
+      <Button variant="outline" size="xs" aria-label={`${skill.name} source`} render={<a href={skill.source} target="_blank" rel="noopener" />}><ExternalLink /> Source</Button>
+    </span>),
   })) : [{ id: 'bundled-unread', title: 'Couldn’t read the bundled skills', description: 'The board server couldn’t read the app’s bundle, so it can’t credit them here.', control: custom(() => null) }];
   return { title: 'Bundled skills', description: 'The skills and checklists the app installs, and who wrote them.', rows };
 }
@@ -192,10 +211,6 @@ export function pages(input: PagesInput): Page[] {
     { id: 'skills', label: 'Skills', icon: <Sparkles />, groups: [
       profileGroup(input),
       bundledGroup(input),
-      { title: 'Skill sync', rows: [
-        { id: 'sync', title: 'Upstream skills', description: '14 skills · last synced 2 days ago', control: { type: 'button', label: <><RefreshCw /> Sync now</> }, reason: notBuilt('Sync now') },
-        { id: 'sync-auto', title: 'Check upstream weekly', control: { type: 'switch', value: true } },
-      ] },
     ] },
     { id: 'notifications', label: 'Notifications', icon: <Bell />, groups: [
       { title: 'Tell me when', rows: [

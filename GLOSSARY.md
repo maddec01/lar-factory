@@ -84,6 +84,10 @@ _Avoid_: relationship, repo type
 One repository's factory settings (its role, item source, show setting and labels), kept in that repository so everyone who onboards it gets the same setup.
 _Avoid_: onboarding config, project config, board config
 
+**Onboarding**:
+Setting up one repository for the factory: its T3 project, provider, item source, labels, domain docs and cleanup.
+_Avoid_: initialization, setup
+
 **Overlay**:
 The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.
@@ -234,7 +238,7 @@ _Avoid_: test board, dev board
 
 **Board app**:
 The installable desktop app that runs the board and updates itself from Releases.
-_Avoid_: Electron app, desktop board
+_Avoid_: Electron app, desktop board, dashboard
 
 **Title bar**:
 The bar at the top of the main area, in the board app and in a browser. It holds the scope, the Refreshed time and the counters. The brand sits in the sidebar's top row.
@@ -245,7 +249,7 @@ The resizable column on the left of the board, beside the main area. The brand s
 _Avoid_: drawer, nav, side panel
 
 **Provider**:
-The service that hosts a repository and its tickets: GitHub or Azure DevOps.
+The service that hosts a repository and its tickets: GitHub or Azure DevOps. A thread's agent runs on a provider instance instead (see Model choice).
 _Avoid_: platform, board provider, host
 
 **Item source**:

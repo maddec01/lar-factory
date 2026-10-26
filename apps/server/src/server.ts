@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { BoardData, Item, ModelGroup, ToolChecks } from '@lar-factory/shared';
+import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type ModelGroup, type ToolCheck, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { loadConfig } from './config/config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
@@ -123,7 +123,10 @@ function logTools(): void {
     const path = tools()?.[name].path;
     return path ? `${name} at ${path}` : missingTool(name);
   });
-  if (board.snapshot().tools?.gh.result === 'logged-out') lines.push('gh is logged out');
+  const gh = board.snapshot().tools?.gh.result;
+  if (gh === 'logged-out') lines.push('gh is logged out');
+  if (gh === 'outdated') lines.push(`gh is older than ${GH_FLOOR}`);
+  if (gh === 'no-project-scope') lines.push("gh can't read Projects");
   const message = lines.join('; ');
   if (message !== toolLog) log(message);
   toolLog = message;
@@ -145,7 +148,7 @@ function showToolChecks(checks: ToolChecks): void {
 async function recheckTools(rereadLoginPath = true): Promise<void> {
   while (checkingTools) await checkingTools;
   const { tools: before } = board.snapshot();
-  const ghBroken = !before || before.gh.result !== 'ok';
+  const ghBlocked = ghStopsRead(before?.gh);
   checkingTools = (async () => {
     await lookUpTools(process.env, rereadLoginPath);
     const { tools: checks, ghError } = await checkTools();
@@ -154,16 +157,21 @@ async function recheckTools(rereadLoginPath = true): Promise<void> {
   })().finally(() => { checkingTools = null; });
   await checkingTools;
   board.push();
-  if (ghBroken && board.snapshot().tools?.gh.result === 'ok') readSoon();
+  if (ghBlocked && !ghStopsRead(board.snapshot().tools?.gh)) readSoon();
+}
+
+/** Whether gh's check stops the read: it blocks every repository the board lists, or the Project when it lists none. */
+function ghStopsRead(check: ToolCheck | undefined): boolean {
+  const sources: ItemSource[] = config.repos.length ? config.repos.map(itemSource) : ['project'];
+  return sources.every((source) => ghBlocksRead(check, source));
 }
 
 /** Reads GitHub now; while a read runs this one is skipped, so two reads never run together. */
 async function refresh(): Promise<void> {
   if (refreshing) return;
   // Before the first tool check there's no gh to read with; that check starts the first read.
-  // A missing or logged-out gh has its own notice and retries; reading would only fail.
-  const { tools: found } = board.snapshot();
-  if (!found || found.gh.result !== 'ok') return;
+  // A gh that blocks the read has its own notice and retries; reading would only fail.
+  if (ghStopsRead(board.snapshot().tools?.gh)) return;
   refreshing = true;
   readAgain = false;
   let read = false;
@@ -181,9 +189,8 @@ async function refresh(): Promise<void> {
   } catch (err) {
     // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale.
     const gh = await probeGh();
-    const failed = gh.check.result !== 'ok';
-    if (failed) showToolChecks({ ...board.snapshot().tools!, gh: gh.check });
-    const error = failed ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
+    if (gh.check.result !== 'ok') showToolChecks({ ...board.snapshot().tools!, gh: gh.check });
+    const error = ghStopsRead(gh.check) ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
     board.update({ error });
     if (error) log(`refresh failed, serving data from ${board.snapshot().fetchedAt ?? 'never'}: ${error}`);
   } finally {

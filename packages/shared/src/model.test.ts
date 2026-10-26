@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -261,4 +261,18 @@ test('failedCheck gives a failed check, and nothing for one that passed or befor
   assert.deepEqual(failedCheck(tools, 'jq'), { result: 'missing', fix: 'brew install jq' });
   assert.equal(failedCheck(tools, 't3'), undefined);
   assert.equal(failedCheck(undefined, 'gh'), undefined);
+});
+
+test('gh blocks every read while missing or logged out, and only Project reads without the project scope', () => {
+  const fix = 'gh auth refresh -s project';
+  for (const source of ['project', 'issues'] as const) {
+    assert.equal(ghBlocksRead(undefined, source), true);
+    assert.equal(ghBlocksRead({ result: 'missing', fix: 'brew install gh' }, source), true);
+    assert.equal(ghBlocksRead({ result: 'logged-out', fix: 'gh auth login' }, source), true);
+    assert.equal(ghBlocksRead({ result: 'ok', scopes: 'unread' }, source), false);
+    assert.equal(ghBlocksRead({ result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' }, source), false);
+  }
+  assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'project'), true);
+  assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'issues'), false);
+  assert.equal(itemSource({ repo: 'maddec01/lar', platform: 'Apple', role: 'app' }), 'project');
 });

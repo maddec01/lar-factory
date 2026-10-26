@@ -4,8 +4,8 @@
 import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
-import type { CheckedTool, ToolCheck, ToolChecks } from '@lar-factory/shared';
-import { runTool } from './run-tool.ts';
+import { GH_FLOOR, type CheckedTool, type ToolCheck, type ToolChecks } from '@lar-factory/shared';
+import { type RunResult, runTool } from './run-tool.ts';
 
 export const TOOL_NAMES = ['t3', 'gh', 'az', 'git', 'jq', 'curl'] as const;
 export type ToolName = typeof TOOL_NAMES[number];
@@ -152,27 +152,58 @@ export interface GhProbe {
 
 const LOGGED_OUT = /not logged in|gh auth login/i;
 
+/** Whether `version` is older than GH_FLOOR; false when it isn't a version number. */
+function olderThanFloor(version: string | undefined): boolean {
+  const parts = version?.match(/^(\d+)\.(\d+)\.(\d+)/)?.slice(1).map(Number);
+  if (!parts) return false;
+  const floor = GH_FLOOR.split('.').map(Number);
+  const i = parts.findIndex((part, j) => part !== floor[j]);
+  return i !== -1 && parts[i]! < floor[i]!;
+}
+
 /**
- * Probes gh as T3 Code does: `gh --version`, then `gh auth status`, 5 s each. A timeout, or
- * an auth status failure that isn't a logout, returns gh's error for the Stale banner.
+ * The token's scopes from `gh auth status`, or null when the board can't read them: no scopes line
+ * (GH_TOKEN, a fine-grained token), a line naming none, or one line per account.
+ */
+function scopesOf(status: string): string[] | null {
+  const lines = status.match(/Token scopes:.*/g);
+  if (lines?.length !== 1) return null;
+  const scopes = [...lines[0]!.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
+  return scopes.length ? scopes : null;
+}
+
+/** What a logged-in gh's version and scopes say: a missing project scope first, as it blocks reading. */
+function loggedInCheck(version: string | undefined, scopes: string[] | null): ToolCheck {
+  if (scopes && !scopes.includes('project')) return { result: 'no-project-scope', ...(version && { version }), fix: 'gh auth refresh -s project' };
+  const unread = scopes ? {} : { scopes: 'unread' as const };
+  if (olderThanFloor(version)) return { result: 'outdated', version: version!, fix: 'brew upgrade gh', ...unread };
+  return { result: 'ok', ...(version && { version }), ...unread };
+}
+
+/**
+ * Probes gh as T3 Code does: `gh --version`, then `gh auth status`, 5 s each, reading the version and the
+ * token's scopes. A timeout, or an auth status failure that isn't a logout, returns gh's error for the Stale banner.
  */
 export async function probeGh(): Promise<GhProbe> {
   const command = toolCommand('gh');
   if (!command) return { check: missingCheck('gh') };
-  let version: string | undefined;
-  for (const args of [['--version'], ['auth', 'status']]) {
-    const { code, stdout, stderr, detail } = await runTool(command.file, args, { env: command.env, timeout: 5_000 });
-    if (code === 0 && args[0] === '--version') version = versionOf(stdout);
-    if (code === 0) continue;
-    // A spawn error: gh went away or can't run since the lookup.
+  const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 5_000 });
+  /** A failed run's probe: missing on a spawn error, which means gh went away or can't run since the lookup; else gh's error. */
+  const failed = ({ code, detail }: RunResult, args: string[], version?: string): GhProbe => {
     if (typeof code === 'string') return { check: missingCheck('gh') };
-    if (args[0] === 'auth' && typeof code === 'number' && LOGGED_OUT.test(stderr || stdout)) {
-      return { check: { result: 'logged-out', ...(version && { version }), fix: 'gh auth login' } };
-    }
     // No code means a signal, which here is the timeout.
     return { check: { result: 'ok', ...(version && { version }) }, error: `gh ${args.join(' ')} failed: ${code === null ? 'timed out after 5 s' : detail}` };
+  };
+  const versionRun = await run(['--version']);
+  if (versionRun.code !== 0) return failed(versionRun, ['--version']);
+  const version = versionOf(versionRun.stdout);
+  const status = await run(['auth', 'status']);
+  // Older gh prints the status to stderr.
+  if (status.code === 0) return { check: loggedInCheck(version, scopesOf(`${status.stdout}\n${status.stderr}`)) };
+  if (typeof status.code === 'number' && LOGGED_OUT.test(status.stderr || status.stdout)) {
+    return { check: { result: 'logged-out', ...(version && { version }), fix: 'gh auth login' } };
   }
-  return { check: { result: 'ok', ...(version && { version }) } };
+  return failed(status, ['auth', 'status'], version);
 }
 
 /** Checks every command the board needs from the last lookup, together; `ghError` is the gh probe's error for the Stale banner. */

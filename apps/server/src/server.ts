@@ -15,9 +15,10 @@ import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { onboardedSources, repoView } from './items/item-sources.ts';
 import { log } from './log.ts';
+import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
-import { projectChoices } from './onboarding/project-choices.ts';
+import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
 import { BOARD_PORTS, listenOnFreePort, reportListening } from './port/port.ts';
@@ -71,6 +72,11 @@ const items = onboardedSources(async () => {
   board.update({ repos: read.configs.map(repoView), repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list) });
   return read;
 });
+/** Each repository's .lar-factory.json answer for onboarding, kept until Recheck. */
+const configChecks = createConfigChecks();
+/** T3's projects as onboarding offers them, as the list is now. */
+const choices = () => projectChoices(onboarded(), configChecks.configOf);
+const offersUnavailable = flipLog("no onboarding offers: can't read T3 Code's projects", 'onboarding offers readable again');
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;
@@ -186,6 +192,8 @@ function showToolChecks(checks: ToolChecks): void {
  */
 async function recheckTools(rereadLoginPath = true): Promise<void> {
   while (checkingTools) await checkingTools;
+  // Recheck asks each repository for its .lar-factory.json again; the timed retry keeps the answers.
+  if (rereadLoginPath) configChecks.clear();
   const { tools: before } = board.snapshot();
   const ghBlocked = ghStopsRead(before?.gh);
   checkingTools = (async () => {
@@ -249,10 +257,23 @@ async function refresh(): Promise<void> {
     refreshing = false;
   }
   board.push();
+  // Repositories not answered yet take a gh call each, so the offers follow the read instead of holding it up.
+  void offerOnboarding().then(() => board.push());
   // PR edits take a gh call or two each, and a start runs t3; the board doesn't wait for them.
   if (read) void syncPrStats(board.snapshot().items);
   if (read) void startAfter.startUnblocked();
   if (readAgain) void refresh();
+}
+
+/** Offers to onboard each T3 project whose repository has .lar-factory.json and isn't on the list; none while T3's projects can't be read. */
+async function offerOnboarding(): Promise<void> {
+  try {
+    board.update({ onboardingOffers: onboardingOffers(await choices()) });
+    offersUnavailable(false);
+  } catch {
+    board.update({ onboardingOffers: [] });
+    offersUnavailable(true);
+  }
 }
 
 /** Reads GitHub now, or once more after the running read, so a change made during that read is read too. */
@@ -272,9 +293,9 @@ const startAfter = createStartAfter({ board, commands, offerModelChoices, file: 
   renamedId: items.renamedId });
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
-  recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: () => projectChoices(onboarded()),
+  recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
-  createProject: (input) => createProject(input, () => projectChoices(onboarded())),
+  createProject: (input) => createProject(input, choices),
 });
 
 /** Logs why the board can't start and exits. */

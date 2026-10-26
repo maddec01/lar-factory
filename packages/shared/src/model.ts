@@ -353,6 +353,8 @@ export interface BoardData {
   repositoryConfigProblems?: RepositoryConfigProblem[];
   /** The repositories on this Mac's list that are still onboarding, in the list's order. Absent in sample mode. */
   onboarding?: OnboardingRepository[];
+  /** A T3 project the board offers to onboard, as its repository has .lar-factory.json and isn't on the list. Absent in sample mode. */
+  onboardingOffers?: OnboardingOffer[];
   refreshSeconds: number;
   /** Time of the last successful read, or null if there has never been one. */
   fetchedAt: string | null;
@@ -671,6 +673,14 @@ export interface OnboardingProgress {
 export interface OnboardingRepository {
   repo: string;
   progress: OnboardingProgress;
+}
+
+/** A T3 project the board offers to onboard with the Repository config its repository has. */
+export interface OnboardingOffer {
+  projectId: string;
+  /** The T3 project's title. */
+  name: string;
+  repo: string;
 }
 
 /** A T3 project onboarding can offer, with what the T3 project step shows about its repository. */

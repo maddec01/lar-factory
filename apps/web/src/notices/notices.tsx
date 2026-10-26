@@ -1,4 +1,4 @@
-// What this page just did to an item, announced in a toast: added or moved with View item,
+// What this page just did to an item, announced in a toast: added, moved or kept with View item,
 // abandoned, started in T3, or a Queued card's action that failed.
 
 import { ref, workTitle, abandonPrompt } from '@lar-factory/shared';
@@ -12,6 +12,8 @@ import type { Toast } from './toasts.tsx';
 
 export type Notice =
   | { verb: 'Added' | 'Moved'; item: Item; to: Status }
+  /** Keep left the item carrying `status` alone. */
+  | { verb: 'Kept'; item: Item; status: Status }
   | { verb: 'Abandoned'; item: Item }
   /** A Queued card's Back to List (`to`) or Abandon (no `to`) failed. */
   | { verb: 'Failed'; item: Item; to?: Status; message: string }
@@ -27,6 +29,8 @@ function viewItem(itemId: string): void {
   clearToast(SLOT);
   useItemDialogStore.getState().open(itemId);
 }
+
+const viewButton = (item: Item) => <Button variant="outline" size="xs" className="view-item" onClick={() => viewItem(item.id)}>View item</Button>;
 
 function toastOf(notice: Notice): Toast {
   const { item } = notice;
@@ -49,10 +53,15 @@ function toastOf(notice: Notice): Toast {
         body: <>Started T3 thread{title !== workTitle(item) && <> <b>{title}</b></>} <code className="thread-id">{threadId}</code> for <TitleLink item={item} />.</>,
       };
     }
+    case 'Kept':
+      return {
+        slot: SLOT, what: `Kept ${notice.status} on ${ref(item)}`,
+        body: <>Kept {notice.status} on <TitleLink item={item} />. {viewButton(item)}</>,
+      };
     default:
       return {
         slot: SLOT, what: `${notice.verb} ${ref(item)}`,
-        body: <>{notice.verb} <TitleLink item={item} /> to {notice.to}. <Button variant="outline" size="xs" className="view-item" onClick={() => viewItem(item.id)}>View item</Button></>,
+        body: <>{notice.verb} <TitleLink item={item} /> to {notice.to}. {viewButton(item)}</>,
       };
   }
 }

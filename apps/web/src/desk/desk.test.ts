@@ -62,6 +62,11 @@ test('a Ready card with a thread at work on it has Open thread alone, not a seco
   expect(controls('I_sample13')).toEqual(['Open thread']);
 });
 
+test('a Ready card for an issue that also carries Verify offers neither Start build nor Start after until one is kept', async () => {
+  await mountPage(withItem('I_sample13', { statuses: ['Ready', 'Verify'] }));
+  expect(controls('I_sample13')).toEqual(['Open thread']);
+});
+
 test('Open thread opens the latest thread in T3, and Open PR the pull request the item dialog links, in a new tab', async () => {
   await mountPage();
   expect(card('I_sample12').querySelector('[data-open-thread]')!.getAttribute('href')).toMatch(/^t3code:\/\//);

@@ -1,7 +1,7 @@
-# Pedro merges every PR
+# The user merges every PR
 
 The factory's [recorded agreement](../plan.md#what-we-agreed) and current
-[AGENTS.md](../../AGENTS.md) reserve every PR merge for Pedro; agents push
+[AGENTS.md](../../AGENTS.md) reserve every PR merge for the user; agents push
 branches and open PRs, never push to `main` or merge.
 This preserves the [stated division of responsibility](../../README.md): a
 person decides and merges, while agents do the rest.

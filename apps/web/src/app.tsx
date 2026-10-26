@@ -1,9 +1,10 @@
 // The page, the control room: the window controls, the sidebar with the List, and the main area with the title bar,
 // the banners, Your desk and the line, scoped to the repository the sidebar picked. While no t3 is found, the notice
-// replaces the main area's content and the sidebar shows only its brand and Settings. Settings takes the main area's
+// replaces the main area's content and the sidebar shows only its brand and Settings; while no repository is
+// onboarded, the empty state offering onboarding replaces it. Settings takes the main area's
 // place, hiding the board rather than closing it, so Back finds it as it was.
 
-import { boardSections, failedCheck, repoKey, sameRepo } from '@lar-factory/shared';
+import { boardSections, failedCheck, noneOnboarded, repoKey, sameRepo } from '@lar-factory/shared';
 import { useBoardStore } from './board/board-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
@@ -13,6 +14,8 @@ import { Line } from './line/line.tsx';
 import { Banners } from './notices/banners.tsx';
 import { Toasts } from './notices/toasts.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
+import { EmptyState } from './onboarding/empty-state.tsx';
+import { WizardDialog } from './onboarding/wizard-dialog.tsx';
 import { SettingsMain } from './settings/settings.tsx';
 import { useSettingsStore } from './settings/settings-store.ts';
 import { SidebarLayout } from './sidebar/sidebar.tsx';
@@ -39,12 +42,13 @@ export function App() {
   // T3 Code not running is a banner; only a missing t3 replaces the main area.
   const missing = t3?.result === 'missing' ? t3 : undefined;
   const settings = useSettingsStore((state) => state.open);
+  const empty = useBoardStore((state) => noneOnboarded(state.data));
   return (
     <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)" board={!missing}>
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="contents" hidden={settings}>
           <TitleBar />
-          {missing ? <T3Missing check={missing} /> : <Content />}
+          {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
         </div>
         {settings && <SettingsMain />}
       </main>
@@ -53,6 +57,7 @@ export function App() {
       <Toasts />
       <ItemDialog />
       <AbandonDialog />
+      <WizardDialog />
     </SidebarLayout>
   );
 }

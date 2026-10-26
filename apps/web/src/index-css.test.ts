@@ -21,3 +21,15 @@ test("the board's focus outline sits in the base layer, so a T3 control's outlin
 test("the board's link rules sit in the base layer, so a link styled as a button keeps its button's colours", () => {
   expect(baseLayer()).toMatch(/^\s*a \{ color: inherit;/m);
 });
+
+// A feature folder with no sheet of its own has no page class names, so its class names are all Tailwind utilities.
+const sources = [...rules('index.css').matchAll(/^@source "\.\/(.+)";$/gm)].map((m) => m[1]);
+const folders = readdirSync(src, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+const utilityFiles = folders
+  .filter((folder) => !readdirSync(src + folder).some((name) => name.endsWith('.css')))
+  .flatMap((folder) => readdirSync(src + folder).filter((name) => name.endsWith('.tsx')).map((name) => `${folder}/${name}`))
+  .filter((path) => readFileSync(src + path, 'utf8').includes('className="'));
+
+test.each(utilityFiles)('Tailwind scans %s, a file in a folder with no sheet of its own', (path) => {
+  expect(sources.some((source) => source === path || source === path.split('/')[0])).toBe(true);
+});

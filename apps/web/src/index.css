@@ -12,6 +12,7 @@
    would otherwise turn on Tailwind utilities of the same name. Add a file when it starts using utilities. */
 @source "./add-item/add-item.tsx";
 @source "./app.tsx";
+@source "./copy/copy-button.tsx";
 @source "./desk";
 @source "./item-dialog";
 @source "./items/item-parts.tsx";
@@ -20,6 +21,7 @@
 @source "./items/start-control.tsx";
 @source "./items/status-glyph.tsx";
 @source "./line";
+@source "./onboarding";
 @source "./notices/banner.tsx";
 @source "./notices/banners.tsx";
 @source "./notices/form-result.tsx";

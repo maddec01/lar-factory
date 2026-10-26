@@ -6,10 +6,9 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
-import { boardSections, noneOnboarded, ref, shortAgo } from '@lar-factory/shared';
+import { boardSections, ref, shortAgo } from '@lar-factory/shared';
 import type { Item, ListGroup } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
-import { AddingARepository } from '../notices/adding-a-repository.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
@@ -77,7 +76,6 @@ export function ListGroups({ query: q }: { query: string }) {
   return (
     <nav className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-2 pb-3 pt-1" aria-label="List">
       {groups.map((group) => <Group key={group.repo} {...group} tone={repoTone(group.repo, data.repos)} now={now} q={q} />)}
-      {noneOnboarded(data) && !q && <p className="list-empty m-0 px-2 text-[13px] text-(--sidebar-muted-foreground)">No repository is onboarded. <AddingARepository /></p>}
       {q && !groups.length && <p className="m-0 px-2 text-[13px] text-(--sidebar-muted-foreground)">Nothing in List matches.</p>}
     </nav>
   );

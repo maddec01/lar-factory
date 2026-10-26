@@ -128,7 +128,7 @@ interface WizardState {
   runAgent: () => void;
   openPr: () => void;
   merge: () => void;
-  reset: (repo: string, alsoPr: boolean) => void;
+  reset: (repo: string) => void;
 }
 
 const setParam = (key: string, value: string | null) => {

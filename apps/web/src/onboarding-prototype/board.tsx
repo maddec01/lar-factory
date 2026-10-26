@@ -3,6 +3,7 @@
 // config, the repository rows with Reset, and the floating variant switcher.
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, FileText, FolderGit2, Play, Plus, RotateCcw } from 'lucide-react';
 import {
   AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
@@ -11,7 +12,6 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/u
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { Card } from '@lar-factory/ui/card';
-import { Checkbox } from '@lar-factory/ui/checkbox';
 import { BrandMark } from '../brand/brand-mark.tsx';
 import { T3_PROJECTS, repoOf } from './mock.ts';
 import { stepSummary } from './steps.tsx';
@@ -77,26 +77,23 @@ export function EmptyState() {
 
 function ResetDialog({ repo, onClose }: { repo: string | null; onClose: () => void }) {
   const reset = useWizardStore((s) => s.reset);
-  const [alsoPr, setAlsoPr] = useState(false);
   return (
     <AlertDialog open={!!repo} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>Reset {repo}?</AlertDialogTitle>
           <AlertDialogDescription render={<div />} className="grid gap-2">
-            <span>Resetting removes:</span>
+            <span>Resetting:</span>
             <ul className="m-0 grid list-disc gap-0.5 ps-5">
-              <li>{repo} from this Mac’s list of onboarded repositories, so the board stops showing its items</li>
-              <li>an onboarding still waiting for its PR, with its Resume</li>
+              <li>drops {repo} from this Mac’s list of onboarded repositories, so the board stops showing its items, and drops an onboarding still waiting for its PR, with its Resume</li>
+              <li>opens a PR removing <code>.lar-factory.json</code>, the <code>## Agent skills</code> block and <code>docs/agents/</code>. Others who onboarded it lose its Repository config once it merges.</li>
             </ul>
-            <span>It leaves alone the T3 project, the labels and statuses on its items, and the repository’s files.</span>
-            <label className="flex items-start gap-2 text-foreground"><Checkbox checked={alsoPr} onCheckedChange={setAlsoPr} className="mt-0.5" />
-              <span>Also open a PR removing <code>.lar-factory.json</code>, the <code>## Agent skills</code> block and <code>docs/agents/</code>. Others who onboarded it lose its Repository config too.</span></label>
+            <span>It leaves alone the T3 project and the labels and statuses on its items.</span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogClose render={<Button variant="outline" size="xs" />}>Cancel</AlertDialogClose>
-          <Button variant="destructive" size="xs" onClick={() => { if (repo) reset(repo, alsoPr); setAlsoPr(false); onClose(); }}>Reset</Button>
+          <Button variant="destructive" size="xs" onClick={() => { if (repo) reset(repo); onClose(); }}>Reset</Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
@@ -147,7 +144,8 @@ export function PrototypeSwitcher() {
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
   });
-  return (
+  // In body, outside the sidebar wrapper's stacking context, so it sits above a dialog's viewport too.
+  return createPortal(
     <div className="fixed bottom-4 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-1 rounded-full bg-neutral-900 px-1.5 py-1 text-xs text-white shadow-lg ring-1 ring-white/20">
       <button type="button" aria-label="Previous variant" className="grid size-7 place-items-center rounded-full hover:bg-white/15" onClick={() => go(-1)}><ChevronLeft className="size-4" /></button>
       <span className="min-w-32 text-center font-medium">{variant} ({VARIANTS[i]!.name})</span>
@@ -156,6 +154,7 @@ export function PrototypeSwitcher() {
       <label className="flex cursor-pointer items-center gap-1.5 rounded-full px-2 py-1 hover:bg-white/15">
         <input type="checkbox" checked={empty} onChange={(e) => setEmpty(e.target.checked)} /> Empty board
       </label>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -24,6 +24,7 @@
 @source "./notices/banners.tsx";
 @source "./notices/form-result.tsx";
 @source "./notices/toasts.tsx";
+@source "./onboarding-prototype";
 @source "./settings";
 @source "./sidebar";
 @source "./title-bar";

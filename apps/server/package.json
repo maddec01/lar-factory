@@ -2,7 +2,7 @@
   "name": "@lar-factory/server",
   "private": true,
   "version": "0.1.0",
-  "description": "Local board for the lar factory: reads the lar GitHub Project through gh and shows it as a board.",
+  "description": "Local board for Lar Factory: reads the lar GitHub Project through gh and shows it as a board.",
   "type": "module",
   "scripts": {
     "build:web": "pnpm --dir ../web run build",

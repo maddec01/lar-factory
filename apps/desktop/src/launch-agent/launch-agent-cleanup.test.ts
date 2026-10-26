@@ -13,7 +13,7 @@ const makeHome = (withAgent: boolean) => {
   const home = tempDir("launch-agent-home-");
   const checkout = NodePath.join(home, "Code/lar-factory");
   NodeFS.mkdirSync(checkout, { recursive: true });
-  NodeFS.writeFileSync(NodePath.join(checkout, "README.md"), "# lar factory\n");
+  NodeFS.writeFileSync(NodePath.join(checkout, "README.md"), "# Lar Factory\n");
   if (withAgent) {
     NodeFS.mkdirSync(NodePath.dirname(LaunchAgentCleanup.plistPath(home)), { recursive: true });
     NodeFS.writeFileSync(LaunchAgentCleanup.plistPath(home), `<plist><string>${checkout}</string></plist>\n`);

@@ -72,13 +72,13 @@ function updateRows({ app, version }: PagesInput): Row[] {
   if (!app) {
     return [
       { ...channel, control: { type: 'segmented', options: ['Nightly', 'Latest'], value: 'Nightly' }, reason: ONLY_APP_UPDATES },
-      { id: 'version', title: 'lar Factory 0.1.0-nightly.42', description: 'Up to date · checked 3 minutes ago', control: { type: 'button', label: 'Check now' }, reason: ONLY_APP_UPDATES },
+      { id: 'version', title: 'Lar Factory 0.1.0-nightly.42', description: 'Up to date · checked 3 minutes ago', control: { type: 'button', label: 'Check now' }, reason: ONLY_APP_UPDATES },
       install,
     ];
   }
   return [
     { ...channel, control: custom(() => <ChannelChoice />) },
-    { id: 'version', title: version ? `lar Factory ${version}` : 'lar Factory', description: <UpdateStatus />, control: custom(() => <CheckNow />) },
+    { id: 'version', title: version ? `Lar Factory ${version}` : 'Lar Factory', description: <UpdateStatus />, control: custom(() => <CheckNow />) },
     install,
   ];
 }

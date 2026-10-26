@@ -117,7 +117,7 @@ export function TitleBar() {
       {!data.tools?.t3 && (
         <>
           {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. */}
-          <h1 className="sr-only">lar Factory</h1>
+          <h1 className="sr-only">Lar Factory</h1>
           <Scope />
           <Refreshed data={data} />
           <div className="flex min-w-0 flex-1 items-center justify-center"><Counters /></div>

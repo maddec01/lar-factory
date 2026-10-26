@@ -70,10 +70,10 @@ describe("createBuildConfig", () => {
     expect(config.files).toContain("!dist-electron/server/**/*");
   });
 
-  it("names the app lar Factory, keeps its release files and appId ASCII, and uses the lar Factory icon", () => {
+  it("names the app Lar Factory, keeps its release files and appId ASCII, and uses the Lar Factory icon", () => {
     const config = createBuildConfig({ version: "0.1.0", signed: false, outputDir: "/out" });
 
-    expect(config.productName).toBe("lar Factory");
+    expect(config.productName).toBe("Lar Factory");
     expect(config.artifactName).toBe("lar-factory-${version}-${arch}.${ext}");
     expect(config.appId).toBe("com.pedrogomes.lar.factory");
     expect(config.mac?.icon).toBe("resources/icon.icns");

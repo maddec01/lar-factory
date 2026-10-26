@@ -27,7 +27,7 @@ async function armableBoard(t: TestContext, items: RawItem[], options: object = 
 
 const arm = (board: Board, itemId: string, model?: unknown) => board.postSession({ itemId, model }, '/api/arm');
 const disarm = (board: Board, itemId: string) => board.postSession({ itemId }, '/api/disarm');
-const armedFile = (home: string) => JSON.parse(readFileSync(join(home, 'Library/Application Support/lar Factory/armed-starts.json'), 'utf8'));
+const armedFile = (home: string) => JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/armed-starts.json'), 'utf8'));
 
 /** Asks for a read and waits until it lands. */
 async function read(board: Board): Promise<BoardData> {

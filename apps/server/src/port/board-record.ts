@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 /** The board server's data folder, which holds its board records and its armed starts. */
 export function boardDataDir(home = process.env.HOME || homedir()): string {
-  return join(home, 'Library/Application Support/lar Factory');
+  return join(home, 'Library/Application Support/Lar Factory');
 }
 
 /** Records this process's board on `port` and returns a function that removes the record. The folder holds one

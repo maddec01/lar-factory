@@ -15,9 +15,9 @@ test('the first paint shows the board data the server put in the page, with no f
   expect($('#board-data')).not.toBeNull();
 });
 
-test('the tab shows "lar Factory" and the logo as its icon', async () => {
+test('the tab shows "Lar Factory" and the logo as its icon', async () => {
   await mountPage(fresh);
-  expect(document.title).toBe('lar Factory');
+  expect(document.title).toBe('Lar Factory');
   const icon = decodeURIComponent($<HTMLLinkElement>('link[rel="icon"]')!.getAttribute('href')!);
   expect(icon).toMatch(/^data:image\/svg\+xml,<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 100 100"/);
   expect(icon).toContain(`d="${BRAND_MARK_L}"`);

@@ -262,7 +262,7 @@ function readManifest(path: string): Manifest | null {
   try { manifest = JSON.parse(readFileSync(path, 'utf8')) as Manifest; }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw new InstallError(`Couldn't read ${path}: ${(error as Error).message}. Delete that file and start lar Factory again.`, false, { cause: error });
+    throw new InstallError(`Couldn't read ${path}: ${(error as Error).message}. Delete that file and start Lar Factory again.`, false, { cause: error });
   }
   const profiles = isRecord(manifest.profiles) ? Object.fromEntries(Object.entries<unknown>(manifest.profiles)
     .filter((entry): entry is [string, Record<string, unknown>] => isProfileName(entry[0]) && isRecord(entry[1]))

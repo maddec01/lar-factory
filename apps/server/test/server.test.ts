@@ -391,7 +391,7 @@ test('BOARD_PORT on a taken port exits with a log line', async (t) => {
 test('a live board records its port for status.sh and removes the record on exit; a sample board records nothing', async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'lar-records-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
-  const records = join(home, 'Library/Application Support/lar Factory/boards');
+  const records = join(home, 'Library/Application Support/Lar Factory/boards');
   const sample = await startBoard(t, {}, true, false, { HOME: home });
   const board = await startBoard(t, {}, false, false, { HOME: home });
   assert.deepEqual(readdirSync(records), [`${board.pid}.json`]);

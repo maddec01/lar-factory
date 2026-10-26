@@ -3,7 +3,7 @@
 // replaces the main area's content and the sidebar shows only its brand and Settings. Settings takes the main area's
 // place, hiding the board rather than closing it, so Back finds it as it was.
 
-import { boardSections, platformOf } from '@lar-factory/shared';
+import { boardSections, failedCheck, platformOf } from '@lar-factory/shared';
 import { useBoardStore } from './board/board-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
@@ -35,14 +35,14 @@ function Content() {
 }
 
 export function App() {
-  const t3 = useBoardStore((state) => state.data.tools?.t3);
+  const t3 = useBoardStore((state) => failedCheck(state.data.tools, 't3'));
   const settings = useSettingsStore((state) => state.open);
   return (
     <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)" board={!t3}>
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="contents" hidden={settings}>
           <TitleBar />
-          {t3 ? <T3Missing problem={t3} /> : <Content />}
+          {t3 ? <T3Missing check={t3} /> : <Content />}
         </div>
         {settings && <SettingsMain />}
       </main>

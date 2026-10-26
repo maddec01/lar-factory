@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
+import type { BoardData, Item, ModelGroup, ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { loadConfig } from './config/config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
@@ -24,7 +24,7 @@ import { loadModelChoices } from './t3/model-choices.ts';
 import { repositoryProjectHints } from './t3/repository-project.ts';
 import { loadT3Reads } from './t3/t3-reads.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
-import { TOOL_NAMES, lookUpTools, lookupProblem, missingTool, probeGh, tools } from './tools/tools.ts';
+import { TOOL_NAMES, checkTools, lookUpTools, missingTool, probeGh, tools } from './tools/tools.ts';
 
 const HOST = '127.0.0.1';
 const config = loadConfig();
@@ -123,39 +123,38 @@ function logTools(): void {
     const path = tools()?.[name].path;
     return path ? `${name} at ${path}` : missingTool(name);
   });
-  if (board.snapshot().tools?.gh?.problem === 'logged-out') lines.push('gh is logged out');
+  if (board.snapshot().tools?.gh.result === 'logged-out') lines.push('gh is logged out');
   const message = lines.join('; ');
   if (message !== toolLog) log(message);
   toolLog = message;
 }
 
-/** Shows a gh problem in place of reading GitHub, and looks again in TOOL_RETRY_MS. */
-function showToolProblems(problems: BoardData['tools']): void {
-  board.update({ tools: problems });
+/** Shows the checks, whose failures have notices, and looks again in TOOL_RETRY_MS while one fails. */
+function showToolChecks(checks: ToolChecks): void {
+  board.update({ tools: checks });
   logTools();
   clearTimeout(toolRetry);
-  if (problems?.t3 || problems?.gh) toolRetry = setTimeout(() => void recheckTools(false), TOOL_RETRY_MS);
+  if (Object.values(checks).some((check) => check.result !== 'ok')) toolRetry = setTimeout(() => void recheckTools(false), TOOL_RETRY_MS);
 }
 
 /**
- * Looks t3, gh and az up again and probes gh, then reads GitHub if gh works now and didn't before.
+ * Looks every tool up again and checks each command, then reads GitHub if gh works now and didn't before.
  * Startup and Recheck reread the login shell PATH; the timed retry passes false to keep the last one.
  * A check asked for during a running one waits for it, then runs.
  */
 async function recheckTools(rereadLoginPath = true): Promise<void> {
   while (checkingTools) await checkingTools;
   const { tools: before } = board.snapshot();
-  const ghBroken = !before || Boolean(before.gh);
+  const ghBroken = !before || before.gh.result !== 'ok';
   checkingTools = (async () => {
     await lookUpTools(process.env, rereadLoginPath);
-    const gh = await probeGh();
-    const t3 = lookupProblem('t3');
-    showToolProblems({ ...(t3 ? { t3 } : {}), ...(gh.problem ? { gh: gh.problem } : {}) });
-    if (gh.error) log(`gh probe failed: ${gh.error}`);
+    const { tools: checks, ghError } = await checkTools();
+    showToolChecks(checks);
+    if (ghError) log(`gh probe failed: ${ghError}`);
   })().finally(() => { checkingTools = null; });
   await checkingTools;
   board.push();
-  if (ghBroken && !board.snapshot().tools?.gh) readSoon();
+  if (ghBroken && board.snapshot().tools?.gh.result === 'ok') readSoon();
 }
 
 /** Reads GitHub now; while a read runs this one is skipped, so two reads never run together. */
@@ -164,7 +163,7 @@ async function refresh(): Promise<void> {
   // Before the first tool check there's no gh to read with; that check starts the first read.
   // A missing or logged-out gh has its own notice and retries; reading would only fail.
   const { tools: found } = board.snapshot();
-  if (!found || found.gh) return;
+  if (!found || found.gh.result !== 'ok') return;
   refreshing = true;
   readAgain = false;
   let read = false;
@@ -182,8 +181,9 @@ async function refresh(): Promise<void> {
   } catch (err) {
     // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale.
     const gh = await probeGh();
-    if (gh.problem) showToolProblems({ ...board.snapshot().tools, gh: gh.problem });
-    const error = gh.problem ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
+    const failed = gh.check.result !== 'ok';
+    if (failed) showToolChecks({ ...board.snapshot().tools!, gh: gh.check });
+    const error = failed ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
     board.update({ error });
     if (error) log(`refresh failed, serving data from ${board.snapshot().fetchedAt ?? 'never'}: ${error}`);
   } finally {

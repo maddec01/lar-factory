@@ -3,7 +3,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { clock } from '@lar-factory/shared';
-import { $, $$, NOW, mountPage, push, sample, settle, stubApp, text } from '../../test/support.ts';
+import { $, $$, NOW, mountPage, push, sample, settle, stubApp, text, toolChecks } from '../../test/support.ts';
 
 const titleBar = () => $<HTMLElement>('.title-bar')!;
 const scopeButton = (platform: string) => $<HTMLButtonElement>(`.list-group[data-platform="${platform}"] button.scope`)!;
@@ -203,7 +203,7 @@ test('the first read of a page that had none pings, a failed read does not', asy
 
 test('above the missing-t3 notice the bar is empty, and the sidebar keeps the brand and Settings, which opens', async () => {
   stubApp({ listProfiles: vi.fn(async () => ({ profiles: [{ name: '.claude', ticked: true }], installed: true, conflicts: [] })) });
-  await mountPage({ ...sample, tools: { t3: { problem: 'missing' } } });
+  await mountPage({ ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
   expect(titleBar().children).toHaveLength(0);
   expect($('.sidebar .brand')).not.toBeNull();
   expect($('.sidebar input[type="search"]'), 'no List to search').toBeNull();
@@ -217,6 +217,6 @@ test('above the missing-t3 notice the bar is empty, and the sidebar keeps the br
 });
 
 test('in a browser, the missing-t3 notice\'s sidebar foot holds only Settings', async () => {
-  await mountPage({ ...sample, tools: { t3: { problem: 'missing' } } });
+  await mountPage({ ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
   expect($$('.sidebar-foot button').map((b) => b.getAttribute('aria-label'))).toEqual(['Settings']);
 });

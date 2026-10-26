@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, kindOf, openBlockers, repositoryProjectHint, sliceProgress, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { formatTokens, formatUsd, shortAgo } from './format.ts';
@@ -252,4 +252,13 @@ test('canAbandon takes List and Queued issues and drafts, never pull requests or
 test('a thread link is T3 Code\'s threads deep link, each id one path segment', () => {
   assert.equal(threadLink('5e-8c5a', 'thread-1'), 't3code://threads/5e-8c5a/thread-1');
   assert.equal(threadLink('env', 'a/b c'), 't3code://threads/env/a%2Fb%20c');
+});
+
+test('failedCheck gives a failed check, and nothing for one that passed or before the first check', () => {
+  const ok = { result: 'ok' } as const;
+  const tools = { gh: { result: 'logged-out', fix: 'gh auth login' }, t3: { result: 'ok', version: '0.1.3' }, git: ok, jq: { result: 'missing', fix: 'brew install jq' }, curl: ok } as const;
+  assert.deepEqual(failedCheck(tools, 'gh'), { result: 'logged-out', fix: 'gh auth login' });
+  assert.deepEqual(failedCheck(tools, 'jq'), { result: 'missing', fix: 'brew install jq' });
+  assert.equal(failedCheck(tools, 't3'), undefined);
+  assert.equal(failedCheck(undefined, 'gh'), undefined);
 });

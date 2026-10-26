@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { boardSections, clock, isStale, shortAgo, slug } from '@lar-factory/shared';
+import { boardSections, clock, failedCheck, isStale, shortAgo, slug } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Menu, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuSeparator, MenuTrigger } from '@lar-factory/ui/menu';
@@ -114,7 +114,7 @@ export function TitleBar() {
   const inset = useTitlebarInset();
   return (
     <header className={`title-bar flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-3 ${inset} [-webkit-app-region:drag]`}>
-      {!data.tools?.t3 && (
+      {!failedCheck(data.tools, 't3') && (
         <>
           {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. */}
           <h1 className="sr-only">Lar Factory</h1>

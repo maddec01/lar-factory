@@ -56,9 +56,14 @@ export interface Creating {
   error: string | null;
 }
 
-/** Why a T3 project can't be picked, or null when it can. The repository a resumed run was kept under stays pickable. */
-export function unpickable(project: ProjectChoice, run: Run): string | null {
-  if (project.onBoard && !(project.repo && run.savedAs && sameRepo(project.repo, run.savedAs))) return 'Its repository is on the board already.';
+/**
+ * Why a T3 project can't be picked, or null when it can. The repository a resumed run was kept under stays pickable;
+ * another one still onboarding is resumed from its own Resume.
+ */
+export function unpickable(project: ProjectChoice, run: Run, data: Pick<BoardData, 'onboarding'> = useBoardStore.getState().data): string | null {
+  if (project.onBoard && !(project.repo && run.savedAs && sameRepo(project.repo, run.savedAs))) {
+    return isOnboarding(data, project.repo) ? 'It’s onboarding already: close this and press its Resume.' : 'Its repository is on the board already.';
+  }
   if (!project.repo) return 'Its folder is no main checkout with a GitHub or Azure DevOps origin.';
   return null;
 }

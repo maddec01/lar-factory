@@ -3,7 +3,7 @@
 
 import { useId, useState, type ReactNode } from 'react';
 import { Check, CircleAlert, FolderPlus, GitPullRequest, Info, LoaderCircle, RotateCw, X } from 'lucide-react';
-import { SETUP_CHECKS, onboardingConfigFile, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting } from '@lar-factory/shared';
+import { SETUP_CHECKS, isOnboarding, onboardingConfigFile, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
@@ -114,19 +114,21 @@ function NewProject({ creating }: { creating: Creating }) {
 
 function ProjectStep({ run }: { run: Run }) {
   const { projects, creating, pick, chooseNew } = useWizardStore();
+  const onboarding = useBoardStore((s) => s.data.onboarding);
   if (projects.state !== 'loaded') return <ProjectsPending />;
   return (
     <Group legend="T3 project" hint="Its threads run in this T3 project, whose folder is the repository’s main checkout.">
       {projects.projects.length === 0 && <p className="m-0 text-sm text-muted-foreground">T3 Code has no project yet.</p>}
       <RadioGroup value={run.projectId ?? (creating ? 'new' : '')} onValueChange={(id) => (id === 'new' ? chooseNew() : pick(id as string))} className="gap-2">
         {projects.projects.map((p) => {
-          const reason = unpickable(p, run);
+          const reason = unpickable(p, run, { onboarding });
+          const kept = p.onBoard && isOnboarding({ onboarding }, p.repo);
           return (
             <Choice key={p.id} value={p.id} disabled={!!reason} title={<span className="flex flex-wrap items-center gap-2">{p.name}
               {p.provider && <Badge variant="outline" size="sm">{p.provider}</Badge>}
               <ConfigBadge project={p} />
-              {p.onBoard && <Badge variant="secondary" size="sm">on the board</Badge>}</span>}>
-              <span className="font-mono">{p.folder}</span>{p.repo ? ` · ${p.repo}` : ` · ${reason}`}
+              {p.onBoard && <Badge variant="secondary" size="sm">{kept ? 'onboarding' : 'on the board'}</Badge>}</span>}>
+              <span className="font-mono">{p.folder}</span>{p.repo ? ` · ${p.repo}` : ` · ${reason}`}{p.repo && kept && reason && ` · ${reason}`}
             </Choice>
           );
         })}

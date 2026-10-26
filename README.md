@@ -98,11 +98,12 @@ through a long conversation, and subagents return summaries instead of files.
 
 Install the board app from
 [GitHub Releases](https://github.com/maddec01/lar-factory/releases): download the
-newest Release's dmg and drag Lar Factory into Applications. On the first launch of
-each new version the app installs every skill and the shared checklists from
-`references/` into `~/.agents`, and links them into the Claude profiles ticked in its
-Settings (`~/.claude` and each `~/.claude-*`). The copied skills' `../../references/`
-links point at those checklists.
+newest Release's dmg and drag Lar Factory into Applications. The app installs every
+skill and the shared checklists from `references/` into `~/.agents`, and links them
+into the Claude profiles ticked in its Settings (`~/.claude` and each `~/.claude-*`).
+The copied skills' `../../references/` links point at those checklists. On every
+launch it compares the installed copies with its own and overwrites any that
+differ, so an edit to an installed skill is lost at the next launch.
 
 If you run `npx skills add` yourself, always pass `-a`: `-y` without it installs into
 every agent the CLI knows.
@@ -166,9 +167,10 @@ the build signs and notarizes, and fails unless `CSC_LINK`, `CSC_KEY_PASSWORD`,
 
 The app's build copies `skills/` and `references/` into `apps/desktop/dist-electron/bundle`,
 which packaging puts in the app's `Resources/bundle`.
-A packaged app installs them into `~/.agents` and the ticked Claude profiles on the
-first launch of each new version, after its window opens, and shows a dialog for
-an error or a conflict. A run from a checkout installs only with `--install-skills`,
+A packaged app installs them into `~/.agents` and the ticked Claude profiles on every
+launch, after its window opens, and writes only the skills, links and checklists that
+differ from the bundle. It shows a dialog for an error, and for a conflict on the
+first launch of each version. A run from a checkout installs only with `--install-skills`,
 and `LAR_FACTORY_INSTALL_ROOT` puts the install in another folder instead of your
 home. From the repo root:
 

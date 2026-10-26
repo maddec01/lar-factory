@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
-import { findTools, mergePaths, readLoginPath } from './tools.ts';
+import { TOOL_NAMES, checkTools, findTools, lookUpTools, mergePaths, readLoginPath, versionOf } from './tools.ts';
 
 /** A temp folder with `bin` holding runnable files of the given names, and a login shell whose PATH starts with `bin`. */
 async function machine(t: TestContext, names: string[]) {
@@ -66,6 +66,49 @@ test('a missing az is reported as missing and the other tools are still found', 
   assert.deepEqual(tools.az, { path: null });
   assert.deepEqual(tools.t3, { path: join(bin, 't3') });
   assert.deepEqual(tools.gh, { path: join(bin, 'gh') });
+});
+
+test('git, jq and curl are looked up like gh, each with its own override', async (t) => {
+  assert.deepEqual(TOOL_NAMES, ['t3', 'gh', 'az', 'git', 'jq', 'curl']);
+  const { dir, bin } = await machine(t, ['git', 'jq', 'curl', 'my-jq']);
+  const found = findTools({ PATH: bin }, null, []);
+  assert.deepEqual([found.git, found.jq, found.curl], [{ path: join(bin, 'git') }, { path: join(bin, 'jq') }, { path: join(bin, 'curl') }]);
+  const overridden = findTools({ PATH: bin, GIT_PATH: join(dir, 'nowhere/git'), JQ_PATH: 'my-jq', CURL_PATH: 'absent-curl' }, null, []);
+  assert.deepEqual(overridden.git, { path: null, override: `GIT_PATH=${join(dir, 'nowhere/git')}` });
+  assert.deepEqual(overridden.jq, { path: join(bin, 'my-jq') });
+  assert.deepEqual(overridden.curl, { path: null, override: 'CURL_PATH=absent-curl' });
+});
+
+test('a version is the first version number on the first line, else that line', () => {
+  assert.equal(versionOf('t3 v0.1.3-nightly.20261025.3655\n'), '0.1.3-nightly.20261025.3655');
+  assert.equal(versionOf('gh version 2.102.0 (2026-09-30)\nhttps://github.com/cli/cli/releases/tag/v2.102.0\n'), '2.102.0');
+  assert.equal(versionOf('jq-1.7.1-apple\n'), '1.7.1-apple');
+  assert.equal(versionOf('curl 8.7.1 (x86_64-apple-darwin26.0) libcurl/8.7.1\nRelease-Date: 2024-03-27\n'), '8.7.1');
+  assert.equal(versionOf('nightly build\n'), 'nightly build');
+  assert.equal(versionOf(''), undefined);
+});
+
+test('the checks report each command: its version, missing with the override and fix, or a logged-out gh', async (t) => {
+  const { dir, bin, shell } = await machine(t, []);
+  const script = async (name: string, body: string) => {
+    await writeFile(join(bin, name), `#!/bin/sh\n${body}\n`);
+    await chmod(join(bin, name), 0o755);
+  };
+  await script('t3', 'echo t3 v0.1.3-nightly.1');
+  await script('gh', '[ "$1" = --version ] && echo "gh version 2.96.1 (2026-08-01)" && exit 0\necho "You are not logged into any GitHub hosts." >&2; exit 1');
+  await script('git', 'echo git version 2.56.0');
+  // A command that runs passes, even when it prints no version.
+  await script('curl', 'exit 2');
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, JQ_PATH: join(dir, 'nowhere/jq') });
+  const { tools, ghError } = await checkTools();
+  assert.deepEqual(tools, {
+    t3: { result: 'ok', version: '0.1.3-nightly.1' },
+    gh: { result: 'logged-out', version: '2.96.1', fix: 'gh auth login' },
+    git: { result: 'ok', version: '2.56.0' },
+    jq: { result: 'missing', override: `JQ_PATH=${join(dir, 'nowhere/jq')}`, fix: 'brew install jq' },
+    curl: { result: 'ok' },
+  });
+  assert.equal(ghError, undefined);
 });
 
 test('the login shell PATH goes before the inherited one, then the Homebrew folders, without duplicates', () => {

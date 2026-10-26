@@ -2,6 +2,11 @@
 // Test-only T3 Code CLI. Never starts a real thread.
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+// The tool check's version probe, which tests don't count as a call.
+if (args[0] === '--version') {
+  process.stdout.write('t3 v0.1.4-nightly.1\n');
+  process.exit(0);
+}
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8')).t3 ?? {};
 fs.appendFileSync(process.env.FAKE_GH_STATE + '.t3calls', JSON.stringify(args) + '\n');
 const main = async () => {

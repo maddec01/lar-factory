@@ -1,11 +1,11 @@
-// The notices for a missing t3, or a missing or logged-out gh, and their Recheck.
+// The notices for a missing t3, a missing or logged-out gh, or a missing git, jq or curl, and their Recheck.
 // Ported from the tool notice cases of test/render.test.ts and its saved copies.
 
 import { expect, test } from 'vite-plus/test';
-import { $, $$, bannerText, fetchMock, mountPage, push, sample, settle } from '../../test/support.ts';
-import type { BoardData, ToolProblems } from '@lar-factory/shared';
+import { $, $$, bannerText, fetchMock, mountPage, push, sample, settle, toolChecks } from '../../test/support.ts';
+import type { BoardData, ToolChecks } from '@lar-factory/shared';
 
-const withTools = (tools: ToolProblems, fields: Partial<BoardData> = {}): BoardData => ({ ...sample, tools, ...fields });
+const withTools = (failed: Partial<ToolChecks>, fields: Partial<BoardData> = {}): BoardData => ({ ...sample, tools: toolChecks(failed), ...fields });
 const failed = { error: 'gh api graphql failed: HTTP 401' };
 const recheckButton = () => $<HTMLButtonElement>('[data-recheck]')!;
 const note = () => $('.recheck-note');
@@ -24,7 +24,7 @@ function holdRecheck(): void {
 const board = (data: BoardData) => new Response(JSON.stringify({ error: null, board: data }));
 
 test('a missing t3 replaces the main area with a notice and Recheck', async () => {
-  await mountPage(withTools({ t3: { problem: 'missing' } }));
+  await mountPage(withTools({ t3: { result: 'missing' } }));
   const notice = $('main .tool-missing .tool-missing-box')!;
   expect(notice.getAttribute('role')).toBe('alert');
   expect(notice.querySelector('h1')!.textContent).toBe('T3 Code not found');
@@ -38,14 +38,14 @@ test('a missing t3 replaces the main area with a notice and Recheck', async () =
 });
 
 test('a t3 override that points nowhere is named', async () => {
-  await mountPage(withTools({ t3: { problem: 'missing', override: 'T3_PATH=/nowhere/t3' } }));
+  await mountPage(withTools({ t3: { result: 'missing', override: 'T3_PATH=/nowhere/t3' } }));
   expect($('.tool-missing-box p')!.textContent).toBe('No runnable t3 is at T3_PATH=/nowhere/t3. Point T3_PATH at the T3 Code CLI or unset it, '
     + 'then press Recheck. The board also looks again every 10 seconds.');
   expect($$('.tool-missing-box code').map((c) => c.textContent)).toEqual(['t3', 'T3_PATH=/nowhere/t3']);
 });
 
 test('a missing or logged-out gh shows its own notice, and other read failures show none', async () => {
-  await mountPage(withTools({ gh: { problem: 'missing' } }, failed));
+  await mountPage(withTools({ gh: { result: 'missing', fix: 'brew install gh' } }, failed));
   const banners = () => $$('.banners .banner');
   expect(banners().length).toBe(1);
   expect(banners()[0]!.getAttribute('role')).toBe('alert');
@@ -54,12 +54,12 @@ test('a missing or logged-out gh shows its own notice, and other read failures s
   expect(banners()[0]!.dataset.variant).toBe('warning');
   expect(banners()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install gh');
 
-  await push(withTools({ gh: { problem: 'logged-out' } }, failed));
+  await push(withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } }, failed));
   expect(banners().length).toBe(1);
   expect(bannerText(banners()[0]!)).toEqual(['GitHub CLI is logged out.', 'The board reads the project through gh. Run gh auth login Copy in a terminal, '
     + 'then press Recheck. The board also looks again every 10 seconds. Recheck']);
 
-  await push(withTools({ gh: { problem: 'missing', override: 'GH_PATH=/nowhere/gh' } }));
+  await push(withTools({ gh: { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' } }));
   expect(banners()[0]!.textContent).toContain('No runnable gh is at GH_PATH=/nowhere/gh. Point GH_PATH at gh or unset it, then press Recheck.');
 
   await push(withTools({}, failed));
@@ -68,7 +68,7 @@ test('a missing or logged-out gh shows its own notice, and other read failures s
 
 test('Recheck posts, shows Checking…, then the board once the tool is found, and keeps focus', async () => {
   holdRecheck();
-  await mountPage(withTools({ t3: { problem: 'missing' } }));
+  await mountPage(withTools({ t3: { result: 'missing' } }));
   recheckButton().focus();
   await settle(() => recheckButton().click());
   expect([recheckButton().textContent, recheckButton().disabled]).toEqual(['Checking…', true]);
@@ -76,7 +76,7 @@ test('Recheck posts, shows Checking…, then the board once the tool is found, a
   expect(rechecks().length, 'one Recheck at a time').toBe(1);
   expect(note(), 'nothing while checking').toBeNull();
 
-  await answer(board(withTools({ t3: { problem: 'missing' } })));
+  await answer(board(withTools({ t3: { result: 'missing' } })));
   expect([recheckButton().textContent, recheckButton().disabled]).toEqual(['Recheck', false]);
   expect([note()!.getAttribute('role'), note()!.textContent]).toEqual(['status', 'Still not found.']);
   expect(document.activeElement, 'focus goes back to Recheck').toBe(recheckButton());
@@ -89,7 +89,7 @@ test('Recheck posts, shows Checking…, then the board once the tool is found, a
 
 test("after Recheck a gh banner says it's still logged out, or why Recheck failed, until the server answers again", async () => {
   holdRecheck();
-  const loggedOut = withTools({ gh: { problem: 'logged-out' } });
+  const loggedOut = withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } });
   await mountPage(loggedOut);
   expect(note(), 'nothing before a Recheck').toBeNull();
   await settle(() => recheckButton().click());
@@ -107,16 +107,31 @@ test("after Recheck a gh banner says it's still logged out, or why Recheck faile
 
 test('a Recheck note answers only the tool problems it found, and goes once they change', async () => {
   holdRecheck();
-  const loggedOut = withTools({ gh: { problem: 'logged-out' } });
+  const loggedOut = withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } });
   await mountPage(loggedOut);
   await settle(() => recheckButton().click());
   await answer(board(loggedOut));
   expect(note()!.textContent).toBe('Still logged out.');
 
-  await push(withTools({ gh: { problem: 'missing' } }));
+  await push(withTools({ gh: { result: 'missing', fix: 'brew install gh' } }));
   expect(note(), 'a different problem is not what Recheck answered').toBeNull();
   await push(withTools({}));
   await push(loggedOut);
   expect(recheckButton()).not.toBeNull();
   expect(note(), 'a gh that logs out again opens a banner without the note').toBeNull();
+});
+
+test('a missing git, jq or curl shows a banner with its install command and Recheck, and the board still shows', async () => {
+  await mountPage(withTools({ jq: { result: 'missing', fix: 'brew install jq' } }));
+  const banners = () => $$('.banners .banner');
+  expect(banners().map(bannerText)).toEqual([['jq not found.', 'lar-work’s scripts read gh’s answers with jq. Install it with brew install jq Copy, '
+    + 'then press Recheck. The board also looks again every 10 seconds. Recheck']]);
+  expect(banners()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install jq');
+  expect($('.desk')).not.toBeNull();
+
+  await push(withTools({ git: { result: 'missing', override: 'GIT_PATH=/nowhere/git', fix: 'brew install git' }, curl: { result: 'missing', fix: 'brew install curl' } }));
+  expect(banners().map((b) => bannerText(b)[0])).toEqual(['git not found.', 'curl not found.']);
+  expect(bannerText(banners()[0]!)[1]).toBe('lar-work’s agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. '
+    + 'Point GIT_PATH at git, or unset it and install it with brew install git Copy, then press Recheck. The board also looks again every 10 seconds. Recheck');
+  expect(bannerText(banners()[1]!)[1]).toContain('lar-work’s scripts tell the board to refresh with curl. Install it with brew install curl Copy');
 });

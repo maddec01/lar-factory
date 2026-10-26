@@ -6,11 +6,16 @@ import { join } from 'node:path';
 import { act } from 'react';
 import { afterEach, beforeAll, beforeEach, vi } from 'vite-plus/test';
 import { pageWithData } from '@lar-factory/shared';
-import type { BoardData, BoardAppBridge, Status, UpdateState } from '@lar-factory/shared';
+import type { BoardData, BoardAppBridge, Status, ToolChecks, UpdateState } from '@lar-factory/shared';
 import template from '../index.html?raw';
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
 
 export const sample = sampleJson as unknown as BoardData;
+
+/** Every command check passing, with the ones given in its place. */
+export const toolChecks = (checks: Partial<ToolChecks> = {}): ToolChecks => ({
+  gh: { result: 'ok' }, t3: { result: 'ok' }, git: { result: 'ok' }, jq: { result: 'ok' }, curl: { result: 'ok' }, ...checks,
+});
 /** The page's clock: twenty minutes after the sample was read. */
 export const NOW = Date.parse('2026-10-21T10:00:00Z');
 

@@ -1,11 +1,11 @@
 // The Settings sections and their grouped rows, from the control room prototype. Most rows aren't built yet: they
 // show the prototype's value, disabled. The working rows are the Claude profiles, the update channel, version and
-// Check now, the gh and t3 rows, and the GitHub Project and repositories, read-only. In a browser the profiles and
+// Check now, the command check rows, and the GitHub Project and repositories, read-only. In a browser the profiles and
 // updates, which only the board app has, show the prototype's values, disabled with that reason.
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import type { BoardData, ToolProblem } from '@lar-factory/shared';
+import type { BoardData, CheckedTool, ToolCheck } from '@lar-factory/shared';
 import type { ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { PlatformTag } from '../items/item-parts.tsx';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
@@ -36,11 +36,20 @@ export interface PagesInput {
 const ONLY_APP_PROFILES = 'Only the board app links skills into Claude profiles';
 const ONLY_APP_UPDATES = 'Only the board app updates itself';
 
-/** A tool's state: OK, or the problem the lookup found. */
-function toolState(problem: ToolProblem | undefined, ok = 'OK'): ComponentProps<typeof ToolState> {
-  if (!problem) return { text: ok, tone: 'success' };
-  return problem.problem === 'logged-out' ? { text: 'Logged out', tone: 'warning' } : { text: 'Not found', tone: 'error' };
+/** A command's state: `ok`, else the version it printed, else OK; or the problem its check found. */
+function toolState(check: ToolCheck | undefined, ok?: string): ComponentProps<typeof ToolState> {
+  if (!check || check.result === 'ok') return { text: ok ?? (check?.version || 'OK'), tone: 'success' };
+  return check.result === 'logged-out' ? { text: 'Logged out', tone: 'warning' } : { text: 'Not found', tone: 'error' };
 }
+
+/** The commands Diagnostics › Tools lists, with what each does. */
+const DIAGNOSED: [CheckedTool, string][] = [
+  ['gh', 'Reads the GitHub Project and its issues.'],
+  ['t3', 'Starts the lar-work threads in T3 Code.'],
+  ['git', 'lar-work’s agents branch, commit and push with it.'],
+  ['jq', 'lar-work’s scripts read gh’s answers with it.'],
+  ['curl', 'lar-work’s scripts tell the board to refresh with it.'],
+];
 
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
 
@@ -184,14 +193,18 @@ export function pages(input: PagesInput): Page[] {
     ] },
     { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, groups: [
       { title: 'Tools', rows: [
-        { id: 'd-gh', title: 'gh', description: toolDescription('Reads the GitHub Project and its issues.', data.tools?.gh), control: custom(() => <ToolState {...toolState(data.tools?.gh)} />) },
-        { id: 'd-t3', title: 't3', description: toolDescription('Starts the lar-work threads in T3 Code.', data.tools?.t3), control: custom(() => <ToolState {...toolState(data.tools?.t3)} />) },
+        ...DIAGNOSED.map(([name, does]): Row => ({
+          id: `d-${name}`, title: name, description: toolDescription(does, data.tools?.[name]), control: custom(() => <ToolState {...toolState(data.tools?.[name])} />),
+        })),
         { id: 'd-server', title: 'Board server', description: `127.0.0.1:4317 · last read ${data.fetchedAt ? 'OK' : 'never'}`, control: { type: 'button', label: 'Open logs' }, reason: notBuilt('Open logs') },
       ] },
     ] },
   ];
 }
 
-/** What the tool does, or the override that points at nothing runnable. */
-const toolDescription = (does: string, problem: ToolProblem | undefined) =>
-  problem?.problem === 'missing' && problem.override ? `Nothing runnable at ${problem.override}` : does;
+/** What the command does, or why its check failed and how to fix it. */
+function toolDescription(does: string, check: ToolCheck | undefined): ReactNode {
+  if (!check || check.result === 'ok') return does;
+  const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';
+  return check.fix ? <>{where}Fix: <code>{check.fix}</code></> : `${where}Install T3 Code.`;
+}

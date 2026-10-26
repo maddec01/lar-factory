@@ -4,7 +4,7 @@
 // the profiles and updates show disabled.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, answerRestart, mountPage, sample, settle, stubApp, text } from '../../test/support.ts';
+import { $, $$, addStylesheet, answerRestart, mountPage, sample, settle, stubApp, text, toolChecks } from '../../test/support.ts';
 import type { BoardData, ProfilesResult, UpdateChannel, UpdateState } from '@lar-factory/shared';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
@@ -133,15 +133,31 @@ test('Repositories shows the GitHub Project, gh\'s login and each repository wit
     ...sample.repos.map(() => ['Edit', true]), ['Add repository', true]]);
 });
 
-test('Diagnostics shows gh and t3 OK while the lookup finds them', async () => {
+const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];
+
+test('Diagnostics shows every command OK before the first check', async () => {
   await open('Diagnostics');
-  expect(['d-gh', 'd-t3'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● OK', '● OK']);
+  expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● OK', '● OK', '● OK', '● OK', '● OK']);
+});
+
+test('Diagnostics shows the version each command printed', async () => {
+  await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'ok', version: '2.102.0' }, t3: { result: 'ok', version: '0.1.3-nightly.1' },
+    git: { result: 'ok', version: '2.56.0' }, jq: { result: 'ok', version: '1.7.1' } }) });
+  expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● 2.102.0', '● 0.1.3-nightly.1', '● 2.56.0', '● 1.7.1', '● OK']);
+  expect(text(row('d-jq'))).toContain('lar-work’s scripts read gh’s answers with it.');
 });
 
 test('Diagnostics shows what the lookup found wrong with gh and t3', async () => {
-  await open('Diagnostics', { ...sample, tools: { gh: { problem: 'logged-out' }, t3: { problem: 'missing', override: 'T3_BIN=/nowhere/t3' } } });
+  await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'logged-out', fix: 'gh auth login' }, t3: { result: 'missing', override: 'T3_BIN=/nowhere/t3' } }) });
   expect(['d-gh', 'd-t3'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● Logged out', '● Not found']);
-  expect(text(row('d-t3'))).toContain('Nothing runnable at T3_BIN=/nowhere/t3');
+  expect(text(row('d-t3'))).toContain('Nothing runnable at T3_BIN=/nowhere/t3. Install T3 Code.');
+  expect(text(row('d-gh'))).toContain('Fix: gh auth login');
+});
+
+test('Diagnostics shows a missing git, jq or curl with its fix', async () => {
+  await open('Diagnostics', { ...sample, tools: toolChecks({ jq: { result: 'missing', override: 'JQ_PATH=/nowhere/jq', fix: 'brew install jq' } }) });
+  expect(text(row('d-jq').querySelector('.tool-state'))).toBe('● Not found');
+  expect(text(row('d-jq'))).toContain('Nothing runnable at JQ_PATH=/nowhere/jq. Fix: brew install jq');
 });
 
 test('in a browser the profiles and updates show disabled, since only the board app has them', async () => {
@@ -438,7 +454,7 @@ describe('updates', () => {
 
   test('above the missing-t3 notice, where the sidebar has no update button, the page still reads the updater', async () => {
     stubChannel();
-    await open('Updates', { ...sample, tools: { t3: { problem: 'missing' } } });
+    await open('Updates', { ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
     expect($('.update-button')).toBeNull();
     expect(checked()).toBe('nightly');
   });

@@ -315,8 +315,8 @@ export interface BoardData {
   armed?: Record<string, ArmedStart>;
   /** Why a start the board ran by itself failed, by item id; the part was disarmed. Arming or disarming it clears this. */
   armedErrors?: Record<string, string>;
-  /** What's wrong with t3 and gh, from the latest lookup; a tool that works has no entry. Absent in sample mode. */
-  tools?: ToolProblems;
+  /** Every command check from the latest lookup. Absent before the first check and in sample mode. */
+  tools?: ToolChecks;
   /** T3 Code's environment id, which thread links need; absent when T3 hasn't written one. */
   t3EnvironmentId?: string;
   /**
@@ -332,15 +332,27 @@ export function repositoryProjectHint(data: Pick<BoardData, 'repositoryProjects'
   return Object.entries(data.repositoryProjects ?? {}).find(([r]) => r.toLowerCase() === key)?.[1] ?? null;
 }
 
-/** A tool the lookup didn't find, naming the override that pointed nowhere, if one did. */
-export type ToolMissing = { problem: 'missing'; override?: string };
+/** The commands the board checks. */
+export type CheckedTool = 'gh' | 't3' | 'git' | 'jq' | 'curl';
 
-/** A tool the board can't use: missing, or (gh only) logged out. */
-export type ToolProblem = ToolMissing | { problem: 'logged-out' };
+/**
+ * A command's check: it runs, with the version it printed if it did; it's missing, naming the override
+ * that pointed nowhere if one did; or (gh only) it's logged out. `fix` is the command that fixes a failed
+ * check; a missing t3 has none, since T3 Code installs it.
+ */
+export type ToolCheck =
+  | { result: 'ok'; version?: string }
+  | { result: 'missing'; override?: string; fix?: string }
+  | { result: 'logged-out'; version?: string; fix: string };
 
-export interface ToolProblems {
-  t3?: ToolMissing;
-  gh?: ToolProblem;
+export type FailedCheck = Exclude<ToolCheck, { result: 'ok' }>;
+
+export type ToolChecks = Record<CheckedTool, ToolCheck>;
+
+/** The tool's check if it failed; undefined when it passed, before the first check and in sample mode. */
+export function failedCheck(tools: ToolChecks | undefined, name: CheckedTool): FailedCheck | undefined {
+  const check = tools?.[name];
+  return check && check.result !== 'ok' ? check : undefined;
 }
 
 // ---------- kinds ----------

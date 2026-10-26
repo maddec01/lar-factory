@@ -36,7 +36,6 @@ describe("plan", () => {
       home: "/Users/someone",
       bundle: "/App/bundle",
       version: "1.0.0",
-      force: false,
     });
   });
 
@@ -49,18 +48,18 @@ describe("plan", () => {
     assert.strictEqual(SkillInstall.plan(launch({ isPackaged: false })), undefined);
   });
 
-  it("forces a dev run with the flag, into the overridden root", () => {
+  it("installs a dev run with the flag into the overridden root", () => {
     const plan = SkillInstall.plan(launch({
       isPackaged: false,
       argv: ["/path/electron", ".", SkillInstall.INSTALL_FLAG],
       env: { [SkillInstall.ROOT_ENV]: "/tmp/home" },
     }));
-    assert.deepStrictEqual(plan, { home: "/tmp/home", bundle: "/App/bundle", version: "1.0.0", force: true });
+    assert.deepStrictEqual(plan, { home: "/tmp/home", bundle: "/App/bundle", version: "1.0.0" });
   });
 });
 
 describe("onLaunch", () => {
-  it.effect("installs a new version once, with the Claude profile's links", () =>
+  it.effect("installs with the Claude profile's links, then restores an edited skill on the next launch", () =>
     Effect.gen(function* () {
       const home = tempDir("skill-home-");
       NodeFS.mkdirSync(NodePath.join(home, ".claude"));
@@ -74,6 +73,27 @@ describe("onLaunch", () => {
 
       const second = yield* SkillInstall.onLaunch(input);
       assert.strictEqual(second?.installed, false);
+
+      NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
+      const third = yield* SkillInstall.onLaunch(input);
+      assert.strictEqual(third?.installed, true);
+      assert.strictEqual(NodeFS.readFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "utf8"), "# lar-work\n");
+    }));
+
+  it.effect("shows a blocking folder's dialog on the first launch of a version, not the next", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      const mine = NodePath.join(home, ".agents/skills/lar-work");
+      NodeFS.mkdirSync(mine, { recursive: true });
+      NodeFS.writeFileSync(NodePath.join(mine, "SKILL.md"), "mine");
+      NodeFS.writeFileSync(NodePath.join(home, ".agents/.lar-factory-install.json"), JSON.stringify({ version: "0.9.0", skills: [] }));
+      const input = launch({ home, bundle: makeBundle() });
+
+      const first = yield* SkillInstall.onLaunch(input);
+      assert.strictEqual(SkillInstall.notice(first!)?.type, "warning");
+      const second = yield* SkillInstall.onLaunch(input);
+      assert.strictEqual(SkillInstall.notice(second!), undefined);
+      assert.strictEqual(NodeFS.readFileSync(NodePath.join(mine, "SKILL.md"), "utf8"), "mine");
     }));
 
   it.effect("writes nothing on a dev run without the flag", () =>
@@ -115,20 +135,21 @@ describe("onLaunch", () => {
 describe("notice", () => {
   it("says nothing after a clean install", () => {
     assert.strictEqual(
-      SkillInstall.notice({ installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [] }),
+      SkillInstall.notice({ installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], warn: false }),
       undefined,
     );
   });
 
+  const conflicted = { installed: false, version: "1.0.0", skills: [], conflicts: ["/home/.agents/skills/lar-work"] };
+
   it("warns about conflicts and names each path", () => {
-    const notice = SkillInstall.notice({
-      installed: true,
-      version: "1.0.0",
-      skills: [],
-      conflicts: ["/home/.agents/skills/lar-work"],
-    });
+    const notice = SkillInstall.notice({ ...conflicted, warn: true });
     assert.strictEqual(notice?.type, "warning");
     assert.include(notice?.detail, "/home/.agents/skills/lar-work");
+  });
+
+  it("says nothing about conflicts an earlier launch of this version reported", () => {
+    assert.strictEqual(SkillInstall.notice({ ...conflicted, warn: false }), undefined);
   });
 
   it("reports a failed install as an error that the next launch retries", () => {

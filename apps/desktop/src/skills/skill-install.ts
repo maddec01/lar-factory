@@ -1,6 +1,6 @@
 // Installs the skills and checklists bundled in the app on launch, with the engine in
-// packages/shared/src/install-skills.ts. A packaged app installs once per version; a dev run
-// installs only when started with INSTALL_FLAG.
+// packages/shared/src/install-skills.ts. A packaged app checks them on every launch and restores
+// any that differ from its bundle; a dev run does so only when started with INSTALL_FLAG.
 
 import * as NodePath from "node:path";
 
@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect";
 
 import { InstallError, installSkills, type InstallResult } from "@lar-factory/shared/install-skills";
 
-/** Starts a dev run's install. A packaged app ignores it and installs each new version. */
+/** Starts a dev run's install. A packaged app ignores it and installs on every launch. */
 export const INSTALL_FLAG = "--install-skills";
 /** Installs into this folder instead of the user's home, for dev runs and tests. */
 export const ROOT_ENV = "LAR_FACTORY_INSTALL_ROOT";
@@ -30,8 +30,6 @@ export interface Plan {
   readonly home: string;
   readonly bundle: string;
   readonly version: string;
-  /** True for a dev run, whose version doesn't change when the skills do. */
-  readonly force: boolean;
 }
 
 export class SkillInstallError extends Data.TaggedError("SkillInstallError")<{
@@ -52,9 +50,8 @@ export const installHome = (home: string, env: LaunchInput["env"]) => env[ROOT_E
 
 /** What this launch installs, or undefined when it installs nothing. */
 export const plan = (input: LaunchInput): Plan | undefined => {
-  const force = !input.isPackaged;
-  if (force && !input.argv.includes(INSTALL_FLAG)) return undefined;
-  return { home: installHome(input.home, input.env), bundle: input.bundle, version: input.version, force };
+  if (!input.isPackaged && !input.argv.includes(INSTALL_FLAG)) return undefined;
+  return { home: installHome(input.home, input.env), bundle: input.bundle, version: input.version };
 };
 
 /**
@@ -65,7 +62,7 @@ export const onLaunch = Effect.fn("SkillInstall.onLaunch")(function* (input: Lau
   const install = plan(input);
   if (!install) return undefined;
   return yield* Effect.try({
-    try: () => installSkills(install.home, install.bundle, install.version, { force: install.force }),
+    try: () => installSkills(install.home, install.bundle, install.version),
     catch: (cause) =>
       new SkillInstallError({
         message: cause instanceof Error ? cause.message : String(cause),
@@ -81,7 +78,7 @@ export interface Notice {
   readonly detail: string;
 }
 
-/** What to tell the user after an install: nothing, its conflicts or its error. */
+/** What to tell the user after an install: nothing, its error, or its conflicts on the first launch of a version. */
 export const notice = (outcome: InstallResult | SkillInstallError): Notice | undefined => {
   if (outcome instanceof SkillInstallError) {
     return {
@@ -92,7 +89,7 @@ export const notice = (outcome: InstallResult | SkillInstallError): Notice | und
         : `${outcome.message}\n\nThe previous skills are still in place. The next launch tries again.`,
     };
   }
-  if (outcome.conflicts.length === 0) return undefined;
+  if (!outcome.warn) return undefined;
   return {
     type: "warning",
     message: "Lar Factory left some skills alone",

@@ -5,15 +5,15 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { blockedText, buildBranch, buildMessage, canAbandon, isBuild, validateDraft, workMessage } from '@lar-factory/shared';
-import type { BoardData, ContentType, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, StartResult, Status } from '@lar-factory/shared';
+import type { BoardData, ContentType, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { loadConfig } from '../config/config.ts';
-import type { BoardConfig } from '../config/config.ts';
-import { abandonItem, addIssueLabel, addProjectItem, issueLabels, setIssueStatus, setItemStatus } from '../github/github.ts';
+import { issueLabels } from '../github/github.ts';
 import { repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
 import { startThread } from '../t3/t3.ts';
+import type { ItemSource } from './item-source.ts';
 
 /** A command's answer: the HTTP status and the JSON body. */
 export interface Reply {
@@ -38,8 +38,10 @@ export interface ItemCommands {
 
 export interface ItemCommandsDeps {
   board: BoardState;
-  /** The config, with the project number as found so far. */
-  project(): BoardConfig;
+  /** Where the commands write their changes. */
+  items: ItemSource;
+  /** The repositories config.json lists, which Add item may create in. */
+  repos: RepoConfig[];
   /** Reads the model choices T3 offers now into the board data. */
   offerModelChoices(): ModelGroup[];
 }
@@ -92,7 +94,7 @@ async function currentRepositoryProject(repo: string): Promise<RepositoryProject
   return repositoryProject(repo, repos);
 }
 
-export function createItemCommands({ board, project, offerModelChoices }: ItemCommandsDeps): ItemCommands {
+export function createItemCommands({ board, items, repos, offerModelChoices }: ItemCommandsDeps): ItemCommands {
   const submissions = new Map<string, {
     draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
   }>();
@@ -127,7 +129,7 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
     const busy = busyReason(itemId, action);
     if (busy) return withBoard(409, { error: busy });
     moving.add(itemId);
-    const error = await setItemStatus(project(), itemId, to).finally(() => moving.delete(itemId));
+    const error = await items.setStatus(item, to).finally(() => moving.delete(itemId));
     if (error) return withBoard(502, { error });
     board.showChanged({ ...item, status: to });
     return withBoard(200, { error: null });
@@ -177,7 +179,7 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
       i.repo?.toLowerCase() === parent.repo.toLowerCase());
     if (onBoard) {
       if (isBuild(onBoard) || onBoard.status === 'In progress') return null;
-      const error = await setItemStatus(project(), onBoard.id, 'In progress');
+      const error = await items.setStatus(onBoard, 'In progress');
       if (!error) board.showChanged({ ...onBoard, status: 'In progress' });
       return error;
     }
@@ -185,7 +187,7 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
     let labels: string[];
     try { labels = await issueLabels(parent.repo, parent.number); }
     catch (err) { return `Could not read the labels of ${parent.repo}#${parent.number}. ${(err as Error).message}`; }
-    return isBuild({ labels }) ? null : setIssueStatus(project(), parent.url, 'In progress');
+    return isBuild({ labels }) ? null : items.setParentStatus(parent, 'In progress');
   }
 
   return {
@@ -194,7 +196,7 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
         return reply(400, { error: 'The submission needs a valid request ID.' });
       }
       let draft: ItemDraft;
-      try { draft = validateDraft(input.draft, project().repos); }
+      try { draft = validateDraft(input.draft, repos); }
       catch (err) { return reply(422, { error: (err as Error).message }); }
       let entry = submissions.get(input.requestId);
       if (entry && JSON.stringify(entry.draft) !== JSON.stringify(draft)) {
@@ -205,7 +207,7 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
         entry = { draft, progress: {} };
         submissions.set(input.requestId, entry);
       }
-      entry.pending ??= addProjectItem(project(), draft, entry.progress);
+      entry.pending ??= items.create(draft, entry.progress);
       const result = await entry.pending;
       entry.pending = undefined;
       if (result.item && !entry.published) {
@@ -241,13 +243,13 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
       const message = buildMessage(item, LAR_WORK);
       const branch = buildBranch(item);
       if (!message || !branch || !item.repo || item.number === null) return reply(409, { error: 'This item needs an issue before it can start.' });
-      const { repo, number } = item;
+      const { repo } = item;
       return async () => {
         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
         const repoProject = await currentRepositoryProject(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
         if (!item.labels.includes('build')) {
-          const error = await addIssueLabel(repo, number, 'build');
+          const error = await items.addLabel(item, 'build');
           if (error) return { thread: null, error };
           board.showChanged({ ...item, labels: [...item.labels, 'build'] });
         }
@@ -267,7 +269,7 @@ export function createItemCommands({ board, project, offerModelChoices }: ItemCo
         if (!canAbandon(item)) return reply(409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${A_TYPE[item.type]} in ${item.status}.` });
         const busy = busyReason(itemId, 'abandon');
         if (busy) return withBoard(409, { error: busy });
-        const work = abandonItem(project(), item).then((error) => {
+        const work = items.abandon(item).then((error) => {
           if (!error) board.remove(itemId);
           return error;
         });

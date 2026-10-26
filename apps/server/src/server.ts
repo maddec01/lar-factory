@@ -9,7 +9,8 @@ import { randomUUID } from 'node:crypto';
 import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { loadConfig } from './config/config.ts';
-import { editPrBody, fetchProject, findProjectNumber, readPrBody } from './github/github.ts';
+import { editPrBody, readPrBody } from './github/github.ts';
+import { githubProject } from './github/github-project.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
@@ -44,7 +45,7 @@ const board = createBoardState({
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
 const modelManifest = modelManifestPath();
 const environmentIdFile = environmentIdPath();
-let projectNumber = config.number;
+const items = githubProject(config);
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;
@@ -170,8 +171,7 @@ async function refresh(): Promise<void> {
   const readRevision = board.revision();
   offerModelChoices();
   try {
-    projectNumber ??= await findProjectNumber(config.owner, config.title);
-    const snapshot = await fetchProject(config.owner, projectNumber);
+    const snapshot = await items.read();
     const { error, fetchedAt } = board.snapshot();
     const recovered = error !== null || fetchedAt === null;
     board.applyRead(snapshot.items, readRevision, withT3Reads);
@@ -207,7 +207,7 @@ function readSoon(): void {
 // Resources/server/dist/, beside Resources/web/dist/.
 const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
-const commands = createItemCommands({ board, project: () => ({ ...config, number: projectNumber }), offerModelChoices });
+const commands = createItemCommands({ board, items, repos: config.repos, offerModelChoices });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({

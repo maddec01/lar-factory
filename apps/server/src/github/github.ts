@@ -3,6 +3,7 @@
 import { buildSubIssueSearch, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, validateDraft } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, RawItem, Searched, Status } from '@lar-factory/shared';
 import type { BoardConfig } from '../config/config.ts';
+import type { ItemsRead } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 
@@ -195,12 +196,7 @@ async function readDossierBodies(raws: RawItem[], searched: Searched): Promise<v
   }
 }
 
-export interface ProjectSnapshot {
-  title: string;
-  items: Item[];
-}
-
-export async function fetchProject(owner: string, number: number): Promise<ProjectSnapshot> {
+export async function fetchProject(owner: string, number: number): Promise<ItemsRead> {
   const raws: RawItem[] = [];
   let title = '';
   await readPages(MAX_PAGES, `Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`, async (after) => {

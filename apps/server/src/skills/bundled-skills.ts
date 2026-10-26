@@ -1,11 +1,14 @@
 // Reads the bundle's skills and checklists for Settings > Skills: each folder in skills/ and each checklist in
-// references/, with its author, licence and source on GitHub. UPSTREAM.md's rows name each Copy's source, path and
-// commit, and its Authors line each source's author and licence; a skill it doesn't list is Lar's own.
+// references/, with its author, licence and source on GitHub. UPSTREAM.md's rows name each Copy's source, path,
+// commit and Date, and its Authors line each source's author and licence; a skill it doesn't list is Lar's own.
+// Each skill's install state comes from the install manifest in the install home.
 
 import { readFileSync, readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { BundledSkill } from '@lar-factory/shared';
+import { readSkillStatus } from '@lar-factory/shared/install-skills';
 
 /** The checkout's root, which holds skills/, references/ and UPSTREAM.md as the app's bundle does. */
 export const BUNDLE_URL = new URL('../../../../', import.meta.url);
@@ -18,13 +21,13 @@ export function bundleUrl(env: NodeJS.ProcessEnv = process.env): URL {
 
 const LAR = { author: 'Lar', licence: 'MIT', repo: 'maddec01/lar-factory', commit: 'main' };
 
-interface Copy { source: string; path: string; commit: string }
+interface Copy { source: string; path: string; commit: string; date: string }
 
 /** UPSTREAM.md's rows by Skill, and its Authors line by source. */
 function parseUpstream(markdown: string) {
   const copies = new Map<string, Copy>();
-  for (const [, name, source, path, commit] of markdown.matchAll(/^\| `([^`]+)` \| (\S+) \| `([^`]+)` \| `([0-9a-f]+)` \|/gm)) {
-    copies.set(name!, { source: source!, path: path!, commit: commit! });
+  for (const [, name, source, path, commit, date] of markdown.matchAll(/^\| `([^`]+)` \| (\S+) \| `([^`]+)` \| `([0-9a-f]+)` \| (\S+) \|/gm)) {
+    copies.set(name!, { source: source!, path: path!, commit: commit!, date: date! });
   }
   const authors = new Map<string, { author: string; licence: string }>();
   const line = /^Authors: (.*)$/m.exec(markdown)?.[1] ?? '';
@@ -51,8 +54,21 @@ export function readBundledSkills(bundle: string): BundledSkill[] {
     const copy = copies.get(name);
     if (!copy) return { name, author: LAR.author, licence: LAR.licence, source: `https://github.com/${LAR.repo}/${kind}/${LAR.commit}/${file}` };
     const credit = authors.get(copy.source) ?? { author: copy.source.split('/')[0]!, licence: 'Unknown licence' };
-    return { name, ...credit, source: `https://github.com/${copy.source}/${kind}/${copy.commit}/${copy.path}` };
+    return { name, ...credit, source: `https://github.com/${copy.source}/${kind}/${copy.commit}/${copy.path}`, date: copy.date };
   });
+}
+
+/** The home the board app installs skills into: LAR_FACTORY_INSTALL_ROOT when set, else the user's home. */
+export function installHome(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.LAR_FACTORY_INSTALL_ROOT || home;
+}
+
+/** `skills` with each skill's state from the install manifest in `home`; unchanged when there is none or it can't be read. */
+export function withInstallState(skills: BundledSkill[], home: string): BundledSkill[] {
+  let status;
+  try { status = readSkillStatus(home); }
+  catch { return skills; }
+  return skills.map((skill) => status?.[skill.name] ? { ...skill, status: status[skill.name] } : skill);
 }
 
 /** The bundle's skills, or none when it can't be read, with the reason. */

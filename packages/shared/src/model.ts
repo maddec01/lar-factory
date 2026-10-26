@@ -1,5 +1,7 @@
 // The board's data model and the rules that place an item in the flow.
-// Shared by the server and the browser, so it imports nothing.
+// Shared by the server and the browser, so it imports nothing but types.
+
+import type { SkillStatus } from './install-skills.ts';
 
 export const STATUSES = [
   'List',
@@ -323,6 +325,10 @@ export interface BundledSkill {
   licence: string;
   /** The URL of its folder or file on GitHub. */
   source: string;
+  /** A Copy's Date in UPSTREAM.md, the day of the upstream commit it matches; absent for Lar's own. */
+  date?: string;
+  /** A skill's state in the install manifest; absent for a checklist, and before the first install that records it. */
+  status?: SkillStatus;
 }
 
 export const SHOW_SETTINGS = ['all', 'opted-in'] as const;

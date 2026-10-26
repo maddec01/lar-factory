@@ -203,6 +203,11 @@ export function listClaudeProfiles(home: string): ClaudeProfile[] {
   return listProfileFolders(home).map((name) => ({ name, ticked: profiles ? profiles[name]?.ticked ?? false : true }));
 }
 
+/** Each bundled skill's state from the last install, or null before the first install that records it. */
+export function readSkillStatus(home: string): Record<string, SkillStatus> | null {
+  return readManifest(join(home, '.agents', INSTALL_MANIFEST))?.status ?? null;
+}
+
 /** What one tick change did: the paths it left alone, and what an untick removed. */
 export interface TickResult {
   conflicts: string[];

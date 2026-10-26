@@ -5,7 +5,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { INSTALL_MANIFEST, installSkills, listClaudeProfiles, setProfileTick } from './install-skills.ts';
+import { INSTALL_MANIFEST, installSkills, listClaudeProfiles, readSkillStatus, setProfileTick } from './install-skills.ts';
 
 function temporary(): string {
   const path = mkdtempSync(join(tmpdir(), 'install-skills-'));
@@ -138,6 +138,13 @@ test('a restored skill keeps its restore time while it matches, and an upgrade m
 
   installSkills(home, bundle(v2), '2.0.0');
   assert.deepEqual((manifest(home) as { status: unknown }).status, matching('lar-work', 'tdd'));
+});
+
+test('readSkillStatus gives each skill’s state from the last install, and null before any install', () => {
+  const home = temporary();
+  assert.equal(readSkillStatus(home), null);
+  installSkills(home, bundle(v1), '1.0.0');
+  assert.deepEqual(readSkillStatus(home), matching('lar-work', 'tdd'));
 });
 
 /** The fs calls that change a file, a folder or a link. */

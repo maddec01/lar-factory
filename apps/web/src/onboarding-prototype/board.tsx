@@ -13,7 +13,6 @@ import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { Card } from '@lar-factory/ui/card';
 import { BrandMark } from '../brand/brand-mark.tsx';
-import { PlatformTag } from '../items/item-parts.tsx';
 import { SmallButton, notBuilt } from '../settings/controls.tsx';
 import { T3_PROJECTS, repoOf } from './mock.ts';
 import { stepSummary } from './steps.tsx';
@@ -103,8 +102,8 @@ function ResetDialog({ repo, onClose }: { repo: string | null; onClose: () => vo
 }
 
 /**
- * Settings › Repositories in the prototype: every repository with its provider, item source, show setting and List
- * group, Resume while onboarding, Edit, Reset, and Add repository. Each repository has its own item source, so no
+ * Settings › Repositories in the prototype: every repository by its name, with its provider, item source and show
+ * setting, Resume while onboarding, Edit, Reset, and Add repository. Each repository has its own item source, so no
  * group names one GitHub Project for the board.
  */
 export function RepositoriesGroup() {
@@ -114,26 +113,22 @@ export function RepositoriesGroup() {
     <section className="grid gap-2">
       <div className="px-1">
         <h3 className="m-0 text-[13px] font-medium">Repositories</h3>
-        <p className="m-0 text-xs text-muted-foreground">Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list. Its List group names its group in the List and in the Scope picker.</p>
+        <p className="m-0 text-xs text-muted-foreground">Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list. The List and the Scope picker group items by the repository’s name.</p>
       </div>
       <div className="divide-y overflow-hidden rounded-xl border bg-card">
         {repos.length === 0 && <div className="px-4 py-3 text-xs text-muted-foreground">No repository is onboarded.</div>}
         {repos.map((r) => (
-          <div key={r.repo} className="flex items-center gap-4 px-4 py-3">
+          <div key={r.repo} className="flex items-center gap-4 px-4 py-3.5">
             <div className="grid min-w-0 flex-1 gap-1">
-              <div className="flex items-center gap-2 truncate text-[13px] font-medium">{r.repo}
+              <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium"><span className="truncate">{r.repo}</span>
                 {r.state === 'onboarding' ? <Badge variant="warning" size="sm">Onboarding</Badge> : <Badge variant="success" size="sm">Onboarded</Badge>}</div>
-              <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-xs">
-                <dt className="text-muted-foreground">Provider</dt><dd className="m-0">{r.provider}</dd>
-                <dt className="text-muted-foreground">Item source</dt><dd className="m-0 truncate">{r.source}</dd>
-                <dt className="text-muted-foreground">Show</dt><dd className="m-0">{r.show}</dd>
-                <dt className="text-muted-foreground">List group</dt><dd className="m-0"><PlatformTag platform={r.platform} /></dd>
-                {r.role && <><dt className="text-muted-foreground">Role</dt><dd className="m-0 truncate">{r.role}</dd></>}
-              </dl>
+              <p className="m-0 truncate text-xs text-muted-foreground" title={`${r.provider} · ${r.source} · ${r.show}`}>{r.provider} · {r.source} · {r.show}</p>
             </div>
-            {r.state === 'onboarding' && <Button size="xs" onClick={() => resume(r.repo)}>Resume</Button>}
-            <SmallButton reason={notBuilt('Edit')}>Edit</SmallButton>
-            <Button size="xs" variant="outline" onClick={() => setResetting(r.repo)}><RotateCcw /> Reset</Button>
+            <div className="flex shrink-0 items-center gap-2">
+              {r.state === 'onboarding' && <Button size="xs" onClick={() => resume(r.repo)}>Resume</Button>}
+              <SmallButton reason={notBuilt('Edit')}>Edit</SmallButton>
+              <Button size="xs" variant="outline" onClick={() => setResetting(r.repo)}><RotateCcw /> Reset</Button>
+            </div>
           </div>
         ))}
         <div className="bg-muted px-4 py-2"><Button size="xs" variant="outline" onClick={() => start()}><Plus /> Add repository</Button></div>

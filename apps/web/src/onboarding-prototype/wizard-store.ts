@@ -35,10 +35,6 @@ export interface Run {
   /** Once the user picks a show setting, a new item source no longer changes it. */
   showTouched: boolean;
   role: string;
-  /** The List group; GLOSSARY.md calls it the Platform. */
-  platform: string;
-  /** Once the user edits the List group, a new repository no longer changes it. */
-  platformTouched: boolean;
   labels: string[];
   checks: { id: string; status: CheckStatus; failedOnce: boolean }[];
   agent: { provider: string; model: string; state: 'idle' | 'running' | 'done'; log: number };
@@ -54,8 +50,6 @@ export interface RepoEntry {
   /** The item source as a line, like `GitHub Project maddec01 #3 · lar`. */
   source: string;
   show: Show;
-  /** The List group: names the repository's group in the List and in the Scope picker (GLOSSARY.md "Platform"). */
-  platform: string;
   role: string;
   state: 'onboarded' | 'onboarding';
   run?: Run;
@@ -67,7 +61,7 @@ function newRun(projectName: string | null = null): Run {
   return {
     id: ++runs, projectChoice: 'existing', projectName, newPath: '~/code/', newOrigin: '', step: 'project', done: [],
     source: 'project', githubProject: 'maddec01 #3 · lar', team: 'Fabrikam Team', show: 'All items', showTouched: false,
-    role: '', platform: '', platformTouched: false, labels: ['build', 'decision', 'blocked', 'applies-to-web'], checks: [],
+    role: '', labels: ['build', 'decision', 'blocked', 'applies-to-web'], checks: [],
     agent: { provider: 'Claude', model: 'Opus 5.5', state: 'idle', log: 0 }, clashes: [], skillChoice: null, skillName: SKILL_CLASH.suggested, pr: 'none',
   };
 }
@@ -88,17 +82,11 @@ export const sourceOfRun = (run: Run) => projectOf(run)?.config?.itemSource ?? (
   project: `GitHub Project ${run.githubProject}`, issues: 'The repository’s issues', sprint: `${run.team}’s current sprint`, backlog: `${run.team}’s backlog`,
 } as const)[run.source];
 
-/** The List group a repository's name suggests: its last word, so `lar-web` gives `Web`. */
-function suggestListGroup(name: string): string {
-  const word = name.split(/[-_.\s]/).filter(Boolean).pop() ?? name;
-  return word[0]!.toUpperCase() + word.slice(1);
-}
-
 /** The repository's row for the board and Settings, from where a run got to. */
 function entryOf(run: Run, project: T3Project, state: RepoEntry['state']): RepoEntry {
   return {
     repo: repoOf(project.origin), provider: providerOf(project.origin), source: sourceOfRun(run), show: (project.config?.show as Show | undefined) ?? run.show,
-    platform: run.platform || project.config?.platform || project.name, role: run.role || project.config?.role || '', state, ...(state === 'onboarding' && { run }),
+    role: run.role || project.config?.role || '', state, ...(state === 'onboarding' && { run }),
   };
 }
 
@@ -107,7 +95,7 @@ export function stepReady(run: Run, step: StepId): boolean {
   const project = projectOf(run);
   switch (step) {
     case 'project': return !!project;
-    case 'setup': return !!project?.config || (!!run.role.trim() && !!run.platform.trim());
+    case 'setup': return !!project?.config || !!run.role.trim();
     case 'checks': return run.checks.length > 0 && run.checks.every((c) => c.status === 'passed');
     case 'cleanup': return run.agent.state === 'done' && (run.skillChoice === 'delete' || (run.skillChoice === 'rename' && !!run.skillName.trim()));
     case 'pr': return run.pr === 'merged';
@@ -115,14 +103,14 @@ export function stepReady(run: Run, step: StepId): boolean {
 }
 
 const SAMPLE_REPOS: RepoEntry[] = [
-  { repo: 'maddec01/lar-server', provider: 'GitHub', source: 'GitHub Project maddec01 #3 · lar', show: 'All items', platform: 'Server', role: 'Backend API server', state: 'onboarded' },
-  { repo: 'maddec01/lar-apple', provider: 'GitHub', source: 'The repository’s issues', show: 'Opted-in items', platform: 'Apple', role: 'Apple client app', state: 'onboarded' },
+  { repo: 'maddec01/lar-server', provider: 'GitHub', source: 'GitHub Project maddec01 #3 · lar', show: 'All items', role: 'Backend API server', state: 'onboarded' },
+  { repo: 'maddec01/lar-apple', provider: 'GitHub', source: 'The repository’s issues', show: 'Opted-in items', role: 'Apple client app', state: 'onboarded' },
 ];
 
 /** lar-web, closed while its PR waits, so the populated board shows Resume straight away. */
 function waitingLarWeb(): RepoEntry {
   const run: Run = {
-    ...newRun('lar-web'), step: 'pr', done: ['project', 'setup', 'checks', 'cleanup'], role: 'Web client', platform: 'Web',
+    ...newRun('lar-web'), step: 'pr', done: ['project', 'setup', 'checks', 'cleanup'], role: 'Web client',
     checks: CHECKS.filter((c) => !c.azureOnly).map((c) => ({ id: c.id, status: 'passed', failedOnce: true })),
     agent: { provider: 'Claude', model: 'Opus 5.5', state: 'done', log: AGENT_LOG.length }, clashes: CLASHES, skillChoice: 'rename', pr: 'open',
   };
@@ -213,9 +201,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const azure = providerOfRun(run) === 'Azure DevOps';
       const source = run.step !== 'project' ? run.source : azure ? (run.source === 'backlog' ? 'backlog' : 'sprint') : run.source === 'issues' ? 'issues' : 'project';
       const show = run.showTouched ? run.show : ({ project: 'All items', issues: 'Opted-in items', sprint: 'All items', backlog: 'Opted-in items' } as const)[source];
-      // The List group starts from the repository's name; the user can change it.
-      const platform = run.platformTouched ? run.platform : suggestListGroup(projectOf(run)!.name);
-      set({ run: { ...run, source, show, platform, done: [...new Set([...run.done, run.step])], step: to } });
+      set({ run: { ...run, source, show, done: [...new Set([...run.done, run.step])], step: to } });
       if (to === 'checks' && run.checks.length === 0) runChecks(get().run!);
     },
     goTo: (step) => set((state) => ({ run: state.run && (state.run.done.includes(step) || state.run.step === step ? { ...state.run, step } : state.run) })),

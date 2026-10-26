@@ -29,8 +29,20 @@ function Choice({ value, title, children, disabled }: { value: string; title: Re
   );
 }
 
+/** One field on its own row: its label, the control, then one line of help. */
 function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return <label className="grid gap-1.5"><span className="text-sm font-medium">{label}</span>{children}{hint && <span className="text-xs text-muted-foreground">{hint}</span>}</label>;
+}
+
+/** A group of choices on its own row: its legend, one line of help, then the choices. */
+function Group({ legend, hint, children }: { legend: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <Fieldset unstyled className="grid gap-2">
+      <FieldsetLegend className="mb-0 font-medium">{legend}</FieldsetLegend>
+      {hint && <p className="m-0 -mt-1 text-xs text-muted-foreground">{hint}</p>}
+      {children}
+    </Fieldset>
+  );
 }
 
 function ProjectStep({ run }: { run: Run }) {
@@ -53,8 +65,8 @@ function ProjectStep({ run }: { run: Run }) {
         <Choice value="new" title="Create a new T3 project">From a folder on this Mac; onboarding clones the origin there if the folder is empty.</Choice>
       </RadioGroup>
       {run.projectChoice === 'new' && (
-        <div className="grid gap-3 rounded-lg border p-3">
-          <Field label="Folder"><Input font="mono" value={run.newPath} onChange={(e) => patch({ newPath: e.target.value })} /></Field>
+        <div className="grid gap-4 rounded-lg border p-4">
+          <Field label="Folder" hint="The repository’s main checkout on this Mac."><Input font="mono" value={run.newPath} onChange={(e) => patch({ newPath: e.target.value })} /></Field>
           <Field label="Git origin" hint="The provider comes from its host: github.com or dev.azure.com.">
             <Input font="mono" placeholder="git@github.com:owner/repo.git" value={run.newOrigin} onChange={(e) => patch({ newOrigin: e.target.value })} />
           </Field>
@@ -83,7 +95,6 @@ function SetupStep({ run }: { run: Run }) {
           <dt className="text-muted-foreground">Provider</dt><dd className="m-0">{provider}</dd>
           <dt className="text-muted-foreground">Item source</dt><dd className="m-0">{config.itemSource}</dd>
           <dt className="text-muted-foreground">Show</dt><dd className="m-0">{config.show}</dd>
-          <dt className="text-muted-foreground">List group</dt><dd className="m-0">{config.platform}</dd>
           <dt className="text-muted-foreground">Repository role</dt><dd className="m-0">{config.role}</dd>
           <dt className="text-muted-foreground">Labels</dt><dd className="m-0">{config.labels.join(', ')}</dd>
         </dl>
@@ -94,12 +105,13 @@ function SetupStep({ run }: { run: Run }) {
   const setSource = (source: Run['source']) => patch({ source, ...(!run.showTouched && { show: SUGGESTED[source] }) });
   const azure = provider === 'Azure DevOps';
   return (
-    <div className="grid gap-5">
-      <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">Provider</span><Badge variant="outline">{provider}</Badge>
-        <span className="text-xs text-muted-foreground">from origin’s host, <span className="font-mono">{project.origin.replace(/^.*@|^https:\/\//, '').split(/[:/]/)[0]}</span></span></div>
-      <Fieldset unstyled className="grid gap-2">
-        <FieldsetLegend>Item source</FieldsetLegend>
-        <p className="m-0 -mt-1 text-xs text-muted-foreground">Where the board finds this repository’s items. It lists the items that can show.</p>
+    <div className="grid gap-6">
+      <div className="grid gap-1.5">
+        <span className="text-sm font-medium">Provider</span>
+        <Badge variant="outline" className="justify-self-start">{provider}</Badge>
+        <span className="text-xs text-muted-foreground">From the origin’s host, <span className="font-mono">{project.origin.replace(/^.*@|^https:\/\//, '').split(/[:/]/)[0]}</span>.</span>
+      </div>
+      <Group legend="Item source" hint="Where the board finds this repository’s items. It lists the items that can show.">
         <RadioGroup value={run.source} onValueChange={(v) => setSource(v as Run['source'])} className="gap-2">
           {azure ? (<>
             <Choice value="sprint" title="The team’s current sprint">Contoso / Fabrikam</Choice>
@@ -109,11 +121,12 @@ function SetupStep({ run }: { run: Run }) {
             <Choice value="issues" title="The repository’s issues">{repoOf(project.origin)}’s own issues, with no extra fields.</Choice>
           </>)}
         </RadioGroup>
-        {run.source === 'project' && <NativeSelect value={run.githubProject} onChange={(e) => patch({ githubProject: e.target.value })}>{GITHUB_PROJECTS.map((p) => <option key={p}>{p}</option>)}</NativeSelect>}
-        {azure && <NativeSelect value={run.team} onChange={(e) => patch({ team: e.target.value })}>{AZURE_TEAMS.map((t) => <option key={t}>{t}</option>)}</NativeSelect>}
-      </Fieldset>
-      <Fieldset unstyled className="grid gap-2">
-        <FieldsetLegend>Show</FieldsetLegend>
+      </Group>
+      {run.source === 'project' && (
+        <Field label="GitHub Project" hint="A Project owned by you, by owner and number."><NativeSelect value={run.githubProject} onChange={(e) => patch({ githubProject: e.target.value })}>{GITHUB_PROJECTS.map((p) => <option key={p}>{p}</option>)}</NativeSelect></Field>
+      )}
+      {azure && <Field label="Team" hint="The Azure DevOps team whose sprint or backlog the board reads."><NativeSelect value={run.team} onChange={(e) => patch({ team: e.target.value })}>{AZURE_TEAMS.map((t) => <option key={t}>{t}</option>)}</NativeSelect></Field>}
+      <Group legend="Show" hint="Which of the item source’s items show on the board.">
         <RadioGroup value={run.show} onValueChange={(v) => patch({ show: v as Show, showTouched: true })} className="gap-2">
           {(['All items', 'Opted-in items'] as const).map((s) => (
             <Choice key={s} value={s} title={<span className="flex items-center gap-2">{s}{SUGGESTED[run.source] === s && <Badge variant="secondary" size="sm">Suggested</Badge>}</span>}>
@@ -121,22 +134,18 @@ function SetupStep({ run }: { run: Run }) {
             </Choice>
           ))}
         </RadioGroup>
-      </Fieldset>
-      <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
-        <Field label="List group" hint="Names this repository’s group in the List and in the Scope picker."><Input placeholder="Web" value={run.platform} onChange={(e) => patch({ platform: e.target.value, platformTouched: true })} /></Field>
-        <Field label="Repository role" hint="What this repository is to the others."><Input placeholder="Web client that talks to the API server" value={run.role} onChange={(e) => patch({ role: e.target.value })} /></Field>
-      </div>
-      <Fieldset unstyled className="grid gap-2">
-        <FieldsetLegend>{azure ? 'Tags' : 'Labels'} onboarding creates</FieldsetLegend>
+      </Group>
+      <Field label="Repository role" hint="What this repository is to the others."><Input placeholder="Web client that talks to the API server" value={run.role} onChange={(e) => patch({ role: e.target.value })} /></Field>
+      <Group legend={`${azure ? 'Tags' : 'Labels'} onboarding creates`}>
         {LABELS.map((l) => (
-          <label key={l.name} className="flex items-center gap-2 text-sm">
-            <Checkbox checked={run.labels.includes(l.name)} onCheckedChange={(on) => patch({ labels: on ? [...run.labels, l.name] : run.labels.filter((x) => x !== l.name) })} />
-            <span className="font-mono">{l.name}</span><span className="text-xs text-muted-foreground">{l.note}</span>
+          <label key={l.name} className="flex cursor-pointer items-start gap-2.5">
+            <Checkbox checked={run.labels.includes(l.name)} onCheckedChange={(on) => patch({ labels: on ? [...run.labels, l.name] : run.labels.filter((x) => x !== l.name) })} className="mt-0.5" />
+            <span className="grid min-w-0 gap-0.5"><span className="font-mono text-sm">{l.name}</span><span className="text-xs text-muted-foreground">{l.note}</span></span>
           </label>
         ))}
         {run.source !== 'project' && <p className="m-0 text-xs text-muted-foreground">Plus one <span className="font-mono">status-</span>{azure ? 'tag' : 'label'} per status, which the board swaps as items move.</p>}
         <p className="m-0 text-xs text-muted-foreground">Left alone, since onboarding didn’t create them: {FOREIGN_LABELS.map((l) => <span key={l} className="font-mono">{l} </span>)}</p>
-      </Fieldset>
+      </Group>
     </div>
   );
 }
@@ -208,15 +217,13 @@ function CleanupStep({ run }: { run: Run }) {
   const { agent } = run;
   const tick = (id: string, on: boolean) => patch({ clashes: run.clashes.map((c) => (c.id === id ? { ...c, ticked: on } : c)) });
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-6">
       <p className="m-0 text-sm text-muted-foreground">Onboarding runs fixed checks for known Clashes, then an agent in a T3 thread in this repository’s project reads every instruction file and reports rules that work against the factory’s. Only the edits you tick go into the PR.</p>
-      <Fieldset unstyled disabled={agent.state !== 'idle'} className="grid gap-2">
-        <FieldsetLegend>Clash agent</FieldsetLegend>
-        <div className="flex flex-wrap items-end gap-2">
-          <Field label="Provider"><NativeSelect value={agent.provider} onChange={(e) => patch({ agent: { ...agent, provider: e.target.value, model: AGENT_MODELS[e.target.value]![0]! } })}>{Object.keys(AGENT_MODELS).map((p) => <option key={p}>{p}</option>)}</NativeSelect></Field>
-          <Field label="Model"><NativeSelect value={agent.model} onChange={(e) => patch({ agent: { ...agent, model: e.target.value } })}>{AGENT_MODELS[agent.provider]!.map((m) => <option key={m}>{m}</option>)}</NativeSelect></Field>
-          {agent.state === 'idle' && <Button onClick={runAgent}>Look for Clashes</Button>}
-        </div>
+      <Fieldset unstyled disabled={agent.state !== 'idle'} className="grid gap-4">
+        <FieldsetLegend className="mb-0 font-medium">Clash agent</FieldsetLegend>
+        <Field label="Provider" hint="The agent provider whose T3 thread looks for Clashes."><NativeSelect value={agent.provider} onChange={(e) => patch({ agent: { ...agent, provider: e.target.value, model: AGENT_MODELS[e.target.value]![0]! } })}>{Object.keys(AGENT_MODELS).map((p) => <option key={p}>{p}</option>)}</NativeSelect></Field>
+        <Field label="Model" hint="The model that thread runs on."><NativeSelect value={agent.model} onChange={(e) => patch({ agent: { ...agent, model: e.target.value } })}>{AGENT_MODELS[agent.provider]!.map((m) => <option key={m}>{m}</option>)}</NativeSelect></Field>
+        {agent.state === 'idle' && <Button className="justify-self-start" onClick={runAgent}>Look for Clashes</Button>}
       </Fieldset>
       {agent.state !== 'idle' && (
         <div className="grid gap-2 rounded-lg border p-3">
@@ -236,11 +243,15 @@ function CleanupStep({ run }: { run: Run }) {
           <AlertTitle>Project skill <span className="font-mono">{SKILL_CLASH.bundled}</span> is named like a bundled skill</AlertTitle>
           <AlertDescription>
             <span><span className="font-mono">{SKILL_CLASH.path}</span> would shadow the factory’s <span className="font-mono">{SKILL_CLASH.bundled}</span>. Onboarding can’t continue until you pick one:</span>
-            <RadioGroup value={run.skillChoice ?? ''} onValueChange={(v) => patch({ skillChoice: v as Run['skillChoice'] })} className="mt-1 gap-1.5">
+            <RadioGroup value={run.skillChoice ?? ''} onValueChange={(v) => patch({ skillChoice: v as Run['skillChoice'] })} className="mt-1 gap-2">
               <label className="flex items-center gap-2 text-sm text-foreground"><Radio value="delete" /> Delete it in the PR</label>
-              <label className="flex items-center gap-2 text-sm text-foreground"><Radio value="rename" /> Rename it to
-                <Input size="sm" font="mono" className="w-48" value={run.skillName} disabled={run.skillChoice !== 'rename'} onChange={(e) => patch({ skillName: e.target.value })} /></label>
+              <label className="flex items-center gap-2 text-sm text-foreground"><Radio value="rename" /> Rename it</label>
             </RadioGroup>
+            {run.skillChoice === 'rename' && (
+              <label className="mt-1 grid gap-1.5 text-foreground"><span className="text-sm font-medium">New skill name</span>
+                <Input size="sm" font="mono" value={run.skillName} onChange={(e) => patch({ skillName: e.target.value })} />
+                <span className="text-xs text-muted-foreground">The PR moves it to <span className="font-mono">.claude/skills/{run.skillName || '…'}/</span>.</span></label>
+            )}
           </AlertDescription>
         </Alert>
         <div className="grid gap-1">

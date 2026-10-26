@@ -8,7 +8,7 @@ export interface T3Project {
   path: string;
   origin: string;
   /** The answers in the repository's `.lar-factory.json` on its default branch, if it has one. */
-  config?: { itemSource: string; show: string; role: string; platform: string; labels: string[] };
+  config?: { itemSource: string; show: string; role: string; labels: string[] };
 }
 
 export const providerOf = (origin: string): Provider => (origin.includes('dev.azure.com') ? 'Azure DevOps' : 'GitHub');
@@ -25,7 +25,7 @@ export const T3_PROJECTS: T3Project[] = [
   { name: 'fabrikam-api', path: '~/code/fabrikam-api', origin: 'https://dev.azure.com/contoso/Fabrikam/_git/fabrikam-api' },
   {
     name: 'lar-docs', path: '~/code/lar-docs', origin: 'git@github.com:maddec01/lar-docs.git',
-    config: { itemSource: 'GitHub Project maddec01 #3 (lar)', show: 'All items', role: 'Public docs site', platform: 'Docs', labels: ['build', 'decision', 'blocked'] },
+    config: { itemSource: 'GitHub Project maddec01 #3 (lar)', show: 'All items', role: 'Public docs site', labels: ['build', 'decision', 'blocked'] },
   },
 ];
 

@@ -11,6 +11,7 @@ import type { Item } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { StatusGlyph } from '../items/status-glyph.tsx';
+import { PROTOTYPE } from '../onboarding-prototype/wizard-store.ts';
 import { useSidebarStore } from './sidebar-store.ts';
 
 const PREVIEW = 6;
@@ -37,17 +38,19 @@ function Group({ platform, repo, items, now, q }: { platform: string; repo: stri
   const scoped = scope === platform;
   const open = q ? true : !shut;
   const shown = q || all ? items : items.slice(0, PREVIEW);
+  // PROTOTYPE (#363): the group goes by its repository's name, with no separate List group.
+  const name = PROTOTYPE && repo ? repo.split('/')[1]! : platform;
   return (
     <section className="list-group" data-platform={platform}>
       <div className={`flex h-9 items-center gap-1.5 rounded-md px-1.5 hover:bg-(--sidebar-row-hover) ${scoped ? 'bg-(--sidebar-row-selected)' : ''}`}>
-        <button type="button" aria-label={open ? `Collapse ${platform}` : `Expand ${platform}`} aria-expanded={open} onClick={() => setShut(!shut)}
+        <button type="button" aria-label={open ? `Collapse ${name}` : `Expand ${name}`} aria-expanded={open} onClick={() => setShut(!shut)}
           className="grid size-5 place-items-center text-(--sidebar-muted-foreground)">
           {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </button>
         <button type="button" aria-pressed={scoped} onClick={() => setScope(scoped ? null : platform)} className="scope flex min-w-0 flex-1 items-center gap-2 text-left">
-          <span className={`plat-${slug(platform)} grid size-5 shrink-0 place-items-center rounded-md bg-[var(--k,var(--muted-foreground))] text-[10px] font-bold text-white`} aria-hidden="true">{platform[0]}</span>
-          <span className="truncate text-sm font-medium text-(--sidebar-foreground)">{platform}</span>
-          {repo && <span className="truncate text-[11px] text-(--sidebar-muted-foreground)">{repo.split('/')[1]}</span>}
+          <span className={`plat-${slug(platform)} grid size-5 shrink-0 place-items-center rounded-md bg-[var(--k,var(--muted-foreground))] text-[10px] font-bold text-white`} aria-hidden="true">{name[0]!.toUpperCase()}</span>
+          <span className="truncate text-sm font-medium text-(--sidebar-foreground)">{name}</span>
+          {repo && !PROTOTYPE && <span className="truncate text-[11px] text-(--sidebar-muted-foreground)">{repo.split('/')[1]}</span>}
         </button>
         <span className="count shrink-0 pr-1 text-[11px] tabular-nums text-(--sidebar-muted-foreground)">{items.length}</span>
       </div>

@@ -32,14 +32,14 @@ export function WizardDialog() {
   const step = run && STEPS[indexOf(run)]!;
   return (
     <Dialog open={!!run} onOpenChange={(open) => !open && close()}>
-      <DialogPopup className="max-w-2xl">
+      <DialogPopup className="max-w-3xl">
         {run && step && (<>
           <DialogHeader>
             <DialogDescription>Onboard {projectOf(run)?.name ?? 'a repository'} · step {indexOf(run) + 1} of {STEPS.length}</DialogDescription>
             <DialogTitle>{step.label}</DialogTitle>
             <Progress value={run.done.length} max={STEPS.length} caption={run.done.length === STEPS.length ? 'Onboarded' : `${run.done.length} of ${STEPS.length} done`} />
           </DialogHeader>
-          <DialogPanel><StepBody run={run} step={run.step} /></DialogPanel>
+          <DialogPanel className="py-6"><StepBody run={run} step={run.step} /></DialogPanel>
           <DialogFooter>
             <span className="mr-auto self-center text-xs text-muted-foreground">Closing keeps it on the board as onboarding, with Resume.</span>
             <Nav run={run} />

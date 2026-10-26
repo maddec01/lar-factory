@@ -18,8 +18,8 @@ the flow and `docs/plan.md` for how it was set up.
   tests sit next to the file they test.
 - `packages/ui` holds Copies of T3's base components and coss's toast, listed in its `UPSTREAM.md`.
   Never edit one: take a fresh copy from upstream and update its row.
-- Nothing secret goes in this public repo; the board reads GitHub through the local
-  `gh` login, and `config.json` holds only repos and their roles.
+- Nothing secret goes in this public repo or in any repository's Repository config
+  (`.lar-factory.json`); the board reads GitHub through the local `gh` login.
 - Every commit and PR title uses conventional commits (`type(scope): description`;
   scopes: `board`, `lar-work`, `skill-sync`, `skills`, `ci`). A required check and the
   `commit-msg` hook enforce it. Update branches by rebase; fold review fixes in with

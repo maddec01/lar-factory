@@ -154,8 +154,7 @@ cd apps/desktop && pnpm run build --unsigned
 ```
 
 It writes an unsigned Apple Silicon app to `apps/desktop/release/mac-arm64/Lar Factory.app`,
-with the board server bundled into one file, its built page and a copy of `config.json`
-inside. Rebuild it after changing `config.json`. If macOS refuses to open it,
+with the board server bundled into one file and its built page inside. If macOS refuses to open it,
 right-click it in Finder and choose Open. Beside it go a dmg, a zip and the update
 feed, `latest-mac.yml`.
 
@@ -227,7 +226,6 @@ packages/shared/   types and logic the apps share; apps import it, never each ot
 references/        checklists Addy's skills link to
 scripts/setup-worktree.sh installs the workspace in a new worktree (.githooks, t3.json)
 scripts/release-secrets.sh stores the Release signing secrets on GitHub
-config.json        lar repos (role), board refresh, pickup limits
 UPSTREAM.md        source and commit of every copy
 docs/plan.md       how this was set up
 ```

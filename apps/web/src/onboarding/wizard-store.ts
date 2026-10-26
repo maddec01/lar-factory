@@ -3,7 +3,8 @@
 // project is picked drops the run; closing after keeps its repository on this Mac's list as onboarding, with where it
 // stopped, and Resume reopens it there. The Checks step runs the command checks, then the setup checks, and holds Next
 // until each passes; a run that reuses its .lar-factory.json finishes there, with no PR. Any other run opens the
-// onboarding PR on the Pull request step, then waits for the board to finish the onboarding once the PR merges.
+// onboarding PR on the Pull request step, then waits for the board to finish the onboarding once the PR merges. A PR
+// the board finds closed without merging offers Reopen PR, or Start over, which opens a new one.
 
 import { create } from 'zustand';
 import {
@@ -96,6 +97,12 @@ export function configOf(run: Run, project: ProjectChoice): RepositoryConfigAnsw
 /** Whether the run's onboarding finished: its PR is open and the board no longer has its repository onboarding, as the PR merged. */
 export const onboarded = (run: Run, data: Pick<BoardData, 'onboarding'>): boolean => !!run.prUrl && !isOnboarding(data, run.repo);
 
+/** Whether the board found the run's PR closed without merging. */
+export function prClosed(run: Run, data: Pick<BoardData, 'onboarding'>): boolean {
+  const kept = run.repo ? data.onboarding?.find((o) => sameRepo(o.repo, run.repo!)) : undefined;
+  return !!run.prUrl && kept?.progress.prUrl === run.prUrl && !!kept.progress.prClosed;
+}
+
 /** The commands the Checks step checks for a GitHub repository; az waits for Azure DevOps in build #386. */
 export const COMMAND_CHECKS = ['gh', 't3', 'git', 'jq', 'curl'] as const satisfies readonly CheckedTool[];
 
@@ -167,16 +174,51 @@ interface WizardState {
   retryCheck: (id: SetupCheckId) => Promise<void>;
   /** Finishes a run that reuses its .lar-factory.json once its checks pass, so its repository goes on the board. */
   finish: () => Promise<void>;
-  /** Opening the onboarding PR, and why the board couldn't. */
-  pr: { opening: boolean; error: string | null };
+  /**
+   * Opening or reopening the onboarding PR, and why the board couldn't; Check now while it waits for the board's read,
+   * and when that read last answered with the PR still open.
+   */
+  pr: { opening: boolean; reopening: boolean; checking: boolean; checkedAt: number | null; error: string | null };
   /** Opens the onboarding PR, which the board keeps with the run's progress. */
   openPr: () => Promise<void>;
+  /** Reopens the run's PR, which closed without merging. */
+  reopenPr: () => Promise<void>;
+  /** Drops the run's closed PR and opens a new one. */
+  startOver: () => Promise<void>;
+  /** Has the board read GitHub now, so it finds a merge before its next refresh, and waits for that read. */
+  checkMerge: () => Promise<void>;
 }
 
 /** Counts project reads, so one answered after a newer read or a close is dropped. */
 let reads = 0;
 /** Counts check runs, so a check answered after a newer run or a close is dropped. */
 let checkRuns = 0;
+
+const IDLE: WizardState['pr'] = { opening: false, reopening: false, checking: false, checkedAt: null, error: null };
+
+/** How long Check now waits for the board's read before it gives up. */
+const READ_WAIT_MS = 60_000;
+
+/**
+ * The board data the page gets once the board read GitHub after `before`: a new read time, or a read problem other than
+ * the one `before` has. Null when none arrives within READ_WAIT_MS, as when gh can't read at all; `cancel` stops waiting.
+ */
+function nextRead(before: BoardData): { read: Promise<BoardData | null>; cancel: () => void } {
+  let cancel = () => {};
+  const read = new Promise<BoardData | null>((resolve) => {
+    const done = (data: BoardData | null) => {
+      clearTimeout(timer);
+      stop();
+      resolve(data);
+    };
+    const stop = useBoardStore.subscribe(({ data }) => {
+      if (data.fetchedAt !== before.fetchedAt || data.error && data.error !== before.error) done(data);
+    });
+    const timer = setTimeout(() => done(null), READ_WAIT_MS);
+    cancel = () => done(null);
+  });
+  return { read, cancel };
+}
 
 const WAITING: Record<SetupCheckId, SetupCheckState> = { checkout: { state: 'waiting' }, source: { state: 'waiting' }, push: { state: 'waiting' } };
 
@@ -243,18 +285,18 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     projects: { state: 'loading' },
     creating: null,
     checks: null,
-    pr: { opening: false, error: null },
+    pr: IDLE,
     start: (offer) => {
       checkRuns++;
       set({ run: { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, savedAs: null, setup: null, prUrl: null },
-        creating: null, checks: null, pr: { opening: false, error: null } });
+        creating: null, checks: null, pr: IDLE });
       void get().loadProjects();
     },
     resume: (repo) => {
       const kept = useBoardStore.getState().data.onboarding?.find((o) => sameRepo(o.repo, repo));
       if (!kept) return;
       checkRuns++;
-      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, pr: { opening: false, error: null } });
+      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, pr: IDLE });
       // The checks read the picked project, so they wait for T3's projects.
       void get().loadProjects().then(() => { if (get().run?.step === 'checks') void get().runChecks(); });
     },
@@ -348,16 +390,46 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const { run, projects, pr } = get();
       const project = run && pickedProject(run, projects);
       const config = run && project && configOf(run, project);
-      if (!run?.repo || !run.projectId || run.step !== 'pr' || run.prUrl || pr.opening || !config) return;
-      set({ pr: { opening: true, error: null } });
+      if (!run?.repo || !run.projectId || run.step !== 'pr' || run.prUrl || pr.opening || pr.reopening || !config) return;
+      set({ pr: { ...IDLE, opening: true } });
       const body = { repo: run.repo, progress: progressOf({ ...run, projectId: run.projectId }), config, ...replacing({ ...run, repo: run.repo }) };
       const result = await postAction<{ prUrl: string }>('/api/onboarding/pr', body);
       receive(result);
       const now = get().run;
       // The run closed while gh ran; the board kept the PR with its onboarding, which Resume reopens.
       if (!now || now.repo !== run.repo) return;
-      if (result.error || !result.prUrl) return set({ pr: { opening: false, error: result.error ?? 'The board sent no PR.' } });
-      set({ run: { ...now, prUrl: result.prUrl, savedAs: run.repo }, pr: { opening: false, error: null } });
+      if (result.error || !result.prUrl) return set({ pr: { ...IDLE, error: result.error ?? 'The board sent no PR.' } });
+      set({ run: { ...now, prUrl: result.prUrl, savedAs: run.repo }, pr: IDLE });
+    },
+    reopenPr: async () => {
+      const { run, pr } = get();
+      if (!run?.repo || !prClosed(run, useBoardStore.getState().data) || pr.reopening) return;
+      set({ pr: { ...IDLE, reopening: true } });
+      const result = await postAction('/api/onboarding/pr/reopen', { repo: run.repo });
+      receive(result);
+      if (get().run?.repo !== run.repo) return;
+      set({ pr: { ...IDLE, error: result.error } });
+    },
+    startOver: async () => {
+      const { run } = get();
+      if (!run || !prClosed(run, useBoardStore.getState().data) || get().pr.reopening) return;
+      set({ run: { ...run, prUrl: null }, pr: IDLE });
+      await get().openPr();
+    },
+    checkMerge: async () => {
+      const { run, pr } = get();
+      if (!run?.prUrl || pr.checking) return;
+      set({ pr: { ...pr, checking: true, error: null } });
+      // Listen before asking, so a read that answers before the post does still counts.
+      const { read, cancel } = nextRead(useBoardStore.getState().data);
+      const asked = await postAction('/api/read', {});
+      if (asked.error) cancel();
+      const data = asked.error ? null : await read;
+      // The run closed, or moved to another PR, while the board read.
+      if (get().run?.prUrl !== run.prUrl) return;
+      const followed = data?.onboarding?.find((o) => o.progress.prUrl === run.prUrl)?.followProblem;
+      const error = asked.error ?? (data ? data.error ?? followed : 'The board hasn’t read GitHub yet. It checks again on its next refresh.');
+      set({ pr: { ...get().pr, checking: false, checkedAt: error ? get().pr.checkedAt : Date.now(), error: error ?? null } });
     },
   };
 });

@@ -118,8 +118,9 @@ export function TitleBar() {
     <header className={`title-bar flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-3 ${inset} [-webkit-app-region:drag]`}>
       {failedCheck(data.tools, 't3')?.result !== 'missing' && (
         <>
-          {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. */}
-          <h1 className="sr-only">Lar Factory</h1>
+          {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. A closing dialog
+              whose opener went away puts focus on it. */}
+          <h1 className="sr-only" tabIndex={-1}>Lar Factory</h1>
           <Scope />
           <Refreshed data={data} />
           <div className="flex min-w-0 flex-1 items-center justify-center"><Counters /></div>

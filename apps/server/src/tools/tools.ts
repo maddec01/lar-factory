@@ -5,6 +5,7 @@ import { accessSync, constants, statSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { GH_FLOOR, type CheckedTool, type ToolCheck, type ToolChecks } from '@lar-factory/shared';
+import { serverRuntimePath, t3Running } from '../t3/t3-settings.ts';
 import { type RunResult, runTool } from './run-tool.ts';
 
 export const TOOL_NAMES = ['t3', 'gh', 'az', 'git', 'jq', 'curl'] as const;
@@ -224,13 +225,21 @@ export async function probeAz(): Promise<ToolCheck> {
   return { result: 'ok', ...(version && { version }) };
 }
 
+/** Checks t3 runs, then that T3 Code is running, as its runtime file at `runtime` says. */
+async function checkT3(runtime: string): Promise<ToolCheck> {
+  const check = await checkVersion('t3');
+  if (check.result !== 'ok' || t3Running(runtime)) return check;
+  return { result: 'not-running', ...(check.version && { version: check.version }) };
+}
+
 /**
  * Checks every command the board needs from the last lookup, together, and az only when `withAz` is set, as
- * only a repository on Azure DevOps needs it. `ghError` is the gh probe's error for the Stale banner.
+ * only a repository on Azure DevOps needs it. t3 also needs T3 Code running, which T3's runtime file at
+ * `t3Runtime` tells. `ghError` is the gh probe's error for the Stale banner.
  */
-export async function checkTools(withAz: boolean): Promise<{ tools: ToolChecks; ghError?: string }> {
-  const others = ['t3', 'git', 'jq', 'curl'] as const satisfies readonly CheckedTool[];
-  const [gh, az, ...checks] = await Promise.all([probeGh(), withAz ? probeAz() : undefined, ...others.map(checkVersion)]);
-  const tools = { gh: gh.check, ...Object.fromEntries(others.map((name, i) => [name, checks[i]!])), ...(az && { az }) } as ToolChecks;
+export async function checkTools(withAz: boolean, t3Runtime = serverRuntimePath()): Promise<{ tools: ToolChecks; ghError?: string }> {
+  const others = ['git', 'jq', 'curl'] as const satisfies readonly CheckedTool[];
+  const [gh, az, t3, ...checks] = await Promise.all([probeGh(), withAz ? probeAz() : undefined, checkT3(t3Runtime), ...others.map(checkVersion)]);
+  const tools = { gh: gh.check, t3, ...Object.fromEntries(others.map((name, i) => [name, checks[i]!])), ...(az && { az }) } as ToolChecks;
   return { tools, ...(gh.error && { ghError: gh.error }) };
 }

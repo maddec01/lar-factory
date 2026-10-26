@@ -184,6 +184,12 @@ test('Diagnostics shows what the lookup found wrong with gh and t3', async () =>
   expect(text(row('d-gh'))).toContain('Fix: gh auth login');
 });
 
+test('Diagnostics shows T3 Code not running, with its fix', async () => {
+  await open('Diagnostics', { ...sample, tools: toolChecks({ t3: { result: 'not-running', version: '0.1.3-nightly.1' } }) });
+  expect(text(row('d-t3').querySelector('.tool-state'))).toBe('● Not running');
+  expect(text(row('d-t3'))).toContain('Open T3 Code.');
+});
+
 test('Diagnostics shows a gh older than 2.94.0 with its fix', async () => {
   await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }) });
   expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● 2.93.1, older than 2.94.0');

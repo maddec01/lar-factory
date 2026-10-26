@@ -100,7 +100,8 @@ test('the checks report each command: its version, missing with the override and
   // A command that runs passes, even when it prints no version.
   await script('curl', 'exit 2');
   await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, JQ_PATH: join(dir, 'nowhere/jq') });
-  const { tools, ghError } = await checkTools(false);
+  await writeFile(join(dir, 'server-runtime.json'), JSON.stringify({ version: 1, pid: process.pid, port: 3773 }));
+  const { tools, ghError } = await checkTools(false, join(dir, 'server-runtime.json'));
   assert.deepEqual(tools, {
     t3: { result: 'ok', version: '0.1.3-nightly.1' },
     gh: { result: 'logged-out', version: '2.96.1', fix: 'gh auth login' },
@@ -109,6 +110,16 @@ test('the checks report each command: its version, missing with the override and
     curl: { result: 'ok' },
   });
   assert.equal(ghError, undefined);
+});
+
+test('t3 is not running without T3\'s runtime file, and missing outranks it', async (t) => {
+  const { dir, bin, shell } = await machine(t, []);
+  await writeFile(join(bin, 't3'), '#!/bin/sh\necho t3 v0.1.3-nightly.1\n');
+  await chmod(join(bin, 't3'), 0o755);
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
+  assert.deepEqual((await checkTools(false, join(dir, 'no-runtime.json'))).tools.t3, { result: 'not-running', version: '0.1.3-nightly.1' });
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, T3_PATH: '/nowhere/t3' });
+  assert.deepEqual((await checkTools(false, join(dir, 'no-runtime.json'))).tools.t3, { result: 'missing', override: 'T3_PATH=/nowhere/t3' });
 });
 
 /** `gh auth status` for a classic token with these scopes, or with no scopes line when null. */

@@ -131,6 +131,10 @@ test('Repositories shows the GitHub Project, the command line tools\' logins and
   expect(groups()).toEqual([['GitHub Project', ['project']], ['Command line tools', ['gh', 'az']],
     ['Repositories', sample.repos.map((r) => `repo-${r.repo}`)]]);
   expect(row('project').querySelector('input')!.value).toBe('maddec01 / lar');
+  expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
+  expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
+  expect(text(row('az'))).not.toContain('no listed repository');
+  await push({ ...sample, project: { owner: 'maddec01', title: 'lar' }, tools: toolChecks() });
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
@@ -142,11 +146,13 @@ test('Repositories shows the GitHub Project, the command line tools\' logins and
 
 const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];
 
-test('Diagnostics shows every command OK before the first check, and az skipped', async () => {
+test('Diagnostics shows every command Not checked before the first check, then OK, and az not checked', async () => {
   await open('Diagnostics');
+  expect([...DIAGNOSED, 'd-az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(Array(6).fill('● Not checked'));
+  await push({ ...sample, tools: toolChecks() });
   expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● OK', '● OK', '● OK', '● OK', '● OK']);
-  expect(text(row('d-az').querySelector('.tool-state'))).toBe('● Skipped');
-  expect(text(row('d-az'))).toContain('Skipped: no listed repository is on Azure DevOps.');
+  expect(text(row('d-az').querySelector('.tool-state'))).toBe('● Not checked');
+  expect(text(row('d-az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
 });
 
 test('the Command line tools rows show signed out, missing or the problem found, with the fix', async () => {

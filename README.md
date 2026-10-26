@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/assets/lar-factory-on-dark.png">
-    <img alt="lar Factory" src=".github/assets/lar-factory-on-light.png" height="56">
+    <img alt="Lar Factory" src=".github/assets/lar-factory-on-light.png" height="56">
   </picture>
 </p>
 
-# lar Factory
+# Lar Factory
 
 A small software factory for [lar](https://github.com/maddec01): the skills,
 build agents and local board that take an idea from a list to a merged PR.
@@ -97,7 +97,7 @@ through a long conversation, and subagents return summaries instead of files.
 
 Install the board app from
 [GitHub Releases](https://github.com/maddec01/lar-factory/releases): download the
-newest Release's dmg and drag lar Factory into Applications. On the first launch of
+newest Release's dmg and drag Lar Factory into Applications. On the first launch of
 each new version the app installs every skill and the shared checklists from
 `references/` into `~/.agents`, and links them into the Claude profiles ticked in its
 Settings (`~/.claude` and each `~/.claude-*`). The copied skills' `../../references/`
@@ -152,7 +152,7 @@ To build a Mac app that runs without the checkout:
 cd apps/desktop && pnpm run build --unsigned
 ```
 
-It writes an unsigned Apple Silicon app to `apps/desktop/release/mac-arm64/lar Factory.app`,
+It writes an unsigned Apple Silicon app to `apps/desktop/release/mac-arm64/Lar Factory.app`,
 with the board server bundled into one file, its built page and a copy of `config.json`
 inside. Rebuild it after changing `config.json`. If macOS refuses to open it,
 right-click it in Finder and choose Open. Beside it go a dmg, a zip and the update

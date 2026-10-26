@@ -1,12 +1,13 @@
 // The Settings page: the sidebar's section list with search and Back, the breadcrumb over each section's rows, the
 // Claude profiles with their switches and what a change did, the bundled skills with their last updates and install
-// states, the update channel, version and Check now, the tool and repository rows, and the rows that aren't built yet. The bridge stands in for the app's preload; without it
+// states, the update channel, version and Check now, the tool rows, the repository rows with Resume and Add repository, and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the profiles and updates show disabled.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
 import { clock, day, type BoardData, type BundledSkill, type ProfilesResult, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
+import { dialog, project, serve } from '../onboarding/onboarding-support.ts';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
 const listed: ProfilesResult = {
@@ -138,20 +139,45 @@ test('the header drags the window, but not Restore defaults', async () => {
 /** Each Settings group's title with its rows' ids. */
 const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
 
-test('Repositories shows the command line tools\' logins and each repository with its role, read-only', async () => {
-  await open('Repositories', sample);
-  expect(groups()).toEqual([['Command line tools', ['gh', 'az']],
-    ['Repositories', sample.repos.map((r) => `repo-${r.repo}`)]]);
+test('Repositories shows the command line tools\' logins and each repository with its provider, item source and show setting', async () => {
+  const repos = [{ ...sample.repos[0]!, project: { owner: 'maddec01', number: 3 } }, { ...sample.repos[1]!, items: 'issues' as const, show: 'opted-in' as const }];
+  await open('Repositories', { ...sample, repos });
+  expect(groups()).toEqual([['Command line tools', ['gh', 'az']], ['Repositories', repos.map((r) => `repo-${r.repo}`)]]);
   expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).not.toContain('no listed repository');
-  await push({ ...sample, tools: toolChecks() });
+  await push({ ...sample, repos, tools: toolChecks() });
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
-  expect(sample.repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual(sample.repos.map((r) => `${r.repo}${r.role}${r.repo.split('/')[1]}Edit`));
-  expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
-    ...sample.repos.map(() => ['Edit', true]), ['Add repository', true]]);
+  expect(repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual([
+    `${repos[0]!.repo}GitHub · GitHub Project maddec01 #3 · All itemsEditReset`,
+    `${repos[1]!.repo}GitHub · Issues · Opted-in itemsEditReset`,
+  ]);
+});
+
+test('Edit and Reset wait for build #385, and Add repository opens the onboarding dialog over Settings', async () => {
+  serve(sample, [project('lar-web')]);
+  await open('Repositories', sample);
+  expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled, b.title])).toEqual([
+    ...sample.repos.flatMap(() => [['Edit', true, 'Editing a repository arrives in build #385'], ['Reset', true, 'Resetting a repository arrives in build #385']]),
+    [' Add repository', false, '']]);
+  await settle(() => $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === ' Add repository')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('T3 project');
+  expect(body().closest('[hidden]'), 'Settings stays open under the dialog').toBeNull();
+});
+
+test('a repository still onboarding is listed with its step, and Resume reopens the dialog there', async () => {
+  const data: BoardData = { ...sample,
+    onboarding: [{ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } } }] };
+  serve(data, [project('lar-web', { onBoard: true })]);
+  await open('Repositories', data);
+  expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web']]);
+  expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webOnboarding · stopped at Provider and item sourceResumeEditReset');
+  await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Provider and item source');
 });
 
 const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];

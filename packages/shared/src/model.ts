@@ -309,6 +309,8 @@ export interface RepoConfig {
   role: string;
   /** Its item source: the GitHub Project its .lar-factory.json names, or the repository's issues. */
   items?: ItemSourceKind;
+  /** The GitHub Project its item source names, by owner and number; absent for the repository's issues. */
+  project?: { owner: string; number: number };
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
 }

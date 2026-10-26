@@ -29,7 +29,7 @@ test('each onboarded repository reads its items from the item source its .lar-fa
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(data.error, null);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]), [[FACTORY, 1, 'Queued'], [FACTORY, 2, 'List'], [APPLE, 7, 'Queued']]);
-  assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'project', show: 'all' },
+  assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all' },
     { repo: APPLE, role: 'Apple client', items: 'issues', show: 'opted-in' }]);
   assert.equal(data.project.title, 'lar');
 });
@@ -39,7 +39,7 @@ test('repositories naming the same Project share one read of it, and a missing f
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(await projectReads(board), 1);
   assert.equal(await configReads(board), 3);
-  assert.deepEqual(data.repos[0], { repo: 'maddec01/lar-server', role: 'Server', items: 'project', show: 'all' });
+  assert.deepEqual(data.repos[0], { repo: 'maddec01/lar-server', role: 'Server', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all' });
 });
 
 test('without a list of onboarded repositories the board is empty', async (t) => {

@@ -27,10 +27,21 @@ const main = async () => {
       const nodes = { build: options.builds, blocked: options.blocked, active: options.active }[label];
       return output({ data: { search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: nodes ?? [] } } });
     }
+    // A repository's issues: options.repoIssues holds each repository's, by owner/name, in either state.
+    if (args.some((a) => a.includes('repository(owner:'))) {
+      const value = (key) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
+      const states = args.filter((a) => a.startsWith('states[]=')).map((a) => a.slice('states[]='.length));
+      const since = value('since');
+      const nodes = (options.repoIssues?.[`${value('owner')}/${value('name')}`] ?? [])
+        .filter((issue) => states.includes(issue.state) && (!since || issue.updatedAt >= since))
+        .map((issue) => ({ ...issue, body: undefined }));
+      return output({ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } } });
+    }
     // Dossier bodies by node id; the project read below leaves bodies out, as the real query does.
     if (args.some((a) => a.includes('nodes(ids:'))) {
       const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
-      const nodes = ids.map((id) => (options.items ?? []).map((i) => i.content).find((c) => c?.id === id)).map((c) => c && { id: c.id, body: c.body ?? '' });
+      const contents = [...(options.items ?? []).map((i) => i.content), ...Object.values(options.repoIssues ?? {}).flat()];
+      const nodes = ids.map((id) => contents.find((c) => c?.id === id)).map((c) => c && { id: c.id, body: c.body ?? '' });
       return output({ data: { nodes } });
     }
     if (options.readDelay) {

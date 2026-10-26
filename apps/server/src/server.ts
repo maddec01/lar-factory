@@ -10,10 +10,10 @@ import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { loadConfig } from './config/config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
-import { githubProject } from './github/github-project.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
+import { configuredSources } from './items/item-sources.ts';
 import { log } from './log.ts';
 import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
@@ -45,7 +45,7 @@ const board = createBoardState({
 const statsSources: StatsSources = { db: statsDbPath(), settings: t3SettingsPath(), rates: usageRatesPath(), home: homedir() };
 const modelManifest = modelManifestPath();
 const environmentIdFile = environmentIdPath();
-const items = githubProject(config);
+const items = configuredSources(config);
 let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;

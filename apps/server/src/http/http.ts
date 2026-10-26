@@ -39,6 +39,8 @@ export interface HttpDeps {
   finishOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
   openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | { status: number; error: string }>;
+  /** Reopens an onboarding's PR that closed without merging, returning the repositories still onboarding, or gh's problem. */
+  reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
 }
 
 export interface BoardServer {
@@ -114,7 +116,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  runSetupCheck, finishOnboarding, openOnboardingPr }: HttpDeps): BoardServer {
+  runSetupCheck, finishOnboarding, openOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -212,6 +214,16 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         board.update({ onboarding: opened.onboarding });
         board.push();
         return { status: 200, body: withBoard({ prUrl: opened.prUrl, error: null }) };
+      },
+    },
+    '/api/onboarding/pr/reopen': {
+      what: 'the onboarding whose PR to reopen', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const reopened = await reopenOnboardingPr(input);
+        if ('error' in reopened) return { status: reopened.status, body: { error: reopened.error } };
+        board.update({ onboarding: reopened.onboarding });
+        board.push();
+        return { status: 200, body: withBoard({ error: null }) };
       },
     },
     // Looks the tools up again for the notices' Recheck button.

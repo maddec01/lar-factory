@@ -3,7 +3,7 @@ import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { NOT_LANDED, SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { rawIssue } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, RawItem } from '@lar-factory/shared';
@@ -130,7 +130,7 @@ test("a part whose repository is still onboarding can't be armed, and one armed 
   writeOnboarding(env.HOME!, 'maddec01/lar-factory');
   mkdirSync(dirname(armedPath(env.HOME!)), { recursive: true });
   writeFileSync(armedPath(env.HOME!), JSON.stringify({ I_12: { model: OPUS } }));
-  const { board } = await armableBoard(t, [blockedBuild(['CLOSED', 'CLOSED']), blockedIssue(20, 'Queued', [], ['OPEN', 'OPEN'])], {}, env);
+  const { board } = await armableBoard(t, [blockedBuild(['CLOSED', 'CLOSED']), blockedIssue(20, 'Queued', [], ['OPEN', 'OPEN'])], NOT_LANDED, env);
   const refused = await arm(board, 'I_20');
   assert.deepEqual([refused.status, (await refused.json()).error], [409, "Waits for onboarding's PR to merge"]);
   const data = await read(board);

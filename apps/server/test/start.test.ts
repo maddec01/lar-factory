@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { draftItem, SAMPLE_MODELS, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
+import { draftItem, NOT_LANDED, SAMPLE_MODELS, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectIssue, rawIssue } from '@lar-factory/shared/test/raw-items';
 import { checkouts } from './repo-support.ts';
@@ -69,7 +69,7 @@ test("Start is refused while the item's repository is still onboarding, and runs
   const { board } = await boardIn(t, [projectIssue(12, 'Queued')], ORIGINS, (dir) => {
     writeOnboarding(dir, 'maddec01/lar-factory');
     return projectsDb(t, PROJECTS(dir));
-  });
+  }, NOT_LANDED);
   const refused = await start(board, 'I_12');
   assert.deepEqual([refused.status, (await refused.json()).error], [409, "Waits for onboarding's PR to merge"]);
   assert.deepEqual(await board.t3Calls(), []);

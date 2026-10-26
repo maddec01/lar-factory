@@ -28,6 +28,14 @@ test('finishing a reused onboarding leaves its repository onboarded and returns 
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web' }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
 });
 
+test('finishing reports the finished repository; a refused finish reports none', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
+  const finished: string[] = [];
+  await finishOnboarding({ repo: 'maddec01/lar-cli' }, dir, gh(null), (repo) => finished.push(repo));
+  await finishOnboarding({ repo: 'maddec01/lar-web' }, dir, gh(CONFIG), (repo) => finished.push(repo));
+  assert.deepEqual(finished, ['maddec01/lar-web']);
+});
+
 test('a run never kept is added, in place of the one it was kept under before', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-apple', onboarding: progress }]);
   assert.deepEqual(await finishOnboarding({ repo: 'maddec01/lar-web', replaces: 'maddec01/lar-apple' }, dir, gh(CONFIG)), { onboarding: [] });

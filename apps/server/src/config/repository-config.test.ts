@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding } from './repository-config.ts';
+import { readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed, stillOnboarding } from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar repository config test '));
@@ -36,7 +36,7 @@ test('the list file names the onboarded repositories, each still onboarding with
 
 test("an onboarding that isn't progress is refused, naming its entry", async (t) => {
   for (const onboarding of [true, { step: 'setup', done: ['project'] }, { step: 3, done: [], answers: { projectId: 'x' } },
-    { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} }, { ...progress(), prUrl: 4 },
+    { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} }, { ...progress(), prUrl: 4 }, { ...progress(), prClosed: false },
     ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { projectNumber: 3 }, { showPicked: 'yes' }].map((wrong) =>
       ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } }]) {
     const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding }] }) });
@@ -65,6 +65,27 @@ test('saving an onboarding makes the list file and its folder when there are non
   const dir = join(await dataDir(t), 'Lar Factory');
   saveOnboarding({ repo: 'maddec01/lar-apple', progress: progress() }, null, dir);
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-apple', onboarding: progress() }]);
+});
+
+test("the board marks an onboarding's PR closed; a save with the same PR keeps the mark, and one with another PR drops it", async (t) => {
+  const PR = 'https://github.com/maddec01/lar-apple/pull/4';
+  const open = { ...progress('pr'), prUrl: PR };
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding: open }] }) });
+  assert.deepEqual(savePrClosed('maddec01/lar-apple', true, dir), [{ repo: 'maddec01/lar-apple', onboarding: { ...open, prClosed: true } }]);
+  assert.deepEqual(saveOnboarding({ repo: 'maddec01/lar-apple', progress: open }, null, dir), [{ repo: 'maddec01/lar-apple', onboarding: { ...open, prClosed: true } }]);
+  assert.deepEqual(savePrClosed('maddec01/lar-apple', false, dir), [{ repo: 'maddec01/lar-apple', onboarding: open }]);
+  savePrClosed('maddec01/lar-apple', true, dir);
+  const next = { ...open, prUrl: 'https://github.com/maddec01/lar-apple/pull/5' };
+  assert.deepEqual(saveOnboarding({ repo: 'maddec01/lar-apple', progress: { ...next, prClosed: true } }, null, dir), [{ repo: 'maddec01/lar-apple', onboarding: next }]);
+  assert.throws(() => savePrClosed('maddec01/lar-web', true, dir), { message: 'maddec01/lar-web is not onboarding.' });
+});
+
+test("the repositories still onboarding carry the problem following each one's PR met on this refresh, whatever the case", () => {
+  const waiting = { ...progress('pr'), prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
+  const list = [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: waiting }, { repo: 'maddec01/lar-docs', onboarding: progress() }];
+  assert.deepEqual(stillOnboarding(list, new Map([['MADDEC01/Lar-Apple', 'gh pr view failed: HTTP 502']])),
+    [{ repo: 'maddec01/lar-apple', progress: waiting, followProblem: 'gh pr view failed: HTTP 502' }, { repo: 'maddec01/lar-docs', progress: progress() }]);
+  assert.deepEqual(stillOnboarding(list), [{ repo: 'maddec01/lar-apple', progress: waiting }, { repo: 'maddec01/lar-docs', progress: progress() }]);
 });
 
 test('finishing an onboarding leaves its entry with the repository alone, in place of the entry it was saved under', async (t) => {

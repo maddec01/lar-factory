@@ -67,7 +67,7 @@ export function isProgress(value: unknown): value is OnboardingProgress {
   return isRecord(value) && typeof value.step === 'string' && strings(value.done) && isRecord(value.answers)
     && (value.answers.provider === undefined || PROVIDERS.includes(value.answers.provider as Provider))
     && typeof value.answers.projectId === 'string' && (value.answers.setup === undefined || isSetup(value.answers.setup))
-    && (value.prUrl === undefined || typeof value.prUrl === 'string');
+    && (value.prUrl === undefined || typeof value.prUrl === 'string') && (value.prClosed === undefined || value.prClosed === true);
 }
 
 /** repositories.json's entries as the file holds them, checked; none when there is no file. */
@@ -101,11 +101,24 @@ export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] 
 /**
  * Stores where an onboarding stopped in its repository's entry, adding the entry when there is none, and drops the
  * onboarding entry of `replaces`, the repository it was saved under before it picked another T3 project. Keeps every
- * other entry as the file has it, and returns the list. Throws for a repository that is onboarded already.
+ * other entry as the file has it, and returns the list. Only the board marks a PR closed, so the progress's own mark is
+ * dropped and the saved one kept while the PR is the same. Throws for a repository that is onboarded already.
  */
 export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
-  return saveEntry({ repo, onboarding: progress }, replaces, dir);
+  const { prClosed: _, ...sent } = progress;
+  const saved = onboardingOf(repo, dir);
+  return saveEntry({ repo, onboarding: saved?.prClosed && saved.prUrl === sent.prUrl ? { ...sent, prClosed: true } : sent }, replaces, dir);
 }
+
+/** Marks whether the repository's onboarding PR closed without merging, as the board found it on GitHub, and returns the list. */
+export function savePrClosed(repo: string, closed: boolean, dir = boardDataDir()): OnboardedRepository[] {
+  const onboarding = onboardingOf(repo, dir);
+  if (!onboarding) throw new Error(`${repo} is not onboarding.`);
+  const { prClosed: _, ...progress } = onboarding;
+  return saveEntry({ repo, onboarding: closed ? { ...progress, prClosed: true } : progress }, null, dir);
+}
+
+const onboardingOf = (repo: string, dir: string) => readRepositoryList(dir).find((e) => sameRepo(e.repo, repo))?.onboarding;
 
 /**
  * Finishes an onboarding: its repository's entry keeps only the repository, in place of its onboarding entry and of
@@ -136,9 +149,14 @@ function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: str
   return readListFile(file).list;
 }
 
-/** The list's repositories that are still onboarding, each with where it stopped. */
-export const stillOnboarding = (list: readonly OnboardedRepository[]): OnboardingRepository[] =>
-  list.flatMap(({ repo, onboarding }) => onboarding ? [{ repo, progress: onboarding }] : []);
+/** The list's repositories that are still onboarding, each with where it stopped and the problem in `followProblems`, by repository, following its PR met. */
+export function stillOnboarding(list: readonly OnboardedRepository[], followProblems: ReadonlyMap<string, string> = new Map()): OnboardingRepository[] {
+  return list.flatMap(({ repo, onboarding }) => {
+    if (!onboarding) return [];
+    const followProblem = [...followProblems].find(([r]) => sameRepo(r, repo))?.[1];
+    return [{ repo, progress: onboarding, ...followProblem !== undefined && { followProblem } }];
+  });
+}
 
 /** settings.json, with each missing field, or the whole file, taking its default; a file it can't use takes them all, with the problem. */
 export function readBoardSettings(dir = boardDataDir()): BoardSettings {

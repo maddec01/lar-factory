@@ -27,6 +27,15 @@ test("each repository's answer is read once and kept until the checks clear", as
   assert.deepEqual(asked, ['maddec01/lar-web', 'maddec01/lar-server', 'maddec01/lar-web']);
 });
 
+test("forgetting a repository reads only its answer again", async () => {
+  const { run, asked } = gh({ 'maddec01/lar-web': 'file', 'maddec01/lar-server': 'none' });
+  const checks = createConfigChecks(run, () => {});
+  await Promise.all([checks.configOf('maddec01/lar-web'), checks.configOf('maddec01/lar-server')]);
+  checks.forget('Maddec01/Lar-Server');
+  await Promise.all([checks.configOf('maddec01/lar-web'), checks.configOf('maddec01/lar-server')]);
+  assert.deepEqual(asked, ['maddec01/lar-web', 'maddec01/lar-server', 'maddec01/lar-server']);
+});
+
 test('a check that fails answers hasConfig null, logs a line once while it keeps failing, and is tried again next time', async () => {
   const files: Record<string, 'file' | 'fails'> = { 'maddec01/lar-web': 'fails' };
   const { run, asked } = gh(files);

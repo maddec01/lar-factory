@@ -1,5 +1,6 @@
 // Whether each GitHub repository has .lar-factory.json on its default branch, and its values, for onboarding's offers
-// and its T3 project step. Each repository's answer is read once and kept until clear(), which Recheck calls, so a refresh makes
+// and its T3 project step. Each repository's answer is read once and kept until clear(), which Recheck calls, or until
+// forget() drops it once its onboarding finishes, so a refresh makes
 // no gh call for a repository already answered. A check that fails answers hasConfig null, is logged and is tried again next time.
 
 import type { ProjectChoice } from '@lar-factory/shared';
@@ -14,6 +15,8 @@ export interface ConfigChecks {
   configOf(repo: string): Promise<ConfigAnswer>;
   /** Forgets every answer, so each repository is read again. */
   clear(): void;
+  /** Forgets `repo`'s answer, so it is read again. */
+  forget(repo: string): void;
 }
 
 export function createConfigChecks(run?: (args: string[]) => Promise<string>, logLine: (line: string) => void = log): ConfigChecks {
@@ -46,5 +49,6 @@ export function createConfigChecks(run?: (args: string[]) => Promise<string>, lo
       return read;
     },
     clear: () => answers.clear(),
+    forget: (repo) => { answers.delete(repo.toLowerCase()); },
   };
 }

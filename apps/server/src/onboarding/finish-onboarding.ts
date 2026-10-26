@@ -9,10 +9,10 @@ import { boardDataDir } from '../port/board-record.ts';
 /**
  * Finishes the body's `repo`, in place of the onboarding saved under `replaces` when it names one, once its default
  * branch has a .lar-factory.json the board can read, and returns the repositories still onboarding; or the status and
- * problem when the body, the file or the list refuses it.
+ * problem when the body, the file or the list refuses it. `finished` hears the repository once it finishes.
  */
-export async function finishOnboarding(input: Record<string, unknown>, dir = boardDataDir(), run?: (args: string[]) => Promise<string>):
-  Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }> {
+export async function finishOnboarding(input: Record<string, unknown>, dir = boardDataDir(), run?: (args: string[]) => Promise<string>,
+  finished: (repo: string) => void = () => {}): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }> {
   const { repo, replaces } = input;
   if (!isRepo(repo) || replaces !== undefined && typeof replaces !== 'string') return { status: 400, error: 'Send the repository whose onboarding finishes.' };
   let found;
@@ -20,6 +20,9 @@ export async function finishOnboarding(input: Record<string, unknown>, dir = boa
   catch (err) { return { status: 502, error: `Can't read ${repo}'s .lar-factory.json: ${message(err)}` }; }
   if (!found) return { status: 409, error: `${repo} has no .lar-factory.json on its default branch to reuse.` };
   if ('problem' in found) return { status: 409, error: found.problem };
-  try { return { onboarding: stillOnboarding(saveOnboarded(repo, replaces ?? null, dir)) }; }
+  let saved;
+  try { saved = saveOnboarded(repo, replaces ?? null, dir); }
   catch (err) { return { status: 409, error: message(err) }; }
+  finished(repo);
+  return { onboarding: stillOnboarding(saved) };
 }

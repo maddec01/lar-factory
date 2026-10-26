@@ -43,7 +43,9 @@ const main = async () => {
     return void process.stdout.write(`${options.canPush !== false}\n`);
   }
   // Onboarding's PR: the default branch is main at commit abc123, and options.fail names the call that fails. An
-  // opened PR goes in options.prs, by URL, with its state, which a test changes to MERGED to merge it.
+  // opened PR goes in options.prs, by URL, with its state, which a test changes to MERGED to merge it; gh pr close and
+  // gh pr reopen change it too. options.branches holds the lar-factory/ branches that exist, each with its open PR's
+  // URL or null.
   const fail = (call, text) => {
     if (options.fail !== call) return false;
     process.stderr.write(text);
@@ -52,6 +54,21 @@ const main = async () => {
   };
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.includes('.default_branch')) return void process.stdout.write('main\n');
   if (args[0] === 'api' && /\/git\/ref\/heads\/main$/.test(args[1])) return void process.stdout.write('abc123\n');
+  const ref = args[0] === 'api' && /\/git\/ref\/heads\/(lar-factory\/.+)$/.exec(args[1])?.[1];
+  if (ref) {
+    if (options.branches && ref in options.branches) return void process.stdout.write('def456\n');
+    process.stderr.write('gh: Not Found (HTTP 404)\n');
+    process.exitCode = 1;
+    return;
+  }
+  if (args[0] === 'pr' && args[1] === 'list' && args.includes('--head')) {
+    return void process.stdout.write(`${options.branches?.[args[args.indexOf('--head') + 1]] ?? ''}\n`);
+  }
+  if (args[0] === 'pr' && (args[1] === 'close' || args[1] === 'reopen')) {
+    if (fail(`pr-${args[1]}`, 'HTTP 403: Resource not accessible by integration\n')) return;
+    options.prs = { ...options.prs, [args[2]]: args[1] === 'close' ? 'CLOSED' : 'OPEN' };
+    return void fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+  }
   if (args[0] === 'api' && /\/git\/refs$/.test(args[1])) return void (fail('branch', 'gh: Reference already exists (HTTP 422)\n') || output({}));
   if (args[0] === 'api' && args[1].endsWith('/contents/.lar-factory.json') && args.includes('PUT')) return void (fail('file', 'HTTP 409: Conflict\n') || output({}));
   if (args[0] === 'pr' && args[1] === 'create') {

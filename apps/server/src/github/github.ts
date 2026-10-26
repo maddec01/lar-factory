@@ -403,6 +403,23 @@ export async function createBranch(repo: string, branch: string, sha: string, ru
   await run(['api', `repos/${repo}/git/refs`, '--method', 'POST', '-f', `ref=refs/heads/${branch}`, '-f', `sha=${sha}`]);
 }
 
+/** Whether the repository has the branch on GitHub. */
+export async function branchExists(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<boolean> {
+  try {
+    await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha']);
+    return true;
+  } catch (err) {
+    if (/HTTP 404/.test(message(err))) return false;
+    throw err;
+  }
+}
+
+/** The URL of the open PR from the branch, or null when it has none. */
+export async function openPrFrom(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+  const url = (await run(['pr', 'list', '-R', repo, '--head', branch, '--state', 'open', '--json', 'url', '--jq', '.[0].url // empty'])).trim();
+  return url || null;
+}
+
 /** Adds a file to a branch on GitHub in a commit of its own. */
 export async function addFile(repo: string, branch: string, path: string, content: string, commit: string,
   run: (args: string[]) => Promise<string> = gh): Promise<void> {
@@ -424,6 +441,16 @@ export async function prState(url: string, run: (args: string[]) => Promise<stri
   const state = (await run(['pr', 'view', url, '--json', 'state', '--jq', '.state'])).trim();
   if (state !== 'OPEN' && state !== 'MERGED' && state !== 'CLOSED') throw new Error(`gh pr view sent no PR state for ${url}: ${state}`);
   return state;
+}
+
+/** Closes a PR, by its URL, with a comment that says why. */
+export async function closePr(url: string, comment: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  await run(['pr', 'close', url, '--comment', comment]);
+}
+
+/** Reopens a PR, by its URL, that closed without merging. */
+export async function reopenPr(url: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  await run(['pr', 'reopen', url]);
 }
 
 /** Deletes an issue for good, which needs admin rights on its repository; returns the error, or null when GitHub accepted it. */

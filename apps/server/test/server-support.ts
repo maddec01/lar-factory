@@ -45,7 +45,12 @@ export function writeRepositoryList(home: string, repos: readonly string[]): voi
   writeFileSync(join(dir, 'repositories.json'), JSON.stringify({ repositories: repos.map((repo) => ({ repo })) }));
 }
 
-/** Lists TEST_REPOSITORIES under `home` with `repo` still onboarding, its PR open. */
+/**
+ * Lists TEST_REPOSITORIES under `home` with `repo` still onboarding, its PR open. Its default branch has no
+ * .lar-factory.json yet, as NOT_LANDED tells the fake gh, or the board finishes the onboarding with the file.
+ */
+export const NOT_LANDED = { repoConfigs: { 'maddec01/lar-factory': null } };
+
 export function writeOnboarding(home: string, repo: string): void {
   const progress = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'project-factory' }, prUrl: `https://github.com/${repo}/pull/1` };
   writeRepositoryList(home, TEST_REPOSITORIES);

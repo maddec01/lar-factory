@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { draftItem, SAMPLE_MODELS, startBoard, until, writeRepositoryList } from './server-support.ts';
+import { draftItem, SAMPLE_MODELS, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectIssue, rawIssue } from '@lar-factory/shared/test/raw-items';
 import { checkouts } from './repo-support.ts';
@@ -63,6 +63,16 @@ test("Start begins one lar-work thread in the card's repository project and leav
     ['thread', 'start', 'project-server', '#30 Issue 30\n$lar-work maddec01/lar-server#30', '--json'],
   ]);
   assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
+});
+
+test("Start is refused while the item's repository is still onboarding, and runs no t3", async (t) => {
+  const { board } = await boardIn(t, [projectIssue(12, 'Queued')], ORIGINS, (dir) => {
+    writeOnboarding(dir, 'maddec01/lar-factory');
+    return projectsDb(t, PROJECTS(dir));
+  });
+  const refused = await start(board, 'I_12');
+  assert.deepEqual([refused.status, (await refused.json()).error], [409, "Waits for onboarding's PR to merge"]);
+  assert.deepEqual(await board.t3Calls(), []);
 });
 
 test('Start runs the thread on the picked model choice, still in the repository project', async (t) => {

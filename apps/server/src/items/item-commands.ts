@@ -3,7 +3,7 @@
 // blocks which lives in this file.
 
 import { join } from 'node:path';
-import { blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDraft, validateDraft, workMessage } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDraft, isOnboarding, validateDraft, workMessage } from '@lar-factory/shared';
 import type { BoardData, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
@@ -160,8 +160,12 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
     return withBoard(200, { error: null });
   }
 
-  /** Refuses a start while an issue the item is blocked by is open; Start after starts it once they close. */
+  /**
+   * Refuses a start while the item's repository is still onboarding, until its PR merges, or while an issue the item
+   * is blocked by is open; Start after starts it once they close.
+   */
   function blockedReply(item: Item): Reply | null {
+    if (isOnboarding(board.snapshot(), item.repo)) return withBoard(409, { error: WAITS_FOR_ONBOARDING });
     const blocked = blockedText(item);
     return blocked ? withBoard(409, { error: `${blocked}; use Start after to start it then.` }) : null;
   }

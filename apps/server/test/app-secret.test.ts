@@ -6,7 +6,7 @@ import { projectIssue } from '@lar-factory/shared/test/raw-items';
 
 const SECRET = 'app-secret-for-tests';
 const REFUSED = 'Submit from the board app.';
-const GUARDED = ['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/recheck'];
+const GUARDED = ['/api/items', '/api/queue', '/api/back-to-list', '/api/start', '/api/abandon', '/api/pick-status', '/api/recheck'];
 
 const post = (board: Board, path: string, headers: Record<string, string> = {}) => fetch(`${board.url}${path}`, {
   method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json', ...headers }, body: '{}' });

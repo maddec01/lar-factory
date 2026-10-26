@@ -95,6 +95,32 @@ test('a move on an issue with two status labels is refused before any write', as
   assert.deepEqual(await labelEdits(board), []);
 });
 
+test('picking one of the statuses on an issue with two keeps it, removes the other, and nothing else moves the issue', async (t) => {
+  const twice = appleIssue(8, { labels: { nodes: [{ name: 'status-review' }, { name: 'status-shaping' }] } });
+  const board = await issuesBoard(t, { repoIssues: { [APPLE]: [twice] }, repoLabels: { [APPLE]: ['status-review'] } } as object);
+  const pick = (status: unknown) => board.post({ itemId: 'I_8', status }, board.url, '/api/pick-status');
+  for (const status of ['Queued', 'Done', 7]) assert.equal((await pick(status)).status, 409, String(status));
+  assert.equal((await board.post({ itemId: 'I_8' }, board.url, '/api/queue')).status, 409);
+  assert.deepEqual(await labelEdits(board), []);
+  const response = await pick('Review');
+  assert.equal(response.status, 200);
+  assert.deepEqual(await labelEdits(board), [['issue', 'edit', '8', '-R', APPLE, '--add-label', 'status-review', '--remove-label', 'status-shaping']]);
+  const shown = (await response.json() as { board: BoardData }).board.items[0]!;
+  assert.deepEqual([shown.status, shown.statuses], ['Review', ['Review']]);
+  const read = await until(board, (d) => d.items[0]!.statuses.length === 1 && d.items[0]!.status === 'Review');
+  assert.equal(read.items.length, 1);
+  assert.equal((await pick('Review')).status, 409, 'one status left, nothing to pick');
+});
+
+test('a closed issue that kept two status labels is Done, with nothing to pick', async (t) => {
+  const closed = appleIssue(8, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(1), updatedAt: daysAgo(1),
+    labels: { nodes: [{ name: 'status-review' }, { name: 'status-shaping' }] } });
+  const board = await issuesBoard(t, { repoIssues: { [APPLE]: [closed] } });
+  assert.equal((await board.board() as BoardData).items[0]!.status, 'Done');
+  assert.equal((await board.post({ itemId: 'I_8', status: 'Review' }, board.url, '/api/pick-status')).status, 409);
+  assert.deepEqual(await labelEdits(board), []);
+});
+
 test("Add item in a repository reading its issues creates the issue with status-list and nothing else, and shows it as List", async (t) => {
   const board = await issuesBoard(t);
   const draft = { repo: APPLE, kind: 'feature', title: 'Capture an item', description: '', labels: [] };

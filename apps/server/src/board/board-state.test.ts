@@ -44,3 +44,15 @@ test('a removed item stays off the board while GitHub still lists it', () => {
   assert.deepEqual(statuses(board.snapshot()), ['b:List']);
   assert.deepEqual(pushed, [['b:List']], 'remove pushes; a change to a removed item does not');
 });
+
+test('a pick stays until a read shows the item with only the status picked', () => {
+  const board = createBoardState(empty());
+  const twice = { ...item('a', 'Shaping'), statuses: ['Shaping', 'Review'] } satisfies Item;
+  board.applyRead([twice], board.revision(), (items) => items);
+  board.showChanged(item('a', 'Shaping'));
+  board.applyRead([twice], board.revision(), (items) => items);
+  assert.deepEqual(board.snapshot().items[0]!.statuses, ['Shaping'], 'the read still shows both');
+  board.applyRead([item('a', 'Shaping')], board.revision(), (items) => items);
+  board.applyRead([twice], board.revision(), (items) => items);
+  assert.deepEqual(board.snapshot().items[0]!.statuses, ['Shaping', 'Review'], 'confirmed, so the board trusts later reads');
+});

@@ -88,15 +88,21 @@ test('a failed edit gives the status it could not set and gh\'s message', async 
   assert.equal(await repoIssues(REPO, gh.run).setStatus(item(['List']), 'Queued'), 'Could not set Queued. gh issue edit failed: HTTP 502');
 });
 
-test('a move on an issue with two status labels is refused before any write', async () => {
+test('a move on an issue with two status labels is refused before it runs', () => {
+  const issues = repoIssues(REPO, fakeGh().run);
+  assert.match(issues.statusRefusal(item(['Shaping', 'Ready'])) ?? '', /This issue carries Shaping and Ready\. Keep one to move it again\./);
+  assert.equal(issues.statusRefusal(item(['Shaping'])), null);
+  assert.equal(issues.statusRefusal({ ...item(['Shaping', 'Ready']), state: 'closed', closedAs: 'done' }), null);
+  assert.equal(issues.statusRefusal(parent), null);
+});
+
+test('a status write adds the new label and removes every other status label the issue carries', async () => {
   const gh = fakeGh();
   const issues = repoIssues(REPO, gh.run);
-  const twice = item(['Shaping', 'Ready']);
-  assert.match(issues.statusRefusal(twice) ?? '', /This issue carries Shaping and Ready\. Keep one to move it again\./);
-  assert.equal(issues.statusRefusal(item(['Shaping'])), null);
-  assert.equal(issues.statusRefusal(parent), null);
-  assert.match(await issues.setStatus(twice, 'Queued') ?? '', /Keep one/);
-  assert.deepEqual(gh.calls, []);
+  assert.equal(await issues.setStatus(item(['Shaping', 'Review']), 'Review'), null);
+  assert.deepEqual(gh.calls.at(-1), ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-review', '--remove-label', 'status-shaping']);
+  assert.equal(await issues.setStatus(item(['Shaping', 'Review']), 'Queued'), null);
+  assert.deepEqual(gh.calls.at(-1), ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-queued', '--remove-label', 'status-shaping', '--remove-label', 'status-review']);
 });
 
 test("a parent's move reads its labels first, swaps them, and is refused when it carries two", async () => {

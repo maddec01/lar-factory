@@ -290,9 +290,10 @@ test("an issue's labels hold the statuses whose labels it carries, in flow order
 });
 
 test('an item carrying more than one status moves only once one is kept, and says which it carries', () => {
-  assert.equal(carriesTwoStatuses({ statuses: ['Ready', 'Verify'] }), true);
-  assert.equal(carriesTwoStatuses({ statuses: ['Ready'] }), false);
-  assert.equal(carriesTwoStatuses({ statuses: [] }), false);
+  assert.equal(carriesTwoStatuses({ statuses: ['Ready', 'Verify'], state: 'open' }), true);
+  assert.equal(carriesTwoStatuses({ statuses: ['Ready'], state: 'open' }), false);
+  assert.equal(carriesTwoStatuses({ statuses: [], state: 'open' }), false);
+  assert.equal(carriesTwoStatuses({ statuses: ['Ready', 'Verify'], state: 'closed' }), false, 'a closed item is Done, whatever labels it kept');
   assert.equal(keepOneText(['Ready', 'Verify']), 'This issue carries Ready and Verify. Keep one to move it again.');
   assert.equal(keepOneText(['Shaping', 'Ready', 'Review']), 'This issue carries Shaping, Ready and Review. Keep one to move it again.');
 });

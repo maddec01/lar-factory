@@ -1,10 +1,10 @@
-// The commands the board's buttons send: add, queue, back to List, start, start build and abandon.
+// The commands the board's buttons send: add, queue, back to List, pick a status, start, start build and abandon.
 // The maps of commands in flight are private here, so every rule about which command
 // blocks which lives in this file.
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { blockedText, buildBranch, buildMessage, canAbandon, isBuild, isDraft, validateDraft, workMessage } from '@lar-factory/shared';
+import { blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDraft, validateDraft, workMessage } from '@lar-factory/shared';
 import type { BoardData, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { loadConfig } from '../config/config.ts';
@@ -26,6 +26,8 @@ export interface ItemCommands {
   capture(input: Record<string, unknown>): Promise<Reply>;
   queue(itemId: string): Promise<Reply>;
   backToList(itemId: string): Promise<Reply>;
+  /** Keeps one of the statuses an issue carrying more than one has, and drops the others: the one move such an issue allows. */
+  pickStatus(itemId: string, status: unknown): Promise<Reply>;
   /** Starts a T3 thread for a Queued item that nothing open blocks, at most once per board run. */
   start(itemId: string, model: unknown): Promise<Reply>;
   /**
@@ -46,7 +48,7 @@ export interface ItemCommandsDeps {
   offerModelChoices(): ModelGroup[];
 }
 
-type Action = 'queue' | 'back to List' | 'start' | 'abandon';
+type Action = 'queue' | 'back to List' | 'pick' | 'start' | 'abandon';
 
 /** A status change the board's buttons make: Queue moves List to Queued, Back to List the reverse. */
 interface Move {
@@ -135,6 +137,21 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
     const error = await items.setStatus(item, to).finally(() => moving.delete(itemId));
     if (error) return withBoard(502, { error });
     board.showChanged({ ...item, status: to, statuses: [to] });
+    return withBoard(200, { error: null });
+  }
+
+  async function pickStatus(itemId: string, status: unknown): Promise<Reply> {
+    const item = board.find(itemId);
+    if (!item) return reply(404, { error: GONE });
+    if (!carriesTwoStatuses(item)) return withBoard(409, { error: 'Only an open item that carries more than one status has one to pick.' });
+    const picked = item.statuses.find((s) => s === status);
+    if (!picked) return withBoard(409, { error: `Pick one of the statuses this item carries: ${item.statuses.join(', ')}.` });
+    const busy = busyReason(itemId, 'pick');
+    if (busy) return withBoard(409, { error: busy });
+    moving.add(itemId);
+    const error = await items.setStatus(item, picked).finally(() => moving.delete(itemId));
+    if (error) return withBoard(502, { error });
+    board.showChanged({ ...item, status: picked, statuses: [picked] });
     return withBoard(200, { error: null });
   }
 
@@ -232,6 +249,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices }: I
 
     queue: (itemId) => move(itemId, QUEUE),
     backToList: (itemId) => move(itemId, BACK_TO_LIST),
+    pickStatus,
 
     start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {
       if (item.status !== 'Queued') return reply(409, { error: `Only Queued items can be started; this one is in ${item.status}.` });

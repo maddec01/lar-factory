@@ -266,7 +266,7 @@ export async function fetchRepoIssues(repo: string, now = Date.now()): Promise<I
 }
 
 /** An error's message, for a write's error text. */
-const message = (err: unknown) => (err instanceof Error ? err.message : 'GitHub request failed.');
+export const message = (err: unknown) => (err instanceof Error ? err.message : 'GitHub request failed.');
 
 /** Looks up the project's Status option once and returns a writer for it. */
 async function statusWriter(config: BoardConfig, name: Status, run: (args: string[]) => Promise<string>) {

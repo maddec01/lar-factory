@@ -2,7 +2,7 @@
 // lar-factory/onboarding starts at the default branch's head, the file goes on it with gh api, then gh pr create opens
 // the PR, whose URL goes in the onboarding's entry. Each refresh finishes an onboarding whose PR merged.
 
-import { SHOW_SETTINGS, isRecord, type OnboardingRepository, type RepositoryConfigAnswers, type ShowSetting } from '@lar-factory/shared';
+import { SHOW_SETTINGS, isRecord, onboardingConfigFile, type OnboardingRepository, type RepositoryConfigAnswers, type ShowSetting } from '@lar-factory/shared';
 import {
   type OnboardedRepository, isItemSource, isProgress, isRepo, saveOnboarded, saveOnboarding, stillOnboarding,
 } from '../config/repository-config.ts';
@@ -27,10 +27,6 @@ interface Opening {
 const isConfig = (value: unknown): value is RepositoryConfigAnswers => isRecord(value) && isItemSource(value.itemSource)
   && SHOW_SETTINGS.includes(value.show as ShowSetting) && typeof value.role === 'string' && value.role.trim() !== '';
 
-/** The .lar-factory.json onboarding writes; labels wait for build #383's label step. */
-const fileFor = ({ role, itemSource, show }: RepositoryConfigAnswers) =>
-  `${JSON.stringify({ version: 1, role: role.trim(), itemSource, show, labels: [] }, null, 2)}\n`;
-
 /**
  * Opens the PR for the body's `repo` with its `config`, then keeps the body's `progress` on the Pull request step with
  * the PR's URL, in place of the onboarding saved under `replaces` when it names one. Returns the URL and the
@@ -50,7 +46,8 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
       opening.head ??= await defaultBranchHead(repo, run);
       if (!opening.branch) opening.branch = await createBranch(repo, ONBOARDING_BRANCH, opening.head.sha, run).then(() => true as const);
       if (!opening.file) {
-        opening.file = await addFile(repo, ONBOARDING_BRANCH, '.lar-factory.json', fileFor(config), TITLE, run).then(() => true as const);
+        const file = onboardingConfigFile({ ...config, role: config.role.trim() });
+        opening.file = await addFile(repo, ONBOARDING_BRANCH, '.lar-factory.json', file, TITLE, run).then(() => true as const);
       }
       opening.url ??= await createPr(repo, { base: opening.head.branch, head: ONBOARDING_BRANCH, title: TITLE, body: BODY }, run);
     } catch (err) {

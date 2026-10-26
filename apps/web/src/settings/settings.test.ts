@@ -202,6 +202,18 @@ test('Diagnostics shows a gh older than 2.94.0 with its fix', async () => {
   expect(text(row('d-gh'))).toContain('Fix: brew upgrade gh');
 });
 
+test('Repositories shows a gh too old as signed in as well', async () => {
+  await open('Repositories', { ...sample, tools: toolChecks({ gh: { result: 'outdated', version: '2.90.0', fix: 'brew upgrade gh' } }) });
+  expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in, 2.90.0, older than 2.94.0');
+  expect(text(row('gh'))).toContain('Fix: brew upgrade gh');
+});
+
+test('a login without the project scope on a gh too old names both problems and both fixes', async () => {
+  await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'no-project-scope', version: '2.90.0', fix: 'gh auth refresh -s project', upgrade: 'brew upgrade gh' } }) });
+  expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● No project scope, 2.90.0, older than 2.94.0');
+  expect(text(row('d-gh'))).toContain('Fix: gh auth refresh -s project, then brew upgrade gh');
+});
+
 test('Diagnostics shows a gh login without the project scope with its fix', async () => {
   await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'no-project-scope', version: '2.102.0', fix: 'gh auth refresh -s project' } }) });
   expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● No project scope');

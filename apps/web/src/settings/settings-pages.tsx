@@ -39,16 +39,17 @@ const ONLY_APP_UPDATES = 'Only the board app updates itself';
 /**
  * A command's state: the version it printed, else OK, noting scopes gh couldn't read; the problem its check found; or
  * Not checked before the first check, in sample mode, and for an az no listed repository needs.
- * A `login` row says Signed in or Signed out instead.
+ * A `login` row says Signed in or Signed out instead, and Signed in beside a gh too old.
  */
 function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
   if (!check) return { text: 'Not checked', tone: 'muted' };
   const unread = 'scopes' in check ? ", couldn't read scopes" : '';
+  const older = (version: string) => `${version}, older than ${GH_FLOOR}`;
   switch (check.result) {
     case 'ok': return { text: `${login ? 'Signed in' : check.version || 'OK'}${unread}`, tone: 'success' };
     case 'logged-out': return { text: login ? 'Signed out' : 'Logged out', tone: 'warning' };
-    case 'outdated': return { text: `${check.version}, older than ${GH_FLOOR}${unread}`, tone: 'warning' };
-    case 'no-project-scope': return { text: 'No project scope', tone: 'warning' };
+    case 'outdated': return { text: `${login ? 'Signed in, ' : ''}${older(check.version)}${unread}`, tone: 'warning' };
+    case 'no-project-scope': return { text: `No project scope${check.upgrade && check.version ? `, ${older(check.version)}` : ''}`, tone: 'warning' };
     case 'no-extension': return { text: 'No azure-devops extension', tone: 'warning' };
     case 'not-running': return { text: 'Not running', tone: 'warning' };
     case 'missing': return { text: 'Not found', tone: 'error' };
@@ -232,5 +233,7 @@ function toolDescription(does: string, check: ToolCheck | undefined): ReactNode 
   if (!check || check.result === 'ok') return does;
   if (check.result === 'not-running') return 'Open T3 Code.';
   const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';
-  return 'fix' in check ? <>{where}Fix: <code>{check.fix}</code></> : `${where}Install T3 Code.`;
+  if (!('fix' in check)) return `${where}Install T3 Code.`;
+  const upgrade = check.result === 'no-project-scope' && check.upgrade;
+  return <>{where}Fix: <code className="whitespace-nowrap">{check.fix}</code>{upgrade && <>, then <code className="whitespace-nowrap">{upgrade}</code></>}</>;
 }

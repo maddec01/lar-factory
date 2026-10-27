@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { Item } from '@lar-factory/shared';
-import { readAzureItemDetails } from './azure-details.ts';
+import { readAzureItemDetails, readAzureOlderComments } from './azure-details.ts';
 import { fakeAz, type FakeComment, type WorkItem } from './fake-az.ts';
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
@@ -81,4 +81,29 @@ test('a logged-out az answers the fix', async () => {
 test('an item without an Azure DevOps repository answers 404', async () => {
   const az = fakeAz({ items: [] });
   assert.deepEqual(await readAzureItemDetails({ ...item(5), repo: 'maddec01/lar' }, az.run), { status: 404, error: 'That item is not an Azure DevOps work item.' });
+});
+
+test('older comments are one comments call with the continuation token, 10 newest first, and the next token', async () => {
+  const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 25 }, (_, i) => comment(i + 1)) })] });
+  const page = await readAzureOlderComments(item(5), '10', az.run);
+  assert.ok(!('error' in page));
+  assert.deepEqual([page.comments.length, page.comments[0]!.id, page.comments[9]!.id, page.olderCursor], [10, '15', '6', '20']);
+  assert.equal(az.calls.length, 1);
+  const call = az.calls[0]!;
+  assert.ok(call.includes('comments') && call.includes('workItemId=5'));
+  assert.deepEqual(call.slice(call.indexOf('--query-parameters') + 1, call.indexOf('--query-parameters') + 4), ['$top=10', 'order=desc', 'continuationToken=10']);
+  assert.equal(call[call.indexOf('--api-version') + 1], '7.1-preview.4');
+});
+
+test('the oldest page answers no token', async () => {
+  const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 12 }, (_, i) => comment(i + 1)) })] });
+  const page = await readAzureOlderComments(item(5), '10', az.run);
+  assert.ok(!('error' in page));
+  assert.deepEqual([page.comments.map((c) => c.id), page.olderCursor], [['2', '1'], null]);
+});
+
+test('older comments of a repository not on Azure DevOps, or of a failed az, answer the error', async () => {
+  assert.deepEqual(await readAzureOlderComments({ id: 'I_1', content: 'ticket', repo: 'maddec01/lar', number: 5 } as Item, '10', fakeAz({ items: [] }).run), { status: 404, error: 'That item is not an Azure DevOps work item.' });
+  const failing = async () => { throw new Error('az exploded'); };
+  assert.deepEqual(await readAzureOlderComments(item(5), '10', failing), { status: 502, error: 'az exploded' });
 });

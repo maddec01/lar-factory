@@ -17,6 +17,28 @@ const TAG_LIMIT = 100;
 const twoStatuses = (item: { statuses: readonly Status[]; state: 'open' | 'closed' }): string | null =>
   (carriesTwoStatuses(item) ? keepOneText(item.statuses) : null);
 
+/** `what` failed in `project`, with the failure's message and fix. */
+export function writeFailure(what: string, project: string, err: unknown): string {
+  if (err instanceof ReadProblem) return `${what} ${err.message}${err.fix ? ` Run ${err.fix}, then try again.` : ''}`;
+  const text = err instanceof Error ? err.message : String(err);
+  if (/TF401289|permissions? to create tags/i.test(text)) {
+    return `${what} You have no right to create tags in ${project}. Ask a project administrator to allow you Create tag definition, then try again.`;
+  }
+  return `${what} ${text}`;
+}
+
+/** Runs `use` on a temporary file holding `body` as JSON, for az's --in-file, and removes the file after. */
+export async function withFile<T>(body: unknown, use: (file: string) => Promise<T>): Promise<T> {
+  const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
+  try {
+    const file = join(dir, 'body.json');
+    await writeFile(file, JSON.stringify(body));
+    return await use(file);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 type Operation = { op: 'test' | 'replace'; path: string; value: unknown };
 
 /** The writes of an Azure item source on `project`, through its `invoke`. */
@@ -30,28 +52,16 @@ export function azureWrites(project: string, invoke: AzureCalls['invoke']):
     (await invoke<{ value: { name: string; category: string }[] }>('wit', 'workitemtypestates', [`type=${field(raw, 'System.WorkItemType')}`])).value;
 
   /** Writes the operations to the work item read at `raw`, failing if it changed since. */
-  async function patch(raw: RawWorkItem & { rev: number }, ops: Operation[]): Promise<void> {
-    const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
-    try {
-      const file = join(dir, 'patch.json');
-      await writeFile(file, JSON.stringify([{ op: 'test', path: '/rev', value: raw.rev }, ...ops]));
-      await invoke('wit', 'workitems', [`id=${raw.id}`], ['--http-method', 'PATCH', '--media-type', 'application/json-patch+json', '--in-file', file]);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
+  const patch = (raw: RawWorkItem & { rev: number }, ops: Operation[]) =>
+    withFile([{ op: 'test', path: '/rev', value: raw.rev }, ...ops], (file) =>
+      invoke('wit', 'workitems', [`id=${raw.id}`], ['--http-method', 'PATCH', '--media-type', 'application/json-patch+json', '--in-file', file]));
 
   /** Runs a write, returning null, the refusal it returns, or `what` failed with the failure's message and fix. */
   async function attempt(what: string, write: () => Promise<string | void>): Promise<string | null> {
     try {
       return (await write()) ?? null;
     } catch (err) {
-      if (err instanceof ReadProblem) return `${what} ${err.message}${err.fix ? ` Run ${err.fix}, then try again.` : ''}`;
-      const text = err instanceof Error ? err.message : String(err);
-      if (/TF401289|permissions? to create tags/i.test(text)) {
-        return `${what} You have no right to create tags in ${project}. Ask a project administrator to allow you Create tag definition, then try again.`;
-      }
-      return `${what} ${text}`;
+      return writeFailure(what, project, err);
     }
   }
 

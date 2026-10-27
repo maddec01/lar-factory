@@ -7,11 +7,10 @@
 // PR closed without merging, which the Pull request step offers to reopen.
 
 import {
-  SHOW_SETTINGS, isRecord, isSkillName, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository,
-  type RepositoryConfigAnswers, type ShowSetting, type SkillPick,
+  isRecord, isSkillName, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
 } from '@lar-factory/shared';
 import {
-  type OnboardedRepository, findRepositoryConfig, isItemSource, isProgress, isRepo, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed,
+  type OnboardedRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed,
   stillOnboarding,
 } from '../config/repository-config.ts';
 import {
@@ -72,10 +71,6 @@ async function onboardingBranch(repo: string, run?: Run): Promise<{ branch: stri
   }
 }
 
-const isConfig = (value: unknown): value is RepositoryConfigAnswers => isRecord(value) && isItemSource(value.itemSource)
-  && SHOW_SETTINGS.includes(value.show as ShowSetting) && typeof value.role === 'string' && value.role.trim() !== ''
-  && Array.isArray(value.labels) && value.labels.every((l) => typeof l === 'string');
-
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
 /**
@@ -96,7 +91,7 @@ const isPicks = (value: unknown): value is OnboardingPicks => isRecord(value) &&
 
 /** The body's repository, its .lar-factory.json or null to reuse the repository's own, and its picks; null when they don't fit. */
 function readAnswers({ repo, config, picks }: Record<string, unknown>): { repo: string; config: string | null; picks: OnboardingPicks } | null {
-  if (!isRepo(repo) || config !== null && !isConfig(config) || !isPicks(picks)) return null;
+  if (!isRepo(repo) || config !== null && !isConfigAnswers(config) || !isPicks(picks)) return null;
   return { repo, config: config && onboardingConfigFile({ ...config, role: config.role.trim() }), picks };
 }
 

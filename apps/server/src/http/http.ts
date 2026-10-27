@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, type ClashRun, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, type ClashRun, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { isRepo } from '../config/repository-config.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
@@ -50,6 +50,10 @@ export interface HttpDeps {
   previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | { status: number; error: string }>;
   /** Reopens an onboarding's PR that closed without merging, returning the repositories still onboarding, or gh's problem. */
   reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
+  /** Edit's load: an onboarded repository's .lar-factory.json values from its default branch and its labels, or why it can't. */
+  readEditConfig(input: Record<string, unknown>): Promise<{ config: RepositoryConfigAnswers; labels: string[] } | { status: number; error: string }>;
+  /** Edit's Save: creates the custom labels the repository lacks and opens the PR on its .lar-factory.json, returning its URL, or gh's problem. */
+  openEditPr(input: Record<string, unknown>): Promise<{ prUrl: string } | { status: number; error: string }>;
 }
 
 export interface BoardServer {
@@ -125,7 +129,8 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
+  runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
+  readEditConfig, openEditPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -255,6 +260,20 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         board.update({ onboarding: reopened.onboarding });
         board.push();
         return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+    '/api/repositories/config': {
+      what: 'the repository to edit', disabled: 'Sample mode edits no repository.',
+      async run(input) {
+        const read = await readEditConfig(input);
+        return 'error' in read ? { status: read.status, body: { error: read.error } } : { status: 200, body: { ...read, error: null } };
+      },
+    },
+    '/api/repositories/config/pr': {
+      what: 'the repository and its new values', disabled: 'Sample mode edits no repository.',
+      async run(input) {
+        const opened = await openEditPr(input);
+        return 'error' in opened ? { status: opened.status, body: { error: opened.error } } : { status: 200, body: { ...opened, error: null } };
       },
     },
     // Looks the tools up again for the notices' Recheck button.

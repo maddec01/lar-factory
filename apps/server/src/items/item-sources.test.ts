@@ -118,7 +118,7 @@ const config = (repo: string, show: RepositoryConfig['show'] = 'all'): Repositor
 test('each read loads the configs first and builds the sources again only when they changed', async () => {
   let configs = [config('maddec01/lar-apple')];
   const built: string[][] = [];
-  const sources = onboardedSources(async () => ({ configs, problems: [] }), (read) => {
+  const sources = onboardedSources(async () => ({ configs, problems: [], resetting: [] }), (read) => {
     built.push(read.map((c) => `${c.repo} ${c.show}`));
     return fakeSource(read.map((c) => c.repo).join(',') || 'none', [], []);
   });
@@ -137,7 +137,7 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
   let fail = false;
   const sources = onboardedSources(async () => {
     if (fail) throw new Error('repositories.json isn\'t valid JSON.');
-    return { configs: [config('maddec01/lar-apple')], problems: [] };
+    return { configs: [config('maddec01/lar-apple')], problems: [], resetting: [] };
   }, () => fakeSource('apple', [], writes));
   await sources.read();
   fail = true;
@@ -150,6 +150,13 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
 test("a read leaves out the items of a repository whose config couldn't be read, though its Project lists them", async () => {
   const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple'), item('I_3', 'maddec01/LAR-APPLE')];
   const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')],
-    problems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }] }), () => fakeSource('lar', listed, []));
+    problems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }], resetting: [] }), () => fakeSource('lar', listed, []));
+  assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
+});
+
+test('a read leaves out the items of a resetting repository, though its Project lists them', async () => {
+  const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple'), item('I_3', 'maddec01/LAR-APPLE')];
+  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')], problems: [], resetting: ['maddec01/lar-apple'] }),
+    () => fakeSource('lar', listed, []));
   assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
 });

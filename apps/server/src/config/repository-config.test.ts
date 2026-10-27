@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { dropRepository, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed, stillOnboarding } from './repository-config.ts';
+import {
+  dropRepository, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed, saveResetting,
+  stillOnboarding,
+} from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar repository config test '));
@@ -47,6 +50,35 @@ test("an onboarding that isn't progress is refused, naming its entry", async (t)
     assert.throws(() => readRepositoryList(dir), { message: `${join(dir, 'repositories.json')}: repositories[0] has an onboarding without its step, done steps and T3 project, or with answers it can't use.` },
       JSON.stringify(onboarding));
   }
+});
+
+const RESET_PR = 'https://github.com/maddec01/lar-apple/pull/9';
+
+test('a resetting entry holds its reset PR, and one without a PR URL is refused, naming its entry', async (t) => {
+  const list = { repositories: [{ repo: 'maddec01/lar-apple', resetting: { prUrl: RESET_PR } }] };
+  assert.deepEqual(readRepositoryList(await dataDir(t, { 'repositories.json': JSON.stringify(list) })), [{ repo: 'maddec01/lar-apple', resetting: { prUrl: RESET_PR } }]);
+  for (const resetting of [true, {}, { prUrl: 4 }]) {
+    const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', resetting }] }) });
+    assert.throws(() => readRepositoryList(dir), { message: `${join(dir, 'repositories.json')}: repositories[0] has a resetting without its PR's URL.` });
+  }
+  const both = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding: progress(), resetting: { prUrl: RESET_PR } }] }) });
+  assert.throws(() => readRepositoryList(both), { message: `${join(both, 'repositories.json')}: repositories[0] is both onboarding and resetting.` });
+});
+
+test("resetting an onboarded repository keeps its reset PR in its entry, whatever the case, and keeps every other entry and the file's other keys", async (t) => {
+  const list = { note: 'kept', repositories: [{ repo: 'maddec01/lar-factory', note: 'kept' }, { repo: 'maddec01/lar-apple' }] };
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify(list) });
+  assert.deepEqual(saveResetting('MADDEC01/Lar-Apple', RESET_PR, dir), [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', resetting: { prUrl: RESET_PR } }]);
+  assert.deepEqual(JSON.parse(await readFile(join(dir, 'repositories.json'), 'utf8')),
+    { note: 'kept', repositories: [{ repo: 'maddec01/lar-factory', note: 'kept' }, { repo: 'maddec01/lar-apple', resetting: { prUrl: RESET_PR } }] });
+});
+
+test('only an onboarded repository can be resetting', async (t) => {
+  const list = { repositories: [{ repo: 'maddec01/lar-apple', onboarding: progress() }, { repo: 'maddec01/lar-web', resetting: { prUrl: RESET_PR } }] };
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify(list) });
+  assert.throws(() => saveResetting('maddec01/lar-apple', RESET_PR, dir), { message: 'maddec01/lar-apple is not onboarded.' });
+  assert.throws(() => saveResetting('maddec01/lar-web', RESET_PR, dir), { message: 'maddec01/lar-web is not onboarded.' });
+  assert.throws(() => saveResetting('maddec01/lar-docs', RESET_PR, dir), { message: 'maddec01/lar-docs is not onboarded.' });
 });
 
 test('saving an onboarding adds its repository to the list, or updates its entry, and keeps the other entries as they are', async (t) => {
@@ -100,6 +132,7 @@ test("the repositories still onboarding carry the problem following each one's P
   assert.deepEqual(stillOnboarding(list, new Map([['MADDEC01/Lar-Apple', 'gh pr view failed: HTTP 502']])),
     [{ repo: 'maddec01/lar-apple', progress: waiting, followProblem: 'gh pr view failed: HTTP 502' }, { repo: 'maddec01/lar-docs', progress: progress() }]);
   assert.deepEqual(stillOnboarding(list), [{ repo: 'maddec01/lar-apple', progress: waiting }, { repo: 'maddec01/lar-docs', progress: progress() }]);
+  assert.deepEqual(stillOnboarding([...list, { repo: 'maddec01/lar-web', resetting: { prUrl: RESET_PR } }]), stillOnboarding(list));
 });
 
 test('finishing an onboarding leaves its entry with the repository alone, in place of the entry it was saved under', async (t) => {
@@ -200,6 +233,20 @@ test("an onboarded repository whose config can't be read is left out with its pr
     { repo: 'maddec01/broken', problem: ".lar-factory.json isn't valid JSON." },
     { repo: 'maddec01/some', problem: '.lar-factory.json field show must be "all" or "opted-in".' },
   ]);
+});
+
+test('a repository still onboarding or resetting reads no config and has no problem', async () => {
+  const read: string[] = [];
+  const gh = async (args: string[]) => {
+    read.push(args[1]!);
+    return JSON.stringify({ role: 'The factory' });
+  };
+  const list = [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: progress() }, { repo: 'maddec01/lar-web', resetting: { prUrl: RESET_PR } }];
+  const { configs, problems, resetting } = await readOnboardedConfigs(list, gh);
+  assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(resetting, ['maddec01/lar-web']);
+  assert.deepEqual(read, ['repos/maddec01/lar-factory/contents/.lar-factory.json']);
 });
 
 test('a gh failure other than a 404 still fails the whole read', async (t) => {

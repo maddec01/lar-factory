@@ -33,7 +33,7 @@ const LINK = '120000';
  * leads to, resolved from the link's folder. Null when the link leads out of the repository, to a missing file or round
  * in a loop.
  */
-async function linkTarget(tree: CommitTree, read: (sha: string) => Promise<string>, path: string): Promise<string | null> {
+export async function linkTarget(tree: CommitTree, read: (sha: string) => Promise<string>, path: string): Promise<string | null> {
   let at = path;
   for (let hops = 0; hops < 8; hops++) {
     const entry = tree.files.get(at);

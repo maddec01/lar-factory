@@ -27,10 +27,14 @@ export interface BoardSettings {
   problem?: string;
 }
 
-/** An onboarded repository, an entry of repositories.json's `repositories`, with where it stopped while it is still onboarding. */
+/**
+ * An onboarded repository, an entry of repositories.json's `repositories`, with where it stopped while it is still
+ * onboarding, or its reset PR while it is resetting.
+ */
 export interface OnboardedRepository {
   repo: string;
   onboarding?: OnboardingProgress;
+  resetting?: { prUrl: string };
 }
 
 /** owner/name, each part of letters, digits, ".", "_" or "-", and neither "." nor ".."; repo-config.sh's repo_form. */
@@ -97,7 +101,12 @@ function readListFile(file: string): { raw: Record<string, unknown> & { reposito
     if (typeof entry !== 'object' || typeof repo !== 'string' || !REPO.test(repo)) {
       throw new Error(`${file}: repositories[${index}] needs a repo of the form owner/name.`);
     }
-    const { onboarding } = entry as { onboarding?: unknown };
+    const { onboarding, resetting } = entry as { onboarding?: unknown; resetting?: unknown };
+    if (onboarding !== undefined && resetting !== undefined) throw new Error(`${file}: repositories[${index}] is both onboarding and resetting.`);
+    if (resetting !== undefined) {
+      if (!isRecord(resetting) || typeof resetting.prUrl !== 'string') throw new Error(`${file}: repositories[${index}] has a resetting without its PR's URL.`);
+      return { repo, resetting: { prUrl: resetting.prUrl } };
+    }
     if (onboarding === undefined) return { repo };
     if (!isProgress(onboarding)) throw new Error(`${file}: repositories[${index}] has an onboarding without its step, done steps and T3 project, or with answers it can't use.`);
     return { repo, onboarding };
@@ -107,7 +116,7 @@ function readListFile(file: string): { raw: Record<string, unknown> & { reposito
 
 /**
  * repositories.json's entries, `{ "repositories": [{ "repo": "owner/name" }] }`, where an entry still onboarding
- * carries its progress as `onboarding`; none when there is no file.
+ * carries its progress as `onboarding`, and one resetting its reset PR as `resetting`; none when there is no file.
  */
 export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] {
   return readListFile(join(dir, 'repositories.json')).list;
@@ -172,6 +181,20 @@ export function dropRepository(repo: string, dir = boardDataDir()): OnboardedRep
   if (!list.some((e) => sameRepo(e.repo, repo))) throw new Error(`${repo} is not on this Mac's list.`);
   return writeListFile(dir, { ...raw, repositories: raw.repositories.filter((_, i) => !sameRepo(list[i]!.repo, repo)) });
 }
+
+/**
+ * Marks an onboarded repository resetting, with its reset PR's URL, keeping every other entry as the file has it, and
+ * returns the list. Throws for a repository that is not onboarded, or is onboarding or resetting.
+ */
+export function saveResetting(repo: string, prUrl: string, dir = boardDataDir()): OnboardedRepository[] {
+  const { raw, list } = readListFile(join(dir, 'repositories.json'));
+  const at = list.findIndex((e) => sameRepo(e.repo, repo));
+  if (at < 0 || list[at]!.onboarding || list[at]!.resetting) throw new Error(`${repo} is not onboarded.`);
+  return writeListFile(dir, { ...raw, repositories: raw.repositories.map((e, i) => i === at ? { ...e, resetting: { prUrl } } : e) });
+}
+
+/** The list's repositories on the board: neither still onboarding nor resetting. */
+export const onTheBoard = (list: readonly OnboardedRepository[]) => list.filter((e) => !e.onboarding && !e.resetting);
 
 /** Writes repositories.json with `content` and returns its list. */
 function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {
@@ -265,23 +288,26 @@ export async function readRepositoryConfig(repo: string, run?: (args: string[]) 
   return found;
 }
 
-/** The onboarded repositories' configs, and why each repository left off the board couldn't be read. */
+/** The onboarded repositories' configs, why each repository left off the board couldn't be read, and the repositories resetting. */
 export interface OnboardedConfigs {
   configs: RepositoryConfig[];
   problems: RepositoryConfigProblem[];
+  resetting: string[];
 }
 
 /**
- * Each onboarded repository's config, in the list's order, and the problem of each whose .lar-factory.json is
- * missing or wrong, which stays off the board; throws any other failure, such as a logged-out gh.
+ * Each config of the list's repositories on the board, in the list's order, the problem of each whose
+ * .lar-factory.json is missing or wrong, which stays off the board, and the repositories resetting, which read none;
+ * throws any other failure, such as a logged-out gh.
  */
 export async function readOnboardedConfigs(list: readonly OnboardedRepository[], run?: (args: string[]) => Promise<string>): Promise<OnboardedConfigs> {
-  const read = await Promise.all(list.map(({ repo }) => readRepositoryConfig(repo, run).catch((err: unknown) => {
+  const read = await Promise.all(onTheBoard(list).map(({ repo }) => readRepositoryConfig(repo, run).catch((err: unknown) => {
     if (err instanceof RepositoryConfigError) return { repo: err.repo, problem: err.problem };
     throw err;
   })));
   return {
     configs: read.filter((r): r is RepositoryConfig => 'role' in r),
     problems: read.filter((r): r is RepositoryConfigProblem => !('role' in r)),
+    resetting: list.flatMap((e) => e.resetting ? [e.repo] : []),
   };
 }

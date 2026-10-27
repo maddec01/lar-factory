@@ -150,11 +150,14 @@ const DOCS: FileWrite[] = [
   { path: 'docs/agents/domain.md', content: DOMAIN },
 ];
 
+/** The docs/agents/ files the setup writes, which Reset deletes. */
+export const AGENT_DOC_PATHS = DOCS.map(({ path }) => path);
+
 /**
- * `markdown` with its `## Agent skills` section, up to the next heading of level one or two outside a code fence,
- * replaced by the factory's block; or null when it has no such section.
+ * `markdown`'s lines split around its `## Agent skills` section, which runs up to the next heading of level one or two
+ * outside a code fence; null when it has no such section.
  */
-function replaceBlock(markdown: string): string | null {
+function splitAtBlock(markdown: string): { before: string[]; after: string[] | null } | null {
   const lines = markdown.split('\n');
   const start = lines.findIndex((line) => /^## Agent skills\s*$/.test(line));
   if (start < 0) return null;
@@ -164,9 +167,21 @@ function replaceBlock(markdown: string): string | null {
     if (/^\s*(```|~~~)/.test(lines[i]!)) fenced = !fenced;
     else if (!fenced && /^#{1,2} /.test(lines[i]!)) { end = i; break; }
   }
-  const before = lines.slice(0, start).join('\n');
-  const after = lines.slice(end).join('\n');
-  return `${before ? `${before}\n` : ''}${AGENT_SKILLS_BLOCK}${end < lines.length ? `\n${after}` : ''}`;
+  return { before: lines.slice(0, start), after: end < lines.length ? lines.slice(end) : null };
+}
+
+/** `markdown` with its `## Agent skills` section replaced by the factory's block; or null when it has no such section. */
+function replaceBlock(markdown: string): string | null {
+  const split = splitAtBlock(markdown);
+  if (!split) return null;
+  const before = split.before.join('\n');
+  return `${before ? `${before}\n` : ''}${AGENT_SKILLS_BLOCK}${split.after ? `\n${split.after.join('\n')}` : ''}`;
+}
+
+/** `markdown` without its `## Agent skills` section, every other byte as it was; or null when it has no such section. */
+export function withoutAgentSkills(markdown: string): string | null {
+  const split = splitAtBlock(markdown);
+  return split && [...split.before, ...split.after ?? ['']].join('\n');
 }
 
 /**

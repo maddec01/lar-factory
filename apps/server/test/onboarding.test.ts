@@ -8,6 +8,7 @@ import { checkouts } from './repo-support.ts';
 import { readsRepositoryConfig, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { BoardData } from '@lar-factory/shared';
+import { rawIssue } from '@lar-factory/shared/test/raw-items';
 
 /** Writes this Mac's list of repositories under `home` with the entries as given. */
 function writeList(home: string, repositories: object[]): void {
@@ -307,6 +308,40 @@ test("a Reset whose PR gh can't close answers with gh's message and keeps the on
   assert.deepEqual([response.status, await response.json()], [502, { error: "Can't close maddec01/lar-web's onboarding PR: gh pr close failed: HTTP 403: Resource not accessible by integration" }]);
   assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories,
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } }]);
+});
+
+test('Reset of an onboarded repository opens its reset PR and takes it off the board, with its items, also after a restart', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  writeList(home, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web' }]);
+  const options = { files: ['.lar-factory.json', 'AGENTS.md'], items: [rawIssue('PVTI_1', 1, 'List', []), rawIssue('PVTI_2', 2, 'List', [], { repository: { nameWithOwner: 'maddec01/lar-web' } })] };
+  const board = await startBoard(t, options, false, false, { HOME: home });
+  await until(board, (d) => d.items.length === 2);
+  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/reset');
+  assert.equal(response.status, 200);
+  const { board: data, prUrl } = await response.json() as { board: BoardData; prUrl: string };
+  assert.equal(prUrl, PR);
+  assert.deepEqual([data.repos.map((r) => r.repo), data.items.map((i) => i.number)], [['maddec01/lar-factory'], [1]]);
+  assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'create').map((args) => args[args.indexOf('--head') + 1]), ['lar-factory/reset']);
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories,
+    [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', resetting: { prUrl: PR } }]);
+  await board.stop();
+  const restarted = await startBoard(t, options, false, false, { HOME: home });
+  const read = await until(restarted, (d) => d.fetchedAt !== null);
+  assert.deepEqual([read.repos.map((r) => r.repo), read.items.map((i) => i.number), read.onboarding, read.repositoryConfigProblems],
+    [['maddec01/lar-factory'], [1], [], []]);
+  assert.ok(!(await restarted.calls()).some((args) => readsRepositoryConfig(args) && args[1]!.includes('lar-web')));
+});
+
+test("a Reset whose reset PR can't be opened answers with gh's message and keeps the repository onboarded", async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  writeList(home, [{ repo: 'maddec01/lar-web' }]);
+  const board = await startBoard(t, { files: ['.lar-factory.json'], fail: 'pr-create' }, false, false, { HOME: home });
+  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/reset');
+  assert.equal(response.status, 502);
+  assert.match((await response.json() as { error: string }).error, /^Can't open maddec01\/lar-web's reset PR: gh pr create failed: /);
+  assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories, [{ repo: 'maddec01/lar-web' }]);
 });
 
 test('a .lar-factory.json that lands another way finishes onboarding and closes the PR with a comment', async (t) => {

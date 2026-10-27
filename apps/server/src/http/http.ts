@@ -42,6 +42,8 @@ export interface HttpDeps {
   startClashRun(input: Record<string, unknown>): Promise<{ runs: ClashRun[] } | { status: number; error: string }>;
   /** The repository's Clash agent runs, oldest first. */
   clashRuns(repo: string): ClashRun[];
+  /** Reads, creates or renames the labels of onboarding's Labels step, answering with the repository's labels, or gh's problem. */
+  repositoryLabels: Record<'read' | 'create' | 'rename', (input: Record<string, unknown>) => Promise<{ labels: string[] } | { status: number; error: string }>>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
   openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /** What an onboarding's PR would change against its default branch with the body's answers and picks, or why it can't say. */
@@ -123,7 +125,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  runSetupCheck, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
+  runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -133,6 +135,15 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
   const drained: Array<() => void> = [];
 
   const withBoard = (body: object) => ({ ...body, board: board.snapshot() });
+
+  /** A write of onboarding's Labels step, which answers with the repository's labels. */
+  const labelsWrite = (action: keyof HttpDeps['repositoryLabels']): Write => ({
+    what: `the labels to ${action}`, disabled: 'Sample mode onboards no repository.',
+    async run(input) {
+      const answer = await repositoryLabels[action](input);
+      return 'error' in answer ? { status: answer.status, body: { error: answer.error } } : { status: 200, body: { ...answer, error: null } };
+    },
+  });
 
   /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
   const WRITES: Record<string, Write> = {
@@ -201,6 +212,9 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         return 'error' in checked ? { status: checked.status, body: { error: checked.error } } : { status: 200, body: { ...checked, error: null } };
       },
     },
+    '/api/onboarding/labels': labelsWrite('read'),
+    '/api/onboarding/labels/create': labelsWrite('create'),
+    '/api/onboarding/labels/rename': labelsWrite('rename'),
     '/api/onboarding/clashes': {
       what: 'the repository to check', disabled: 'Sample mode onboards no repository.',
       async run(input) {

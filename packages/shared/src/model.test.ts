@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { applicability, validateDraft } from './add-item.ts';
@@ -55,7 +55,9 @@ test('kinds come from labels', () => {
   assert.equal(kindOf(item('List', ['build', 'bug'])), 'bug');
   assert.equal(kindOf(item('List', ['build', 'feature'])), 'feature');
   assert.equal(kindOf(item('List', ['build'])), 'build', 'with no other kind it reads as a build');
-  assert.equal(kindOf(item('List', ['build', 'decision: research'])), 'decision');
+  assert.equal(kindOf(item('List', ['build', 'decision-research'])), 'decision');
+  assert.equal(kindOf(item('List', [['decision:', 'grill'].join(' ')])), 'issue', 'the old decision label is no kind');
+  assert.equal(kindLabel(item('List', ['decision-task'])), 'decision-task');
 });
 
 test('the build label makes a build whatever the kind, except on a concept', () => {

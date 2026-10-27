@@ -13,4 +13,5 @@ export * from './github-items.ts';
 export * from './page-data.ts';
 export * from './board-app.ts';
 export * from './is-record.ts';
+export * from './workflow-labels.ts';
 export * from './skill-check.ts';

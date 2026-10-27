@@ -30,7 +30,7 @@ const unblocked = () => writable(withItem('I_sample13', { blockers: [{ number: 2
 const c200 = sample.items.find((i) => i.id === C200)!;
 /** A Queued grill under #200, blocked by `blockers`. */
 const decision = (blockers: Item['blockers'] = []): Item => ({
-  ...sample.items.find((i) => i.id === 'I_sample05')!, id: 'I_d204', number: 204, title: 'Pick the relay host', labels: ['decision: grill'],
+  ...sample.items.find((i) => i.id === 'I_sample05')!, id: 'I_d204', number: 204, title: 'Pick the relay host', labels: ['decision-grill'],
   repo: c200.repo, parent: { number: 200, repo: c200.repo!, title: c200.title, url: c200.url!, state: 'open' },
   blockers,
 });

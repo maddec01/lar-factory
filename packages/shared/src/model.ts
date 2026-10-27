@@ -489,8 +489,8 @@ export type Kind =
   | 'issue';
 
 export function decisionType(item: Item): string | null {
-  const label = item.labels.find((l) => l.startsWith('decision:'));
-  return label ? label.slice('decision:'.length).trim() : null;
+  const label = item.labels.find((l) => l.startsWith('decision-'));
+  return label ? label.slice('decision-'.length) : null;
 }
 
 export function kindOf(item: Item): Kind {
@@ -514,7 +514,7 @@ export function isBuild(item: Pick<Item, 'labels'>): boolean {
 
 export function kindLabel(item: Item): string {
   const kind = kindOf(item);
-  if (kind === 'decision') return `decision: ${decisionType(item)}`;
+  if (kind === 'decision') return `decision-${decisionType(item)}`;
   if (kind === 'pr') return 'pull request';
   return kind;
 }

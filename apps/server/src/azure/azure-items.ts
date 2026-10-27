@@ -1,4 +1,4 @@
-// What the Azure DevOps item sources share: reading a team's work items through az, read only for now.
+// What the Azure DevOps item sources share: reading a team's work items through az, and writing them through azure-writes.ts.
 // A work item keeps its status as a status-<name> tag in System.Tags, and every other tag is a label.
 // Only the team's requirement backlog level's types show at the top level, each with its Tasks as children,
 // and each type's state categories decide what is Done (Completed) and what is hidden (Removed).
@@ -6,11 +6,12 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { STATUSES, carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
-import type { Blocker, IssueRef, Item, Status } from '@lar-factory/shared';
+import { STATUSES, labelStatuses, statusLabel } from '@lar-factory/shared';
+import type { Blocker, IssueRef, Item } from '@lar-factory/shared';
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
+import { azureWrites } from './azure-writes.ts';
 
 /** Runs az with these arguments and resolves with its output, or throws its error. */
 export type Az = (args: string[]) => Promise<string>;
@@ -19,7 +20,7 @@ export type Az = (args: string[]) => Promise<string>;
 const API_VERSION = '7.1';
 /** The most ids one workitemsbatch call reads. */
 const BATCH = 200;
-const READ_ONLY = 'The board reads Azure DevOps work items but does not write them yet. Change it in Azure DevOps.';
+const NO_CREATE = 'The board does not create Azure DevOps work items yet. Create it in Azure DevOps.';
 
 export async function az(args: string[]): Promise<string> {
   const command = toolCommand('az');
@@ -49,7 +50,8 @@ const text = (value: unknown): string => (typeof value === 'string' ? value : ''
 export const field = (raw: RawWorkItem, name: string) => text(raw.fields[name]);
 /** The ids a work item's links of `rel` point at: the last part of each link's URL. */
 export const linked = (raw: RawWorkItem, rel: string) => (raw.relations ?? []).filter((r) => r.rel === rel).map((r) => Number(r.url.split('/').at(-1)));
-const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';').map((t) => t.trim()).filter(Boolean);
+/** The work item's tags, from System.Tags's "a; b". */
+export const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';').map((t) => t.trim()).filter(Boolean);
 const STATUS_TAGS = new Set(STATUSES.flatMap((s) => (s === 'Done' ? [] : [statusLabel(s)])));
 
 /** A name with its URL encoding undone, or as it is when that encoding is broken. */
@@ -57,10 +59,6 @@ function decoded(name: string): string {
   try { return decodeURIComponent(name); }
   catch { return name; }
 }
-
-/** Why a move of an open item carrying more than one status tag is refused, or null. */
-const twoStatuses = (item: { statuses: readonly Status[]; state: 'open' | 'closed' }): string | null =>
-  (carriesTwoStatuses(item) ? keepOneText(item.statuses) : null);
 
 /** The team's backlog levels: the requirement level's id and types, and the task level's types. */
 interface BacklogConfiguration {
@@ -192,11 +190,7 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
       });
       return { title, items };
     },
-    setStatus: async () => READ_ONLY,
-    statusRefusal: (item) => ('statuses' in item ? twoStatuses(item) : null) ?? READ_ONLY,
-    addLabel: async () => READ_ONLY,
-    create: async () => ({ item: null, issueUrl: null, error: READ_ONLY }),
-    setParentStatus: async () => READ_ONLY,
-    abandon: async () => READ_ONLY,
+    ...azureWrites(project, invoke),
+    create: async () => ({ item: null, issueUrl: null, error: NO_CREATE }),
   };
 }

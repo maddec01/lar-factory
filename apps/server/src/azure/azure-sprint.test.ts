@@ -127,13 +127,3 @@ test('any other az failure fails the read, naming the repository', async () => {
   const source = mergeSources([], new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint(REPO, TEAM, az.run)]]));
   await assert.rejects(source.read(), { message: `${REPO}: az boards iteration failed: TF400813: not authorized` });
 });
-
-test('the sprint is read only: every write says so', async () => {
-  const sprint = azureSprint(REPO, TEAM, fakeAz({ items: SPRINT, sprint: [6] }).run);
-  const [item] = (await sprint.read()).items;
-  const refusal = 'The board reads Azure DevOps work items but does not write them yet. Change it in Azure DevOps.';
-  assert.equal(sprint.statusRefusal(item!), refusal);
-  assert.equal(await sprint.setStatus(item!, 'Queued'), refusal);
-  assert.equal(await sprint.addLabel(item!, 'bug'), refusal);
-  assert.equal(await sprint.abandon(item!), refusal);
-});

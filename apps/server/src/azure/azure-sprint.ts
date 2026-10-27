@@ -1,4 +1,4 @@
-// The Azure DevOps sprint item source: reads one team's current sprint through az, read only for now.
+// The Azure DevOps sprint item source: reads one team's current sprint through az; azure-writes.ts writes its work items.
 
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
 import { az, azureItems, type Az } from './azure-items.ts';

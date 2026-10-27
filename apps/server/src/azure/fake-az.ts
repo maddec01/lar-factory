@@ -31,7 +31,7 @@ export const STATES: Record<string, [string, string][]> = {
 /**
  * A fake az for one team whose current sprint holds `sprint`'s ids and whose requirement backlog lists `backlog`'s,
  * reading `items` (listed or not), with `requirement` its requirement backlog level's type and `areas` its area paths.
- * It records each call, and `fail` throws for a call it matches.
+ * It records each call and each work item patch, and `fail` throws for a call it matches.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
   requirement = 'User Story', areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], fail }: {
@@ -46,6 +46,8 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   const calls: string[][] = [];
   /** Each workitemsbatch call's ids, read from its --in-file while the file exists. */
   const batches: number[][] = [];
+  /** Each work item patch's id and operations, read from its --in-file while the file exists. */
+  const patches: { id: number; ops: unknown[] }[] = [];
   const byId = new Map(items.map((i) => [i.id, i]));
   const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
   const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
@@ -95,6 +97,12 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         const found = ids.flatMap((id) => byId.has(id) ? [raw(byId.get(id)!)] : []);
         return JSON.stringify({ count: found.length, value: found });
       }
+      if (resource === 'wit/workitems') {
+        const id = Number(route(args, 'id'));
+        if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
+        if (args.includes('--http-method')) patches.push({ id, ops: JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as unknown[] });
+        return JSON.stringify(raw(byId.get(id)!));
+      }
       if (resource === 'wit/workitemtypestates') {
         const states = STATES[route(args, 'type')!]!;
         return JSON.stringify({ count: states.length, value: states.map(([name, category]) => ({ name, color: '000000', category })) });
@@ -102,5 +110,5 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
     }
     throw new Error(`fake az: unexpected ${args.join(' ')}`);
   };
-  return { calls, batches, run };
+  return { calls, batches, patches, run };
 }

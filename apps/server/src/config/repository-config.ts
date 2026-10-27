@@ -8,7 +8,9 @@ import {
   PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigAnswers,
   type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
+import { problemOf } from '../azure/azure-items.ts';
 import { readDefaultBranchFile as readAzureFile } from '../azure/azure-repos.ts';
+import { ReadProblem } from '../items/item-source.ts';
 import { readBranchFile } from '../github/github.ts';
 import { boardDataDir } from '../port/board-record.ts';
 
@@ -316,14 +318,22 @@ export interface OnboardedConfigs {
   resetting: string[];
 }
 
+/** Why az couldn't read an Azure repository's .lar-factory.json, with the fix when one command is it. */
+function azProblem(err: unknown): string {
+  const problem = problemOf(err);
+  if (problem instanceof ReadProblem) return problem.fix ? `${problem.message} Run ${problem.fix}.` : problem.message;
+  return `could not read .lar-factory.json. ${problem instanceof Error ? problem.message : String(problem)}`;
+}
+
 /**
  * Each config of the list's repositories on the board, in the list's order, the problem of each whose
- * .lar-factory.json is missing or wrong, which stays off the board, and the repositories resetting, which read none;
- * throws any other failure, such as a logged-out gh.
+ * .lar-factory.json is missing or wrong, or that az can't read, which stays off the board, and the repositories
+ * resetting, which read none; throws any other failure, such as a logged-out gh.
  */
 export async function readOnboardedConfigs(list: readonly OnboardedRepository[], run?: (args: string[]) => Promise<string>): Promise<OnboardedConfigs> {
   const read = await Promise.all(onTheBoard(list).map(({ repo }) => readRepositoryConfig(repo, run).catch((err: unknown) => {
     if (err instanceof RepositoryConfigError) return { repo: err.repo, problem: err.problem };
+    if (onAzure(repo)) return { repo, problem: azProblem(err) };
     throw err;
   })));
   return {

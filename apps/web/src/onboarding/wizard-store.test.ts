@@ -4,7 +4,7 @@
 import { expect, test, vi } from 'vite-plus/test';
 import { fetchMock, sample, settle, toolChecks } from '../../test/support.ts';
 import type { Clashes } from './wizard-store.ts';
-import type { BoardData, BundledSkill, Clash, FixedClashes, ProjectChoice, SetupAnswers, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
+import type { BoardData, BundledSkill, Clash, ClashRun, ClashRunState, FixedClashes, ProjectChoice, SetupAnswers, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
 
 const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
@@ -270,6 +270,10 @@ const json = (body: object) => new Response(JSON.stringify(body));
 /** What the fixed checks find when there's nothing to clean up. */
 const NONE: FixedClashes = { clashes: [], skillClashes: [], projectSkills: [] };
 
+const OPUS = { instanceId: 'claudeAgent', model: 'claude-opus-4-7' };
+/** A Clash agent run that ended with no Clash. */
+const DONE: ClashRun = { state: 'done', clashes: [], title: 'Look for Clashes in maddec01/lar-web (run 1)', threadId: 'thread-1', model: OPUS, startedAt: '2026-10-21T09:50:00Z' };
+
 /**
  * The store, fresh, with `projects` as T3's, the commands rechecked as `tools`, each setup check answered from `results`
  * (passing when it isn't named), Finish answered with `finish` and the fixed checks with `clashes`.
@@ -282,6 +286,7 @@ async function checkingStore(projects: ProjectChoice[], results: Partial<Record<
     if (url === '/api/onboarding/checks') return json({ result: results[(JSON.parse(String(init!.body)) as { check: SetupCheckId }).check] ?? PASS, error: null });
     if (url === '/api/onboarding/finish') return json(finish);
     if (url === '/api/onboarding/clashes') return json(clashes);
+    if (url.startsWith('/api/onboarding/clash-runs')) return json({ runs: [DONE] });
     return json({ error: null });
   });
   const { useWizardStore } = await import('./wizard-store.ts');
@@ -356,6 +361,7 @@ async function toCleanup(wizard: Awaited<ReturnType<typeof checkingStore>>, name
   await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), bundledSkills: BUNDLED }));
   await settle(() => wizard.getState().next());
   await vi.waitFor(() => expect(wizard.getState().clashes?.state).not.toBe('reading'));
+  await vi.waitFor(() => expect(wizard.getState().agent.runs ?? wizard.getState().agent.error).not.toBeNull());
 }
 
 /** The fixed checks once read. */
@@ -393,7 +399,7 @@ test('a project skill named like a bundled skill holds Next until Delete it, or 
   const { skillProblem, stepReady } = await import('./wizard-store.ts');
   await toCleanup(wizard, 'lar-web');
   const problem = () => skillProblem(SKILL, wizard.getState().run!.cleanup, read(wizard.getState().clashes));
-  const ready = () => stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes);
+  const ready = () => stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes, wizard.getState().agent);
   expect([problem(), ready()]).toEqual(['Next needs Delete it in the PR, or Rename it.', false]);
   for (const [name, why] of [
     ['', 'Next needs a new name: lowercase letters, digits and single hyphens, like web-code-review.'],
@@ -426,12 +432,12 @@ test("fixed checks the board can't run hold Next with its problem, and Retry run
   const { stepReady } = await import('./wizard-store.ts');
   await toCleanup(wizard, 'lar-web');
   expect(wizard.getState().clashes).toEqual({ state: 'failed', error: "Can't read maddec01/lar-web's default branch: HTTP 502" });
-  expect(stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes)).toBe(false);
+  expect(stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes, wizard.getState().agent)).toBe(false);
   const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/clashes' ? json({ ...NONE, error: null }) : served(url, init));
   await settle(() => wizard.getState().findClashes());
   expect(wizard.getState().clashes).toMatchObject({ state: 'read', found: NONE });
-  expect(stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes)).toBe(true);
+  expect(stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes, wizard.getState().agent)).toBe(true);
 });
 
 test('Resume on Cleanup brings back the ticks and skill picks, and runs the fixed checks again', async () => {
@@ -599,4 +605,107 @@ test('Reopen PR and Start over do nothing while the PR is open', async () => {
   await settle(() => wizard.getState().startOver());
   expect(fetchMock).not.toHaveBeenCalled();
   expect(wizard.getState().run!.prUrl).toBe(PR);
+});
+
+/**
+ * The board's Clash agent runs for maddec01/lar-web, which the test ends with `end`: a GET answers them, and a post
+ * starts a run that answers with its first message. Each request is recorded.
+ */
+function agentBoard(runs: ClashRun[] = []) {
+  const requests: (string | object)[] = [];
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (!url.startsWith('/api/onboarding/clash-runs')) return served(url, init);
+    if (init?.method !== 'POST') {
+      requests.push(url);
+      return json({ runs });
+    }
+    const body = JSON.parse(String(init.body)) as { model: ClashRun['model'] };
+    requests.push(body);
+    runs.push({ state: 'running', progress: null, title: `Look for Clashes in maddec01/lar-web (run ${runs.length + 1})`, threadId: null, model: body.model, startedAt: '2026-10-21T10:00:00Z' });
+    return json({ runs, error: null });
+  });
+  const end = (state: ClashRunState) => { const last = runs.at(-1)!; runs[runs.length - 1] = { ...state, title: last.title, threadId: `thread-${runs.length}`, model: last.model, startedAt: last.startedAt }; };
+  const progress = (message: string) => { runs[runs.length - 1] = { ...runs.at(-1)!, state: 'running', progress: message, threadId: `thread-${runs.length}` } as ClashRun; };
+  return { requests, end, progress, runs };
+}
+
+const AGENT_CLASH: Clash = { id: 'agent-1', file: 'AGENTS.md', line: 12, reason: 'It says to push to main.', edit: { kind: 'lines', remove: ['Push to main.'], add: ['Open a PR.'] }, ticked: true };
+const GETS = '/api/onboarding/clash-runs?repo=maddec01%2Flar-web';
+
+test('Look for Clashes starts a run on the picked model, reads it every few seconds while it runs, and Next waits until it is done', async () => {
+  const wizard = await checkingStore([project('lar-web')]);
+  const { AGENT_POLL_MS, latestRun, stepReady, ticked } = await import('./wizard-store.ts');
+  const agent = agentBoard();
+  await toCleanup(wizard, 'lar-web');
+  const ready = () => stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes, wizard.getState().agent);
+  expect(wizard.getState().agent.runs, 'no run yet').toEqual([]);
+  expect(ready()).toBe(false);
+
+  wizard.getState().pickModel(OPUS);
+  await settle(() => wizard.getState().lookForClashes(OPUS));
+  expect(agent.requests).toEqual([GETS, { repo: 'maddec01/lar-web', projectId: 'lar-web', model: OPUS }]);
+  expect(latestRun(wizard.getState().agent)).toMatchObject({ state: 'running', progress: null });
+  expect(ready()).toBe(false);
+
+  agent.progress('Reading AGENTS.md');
+  await settle(() => vi.advanceTimersByTime(AGENT_POLL_MS));
+  expect(latestRun(wizard.getState().agent)).toMatchObject({ state: 'running', progress: 'Reading AGENTS.md', threadId: 'thread-1' });
+  agent.end({ state: 'done', clashes: [AGENT_CLASH] });
+  await settle(() => vi.advanceTimersByTime(AGENT_POLL_MS));
+  expect(latestRun(wizard.getState().agent)).toMatchObject({ state: 'done', clashes: [AGENT_CLASH] });
+  expect(ready()).toBe(true);
+  await settle(() => vi.advanceTimersByTime(AGENT_POLL_MS * 3));
+  expect(agent.requests.filter((r) => r === GETS), 'no read once it is done').toHaveLength(3);
+
+  wizard.getState().tick('agent-1', false);
+  expect(ticked(AGENT_CLASH, wizard.getState().run!.cleanup)).toBe(false);
+  await settle(() => wizard.getState().close());
+  expect(kept()).toMatchObject([{ progress: { step: 'cleanup', answers: { cleanup: { ticks: { 'agent-1': false } } } } }]);
+});
+
+test.each([
+  ['failed', { state: 'failed', why: 'The agent errored.' }],
+  ['waiting', { state: 'waiting', why: 'The agent is waiting for an answer in T3 Code.' }],
+  ['timed-out', { state: 'timed-out', why: 'The run took longer than 15 minutes.' }],
+] as const)('a %s run holds Next, and Retry starts a new run, keeps the old one listed and drops the agent ticks', async (_, ended) => {
+  const wizard = await checkingStore([project('lar-web')]);
+  const { latestRun, stepReady } = await import('./wizard-store.ts');
+  const agent = agentBoard();
+  await toCleanup(wizard, 'lar-web');
+  const ready = () => stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes, wizard.getState().agent);
+  await settle(() => wizard.getState().lookForClashes(OPUS));
+  agent.end(ended);
+  await settle(() => wizard.getState().readClashRuns());
+  expect(latestRun(wizard.getState().agent)).toMatchObject(ended);
+  expect(ready()).toBe(false);
+  wizard.getState().tick('agent-1', false);
+  wizard.getState().tick('context', false);
+
+  await settle(() => wizard.getState().lookForClashes(OPUS));
+  expect(wizard.getState().agent.runs!.map((r) => r.title)).toEqual(['Look for Clashes in maddec01/lar-web (run 1)', 'Look for Clashes in maddec01/lar-web (run 2)']);
+  expect(wizard.getState().run!.cleanup!.ticks, "the new run's agent-1 is another Clash").toEqual({ context: false });
+  agent.end({ state: 'done', clashes: [] });
+  await settle(() => wizard.getState().readClashRuns());
+  expect(ready()).toBe(true);
+});
+
+test('closing during a run stops reading it, and Resume shows its progress, then its result', async () => {
+  const wizard = await checkingStore([project('lar-web', { onBoard: true })]);
+  const { AGENT_POLL_MS, latestRun } = await import('./wizard-store.ts');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const agent = agentBoard([{ state: 'running', progress: 'Reading CLAUDE.md', title: 'Look for Clashes in maddec01/lar-web (run 1)', threadId: 'thread-1', model: OPUS, startedAt: '2026-10-21T09:58:00Z' }]);
+  const progress = { step: 'cleanup', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web', setup: { ...SETUP, itemSource: 'issues' as const, role: 'Web client' }, cleanup: { ticks: {}, skills: {} } } };
+  useBoardStore.getState().receive({ ...sample, bundledSkills: BUNDLED, onboarding: [{ repo: 'maddec01/lar-web', progress }] });
+  await settle(() => wizard.getState().resume('maddec01/lar-web'));
+  expect(latestRun(wizard.getState().agent)).toMatchObject({ state: 'running', progress: 'Reading CLAUDE.md' });
+
+  await settle(() => wizard.getState().close());
+  await settle(() => vi.advanceTimersByTime(AGENT_POLL_MS * 3));
+  expect(agent.requests, 'no read once closed').toEqual([GETS]);
+
+  agent.end({ state: 'done', clashes: [AGENT_CLASH] });
+  await settle(() => wizard.getState().resume('maddec01/lar-web'));
+  expect(latestRun(wizard.getState().agent)).toMatchObject({ state: 'done', clashes: [AGENT_CLASH] });
+  expect(agent.requests, 'Resume starts no run').toEqual([GETS, GETS]);
 });

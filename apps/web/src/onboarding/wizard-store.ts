@@ -2,15 +2,17 @@
 // has given, with T3's projects as the server lists them and the folder Create a new T3 project adds. Closing before a
 // project is picked, or an offered run before Next or any change, drops the run; closing after keeps its repository on
 // this Mac's list as onboarding, with where it stopped, and Resume reopens it there. The Checks step runs the command checks, then the setup checks, and holds Next
-// until each passes. The Cleanup step runs the fixed checks for known Clashes, keeps the user's ticks and skill picks
-// with the run, and holds Next until each project skill named like a bundled skill is deleted or renamed. A run that
+// until each passes. The Cleanup step runs the fixed checks for known Clashes and reads the Clash agent's runs, which the
+// board keeps going while the dialog is closed, asking again every few seconds while one runs. It keeps the user's ticks
+// and skill picks with the run, and holds Next until the latest agent run is done and each project skill named like a
+// bundled skill is deleted or renamed. A run that
 // reuses its .lar-factory.json finishes there, with no PR, until build #384's PR writer. Any other run opens the
 // onboarding PR on the Pull request step, then waits for the board to finish the onboarding once the PR merges. A PR
 // the board finds closed without merging offers Reopen PR, or Start over, which opens a new one.
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, isOnboarding, sameRepo, skillRenameProblem, type BoardData, type CheckedTool, type Clash, type CleanupPicks, type FixedClashes, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
+  SETUP_CHECKS, isOnboarding, sameRepo, skillRenameProblem, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
   type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type SkillClash, type SkillPick, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -153,8 +155,8 @@ export function checksPassed(checks: Checks | null, tools: ToolChecks | undefine
  */
 export type Clashes = { state: 'reading' } | { state: 'read'; found: FixedClashes; bundled: string[] } | { state: 'failed'; error: string };
 
-/** Whether a Clash's edit goes in the PR: the user's tick, else as the check offers it. */
-export const ticked = (clash: Clash, picks: CleanupPicks | null): boolean => picks?.ticks[clash.id] ?? clash.ticked;
+/** Whether a Clash's edit goes in the PR: never when it won't apply, else the user's tick, else as the check offers it. */
+export const ticked = (clash: Clash, picks: CleanupPicks | null): boolean => !clash.wontApply && (picks?.ticks[clash.id] ?? clash.ticked);
 
 /** The folder that holds a skill's folder, such as `.claude/skills/`. */
 export const skillsDir = (path: string) => path.replace(/[^/]+\/$/, '');
@@ -174,21 +176,48 @@ export function skillProblem(skill: SkillClash, picks: CleanupPicks | null, clas
   return skillRenameProblem(pick.name, clashes.bundled, clashes.found.projectSkills, renamedBeside);
 }
 
-/** Whether the fixed checks ran and each skill Clash is picked. */
-const cleanupDone = (run: Run, clashes: Clashes | null): boolean =>
-  clashes?.state === 'read' && clashes.found.skillClashes.every((skill) => !skillProblem(skill, run.cleanup, clashes));
+/**
+ * The Cleanup step's Clash agent: its runs as the board last answered, oldest first, null until it first answers; the
+ * model picked for the next run, null while none is; whether Look for Clashes or Retry is posting; and the board's
+ * problem with the last post or read, with which call failed, so Retry makes it again.
+ */
+export interface Agent {
+  runs: ClashRun[] | null;
+  model: ModelChoice | null;
+  starting: boolean;
+  error: { call: 'start' | 'read'; message: string } | null;
+}
+
+const NO_AGENT: Agent = { runs: null, model: null, starting: false, error: null };
+
+/** The agent's latest run, which the step shows and Next waits for; null before the first. */
+export const latestRun = (agent: Agent | null): ClashRun | null => agent?.runs?.at(-1) ?? null;
+
+/** The model the next run starts on: the one picked, else the latest run's, else the first T3 offers. */
+export const nextModel = (agent: Agent | null, groups: readonly ModelGroup[]): ModelChoice | null => {
+  if (agent?.model) return agent.model;
+  const latest = latestRun(agent);
+  if (latest) return latest.model;
+  const first = groups.find((g) => g.models.length);
+  return first ? { instanceId: first.instanceId, model: first.models[0]!.slug } : null;
+};
+
+/** Whether the fixed checks ran, the latest agent run is done and each skill Clash is picked. */
+const cleanupDone = (run: Run, clashes: Clashes | null, agent: Agent | null): boolean =>
+  clashes?.state === 'read' && latestRun(agent)?.state === 'done' && clashes.found.skillClashes.every((skill) => !skillProblem(skill, run.cleanup, clashes));
 
 /** Whether the run finishes on the Cleanup step: it reuses its .lar-factory.json, so it opens no PR until build #384's PR writer. */
 export const finishesOnCleanup = (run: Run, projects: Projects): boolean => run.step === 'cleanup' && !!pickedProject(run, projects)?.config;
 
 /** Whether the run's step lets Next move past it. */
-export function stepReady(run: Run, projects: Projects, checks: Checks | null = null, tools?: ToolChecks, clashes: Clashes | null = null): boolean {
+export function stepReady(run: Run, projects: Projects, checks: Checks | null = null, tools?: ToolChecks, clashes: Clashes | null = null,
+  agent: Agent | null = null): boolean {
   const project = pickedProject(run, projects);
   if (!project) return false;
   if (run.step === 'project') return true;
   if (run.step === 'setup') return !!project.config || asksSetup(project) && setupAnswered(run.setup);
   if (run.step === 'checks') return checksPassed(checks, tools, itemSourceOf(run, project));
-  if (run.step === 'cleanup') return cleanupDone(run, clashes);
+  if (run.step === 'cleanup') return cleanupDone(run, clashes, agent);
   return false;
 }
 
@@ -202,6 +231,8 @@ interface WizardState {
   checks: Checks | null;
   /** The Cleanup step's fixed checks; null until the run first reaches it. */
   clashes: Clashes | null;
+  /** The Cleanup step's Clash agent. */
+  agent: Agent;
   /** Finish for a run that reuses its .lar-factory.json: whether it's running, and why the board refused it. */
   finishing: { running: boolean; error: string | null };
   /** The button that opened the dialog, which gets focus back when it closes. */
@@ -229,6 +260,16 @@ interface WizardState {
   retryCheck: (id: SetupCheckId) => Promise<void>;
   /** Runs the fixed checks for known Clashes on the run's repository. */
   findClashes: () => Promise<void>;
+  /** Reads the agent's runs for the run's repository, and again every few seconds while the latest runs. */
+  readClashRuns: () => Promise<void>;
+  /** Picks the model the next agent run starts on. */
+  pickModel: (model: ModelChoice) => void;
+  /**
+   * Look for Clashes, Look again or Retry: starts an agent run in a new T3 thread on `model`, leaving the earlier runs listed. A
+   * new run's Clashes reuse the ids of the earlier ones', so their ticks are dropped once the board takes the run; a failed
+   * start keeps them.
+   */
+  lookForClashes: (model: ModelChoice) => Promise<void>;
   /** Ticks or unticks a Clash's edit, by its id. */
   tick: (id: string, on: boolean) => void;
   /** Picks Delete or Rename for a skill Clash, by its path. */
@@ -256,6 +297,10 @@ let reads = 0;
 let checkRuns = 0;
 /** Counts fixed check runs, so one answered after a newer run or a close is dropped. */
 let clashReads = 0;
+/** Counts reads of the agent's runs, so one answered after a newer read, a start or a close is dropped, and its next read with it. */
+let agentReads = 0;
+/** The next read of the agent's runs while one runs. */
+let agentTimer: ReturnType<typeof setTimeout> | undefined;
 /** The run an offer opened, until Next or a change replaces it; closing it then keeps nothing. */
 let untouchedOffer: Run | null = null;
 
@@ -265,6 +310,19 @@ const NOT_FINISHING: WizardState['finishing'] = { running: false, error: null };
 const NO_PICKS: CleanupPicks = { ticks: {}, skills: {} };
 
 const IDLE: WizardState['pr'] = { opening: false, reopening: false, checking: false, checkedAt: null, error: null };
+
+/** How often the step asks for the agent's runs while one runs. */
+export const AGENT_POLL_MS = 3_000;
+
+/** Stops reading the agent's runs: the dialog closed, or a newer read or start replaces the one waiting. */
+function stopAgentReads(): void {
+  agentReads++;
+  clearTimeout(agentTimer);
+}
+
+/** Drops the ticks of the agent's Clashes, whose ids a new run reuses. */
+const withoutAgentTicks = (picks: CleanupPicks): CleanupPicks =>
+  ({ ...picks, ticks: Object.fromEntries(Object.entries(picks.ticks).filter(([id]) => !id.startsWith('agent-'))) });
 
 /** How long Check now waits for the board's read before it gives up. */
 const READ_WAIT_MS = 60_000;
@@ -329,14 +387,23 @@ async function keep(run: Run & { projectId: string; repo: string }): Promise<voi
 
 export const useWizardStore = create<WizardState>()((set, get) => {
   const move = (by: 1 | -1) => {
-    const { run, projects, checks, clashes } = get();
+    const { run, projects, checks, clashes, agent } = get();
     // Once its PR is open, the run stays on the Pull request step.
-    if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes))) return;
+    if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes, agent))) return;
     const to = STEPS[STEPS.findIndex((s) => s.id === run.step) + by]?.id;
     if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done,
       setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo) : null), cleanup: run.cleanup ?? (to === 'cleanup' ? NO_PICKS : null) } });
     if (to === 'checks') void get().runChecks();
-    if (to === 'cleanup') void get().findClashes();
+    if (to === 'cleanup') {
+      void get().findClashes();
+      void get().readClashRuns();
+    } else stopAgentReads();
+  };
+
+  /** Shows the agent's runs as the board answered them, and asks again in a while if the latest still runs. */
+  const showRuns = (runs: ClashRun[], read: number) => {
+    set({ agent: { ...get().agent, runs, error: null } });
+    if (runs.at(-1)?.state === 'running') agentTimer = setTimeout(() => { if (read === agentReads) void get().readClashRuns(); }, AGENT_POLL_MS);
   };
 
   /** The run's checks while `runId` is the latest check run and the run is open. */
@@ -362,6 +429,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     creating: null,
     checks: null,
     clashes: null,
+    agent: NO_AGENT,
     finishing: NOT_FINISHING,
     pr: IDLE,
     opener: null,
@@ -372,7 +440,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const run: Run = { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer ? 'GitHub' : null,
         savedAs: null, setup: null, cleanup: null, prUrl: null };
       untouchedOffer = offer ? run : null;
-      set({ run, creating: null, checks: null, clashes: null, finishing: NOT_FINISHING, pr: IDLE, opener: focused() });
+      stopAgentReads();
+      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, finishing: NOT_FINISHING, pr: IDLE, opener: focused() });
       void get().loadProjects();
     },
     resume: (repo) => {
@@ -380,9 +449,13 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       if (!kept) return;
       checkRuns++;
       clashReads++;
-      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, clashes: null, finishing: NOT_FINISHING, pr: IDLE, opener: focused() });
-      // The checks read the picked project, so they wait for T3's projects; the fixed checks read only the repository.
-      if (get().run!.step === 'cleanup') void get().findClashes();
+      stopAgentReads();
+      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, clashes: null, agent: NO_AGENT, finishing: NOT_FINISHING, pr: IDLE, opener: focused() });
+      // The checks read the picked project, so they wait for T3's projects; the fixed checks and agent runs read only the repository.
+      if (get().run!.step === 'cleanup') {
+        void get().findClashes();
+        void get().readClashRuns();
+      }
       void get().loadProjects().then(() => { if (get().run?.step === 'checks') void get().runChecks(); });
     },
     close: () => {
@@ -390,7 +463,9 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       reads++;
       checkRuns++;
       clashReads++;
-      set({ run: null, checks: null, clashes: null });
+      // The board keeps the agent's run going; Resume reads it again.
+      stopAgentReads();
+      set({ run: null, checks: null, clashes: null, agent: NO_AGENT });
       // A run whose PR merged is onboarded, so there's no onboarding left to keep.
       if (run?.projectId && run.repo && run !== untouchedOffer && !onboarded(run, useBoardStore.getState().data)) {
         void keep({ ...run, projectId: run.projectId, repo: run.repo });
@@ -472,6 +547,38 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const bundled = (useBoardStore.getState().data.bundledSkills ?? []).map((skill) => skill.name).filter((name) => !name.includes('/'));
       set({ clashes: { state: 'read', found: { clashes, skillClashes, projectSkills }, bundled } });
     },
+    readClashRuns: async () => {
+      const { run } = get();
+      if (!run?.repo) return;
+      stopAgentReads();
+      const read = agentReads;
+      let answer: { runs?: ClashRun[]; error?: string | null };
+      try {
+        const response = await fetch(`/api/onboarding/clash-runs?repo=${encodeURIComponent(run.repo)}`, { cache: 'no-store' });
+        answer = await response.json() as typeof answer;
+        if (!answer.runs && !answer.error) answer.error = `The board answered ${response.status}.`;
+      } catch {
+        answer = { error: "Can't reach the board." };
+      }
+      if (read !== agentReads || !get().run) return;
+      if (answer.runs) return showRuns(answer.runs, read);
+      set({ agent: { ...get().agent, error: { call: 'read', message: answer.error! } } });
+    },
+    pickModel: (model) => set({ agent: { ...get().agent, model } }),
+    lookForClashes: async (model) => {
+      const { run, agent } = get();
+      if (!run?.repo || !run.projectId || agent.starting || latestRun(agent)?.state === 'running') return;
+      stopAgentReads();
+      const read = agentReads;
+      set({ agent: { ...agent, starting: true, error: null } });
+      const answer = await postAction<{ runs: ClashRun[] }>('/api/onboarding/clash-runs', { repo: run.repo, projectId: run.projectId, model });
+      const now = get().run;
+      if (read !== agentReads || !now) return;
+      set({ agent: { ...get().agent, starting: false } });
+      if (answer.error || !answer.runs) return set({ agent: { ...get().agent, error: { call: 'start', message: answer.error ?? 'The board sent no run.' } } });
+      if (now.cleanup) set({ run: { ...now, cleanup: withoutAgentTicks(now.cleanup) } });
+      showRuns(answer.runs, read);
+    },
     tick: (id, on) => {
       const { run } = get();
       if (run?.cleanup) set({ run: { ...run, cleanup: { ...run.cleanup, ticks: { ...run.cleanup.ticks, [id]: on } } } });
@@ -481,9 +588,9 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       if (run?.cleanup) set({ run: { ...run, cleanup: { ...run.cleanup, skills: { ...run.cleanup.skills, [path]: pick } } } });
     },
     finish: async () => {
-      const { run, projects, checks, clashes, finishing } = get();
+      const { run, projects, checks, clashes, agent, finishing } = get();
       if (!run?.repo || finishing.running || !finishesOnCleanup(run, projects)
-        || !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes)) return;
+        || !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes, agent)) return;
       set({ finishing: { running: true, error: null } });
       const result = await postAction('/api/onboarding/finish', { repo: run.repo, ...replacing({ ...run, repo: run.repo }) });
       receive(result);
@@ -492,7 +599,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       if (result.error) return set({ finishing: { running: false, error: result.error } });
       checkRuns++;
       clashReads++;
-      set({ run: null, checks: null, clashes: null, finishing: NOT_FINISHING });
+      stopAgentReads();
+      set({ run: null, checks: null, clashes: null, agent: NO_AGENT, finishing: NOT_FINISHING });
       showToast({ slot: 'onboarding', what: `Onboarded ${run.repo}`, body: `Onboarded ${run.repo}. Its items show once the board reads them.` });
     },
     openPr: async () => {

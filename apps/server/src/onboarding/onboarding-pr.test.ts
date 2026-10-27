@@ -538,11 +538,19 @@ test('on Azure Repos, a completed PR finishes onboarding, an abandoned one is ma
   assert.equal(az.prs[1]!.status, 'active');
 });
 
+test('on Azure Repos, the preview lists the changes the GitHub path lists for the same files, reading them through az', async () => {
+  const az = fakeAzRepos({ files: { '/AGENTS.md': RULES } });
+  const preview = await previewOnboardingPr({ repo: AZURE, config, picks: { clashes: [pushRule], skills: {} } }, az.run);
+  assert.deepEqual(preview, await previewOnboardingPr({ repo: 'maddec01/lar-web', config, picks: { clashes: [pushRule], skills: {} } }, gh().run));
+  assert.ok(az.calls.some((args) => args.includes('blobs')), 'the edit reads AGENTS.md\'s text');
+  assert.ok(az.calls.filter((args) => args[1] === 'invoke').every((args) => args.includes('--api-version')));
+});
+
 test('on Azure Repos, the PR opener checks no workflow label', async (t) => {
   const dir = await dataDir(t, [{ repo: AZURE, onboarding: progress }]);
   const az = fakeAzRepos();
   const opened = await createPrOpener(dir, az.run)({ repo: AZURE, progress, config: { ...azureConfig, labels: [] }, picks });
-  assert.doesNotMatch((opened as { error?: string }).error ?? '', /workflow label/);
+  assert.doesNotMatch((opened as { error?: string }).error ?? '', /still lacks a workflow label/);
   assert.ok(az.calls.length > 0 && !az.calls.some((args) => args[0] === 'label'), 'it goes on past the check, listing no label');
 });
 

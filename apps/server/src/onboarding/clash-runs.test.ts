@@ -2,7 +2,8 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { ClashRun, ModelGroup } from '@lar-factory/shared';
 import type { WaitedRun } from '../t3/t3.ts';
-import { createClashRuns, parseClashReply, type ClashRunDeps } from './clash-runs.ts';
+import { fakeAzRepos } from '../azure/fake-az.ts';
+import { createClashRuns, defaultBranch, parseClashReply, type ClashRunDeps } from './clash-runs.ts';
 
 const GROUPS: ModelGroup[] = [{ instanceId: 'claudeAgent', name: 'Claude', models: [{ slug: 'claude-opus-5-5', label: 'Claude Opus 5.5' }] }];
 const MODEL = { instanceId: 'claudeAgent', model: 'claude-opus-5-5' };
@@ -57,6 +58,15 @@ test('a run fetches the default branch in the T3 project\'s folder before it sta
   await end({ ended: 'completed', threadId: 'thread-1', reply: REPLY });
   assert.deepEqual(calls, ['branch maddec01/lar-web', 'fetch /dev/lar-web main',
     'start project-web claude-opus-5-5 Look for Clashes in maddec01/lar-web (run r1)']);
+});
+
+test('a run on an Azure repository fetches the default branch az names', async () => {
+  const az = fakeAzRepos({ defaultBranch: 'develop' });
+  const { deps, calls, end } = stubs({ defaultBranch: (repo) => defaultBranch(repo, az.run) });
+  await createClashRuns(() => GROUPS, deps).start({ ...INPUT, repo: 'contoso/Fabrikam%20Fiber/lar-api' });
+  await end({ ended: 'completed', threadId: 'thread-1', reply: REPLY });
+  assert.equal(calls[0], 'fetch /dev/lar-web develop');
+  assert.ok(az.calls.length > 0);
 });
 
 test("the message has the agent read every file from the fetched origin/<default>, not the working tree, and answer in the Clash JSON", async () => {

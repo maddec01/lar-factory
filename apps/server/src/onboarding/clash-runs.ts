@@ -5,7 +5,8 @@
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { isRecord, type Clash, type ClashRun, type ClashRunState, type ModelChoice, type ModelGroup } from '@lar-factory/shared';
-import { isRepo } from '../config/repository-config.ts';
+import { AZURE_REPOS } from '../azure/azure-repos.ts';
+import { isRepo, onAzure } from '../config/repository-config.ts';
 import { defaultBranchHead, message as errorMessage } from '../github/github.ts';
 import { liveProjects, threadByTitle } from '../t3/t3-db.ts';
 import { statsDbPath } from '../t3/t3-settings.ts';
@@ -15,7 +16,12 @@ import { isInstructionFile, isLineEdit, opencodeInstructions, overlaps, removesW
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 
-/** What a run reads and runs: gh, T3's projects and threads, git and t3. */
+/** The repository's default branch, read with az on Azure DevOps and gh on GitHub; `run` stands in for that tool. */
+export async function defaultBranch(repo: string, run?: (args: string[]) => Promise<string>): Promise<string> {
+  return (await (onAzure(repo) ? AZURE_REPOS.defaultBranchHead : defaultBranchHead)(repo, run)).branch;
+}
+
+/** What a run reads and runs: gh or az, T3's projects and threads, git and t3. */
 export interface ClashRunDeps {
   defaultBranch(repo: string): Promise<string>;
   /** The T3 project's folder, or null when T3 no longer has it; throws when T3's projects can't be read. */
@@ -34,7 +40,7 @@ export interface ClashRunDeps {
 }
 
 const DEPS: ClashRunDeps = {
-  defaultBranch: async (repo) => (await defaultBranchHead(repo)).branch,
+  defaultBranch: (repo) => defaultBranch(repo),
   projectFolder: (projectId) => liveProjects(statsDbPath(), homedir()).find((p) => p.id === projectId)?.folder ?? null,
   fetch: async (folder, branch) => {
     const git = toolCommand('git');

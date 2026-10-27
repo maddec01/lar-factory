@@ -600,12 +600,12 @@ function PathAndWhat({ path, what }: { path: string; what: string }) {
   );
 }
 
-/** What the PR writes whatever is ticked; a reused .lar-factory.json stays as it is. */
-function AlwaysWritten({ reused }: { reused: boolean }) {
+/** What the PR writes whatever is ticked; a reused .lar-factory.json stays as it is. On Azure DevOps, items are work items and labels are tags. */
+function AlwaysWritten({ reused, azure }: { reused: boolean; azure: boolean }) {
   const rows = [
     { file: '## Agent skills', what: 'In CLAUDE.md if the repository has one, else in AGENTS.md; replaces the block where one is.' },
-    { file: 'docs/agents/issue-tracker.md', what: 'Where the factory tracks issues; replaces the file if there is one.' },
-    { file: 'docs/agents/triage-labels.md', what: 'The factory’s labels and triage roles; replaces the file if there is one.' },
+    { file: 'docs/agents/issue-tracker.md', what: `Where the factory tracks ${azure ? 'work items' : 'issues'}; replaces the file if there is one.` },
+    { file: 'docs/agents/triage-labels.md', what: `The factory’s ${azure ? 'tags' : 'labels'} and triage roles; replaces the file if there is one.` },
     { file: 'docs/agents/domain.md', what: 'Where the domain docs live; replaces the file if there is one.' },
     { file: '.lar-factory.json', what: reused ? 'Kept as it is.' : 'The Repository config: role, item source and show setting.' },
   ];
@@ -649,7 +649,7 @@ function CleanupStep({ run }: { run: Run }) {
         </div>
       </>)}
       <ClashAgent run={run} />
-      <AlwaysWritten reused={!!project.config} />
+      <AlwaysWritten reused={!!project.config} azure={project.provider === 'Azure DevOps'} />
     </div>
   );
 }

@@ -6,18 +6,17 @@
 // and thread, and the agent's Clashes once the run is done, or why it ended without them with Retry, which starts a new
 // thread. The Pull request step lists what the PR changes, opens it, then waits for its merge.
 
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Check, CircleAlert, ExternalLink, FileText, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
   SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, threadLink, type Clash, type ClashRun, type LabelPlan, type LabelRow,
-  type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting,
+  type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupCheckId,
   type SkillClash,
 } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { Checkbox } from '@lar-factory/ui/checkbox';
-import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { Input } from '@lar-factory/ui/input';
 import { NativeSelect } from '@lar-factory/ui/native-select';
 import { Progress } from '@lar-factory/ui/progress';
@@ -25,55 +24,11 @@ import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
 import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
+import { CUSTOM_LABELS_HELP, Choice, CustomLabelPicker, CustomLabelsTitle, Field, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
 import {
   COMMAND_CHECKS, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, customLabelsToCreate, itemSourceOf, labelsPlan, latestRun,
-  nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
+  nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, skillProblem, skillsDir, ticked, unpickable, useWizardStore,
 } from './wizard-store.ts';
-
-/** One choice of a radio group: its title, then a line of detail. */
-function Choice({ value, title, children, disabled }: { value: string; title: ReactNode; children?: ReactNode; disabled?: boolean }) {
-  return (
-    <label data-choice={value} className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 has-data-checked:border-ring has-data-checked:bg-accent/40 ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
-      <Radio value={value} disabled={disabled} className="mt-0.5" />
-      <span className="grid min-w-0 flex-1 gap-0.5"><span className="text-sm font-medium">{title}</span>{children && <span className="text-xs text-muted-foreground">{children}</span>}</span>
-    </label>
-  );
-}
-
-/** The props that tie a field's control to its help and problem. */
-type Described = { 'aria-describedby'?: string; 'aria-invalid'?: true };
-
-/**
- * One field on its own row: its label and control, one line of help, then what Next waits for from it, if anything.
- * The help and problem sit outside the label and describe the control, so they aren't read as its name. The problem
- * is muted help until `invalid`, which marks it and the control.
- */
-function Field({ name, label, hint, problem, invalid = false, children }: {
-  name?: string; label: string; hint?: ReactNode; problem?: string; invalid?: boolean; children: (described: Described) => ReactNode;
-}) {
-  const id = useId();
-  const marked = !!problem && invalid;
-  const describedBy = [hint && `${id}-hint`, problem && `${id}-problem`].filter(Boolean).join(' ');
-  return (
-    <div data-field={name} className="grid gap-1.5">
-      <label className="grid gap-1.5"><span className="text-sm font-medium">{label}</span>
-        {children({ ...describedBy && { 'aria-describedby': describedBy }, ...marked && { 'aria-invalid': true } })}</label>
-      {hint && <span id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</span>}
-      {problem && <span id={`${id}-problem`} data-problem className={`text-xs ${marked ? 'text-destructive-foreground' : 'text-muted-foreground'}`}>{problem}</span>}
-    </div>
-  );
-}
-
-/** A group of choices on its own row: its legend, one line of help, then the choices. */
-function Group({ legend, hint, children }: { legend: string; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <Fieldset unstyled className="grid gap-2">
-      <FieldsetLegend className="mb-0 font-medium">{legend}</FieldsetLegend>
-      {hint && <p className="m-0 -mt-1 text-xs text-muted-foreground">{hint}</p>}
-      {children}
-    </Fieldset>
-  );
-}
 
 /** Whether the project's repository has .lar-factory.json; reading an Azure DevOps repository waits for build #386. */
 function ConfigBadge({ project }: { project: ProjectChoice }) {
@@ -150,8 +105,6 @@ function ProjectStep({ run }: { run: Run }) {
   );
 }
 
-const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opted-in': 'Opted-in items' };
-
 /** An item source as a line, like `GitHub Project maddec01 #3`. */
 const sourceLine = (source: RepositoryItemSource, repo: string) => source.kind === 'github-project' ? `GitHub Project ${source.owner} #${source.number}` : `${repo}’s issues`;
 
@@ -182,59 +135,8 @@ function ReusedConfig({ project, config }: { project: ProjectChoice; config: Non
   );
 }
 
-type TextAnswer = keyof ReturnType<typeof setupProblems>;
-
-/**
- * The questions: item source, show setting with the suggested one marked, and Repository role. A text answer's problem
- * is muted help until its field is edited or left.
- */
-function SetupQuestions({ project, setup }: { project: ProjectChoice; setup: SetupAnswers }) {
-  const answer = useWizardStore((s) => s.answer);
-  const suggested = suggestedShow(setup.itemSource);
-  const problems = setupProblems(setup);
-  const [touched, setTouched] = useState<ReadonlySet<TextAnswer>>(new Set());
-  const touch = (key: TextAnswer) => { if (!touched.has(key)) setTouched(new Set([...touched, key])); };
-  /** A text answer's problem, whether it's marked, and the handlers that mark it. */
-  const textAnswer = (key: TextAnswer) => ({
-    field: { problem: problems[key], invalid: touched.has(key) },
-    control: { value: setup[key], onBlur: () => touch(key), onChange: (e: { target: { value: string } }) => { touch(key); answer({ [key]: e.target.value }); } },
-  });
-  const owner = textAnswer('projectOwner');
-  const number = textAnswer('projectNumber');
-  const role = textAnswer('role');
-  return (<>
-    <Group legend="Item source" hint="Where the board finds this repository’s items. It lists the items that can show.">
-      <RadioGroup value={setup.itemSource} onValueChange={(v) => answer({ itemSource: v as SetupAnswers['itemSource'] })} className="gap-2">
-        <Choice value="github-project" title="A GitHub Project">A Project named by its owner and number, which other repositories may name too.</Choice>
-        <Choice value="issues" title="The repository’s issues">{project.repo}’s own issues, with no extra fields.</Choice>
-      </RadioGroup>
-    </Group>
-    {setup.itemSource === 'github-project' && (<>
-      <Field name="project-owner" label="Project owner" hint="The GitHub user or organization that owns the Project." {...owner.field}>
-        {(described) => <Input font="mono" {...owner.control} {...described} />}
-      </Field>
-      <Field name="project-number" label="Project number" hint="The number in the Project’s URL, after /projects/." {...number.field}>
-        {(described) => <Input font="mono" inputMode="numeric" placeholder="3" {...number.control} {...described} />}
-      </Field>
-    </>)}
-    <Group legend="Show" hint="Which of the item source’s items show on the board.">
-      <RadioGroup value={setup.show} onValueChange={(v) => answer({ show: v as ShowSetting })} className="gap-2">
-        {(['all', 'opted-in'] as const).map((show) => (
-          <Choice key={show} value={show} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge variant="secondary" size="sm">Suggested</Badge>}</span>}>
-            {show === 'all' ? 'Every open item from the item source; an item with no status counts as List.'
-              : `Only items that carry a status show; someone opts an item in by giving it ${setup.itemSource === 'github-project' ? 'the List Status' : 'the status-list label'}.`}
-          </Choice>
-        ))}
-      </RadioGroup>
-    </Group>
-    <Field name="role" label="Repository role" hint="What this repository is to the others." {...role.field}>
-      {(described) => <Input placeholder="Web client that talks to the API server" {...role.control} {...described} />}
-    </Field>
-  </>);
-}
-
 function SetupStep({ run }: { run: Run }) {
-  const projects = useWizardStore((s) => s.projects);
+  const { projects, answer } = useWizardStore();
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
   if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
@@ -249,7 +151,7 @@ function SetupStep({ run }: { run: Run }) {
         <Problem title="Can’t reuse .lar-factory.json">{project.configProblem} Fix the file on {project.repo}’s default branch, then Retry.</Problem>
       ) : !asksSetup(project) ? (
         <Problem title="Can’t check .lar-factory.json">Couldn’t read whether {project.repo} has .lar-factory.json on its default branch.</Problem>
-      ) : run.setup && <SetupQuestions project={project} setup={run.setup} />}
+      ) : run.setup && <SetupFields repo={project.repo} setup={run.setup} onAnswer={answer} />}
     </div>
   );
 }
@@ -302,21 +204,18 @@ function LeftAlone({ labels }: { labels: LeftAloneLabel[] }) {
   );
 }
 
-const CUSTOM_LABELS_HELP = 'Custom labels mark which part of the product an item touches, such as app: music. Add item offers them, and the queue shows them on each item.';
-
 /**
- * The custom labels: a reused .lar-factory.json's, listed; else a toggle for each label the step offers and each pick,
- * then a field whose Add creates a new label on the repository and picks it.
+ * The custom labels: a reused .lar-factory.json's, listed; else the custom label picker, whose Add creates the typed
+ * label on the repository and picks it.
  */
 function CustomLabels({ run, project, plan, labels }: { run: Run; project: ProjectChoice; plan: LabelPlan; labels: Labels }) {
   const { toggleCustomLabel, typeCustomLabel, addCustomLabel } = useWizardStore();
-  const title = <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Custom labels</h4>;
   if (project.config) {
     const { labels: names } = project.config;
     const missing = customLabelsToCreate(project, labels);
     return (
       <div data-custom-labels className="grid gap-1">
-        {title}
+        <CustomLabelsTitle />
         <p className="m-0 text-xs text-muted-foreground">{CUSTOM_LABELS_HELP} These are the ones {project.repo}’s .lar-factory.json lists; change them in that file. Create makes the missing ones, with GitHub’s colour, but none that can’t be a custom label.</p>
         {names.length ? (
           <ul className="m-0 grid list-none divide-y rounded-lg border p-0">
@@ -339,36 +238,9 @@ function CustomLabels({ run, project, plan, labels }: { run: Run; project: Proje
       </div>
     );
   }
-  const offered = customLabelChoices(plan);
-  const choices = [...offered, ...run.customLabels.filter((name) => !offered.some((o) => o.toLowerCase() === name.toLowerCase()))];
-  const problem = labels.typed.trim() ? customLabelProblem(labels.typed) : null;
-  const add = () => void addCustomLabel();
   return (
-    <div data-custom-labels className="grid gap-2">
-      <div className="grid gap-1">{title}<p className="m-0 text-xs text-muted-foreground">{CUSTOM_LABELS_HELP} Pick the ones {project.repo} uses, or add a new one.</p></div>
-      {choices.length > 0 && (
-        <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0">
-          {choices.map((name) => (
-            <li key={name} data-custom={name}>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={run.customLabels.includes(name)} onCheckedChange={() => toggleCustomLabel(name)} />
-                <code className="min-w-0 break-all font-mono">{name}</code>
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
-      <span className="flex gap-2">
-        <Input data-new-custom font="mono" placeholder="app: music" aria-label="New custom label" value={labels.typed} disabled={labels.busy === 'custom'}
-          onChange={(e) => typeCustomLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-        <Button data-add-custom variant="outline" disabled={!labels.typed.trim() || !!problem || !!labels.busy} onClick={add}>
-          {labels.busy === 'custom' ? <><LoaderCircle className="animate-spin" /> Adding…</> : 'Add'}</Button>
-      </span>
-      {problem && <p className="m-0 text-xs text-destructive-foreground">{problem}</p>}
-      {labels.error?.action === 'custom' && (
-        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t create {labels.error.name}</AlertTitle><AlertDescription>{labels.error.message}</AlertDescription></Alert>
-      )}
-    </div>
+    <CustomLabelPicker repo={project.repo!} offered={customLabelChoices(plan)} picked={run.customLabels} typed={labels.typed} adding={labels.busy === 'custom'} busy={!!labels.busy}
+      error={labels.error?.action === 'custom' ? labels.error : null} onToggle={toggleCustomLabel} onType={typeCustomLabel} onAdd={() => void addCustomLabel()} />
   );
 }
 

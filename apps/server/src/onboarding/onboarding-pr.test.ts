@@ -538,6 +538,14 @@ test('on Azure Repos, a completed PR finishes onboarding, an abandoned one is ma
   assert.equal(az.prs[1]!.status, 'active');
 });
 
+test('on Azure Repos, the PR opener checks no workflow label', async (t) => {
+  const dir = await dataDir(t, [{ repo: AZURE, onboarding: progress }]);
+  const az = fakeAzRepos();
+  const opened = await createPrOpener(dir, az.run)({ repo: AZURE, progress, config: { ...azureConfig, labels: [] }, picks });
+  assert.doesNotMatch((opened as { error?: string }).error ?? '', /workflow label/);
+  assert.ok(az.calls.length > 0 && !az.calls.some((args) => args[0] === 'label'), 'it goes on past the check, listing no label');
+});
+
 test('on Azure Repos, a .lar-factory.json that lands another way finishes onboarding and abandons the active PR after a comment', async (t) => {
   const pr = `${REPO_URL}/pullrequest/7`;
   const dir = await dataDir(t, [{ repo: AZURE, onboarding: { ...progress, step: 'pr', prUrl: pr } }]);

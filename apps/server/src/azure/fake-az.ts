@@ -33,11 +33,11 @@ export const STATES: Record<string, [string, string][]> = {
 /**
  * A fake az for one team whose current sprint holds `sprint`'s ids and whose requirement backlog lists `backlog`'s,
  * reading `items` (listed or not), with `requirement` its requirement backlog level's type and `areas` its area paths.
- * `pullRequests` are the PRs az repos pr show prints. It records each call, each work item patch and each work item created,
- * and `fail` throws for a call it matches.
+ * `pullRequests` are the PRs az repos pr show prints, and `tags` the project's tags, which a tag PATCH renames. It records
+ * each call, each work item patch, each work item created and each tag renamed, and `fail` throws for a call it matches.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
-  requirement = 'User Story', areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], fail }: {
+  requirement = 'User Story', areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], tags = [], fail }: {
   items: WorkItem[];
   sprint?: number[];
   backlog?: number[];
@@ -45,9 +45,12 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   areas?: { value: string; includeChildren: boolean }[];
   iterations?: { id: string; name: string }[];
   pullRequests?: FakePr[];
+  tags?: string[];
   fail?: (args: string[]) => Error | undefined;
 }) {
   const calls: string[][] = [];
+  /** Each tag PATCH's tag and the new name its --in-file gives. */
+  const tagRenames: { from: string; to: string }[] = [];
   /** Each workitemsbatch call's ids, read from its --in-file while the file exists. */
   const batches: number[][] = [];
   /** Each work item patch's id and operations, read from its --in-file while the file exists. */
@@ -124,6 +127,16 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         if (args.includes('--http-method')) patches.push({ id, ops: JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as unknown[] });
         return JSON.stringify(raw(byId.get(id)!));
       }
+      if (resource === 'wit/tags' && args.includes('--http-method')) {
+        const from = route(args, 'tagIdOrName')!;
+        const { name: to } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { name: string };
+        const at = tags.findIndex((t) => t.toLowerCase() === from.toLowerCase());
+        if (at < 0) throw new Error(`az devops invoke failed: TF400516: The tag ${from} does not exist.`);
+        tagRenames.push({ from, to });
+        tags[at] = to;
+        return JSON.stringify({ id: `tag-${at}`, name: to });
+      }
+      if (resource === 'wit/tags') return JSON.stringify({ count: tags.length, value: tags.map((name, at) => ({ id: `tag-${at}`, name, active: true })) });
       if (resource === 'wit/workitemtypestates') {
         const states = STATES[route(args, 'type')!]!;
         return JSON.stringify({ count: states.length, value: states.map(([name, category]) => ({ name, color: '000000', category })) });
@@ -131,7 +144,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
     }
     throw new Error(`fake az: unexpected ${args.join(' ')}`);
   };
-  return { calls, batches, patches, created, run };
+  return { calls, batches, patches, created, tags, tagRenames, run };
 }
 
 /** A pull request on the fake repository, as az repos pr show prints it. */

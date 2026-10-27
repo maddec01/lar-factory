@@ -1,7 +1,8 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { WORKFLOW_LABELS } from '@lar-factory/shared';
-import { createCustomLabel, createRepositoryLabels, readRepositoryLabels, renameRepositoryLabels } from './repository-labels.ts';
+import { fakeAz } from '../azure/fake-az.ts';
+import { createCustomLabel, createRepositoryLabels, readRepositoryLabels, renameRepositoryLabels, workflowLabelsProblem } from './repository-labels.ts';
 
 /** A fake gh over a repository with `names` as its labels: it records each call and creates, renames and looks labels up. */
 function fakeGh(names: string[], fail: Partial<Record<'list' | 'create' | 'edit', string>> = {}) {
@@ -139,4 +140,47 @@ test('a body without its repository, item source or old names is refused', async
   assert.equal((await renameRepositoryLabels({ repo: REPO, names: 'decision: grill' }, gh.run) as { status: number }).status, 400);
   assert.equal((await createCustomLabel({ repo: REPO, name: 3 }, gh.run) as { status: number }).status, 400);
   assert.deepEqual(gh.calls, []);
+});
+
+test("a GitHub repository still lacking a workflow label holds onboarding's PR back", async () => {
+  assert.deepEqual(await workflowLabelsProblem(REPO, fakeGh(ALL.slice(1)).run),
+    { status: 409, error: `${REPO} still lacks a workflow label. Go back to the Labels step and create or rename it.` });
+  assert.equal(await workflowLabelsProblem(REPO, fakeGh(ALL).run), null);
+});
+
+const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
+const tagsCall = ['devops', 'invoke', '--area', 'wit', '--resource', 'tags', '--route-parameters', 'project=Fabrikam Fiber', '--api-version', '7.1-preview.1',
+  '--org', 'https://dev.azure.com/contoso', '--detect', 'false', '--output', 'json'];
+
+test("on Azure DevOps the step reads the project's tags with az", async () => {
+  const az = fakeAz({ items: [], tags: ['repo-lar-api', 'decision: grill'] });
+  assert.deepEqual(await readRepositoryLabels({ repo: AZURE }, az.run), { labels: ['repo-lar-api', 'decision: grill'] });
+  assert.deepEqual(az.calls, [tagsCall]);
+  const refused = fakeAz({ items: [], fail: () => new Error('az devops invoke failed: TF400813: not authorized') });
+  assert.deepEqual(await readRepositoryLabels({ repo: AZURE }, refused.run),
+    { status: 502, error: "Can't read contoso/Fabrikam Fiber/lar-api's tags: az devops invoke failed: TF400813: not authorized" });
+});
+
+test('on Azure DevOps Rename renames the old tag in the project, then reads the tags again', async () => {
+  const az = fakeAz({ items: [], tags: ['decision: grill', 'web'] });
+  assert.deepEqual(await renameRepositoryLabels({ repo: AZURE, names: ['decision: grill'] }, az.run), { labels: ['decision-grill', 'web'] });
+  assert.deepEqual(az.tagRenames, [{ from: 'decision: grill', to: 'decision-grill' }]);
+  const patch = az.calls.find((c) => c.includes('--http-method'))!;
+  assert.deepEqual(patch.slice(0, 9), ['devops', 'invoke', '--area', 'wit', '--resource', 'tags', '--route-parameters', 'project=Fabrikam Fiber', 'tagIdOrName=decision: grill']);
+  assert.equal(patch[patch.indexOf('--http-method') + 1], 'PATCH');
+  assert.deepEqual(az.calls.at(-1), tagsCall);
+});
+
+test("on Azure DevOps a rename that az refuses answers with az's message", async () => {
+  const az = fakeAz({ items: [], tags: ['decision: grill'], fail: (args) => args.includes('--http-method') ? new Error('az devops invoke failed: TF401289: access denied') : undefined });
+  assert.deepEqual(await renameRepositoryLabels({ repo: AZURE, names: ['decision: grill'] }, az.run),
+    { status: 502, error: "Couldn't rename decision: grill to decision-grill in contoso/Fabrikam Fiber/lar-api: az devops invoke failed: TF401289: access denied" });
+});
+
+test('on Azure DevOps nothing creates a tag, and no workflow tag holds the PR back', async () => {
+  const az = fakeAz({ items: [] });
+  assert.equal((await createRepositoryLabels({ repo: AZURE, itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, renaming: [] }, az.run) as { status: number }).status, 400);
+  assert.equal((await createCustomLabel({ repo: AZURE, name: 'web' }, az.run) as { status: number }).status, 400);
+  assert.equal(await workflowLabelsProblem(AZURE, az.run), null);
+  assert.deepEqual(az.calls, []);
 });

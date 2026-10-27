@@ -3,9 +3,12 @@
 // reads the labels again before each change and works only from the shared label plan, so it changes no other label.
 // It also creates a custom label the user types, or a reused .lar-factory.json's that the repository lacks, which is no
 // workflow or status label; and it tells the finish and the PR whether a workflow label is still missing.
+// On Azure DevOps the labels are the project's tags, read and renamed through az. It creates none: the board writes a
+// tag the first time a work item needs it, so a missing one holds nothing back.
 
-import { customLabelProblem, labelPlan, labelsToCreate, missingCustomLabels, workflowLabelsMissing } from '@lar-factory/shared';
-import { isItemSource, isRepo } from '../config/repository-config.ts';
+import { customLabelProblem, labelPlan, labelsToCreate, missingCustomLabels, shownRepo, workflowLabelsMissing } from '@lar-factory/shared';
+import { listTags, renameTag } from '../azure/azure-tags.ts';
+import { isItemSource, isRepo, onAzure } from '../config/repository-config.ts';
 import { createLabel, listLabels, message, renameLabel } from '../github/github.ts';
 
 type Run = (args: string[]) => Promise<string>;
@@ -13,11 +16,14 @@ type Answer = Promise<{ labels: string[] } | { status: number; error: string }>;
 
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
-/** The repository's labels, or why gh can't read them. */
+/** The repository's labels, or its project's tags on Azure DevOps, or why gh or az can't read them. */
 async function read(repo: string, run?: Run): Answer {
-  try { return { labels: await listLabels(repo, run) }; }
-  catch (err) { return { status: 502, error: `Can't read ${repo}'s labels: ${message(err)}` }; }
+  try { return { labels: await (onAzure(repo) ? listTags : listLabels)(repo, run) }; }
+  catch (err) { return { status: 502, error: `Can't read ${shownRepo(repo)}'s ${onAzure(repo) ? 'tags' : 'labels'}: ${message(err)}` }; }
 }
+
+/** The refusal of a create on Azure DevOps, whose tags the board writes on the work items that need them. */
+const NO_TAG_CREATE = { status: 400, error: 'Azure DevOps has no tag to create: the board writes each tag the first time a work item needs it.' };
 
 /** Lists the body's repository's labels. */
 export async function readRepositoryLabels(input: Record<string, unknown>, run?: Run): Answer {
@@ -36,6 +42,7 @@ export async function createRepositoryLabels(input: Record<string, unknown>, run
   if (!isRepo(repo) || !isItemSource(itemSource) || !strings(renaming) || !strings(custom)) {
     return { status: 400, error: 'Send the repository, its item source, the old labels Rename moves and any custom labels to create.' };
   }
+  if (onAzure(repo)) return NO_TAG_CREATE;
   const before = await read(repo, run);
   if ('error' in before) return before;
   const labels = [...labelsToCreate(labelPlan(before.labels, itemSource.kind), renaming),
@@ -49,16 +56,20 @@ export async function createRepositoryLabels(input: Record<string, unknown>, run
 
 /**
  * Why onboarding can't finish while `repo` lacks a workflow label or has one under its old name; or null once it has
- * each. The status labels don't hold it. Only a GitHub repository gets here, as Azure DevOps' tags wait for build #386.
+ * each. The status labels don't hold it, and on Azure DevOps nothing does, as the board writes a tag when it needs it.
  */
 export async function workflowLabelsProblem(repo: string, run?: Run): Promise<{ status: number; error: string } | null> {
+  if (onAzure(repo)) return null;
   const labels = await read(repo, run);
   if ('error' in labels) return labels;
   return workflowLabelsMissing(labelPlan(labels.labels, 'github-project'))
     ? { status: 409, error: `${repo} still lacks a workflow label. Go back to the Labels step and create or rename it.` } : null;
 }
 
-/** Renames each of the body's old workflow labels to its new name, so its issues keep it; answers with the labels it has then. */
+/**
+ * Renames each of the body's old workflow labels, or tags in its Azure DevOps project, to its new name, so its issues or
+ * work items keep it; answers with the labels it has then.
+ */
 export async function renameRepositoryLabels(input: Record<string, unknown>, run?: Run): Answer {
   const { repo, names } = input;
   if (!isRepo(repo) || !strings(names)) return { status: 400, error: 'Send the repository and the old labels to rename.' };
@@ -70,12 +81,12 @@ export async function renameRepositoryLabels(input: Record<string, unknown>, run
     const row = plan.workflow.find((r) => r.state === 'rename' && r.oldName.toLowerCase() === name.toLowerCase());
     if (row?.state === 'rename') { renames.push({ from: row.oldName, to: row.label.name }); continue; }
     const beside = plan.leftAlone.find((l) => l.name.toLowerCase() === name.toLowerCase())?.keptBeside;
-    if (beside) return { status: 409, error: `${repo} has ${beside} already, so ${name} can't be renamed to it.` };
+    if (beside) return { status: 409, error: `${shownRepo(repo)} has ${beside} already, so ${name} can't be renamed to it.` };
     return { status: 400, error: `${name} is no old workflow label the repository has.` };
   }
   for (const { from, to } of renames) {
-    try { await renameLabel(repo, from, to, run); }
-    catch (err) { return { status: 502, error: `Couldn't rename ${from} to ${to} in ${repo}: ${message(err)}` }; }
+    try { await (onAzure(repo) ? renameTag : renameLabel)(repo, from, to, run); }
+    catch (err) { return { status: 502, error: `Couldn't rename ${from} to ${to} in ${shownRepo(repo)}: ${message(err)}` }; }
   }
   return read(repo, run);
 }
@@ -84,6 +95,7 @@ export async function renameRepositoryLabels(input: Record<string, unknown>, run
 export async function createCustomLabel(input: Record<string, unknown>, run?: Run): Answer {
   const { repo, name } = input;
   if (!isRepo(repo) || typeof name !== 'string') return { status: 400, error: 'Send the repository and the custom label to create.' };
+  if (onAzure(repo)) return NO_TAG_CREATE;
   const problem = customLabelProblem(name);
   if (problem) return { status: 400, error: problem };
   const label = name.trim();

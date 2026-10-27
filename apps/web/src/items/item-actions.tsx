@@ -2,7 +2,7 @@
 // both, and Keep for each status of an issue that carries more than one, each with its pending label, plus a failed
 // Queue's or Keep's error.
 
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import { canAbandon, ref } from '@lar-factory/shared';
 import type { BoardData, Item, Status } from '@lar-factory/shared';
 import { Button, InlineButton } from '@lar-factory/ui/button';
@@ -43,13 +43,19 @@ export function PickStatusButtons({ item, data }: { item: Item; data: BoardData 
   ));
 }
 
-/** Abandon, a link in the footer. */
+/** Abandon, a link in the footer; greyed out, with a line saying why, on an item whose provider can't abandon it. */
 export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);
+  const reason = useId();
   if (!canAbandon(item)) return null;
   const verb = action?.phase === 'pending' && action.kind === 'abandon' ? 'Abandoning…' : 'Abandon';
-  return <InlineButton tone="destructive" className="link-action danger" data-abandon={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
-    {...writeState(data, action)} onClick={() => askAbandon(item.id)}>{verb}</InlineButton>;
+  const refusal = item.abandonRefusal;
+  const state = refusal ? { disabled: true as const, title: refusal, 'aria-describedby': reason } : writeState(data, action);
+  return <>
+    <InlineButton tone="destructive" className="link-action danger disabled:pointer-events-auto" data-abandon={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
+      {...state} onClick={() => askAbandon(item.id)}>{verb}</InlineButton>
+    {refusal && <span id={reason} className="text-muted-foreground" data-abandon-refusal>{refusal}</span>}
+  </>;
 }
 
 /** A failed Queue or Keep, until it's closed. */

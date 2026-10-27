@@ -118,3 +118,10 @@ test(`a read runs at most ${PR_READS} az repos pr show calls at once`, async () 
   assert.equal(item!.linkedPrs.length, 10);
   assert.equal(most, PR_READS);
 });
+
+test("an item whose type has no Removed state, such as Basic's Issue, carries why Abandon can't run; one whose type has one carries nothing", async () => {
+  const items: WorkItem[] = [{ id: 1, type: 'Issue', state: 'To Do' }, { id: 11, type: 'Task', state: 'New', parent: 1 }];
+  const [issue, task] = (await azureSprint([WEB], TEAM, fakeAz({ items, requirement: 'Issue' }).run).read()).items;
+  assert.equal(issue!.abandonRefusal, "Issue has no Removed state in Fabrikam Fiber, so the board can't abandon it. Close or delete it in Azure DevOps.");
+  assert.equal(task!.abandonRefusal, undefined);
+});

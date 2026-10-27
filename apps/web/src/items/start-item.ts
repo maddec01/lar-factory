@@ -1,5 +1,5 @@
-// Start on a Queued item, or Start build on a Ready one: posts the picked model choice to
-// /api/start or /api/start-build, shows the thread it started or why it didn't, and remembers the
+// Start on a Queued item, or Start build on a Ready one: posts the picked model choice, and the repository picked for
+// an untagged Azure work item, to /api/start or /api/start-build, shows the thread it started or why it didn't, and remembers the
 // choice once a thread starts or may have.
 
 import { flushSync } from 'react-dom';
@@ -15,11 +15,11 @@ import type { StartKind } from './start-store.ts';
 
 const PATH: Record<StartKind, string> = { refine: '/api/start', build: '/api/start-build' };
 
-export async function startItem(itemId: string, choice?: ModelChoice, kind: StartKind = 'refine'): Promise<void> {
+export async function startItem(itemId: string, choice?: ModelChoice, kind: StartKind = 'refine', repo?: string): Promise<void> {
   const starts = useStartStore.getState();
   if (startOf(starts, itemId, kind)?.phase === 'pending' || useActionStore.getState().actions[itemId]?.phase === 'pending') return;
   starts.set(itemId, { phase: 'pending' }, kind);
-  const result = await postAction<StartResult>(PATH[kind], startRequest(useBoardStore.getState().data.capture?.session, itemId, choice));
+  const result = await postAction<StartResult>(PATH[kind], startRequest(useBoardStore.getState().data.capture?.session, itemId, choice, repo));
   flushSync(() => {
     receive(result);
     starts.set(itemId, result.thread ? { phase: 'started', thread: result.thread }

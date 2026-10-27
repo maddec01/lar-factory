@@ -190,10 +190,9 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
   }
 
   /** Each type's state categories, by type and state name. */
-  async function categories(types: readonly string[]): Promise<(type: string, state: string) => Category | undefined> {
+  async function categories(types: readonly string[]): Promise<Map<string, Map<string, Category>>> {
     const read = await Promise.all(types.map(statesOf));
-    const byType = new Map(types.map((type, i) => [type, new Map(read[i]!.value.map((s) => [s.name, s.category]))]));
-    return (type, state) => byType.get(type)?.get(state);
+    return new Map(types.map((type, i) => [type, new Map(read[i]!.value.map((s) => [s.name, s.category]))]));
   }
 
   /** The PRs the work items link, each read once, PR_READS at once, by id; a PR az no longer finds is left out. */
@@ -225,8 +224,11 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const withTasks = [...listed, ...await workItems(unread(parents, 'System.LinkTypes.Hierarchy-Forward', listed))];
       const all = [...withTasks, ...await workItems(unread(withTasks, 'System.LinkTypes.Dependency-Reverse', withTasks))];
       const byId = new Map(all.map((raw) => [raw.id, raw]));
-      const categoryOf = await categories([...new Set(all.map(type))]);
-      const category = (raw: RawWorkItem) => categoryOf(type(raw), field(raw, 'System.State'));
+      const byType = await categories([...new Set(all.map(type))]);
+      const category = (raw: RawWorkItem) => byType.get(type(raw))?.get(field(raw, 'System.State'));
+      // Abandon moves a work item to its type's Removed-category state, which Basic's Issue lacks.
+      const abandonRefusal = (raw: RawWorkItem) => ([...byType.get(type(raw))?.values() ?? []].includes('Removed') ? {}
+        : { abandonRefusal: `${type(raw)} has no Removed state in ${project}, so the board can't abandon it. Close or delete it in Azure DevOps.` });
 
       const done = (raw: RawWorkItem) => category(raw) === 'Completed';
       const shown = (raw: RawWorkItem) => category(raw) !== 'Removed';
@@ -270,6 +272,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
           title: field(raw, 'System.Title'),
           url: url(raw.id),
           ...placed.get(raw.id)!,
+          ...abandonRefusal(raw),
           labels: labelsOf(raw),
           state: closed ? 'closed' : 'open',
           closedAs: closed ? 'done' : null,

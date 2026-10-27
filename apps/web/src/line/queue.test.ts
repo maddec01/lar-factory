@@ -47,6 +47,14 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['I_sample06']);
 });
 
+test('a row for an untagged item two repositories read names both', async () => {
+  const [web, api] = ['contoso/Fabrikam/web', 'contoso/Fabrikam/api'];
+  const untagged = { ...sample05, repo: web, untaggedFor: [web, api], labels: [] };
+  await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'sprint', team: 'Web', show: 'all', labels: [] }],
+    items: sample.items.map((i) => (i.id === sample05.id ? untagged : i)) });
+  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('web or api · queued 2h ago');
+});
+
 test("a row shows the item's kind label and its repository's custom labels, colons and all, without case, and hides every other label", async () => {
   const labelled = { ...sample05, labels: ['needs-triage', 'area: web', 'status-queued', 'Improvement', 'app: music', 'active', 'build', 'Area: Server', 'decision-grill'] };
   await mountPage({ ...sample, items: sample.items.map((i) => i.id === sample05.id ? labelled : i) });

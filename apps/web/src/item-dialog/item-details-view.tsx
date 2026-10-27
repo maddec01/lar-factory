@@ -56,7 +56,7 @@ function Comments({ itemId, entry, now }: { itemId: string; entry: DetailsEntry;
     <div className="grid min-w-0 gap-2" data-comments>
       <Heading>Comments{comments.length > 0 && ` · ${comments.length}`}</Heading>
       {comments.length > 0
-        ? <ol className="m-0 grid list-none gap-3 p-0">{comments.map((c) => <Comment key={c.id} comment={c} now={now} />)}</ol>
+        ? <ol className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-3 p-0">{comments.map((c) => <Comment key={c.id} comment={c} now={now} />)}</ol>
         : <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>}
       {older.hasMore && (
         <div className="flex flex-wrap items-center gap-3">

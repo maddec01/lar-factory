@@ -66,7 +66,7 @@ function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData
         <DialogTitle className="text-lg leading-snug tracking-tight"><ItemTitle item={item} /></DialogTitle>
         {item.parent && <DialogDescription>Part of <a href={item.parent.url} target="_blank" rel="noopener" className="underline">#{item.parent.number} {item.parent.title}</a></DialogDescription>}
       </DialogHeader>
-      <DialogPanel className="grid gap-5 space-y-0">
+      <DialogPanel className="grid grid-cols-[minmax(0,1fr)] gap-5 space-y-0 overflow-x-hidden">
         <StepTrack status={item.status} labels />
         {hint && (
           <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
@@ -76,16 +76,16 @@ function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData
         )}
         <div className="grid min-w-0 gap-8 md:grid-cols-[minmax(0,1fr)_15rem]">
           <article className="grid min-w-0 content-start gap-6"><ItemText itemId={item.id} read={read} now={now} /></article>
-          <aside className="grid min-w-0 content-start gap-5 md:border-l md:border-(--border) md:pl-6">
+          <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5 md:border-l md:border-(--border) md:pl-6">
             <ItemFields item={item} read={read} now={now} />
             {item.slices.length > 0 && (
-              <section className="grid gap-2">
+              <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
                 <h2 className="m-0 text-[13px] font-medium">Slices <span className="text-(--muted-foreground)">{item.slices.filter((s) => s.progress === 'done').length}/{item.slices.length} done</span></h2>
                 <SliceList item={item} />
               </section>
             )}
-            {item.linkedPrs.length > 0 && <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Pull requests</h2><PrList item={item} /></section>}
-            <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Agent work</h2><StatsGrid item={item} /></section>
+            {item.linkedPrs.length > 0 && <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2"><h2 className="m-0 text-[13px] font-medium">Pull requests</h2><PrList item={item} /></section>}
+            <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2"><h2 className="m-0 text-[13px] font-medium">Agent work</h2><StatsGrid item={item} /></section>
           </aside>
         </div>
         <ActionError item={item} />

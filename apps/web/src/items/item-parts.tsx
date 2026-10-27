@@ -71,7 +71,7 @@ export function SliceBar({ item }: { item: Item }) {
 
 export function SliceList({ item }: { item: Item }) {
   return (
-    <ul className="m-0 grid list-none gap-0.5 p-0">
+    <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-0.5 p-0">
       {item.slices.map((s) => (
         <li key={s.number} className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px] hover:bg-(--soft)">
           <span className="grid size-4 place-items-center rounded-full border-[1.5px]"
@@ -92,7 +92,7 @@ const CHECKS_COLOR = { failed: 'var(--error)', running: 'var(--warning)', passed
 
 export function PrList({ item }: { item: Item }) {
   return (
-    <ul className="m-0 grid list-none gap-1 p-0">
+    <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-1 p-0">
       {item.linkedPrs.map((pr) => {
         const state = checkState(pr.checks);
         return (

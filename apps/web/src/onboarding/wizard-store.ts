@@ -21,7 +21,7 @@ import {
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
-import { answerSetup, setupItemSource, setupProblems, suggestedShow, type SetupChange } from './setup-answers.ts';
+import { answerSetup, byTeam, setupItemSource, setupProblems, suggestedShow, type SetupChange } from './setup-answers.ts';
 
 /** The steps in order. */
 export const STEPS = [
@@ -115,11 +115,14 @@ export function prClosed(run: Run, data: Pick<BoardData, 'onboarding'>): boolean
   return !!run.prUrl && kept?.progress.prUrl === run.prUrl && !!kept.progress.prClosed;
 }
 
-/** The commands the Checks step checks for a GitHub repository; az waits for Azure DevOps in build #386. */
-export const COMMAND_CHECKS = ['gh', 't3', 'git', 'jq', 'curl'] as const satisfies readonly CheckedTool[];
+/** Whether the item source is an Azure DevOps team's, read through az rather than gh. */
+const readsAzureTeam = (source: RepositoryItemSource | null): boolean => !!source && byTeam(source.kind);
+
+/** The commands the Checks step checks for the item source: az for an Azure DevOps team's, gh for a GitHub one. */
+export const commandChecks = (source: RepositoryItemSource | null): CheckedTool[] => [readsAzureTeam(source) ? 'az' : 'gh', 't3', 'git', 'jq', 'curl'];
 
 /** Whether a command's check passes for the item source; gh needs the project scope only to read a GitHub Project. */
-export function commandPasses(name: (typeof COMMAND_CHECKS)[number], tools: ToolChecks | undefined, source: RepositoryItemSource | null): boolean {
+export function commandPasses(name: CheckedTool, tools: ToolChecks | undefined, source: RepositoryItemSource | null): boolean {
   const check = tools?.[name];
   return check?.result === 'ok' || check?.result === 'no-project-scope' && source?.kind === 'issues' && !check.upgrade;
 }
@@ -136,7 +139,7 @@ export interface Checks {
 
 /** Whether every check on the Checks step passed. */
 export function checksPassed(checks: Checks | null, tools: ToolChecks | undefined, source: RepositoryItemSource | null): boolean {
-  return checks?.commands.state === 'done' && COMMAND_CHECKS.every((name) => commandPasses(name, tools, source))
+  return checks?.commands.state === 'done' && commandChecks(source).every((name) => commandPasses(name, tools, source))
     && SETUP_CHECKS.every((id) => { const c = checks.setup[id]; return c.state === 'done' && c.result.passed; });
 }
 
@@ -692,8 +695,11 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     },
     runChecks: async () => {
       const runId = ++checkRuns;
+      const { run, projects } = get();
+      const project = run && pickedProject(run, projects);
       set({ checks: { commands: { state: 'running' }, setup: WAITING } });
-      const rechecked = await postAction('/api/recheck', {});
+      // The board checks az only while a listed repository needs it, so an Azure DevOps run asks for it.
+      const rechecked = await postAction('/api/recheck', project?.provider === 'Azure DevOps' ? { az: true } : {});
       receive(rechecked);
       const checks = current(runId);
       if (!checks) return;

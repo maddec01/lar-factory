@@ -23,8 +23,8 @@ export interface HttpDeps {
   appSecret: string | null;
   /** Sample mode serves a fixed file: it writes nothing and runs no tools. */
   sample: boolean;
-  /** Looks the tools up again. */
-  recheck(): Promise<void>;
+  /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
+  recheck(options?: { az?: boolean }): Promise<void>;
   /** Reads GitHub now, or once more after the running read. */
   readSoon(): void;
   /** The startup tool check; requests other than /healthz and assets wait for it. */
@@ -348,12 +348,12 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         return { status: 200, body: withBoard({ error: null }) };
       },
     },
-    // Looks the tools up again for the notices' Recheck button.
+    // Looks the tools up again for the notices' Recheck button and onboarding's Checks step.
     '/api/recheck': {
       what: 'the recheck request',
-      async run() {
+      async run(input) {
         if (sample) return { status: 403, body: { error: 'Sample mode looks no tools up.' } };
-        await recheck();
+        await recheck({ az: input.az === true });
         return { status: 200, body: withBoard({ error: null }) };
       },
     },

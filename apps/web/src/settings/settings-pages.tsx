@@ -1,6 +1,6 @@
 // The Settings sections and their grouped rows, from the control room prototype. Most rows aren't built yet: they
 // show the prototype's value, disabled. The working rows are the Claude profiles, the update channel, version and
-// Check now, the command check rows, the gh and az logins, each repository with Resume and Add repository, which open the onboarding dialog, and the
+// Check now, the command check rows, the gh and az logins, each repository with Edit, which opens Edit's dialog, Resume and Add repository, which open the onboarding dialog, and the
 // bundled skills with their authors, licences, last updates, install states and sources. In a browser the profiles
 // and updates, which only the board app has, show the prototype's values, disabled with that reason.
 
@@ -11,6 +11,7 @@ import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-sk
 import { Button } from '@lar-factory/ui/button';
 import { RepoTag } from '../items/item-parts.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
+import { useEditStore } from '../repositories/edit-store.ts';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, SmallButton, ToolState, notBuilt } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
@@ -91,9 +92,8 @@ const sourceName = (kind: keyof typeof ITEM_SOURCES, project?: { owner: string; 
   kind === 'project' && project ? `${ITEM_SOURCES.project} ${project.owner} #${project.number}` : ITEM_SOURCES[kind];
 const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
 
-/** Edit and Reset, which wait for build #385. */
-const editAndReset = <><SmallButton reason="Editing a repository arrives in build #385">Edit</SmallButton>
-  <SmallButton reason="Resetting a repository arrives in build #385">Reset</SmallButton></>;
+/** Reset, which waits for a later slice of build #385. */
+const reset = <SmallButton reason="Resetting a repository arrives in build #385">Reset</SmallButton>;
 
 /**
  * A repository still onboarding: its provider, its item source and show setting once it has passed the step that asks
@@ -107,19 +107,21 @@ function onboardingDescription(progress: OnboardingProgress): string {
 }
 
 /**
- * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting,
- * one still onboarding with what it has answered, the step it stopped at and Resume. Add repository opens the onboarding dialog. The board
+ * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting and
+ * Edit, which opens Edit's dialog, one still onboarding with what it has answered, the step it stopped at and Resume. Add repository opens the onboarding dialog. The board
  * reads only GitHub repositories until build #386.
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
     id: `repo-${r.repo}`, title: r.repo, description: `GitHub · ${sourceName(itemSource(r), r.project)} · ${SHOWN[r.show ?? 'all']}`,
-    control: custom(() => <span className="flex items-center gap-2">{editAndReset}</span>),
+    control: custom(() => <span className="flex items-center gap-2">
+      <Button variant="outline" size="xs" onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>{reset}
+    </span>),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
     id: `repo-${repo}`, title: repo, description: onboardingDescription(progress),
     control: custom(() => <span className="flex items-center gap-2">
-      <Button size="xs" onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>{editAndReset}
+      <Button size="xs" onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>{reset}
     </span>),
   }));
   return { title: 'Repositories', description: 'Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list.',

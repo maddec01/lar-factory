@@ -21,7 +21,7 @@ import {
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
-import { answerSetup, setupProblems, suggestedShow, type SetupChange } from './setup-answers.ts';
+import { answerSetup, setupItemSource, setupProblems, suggestedShow, type SetupChange } from './setup-answers.ts';
 
 /** The steps in order. */
 export const STEPS = [
@@ -97,7 +97,7 @@ const setupAnswered = (setup: SetupAnswers | null): boolean => !!setup && Object
 export function itemSourceOf(run: Run, project: ProjectChoice): RepositoryItemSource | null {
   if (project.config) return project.config.itemSource;
   if (!setupAnswered(run.setup)) return null;
-  return run.setup!.itemSource === 'issues' ? { kind: 'issues' } : { kind: 'github-project', owner: run.setup!.projectOwner, number: Number(run.setup!.projectNumber) };
+  return setupItemSource(run.setup!);
 }
 
 /** The .lar-factory.json values the onboarding PR writes, from the setup step's answers; null until they are whole. */

@@ -1,7 +1,7 @@
 // The setup fields' answers: the show setting suggested for an item source, giving an answer, and what each answer
 // that Next or Save waits for needs. Onboarding's Provider and item source step and Edit both use them.
 
-import type { SetupAnswers, ShowSetting } from '@lar-factory/shared';
+import type { RepositoryItemSource, SetupAnswers, ShowSetting } from '@lar-factory/shared';
 
 /** The button that waits for the answers: Next in onboarding, Save in Edit. */
 export type SetupAction = 'Next' | 'Save';
@@ -32,3 +32,7 @@ export function setupProblems(setup: SetupAnswers, action: SetupAction = 'Next')
     ...!setup.role.trim() && { role: `${action} needs the repository’s role.` },
   };
 }
+
+/** The item source the answers name, once setupProblems finds nothing in them. */
+export const setupItemSource = (setup: SetupAnswers): RepositoryItemSource => setup.itemSource === 'issues'
+  ? { kind: 'issues' } : { kind: 'github-project', owner: setup.projectOwner, number: Number(setup.projectNumber) };

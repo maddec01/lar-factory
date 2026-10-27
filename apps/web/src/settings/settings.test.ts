@@ -1,6 +1,6 @@
 // The Settings page: the sidebar's section list with search and Back, the breadcrumb over each section's rows, the
 // Claude profiles with their switches and what a change did, the bundled skills with their last updates and install
-// states, the update channel, version and Check now, the tool rows, the repository rows with Resume and Add repository, and the rows that aren't built yet. The bridge stands in for the app's preload; without it
+// states, the update channel, version and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog has its own test), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the profiles and updates show disabled.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
@@ -156,11 +156,11 @@ test('Repositories shows the command line tools\' logins and each repository wit
   ]);
 });
 
-test('Edit and Reset wait for build #385, and Add repository opens the onboarding dialog over Settings', async () => {
+test('Reset waits for build #385, and Add repository opens the onboarding dialog over Settings', async () => {
   serve(sample, [project('lar-web')]);
   await open('Repositories', sample);
   expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled, b.title])).toEqual([
-    ...sample.repos.flatMap(() => [['Edit', true, 'Editing a repository arrives in build #385'], ['Reset', true, 'Resetting a repository arrives in build #385']]),
+    ...sample.repos.flatMap(() => [['Edit', false, ''], ['Reset', true, 'Resetting a repository arrives in build #385']]),
     [' Add repository', false, '']]);
   await settle(() => $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === ' Add repository')!.click());
   await settle(() => vi.advanceTimersByTime(50));
@@ -177,8 +177,8 @@ test('a repository still onboarding is listed with its provider, the answers it 
   serve(data, [project('lar-web', { onBoard: true })]);
   await open('Repositories', data);
   expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-maddec01/lar-notes']]);
-  expect(text(row('repo-maddec01/lar-web')), 'answers the step has not passed yet').toBe('maddec01/lar-webGitHub · Onboarding, stopped at Provider and item sourceResumeEditReset');
-  expect(text(row('repo-maddec01/lar-notes'))).toBe('maddec01/lar-notesGitHub · Issues · Opted-in items · Onboarding, stopped at ChecksResumeEditReset');
+  expect(text(row('repo-maddec01/lar-web')), 'answers the step has not passed yet').toBe('maddec01/lar-webGitHub · Onboarding, stopped at Provider and item sourceResumeReset');
+  expect(text(row('repo-maddec01/lar-notes'))).toBe('maddec01/lar-notesGitHub · Issues · Opted-in items · Onboarding, stopped at ChecksResumeReset');
   const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-notes', provider: 'GitHub' as const, setup }, prUrl: 'https://github.com/maddec01/lar-notes/pull/2' };
   const onProject = { ...pr, answers: { ...pr.answers, setup: { ...setup, itemSource: 'github-project' as const, projectNumber: '3', show: 'all' as const } } };
   await push({ ...data, onboarding: [{ repo: 'maddec01/lar-web', progress: onProject }, { repo: 'maddec01/lar-notes', progress: { ...pr, prClosed: true } }] });

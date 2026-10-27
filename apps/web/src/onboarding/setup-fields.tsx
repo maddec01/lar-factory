@@ -64,7 +64,7 @@ export const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opt
 type TextAnswer = keyof ReturnType<typeof setupProblems>;
 
 /** An Azure DevOps repository's project, as people read it: organization/project/repository's middle part, decoded. */
-function azureProject(repo: string): string {
+export function azureProject(repo: string): string {
   const project = repo.split('/')[1] ?? '';
   try { return decodeURIComponent(project); } catch { return project; }
 }

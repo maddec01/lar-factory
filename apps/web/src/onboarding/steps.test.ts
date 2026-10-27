@@ -949,6 +949,34 @@ test("Retry after the fixed checks' read failed reads them again, then lists the
   expect(changeRows()).toHaveLength(WRITTEN.length);
 });
 
+test("an Azure DevOps repository's PR adds the team's item source, made on Azure DevOps, and names the PR as Azure Repos does", async () => {
+  await openSetup(AZURE);
+  await settle(() => choice('azure-backlog').querySelector<HTMLElement>('[role="radio"]')!.click());
+  await type(input('team')!, 'Fabrikam Team');
+  await type(input('role')!, 'API server');
+  answerChecks({}, toolChecks({ az: { result: 'ok' } }));
+  await openChecks();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED, modelChoices: MODELS }));
+  answerClashes(NONE, DONE);
+  await settle(() => nextButton().click());
+  await settle();
+  answerChanges(WRITTEN);
+  await settle(() => nextButton().click());
+  await settle();
+  expect(text(prStep())).toContain('made on Azure DevOps from the default branch');
+  expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'API server',
+    itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', labels: [] });
+  const prUrl = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api/pullrequest/100';
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr' ? new Response(JSON.stringify({ prUrl, error: null,
+    board: { ...sample, tools: toolChecks(), onboarding: [{ repo: AZURE.repo, progress: { step: 'pr', done: [], answers: { projectId: 'lar-api' }, prUrl } }] } }))
+    : served(url, init));
+  await settle(() => button(prStep(), 'Open the PR')!.click());
+  await settle();
+  expect(text(prStep().querySelector(`a[href="${prUrl}"]`))).toBe('contoso/Fabrikam Fiber/lar-api!100');
+});
+
 test('the Pull request step shows the branch and the .lar-factory.json it writes, then Open the PR waits for the merge', async () => {
   await openPrStep(WRITTEN, ['app: music']);
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Pull request');

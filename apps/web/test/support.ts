@@ -120,6 +120,13 @@ export async function settle(fn: () => unknown = () => {}): Promise<void> {
   });
 }
 
+/** Presses a design-system menu's trigger: Radix opens a menu on the pointer's press, not on the click after it, and
+ *  starts listening for a press outside it on the next tick. */
+export async function pressMenu(el: Element): Promise<void> {
+  await settle(() => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, pointerType: 'mouse' })));
+  await settle(() => vi.advanceTimersByTime(0));
+}
+
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';

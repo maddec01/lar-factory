@@ -47,7 +47,7 @@ test('every Azure DevOps origin form names its project/repo', async (t) => {
 
 test('Start build finds only GitHub checkouts; Azure DevOps naming waits for build #386', async (t) => {
   const env = t3Home(t, { 'lar-factory': GITHUB[0]!, 'lar-api': AZURE[0]! });
-  const repo = (name: string) => ({ repo: name, role: 'server' });
+  const repo = (name: string) => ({ repo: name, role: 'server', labels: [] });
   assert.deepEqual(await repositoryProjectHints([repo('maddec01/lar-factory'), repo('Fabrikam/lar-api')], env), {
     'maddec01/lar-factory': null,
     'Fabrikam/lar-api': 'No T3 project is a checkout of Fabrikam/lar-api; add the checkout in T3 Code',

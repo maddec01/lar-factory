@@ -239,7 +239,7 @@ test('a map with no End-to-end check section has no Check phase, and its map say
 
 test('a Map lane named owner/name shows it once', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  await mountPage({ ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork' }] });
+  await mountPage({ ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork', labels: [] }] });
   await press(button(dossier(), 'Map'));
   const lanes = [...dossier().querySelectorAll('[data-work-map] .sticky')];
   expect(lanes.map(text)).toEqual(['Decisionsgrill, prototype, research', 'maddec01/lar-server']);

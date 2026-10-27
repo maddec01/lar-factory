@@ -18,19 +18,19 @@ const appleIssue = (number: number, labels: string[] = []) =>
 const projectReads = async (board: Board) => (await board.calls()).filter((args) => args.some((a) => a.includes('projectV2(number'))).length;
 const configReads = async (board: Board) => (await board.calls()).filter((args) => args[1]?.endsWith('/.lar-factory.json')).length;
 
-test('each onboarded repository reads its items from the item source its .lar-factory.json names, with its show setting', async (t) => {
+test('each onboarded repository reads its items from the item source its .lar-factory.json names, with its show setting and custom labels', async (t) => {
   const board = await startBoard(t, {
     repositories: [FACTORY, APPLE],
     repoConfigs: { [FACTORY]: { version: 1, role: 'The factory', itemSource: LAR, show: 'all', labels: [] },
-      [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' }, show: 'opted-in' } },
+      [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: music'] } },
     items: [projectIssue(1, 'Queued', FACTORY), projectIssue(2, 'List', FACTORY)],
     repoIssues: { [APPLE]: [appleIssue(7, ['status-queued']), appleIssue(8)] },
   });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(data.error, null);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]), [[FACTORY, 1, 'Queued'], [FACTORY, 2, 'List'], [APPLE, 7, 'Queued']]);
-  assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all' },
-    { repo: APPLE, role: 'Apple client', items: 'issues', show: 'opted-in' }]);
+  assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all', labels: [] },
+    { repo: APPLE, role: 'Apple client', items: 'issues', show: 'opted-in', labels: ['app: music'] }]);
   assert.equal(data.project.title, 'lar');
 });
 
@@ -39,7 +39,7 @@ test('repositories naming the same Project share one read of it, and a missing f
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(await projectReads(board), 1);
   assert.equal(await configReads(board), 3);
-  assert.deepEqual(data.repos[0], { repo: 'maddec01/lar-server', role: 'Server', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all' });
+  assert.deepEqual(data.repos[0], { repo: 'maddec01/lar-server', role: 'Server', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all', labels: [] });
 });
 
 test('without a list of onboarded repositories the board is empty', async (t) => {
@@ -94,7 +94,7 @@ test('a change to a .lar-factory.json shows on the next refresh', async (t) => {
   await until(board, (d) => d.items.map((i) => i.number).join() === '1');
   await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } } });
   const data: BoardData = await until(board, (d) => d.items.map((i) => i.number).join() === '7');
-  assert.deepEqual(data.repos, [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all' }]);
+  assert.deepEqual(data.repos, [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all', labels: [] }]);
 });
 
 test("a repository whose .lar-factory.json is missing, doesn't parse or has a wrong field stays off the board with a notice, the others still show", async (t) => {

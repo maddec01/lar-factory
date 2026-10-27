@@ -19,10 +19,10 @@ const unlisted: ItemSource = {
   abandon: async () => NOT_ONBOARDED,
 };
 
-/** A repository's config as the page sees it: its role, item source and show setting. */
-export function repoView({ repo, role, itemSource, show }: RepositoryConfig): RepoConfig {
-  return itemSource.kind === 'issues' ? { repo, role, items: 'issues', show }
-    : { repo, role, items: 'project', project: { owner: itemSource.owner, number: itemSource.number }, show };
+/** A repository's config as the page sees it: its role, item source, show setting and custom labels. */
+export function repoView({ repo, role, itemSource, show, labels }: RepositoryConfig): RepoConfig {
+  return itemSource.kind === 'issues' ? { repo, role, items: 'issues', show, labels }
+    : { repo, role, items: 'project', project: { owner: itemSource.owner, number: itemSource.number }, show, labels };
 }
 
 /**

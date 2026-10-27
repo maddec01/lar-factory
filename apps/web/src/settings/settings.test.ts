@@ -101,7 +101,7 @@ test.each([[15, '15 seconds'], [60, '1 minute'], [300, '5 minutes'], [120, '2 mi
 });
 
 test('a repository colour named owner/name shows it once; one named by its name shows owner/name under it', async () => {
-  await open('Appearance', { ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork' }] });
+  await open('Appearance', { ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork', labels: [] }] });
   expect(text(row('color-maddec01/lar-server')).split('maddec01/lar-server').length - 1, 'the title and the tag, no description').toBe(2);
   expect(text(row('color-maddec01/lar-apple'))).toContain('maddec01/lar-apple');
 });

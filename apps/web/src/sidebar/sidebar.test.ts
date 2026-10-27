@@ -327,7 +327,7 @@ test('a repository written in another case than GitHub gives it keeps one group,
 });
 
 test('two repositories that share a name both show as owner/name, with their owner\'s letter, and each scopes to itself', async () => {
-  const repos = [{ repo: 'maddec01/lar', role: 'app' }, { repo: 'fabrikam/lar', role: 'app' }];
+  const repos = [{ repo: 'maddec01/lar', role: 'app', labels: [] }, { repo: 'fabrikam/lar', role: 'app', labels: [] }];
   const items = [{ ...sample.items[0]!, id: 'I_ours', repo: 'maddec01/lar' }, { ...sample.items[0]!, id: 'I_theirs', repo: 'fabrikam/lar' }];
   await mountPage({ ...sample, repos, items });
   expect($$('.list-group').map((g) => text(g.querySelector('button.scope')))).toEqual(['Mmaddec01/lar', 'Ffabrikam/lar']);

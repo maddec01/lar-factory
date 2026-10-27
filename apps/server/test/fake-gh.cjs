@@ -5,6 +5,8 @@ const args = process.argv.slice(2);
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
 fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
 const output = (value) => process.stdout.write(JSON.stringify(value));
+const WORKFLOW_LABELS = ['bug', 'feature', 'improvement', 'concept', 'decision-grill', 'decision-prototype', 'decision-research', 'decision-task',
+  'build', 'active', 'blocked'];
 const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued' }, { id: 'IN_PROGRESS_1', name: 'In progress' }];
 const main = async () => {
   if (args[0] === '--version') return void process.stdout.write(`gh version ${options.ghVersion ?? '2.96.0'} (2026-09-01)\n`);
@@ -166,11 +168,14 @@ const main = async () => {
     }
     return output({ name: labelPath[2] });
   }
-  if (args[0] === 'label' && args[1] === 'list') return output((options.repoLabels?.[args[args.indexOf('-R') + 1]] ?? []).map((name) => ({ name })));
+  // gh label list lists every workflow label for a repository options.repoLabels doesn't name, so onboarding can finish.
+  if (args[0] === 'label' && args[1] === 'list') return output((options.repoLabels?.[args[args.indexOf('-R') + 1]] ?? WORKFLOW_LABELS).map((name) => ({ name })));
+  // A label's name comes after --, for gh label create and gh label edit alike.
+  const named = args[args.indexOf('--') + 1];
   if (args[0] === 'label' && args[1] === 'edit') {
     const repo = args[args.indexOf('--repo') + 1];
-    const to = args[args.indexOf('--name') + 1];
-    options.repoLabels = { ...options.repoLabels, [repo]: (options.repoLabels?.[repo] ?? []).map((name) => name === args[2] ? to : name) };
+    const to = args.find((a) => a.startsWith('--name=')).slice('--name='.length);
+    options.repoLabels = { ...options.repoLabels, [repo]: (options.repoLabels?.[repo] ?? []).map((name) => name === named ? to : name) };
     fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
     return;
   }
@@ -181,7 +186,7 @@ const main = async () => {
       return;
     }
     const repo = args[args.indexOf('-R') + 1];
-    options.repoLabels = { ...options.repoLabels, [repo]: [...(options.repoLabels?.[repo] ?? []), args[2]] };
+    options.repoLabels = { ...options.repoLabels, [repo]: [...(options.repoLabels?.[repo] ?? []), named] };
     fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
     return;
   }

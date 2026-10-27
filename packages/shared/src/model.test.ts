@@ -370,9 +370,9 @@ test('Add item refuses an unlisted repository, an unknown kind, a blank title an
   }
 });
 
-test(".lar-factory.json as onboarding writes it has the answers, version 1 and no labels until build #383's label step", () => {
-  assert.equal(onboardingConfigFile({ itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' }),
-    '{\n  "version": 1,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "show": "opted-in",\n  "labels": []\n}\n');
+test('.lar-factory.json as onboarding writes it has the answers, version 1 and the custom labels the Labels step picked', () => {
+  assert.equal(onboardingConfigFile({ itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: ['app: music', 'web'] }),
+    '{\n  "version": 1,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "show": "opted-in",\n  "labels": [\n    "app: music",\n    "web"\n  ]\n}\n');
 });
 
 test('a skill Clash renames only to a valid name no bundled skill, no other project skill and no rename beside it has', () => {

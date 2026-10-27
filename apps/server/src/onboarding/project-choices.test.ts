@@ -38,7 +38,7 @@ test('each T3 project shows its provider, whether its repository has .lar-factor
   const folder = (name: string) => join(home, 'Developer/lar', name);
   assert.deepEqual(choices, [
     { id: 'lar-web', name: 'lar-web', folder: folder('lar-web'), repo: 'maddec01/lar-web', provider: 'GitHub', hasConfig: true, onBoard: false,
-      config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } },
+      config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client', labels: [] } },
     { id: 'lar-server', name: 'lar-server', folder: folder('lar-server'), repo: 'maddec01/lar-server', provider: 'GitHub', hasConfig: false, onBoard: true },
     // Reading an Azure DevOps repository's file waits for build #386.
     { id: 'lar-api', name: 'lar-api', folder: folder('lar-api'), repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: null, onBoard: false },

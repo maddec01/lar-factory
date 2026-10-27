@@ -1,6 +1,6 @@
 // Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
-import { DONE_WINDOW_MS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, statusLabel } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, statusLabel } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, Searched, Status, StatusSource } from '@lar-factory/shared';
 import type { ItemsRead } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -338,18 +338,18 @@ export async function addIssueLabel(repo: string, number: number, label: string,
  */
 export async function createStatusLabel(repo: string, status: Exclude<Status, 'Done'>,
   run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
-  const label = statusLabel(status);
+  const label = STATUS_LABELS.find((l) => l.name === statusLabel(status))!;
   try {
-    await run(['api', `repos/${repo}/labels/${label}`]);
+    await run(['api', `repos/${repo}/labels/${label.name}`]);
     return null;
   } catch (err) {
-    if (!/HTTP 404\b/.test(message(err))) return `Could not look up the ${label} label in ${repo}. ${message(err)}`;
+    if (!/HTTP 404\b/.test(message(err))) return `Could not look up the ${label.name} label in ${repo}. ${message(err)}`;
   }
   try {
-    await run(['label', 'create', label, '-R', repo, '--color', 'EDEDED', '--description', `Status: ${status}`]);
+    await createLabel(repo, label, run);
     return null;
   } catch (err) {
-    return `Could not create the ${label} label in ${repo}. ${message(err)}`;
+    return `Could not create the ${label.name} label in ${repo}. ${message(err)}`;
   }
 }
 
@@ -359,15 +359,19 @@ export async function listLabels(repo: string, run: (args: string[]) => Promise<
   return labels.map((l) => l.name);
 }
 
-/** Creates a label in a repository with its colour and description. */
-export async function createLabel(repo: string, label: { name: string; color: string; description: string },
+/**
+ * Creates a label in a repository, with its colour and description when it has them; GitHub picks a colour otherwise.
+ * The name comes after `--`, so one that starts with - is no gh flag.
+ */
+export async function createLabel(repo: string, label: { name: string; color?: string; description?: string },
   run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['label', 'create', label.name, '-R', repo, '--color', label.color, '--description', label.description]);
+  await run(['label', 'create', '-R', repo, ...label.color ? ['--color', label.color] : [],
+    ...label.description ? ['--description', label.description] : [], '--', label.name]);
 }
 
-/** Renames a repository's label; every issue that carries it keeps it under the new name. */
+/** Renames a repository's label; every issue that carries it keeps it under the new name. The old name comes after `--`, so it is no gh flag. */
 export async function renameLabel(repo: string, from: string, to: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['label', 'edit', from, '--name', to, '--repo', repo]);
+  await run(['label', 'edit', `--name=${to}`, '--repo', repo, '--', from]);
 }
 
 /** Swaps the status labels an issue carries for `status`'s in one edit; returns the error, or null when GitHub accepted it. */

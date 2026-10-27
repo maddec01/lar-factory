@@ -190,6 +190,20 @@ test("onboarding's Clash agent runs on a fresh fetch of origin's default branch,
   assert.equal(bad.status, 400);
 });
 
+test('an onboarding whose repository lacks a workflow label opens no PR, with a new or a reused .lar-factory.json', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  writeList(home, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+  const board = await startBoard(t, { repoLabels: { 'maddec01/lar-web': ['bug', 'decision: grill'] } } as object, false, false, { HOME: home });
+  const refused = { error: 'maddec01/lar-web still lacks a workflow label. Go back to the Labels step and create or rename it.' };
+  for (const sent of [config, null]) {
+    const response = await board.post({ repo: 'maddec01/lar-web', progress, config: sent, picks: { clashes: [], skills: {} } }, board.url, '/api/onboarding/pr');
+    assert.deepEqual([response.status, await response.json()], [409, refused], JSON.stringify(sent));
+  }
+  assert.ok(!(await board.calls()).some((args) => args[0] === 'pr' && args[1] === 'create'));
+  assert.deepEqual((await board.board() as BoardData).onboarding, [{ repo: 'maddec01/lar-web', progress }]);
+});
+
 test("the Labels step reads a repository's labels, creates the missing workflow labels and renames an old one", async (t) => {
   const board = await startBoard(t, { repoLabels: { 'maddec01/lar-web': ['bug', 'decision: grill', 'needs-triage'] } } as object);
   const labels = async (path: string, body: object = {}) => {
@@ -202,11 +216,13 @@ test("the Labels step reads a repository's labels, creates the missing workflow 
   assert.ok(created!.includes('blocked') && created!.includes('status-list') && !created!.includes('decision-grill'));
   const [, renamed] = await labels('/api/onboarding/labels/rename', { names: ['decision: grill'] });
   assert.ok(renamed!.includes('decision-grill') && !renamed!.includes('decision: grill') && renamed!.includes('needs-triage'));
+  const [, custom] = await labels('/api/onboarding/labels/custom', { name: 'app: music' });
+  assert.ok(custom!.includes('app: music'));
 });
 
 test('the sample board runs no onboarding check, finds no Clash, runs no Clash agent and touches no label', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs', '/api/onboarding/labels', '/api/onboarding/labels/create', '/api/onboarding/labels/rename']) {
+  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs', '/api/onboarding/labels', '/api/onboarding/labels/create', '/api/onboarding/labels/rename', '/api/onboarding/labels/custom']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }
@@ -214,7 +230,7 @@ test('the sample board runs no onboarding check, finds no Clash, runs no Clash a
   assert.deepEqual([runs.status, await runs.json()], [403, { error: 'Sample mode onboards no repository.' }]);
 });
 
-const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' };
+const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: [] };
 const PR = 'https://github.com/maddec01/lar-web/pull/77';
 
 test('opening the onboarding PR keeps its URL on the Pull request step, and its merge finishes onboarding on the next check', async (t) => {

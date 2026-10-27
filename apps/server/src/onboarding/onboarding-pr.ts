@@ -21,6 +21,7 @@ import {
 import { boardDataDir } from '../port/board-record.ts';
 import { bundledSkillNames } from '../skills/bundled-skills.ts';
 import { planPrChanges, type PrPlan } from './pr-changes.ts';
+import { workflowLabelsProblem } from './repository-labels.ts';
 
 const ONBOARDING_BRANCH = 'lar-factory/onboarding';
 const TITLE = 'chore: onboard to lar Factory';
@@ -72,7 +73,8 @@ async function onboardingBranch(repo: string, run?: Run): Promise<{ branch: stri
 }
 
 const isConfig = (value: unknown): value is RepositoryConfigAnswers => isRecord(value) && isItemSource(value.itemSource)
-  && SHOW_SETTINGS.includes(value.show as ShowSetting) && typeof value.role === 'string' && value.role.trim() !== '';
+  && SHOW_SETTINGS.includes(value.show as ShowSetting) && typeof value.role === 'string' && value.role.trim() !== ''
+  && Array.isArray(value.labels) && value.labels.every((l) => typeof l === 'string');
 
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
@@ -130,9 +132,9 @@ export async function previewOnboardingPr(input: Record<string, unknown>, run?: 
 }
 
 /**
- * Opens the PR for the body's `repo` with its `config`, or null to reuse the repository's own, and its `picks`, then
- * keeps the body's `progress` on the Pull request step with the PR's URL, in place of the onboarding saved under
- * `replaces` when it names one. Returns the URL and the repositories still onboarding, or the status and problem, with
+ * Opens the PR for the body's `repo` with its `config`, or null to reuse the repository's own, and its `picks`, once
+ * the repository has every workflow label, then keeps the body's `progress` on the Pull request step with the PR's
+ * URL, in place of the onboarding saved under `replaces` when it names one. Returns the URL and the repositories still onboarding, or the status and problem, with
  * gh's message, when a call, a pick or the list refuses it; a refused pick writes nothing.
  */
 export function createPrOpener(dir = boardDataDir(), run?: Run) {
@@ -142,6 +144,8 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
     const answers = readAnswers(input);
     if (!answers || !isProgress(progress) || replaces !== undefined && typeof replaces !== 'string') return { status: 400, error: ANSWERS };
     const { repo, config, picks } = answers;
+    const missing = await workflowLabelsProblem(repo, run);
+    if (missing) return missing;
     const key = repo.toLowerCase();
     const kept = openings.get(key);
     const answered = JSON.stringify([config, picks]);

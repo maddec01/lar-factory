@@ -53,7 +53,7 @@ test('a missing label is created once, then used', async () => {
   assert.equal(await issues.setStatus(item(['List']), 'Shaping'), null);
   assert.deepEqual(gh.calls, [
     ['api', `repos/${REPO}/labels/status-shaping`],
-    ['label', 'create', 'status-shaping', '-R', REPO, '--color', 'EDEDED', '--description', 'Status: Shaping'],
+    ['label', 'create', '-R', REPO, '--color', 'EDEDED', '--description', 'Status: Shaping', '--', 'status-shaping'],
     ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-shaping', '--remove-label', 'status-list'],
     ['issue', 'edit', '7', '-R', REPO, '--add-label', 'status-shaping', '--remove-label', 'status-list'],
   ]);
@@ -134,6 +134,7 @@ test('Add item gives the new issue status-list, creating the label first', async
   const result = await repoIssues(REPO, gh.run).create({ repo: REPO, kind: 'bug', title: 'Stall', description: '', labels: ['os: ios'] }, {});
   assert.equal(result.error, null);
   assert.deepEqual(result.item?.statuses, ['List']);
-  assert.deepEqual(gh.calls.map((c) => c.slice(0, 3)), [['api', `repos/${REPO}/labels/status-list`], ['label', 'create', 'status-list'], ['api', '--method', 'POST']]);
+  assert.deepEqual(gh.calls.map((c) => c[0] === 'label' ? [...c.slice(0, 2), c.at(-1)] : c.slice(0, 3)),
+    [['api', `repos/${REPO}/labels/status-list`], ['label', 'create', 'status-list'], ['api', '--method', 'POST']]);
   assert.deepEqual(gh.calls[2]!.filter((a) => a.startsWith('labels[]')), ['labels[]=bug', 'labels[]=os: ios', 'labels[]=status-list']);
 });

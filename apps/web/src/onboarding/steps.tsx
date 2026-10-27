@@ -1,16 +1,17 @@
 // The body of each onboarding step, which the dialog shows one at a time. Each field sits on its own row with its
 // label and one line of help. The Labels step lists each workflow label, and for a repository that reads its issues
-// each status label, with whether the repository has it, then the labels it leaves alone. The Cleanup step lists each
-// Clash the fixed checks find, with its edit to tick, and asks Delete or Rename for each project skill named like a
-// bundled skill. Its Clash agent asks for a provider and model, then shows its run's latest message and thread, and the
-// agent's Clashes once the run is done, or why it ended without them with Retry, which starts a new thread. The Pull
-// request step lists what the PR changes, opens it, then waits for its merge.
+// each status label, with whether the repository has it, the custom labels to pick, then the labels it leaves alone. The
+// Cleanup step lists each Clash the fixed checks find, with its edit to tick, and asks Delete or Rename for each project
+// skill named like a bundled skill. Its Clash agent asks for a provider and model, then shows its run's latest message
+// and thread, and the agent's Clashes once the run is done, or why it ended without them with Retry, which starts a new
+// thread. The Pull request step lists what the PR changes, opens it, then waits for its merge.
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Check, CircleAlert, ExternalLink, FileText, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
-  SETUP_CHECKS, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, threadLink, type Clash, type ClashRun, type LabelRow, type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice,
-  type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting, type SkillClash,
+  SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, threadLink, type Clash, type ClashRun, type LabelPlan, type LabelRow,
+  type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting,
+  type SkillClash,
 } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
@@ -25,8 +26,8 @@ import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import {
-  COMMAND_CHECKS, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, labelsPlan, latestRun, nextModel, onboarded,
-  pickedProject, picksOf, prClosed, renaming, setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
+  COMMAND_CHECKS, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, customLabelsToCreate, itemSourceOf, labelsPlan, latestRun,
+  nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
 } from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
@@ -259,28 +260,32 @@ function LabelItem({ row, labels }: { row: LabelRow; labels: Labels }) {
   return (
     <li data-label={row.label.name} data-state={row.state} className="flex items-center gap-2.5 px-3 py-2 text-sm">
       <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: `#${row.label.color}` }} />
-      <span className="grid min-w-0 flex-1 gap-0.5"><span className="font-mono font-medium">{row.label.name}</span>
+      <span className="grid min-w-0 flex-1 gap-0.5"><span className="font-mono font-medium break-all">{row.label.name}</span>
         <span className="text-xs text-muted-foreground">{row.label.description}</span></span>
       {row.state === 'rename' ? (
         <label className="flex items-center gap-2 text-xs">
           <Checkbox checked={!labels.kept.includes(row.oldName)} disabled={!!labels.busy} onCheckedChange={() => toggleRename(row.oldName)} />
-          Rename <code className="font-mono">{row.oldName}</code>
+          Rename <code className="font-mono break-all">{row.oldName}</code>
         </label>
       ) : <Badge variant={row.state === 'present' ? 'success' : 'warning'} size="sm">{row.state}</Badge>}
     </li>
   );
 }
 
-function LabelList({ title, rows, labels }: { title: string; rows: LabelRow[]; labels: Labels }) {
+function LabelList({ title, note, rows, labels }: { title: string; note?: string; rows: LabelRow[]; labels: Labels }) {
   return (
     <div className="grid gap-1">
       <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
+      {note && <p className="m-0 text-xs text-muted-foreground">{note}</p>}
       <ul className="m-0 grid list-none divide-y rounded-lg border p-0">{rows.map((row) => <LabelItem key={row.label.name} row={row} labels={labels} />)}</ul>
     </div>
   );
 }
 
-/** The labels the step changes nothing on; an old name beside its new label keeps its issues until the user moves them. */
+/**
+ * The labels the step changes nothing on, less the custom labels it lists; an old name beside its new label keeps its
+ * issues until the user moves them.
+ */
 function LeftAlone({ labels }: { labels: LeftAloneLabel[] }) {
   if (!labels.length) return null;
   return (
@@ -288,7 +293,7 @@ function LeftAlone({ labels }: { labels: LeftAloneLabel[] }) {
       <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Left alone</h4>
       <ul className="m-0 grid list-none gap-1 p-0 text-sm">
         {labels.map((l) => (
-          <li key={l.name} data-left={l.name}><code className="font-mono">{l.name}</code>
+          <li key={l.name} data-left={l.name} className="min-w-0 break-all"><code className="font-mono">{l.name}</code>
             {l.keptBeside && <span className="text-xs text-muted-foreground"> · The repository has {l.keptBeside} too, so it can’t be renamed. Its issues keep {l.name} until you move them to {l.keptBeside}.</span>}
           </li>
         ))}
@@ -297,9 +302,81 @@ function LeftAlone({ labels }: { labels: LeftAloneLabel[] }) {
   );
 }
 
+const CUSTOM_LABELS_HELP = 'Custom labels mark which part of the product an item touches, such as app: music. Add item offers them, and the queue shows them on each item.';
+
+/**
+ * The custom labels: a reused .lar-factory.json's, listed; else a toggle for each label the step offers and each pick,
+ * then a field whose Add creates a new label on the repository and picks it.
+ */
+function CustomLabels({ run, project, plan, labels }: { run: Run; project: ProjectChoice; plan: LabelPlan; labels: Labels }) {
+  const { toggleCustomLabel, typeCustomLabel, addCustomLabel } = useWizardStore();
+  const title = <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Custom labels</h4>;
+  if (project.config) {
+    const { labels: names } = project.config;
+    const missing = customLabelsToCreate(project, labels);
+    return (
+      <div data-custom-labels className="grid gap-1">
+        {title}
+        <p className="m-0 text-xs text-muted-foreground">{CUSTOM_LABELS_HELP} These are the ones {project.repo}’s .lar-factory.json lists; change them in that file. Create makes the missing ones, with GitHub’s colour, but none that can’t be a custom label.</p>
+        {names.length ? (
+          <ul className="m-0 grid list-none divide-y rounded-lg border p-0">
+            {names.map((name) => {
+              const problem = customLabelProblem(name);
+              const state = problem ? 'problem' : missing.includes(name) ? 'missing' : 'present';
+              return (
+                <li key={name} data-custom={name} data-state={state} className="flex items-center gap-2.5 px-3 py-2 text-sm">
+                  <span className="grid min-w-0 flex-1 gap-0.5">
+                    <code className="break-all font-mono">{name}</code>
+                    {problem && <span data-problem className="text-xs text-destructive-foreground">{problem}</span>}
+                  </span>
+                  <Badge variant={state === 'present' ? 'success' : state === 'missing' ? 'warning' : 'error'} size="sm">
+                    {problem ? 'can’t create' : state}</Badge>
+                </li>
+              );
+            })}
+          </ul>
+        ) : <p className="m-0 text-sm text-muted-foreground">It lists none.</p>}
+      </div>
+    );
+  }
+  const offered = customLabelChoices(plan);
+  const choices = [...offered, ...run.customLabels.filter((name) => !offered.some((o) => o.toLowerCase() === name.toLowerCase()))];
+  const problem = labels.typed.trim() ? customLabelProblem(labels.typed) : null;
+  const add = () => void addCustomLabel();
+  return (
+    <div data-custom-labels className="grid gap-2">
+      <div className="grid gap-1">{title}<p className="m-0 text-xs text-muted-foreground">{CUSTOM_LABELS_HELP} Pick the ones {project.repo} uses, or add a new one.</p></div>
+      {choices.length > 0 && (
+        <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0">
+          {choices.map((name) => (
+            <li key={name} data-custom={name}>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={run.customLabels.includes(name)} onCheckedChange={() => toggleCustomLabel(name)} />
+                <code className="min-w-0 break-all font-mono">{name}</code>
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      <span className="flex gap-2">
+        <Input data-new-custom font="mono" placeholder="app: music" aria-label="New custom label" value={labels.typed} disabled={labels.busy === 'custom'}
+          onChange={(e) => typeCustomLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+        <Button data-add-custom variant="outline" disabled={!labels.typed.trim() || !!problem || !!labels.busy} onClick={add}>
+          {labels.busy === 'custom' ? <><LoaderCircle className="animate-spin" /> Adding…</> : 'Add'}</Button>
+      </span>
+      {problem && <p className="m-0 text-xs text-destructive-foreground">{problem}</p>}
+      {labels.error?.action === 'custom' && (
+        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t create {labels.error.name}</AlertTitle><AlertDescription>{labels.error.message}</AlertDescription></Alert>
+      )}
+    </div>
+  );
+}
+
+const STATUS_LABELS_NOTE = 'The board keeps each item’s status in one of these labels, as build #379 set up. Create makes the missing ones, but Next doesn’t wait for them.';
+
 /**
  * The Labels step: each workflow label with what it does and whether the repository has it, the status labels for
- * a repository that reads its issues, Create and Rename, then the labels it leaves alone. On Azure DevOps it waits for
+ * a repository that reads its issues, Create and Rename, the custom labels, then the labels it leaves alone. On Azure DevOps it waits for
  * build #386.
  */
 function LabelsStep({ run }: { run: Run }) {
@@ -319,26 +396,29 @@ function LabelsStep({ run }: { run: Run }) {
       <AlertAction><Button size="xs" variant="outline" onClick={() => void loadLabels()}><RotateCw /> Retry</Button></AlertAction></Alert>;
   }
   const plan = labelsPlan(run, project, labels)!;
-  const creates = labelsToCreate(plan, renaming(plan, labels)).length;
+  const creates = labelsToCreate(plan, renaming(plan, labels)).length + customLabelsToCreate(project, labels).length;
+  // The custom labels the step lists as picked, a reused file's or the run's, which Left alone leaves out.
+  const chosen = new Set((project.config?.labels ?? run.customLabels).map((l) => l.toLowerCase()));
   const renames = renaming(plan, labels).length;
   const retry = labels.error?.action === 'rename' ? renameLabels : createLabels;
   return (
     <div className="grid gap-4">
       <p className="m-0 text-xs text-muted-foreground">lar-work and the board read these labels on {project.repo}. Next waits until it has every workflow label. A rename keeps the label on every issue that carries it.</p>
       <LabelList title="Workflow labels" rows={plan.workflow} labels={labels} />
-      {plan.status.length > 0 && <LabelList title="Status labels" rows={plan.status} labels={labels} />}
+      {plan.status.length > 0 && <LabelList title="Status labels" note={STATUS_LABELS_NOTE} rows={plan.status} labels={labels} />}
       {(creates > 0 || renames > 0) && <div className="flex gap-2">
         {creates > 0 && <Button data-create-labels size="sm" disabled={!!labels.busy} onClick={() => void createLabels()}>
           {labels.busy === 'create' ? <><LoaderCircle className="animate-spin" /> Creating…</> : `Create ${creates} missing`}</Button>}
         {renames > 0 && <Button data-rename-labels size="sm" variant="outline" disabled={!!labels.busy} onClick={() => void renameLabels()}>
           {labels.busy === 'rename' ? <><LoaderCircle className="animate-spin" /> Renaming…</> : `Rename ${renames}`}</Button>}
       </div>}
-      {labels.error && (
+      {labels.error && labels.error.action !== 'custom' && (
         <Alert variant="error"><CircleAlert /><AlertTitle>{labels.error.action === 'create' ? 'Can’t create the labels' : 'Can’t rename the labels'}</AlertTitle>
           <AlertDescription>{labels.error.message}</AlertDescription>
           <AlertAction><Button size="xs" variant="outline" disabled={!!labels.busy} onClick={() => void retry()}><RotateCw /> Retry</Button></AlertAction></Alert>
       )}
-      <LeftAlone labels={plan.leftAlone} />
+      <CustomLabels run={run} project={project} plan={plan} labels={labels} />
+      <LeftAlone labels={plan.leftAlone.filter((l) => !labels.created.includes(l.name) && !chosen.has(l.name.toLowerCase()))} />
     </div>
   );
 }

@@ -1,11 +1,12 @@
 // The T3 project step: T3's projects, each with its provider and whether its repository has .lar-factory.json, and
 // the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
 // and role, or the values of a .lar-factory.json it reuses. The Labels step: each label's state, Create and Rename, gh's
-// message with Retry, and the Azure DevOps note. The Checks step: each check with its state and a failure's fix with
-// Retry. The Cleanup step: each fixed Clash with its tick, Delete or Rename for a project skill named like a bundled
-// skill, the Clash agent's run with its thread, Clashes or why it ended with Retry, and what the PR always writes. The
-// Pull request step: the PR's changes for a new or a reused .lar-factory.json, Open the PR, gh's message with Retry, the
-// wait for the merge, and Reopen PR and Start over for a PR closed without merging.
+// message with Retry, the custom labels to pick or type, a reused file's custom labels, and the Azure DevOps note. The
+// Checks step: each check with its state and a failure's fix with Retry. The Cleanup step: each fixed Clash with its
+// tick, Delete or Rename for a project skill named like a bundled skill, the Clash agent's run with its thread, Clashes or
+// why it ended with Retry, and what the PR always writes. The Pull request step: the PR's changes for a new or a reused
+// .lar-factory.json, Open the PR, gh's message with Retry, the wait for the merge, and Reopen PR and Start over for a PR
+// closed without merging.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { STATUS_LABELS, WORKFLOW_LABELS, type BundledSkill, type ClashRun, type OnboardingPrChange, type ClashRunState, type FixedClashes, type ModelGroup, type ProjectChoice, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
@@ -210,7 +211,7 @@ test('a picked show setting stays when the item source changes', async () => {
 
 test('a reused .lar-factory.json shows its values and asks nothing', async () => {
   await openSetup(project('lar-web', { hasConfig: true,
-    config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'opted-in', role: 'Web client' } }));
+    config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'opted-in', role: 'Web client', labels: [] } }));
   const values = text(dialog()!.querySelector('[data-reused-config]'));
   for (const value of ['GitHub', 'GitHub Project maddec01 #3', 'Opted-in items', 'Web client']) expect(values).toContain(value);
   expect(text(dialog()!.querySelector('[data-slot="dialog-panel"]'))).toContain('build #385');
@@ -651,6 +652,7 @@ test('the Labels step shows each workflow label with what it does and whether th
   expect(labelRow('decision-task')!.dataset.state).toBe('present');
   expect(labelRow('status-list')!.dataset.state, 'issues list the status labels').toBe('present');
   expect(labelRow('status-queued')!.dataset.state).toBe('missing');
+  expect(text(dialog()!.querySelector('[data-label="status-list"]')!.closest('ul')!.previousElementSibling)).toContain('Next doesn’t wait for them');
   const left = dialog()!.querySelector<HTMLElement>('[data-left-alone]')!;
   expect([...left.querySelectorAll<HTMLElement>('[data-left]')].map((l) => l.dataset.left)).toEqual(['decision: task', 'needs-triage']);
   expect(text(left.querySelector('[data-left="decision: task"]'))).toContain('Its issues keep decision: task until you move them to decision-task.');
@@ -683,9 +685,102 @@ test("a Create gh refuses shows gh's message with Retry", async () => {
   expect(nextButton().disabled).toBe(false);
 });
 
+const customSection = () => dialog()!.querySelector<HTMLElement>('[data-custom-labels]')!;
+const customRow = (name: string) => customSection().querySelector<HTMLElement>(`[data-custom="${name}"]`);
+const customNames = () => [...customSection().querySelectorAll<HTMLElement>('[data-custom]')].map((r) => r.dataset.custom);
+const picked = (name: string) => customRow(name)!.querySelector('[role="checkbox"]')!.getAttribute('aria-checked');
+
+test('the Labels step offers the labels it leaves alone as custom labels to pick, less the status labels and old names', async () => {
+  await openLabels([...EVERY_LABEL, 'decision: task', 'app: music', 'web']);
+  expect(text(customSection())).toContain('which part of the product an item touches');
+  expect(customNames()).toEqual(['app: music', 'web']);
+  expect(picked('web')).toBe('false');
+  await settle(() => customRow('web')!.querySelector<HTMLElement>('[role="checkbox"]')!.click());
+  expect(picked('web')).toBe('true');
+});
+
+test('a typed custom label with a colon is created on the repository and shows picked; one gh refuses shows its message', async () => {
+  await openLabels(EVERY_LABEL, [...EVERY_LABEL, 'app: music']);
+  const field = customSection().querySelector<HTMLInputElement>('[data-new-custom] input, input[data-new-custom]')!;
+  await type(field, 'build');
+  expect(text(customSection())).toContain('build is a workflow label.');
+  expect(panelButton('[data-add-custom]').disabled).toBe(true);
+  await type(field, 'app: music');
+  await settle(() => panelButton('[data-add-custom]').click());
+  await settle();
+  const sent = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/onboarding/labels/custom')!;
+  expect(JSON.parse(String(sent[1].body))).toEqual({ repo: 'maddec01/lar-web', name: 'app: music' });
+  expect(picked('app: music')).toBe('true');
+  expect(dialog()!.querySelector('[data-left="app: music"]'), 'a label the step created is not left alone').toBeNull();
+
+  answerLabels(EVERY_LABEL, EVERY_LABEL, "Couldn't create web in maddec01/lar-web: gh label create failed: HTTP 403");
+  await type(field, 'web');
+  await settle(() => panelButton('[data-add-custom]').click());
+  await settle();
+  const alert = [...customSection().querySelectorAll('[role="alert"]')].find((a) => text(a).includes('Can’t create web'))!;
+  expect(text(alert)).toContain('HTTP 403');
+  await type(field, 'web2');
+  expect([...customSection().querySelectorAll('[role="alert"]')].some((a) => text(a).includes('Can’t create')), 'typing clears the failed add').toBe(false);
+});
+
+test('a ticked custom label is not listed as left alone too, and a long one breaks inside the dialog', async () => {
+  const long = 'area:' + 'x'.repeat(45);
+  await openLabels([...EVERY_LABEL, 'web', long]);
+  const left = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-left]')].map((l) => l.dataset.left);
+  expect(left()).toEqual(['web', long]);
+  await settle(() => customRow('web')!.querySelector<HTMLElement>('[role="checkbox"]')!.click());
+  expect(left()).toEqual([long]);
+  expect(customRow(long)!.querySelector('code')!.className).toContain('break-all');
+});
+
+test("a reused .lar-factory.json's Labels step lists its custom labels and asks nothing about them", async () => {
+  await openSetup(project('lar-web', { hasConfig: true,
+    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['app: music', 'web'] } }));
+  answerLabels([...EVERY_LABEL, 'app: music', 'web', 'other']);
+  await settle(() => nextButton().click());
+  await settle();
+  expect(text(customSection())).toContain('.lar-factory.json');
+  expect(customNames()).toEqual(['app: music', 'web']);
+  expect(customSection().querySelector('[role="checkbox"], input')).toBeNull();
+  expect(dialog()!.querySelector('[data-left="web"]'), "the file's custom labels are not left alone too").toBeNull();
+});
+
+test("a reused .lar-factory.json's custom labels show whether the repository has each, and Create makes the missing ones", async () => {
+  await openSetup(project('lar-web', { hasConfig: true,
+    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['app: music', 'web'] } }));
+  answerLabels([...EVERY_LABEL, 'App: Music'], [...EVERY_LABEL, 'App: Music', 'web']);
+  await settle(() => nextButton().click());
+  await settle();
+  expect([customRow('app: music')!.dataset.state, customRow('web')!.dataset.state]).toEqual(['present', 'missing']);
+  expect(text(panelButton('[data-create-labels]'))).toBe('Create 1 missing');
+  await settle(() => panelButton('[data-create-labels]').click());
+  await settle();
+  const sent = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/onboarding/labels/create')!;
+  expect(JSON.parse(String(sent[1].body))).toMatchObject({ renaming: [], custom: ['web'] });
+  expect(customRow('web')!.dataset.state).toBe('present');
+});
+
+test("a reused .lar-factory.json's custom label that can't be one shows why on its row, and Create still makes the workflow labels", async () => {
+  await openSetup(project('lar-web', { hasConfig: true,
+    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['build', 'x'.repeat(51), 'web'] } }));
+  answerLabels(EVERY_LABEL.filter((n) => n !== 'blocked'), EVERY_LABEL);
+  await settle(() => nextButton().click());
+  await settle();
+  expect(customRow('build')!.dataset.state).toBe('problem');
+  expect(text(customRow('build')!.querySelector('[data-problem]'))).toBe('build is a workflow label.');
+  expect(text(customRow('build')!.querySelector('[data-slot="badge"]'))).toBe('can’t create');
+  expect(text(customRow('x'.repeat(51))!.querySelector('[data-problem]'))).toContain('at most 50 characters');
+  expect(text(panelButton('[data-create-labels]'))).toBe('Create 2 missing');
+  await settle(() => panelButton('[data-create-labels]').click());
+  await settle();
+  const sent = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/onboarding/labels/create')!;
+  expect(JSON.parse(String(sent[1].body))).toMatchObject({ custom: ['web'] });
+  expect(nextButton().disabled).toBe(false);
+});
+
 test('on Azure DevOps the Labels step says tags arrive in build #386, reads no label and lets Next through', async () => {
   await openSetup(project('lar-api', { repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true,
-    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'API' } }));
+    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'API', labels: [] } }));
   await settle(() => nextButton().click());
   expect(text(dialog()!.querySelector('[data-labels-azure]'))).toContain('build #386');
   expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith('/api/onboarding/labels'))).toBe(false);
@@ -722,11 +817,13 @@ const WRITTEN: OnboardingPrChange[] = [{ kind: 'agent-skills', path: 'CLAUDE.md'
   { kind: 'write', path: 'docs/agents/triage-labels.md', created: false }, { kind: 'write', path: 'docs/agents/domain.md', created: true }];
 
 /**
- * Answers the setup step with the repository's issues and a role, passes Checks and Cleanup, and opens the Pull request
- * step with the PR's changes previewed as `changes`.
+ * Answers the setup step with the repository's issues and a role, picks `custom` as its custom labels, passes Checks and
+ * Cleanup, and opens the Pull request step with the PR's changes previewed as `changes`.
  */
-async function openPrStep(changes: OnboardingPrChange[] = WRITTEN): Promise<object[]> {
+async function openPrStep(changes: OnboardingPrChange[] = WRITTEN, custom: string[] = []): Promise<object[]> {
   await openCleanup(project('lar-web'));
+  const { useWizardStore } = await import('./wizard-store.ts');
+  for (const name of custom) useWizardStore.getState().toggleCustomLabel(name);
   const previews = answerChanges(changes);
   await settle(() => nextButton().click());
   await settle();
@@ -762,7 +859,7 @@ test('Open the PR waits while the PR\'s changes are read', async () => {
 });
 
 test("with a reused .lar-factory.json, Cleanup goes on to the Pull request step, which lists the changes without the file and opens the PR", async () => {
-  const reused = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } });
+  const reused = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client', labels: [] } });
   await openCleanup(reused);
   expect(text(cleanup().querySelector('[data-written=".lar-factory.json"]'))).toContain('Kept as it is.');
   const previews = answerChanges(WRITTEN);
@@ -814,10 +911,10 @@ test("Retry after the fixed checks' read failed reads them again, then lists the
 });
 
 test('the Pull request step shows the branch and the .lar-factory.json it writes, then Open the PR waits for the merge', async () => {
-  await openPrStep();
+  await openPrStep(WRITTEN, ['app: music']);
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Pull request');
   expect(text(prStep())).toContain('lar-factory/onboarding');
-  expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: [] });
+  expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: music'] });
   answerPr({ prUrl: PR });
   await settle(() => button(prStep(), 'Open the PR')!.click());
   await settle();

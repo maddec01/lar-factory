@@ -1,10 +1,12 @@
 // The GitHub side of onboarding's Labels step: reads a repository's labels, creates the workflow labels it lacks (and
 // for a repository that reads its issues, its status labels), and renames old workflow labels to their new names. It
 // reads the labels again before each change and works only from the shared label plan, so it changes no other label.
+// It also creates a custom label the user types, or a reused .lar-factory.json's that the repository lacks, which is no
+// workflow or status label; and it tells the finish and the PR whether a workflow label is still missing.
 
-import { STATUSES, labelPlan, labelsToCreate, statusLabel, type Status } from '@lar-factory/shared';
+import { customLabelProblem, labelPlan, labelsToCreate, missingCustomLabels, workflowLabelsMissing } from '@lar-factory/shared';
 import { isItemSource, isRepo } from '../config/repository-config.ts';
-import { createLabel, createStatusLabel, listLabels, message, renameLabel } from '../github/github.ts';
+import { createLabel, listLabels, message, renameLabel } from '../github/github.ts';
 
 type Run = (args: string[]) => Promise<string>;
 type Answer = Promise<{ labels: string[] } | { status: number; error: string }>;
@@ -25,26 +27,35 @@ export async function readRepositoryLabels(input: Record<string, unknown>, run?:
 
 /**
  * Creates every label the step finds missing in the body's repository, read through its item source, except those
- * under an old name in `renaming`, which Rename moves instead; answers with the labels it has then.
+ * under an old name in `renaming`, which Rename moves instead, then each of the body's `custom` labels, a reused
+ * .lar-factory.json's, that it lacks, with GitHub's colour, less any customLabelProblem refuses, which the step shows
+ * on its row; answers with the labels it has then.
  */
 export async function createRepositoryLabels(input: Record<string, unknown>, run?: Run): Answer {
-  const { repo, itemSource, renaming } = input;
-  if (!isRepo(repo) || !isItemSource(itemSource) || !strings(renaming)) {
-    return { status: 400, error: 'Send the repository, its item source and the old labels Rename moves.' };
+  const { repo, itemSource, renaming, custom = [] } = input;
+  if (!isRepo(repo) || !isItemSource(itemSource) || !strings(renaming) || !strings(custom)) {
+    return { status: 400, error: 'Send the repository, its item source, the old labels Rename moves and any custom labels to create.' };
   }
   const before = await read(repo, run);
   if ('error' in before) return before;
-  for (const label of labelsToCreate(labelPlan(before.labels, itemSource.kind), renaming)) {
-    const status = STATUSES.find((s): s is Exclude<Status, 'Done'> => s !== 'Done' && statusLabel(s) === label.name);
-    if (status) {
-      const error = await createStatusLabel(repo, status, run);
-      if (error) return { status: 502, error };
-      continue;
-    }
+  const labels = [...labelsToCreate(labelPlan(before.labels, itemSource.kind), renaming),
+    ...missingCustomLabels(before.labels, custom.map((c) => c.trim())).map((name) => ({ name }))];
+  for (const label of labels) {
     try { await createLabel(repo, label, run); }
     catch (err) { return { status: 502, error: `Couldn't create ${label.name} in ${repo}: ${message(err)}` }; }
   }
   return read(repo, run);
+}
+
+/**
+ * Why onboarding can't finish while `repo` lacks a workflow label or has one under its old name; or null once it has
+ * each. The status labels don't hold it. Only a GitHub repository gets here, as Azure DevOps' tags wait for build #386.
+ */
+export async function workflowLabelsProblem(repo: string, run?: Run): Promise<{ status: number; error: string } | null> {
+  const labels = await read(repo, run);
+  if ('error' in labels) return labels;
+  return workflowLabelsMissing(labelPlan(labels.labels, 'github-project'))
+    ? { status: 409, error: `${repo} still lacks a workflow label. Go back to the Labels step and create or rename it.` } : null;
 }
 
 /** Renames each of the body's old workflow labels to its new name, so its issues keep it; answers with the labels it has then. */
@@ -66,5 +77,19 @@ export async function renameRepositoryLabels(input: Record<string, unknown>, run
     try { await renameLabel(repo, from, to, run); }
     catch (err) { return { status: 502, error: `Couldn't rename ${from} to ${to} in ${repo}: ${message(err)}` }; }
   }
+  return read(repo, run);
+}
+
+/** Creates the body's typed custom label, unless the repository has it already; answers with the labels it has then. */
+export async function createCustomLabel(input: Record<string, unknown>, run?: Run): Answer {
+  const { repo, name } = input;
+  if (!isRepo(repo) || typeof name !== 'string') return { status: 400, error: 'Send the repository and the custom label to create.' };
+  const problem = customLabelProblem(name);
+  if (problem) return { status: 400, error: problem };
+  const label = name.trim();
+  const before = await read(repo, run);
+  if ('error' in before || before.labels.some((l) => l.toLowerCase() === label.toLowerCase())) return before;
+  try { await createLabel(repo, { name: label }, run); }
+  catch (err) { return { status: 502, error: `Couldn't create ${label} in ${repo}: ${message(err)}` }; }
   return read(repo, run);
 }

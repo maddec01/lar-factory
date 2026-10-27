@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { STATUS_LABELS, labelPlan, labelsToCreate, workflowLabelsMissing } from './label-step.ts';
+import { STATUS_LABELS, customLabelChoices, customLabelProblem, labelPlan, missingCustomLabels, labelsToCreate, workflowLabelsMissing } from './label-step.ts';
 import { WORKFLOW_LABELS } from './workflow-labels.ts';
 
 const ALL = WORKFLOW_LABELS.map((l) => l.name);
@@ -41,4 +41,28 @@ test('Create makes the missing labels, and those under an old name that Rename i
   assert.ok(!created.includes('decision-grill'), 'Rename moves decision: grill');
   assert.ok(!created.includes('bug') && !created.includes('status-list'));
   assert.ok(created.includes('status-queued'));
+});
+
+test('the custom labels to pick from are the labels left alone, less the status labels and the old names kept beside their new ones', () => {
+  const plan = labelPlan(['bug', 'decision-task', 'decision: task', 'decision: grill', 'app: music', 'Status-Queued', 'status-list', 'web'], 'github-project');
+  assert.deepEqual(customLabelChoices(plan), ['app: music', 'web']);
+});
+
+test('a custom label may hold a colon, but is no workflow or status label and not empty', () => {
+  assert.equal(customLabelProblem('app: music'), null);
+  assert.match(customLabelProblem('  ')!, /name/);
+  assert.match(customLabelProblem('Build')!, /workflow label/);
+  assert.match(customLabelProblem('decision: grill')!, /workflow label/);
+  assert.match(customLabelProblem('status-review')!, /status label/);
+  assert.equal(customLabelProblem('x'.repeat(50)), null);
+  assert.equal(customLabelProblem('x'.repeat(51)), 'GitHub takes label names of at most 50 characters; this one has 51.');
+  assert.equal(customLabelProblem(' -R'), 'A label’s name can’t start with -.');
+});
+
+test("a reused file's custom labels the repository lacks are missing, matched without case", () => {
+  assert.deepEqual(missingCustomLabels(['App: Music', 'bug'], ['app: music', 'os: ios']), ['os: ios']);
+});
+
+test("a reused file's custom label that customLabelProblem refuses is not among those Create makes", () => {
+  assert.deepEqual(missingCustomLabels([], ['build', 'status-review', '-R', 'x'.repeat(51), 'web']), ['web']);
 });

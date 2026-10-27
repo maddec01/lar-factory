@@ -3,7 +3,7 @@
 // removes, what Reset drops from this Mac and what it leaves, and that it closes the open Edit PR while there is one,
 // after the prototype's ResetDialog. On Azure DevOps it names Azure DevOps and tags, and says it abandons a PR.
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { onAzure, sameRepo, shownRepo } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
@@ -41,6 +41,19 @@ function OnboardedDetail({ repo, editPr }: { repo: string; editPr: string | unde
   </>;
 }
 
+/**
+ * Cancel, which takes focus once the dialog has opened, so Enter doesn't open GitHub through a PR link. The copied
+ * Modal focuses its first tabbable element as it opens, so Cancel takes focus on the next task, after it.
+ */
+function CancelButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => ref.current?.focus());
+    return () => clearTimeout(timer);
+  }, []);
+  return <Button ref={ref} variant="secondary" disabled={disabled} onClick={onClick}>Cancel</Button>;
+}
+
 export function ResetDialog() {
   const { reset, close, confirm } = useResetStore();
   const onboarding = useBoardStore((s) => s.data.onboarding);
@@ -62,8 +75,7 @@ export function ResetDialog() {
           </div>
         </Modal.Body>
         <Modal.Footer>
-          {/* Focus starts on Cancel, not a PR link, so Enter doesn't open GitHub; the Modal keeps focus already inside it. */}
-          <Button autoFocus variant="secondary" disabled={reset.resetting} onClick={close}>Cancel</Button>
+          <CancelButton disabled={reset.resetting} onClick={close} />
           <Button variant="destructive" loading={reset.resetting} onClick={() => void confirm()}>{reset.resetting ? 'Resetting…' : 'Reset'}</Button>
         </Modal.Footer>
       </Modal.Content>

@@ -11,6 +11,7 @@ import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-sk
 import { Button } from '@lar-factory/ui/button';
 import { RepoTag } from '../items/item-parts.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
+import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { useResetStore } from '../repositories/reset-store.ts';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
@@ -24,6 +25,8 @@ interface Row {
   control: Control;
   /** Why a value-only control is disabled; by default, that the row isn't built yet. */
   reason?: string;
+  /** Shown under the title and the control, across the row's whole width. */
+  below?: ReactNode;
 }
 export interface Group { title: string; description?: string; rows: Row[]; footer?: ReactNode; note?: ReactNode }
 export interface Page { id: string; label: string; icon: ReactNode; groups: Group[] }
@@ -106,7 +109,7 @@ function onboardingDescription(progress: OnboardingProgress): string {
 
 /**
  * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting,
- * Edit, which opens Edit's dialog, and Reset, which opens Reset's confirmation, one still onboarding with what it has answered, the step it stopped at, Resume and
+ * Edit, which opens Edit's dialog, Reset, which opens Reset's confirmation, and the config update notice while it has one, one still onboarding with what it has answered, the step it stopped at, Resume and
  * Reset, which opens Reset's confirmation. Add repository opens the onboarding dialog. The board
  * reads only GitHub repositories until build #386.
  */
@@ -114,6 +117,7 @@ function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
     id: `repo-${r.repo}`, title: r.repo, description: <>GitHub · {sourceName(itemSource(r), r.project)} · {SHOWN[r.show ?? 'all']}
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
+    below: <ConfigUpdateNotice repo={r} />,
     control: custom(() => <span className="flex items-center gap-2">
       <Button variant="outline" size="xs" onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>
       <Button variant="outline" size="xs" onClick={() => useResetStore.getState().open(r.repo)}>Reset</Button>

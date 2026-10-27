@@ -82,7 +82,7 @@ export function SettingsNav() {
   );
 }
 
-/** T3's SettingsGroup: a title over a bordered list of rows, label left and control right. */
+/** T3's SettingsGroup: a title over a bordered list of rows, label left and control right, and what a row has below them. */
 function GroupView({ group }: { group: Group }) {
   return (
     <section className="settings-group grid gap-2">
@@ -92,14 +92,17 @@ function GroupView({ group }: { group: Group }) {
       </div>
       <div className="divide-y divide-(--border) overflow-hidden rounded-xl border border-(--border) bg-(--card)">
         {group.rows.map((row) => (
-          <div key={row.id} className="settings-row flex items-center gap-x-4 gap-y-2 px-4 py-3" data-row={row.id}>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-medium">{row.title}</div>
-              {row.description && <div className="text-xs text-(--muted-foreground)">{row.description}</div>}
+          <div key={row.id} className="settings-row grid gap-2 px-4 py-3" data-row={row.id}>
+            <div className="flex items-center gap-x-4 gap-y-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-medium">{row.title}</div>
+                {row.description && <div className="text-xs text-(--muted-foreground)">{row.description}</div>}
+              </div>
+              {row.control.type === 'custom'
+                ? row.control.render()
+                : <ShownControl control={row.control} label={row.title} reason={row.reason ?? notBuilt(row.title)} />}
             </div>
-            {row.control.type === 'custom'
-              ? row.control.render()
-              : <ShownControl control={row.control} label={row.title} reason={row.reason ?? notBuilt(row.title)} />}
+            {row.below}
           </div>
         ))}
         {group.footer && <div className="bg-(--muted) px-4 py-2">{group.footer}</div>}

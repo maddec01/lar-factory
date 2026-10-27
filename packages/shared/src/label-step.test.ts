@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { STATUS_LABELS, customLabelChoices, customLabelProblem, labelPlan, missingCustomLabels, labelsToCreate, workflowLabelsMissing } from './label-step.ts';
+import { STATUS_LABELS, customLabelChoices, customLabelProblem, customTagProblem, labelPlan, missingCustomLabels, labelsToCreate, workflowLabelsMissing } from './label-step.ts';
 import { WORKFLOW_LABELS } from './workflow-labels.ts';
 
 const ALL = WORKFLOW_LABELS.map((l) => l.name);
@@ -26,6 +26,11 @@ test('a repository that reads its issues lists the status labels too, and those 
   assert.deepEqual(plan.status.map((r) => [r.label.name, r.state]), STATUS_LABELS.map((l) => [l.name, ['status-list', 'status-in-progress'].includes(l.name) ? 'present' : 'missing']));
   assert.deepEqual(plan.leftAlone, []);
   assert.deepEqual(STATUS_LABELS[0], { name: 'status-list', color: 'EDEDED', description: 'Status: List' });
+});
+
+test("an Azure DevOps team's sprint or backlog lists the status tags too, which a GitHub Project doesn't", () => {
+  for (const source of ['azure-sprint', 'azure-backlog'] as const) assert.equal(labelPlan(ALL, source).status.length, STATUS_LABELS.length);
+  assert.deepEqual(labelPlan(ALL, 'github-project').status, []);
 });
 
 test('Next waits while any workflow label is missing or still under its old name, not for the status labels', () => {
@@ -57,6 +62,13 @@ test('a custom label may hold a colon, but is no workflow or status label and no
   assert.equal(customLabelProblem('x'.repeat(50)), null);
   assert.equal(customLabelProblem('x'.repeat(51)), 'GitHub takes label names of at most 50 characters; this one has 51.');
   assert.equal(customLabelProblem(' -R'), 'A label’s name can’t start with -.');
+});
+
+test('a custom tag is refused as a custom label is, and also when it holds a comma or semicolon', () => {
+  assert.equal(customTagProblem('app: music'), null);
+  assert.match(customTagProblem('Build')!, /workflow label/);
+  assert.equal(customTagProblem('app, music'), 'A tag’s name can’t hold a comma or semicolon.');
+  assert.equal(customTagProblem('app; music'), 'A tag’s name can’t hold a comma or semicolon.');
 });
 
 test("a reused file's custom labels the repository lacks are missing, matched without case", () => {

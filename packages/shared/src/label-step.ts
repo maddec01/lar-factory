@@ -1,6 +1,6 @@
 // What onboarding's Labels step finds in a repository's labels: each workflow label present, missing, or present
-// under its old name to rename; for a repository that reads its issues, each status label; and every other label,
-// which the step leaves alone. The custom labels to pick come from those left alone. The board and the server read the
+// under its old name to rename; for a repository that reads its issues or an Azure DevOps team's work items, each
+// status label; and every other label, which the step leaves alone. On Azure DevOps the labels are the project's tags. The custom labels to pick come from those left alone. The board and the server read the
 // same plan, so the server creates and renames only what the step offers. GitHub matches label names without case.
 
 import { STATUSES, statusLabel, type RepositoryItemSource } from './model.ts';
@@ -21,7 +21,7 @@ export interface LeftAloneLabel {
 
 export interface LabelPlan {
   workflow: LabelRow[];
-  /** The status labels, for a repository that reads its issues; empty for a GitHub Project. */
+  /** The status labels, for an item source that reads status-<name> labels or tags; empty for a GitHub Project. */
   status: LabelRow[];
   leftAlone: LeftAloneLabel[];
 }
@@ -46,7 +46,7 @@ export function labelPlan(names: readonly string[], source: RepositoryItemSource
     return { label, state: 'rename', oldName: old };
   };
   const workflow = WORKFLOW_LABELS.map(row);
-  const status = source === 'issues' ? STATUS_LABELS.map(row) : [];
+  const status = source === 'github-project' ? [] : STATUS_LABELS.map(row);
   const leftAlone = names.filter((n) => !used.has(key(n)))
     .map((name) => ({ name, ...keptBeside.has(key(name)) && { keptBeside: keptBeside.get(key(name))! } }));
   return { workflow, status, leftAlone };
@@ -77,6 +77,10 @@ export function customLabelProblem(name: string): string | null {
   if (typed.startsWith('status-')) return `${name.trim()} is a status label.`;
   return null;
 }
+
+/** Why `name` can't be a custom tag on Azure DevOps, or null when it can: a custom label's problems, and System.Tags's separators. */
+export const customTagProblem = (name: string): string | null =>
+  customLabelProblem(name) ?? (/[,;]/.test(name) ? 'A tag’s name can’t hold a comma or semicolon.' : null);
 
 /**
  * The custom labels in `custom`, such as a reused .lar-factory.json's, that a repository with labels `names` lacks and

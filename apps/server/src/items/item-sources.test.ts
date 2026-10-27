@@ -188,3 +188,42 @@ test('a problem with a source that repositories share shows under each of them',
   const read = await mergeSources([], new Map([['contoso/p/web', sprint], ['contoso/p/api', sprint]])).read();
   assert.deepEqual(read.problems, [{ repo: 'contoso/p/web', problem: 'az is logged out.', fix: 'az login' }, { repo: 'contoso/p/api', problem: 'az is logged out.', fix: 'az login' }]);
 });
+
+/** A source whose read finishes when `finish` is called. */
+function slowSource(name: string): { source: ItemSource; finish: () => void } {
+  let finish = () => {};
+  const done = new Promise<void>((resolve) => { finish = resolve; });
+  return { source: { ...fakeSource(name, [], []), name, read: async () => { await done; return { title: name, items: [] }; } }, finish };
+}
+
+test('a read marks each source as started at once and as finished when its own read ends, without waiting for the others', async () => {
+  const fast = slowSource('lar-apple');
+  const slow = slowSource('Project maddec01/1');
+  const events: string[] = [];
+  const progress = { started: (name: string) => events.push(`+${name}`), finished: (name: string) => events.push(`-${name}`) };
+  const read = mergeSources([slow.source], new Map([['maddec01/lar-apple', fast.source]])).read(progress);
+  assert.deepEqual(events, ['+Project maddec01/1', '+lar-apple']);
+  fast.finish();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(events.slice(2), ['-lar-apple'], 'the fast read reports before the slow one ends');
+  slow.finish();
+  await read;
+  assert.deepEqual(events.slice(3), ['-Project maddec01/1']);
+});
+
+test("a source without a name is named by its repositories, and a failed read still finishes", async () => {
+  const events: string[] = [];
+  const progress = { started: (name: string) => events.push(`+${name}`), finished: (name: string) => events.push(`-${name}`) };
+  const failing: ItemSource = { ...fakeSource('x', [], []), read: async () => { throw new Error('boom'); } };
+  const sources = mergeSources([], new Map([['contoso/p%20q/web', failing], ['contoso/p%20q/api', failing]]));
+  await assert.rejects(sources.read(progress), /boom/);
+  assert.deepEqual(events, ['+web, api', '-web, api']);
+});
+
+test('the onboarded sources pass the progress to the sources they build', async () => {
+  const events: string[] = [];
+  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-apple')], problems: [], resetting: [] }), () => ({
+    ...fakeSource('lar', [], []), read: async (progress) => { progress?.started('lar'); progress?.finished('lar'); return { title: 'lar', items: [] }; } }));
+  await sources.read({ started: (name) => events.push(`+${name}`), finished: (name) => events.push(`-${name}`) });
+  assert.deepEqual(events, ['+lar', '-lar']);
+});

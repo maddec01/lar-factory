@@ -8,6 +8,7 @@ export function githubProject(project: GithubProjectRef): ItemSource {
   // Each item's Project item id by its Item.id, from the last read and from Add item since. Nothing outside this file sees one.
   let projectItemIds = new Map<string, string>();
   return {
+    name: `Project ${project.owner}/${project.number}`,
     async read() {
       const { projectItemIds: read, ...items } = await fetchProject(project.owner, project.number);
       projectItemIds = read;

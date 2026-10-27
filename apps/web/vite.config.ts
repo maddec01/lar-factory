@@ -43,5 +43,8 @@ export default defineConfig({
     ...sharedTest,
     environment: 'jsdom',
     include: ['src/**/*.test.ts'],
+    // Every test's page stays mounted, and ninna-ui's toast list is global to its module. Run through Vite, the
+    // module is loaded again after each test's vi.resetModules, so a test's toasts reach only its own page.
+    server: { deps: { inline: ['@ninna-ui/feedback'] } },
   },
 });

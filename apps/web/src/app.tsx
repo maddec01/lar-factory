@@ -6,6 +6,7 @@
 // settled.
 
 import { boardSections, failedCheck, inRepo, noneOnboarded } from '@lar-factory/shared';
+import { Notifications } from '@lar-factory/ui/design-system/Notifications';
 import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
 import { useScopeStore } from './board/scope-store.ts';
@@ -16,7 +17,6 @@ import { AbandonDialog } from './items/abandon-dialog.tsx';
 import { Line } from './line/line.tsx';
 import { LoadingScreen } from './loading/loading-screen.tsx';
 import { Banners } from './notices/banners.tsx';
-import { Toasts } from './notices/toasts.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
 import { EmptyState } from './onboarding/empty-state.tsx';
 import { OnboardingCards } from './onboarding/onboarding-cards.tsx';
@@ -59,7 +59,7 @@ export function App() {
         </main>
         {/* Outside main, so the announcement sits apart from the page. */}
         <CopyStatus />
-        <Toasts />
+        <Notifications />
         <ItemDialog />
         <SettingsDialog />
         <AbandonDialog />

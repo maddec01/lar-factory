@@ -1,21 +1,14 @@
 // The page's banners: a warning with a title and a description, and one with a close button that, closed,
 // stays away until its key is restored or the page reloads.
 
-import { useRef } from 'react';
-import type { ReactNode, Ref } from 'react';
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
+import type { ReactNode } from 'react';
+import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { useDismissed, useDismissStore } from './dismiss-store.ts';
 import { DismissButton, closeKeepingFocus } from './toasts.tsx';
 
-/** `action` sits at the banner's right end. */
-export function Banner({ title, action, ref, children }: { title: string; action?: ReactNode; ref?: Ref<HTMLDivElement>; children: ReactNode }) {
-  return (
-    <Alert variant="warning" className="banner" ref={ref}>
-      <AlertTitle>{title}</AlertTitle>
-      <AlertDescription className="block">{children}</AlertDescription>
-      {action && <AlertAction>{action}</AlertAction>}
-    </Alert>
-  );
+/** `action` sits under the banner's text. */
+export function Banner({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return <Alert tone="warning" data-tone="warning" className="banner" title={title} action={action}>{children}</Alert>;
 }
 
 export function ClosableBanner({ dismissKey, what, title, children }: {
@@ -25,9 +18,12 @@ export function ClosableBanner({ dismissKey, what, title, children }: {
   title: string;
   children: ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
   const dismissed = useDismissed(dismissKey);
   if (dismissed) return null;
-  const close = () => closeKeepingFocus(ref.current, () => useDismissStore.getState().dismiss(dismissKey));
-  return <Banner title={title} ref={ref} action={<DismissButton what={what} onClick={close} />}>{children}</Banner>;
+  return (
+    <Banner title={title} action={<DismissButton what={what} onClick={(event) =>
+      closeKeepingFocus(event.currentTarget.closest('.banner'), () => useDismissStore.getState().dismiss(dismissKey))} />}>
+      {children}
+    </Banner>
+  );
 }

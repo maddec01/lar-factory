@@ -37,7 +37,7 @@ async function openRepositories(data: BoardData): Promise<void> {
 test('a repository below the app version shows the notice with both versions; one at it shows none', async () => {
   serve(outdated, { body: { error: null } });
   await openRepositories(outdated);
-  expect(text(notice()!.querySelector('span'))).toBe('Its .lar-factory.json is at version 1, and Lar Factory now writes version 2. The board reads the '
+  expect(text(notice()!.querySelector('[data-slot="description"]'))).toBe('Its .lar-factory.json is at version 1, and Lar Factory now writes version 2. The board reads the '
     + 'older file with defaults. The PR rewrites the file with the same values at version 2.');
   expect(notice(sample.repos[1]!.repo)).toBeNull();
   expect(notice()!.parentElement, 'across the row, under the name and controls').toBe(row());

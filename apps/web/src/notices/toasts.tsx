@@ -1,13 +1,12 @@
-// Toasts, drawn by coss's toast: a success clears itself after 5 s, later while it's hovered or has focus;
-// a failure stays until it's closed. One toast per slot, so a new one replaces the last. They sit top right,
-// below the banners while they're on screen and below the title bar.
+// Toasts, shown through the copied Notifications: a success clears itself after 5 s, later while it's hovered or
+// has focus; a failure stays until it's closed. One toast per slot, so a new one replaces the last.
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { XIcon } from 'lucide-react';
-import { Button } from '@lar-factory/ui/button';
-import { ToastProvider, toastManager } from '@lar-factory/ui/toast';
+import { IconButton } from '@lar-factory/ui/design-system/IconButton';
+import { CloseIcon } from '@lar-factory/ui/design-system/NavigationIcons';
+import { toast as toasts } from '@lar-factory/ui/toasts';
 import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 
 /** How long a success toast stays. */
@@ -20,7 +19,7 @@ const FALLBACK_FOCUS = '.add-item';
 export interface Toast {
   /** One toast per slot: a new one replaces the last. */
   slot: string;
-  /** A failure is an alert with a red dot, as T3's error toast, that stays until it's closed; a success clears itself after 5 s. */
+  /** A failure is a red alert that stays until it's closed; a success is green and clears itself after 5 s. */
   failed?: boolean;
   /** Names the toast for its close button, such as "Moved #61". */
   what: string;
@@ -30,8 +29,8 @@ export interface Toast {
 }
 
 /** The close button every failure and toast carries; `what` names what it closes for screen readers. */
-export function DismissButton({ what, onClick }: { what: string; onClick: () => void }) {
-  return <Button variant="ghost" size="icon-xs" className="dismiss" aria-label={`Dismiss${what}`} onClick={onClick}><XIcon /></Button>;
+export function DismissButton({ what, onClick }: { what: string; onClick: (event: MouseEvent<HTMLButtonElement>) => void }) {
+  return <IconButton className="dismiss" aria-label={`Dismiss${what}`} icon={<CloseIcon />} onClick={onClick} />;
 }
 
 const focusFirst = (selectors: string[]) => {
@@ -58,29 +57,28 @@ export function closeKeepingFocus(el: Element | null, close: () => void, next: s
   if (hadFocus) focusAfterClose(next);
 }
 
-/** The id of the toast in each slot, in coss's toast manager. */
+/** The id of the toast in each slot, in ninna-ui's toast manager. */
 const slots = new Map<string, string>();
-let count = 0;
+
+/** Closes the toast `id` in `slot`, moving focus on if it was in the toast. */
+function closeToast(slot: string, id: string, focusAfter: string[] = []): void {
+  closeKeepingFocus(document.querySelector(`[data-toast-id="${id}"]`), () => {
+    if (slots.get(slot) === id) slots.delete(slot);
+    toasts.dismiss(id);
+  }, focusAfter);
+}
 
 /** Shows `toast` in its slot, replacing the one there. */
 export function showToast(toast: Toast): void {
   clearToast(toast.slot);
-  const id = `toast-${++count}`;
-  slots.set(toast.slot, id);
-  toastManager.add({
-    id,
-    // The board's own clock closes successes (ToastBody), so the manager never does.
-    timeout: 0,
-    description: <ToastBody {...toast} onClose={() => toastManager.close(id)} />,
-    data: { rootProps: { role: toast.failed ? 'alert' : 'status', 'data-toast': toast.slot, 'data-toast-id': id, 'data-tone': toast.failed ? 'error' : undefined } },
-    // Every way a toast closes runs this, a swipe included, while the toast is still on the page.
-    onClose: () => {
-      if (slots.get(toast.slot) === id) slots.delete(toast.slot);
-      const el = document.querySelector(`[data-toast-id="${id}"]`);
-      // A closed toast stays on the page while it animates out, so its focus is moved, not found lost.
-      if (el?.contains(document.activeElement)) focusAfterClose(toast.focusAfter ?? []);
-    },
+  const id: string = toasts.create({
+    color: toast.failed ? 'danger' : 'success',
+    // The board's own clock closes successes (ToastBody) and its own button closes every toast, so ninna-ui never does.
+    duration: 0,
+    closable: false,
+    description: <ToastBody {...toast} onClose={() => closeToast(toast.slot, id, toast.focusAfter)} />,
   });
+  slots.set(toast.slot, id);
 }
 
 /** Shows a success toast in `slot` that links the PR at `prUrl` as `label`, between `before` and `after`. */
@@ -93,21 +91,18 @@ export function showPrToast({ slot, what, prUrl, label, before = 'Opened ', afte
 /** Closes whatever toast holds this slot. */
 export function clearToast(slot: string): void {
   const id = slots.get(slot);
-  if (id) toastManager.close(id);
+  if (id) closeToast(slot, id);
 }
 
 /** One toast's content. `onClose` runs when its close button is clicked or, for a success, when its time is up. */
-function ToastBody({ what, failed = false, body, onClose }: Toast & { onClose: () => void }) {
+function ToastBody({ slot, what, failed = false, body, onClose }: Toast & { onClose: () => void }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const toast = () => ref.current?.closest('[data-toast]') ?? null;
-  // The banners come and go, so place toasts again as each one shows.
-  useLayoutEffect(placeToasts, []);
   useEffect(() => {
     if (failed) return;
     let timer: ReturnType<typeof setTimeout>;
     const expire = (paused: boolean) => {
       // Being read or used: check again soon, then give it a full 5 s once it's left.
-      if (toast()?.matches(':hover, :focus-within')) timer = setTimeout(() => expire(true), RECHECK_MS);
+      if (ref.current?.closest('[data-slot="toast"]')?.matches(':hover, :focus-within')) timer = setTimeout(() => expire(true), RECHECK_MS);
       else if (paused) timer = setTimeout(() => expire(false), TOAST_MS);
       else onClose();
     };
@@ -115,33 +110,9 @@ function ToastBody({ what, failed = false, body, onClose }: Toast & { onClose: (
     return () => clearTimeout(timer);
   }, [failed, onClose]);
   return (
-    <span ref={ref}>
+    <span ref={ref} data-toast={slot}>
       <DismissButton what={`: ${what}`} onClick={onClose} />
-      <span className={`me-2 inline-block size-2 rounded-full ${failed ? 'bg-error' : 'bg-success'}`} />
       {body}
     </span>
   );
-}
-
-/** Keeps --toast-anchor at the bottom of the banners while they're on screen, and never above the title bar's,
- * so toasts (placed below it in notices.css) never cover the banners' buttons nor sit in the bar
- * that drags the window. */
-function placeToasts(): void {
-  const bottom = Math.max(...['.banners', '.title-bar'].map((sel) => document.querySelector(sel)?.getBoundingClientRect().bottom ?? 0));
-  document.documentElement.style.setProperty('--toast-anchor', `${Math.round(bottom)}px`);
-}
-
-/** The page's toasts. */
-export function Toasts() {
-  useEffect(() => {
-    placeToasts();
-    // The main area scrolls, not the window: capture hears its scroll.
-    addEventListener('scroll', placeToasts, { passive: true, capture: true });
-    addEventListener('resize', placeToasts);
-    return () => {
-      removeEventListener('scroll', placeToasts, { capture: true });
-      removeEventListener('resize', placeToasts);
-    };
-  }, []);
-  return <ToastProvider position="top-right" />;
 }

@@ -1,7 +1,7 @@
 // A button that copies its text and says Copied for a moment, and the live region that announces it.
 
 import { useEffect, useState } from 'react';
-import { Button } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { useCopyStore } from './copy-store.ts';
 
 async function writeClipboard(text: string): Promise<void> {
@@ -34,7 +34,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
     setCopied(Date.now());
     announce();
   };
-  return <Button variant="outline" size="xs" aria-label={label} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>;
+  return <Button variant="secondary" aria-label={label} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>;
 }
 
 export function CopyStatus() {

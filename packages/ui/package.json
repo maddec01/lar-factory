@@ -21,6 +21,7 @@
     "./textarea": "./src/components/ui/textarea.tsx",
     "./tooltip": "./src/components/ui/tooltip.tsx",
     "./toast": "./src/coss/toast.tsx",
+    "./toasts": "./src/toasts/toasts.ts",
     "./kept-mounted-dialog-popup": "./src/dialog/kept-mounted-dialog-popup.tsx",
     "./card": "./src/card/card.tsx",
     "./fieldset": "./src/form/fieldset.tsx",

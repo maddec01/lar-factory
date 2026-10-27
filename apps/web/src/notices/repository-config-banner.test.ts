@@ -18,7 +18,7 @@ test("each repository whose .lar-factory.json can't be read gets a banner naming
       + 'See Adding a repository in apps/server/README.md. The board reads it again on each refresh.'],
   ]);
   expect(banners()[0]!.querySelector('a')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-factory/blob/main/apps/server/README.md#adding-a-repository');
-  expect(banners()[0]!.dataset.variant).toBe('warning');
+  expect(banners()[0]!.dataset.tone).toBe('warning');
 
   await push({ ...sample, repositoryConfigProblems: [] });
   expect(banners()).toEqual([]);

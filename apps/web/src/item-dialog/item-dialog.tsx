@@ -1,28 +1,30 @@
 // The item dialog: every item, wherever it's listed, opens here over the page, as a wide modal. It shows the item's
-// repository, status, track and hint, a meta area of people, labels, dates, milestone or iteration and area, checks
-// and agent work, then its description and comments. Sub-tickets, slices and pull requests sit in a sidebar beside
-// them when the dialog is 45rem wide, else between the description and the comments. The board's fields show at
+// repository, status and agent work figures, a progress bar with the slices as an overview, its hint, a meta area of
+// people, labels, dates, milestone or iteration and area and checks, then its description and comments. Sub-tickets
+// and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the
+// comments. The board's fields show at
 // once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
 // item, and the one action the item's status asks for, with Back to List and Abandon at its left.
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { ExternalLink, Play } from 'lucide-react';
+import { ExternalLink, Play, X } from 'lucide-react';
 import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/button';
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
+import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
 import { useBoardStore } from '../board/board-store.ts';
 import { AbandonButton, ActionError, BackToListButton, PickStatusButtons, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
-import { ItemTitle, PrList, RepoTag, SliceList, StepTrack } from '../items/item-parts.tsx';
+import { AgentWork, ItemTitle, PrList, RepoTag } from '../items/item-parts.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
 import { ItemComments, ItemDescription, ItemMeta, SubTickets } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
+import { ItemProgress } from './item-progress.tsx';
 import { useItemDetails } from './use-item-details.ts';
 
 /** The one thing the item's status asks of you; an item carrying more than one status asks you to keep one. */
@@ -54,9 +56,9 @@ function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   return <>{!carriesTwoStatuses(item) && <BackToListButton item={item} data={data} />}<AbandonButton item={item} data={data} /></>;
 }
 
-/** Whether the sidebar has anything: slices, pull requests, or sub-tickets (as many as the board counts while the details load). */
+/** Whether the sidebar has anything: pull requests, or sub-tickets (as many as the board counts while the details load). */
 const hasRelations = (item: Item, read: ItemDetailsRead): boolean =>
-  item.slices.length > 0 || item.linkedPrs.length > 0
+  item.linkedPrs.length > 0
   || (read.state === 'loaded' ? read.details.subTickets.length > 0 : read.state === 'loading' && item.subIssues.total > 0);
 
 const Section = ({ heading, children }: { heading: ReactNode; children: ReactNode }) => (
@@ -69,17 +71,22 @@ function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData
   const hint = carriesTwoStatuses(item) ? keepOneText(item.statuses) : HINTS[item.status];
   return (
     <>
-      <DialogHeader>
-        <div className="flex flex-wrap items-center gap-2 pr-8 text-xs text-(--muted-foreground)">
+      <header className="flex min-h-12 shrink-0 items-center gap-2 border-b ps-6 pe-2 text-xs text-(--muted-foreground)">
+        <div className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap">
           {itemRepos(item).map((repo) => <RepoTag key={repo} repo={repo} repos={data.repos} />)}
-          <ItemStatusGlyph item={item} /> <span className="font-medium text-(--foreground)">{item.status}</span> · updated {shortAgo(item.updatedAt, now)}
+          <ItemStatusGlyph item={item} /> <span className="font-medium text-(--foreground)">{item.status}</span>
+          <span className="min-w-0 truncate @max-[30rem]:hidden">· updated {shortAgo(item.updatedAt, now)}</span>
           {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {openBlockers(item).length}</span>}
         </div>
+        <AgentWork item={item} className="shrink-0 whitespace-nowrap @max-[40rem]:hidden" />
+        <DialogClose aria-label="Close" render={<Button size="icon" variant="ghost" />}><X /></DialogClose>
+      </header>
+      <DialogHeader className="pt-4">
         <DialogTitle className="text-lg leading-snug tracking-tight"><ItemTitle item={item} /></DialogTitle>
         {item.parent && <DialogDescription>Part of <a href={item.parent.url} target="_blank" rel="noopener" className="underline">#{item.parent.number} {item.parent.title}</a></DialogDescription>}
       </DialogHeader>
-      <DialogPanel className="grid grid-cols-[minmax(0,1fr)] gap-5 space-y-0">
-        <StepTrack status={item.status} labels />
+      <DialogPanel className="grid grid-cols-[minmax(0,1fr)] gap-3 space-y-0">
+        <ItemProgress item={item} />
         {hint && (
           <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
             <StatusGlyph status={item.status} className="size-4" />
@@ -87,12 +94,11 @@ function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData
           </div>
         )}
         <ItemMeta item={item} read={read} now={now} />
-        <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-6 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem] @min-[45rem]:grid-rows-[auto_1fr]' : ''}`}>
+        <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem] @min-[45rem]:grid-rows-[auto_1fr]' : ''}`}>
           <ItemDescription read={read} className="@min-[45rem]:col-start-1" />
           {aside && (
-            <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5 @min-[45rem]:col-start-2 @min-[45rem]:row-span-2 @min-[45rem]:row-start-1 @min-[45rem]:border-l @min-[45rem]:border-(--border) @min-[45rem]:pl-6">
+            <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 @min-[45rem]:col-start-2 @min-[45rem]:row-span-2 @min-[45rem]:row-start-1 @min-[45rem]:border-l @min-[45rem]:border-(--border) @min-[45rem]:pl-6">
               <SubTickets read={read} />
-              {item.slices.length > 0 && <Section heading={<>Slices <span className="text-(--muted-foreground)">{item.slices.filter((s) => s.progress === 'done').length}/{item.slices.length} done</span></>}><SliceList item={item} /></Section>}
               {item.linkedPrs.length > 0 && <Section heading="Pull requests"><PrList item={item} /></Section>}
             </aside>
           )}
@@ -127,7 +133,7 @@ export function ItemDialog() {
   const item = kept.current;
   return (
     <Dialog open={Boolean(opened)} onOpenChange={(open) => !open && close()}>
-      <DialogPopup className="@container h-[88vh] max-w-5xl" data-item-dialog>
+      <DialogPopup className="@container h-[88vh] max-w-5xl" showCloseButton={false} data-item-dialog>
         {item && <ItemDialogBody item={item} data={data} now={now} open={Boolean(opened)} />}
       </DialogPopup>
     </Dialog>

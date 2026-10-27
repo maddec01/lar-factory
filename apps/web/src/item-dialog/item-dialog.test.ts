@@ -1,6 +1,6 @@
-// The item dialog: opened through its store, it shows an item's repository, status, track and a meta area of labels and
-// agent work under the title, then slices and pull requests in a sidebar, and its footer carries GitHub and the action
-// the item's status asks for.
+// The item dialog: opened through its store, it shows an item's repository, status and agent work figures in its header,
+// a meta area of labels under the title, a progress bar with the slices as an overview, then sub-tickets and pull
+// requests in a sidebar, and its footer carries GitHub and the action the item's status asks for.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
@@ -25,32 +25,60 @@ async function openItem(itemId: string): Promise<void> {
   await settle(() => useItemDialogStore.getState().open(itemId));
 }
 
-test('the dialog shows the repository, status, update time, blockers, numbered title, parent, track and slices', async () => {
+test('the dialog shows the repository, status, update time, blockers, numbered title, parent and a progress bar', async () => {
   await mountPage();
   await openItem('I_sample13');
   expect(dialog()!.getAttribute('role')).toBe('dialog');
-  const meta = inDialog('[data-slot="dialog-header"] > div')!;
-  expect(text(meta)).toBe('lar-server Ready · updated 1h agoblocked by 1');
+  const meta = inDialog('header')!;
+  expect(text(meta)).toBe('lar-server Ready· updated 1h agoblocked by 1');
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('#140 Owner accounts');
   const parent = inDialog<HTMLAnchorElement>('[data-slot="dialog-description"] a')!;
   expect([text(parent), parent.href]).toEqual(['#200 lar cloud: website sign-in and relay', 'https://github.com/maddec01/lar-server/issues/200']);
-  const [track, names] = $$('[data-item-dialog] [data-slot="dialog-panel"] > div:first-child ol');
-  expect(track!.children).toHaveLength(10);
-  expect(text(names!.querySelector('.font-semibold'))).toBe('Ready');
-  const slices = section('Slices');
-  expect(text(slices.querySelector('h2'))).toBe('Slices 1/3 done');
-  expect([...slices.querySelectorAll('li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
+  expect(steps()).toHaveLength(10);
   expect(text(inDialog('[data-meta]'))).toContain('No T3 thread has worked on this yet.');
   expect(text(inDialog('[data-labels]'))).toBe('build');
 });
 
-test('the labels, people, dates and agent work sit in a meta area under the title, and the sidebar holds only relations', async () => {
+/** The progress bar's ten step segments. */
+const steps = () => $$('[data-item-dialog] [data-progress] [data-steps] > li');
+
+test('the progress bar names the current step on its segment and every step in a title and an accessible label', async () => {
+  await mountPage();
+  await openItem('I_sample13');
+  const current = steps()[4]!;
+  expect([current.getAttribute('aria-label'), current.getAttribute('aria-current'), text(current)]).toEqual(['Step 5 of 10: Ready', 'step', 'Ready5/10']);
+  expect(steps().map((s) => s.title)).toEqual(['List', 'Queued', 'Shaping', 'Needs you', 'Ready', 'In progress', 'Review', 'Verify', 'Ready to merge', 'Done']);
+  expect(steps().filter((s) => s !== current).map((s) => text(s))).toEqual(Array(9).fill(''));
+  expect(steps().filter((s) => s.hasAttribute('aria-current'))).toEqual([current]);
+});
+
+test('slices show as an overview under the progress bar, not in the sidebar, with a bar of their own while the item is not at work', async () => {
+  await mountPage();
+  await openItem('I_sample13');
+  const slices = inDialog('[data-slices]')!;
+  expect(text(slices.querySelector('p'))).toBe('Slices · 1/3 done');
+  expect([...slices.querySelectorAll('ul > li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
+  expect(slices.querySelectorAll('ol > li'), 'a small bar of the slices').toHaveLength(3);
+  expect(steps()[4]!.querySelector('ol'), 'the Ready segment is not subdivided').toBeNull();
+  expect($$('[data-item-dialog] aside h2').map(text)).toEqual(['Sub-tickets']);
+});
+
+test('an In progress item with slices subdivides its current segment, a mini segment for each slice', async () => {
+  const slices = sample.items.find((i) => i.id === 'I_sample13')!.slices;
+  await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample14' ? { ...i, slices } : i)) });
+  await openItem('I_sample14');
+  expect([...steps()[5]!.querySelectorAll<HTMLElement>('ol > li')].map((s) => s.title)).toEqual(['#144 Owner table and sign-up', '#145 Sign-in sessions', '#146 Owner settings page']);
+  expect(text(inDialog('[data-slices] p'))).toBe('Slices · 1/3 done');
+  expect(inDialog('[data-slices] ol'), 'the bar is in the track, not repeated').toBeNull();
+  expect(inDialog('[data-slices] ul')!.children).toHaveLength(3);
+});
+
+test('the labels, people and dates sit in a meta area under the title, and the sidebar holds only relations', async () => {
   await mountPage();
   await openItem('I_sample13');
   const meta = text(inDialog('[data-meta]'));
   expect(meta).toMatch(/Author.*maddec01.*Assignees.*maddec01.*claude-bot.*Labels.*build.*Milestone.*Cloud v0\.1.*Created.*Updated/);
   expect(inDialog('[data-meta]')!.closest('aside'), 'not in the sidebar').toBeNull();
-  expect([...$$('[data-item-dialog] aside h2').map(text)]).toEqual(['Sub-tickets', 'Slices 1/3 done']);
   expect(text(inDialog('aside'))).not.toMatch(/Author|Assignees|Labels|Created|Updated|Agent work/);
 });
 
@@ -60,12 +88,14 @@ test('an item with no slices, pull requests or sub-tickets has no sidebar', asyn
   expect(inDialog('aside')).toBeNull();
 });
 
-test('the track names every step only in a wide dialog; a narrow one names the current step alone', async () => {
+test('the header bar holds the agent work figures and the close button', async () => {
   await mountPage();
-  await openItem('I_sample13');
-  expect(text(inDialog('[data-step]'))).toBe('Ready · step 5 of 10');
-  expect(inDialog('[data-step]')!.className, 'hidden once the dialog is wide enough for every name').toContain('@min-[48rem]:hidden');
-  expect(text(inDialog('[data-slot="dialog-panel"] > div:first-child ol:last-of-type')).startsWith('List')).toBe(true);
+  await openItem('I_sample14');
+  const close = inDialog<HTMLButtonElement>('header [aria-label="Close"]')!;
+  expect(inDialog('header')!.contains(inDialog('[data-agent-work]'))).toBe(true);
+  expect(dialog()!.querySelectorAll('[aria-label="Close"]'), 'the popup draws no second one').toHaveLength(1);
+  await press(close);
+  expect(dialog()).toBeNull();
 });
 
 test('the dialog lays out by its own width and never hides an overflow', async () => {
@@ -80,31 +110,23 @@ test('the dialog of an untagged item two repositories read tags it with both', a
   await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'sprint', team: 'Web', show: 'all', labels: [] }],
     items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, repo: web, untaggedFor: [web, api] } : i)) });
   await openItem('I_sample05');
-  expect([...inDialog('[data-slot="dialog-header"] > div')!.querySelectorAll('.repo-tag')].map(text)).toEqual(['web', 'api']);
-});
-
-test('the slice rows are 13px with the status word at 11px', async () => {
-  await mountPage();
-  await openItem('I_sample13');
-  const rows = [...section('Slices').querySelectorAll('li')];
-  expect(rows).toHaveLength(3);
-  for (const row of rows) {
-    expect(row.classList.contains('text-[13px]')).toBe(true);
-    expect(row.lastElementChild!.classList.contains('text-[11px]')).toBe(true);
-  }
+  expect([...inDialog('header')!.querySelectorAll('.repo-tag')].map(text)).toEqual(['web', 'api']);
 });
 
 test('the dialog shows the hint, each pull request with its checks, and the agent work figures', async () => {
   await mountPage();
   await openItem('I_sample14');
-  expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/^lar-apple In progress · updated 25m ago$/);
+  const work = inDialog('header [data-agent-work]')!;
+  expect(text(inDialog('header'))).toBe('lar-apple In progress· updated 25m ago$24.18 · 2h 14m · 16.6M tokens · 1h 20m wall');
+  expect(work.title).toBe('Cost $24.18 · Agent time 2h 14m · Tokens 16.6M · Wall time 1h 20m');
+  expect(inDialog('[data-meta] [data-agent-work]')!.className, 'a narrow dialog shows them in the meta area instead').toContain('@min-[40rem]:hidden');
+  expect(work.className, 'a wide one in the header').toContain('@max-[40rem]:hidden');
   const pr = section('Pull requests').querySelector('li')!;
   expect([text(pr), pr.querySelector('a')!.getAttribute('href')]).toEqual(['PR #33 (draft)checks running', 'https://github.com/maddec01/lar-apple/pull/33']);
-  expect($$('[data-item-dialog] dl > div').map(text)).toEqual(['Cost$24.18', 'Agent time2h 14m', 'Tokens16.6M', 'Wall time1h 20m']);
 
   await openItem('I_sample16');
   expect(text(inDialog('[data-slot="dialog-panel"] > div:nth-child(2)')), 'the hint').toBe('Test it with the steps in the PR, then merge');
-  expect(inDialog('dl'), 'no figures').toBeNull();
+  expect(inDialog('[data-agent-work]'), 'no figures').toBeNull();
   expect(text(inDialog('[data-meta]')), 'unreadable stats say so').toContain('The T3 Code database could not be read');
 });
 
@@ -217,7 +239,7 @@ test('Queue in the dialog shows it in flight, then shows the item Queued, says s
   expect(posted()).toEqual([['/api/queue', { itemId: 'I_sample01' }]]);
 
   await answer({ error: null, board: moved('I_sample01', 'Queued') });
-  expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/ Queued · /);
+  expect(text(inDialog('header'))).toMatch(/ Queued· /);
   expect(text(toast())).toBe(`Moved #61 ${sample.items[0]!.title} to Queued. View item`);
   expect(document.activeElement).toBe(button('start', 'I_sample01'));
 });
@@ -243,8 +265,8 @@ test('an issue with two statuses shows in the first with a warning mark, and its
   expect($('[data-item="I_sample07"] [data-two-statuses]')!.getAttribute('aria-label')).toBe('Carries Shaping and Review; keep one');
   expect($('[data-item="I_sample06"] [data-two-statuses]'), 'one status, no mark').toBeNull();
   await openItem('I_sample07');
-  expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/^[\w-]+ Shaping · /);
-  expect(inDialog('[data-slot="dialog-header"] [data-two-statuses]')).not.toBeNull();
+  expect(text(inDialog('header'))).toMatch(/^[\w-]+ Shaping· /);
+  expect(inDialog('header [data-two-statuses]')).not.toBeNull();
   expect(text(inDialog('[data-slot="dialog-panel"] > div:nth-child(2)'))).toBe('This issue carries Shaping and Review. Keep one to move it again.');
   expect(footerControls()).toEqual(['GitHub', 'Keep Shaping', 'Keep Review']);
 });
@@ -276,7 +298,7 @@ test('Keep posts the status picked, shows it in flight, then shows the item with
   expect(posted()).toEqual([['/api/pick-status', { itemId: 'I_sample07', status: 'Review' }]]);
 
   await answer({ error: null, board: { ...twice, items: twice.items.map((i) => (i.id === 'I_sample07' ? { ...i, status: 'Review', statuses: ['Review'] } : i)) } });
-  expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/ Review · /);
+  expect(text(inDialog('header'))).toMatch(/ Review· /);
   expect(inDialog('[data-two-statuses], [data-pick-status]')).toBeNull();
   expect(text(toast())).toMatch(/^Kept Review on #\d+ .*\./);
 });

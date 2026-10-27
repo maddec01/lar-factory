@@ -1,7 +1,7 @@
 // What the item dialog shows from an item's details: the description and comments in its main column, the people,
-// labels, dates, milestone or iteration and area, agent work and a pull request's checks in the meta area under its
-// title, and the sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows
-// its error in the description's place; the board's own fields never wait.
+// labels, dates, milestone or iteration and area and a pull request's checks in the meta area under its title, and the
+// sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows its error in the
+// description's place; the board's own fields never wait.
 
 import type { ReactNode } from 'react';
 import { CircleCheck, CircleDot, LoaderCircle } from 'lucide-react';
@@ -10,7 +10,7 @@ import type { Item, ItemComment, ItemDetails } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { RichText } from '@lar-factory/ui/rich-text';
-import { ChecksBadge, StatChips } from '../items/item-parts.tsx';
+import { AgentWork, AgentWorkNote, ChecksBadge } from '../items/item-parts.tsx';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
 import type { DetailsEntry } from './details-cache.ts';
@@ -105,29 +105,26 @@ function FromDetails({ read, label, show }: { read: ItemDetailsRead; label: stri
 
 /**
  * The meta area under the title: author, assignees, labels, milestone or iteration and area, dates, a pull request item's
- * checks, and the agent work figures. They wrap onto as many lines as the width needs. Labels, update time, checks and
- * agent work come from the board.
+ * checks, and the agent work figures, which only show here while the dialog is too narrow for the header to hold them, or why
+ * there are none. They wrap onto as many lines as the width needs. Labels, update time and checks come from the board.
  */
 export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRead; now: number }) {
   const azure = Boolean(item.repo && onAzure(item.repo));
   return (
-    <div className="grid min-w-0 gap-2.5" data-meta>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
-        <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
-        <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
-        {item.labels.length > 0 && (
-          <Fact label="Labels"><span className="flex flex-wrap gap-1" data-labels>{item.labels.map((l) => <Badge key={l} variant="outline" className="h-auto max-w-full whitespace-normal py-px text-start wrap-anywhere sm:h-auto">{l}</Badge>)}</span></Fact>
-        )}
-        {azure
-          ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>
-          : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}
-        <FromDetails read={read} label="Created" show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />} />
-        <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
-      </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-        {item.pipeline && <ChecksBadge checks={item.pipeline.checks} counts />}
-        <StatChips item={item} />
-      </div>
+    <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2" data-meta>
+      <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
+      <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
+      {item.labels.length > 0 && (
+        <Fact label="Labels"><span className="flex flex-wrap gap-1" data-labels>{item.labels.map((l) => <Badge key={l} variant="outline" className="h-auto max-w-full whitespace-normal py-px text-start wrap-anywhere sm:h-auto">{l}</Badge>)}</span></Fact>
+      )}
+      {azure
+        ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>
+        : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}
+      <FromDetails read={read} label="Created" show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />} />
+      <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
+      {item.pipeline && <ChecksBadge checks={item.pipeline.checks} counts />}
+      <AgentWorkNote item={item} />
+      <AgentWork item={item} className="@min-[40rem]:hidden" />
     </div>
   );
 }

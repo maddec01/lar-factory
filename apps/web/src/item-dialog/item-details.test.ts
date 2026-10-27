@@ -122,7 +122,7 @@ test('a failed read shows its error in the modal and the board data stays visibl
   expect(text(inDialog('[role="alert"]'))).toBe('Could not load the details: Item details are not available yet.');
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('#140 Owner accounts');
   expect(inDialog('[data-labels]')!.textContent).toBe('build');
-  expect(text(inDialog('section h2'))).toBe('Slices 1/3 done');
+  expect(text(inDialog('[data-slices] p'))).toBe('Slices · 1/3 done');
   expect(inDialog('[aria-busy="true"]')).toBeNull();
 });
 

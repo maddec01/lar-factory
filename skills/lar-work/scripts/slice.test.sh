@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests slice.sh against a fake gh and a fake sleep. No network.
+# Tests slice.sh against a fake gh, a fake az and a fake sleep. No network.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -59,7 +59,18 @@ cat >"$bin/sleep" <<'EOF'
 #!/bin/bash
 echo "sleep $*" >>"$FAKE_GH_LOG"
 EOF
-chmod +x "$bin/gh" "$bin/sleep"
+# A fake az that answers the Task create: it logs "az <args>", then the JSON patch
+# on one line, and prints the new work item 77. With FAKE_AZ_ERROR set it fails with it.
+cat >"$bin/az" <<'EOF'
+#!/bin/bash
+echo "az $*" >>"$FAKE_GH_LOG"
+if [[ -n ${FAKE_AZ_ERROR:-} ]]; then echo "$FAKE_AZ_ERROR" >&2; exit 1; fi
+args="$*" file=${args#*--in-file }
+jq -c . "${file%% *}" >>"$FAKE_GH_LOG"
+echo "WARNING: an az warning on stderr" >&2
+echo '{"id": 77, "rev": 1, "fields": {"System.WorkItemType": "Task"}}'
+EOF
+chmod +x "$bin/gh" "$bin/sleep" "$bin/az"
 items="$bin/items"
 export FAKE_GH_LOG="$log" FAKE_GH_ITEMS="$items" PATH="$bin:$PATH"
 
@@ -165,6 +176,47 @@ if output=$(bash "$slice" maddec01/lar-factory 133 2>&1); then
     fail "missing arguments print usage: $output"
 else
     if [[ $output == *usage* ]]; then pass "missing arguments print usage"; else fail "missing arguments print usage: $output"; fi
+fi
+
+# On Azure DevOps
+
+azure_build=https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/42
+printf '## What to build\n\nA "quoted" line.\n' >"$body"
+: >"$log"
+status=0
+output=$(bash "$slice" contoso/Fabrikam%20Fiber/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
+errors=$(cat "$bin/err")
+want_patch=$(jq -nc --rawfile body "$body" '[{op: "add", path: "/fields/System.Title", value: "A slice"},
+    {op: "add", path: "/fields/System.Description", value: $body},
+    {op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown"},
+    {op: "add", path: "/relations/-", value: {rel: "System.LinkTypes.Hierarchy-Reverse", url: "https://dev.azure.com/contoso/_apis/wit/workItems/42"}}]')
+if ((status == 0)) && [[ $output == https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/77 && -z $errors ]] &&
+    [[ $(sed -n 1p "$log") == "az devops invoke --area wit --resource workitems --organization https://dev.azure.com/contoso --route-parameters project=Fabrikam Fiber type=Task --http-method POST --media-type application/json-patch+json --in-file "*" --api-version 7.2-preview.3 --output json" ]] &&
+    [[ $(sed -n 2p "$log") == "$want_patch" ]] && (($(wc -l <"$log") == 2)); then
+    pass "on Azure DevOps, creates a Task under the build's work item in one call and prints its URL"
+else
+    fail "on Azure DevOps, creates a Task under the build's work item in one call and prints its URL: $status $output / $errors / $(cat "$log")"
+fi
+
+: >"$log"
+status=0
+output=$(FAKE_AZ_ERROR="ERROR: Before you can run Azure DevOps commands, you need to run the login command (az login if using AAD/MSA identity else az devops login if using PAT token) to setup credentials." \
+    bash "$slice" contoso/Fabrikam/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
+errors=$(cat "$bin/err")
+if ((status != 0)) && [[ -z $output && $errors == "slice.sh: az is logged out. Run az login, then rerun." ]]; then
+    pass "on Azure DevOps with az logged out, says to run az login"
+else
+    fail "on Azure DevOps with az logged out, says to run az login: $status $output / $errors"
+fi
+
+: >"$log"
+status=0
+output=$(bash "$slice" contoso/Fabrikam/web 42 "A slice" "$body" 2>"$bin/err") || status=$?
+errors=$(cat "$bin/err")
+if ((status != 0)) && [[ -z $output && $errors == *"the parent is the build's work item URL"* ]] && [[ ! -s $log ]]; then
+    pass "on an Azure repository, a parent that isn't a work item URL stops before any call"
+else
+    fail "on an Azure repository, a parent that isn't a work item URL stops before any call: $status $output / $errors / $(cat "$log")"
 fi
 
 rm -rf "$bin"

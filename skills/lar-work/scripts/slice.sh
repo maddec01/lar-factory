@@ -8,6 +8,9 @@
 # (default 2) for SLICE_POLL_TIMEOUT seconds (default 20) and deletes any item
 # that appears. Once it has deleted one, it stops at the first poll that finds none.
 # A repository that reads its issues has no Project, so there is nothing to poll.
+# On Azure DevOps the parent is the build's work item URL, and the slice is a Task
+# in the build's project, created with its parent link and a markdown description
+# in one call. <owner/repo> is then the Azure repository, as repo-config.sh takes it.
 set -euo pipefail
 
 usage="usage: slice.sh <owner/repo> <parent number or URL> <title> <body-file>"
@@ -17,6 +20,32 @@ title=${3:?$usage}
 body=${4:?$usage}
 interval=${SLICE_POLL_INTERVAL:-2}
 timeout=${SLICE_POLL_TIMEOUT:-20}
+
+# shellcheck source-path=SCRIPTDIR source=azure.sh
+source "$(dirname "$0")/azure.sh"
+if azure_work_item "$parent"; then
+    patch=$(mktemp) err=$(mktemp)
+    trap 'rm -f "$patch" "$err"' EXIT
+    jq -n --arg title "$title" --rawfile body "$body" --arg parent "$az_org/_apis/wit/workItems/$az_id" '[
+        {op: "add", path: "/fields/System.Title", value: $title},
+        {op: "add", path: "/fields/System.Description", value: $body},
+        {op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown"},
+        {op: "add", path: "/relations/-", value: {rel: "System.LinkTypes.Hierarchy-Reverse", url: $parent}}]' >"$patch"
+    # The create endpoint is .../workitems/$<type>; az fills in the type.
+    if ! created=$(az devops invoke --area wit --resource workitems --organization "$az_org" \
+        --route-parameters "project=$(percent_decode "$az_project")" type=Task \
+        --http-method POST --media-type application/json-patch+json --in-file "$patch" \
+        --api-version 7.2-preview.3 --output json 2>"$err"); then
+        echo "slice.sh: $(az_failure "could not create the slice under $parent" "$(cat "$err")")" >&2
+        exit 1
+    fi
+    echo "$az_org/$az_project/_workitems/edit/$(jq -r .id <<<"$created")"
+    exit 0
+fi
+if azure_repo "$repo"; then
+    echo "slice.sh: on Azure DevOps the parent is the build's work item URL, not $parent." >&2
+    exit 1
+fi
 
 build_repo=$repo
 if [[ $parent =~ ^https://github\.com/([^/]+/[^/]+)/issues/[0-9]+$ ]]; then build_repo=${BASH_REMATCH[1]}; fi

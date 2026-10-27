@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fakeAzRepos } from '../azure/fake-az.ts';
 import {
-  dropRepository, isItemSource, isRepo, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding,
-  savePrClosed, saveResetting, stillOnboarding,
+  dropRepository, findRepositoryConfig, isItemSource, isRepo, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded,
+  saveOnboarding, savePrClosed, saveResetting, stillOnboarding,
 } from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
@@ -247,8 +248,8 @@ test("an Azure DevOps repository's config names its team's sprint or backlog, wi
     'contoso/Fabrikam/backlog-no-team': { role: 'x', itemSource: { kind: 'azure-backlog' } },
     'contoso/Fabrikam/none': { role: 'x' }, 'contoso/Fabrikam/issues': { role: 'x', itemSource: { kind: 'issues' } },
     'contoso/Fabrikam/no-team': { role: 'x', itemSource: { kind: 'azure-sprint' } }, 'contoso/Fabrikam/empty-team': { role: 'x', itemSource: { kind: 'azure-sprint', team: '' } } };
-  // Reading the file with az waits for its own slice; this reader hands back each file as it is.
-  const read = async (args: string[]) => JSON.stringify(files[/^repos\/(.+)\/contents\//.exec(args[1] ?? '')?.[1] ?? '']);
+  // An az that hands back each repository's file, named by the items call's repositoryId.
+  const read = async (args: string[]) => JSON.stringify({ content: JSON.stringify(files[`contoso/Fabrikam/${args.find((a) => a.startsWith('repositoryId='))!.slice(13)}`]) });
   assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/api', read)).itemSource, { kind: 'azure-sprint', team: 'Fabrikam Team' });
   assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/web', read)).itemSource, { kind: 'azure-backlog', team: 'Web' });
   const refusals = {
@@ -259,6 +260,18 @@ test("an Azure DevOps repository's config names its team's sprint or backlog, wi
     'contoso/Fabrikam/empty-team': 'field itemSource.team must name the team for an azure-sprint',
   };
   for (const [repo, problem] of Object.entries(refusals)) await assert.rejects(readRepositoryConfig(repo, read), { message: `${repo}: .lar-factory.json ${problem}.` });
+});
+
+test("an Azure DevOps repository's config is read from its default branch with one az call, and a missing file is no config", async () => {
+  const file = { role: 'API', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in' };
+  const az = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify(file) } });
+  assert.deepEqual(await findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', az.run),
+    { repo: 'contoso/Fabrikam%20Fiber/lar-api', version: 1, role: 'API', itemSource: file.itemSource, show: 'opted-in', labels: [] });
+  assert.deepEqual(az.calls, [['devops', 'invoke', '--area', 'git', '--resource', 'items', '--route-parameters', 'project=Fabrikam Fiber', 'repositoryId=lar-api',
+    '--query-parameters', 'path=/.lar-factory.json', 'includeContent=true', '--api-version', '7.1', '--org', 'https://dev.azure.com/contoso', '--detect', 'false', '--output', 'json']]);
+  assert.equal(await findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', fakeAzRepos().run), null);
+  const loggedOut = fakeAzRepos({ fail: () => new Error('az devops invoke failed: Please run az login to setup account.') });
+  await assert.rejects(findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', loggedOut.run), /az login/);
 });
 
 test('a gh failure other than a 404 passes through', async () => {

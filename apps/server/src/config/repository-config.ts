@@ -8,6 +8,7 @@ import {
   PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigAnswers,
   type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
+import { readDefaultBranchFile as readAzureFile } from '../azure/azure-repos.ts';
 import { readBranchFile } from '../github/github.ts';
 import { boardDataDir } from '../port/board-record.ts';
 
@@ -49,7 +50,7 @@ const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 export const isRepo = (value: unknown): value is string => typeof value === 'string' && REPO.test(value);
 
 /** Whether a repository is on Azure DevOps: organization/project/repository, not GitHub's owner/name. */
-const onAzure = (repo: string): boolean => repo.split('/').length === 3;
+export const onAzure = (repo: string): boolean => repo.split('/').length === 3;
 
 const isTeam = (value: unknown): value is string => typeof value === 'string' && value !== '';
 
@@ -280,10 +281,12 @@ class RepositoryConfigError extends Error {
 
 /**
  * The repository's .lar-factory.json from its default branch, or from `branch` when given, never a checkout, with
- * defaults filled in; null when it has none, or why the one it has is wrong. Throws any other failure, such as a logged-out gh.
+ * defaults filled in; null when it has none, or why the one it has is wrong. An Azure DevOps repository's default-branch
+ * file is read with az, any other's with gh, and `run` stands in for that tool. Throws any other failure, such as a
+ * logged-out gh or az.
  */
 export async function findRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>, branch?: string): Promise<RepositoryConfig | { problem: string } | null> {
-  const text = await readBranchFile(repo, '.lar-factory.json', branch, run);
+  const text = await (onAzure(repo) && branch === undefined ? readAzureFile(repo, '.lar-factory.json', run) : readBranchFile(repo, '.lar-factory.json', branch, run));
   if (text === null) return null;
   let raw: unknown;
   try { raw = JSON.parse(text); }

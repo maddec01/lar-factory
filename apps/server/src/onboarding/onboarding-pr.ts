@@ -4,16 +4,19 @@
 // branch is lar-factory/onboarding; when that is taken, its open PR is reused with the branch moved to the new commit,
 // and with none the first free lar-factory/onboarding-N is used. Each refresh finishes an onboarding whose PR merged,
 // or whose default branch got a .lar-factory.json another way when the PR adds one, closing the PR then, and marks a
-// PR closed without merging, which the Pull request step offers to reopen. Reset closes an onboarding's open PR and
-// drops the onboarding from the list; on an onboarded repository it opens the reset PR and marks the entry resetting.
-// Each refresh drops a resetting entry once its reset PR merged or closed unmerged.
+// PR closed without merging, which the Pull request step offers to reopen. On Azure Repos, az finds the branch, opens the
+// PR, and follows, closes and reopens it; the workflow labels check and the one commit still go through gh, so opening
+// one there fails until they get an az path. Reset closes an onboarding's open PR and drops the onboarding from the
+// list; on an onboarded repository it opens the reset PR and marks the entry resetting. Each refresh drops a resetting
+// entry once its reset PR merged or closed unmerged.
 
 import {
   isRecord, isSkillName, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
 } from '@lar-factory/shared';
+import { AZURE_REPOS } from '../azure/azure-repos.ts';
 import {
-  type OnboardedRepository, dropRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed,
-  saveResetting, stillOnboarding,
+  type OnboardedRepository, dropRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, onAzure, readRepositoryList, saveOnboarded, saveOnboarding,
+  savePrClosed, saveResetting, stillOnboarding,
 } from '../config/repository-config.ts';
 import {
   branchExists, closePr, commitTree, createBranch, createCommit, createPr, createTree, defaultBranchHead, editPrBody, message, moveBranch, openPrFrom,
@@ -51,9 +54,14 @@ function describe(change: OnboardingPrChange): string {
 const prBody = (changes: OnboardingPrChange[]) =>
   `This PR:\n\n${changes.map((change) => `- ${describe(change)}`).join('\n')}\n\nOnboarding finishes on the board once this PR merges.`;
 
+const GITHUB = { branchExists, closePr, createBranch, createPr, defaultBranchHead, openPrFrom, prState, reopenPr };
+
+/** The calls that open and follow the repository's PR: az's on Azure DevOps, gh's on GitHub. `run` stands in for that tool. */
+const host = (repo: string): typeof GITHUB => (onAzure(repo) ? AZURE_REPOS : GITHUB);
+
 /**
- * How far opening a repository's PR with one set of answers got, so Retry goes on from the gh call that failed; Retry
- * with other answers or picks starts again, so the PR never carries older ones.
+ * How far opening a repository's PR with one set of answers got, so Retry goes on from the gh or az call that failed;
+ * Retry with other answers or picks starts again, so the PR never carries older ones.
  */
 interface Opening {
   key: string;
@@ -68,6 +76,7 @@ interface Opening {
 
 /** The branch onboarding's PR comes from: the first of lar-factory/onboarding, -2, -3 and on that is free, or taken with an open PR to reuse. */
 async function onboardingBranch(repo: string, run?: Run): Promise<{ branch: string; prUrl: string | null }> {
+  const { branchExists, openPrFrom } = host(repo);
   for (let n = 1; ; n++) {
     const branch = n === 1 ? ONBOARDING_BRANCH : `${ONBOARDING_BRANCH}-${n}`;
     if (!await branchExists(repo, branch, run)) return { branch, prUrl: null };
@@ -135,7 +144,7 @@ export async function previewOnboardingPr(input: Record<string, unknown>, run?: 
  * Opens the PR for the body's `repo` with its `config`, or null to reuse the repository's own, and its `picks`, once
  * the repository has every workflow label, then keeps the body's `progress` on the Pull request step with the PR's
  * URL, in place of the onboarding saved under `replaces` when it names one. Returns the URL and the repositories still onboarding, or the status and problem, with
- * gh's message, when a call, a pick or the list refuses it; a refused pick writes nothing.
+ * gh's or az's message, when a call, a pick or the list refuses it; a refused pick writes nothing.
  */
 export function createPrOpener(dir = boardDataDir(), run?: Run) {
   const openings = new Map<string, Opening>();
@@ -151,6 +160,7 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
     const answered = JSON.stringify([config, picks]);
     const opening: Opening = kept?.key === answered ? kept : { key: answered };
     openings.set(key, opening);
+    const { createBranch, createPr } = host(repo);
     try {
       opening.head ??= await defaultBranchHead(repo, run);
       if (!opening.plan) {
@@ -203,7 +213,7 @@ export async function reopenOnboardingPr(input: Record<string, unknown>, dir = b
   try { prUrl = readRepositoryList(dir).find((e) => sameRepo(e.repo, repo))?.onboarding?.prUrl; }
   catch (err) { return { status: 409, error: message(err) }; }
   if (!prUrl) return { status: 409, error: `${repo} has no onboarding PR to reopen.` };
-  try { await reopenPr(prUrl, run); }
+  try { await host(repo).reopenPr(prUrl, run); }
   catch (err) { return { status: 502, error: `Can't reopen ${repo}'s onboarding PR: ${message(err)}` }; }
   try { return { onboarding: stillOnboarding(savePrClosed(repo, false, dir)) }; }
   catch (err) { return { status: 409, error: message(err) }; }
@@ -270,6 +280,7 @@ export async function followOnboardingPrs(list: OnboardedRepository[], dir = boa
   const followed = list.filter((e) => e.onboarding?.prUrl);
   for (const { repo, onboarding } of followed) {
     if (!onboarding?.prUrl) continue;
+    const { closePr, prState } = host(repo);
     try {
       const state = await prState(onboarding.prUrl, run);
       if (state === 'MERGED') {

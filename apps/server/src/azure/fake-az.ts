@@ -112,3 +112,102 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   };
   return { calls, batches, patches, run };
 }
+
+/** A pull request on the fake repository, as az repos pr show prints it. */
+export interface FakePr {
+  pullRequestId: number;
+  status: 'active' | 'completed' | 'abandoned';
+  isDraft?: boolean;
+  mergeStatus?: string;
+  sourceRefName: string;
+  description?: string;
+  closedDate?: string;
+}
+
+/** The fake repository's web URL, as az prints it for contoso/Fabrikam%20Fiber/lar-api. */
+export const REPO_URL = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api';
+
+/**
+ * A fake az for one Azure Repos repository whose default branch is main at abc123 and holds `files`, with `branches`
+ * besides main, by name and head, and `prs`. Pushes, new branches and PRs change it, and it records each call; `fail`
+ * throws for a call it matches.
+ */
+export function fakeAzRepos({ files = {}, branches = {}, prs = [], fail }: {
+  files?: Record<string, string>;
+  branches?: Record<string, string>;
+  prs?: FakePr[];
+  fail?: (args: string[]) => Error | undefined;
+} = {}) {
+  const calls: string[][] = [];
+  /** Each push's ref and the files its commit adds, read from its --in-file while the file exists. */
+  const pushes: { ref: string; oldObjectId: string; comment: string; files: Record<string, string> }[] = [];
+  /** Each comment thread posted on a PR, by the PR's id. */
+  const comments: { id: number; content: string }[] = [];
+  const heads = new Map(Object.entries({ main: 'abc123', ...branches }));
+  const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
+  const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
+  const show = (pr: FakePr) => JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'lar-api', webUrl: REPO_URL } });
+  const byId = (args: string[]) => {
+    const pr = prs.find((p) => p.pullRequestId === Number(flag(args, '--id')));
+    if (!pr) throw new Error('az repos pr show failed: TF401180: The requested pull request was not found.');
+    return pr;
+  };
+  const run = async (args: string[]) => {
+    calls.push(args);
+    const failure = fail?.(args);
+    if (failure) throw failure;
+    const command = args.slice(0, 3).join(' ');
+    if (args[0] === 'devops' && args[1] === 'invoke') {
+      const resource = `${flag(args, '--area')}/${flag(args, '--resource')}`;
+      if (resource === 'git/items') {
+        const path = route(args, 'path')!;
+        if (!(path in files)) throw new Error(`az devops invoke failed: TF401174: The item ${path} could not be found in the repository.`);
+        return JSON.stringify({ path, content: files[path] });
+      }
+      if (resource === 'git/pushes') {
+        const body = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as {
+          refUpdates: { name: string; oldObjectId: string }[];
+          commits: { comment: string; changes: { item: { path: string }; newContent: { content: string; contentType: string } }[] }[];
+        };
+        const [{ name, oldObjectId }] = body.refUpdates as [{ name: string; oldObjectId: string }];
+        const [commit] = body.commits as [typeof body.commits[number]];
+        pushes.push({ ref: name, oldObjectId, comment: commit.comment,
+          files: Object.fromEntries(commit.changes.map((c) => [c.item.path, Buffer.from(c.newContent.content, 'base64').toString()])) });
+        heads.set(name.replace('refs/heads/', ''), `pushed${pushes.length}`);
+        return JSON.stringify({ pushId: pushes.length });
+      }
+      if (resource === 'git/pullRequestThreads') {
+        const body = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { comments: { content: string }[] };
+        comments.push({ id: Number(route(args, 'pullRequestId')), content: body.comments[0]!.content });
+        return '{}';
+      }
+    }
+    if (command === 'repos show --repository') return JSON.stringify({ name: 'lar-api', defaultBranch: 'refs/heads/main', webUrl: REPO_URL });
+    if (command === 'repos ref list') {
+      // --filter matches the start of each name after refs/.
+      const filter = flag(args, '--filter');
+      return JSON.stringify([...heads].filter(([name]) => `heads/${name}`.startsWith(filter)).map(([name, objectId]) => ({ name: `refs/heads/${name}`, objectId })));
+    }
+    if (command === 'repos ref create') {
+      heads.set(flag(args, '--name').replace('heads/', ''), flag(args, '--object-id'));
+      return '{}';
+    }
+    if (command === 'repos pr list') {
+      const source = `refs/heads/${flag(args, '--source-branch')}`;
+      return JSON.stringify(prs.filter((p) => p.sourceRefName === source && p.status === 'active').map((p) => JSON.parse(show(p)) as unknown));
+    }
+    if (command === 'repos pr create') {
+      const pr: FakePr = { pullRequestId: 100 + prs.length, status: 'active', sourceRefName: `refs/heads/${flag(args, '--source-branch')}` };
+      prs.push(pr);
+      return show(pr);
+    }
+    if (command === 'repos pr show') return show(byId(args));
+    if (command === 'repos pr update') {
+      const pr = byId(args);
+      pr.status = flag(args, '--status') as FakePr['status'];
+      return show(pr);
+    }
+    throw new Error(`fake az: unexpected ${args.join(' ')}`);
+  };
+  return { calls, pushes, comments, heads, prs, run };
+}

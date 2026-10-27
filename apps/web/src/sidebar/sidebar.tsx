@@ -1,7 +1,6 @@
 // The left sidebar, on T3 Code's sidebar component and copied in layout from T3's: the brand T3's gap past the toggle, search with Add item, the
 // List by repository, and T3's footer row with Settings left and the update button right. Above the missing-t3 notice there's no List to
-// search or add to, so only the brand and Settings show. In Settings the section list takes the List's place, hiding
-// the List rather than closing it, so Back finds it as it was. Its right edge is T3's drag handle, with T3's width
+// search or add to, so only the brand and Settings show. Its right edge is T3's drag handle, with T3's width
 // rules (threadSidebarWidth.ts) as T3 Code's apps/web/src/components/AppSidebarLayout.tsx applies them at d53873b.
 
 import { useState, useSyncExternalStore, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
@@ -10,8 +9,7 @@ import { boardApp } from '@lar-factory/shared';
 import { Sidebar as T3Sidebar, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarProvider, SidebarRail, useSidebar } from '@lar-factory/ui/sidebar';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { AddItem } from '../add-item/add-item.tsx';
-import { SettingsButton, SettingsNav } from '../settings/settings.tsx';
-import { useSettingsStore } from '../settings/settings-store.ts';
+import { SettingsButton } from '../settings/settings.tsx';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { ListGroups } from './list-groups.tsx';
@@ -152,33 +150,23 @@ export function SidebarLayout({ className, board, children }: { className?: stri
  *  Below 768 px it is T3's sheet. */
 function Sidebar({ board, resizable, onResetWidth }: { board: boolean; resizable: SidebarResizable; onResetWidth: () => void }) {
   const [query, setQuery] = useState('');
-  const settings = useSettingsStore((state) => state.open);
   const windowControlsInsetStyle = useWindowControlsInsetStyle();
   const { isMobile } = useSidebar();
   return (
     <T3Sidebar collapsible="offcanvas" resizable={resizable} className="sidebar border-(--sidebar-border) text-(--sidebar-foreground)" style={{ ...windowControlsInsetStyle, ...TITLEBAR_CONTENT_LEFT }}>
       <div className="flex h-13 shrink-0 items-center pr-3 pl-[var(--workspace-titlebar-content-left)] [-webkit-app-region:drag]"><Brand /></div>
-      <div className="contents" hidden={settings}>
-        {board ? (
-          <>
-            <div className="px-2 pb-2"><SearchRow query={query} onQuery={setQuery} /></div>
-            <ListGroups query={query.trim().toLowerCase()} />
-          </>
-        ) : <div className="flex-1" />}
-      </div>
-      {settings ? (
+      {board ? (
         <>
-          <SettingsNav />
-          {board && <span className="absolute bottom-2 right-2"><Update /></span>}
+          <div className="px-2 pb-2"><SearchRow query={query} onQuery={setQuery} /></div>
+          <ListGroups query={query.trim().toLowerCase()} />
         </>
-      ) : (
-        <SidebarFooter className="sidebar-foot">
-          <SidebarMenu className="flex-row items-center">
-            <SidebarMenuItem className="shrink-0"><SettingsButton /></SidebarMenuItem>
-            {board && <SidebarMenuItem className="ml-auto shrink-0"><Update /></SidebarMenuItem>}
-          </SidebarMenu>
-        </SidebarFooter>
-      )}
+      ) : <div className="flex-1" />}
+      <SidebarFooter className="sidebar-foot">
+        <SidebarMenu className="flex-row items-center">
+          <SidebarMenuItem className="shrink-0"><SettingsButton /></SidebarMenuItem>
+          {board && <SidebarMenuItem className="ml-auto shrink-0"><Update /></SidebarMenuItem>}
+        </SidebarMenu>
+      </SidebarFooter>
       {/* The sheet below 768 px doesn't resize, so it has no drag handle. */}
       {!isMobile && <SidebarRail onDoubleClick={onResetWidth} />}
     </T3Sidebar>

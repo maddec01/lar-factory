@@ -212,8 +212,8 @@ test('above the missing-t3 notice the bar is empty, and the sidebar keeps the br
   await settle(() => $<HTMLButtonElement>('.sidebar .open-settings')!.click());
   await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Skills')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect($('.tool-missing')!.closest('[hidden]'), 'Settings takes the notice\'s place').not.toBeNull();
-  expect($('.settings-body')!.textContent).toContain('~/.claude');
+  expect($('[role="dialog"] .settings-body')!.textContent, 'Settings opens over the notice').toContain('~/.claude');
+  expect($('.tool-missing')).not.toBeNull();
 });
 
 test('in a browser, the missing-t3 notice\'s sidebar foot holds only Settings', async () => {

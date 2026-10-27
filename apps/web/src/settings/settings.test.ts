@@ -1,4 +1,4 @@
-// The Settings page: the sidebar's section list with search and Back, the breadcrumb over each section's rows, the
+// Settings: the modal with its section list in groups, each section's title and description over its rows, the
 // Claude profiles with their switches and what a change did, the bundled skills with their last updates and install
 // states, the update channel, version and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the profiles and updates show disabled.
@@ -26,20 +26,23 @@ function stubBridge(setResult: ProfilesResult = listed) {
 }
 
 const settingsButton = () => $<HTMLButtonElement>('.open-settings');
+const modal = () => $('[data-slot="modal-content"]');
 const sections = () => $$<HTMLButtonElement>('.settings-nav button');
 const section = (label: string) => sections().find((b) => text(b) === label)!;
-const back = () => [...$$<HTMLButtonElement>('.settings-foot button')].find((b) => text(b) === 'Back')!;
+const close = () => modal()!.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
 const body = () => $('.settings-body')!;
 const row = (id: string) => $(`.settings-row[data-row="${id}"]`)!;
 const switches = () => $$<HTMLButtonElement>('.settings-body [role="switch"]');
 const ticked = (box: Element) => box.getAttribute('aria-checked') === 'true';
 const result = () => $('#settings-result')!;
-const search = () => $<HTMLInputElement>('.sidebar input[aria-label="Search settings"]')!;
+const search = () => $<HTMLInputElement>('.settings-nav input[aria-label="Search settings"]')!;
 
 async function type(input: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
   await settle(() => input.dispatchEvent(new Event('input', { bubbles: true })));
 }
+/** A row's select: lar-server's, a combobox showing its value. */
+const select = (id: string) => row(id).querySelector<HTMLButtonElement>('[role="combobox"]')!;
 
 /** Mounts the page with `data`, opens Settings and shows `label`'s section. */
 async function open(label = 'Skills', data: BoardData = sample): Promise<void> {
@@ -49,23 +52,34 @@ async function open(label = 'Skills', data: BoardData = sample): Promise<void> {
   await settle(() => vi.advanceTimersByTime(50));
 }
 
-test('Settings opens from the sidebar\'s foot, in a browser too, and replaces the List and the title bar', async () => {
+test('Settings opens from the sidebar\'s foot, in a browser too, as a modal over the board with the sections in groups on the left', async () => {
   await mountPage();
   expect(settingsButton()!.getAttribute('aria-label')).toBe('Settings');
   await settle(() => settingsButton()!.click());
-  expect(sections().map(text)).toEqual(['General', 'Appearance', 'Repositories', 'T3 Code', 'Skills', 'Notifications', 'Keybindings', 'Updates', 'Archive', 'Diagnostics']);
+  expect(modal()!.getAttribute('role')).toBe('dialog');
+  expect($$('.settings-nav [role="group"]').map((g) => [g.getAttribute('aria-label'), [...g.querySelectorAll('button')].map(text)])).toEqual([
+    ['Board', ['General', 'Appearance', 'Notifications', 'Keybindings']],
+    ['Connections', ['Repositories', 'T3 Code', 'Skills']],
+    ['App', ['Updates', 'Archive', 'Diagnostics']],
+  ]);
   expect(section('General').getAttribute('aria-current')).toBe('page');
-  expect($('.list-group')!.closest('[hidden]'), 'the List hides').not.toBeNull();
-  expect($('.title-bar')!.closest('[hidden]'), 'the title bar hides').not.toBeNull();
-  expect(text($('.settings-header'))).toBe('Settings›General Restore defaults');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
+  expect(text(modal())).toContain('How the board refreshes, what Start may do on its own, and how the app sits on your Mac.');
   expect($$('.settings-group h3').map(text)).toEqual(['Board', 'Flow limits', 'App']);
+  expect($('.list-group')!.closest('[hidden]'), 'the board stays under it').toBeNull();
+  expect($('.title-bar')).not.toBeNull();
 });
 
-test('a section shows in the breadcrumb and the main area', async () => {
+test('choosing a section shows its title, description and controls on the right', async () => {
   await open('Notifications');
-  expect(text($('.settings-header h1'))).toBe('Notifications');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Notifications');
+  expect(modal()!.getAttribute('aria-label') ?? text($(`#${modal()!.getAttribute('aria-labelledby')}`))).toBe('Settings: Notifications');
+  expect(text(modal())).toContain('Which changes on the board tell you, and when.');
   expect(section('Notifications').getAttribute('aria-current')).toBe('page');
+  expect(section('General').getAttribute('aria-current')).toBeNull();
   expect($$('.settings-group h3').map(text)).toEqual(['Tell me when', 'Delivery']);
+  expect(switches().map((s) => s.getAttribute('aria-label')).slice(0, 2)).toEqual(['An item needs me', 'A build is ready to verify']);
+  expect(select('quiet').textContent).toBe('Follow Focus');
 });
 
 test('search keeps the sections whose name or a row matches, and / focuses it', async () => {
@@ -74,30 +88,61 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
   expect(sections().map(text)).toEqual(['General']);
   await type(search(), 'claude');
   expect(sections().map(text)).toEqual(['Skills']);
+  expect($$('.settings-nav [role="group"]').map((g) => g.getAttribute('aria-label')), 'a group with no match goes').toEqual(['Connections']);
+  await type(search(), '');
+  expect(sections()).toHaveLength(10);
   search().blur();
-  await settle(() => dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true })));
+  await settle(() => modal()!.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true })));
   expect(document.activeElement).toBe(search());
 });
 
-test('Back returns to the board with the sidebar as it was', async () => {
+test('a search that leaves out the open section shows the first one it keeps, and clearing it goes back', async () => {
+  await open('General');
+  await type(search(), 'claude');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Skills');
+  expect(section('Skills').getAttribute('aria-current')).toBe('page');
+  await type(search(), '');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
+  expect(section('General').getAttribute('aria-current')).toBe('page');
+});
+
+test('a search that matches nothing says so in the section list and keeps the open section on the right', async () => {
+  await open('Notifications');
+  await type(search(), 'zzz');
+  expect(sections()).toHaveLength(0);
+  expect(text($('.settings-nav [role="status"]')), 'screen readers announce it').toBe('No settings match.');
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Notifications');
+  await type(search(), '');
+  expect($('.settings-nav .no-match')).toBeNull();
+});
+
+test('Close returns to the board with the sidebar as it was, and Settings opens again on the same section', async () => {
   await mountPage();
   const collapse = $<HTMLButtonElement>('.list-group[data-repo="maddec01/lar-server"] button[aria-expanded]')!;
   await settle(() => collapse.click());
   await settle(() => $<HTMLButtonElement>('.list-group[data-repo="maddec01/lar-apple"] .scope')!.click());
   await settle(() => settingsButton()!.click());
-  await settle(() => back().click());
-  expect($('.settings-nav')).toBeNull();
+  await settle(() => section('Diagnostics').click());
+  await settle(() => close().click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(modal()).toBeNull();
   expect($('.settings-body')).toBeNull();
-  expect($('.list-group')!.closest('[hidden]')).toBeNull();
   expect($('.list-group[data-repo="maddec01/lar-server"] button[aria-expanded]')!.getAttribute('aria-expanded')).toBe('false');
   expect(text($('.title-bar .scope'))).toBe('lar-apple');
+  await settle(() => settingsButton()!.click());
+  expect(section('Diagnostics').getAttribute('aria-current')).toBe('page');
+});
+
+test('the modal takes clicks over the title bar in the board app, rather than dragging the window', async () => {
+  await open('General');
+  const { noDrag } = addStylesheet();
+  expect(noDrag(modal()!)).toBe(true);
+  expect(noDrag($('[data-slot="modal-overlay"]')!)).toBe(true);
 });
 
 test.each([[15, '15 seconds'], [60, '1 minute'], [300, '5 minutes'], [120, '2 minutes']])('Refresh every shows the board\'s %i s as %s', async (seconds, label) => {
   await open('General', { ...sample, refreshSeconds: seconds });
-  const refresh = row('refresh').querySelector('select')!;
-  expect(refresh.value).toBe(label);
-  expect(refresh.selectedOptions[0]!.textContent).toBe(label);
+  expect(select('refresh').textContent).toBe(label);
 });
 
 test('a repository colour named owner/name shows it once; one named by its name shows owner/name under it', async () => {
@@ -114,27 +159,11 @@ test('Refresh every says the board reads each repository\'s items and .lar-facto
 
 test('a row that isn\'t built yet shows the prototype\'s value, disabled, and says so', async () => {
   await open('General');
-  const refresh = row('refresh').querySelector('select')!;
-  expect([refresh.value, refresh.disabled]).toEqual(['45 seconds', true]);
+  expect([select('refresh').textContent, select('refresh').disabled]).toEqual(['45 seconds', true]);
   expect(row('refresh').querySelector('.shown-control')!.getAttribute('title')).toBe('Refresh every isn\'t built yet');
   expect(row('login').querySelector<HTMLButtonElement>('[role="switch"]')!.disabled).toBe(true);
+  expect($$<HTMLButtonElement>('.settings-body [role="radio"]').every((b) => b.disabled)).toBe(true);
   expect($$<HTMLButtonElement>('.settings-body button').every((b) => b.disabled)).toBe(true);
-  const restore = [...$$<HTMLButtonElement>('.settings-header button')].find((b) => text(b).trim() === 'Restore defaults')!;
-  expect([restore.disabled, restore.title]).toEqual([true, 'Restore defaults isn\'t built yet']);
-});
-
-test('with the sidebar hidden, the header starts T3\'s gap past the toggle', async () => {
-  await open('General');
-  expect($('.settings-header')!.className.split(' ')).toContain('pl-4');
-  await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
-  expect($('.settings-header')!.className.split(' ')).toContain('pl-[var(--workspace-titlebar-content-left)]');
-});
-
-test('the header drags the window, but not Restore defaults', async () => {
-  await open('General');
-  const { noDrag } = addStylesheet();
-  expect($('.settings-header')!.className).toContain('[-webkit-app-region:drag]');
-  expect(noDrag($('.settings-header button')!.parentElement!)).toBe(true);
 });
 
 /** Each Settings group's title with its rows' ids. */
@@ -171,7 +200,7 @@ test('a repository with an open Edit PR shows it on its row, with its link, unti
   expect(row(`repo-${sample.repos[0]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
 });
 
-test('each onboarded repository has Edit and Reset, and Add repository opens the onboarding dialog over Settings', async () => {
+test('each onboarded repository has Edit and Reset, and Add repository opens the onboarding dialog in Settings\' place until it closes', async () => {
   serve(sample, [project('lar-web')]);
   await open('Repositories', sample);
   expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
@@ -179,7 +208,10 @@ test('each onboarded repository has Edit and Reset, and Add repository opens the
   await settle(() => $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === ' Add repository')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('T3 project');
-  expect(body().closest('[hidden]'), 'Settings stays open under the dialog').toBeNull();
+  expect(modal(), 'Settings steps aside, so the two dialogs don\'t fight over focus').toBeNull();
+  await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2')), 'and comes back where it was').toBe('Repositories');
 });
 
 test('an Azure DevOps repository still onboarding names its team’s sprint or backlog', async () => {
@@ -540,7 +572,7 @@ test('Skills says Loading until the list arrives, also when opened again', async
   expect(text(body())).not.toContain('Loading…');
   expect(switches().slice(0, 2).map(ticked)).toEqual([true, false]);
 
-  await settle(() => back().click());
+  await settle(() => close().click());
   bridge.listProfiles.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
   await settle(() => settingsButton()!.click());
   expect(section('Skills').getAttribute('aria-current'), 'Settings opens on the section it showed').toBe('page');
@@ -581,11 +613,11 @@ test('open Settings turn the switches on once the launch install finishes', asyn
   expect(bridge.listProfiles).toHaveBeenCalledTimes(3);
 });
 
-test('Back stops reading the profiles', async () => {
+test('Closing Settings stops reading the profiles', async () => {
   const bridge = stubBridge();
   bridge.listProfiles.mockResolvedValue({ ...listed, installed: false });
   await open();
-  await settle(() => back().click());
+  await settle(() => close().click());
   await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS * 3));
   expect(bridge.listProfiles).toHaveBeenCalledOnce();
 });
@@ -619,7 +651,7 @@ describe('updates', () => {
     stubChannel();
     await open('Updates');
     expect($('.settings-body [role="radiogroup"]')!.getAttribute('aria-label')).toBe('Update channel');
-    expect(radios().map((each) => [each.value, text(each)])).toEqual([['nightly', 'Nightly'], ['latest', 'Latest']]);
+    expect(radios().map((each) => [each.value, text(each.labels[0]!)])).toEqual([['nightly', 'Nightly'], ['latest', 'Latest']]);
     expect(checked()).toBe('nightly');
     expect(text(row('version'))).toContain('Lar Factory 0.2.0-nightly.20261023.41');
     expect(status()).toBe('Up to date on 0.2.0-nightly.20261023.41.');

@@ -228,10 +228,13 @@
 }
 
 /* The board's own: T3's dialog popups don't drag the window, but their viewports and backdrops, which cover the
-   title bar, do in the board app. Neither may, so a click over the bar while a dialog is open reaches the page. */
+   title bar, do in the board app. Neither may, so a click over the bar while a dialog is open reaches the page.
+   lar-server's Modal, its overlay and its content, likewise. */
 [data-slot="dialog-viewport"],
 [data-slot="dialog-backdrop"],
 [data-slot="alert-dialog-viewport"],
-[data-slot="alert-dialog-backdrop"] {
+[data-slot="alert-dialog-backdrop"],
+[data-slot="modal-overlay"],
+[data-slot="modal-content"] {
   -webkit-app-region: no-drag;
 }

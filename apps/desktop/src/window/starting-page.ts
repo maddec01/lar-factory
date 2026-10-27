@@ -50,7 +50,7 @@ const script = `(() => {
 /** A data: URL for the starting page, which opens on the first step. */
 export const url = (): string => {
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Lar Factory</title>
+<html lang="en" data-theme="minimal"><head><meta charset="utf-8"><title>Lar Factory</title>
 <style>${css}</style></head>
 <body><main class="loading-lockup" role="status">
 <div class="loading-wordmark"><svg class="loading-mark" viewBox="${BRAND_MARK_VIEWBOX}" aria-hidden="true">

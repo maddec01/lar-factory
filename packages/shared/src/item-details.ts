@@ -36,3 +36,10 @@ export interface ItemDetails {
   /** Where the next 10 older comments start; null when there are none. */
   olderCursor: string | null;
 }
+
+/** One page of older comments, newest first. */
+export interface ItemCommentsPage {
+  comments: ItemComment[];
+  /** Where the next 10 older comments start; null when this page reached the oldest. */
+  olderCursor: string | null;
+}

@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { ITEM_DETAILS_QUERY, readGithubItemDetails } from './github-details.ts';
+import { ITEM_DETAILS_QUERY, OLDER_COMMENTS_QUERY, readGithubItemDetails, readGithubOlderComments } from './github-details.ts';
 import type { Item } from '@lar-factory/shared';
 
 const item = (id: string, content: Item['content'] = 'ticket'): Item => ({ id, content } as Item);
@@ -71,4 +71,32 @@ test('an item GitHub does not know says so, and a failed gh call answers its mes
   assert.deepEqual(await readGithubItemDetails(item('I_gone'), fakeGh(null).run), { status: 404, error: 'GitHub has no such item.' });
   const failing = async () => { throw new Error('gh api graphql failed: HTTP 403: API rate limit exceeded'); };
   assert.deepEqual(await readGithubItemDetails(item('I_4'), failing), { status: 502, error: 'gh api graphql failed: HTTP 403: API rate limit exceeded' });
+});
+
+test('older comments are one graphql call for the 10 before the cursor, newest first, with the next cursor', async () => {
+  const gh = fakeGh({ __typename: 'Issue', comments: { pageInfo: { hasPreviousPage: true, startCursor: 'CUR_0' }, nodes: [comment(1), comment(2, null)] } });
+  assert.deepEqual(await readGithubOlderComments(item('I_5'), 'CUR_1', gh.run), {
+    comments: [
+      { id: 'IC_2', author: 'ghost', createdAt: '2026-10-12T08:00:00Z', body: 'Comment 2', format: 'markdown' },
+      { id: 'IC_1', author: 'maddec01', createdAt: '2026-10-11T08:00:00Z', body: 'Comment 1', format: 'markdown' },
+    ],
+    olderCursor: 'CUR_0',
+  });
+  assert.deepEqual(gh.calls, [['api', 'graphql', '-f', `query=${OLDER_COMMENTS_QUERY}`, '-f', 'id=I_5', '-f', 'before=CUR_1']]);
+  const connections = OLDER_COMMENTS_QUERY.match(/comments\([^)]*\)/g) ?? [];
+  assert.ok(connections.length > 0 && connections.every((c) => c === 'comments(last: 10, before: $before)'));
+});
+
+test('the oldest page of a pull request answers no cursor', async () => {
+  const gh = fakeGh({ __typename: 'PullRequest', comments: { pageInfo: { hasPreviousPage: false, startCursor: 'CUR_0' }, nodes: [comment(1)] } });
+  const page = await readGithubOlderComments(item('PR_2', 'pr'), 'CUR_1', gh.run);
+  assert.ok(!('error' in page));
+  assert.deepEqual([page.comments.map((c) => c.id), page.olderCursor], [['IC_1'], null]);
+});
+
+test('older comments of an item GitHub no longer has or of a failed call answer the error', async () => {
+  assert.deepEqual(await readGithubOlderComments(item('I_gone'), 'CUR_1', fakeGh(null).run), { status: 404, error: 'GitHub has no such item.' });
+  assert.deepEqual(await readGithubOlderComments(item('I_6'), 'CUR_1', fakeGh({ __typename: 'DraftIssue' }).run), { status: 404, error: 'GitHub has no such item.' }, 'a draft has no comments to page');
+  const failing = async () => { throw new Error('gh api graphql failed: HTTP 403'); };
+  assert.deepEqual(await readGithubOlderComments(item('I_7'), 'CUR_1', failing), { status: 502, error: 'gh api graphql failed: HTTP 403' });
 });

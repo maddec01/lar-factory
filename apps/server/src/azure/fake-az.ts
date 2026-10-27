@@ -158,13 +158,20 @@ export interface FakePr {
   closedDate?: string;
 }
 
+/** One change of a push to the fake repository: its type, path and, unless it deletes, its text. */
+interface FakeChange {
+  changeType: string;
+  path: string;
+  content?: string;
+}
+
 /** The fake repository's web URL, as az prints it for contoso/Fabrikam%20Fiber/lar-api. */
 export const REPO_URL = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api';
 
 /**
  * A fake az for one Azure Repos repository whose default branch, `defaultBranch` or main, is at abc123 and holds `files`,
  * with `branches` besides it, by name and head, and `prs`; `canPush` is whether az's login may push to it. Each commit's
- * tree lists `files`, in part when `partialTree`. Pushes, new branches and PRs change it, and it records each call; `fail`
+ * tree lists `files`, in part when `partialTree`. Pushes and PRs change it, and it records each call. A push whose old head is out of date fails, and `fail`
  * throws for a call it matches.
  */
 export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {}, prs = [], canPush = true, partialTree = false, fail }: {
@@ -177,8 +184,8 @@ export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {},
   fail?: (args: string[]) => Error | undefined;
 } = {}) {
   const calls: string[][] = [];
-  /** Each push's ref and the files its commit adds, read from its --in-file while the file exists. */
-  const pushes: { ref: string; oldObjectId: string; comment: string; files: Record<string, string> }[] = [];
+  /** Each push's ref, its commit's parents and message, and each change's type, path and text, read from its --in-file while the file exists. */
+  const pushes: { ref: string; oldObjectId: string; parents: string[]; comment: string; changes: FakeChange[] }[] = [];
   /** Each comment thread posted on a PR, by the PR's id. */
   const comments: { id: number; content: string }[] = [];
   const heads = new Map(Object.entries({ [defaultBranch]: 'abc123', ...branches }));
@@ -218,13 +225,16 @@ export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {},
       if (resource === 'git/pushes') {
         const body = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as {
           refUpdates: { name: string; oldObjectId: string }[];
-          commits: { comment: string; changes: { item: { path: string }; newContent: { content: string; contentType: string } }[] }[];
+          commits: { comment: string; parents: string[]; changes: { changeType: string; item: { path: string }; newContent?: { content: string; contentType: string } }[] }[];
         };
         const [{ name, oldObjectId }] = body.refUpdates as [{ name: string; oldObjectId: string }];
         const [commit] = body.commits as [typeof body.commits[number]];
-        pushes.push({ ref: name, oldObjectId, comment: commit.comment,
-          files: Object.fromEntries(commit.changes.map((c) => [c.item.path, Buffer.from(c.newContent.content, 'base64').toString()])) });
-        heads.set(name.replace('refs/heads/', ''), `pushed${pushes.length}`);
+        // A push names the ref's head as it was, or 40 zeros for a new ref, and Azure refuses it when that is not so.
+        const branch = name.replace('refs/heads/', '');
+        if (oldObjectId !== (heads.get(branch) ?? '0'.repeat(40))) throw new Error(`az devops invoke failed: TF401028: The reference '${name}' has already been updated by another client.`);
+        pushes.push({ ref: name, oldObjectId, parents: commit.parents, comment: commit.comment, changes: commit.changes.map((c) => ({ changeType: c.changeType, path: c.item.path,
+          ...c.newContent && { content: Buffer.from(c.newContent.content, c.newContent.contentType === 'base64encoded' ? 'base64' : 'utf8').toString() } })) });
+        heads.set(branch, `pushed${pushes.length}`);
         return JSON.stringify({ pushId: pushes.length });
       }
       if (resource === 'security/permissions') {
@@ -247,10 +257,6 @@ export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {},
       const filter = flag(args, '--filter');
       return JSON.stringify([...heads].filter(([name]) => `heads/${name}`.startsWith(filter)).map(([name, objectId]) => ({ name: `refs/heads/${name}`, objectId })));
     }
-    if (command === 'repos ref create') {
-      heads.set(flag(args, '--name').replace('heads/', ''), flag(args, '--object-id'));
-      return '{}';
-    }
     if (command === 'repos pr list') {
       const source = `refs/heads/${flag(args, '--source-branch')}`;
       return JSON.stringify(prs.filter((p) => p.sourceRefName === source && p.status === 'active').map((p) => JSON.parse(show(p)) as unknown));
@@ -263,7 +269,10 @@ export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {},
     if (command === 'repos pr show') return show(byId(args));
     if (command === 'repos pr update') {
       const pr = byId(args);
-      pr.status = flag(args, '--status') as FakePr['status'];
+      if (args.includes('--status')) pr.status = flag(args, '--status') as FakePr['status'];
+      // The board passes --description=<text> joined, so a description starting with - is no option.
+      const description = args.find((a) => a.startsWith('--description='));
+      if (description !== undefined) pr.description = description.slice('--description='.length);
       return show(pr);
     }
     throw new Error(`fake az: unexpected ${args.join(' ')}`);

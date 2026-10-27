@@ -1,12 +1,11 @@
-// Onboarding's PR, opened on GitHub without touching any checkout. Its one commit, made with the Git data API on the
-// default branch's head, holds the factory's agent setup, the .lar-factory.json unless the repository's own is reused,
-// and the fixes the Cleanup step picked; gh pr create then opens the PR, whose URL goes in the onboarding's entry. The
-// branch is lar-factory/onboarding; when that is taken, its open PR is reused with the branch moved to the new commit,
-// and with none the first free lar-factory/onboarding-N is used. Each refresh finishes an onboarding whose PR merged,
-// or whose default branch got a .lar-factory.json another way when the PR adds one, closing the PR then, and marks a
-// PR closed without merging, which the Pull request step offers to reopen. On Azure Repos, az reads the default branch,
-// finds the branch, opens the PR, and follows, closes and reopens it; the one commit still goes through gh, so opening
-// one there fails until it gets an az path.
+// Onboarding's PR, opened without touching any checkout. Its one commit, made on the default branch's head, holds the
+// factory's agent setup, the .lar-factory.json unless the repository's own is reused, and the fixes the Cleanup step
+// picked; on GitHub the Git data API makes it and gh pr create opens the PR, on Azure Repos one az push makes it with its
+// branch and az repos pr create opens the PR. The PR's URL goes in the onboarding's entry. The branch is
+// lar-factory/onboarding; when that is taken, its open PR is reused with the branch moved to the new commit and the
+// PR's body replaced, and with none the first free lar-factory/onboarding-N is used. Each refresh finishes an
+// onboarding whose PR merged, or whose default branch got a .lar-factory.json another way when the PR adds one, closing
+// the PR then, and marks a PR closed without merging, which the Pull request step offers to reopen.
 // Reset closes an onboarding's open PR and drops the onboarding from the list; on an onboarded repository it opens the
 // reset PR and marks the entry resetting. Each refresh drops a resetting entry once its reset PR merged or closed unmerged.
 
@@ -54,14 +53,15 @@ function describe(change: OnboardingPrChange): string {
 const prBody = (changes: OnboardingPrChange[]) =>
   `This PR:\n\n${changes.map((change) => `- ${describe(change)}`).join('\n')}\n\nOnboarding finishes on the board once this PR merges.`;
 
-const GITHUB = { branchExists, closePr, commitTree, createBranch, createPr, defaultBranchHead, openPrFrom, prState, readBlob, reopenPr };
+const GITHUB = { branchExists, closePr, commitTree, createPr, defaultBranchHead, editPrBody, openPrFrom, prState, readBlob, reopenPr };
 
 /** The calls that open and follow the repository's PR: az's on Azure DevOps, gh's on GitHub. `run` stands in for that tool. */
 const host = (repo: string): typeof GITHUB => (onAzure(repo) ? AZURE_REPOS : GITHUB);
 
 /**
  * How far opening a repository's PR with one set of answers got, so Retry goes on from the gh or az call that failed;
- * Retry with other answers or picks starts again, so the PR never carries older ones.
+ * Retry with other answers or picks starts again, so the PR never carries older ones. On Azure Repos the push makes no
+ * tree or commit of its own to keep.
  */
 interface Opening {
   key: string;
@@ -161,7 +161,8 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
     const answered = JSON.stringify([config, picks]);
     const opening: Opening = kept?.key === answered ? kept : { key: answered };
     openings.set(key, opening);
-    const { createBranch, createPr, defaultBranchHead } = host(repo);
+    const { createPr, defaultBranchHead, editPrBody } = host(repo);
+    const azure = onAzure(repo);
     try {
       opening.head ??= await defaultBranchHead(repo, run);
       if (!opening.plan) {
@@ -172,17 +173,21 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
         }
         opening.plan = planned;
       }
-      opening.tree ??= await createTree(repo, opening.plan.base, opening.plan.entries, run);
-      opening.commit ??= await createCommit(repo, TITLE, opening.tree, opening.head.sha, run);
+      if (!azure) {
+        opening.tree ??= await createTree(repo, opening.plan.base, opening.plan.entries, run);
+        opening.commit ??= await createCommit(repo, TITLE, opening.tree, opening.head.sha, run);
+      }
       const body = prBody(opening.plan.changes);
       if (!opening.branch) {
         const { branch, prUrl } = await onboardingBranch(repo, run);
+        // On Azure Repos one push makes the commit and makes or moves the branch.
+        if (azure) await AZURE_REPOS.pushCommit(repo, branch, { message: TITLE, parent: opening.head.sha, entries: opening.plan.entries }, run);
         if (prUrl) {
-          await moveBranch(repo, branch, opening.commit, run);
+          if (!azure) await moveBranch(repo, branch, opening.commit!, run);
           await editPrBody(prUrl, body, run);
           opening.url = prUrl;
-        } else {
-          await createBranch(repo, branch, opening.commit, run);
+        } else if (!azure) {
+          await createBranch(repo, branch, opening.commit!, run);
         }
         opening.branch = branch;
       }

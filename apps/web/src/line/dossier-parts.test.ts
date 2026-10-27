@@ -4,7 +4,7 @@
 import { expect, test } from 'vite-plus/test';
 import type { Item } from '@lar-factory/shared';
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
-import { dossiersOf, inDossiers, openWaits, partKind, partsOf } from './dossier-parts.ts';
+import { DECISION_KINDS, dossiersOf, inDossiers, openWaits, partKind, partsOf } from './dossier-parts.ts';
 
 const items = (sampleJson as unknown as { items: Item[] }).items;
 const byNumber = (n: number) => items.find((i) => i.number === n)!;
@@ -31,7 +31,10 @@ test('a dossier shows where its parent or any part is in the scope', () => {
 test('parts run decisions first, research, grill, prototype, then builds, each with its kind from its labels', () => {
   expect(partsOf(byNumber(200), items).map((p) => [p.item.number, p.kind])).toEqual([[203, 'research'], [201, 'grill'], [202, 'prototype'], [140, 'build']]);
   expect(partsOf(byNumber(180), items).map((p) => [p.item.number, p.kind])).toEqual([[181, 'build'], [40, 'build']]);
-  expect(partKind({ ...byNumber(201), labels: ['decision: wayfind'] }), 'an unknown decision builds').toBe('build');
+  expect(partKind({ ...byNumber(201), labels: ['decision-task'] }), 'a task decision is a decision').toBe('task');
+  expect(DECISION_KINDS).toContain('task');
+  expect(partKind({ ...byNumber(201), labels: ['decision-wayfind'] }), 'an unknown decision builds').toBe('build');
+  expect(partKind({ ...byNumber(201), labels: [['decision:', 'grill'].join(' ')] }), 'the old decision label builds').toBe('build');
 });
 
 test("each part carries its blocked-by issues and its newest thread", () => {

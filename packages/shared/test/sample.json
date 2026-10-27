@@ -358,7 +358,7 @@
       "url": "https://github.com/maddec01/lar-server/issues/201",
       "repo": "maddec01/lar-server",
       "labels": [
-        "decision: grill"
+        "decision-grill"
       ],
       "state": "open",
       "closedAs": null,
@@ -450,7 +450,7 @@
       "url": "https://github.com/maddec01/lar-server/issues/202",
       "repo": "maddec01/lar-server",
       "labels": [
-        "decision: prototype"
+        "decision-prototype"
       ],
       "state": "open",
       "closedAs": null,
@@ -1110,7 +1110,7 @@
       "url": "https://github.com/maddec01/lar-server/issues/203",
       "repo": "maddec01/lar-server",
       "labels": [
-        "decision: research"
+        "decision-research"
       ],
       "state": "closed",
       "closedAs": "done",

@@ -5,9 +5,9 @@
 import { blockerRef, decisionType, kindOf, openBlockers } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
-const PART_KINDS = ['research', 'grill', 'prototype', 'build'] as const;
+const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'build'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
-export const DECISION_KINDS: readonly PartKind[] = ['research', 'grill', 'prototype'];
+export const DECISION_KINDS: readonly PartKind[] = ['research', 'grill', 'prototype', 'task'];
 
 export interface Part {
   item: Item;
@@ -34,7 +34,7 @@ export const isDone = (item: Item) => item.status === 'Done' || item.state === '
 const childOf = (child: Item, parent: Item) => child.parent?.number === parent.number && child.parent.repo === parent.repo;
 export const threadsOf = (item: Item): ItemThread[] => (Array.isArray(item.threads) ? item.threads : []);
 
-/** `decision: grill`, `decision: prototype` and `decision: research` are decisions; everything else builds. */
+/** `decision-grill`, `decision-prototype`, `decision-research` and `decision-task` are decisions; everything else builds. */
 export function partKind(item: Item): PartKind {
   const decision = decisionType(item);
   return DECISION_KINDS.find((k) => k === decision) ?? 'build';

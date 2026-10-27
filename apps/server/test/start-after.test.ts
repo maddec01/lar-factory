@@ -89,7 +89,7 @@ test('a start armed under its Project item id, before items were keyed by node i
 });
 
 test("a Queued decision starts with today's Start once its blockers close", async (t) => {
-  const decision = (states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED']) => blockedIssue(20, 'Queued', ['decision: grill'], states);
+  const decision = (states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED']) => blockedIssue(20, 'Queued', ['decision-grill'], states);
   const { board } = await armableBoard(t, [decision(['OPEN', 'OPEN'])]);
   assert.equal((await arm(board, 'I_20')).status, 200);
   await board.update({ items: [decision(['CLOSED', 'CLOSED'])] });

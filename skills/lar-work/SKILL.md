@@ -21,14 +21,17 @@ verifies visible changes and merges every PR; the rest is yours.
   shaping, concept and decision threads, and a fresh thread resuming one after
   a handoff. Build threads get it from `agents/builder.md`.
 - Move the issue's Status on the "lar" board at every step:
-  `bash <this skill>/scripts/status.sh <owner/repo#n> "<Status>"`. Statuses:
+  `bash <this skill>/scripts/status.sh <owner/repo#n> "<Status>"`, or the work
+  item's URL on Azure DevOps. Statuses:
   List, Queued, Shaping, Needs you, Ready, In progress, Review, Verify,
-  Ready to merge. `status.sh` refuses Done: closing the issue makes it Done.
+  Ready to merge. `status.sh` refuses Done: closing the issue, or completing
+  the work item, makes it Done.
 - Facts are yours to find; decisions are the user's. Read code, docs and history
   in **subagents**. Every factory subagent reports in ≤300 words, never whole
   files, logs or screenshots. Ask the user only what a subagent can't answer.
 - **Tools**: `gh issue view <ref> --comments` and `gh issue comment` for
-  issues; `t3_thread_launch` for a handoff thread; a native subagent or a
+  issues, and on Azure DevOps the read and comment commands in
+  [Azure DevOps](issue-tracker.md#azure-devops); `t3_thread_launch` for a handoff thread; a native subagent or a
   `delegate_task` child task per [Orchestration](orchestration.md) for
   delegated work; `AskUserQuestion` for ordinary questions to the user, following
   the [question guide](questions.md). Retro picks and their clarifications
@@ -90,7 +93,8 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
   and returns ≤300 words in `domain-modeling` vocabulary: what exists, where,
   and what the issue would change. It also returns each onboarded repository's **role**:
   `bash <this skill>/scripts/repo-config.sh --list` lists the repositories, and
-  `bash <this skill>/scripts/repo-config.sh <owner/repo>` prints one's config,
+  `bash <this skill>/scripts/repo-config.sh <owner/repo>` (or an Azure
+  repository's origin URL or `<org>/<project>/<repo>`) prints one's config,
   read from its default branch (this checkout may be another repo's).
 
 ## 2. Size up
@@ -107,7 +111,8 @@ map"). Shaping ends at Ready, with the user starting each build from the board.
 
 Add the kind label (`bug`, `feature`, `improvement`, `concept`), first running
 [label setup](issue-tracker.md#label-setup) in the issue's repo if it lacks the
-label. Anything the user adds or corrects is another open question. Then:
+label. On Azure DevOps the kind is a tag, added with `retag`
+([Tags](issue-tracker.md#tags)), and needs no setup. Anything the user adds or corrects is another open question. Then:
 
 - **Bug**: first a **Diagnose subagent** with `diagnosing-bugs` returns the
   cause, the evidence and a failing test to write; its open questions join the
@@ -149,7 +154,10 @@ label. Anything the user adds or corrects is another open question. Then:
 - **Another repository changes** (its role says it serves or uses what this
   item changes): that work becomes a build there, a
   sub-issue of this issue that blocks it (reuse an open issue that covers it),
-  with its own brief and gate. This issue's build starts once that one closes
+  with its own brief and gate. On Azure DevOps it's a child Task tagged
+  `repo-<that repository>` that this item waits for
+  ([Work in another repository](issue-tracker.md#children-and-blockers)).
+  This issue's build starts once that one closes
   (**5. Start the build**). This issue is a build only if its own repository
   changes.
 - **No open questions**: write the brief.
@@ -201,7 +209,7 @@ another issue starts only once that issue closes, by hand or through the
 board's **Start after**. With no repository project for the build's repo,
 Start build stays disabled until the user adds the project in T3. Start build:
 
-1. adds the `build` label, so the board shows the build's sub-issues as slices;
+1. adds the `build` label (a tag on Azure DevOps), so the board shows the build's sub-issues as slices;
 2. sets a parent that isn't a build to In progress, where it stays until a
    build's PR closes it ([Parent closing](issue-tracker.md#parent-closing));
 3. starts the build thread in the build's repository project, in a new

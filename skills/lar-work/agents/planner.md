@@ -15,7 +15,9 @@ scan-and-rewrite pass. Code is out of scope.
   context. Chain slices that touch the same file with blocked-by.
 - Publish each slice with `bash <lar-work>/scripts/slice.sh <owner/repo>
   <build> "<title>" <body-file>`, then add native blocked-by links (**Slices**
-  in `<lar-work>/issue-tracker.md`). Its body,
+  in `<lar-work>/issue-tracker.md`). On Azure DevOps pass the Azure repository
+  and the build's work item URL, and link blockers as predecessors (**Azure
+  slices**). Its body,
   self-contained for an implementer that has seen nothing else: What to build,
   Acceptance criteria, and a short **Where to look** (files or modules to
   start from). A slice editing skills, `AGENTS.md` or `CLAUDE.md` says to load

@@ -8,7 +8,9 @@ slices.
 `<lar-work>` is the folder holding this file's parent. Set a status with
 `bash <lar-work>/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
 name: the ones named here, plus `gh issue view <ref> --comments` and
-`gh issue comment`. Call `orchestrator_capabilities` only when a model must
+`gh issue comment`, or on Azure DevOps the read and comment commands in
+**Azure DevOps** in `<lar-work>/issue-tracker.md`. `status.sh` takes a work
+item's URL there. Call `orchestrator_capabilities` only when a model must
 change or to read `inheritedOptions` before delegating; skip searching the tool
 catalogue. Read each file or skill a step names only when that step runs.
 
@@ -107,7 +109,9 @@ Work in another repository (a planner or implementer `needs <owner/repo>`, a
 failed check or a failed Verify) becomes a build there, and this build carries
 on. Write its short brief per **3. Brief** in `<lar-work>/SKILL.md`, with that
 repository's Domain docs only, as a sub-issue of this build that blocks it
-(reuse an open issue that covers the work); run its **4. Gate** Doubt, set it
+(reuse an open issue that covers the work), or on Azure DevOps a child Task
+tagged `repo-<that repository>` that this build waits for (**Children and
+blockers** in `<lar-work>/issue-tracker.md`); run its **4. Gate** Doubt, set it
 **Ready** and tell the user in chat that it waits for the board's Start build
 (**5. Start the build**). Ask the user only a product question they haven't
 confirmed. A slice holding that work
@@ -160,7 +164,11 @@ reviewer, its round and, for a skip, your recorded reason. It opens the PR and r
 
 Call `watch_pull_request` on the PR; T3 wakes you when checks finish, someone
 comments or the branch conflicts. Fast checks can finish first, so handle them
-now and on every wake: read `gh pr checks <pr> --required`, then:
+now and on every wake: read `gh pr checks <pr> --required`, or on Azure Repos
+`az repos pr policy list --id <pr> --organization <org>`, where each policy
+with `configuration.isBlocking` true is a required check whose `status` is
+`approved` or `notApplicable` when green, `rejected` when failed, and `queued`
+or `running` while it runs. Then:
 
 - **Required checks green**: set the recommended status,
   `unwatch_pull_request`, go to **Retro**.

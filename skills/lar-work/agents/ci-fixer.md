@@ -14,16 +14,23 @@ scan-and-rewrite pass. Code is out of scope.
 
 1. Find the cause:
    - a failing check: `gh pr checks <pr> --required` for its run, then
-     `gh run view <run-id> --log-failed`;
+     `gh run view <run-id> --log-failed`. On Azure Repos the check is a
+     rejected blocking policy in `az repos pr policy list --id <pr> --organization <org>`;
+     a build policy's `context.buildId` is its run. List the run's logs with
+     `az devops invoke --area build --resource logs --route-parameters project=<project> buildId=<id> --organization <org> --api-version 7.1`,
+     and add `logId=<n>` to read one;
    - a merge conflict: `git fetch origin && git rebase origin/main`, resolving
      each conflict for the intent of both sides.
 2. Sort it:
    - **Conventional commits fails on the PR title**: run
-     `gh pr edit <pr> --title "<type(scope): description>"`. No push.
+     `gh pr edit <pr> --title "<type(scope): description>"`, or on Azure Repos
+     `az repos pr update --id <pr> --title "<...>" --organization <org>`. No push.
      Cite other-repo work per `../cross-repo-citations.md`.
    - **Infrastructure**: a runner offline or never picking the job up, network
      or registry errors, or a cancelled run with no newer run for the same
-     head commit (`gh run list --commit <sha>`). A run cancelled because a
+     head commit (`gh run list --commit <sha>`; on Azure,
+     `az pipelines runs list --branch <branch> --project <project> --organization <org>`
+     and match `sourceVersion`). A run cancelled because a
      newer one replaced it is normal `cancel-in-progress`, not a failure.
      Report infrastructure and change nothing.
    - **Code**: fix it test-first where a test can catch it, as a

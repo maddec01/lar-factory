@@ -34,6 +34,13 @@ scan-and-rewrite pass. Code is out of scope.
      build (**Parent closing** in `../issue-tracker.md`) and, for a concept
      map, every decision sub-issue is also closed and its **Fog** is empty;
      then the attribution line the repo's agents use.
+
+   On Azure Repos, open it with `az repos pr create --repository <repo>
+   --source-branch <branch> --target-branch main --title "<title>"
+   --description "$(cat <body-file>)" --work-items <ids> --transition-work-items true
+   --project <project> --organization <org>`. Azure has no `Closes` line:
+   `--work-items` takes the ids the `Closes` rule names, and
+   `--transition-work-items` completes them when the PR merges.
 3. Recommend the status for once required checks pass:
    - **Verify** when the change is visible on screen, the brief says Verify,
      this build merges last for an issue with `build` sub-issues (its Test

@@ -1,7 +1,9 @@
 # Concepts
 
 Run [label setup](issue-tracker.md#label-setup) for the map's repository before
-creating or labelling the map and its sub-issues. For a sub-issue in another
+creating or labelling the map and its sub-issues (GitHub only). On Azure DevOps
+labels are tags and sub-issues are child Tasks: use
+[Azure DevOps](issue-tracker.md#azure-devops) for every write below. For a sub-issue in another
 repository, select that destination explicitly, as the guide shows.
 
 The issue becomes the **map**, labelled `concept`, with this body:
@@ -46,7 +48,8 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
 2. Create a sub-issue for each decision you can phrase now, labelled
    `decision-grill`, `decision-prototype`, `decision-research` or
    `decision-task`, with blocked-by links where one needs another
-   ([native relationship commands](issue-tracker.md#native-relationships)).
+   ([native relationship commands](issue-tracker.md#native-relationships), or
+   [Children and blockers](issue-tracker.md#children-and-blockers) on Azure DevOps).
    Put them in Queued; the rest stays in Fog.
 3. Start each `decision-research` now, in the background, with the `research`
    skill. Findings go on a `research/<n>-<slug>` branch linked from the

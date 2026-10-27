@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, ghBlocksRead, itemSource, type BoardData, type FirstRead, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
@@ -16,6 +16,7 @@ import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { onboardedSources, repoView } from './items/item-sources.ts';
+import type { ReadProgress } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createClashRuns } from './onboarding/clash-runs.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
@@ -60,6 +61,7 @@ const board = createBoardState({
   fetchedAt: null,
   error: settings.problem ?? null,
   items: [],
+  firstRead: { step: 'repositories', running: [], settled: false },
   modelChoices: [],
   bundledSkills: bundledSkills(),
 });
@@ -114,6 +116,7 @@ const items = onboardedSources(async () => {
     }),
     repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list, followProblems),
   });
+  moveFirstRead({ step: 'items' });
   return read;
 });
 /** Each resetting repository's problem following its reset PR on the last read, so a problem that lasts logs once. */
@@ -135,6 +138,31 @@ let toolRetry: NodeJS.Timeout | undefined;
 let toolLog = '';
 /** How often the board looks again while a check fails that retriesTools names. Tests shorten it with BOARD_TOOL_RETRY_MS. */
 const TOOL_RETRY_MS = Number(process.env.BOARD_TOOL_RETRY_MS) || 10_000;
+
+/**
+ * Changes the first read's progress and pushes it at once, so a page names what runs now. A settled first read stays
+ * settled: the polls and reads after it report nothing.
+ */
+function moveFirstRead(change: Partial<FirstRead>): void {
+  const current = board.snapshot().firstRead;
+  if (current.settled) return;
+  board.update({ firstRead: { ...current, ...change } });
+  board.push();
+}
+
+/** Marks each item source of the first read as running while it reads. */
+const firstReadProgress: ReadProgress = {
+  started: (name) => moveFirstRead({ running: [...board.snapshot().firstRead.running, name] }),
+  finished: (name) => {
+    const running = [...board.snapshot().firstRead.running];
+    const at = running.indexOf(name);
+    if (at !== -1) running.splice(at, 1);
+    moveFirstRead({ running });
+  },
+};
+
+/** The first read ends: it read the repositories, failed, or gh blocked it. */
+const settleFirstRead = () => moveFirstRead({ running: [], settled: true });
 
 /** Logs `whenSet` or `whenCleared` each time the condition it's given flips; it starts cleared. */
 function flipLog(whenSet: string, whenCleared: string): (set: boolean) => void {
@@ -249,6 +277,8 @@ async function recheckTools(rereadLoginPath = true, az = false): Promise<void> {
     if (ghError) log(`gh probe failed: ${ghError}`);
   })().finally(() => { checkingTools = null; });
   await checkingTools;
+  // A gh that still blocks the read after a check means the first read never starts.
+  if (ghStopsRead(board.snapshot().tools?.gh)) settleFirstRead();
   board.push();
   if (ghBlocked && !ghStopsRead(board.snapshot().tools?.gh)) readSoon();
 }
@@ -274,7 +304,11 @@ async function refresh(): Promise<void> {
   if (refreshing) return;
   // Before the first tool check there's no gh to read with; that check starts the first read.
   // A gh that blocks the read has its own notice and retries; reading would only fail.
-  if (ghStopsRead(board.snapshot().tools?.gh)) return;
+  if (ghStopsRead(board.snapshot().tools?.gh)) {
+    // Without a check yet it is only too early to read; the check settles the first read if gh blocks it.
+    if (board.snapshot().tools) settleFirstRead();
+    return;
+  }
   refreshing = true;
   readAgain = false;
   let read = false;
@@ -283,11 +317,12 @@ async function refresh(): Promise<void> {
   // The app installs after the board server starts, so each read picks up the latest install's state.
   board.update({ bundledSkills: bundledSkills() });
   try {
-    const snapshot = await items.read();
+    const snapshot = await items.read(firstReadProgress);
     const { error, fetchedAt } = board.snapshot();
     const recovered = error !== null && error !== settings.problem || fetchedAt === null;
     board.applyRead(snapshot.items, readRevision, withT3Reads);
     const repos = items.repos();
+    moveFirstRead({ step: 'finishing' });
     board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: settings.problem ?? null, itemSourceProblems: snapshot.problems ?? [],
       t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
@@ -301,6 +336,7 @@ async function refresh(): Promise<void> {
     if (error) log(`refresh failed, serving data from ${board.snapshot().fetchedAt ?? 'never'}: ${error}`);
   } finally {
     refreshing = false;
+    settleFirstRead();
   }
   board.push();
   // Repositories not answered yet take a gh call each, so the offers follow the read instead of holding it up.
@@ -384,7 +420,7 @@ if (!fixture) board.update({ onboarding: stillOnboarding(onboarded()) });
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).
 if (fixture) {
-  board.update({ ...JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, capture });
+  board.update({ ...JSON.parse(readFileSync(fixture, 'utf8')) as BoardData, capture, firstRead: SETTLED_FIRST_READ });
   offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
 }

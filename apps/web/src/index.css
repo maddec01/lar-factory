@@ -22,6 +22,7 @@
 @source "./items/start-control.tsx";
 @source "./items/status-glyph.tsx";
 @source "./line";
+@source "./list";
 @source "./onboarding";
 @source "./repositories";
 @source "./notices/banner.tsx";

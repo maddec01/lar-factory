@@ -6,7 +6,7 @@ import type { UpdateChannel, UpdateState } from '@lar-factory/shared';
 import { FormResult } from '../notices/form-result.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { canCheckForUpdate, getUpdateDisabledReason } from '../updates/update-button-logic.ts';
-import { SmallButton, Segmented, Switch } from './controls.tsx';
+import { SmallButton, Choice, Switch } from './controls.tsx';
 import { type SettingsResult, profilePath, useSettingsStore } from './settings-store.ts';
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
@@ -74,7 +74,7 @@ export function ChannelChoice() {
   const { switchingTo, setChannel } = useSettingsStore();
   // Busy while the app switches, as the profile ticks, and while it downloads or installs, when it would refuse a switch.
   const busy = !state || switchingTo !== null || installing || state.status === 'downloading';
-  return <Segmented label="Update channel" options={CHANNELS} value={switchingTo ?? state?.channel ?? null} busy={busy}
+  return <Choice label="Update channel" options={CHANNELS} value={switchingTo ?? state?.channel ?? null} busy={busy}
     onChange={(channel) => void setChannel(channel as UpdateChannel)} />;
 }
 

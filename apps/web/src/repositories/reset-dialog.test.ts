@@ -74,8 +74,10 @@ test("a Reset whose PR gh can't close keeps the confirmation open with gh's mess
   await settle(() => button(dialog()!, 'Reset').click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="alert"]'))).toBe(`Can’t resetCan't close ${REPO}'s onboarding PR: HTTP 403: Resource not accessible`);
-  expect(row()).not.toBeNull();
   expect(button(dialog()!, 'Reset').disabled).toBe(false);
+  await settle(() => button(dialog()!, 'Cancel').click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(row(), 'Settings comes back with the row').not.toBeNull();
 });
 
 const ONBOARDED = sample.repos[0]!.repo;
@@ -122,7 +124,9 @@ test("a Reset of an onboarded repository whose PR gh can't open keeps the confir
   await settle(() => button(dialog()!, 'Reset').click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="alert"]'))).toBe(`Can’t resetCan't open ${ONBOARDED}'s reset PR: HTTP 403`);
-  expect(row(ONBOARDED)).not.toBeNull();
+  await settle(() => button(dialog()!, 'Cancel').click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(row(ONBOARDED), 'Settings comes back with the row').not.toBeNull();
 });
 
 test("a Reset that closed the Edit PR but can't open the reset PR drops that Edit PR from the confirmation and the row", async () => {
@@ -135,6 +139,8 @@ test("a Reset that closed the Edit PR but can't open the reset PR drops that Edi
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="alert"]'))).toBe(`Can’t reset${error}`);
   expect(dialog()!.querySelector('[data-closes-edit-pr]')).toBeNull();
+  await settle(() => button(dialog()!, 'Cancel').click());
+  await settle(() => vi.advanceTimersByTime(50));
   expect(row(ONBOARDED)!.querySelector('[data-edit-pr]')).toBeNull();
 });
 

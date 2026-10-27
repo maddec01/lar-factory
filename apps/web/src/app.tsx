@@ -1,8 +1,8 @@
 // The page, the control room: the window controls, the sidebar with the List, and the main area with the title bar,
 // a card for each repository still onboarding, the offers to onboard T3 projects that have a Repository config, the banners, Your desk and the line, scoped to the repository the
 // sidebar picked. While no t3 is found, the notice replaces the main area's content and the sidebar shows only its
-// brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces it. Settings takes the main area's
-// place, hiding the board rather than closing it, so Back finds it as it was. The loading screen covers all of it
+// brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces it. Settings opens as a modal
+// over it all. The loading screen covers all of it
 // until the server's first read has settled.
 
 import { boardSections, failedCheck, inRepo, noneOnboarded } from '@lar-factory/shared';
@@ -22,8 +22,7 @@ import { OnboardingOffers } from './onboarding/onboarding-offers.tsx';
 import { WizardDialog } from './onboarding/wizard-dialog.tsx';
 import { EditDialog } from './repositories/edit-dialog.tsx';
 import { ResetDialog } from './repositories/reset-dialog.tsx';
-import { SettingsMain } from './settings/settings.tsx';
-import { useSettingsStore } from './settings/settings-store.ts';
+import { SettingsDialog } from './settings/settings.tsx';
 import { SidebarLayout } from './sidebar/sidebar.tsx';
 import { useSidebarStore } from './sidebar/sidebar-store.ts';
 import { TitleBar } from './title-bar/title-bar.tsx';
@@ -49,21 +48,18 @@ export function App() {
   const t3 = useBoardStore((state) => failedCheck(state.data.tools, 't3'));
   // T3 Code not running is a banner; only a missing t3 replaces the main area.
   const missing = t3?.result === 'missing' ? t3 : undefined;
-  const settings = useSettingsStore((state) => state.open);
   const empty = useBoardStore((state) => noneOnboarded(state.data));
   return (
     <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)" board={!missing}>
       <main className="flex min-w-0 flex-1 flex-col">
-        <div className="contents" hidden={settings}>
-          <TitleBar />
-          {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
-        </div>
-        {settings && <SettingsMain />}
+        <TitleBar />
+        {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
       </main>
       {/* Outside main, so the announcement sits apart from the page. */}
       <CopyStatus />
       <Toasts />
       <ItemDialog />
+      <SettingsDialog />
       <AbandonDialog />
       <WizardDialog />
       <EditDialog />

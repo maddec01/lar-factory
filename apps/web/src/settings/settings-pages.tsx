@@ -8,7 +8,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, Plus, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
 import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-skills';
-import { Button } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { RepoTag } from '../items/item-parts.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
@@ -29,7 +29,7 @@ interface Row {
   below?: ReactNode;
 }
 export interface Group { title: string; description?: string; rows: Row[]; footer?: ReactNode; note?: ReactNode }
-export interface Page { id: string; label: string; icon: ReactNode; groups: Group[] }
+export interface Page { id: string; label: string; icon: ReactNode; description: string; groups: Group[] }
 
 export interface PagesInput {
   data: BoardData;
@@ -125,20 +125,20 @@ function repositoryGroup(data: BoardData): Group {
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     below: <ConfigUpdateNotice repo={r} />,
     control: custom(() => <span className="flex items-center gap-2">
-      <Button variant="outline" size="xs" onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>
-      <Button variant="outline" size="xs" onClick={() => useResetStore.getState().open(r.repo)}>Reset</Button>
+      <Button variant="secondary" onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>
+      <Button variant="secondary" onClick={() => useResetStore.getState().open(r.repo)}>Reset</Button>
     </span>),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
     id: `repo-${repo}`, title: shownRepo(repo), description: onboardingDescription(progress),
     control: custom(() => <span className="flex items-center gap-2">
-      <Button size="xs" onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>
-      <Button variant="outline" size="xs" onClick={() => useResetStore.getState().open(repo)}>Reset</Button>
+      <Button onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>
+      <Button variant="secondary" onClick={() => useResetStore.getState().open(repo)}>Reset</Button>
     </span>),
   }));
   return { title: 'Repositories', description: 'Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list.',
     rows: [...onboarded, ...onboarding],
-    footer: <Button variant="outline" size="xs" onClick={() => useWizardStore.getState().start()}><Plus /> Add repository</Button> };
+    footer: <Button variant="secondary" onClick={() => useWizardStore.getState().start()}><Plus /> Add repository</Button> };
 }
 
 function profileGroup({ app, profiles }: PagesInput): Group {
@@ -198,7 +198,7 @@ function bundledGroup({ data, version }: PagesInput): Group {
     id: `bundled-${skill.name}`, title: skill.name, description: <>{skill.author} · {skill.licence}{updated(skill)}<BlockedReason status={skill.status} /></>,
     control: custom(() => <span className="flex items-center gap-2">
       <InstallState status={skill.status} />
-      <Button variant="outline" size="xs" aria-label={`${skill.name} source`} render={<a href={skill.source} target="_blank" rel="noopener" />}><ExternalLink /> Source</Button>
+      <a className="inline-flex items-center gap-1 text-xs font-medium text-(--foreground) underline-offset-2 hover:underline [&_svg]:size-3.5" aria-label={`${skill.name} source`} href={skill.source} target="_blank" rel="noopener"><ExternalLink /> Source</a>
     </span>),
   })) : [{ id: 'bundled-unread', title: 'Couldn’t read the bundled skills', description: 'The board server couldn’t read the app’s bundle, so it can’t credit them here.', control: custom(() => null) }];
   return { title: 'Bundled skills', description: 'The skills and checklists the app installs, and who wrote them.', rows };
@@ -209,7 +209,7 @@ function updateRows({ app, version }: PagesInput): Row[] {
   const install: Row = { id: 'auto-install', title: 'Install when I quit', control: { type: 'switch', value: true } };
   if (!app) {
     return [
-      { ...channel, control: { type: 'segmented', options: ['Nightly', 'Latest'], value: 'Nightly' }, reason: ONLY_APP_UPDATES },
+      { ...channel, control: { type: 'radio', options: ['Nightly', 'Latest'], value: 'Nightly' }, reason: ONLY_APP_UPDATES },
       { id: 'version', title: 'Lar Factory 0.1.0-nightly.42', description: 'Up to date · checked 3 minutes ago', control: { type: 'button', label: 'Check now' }, reason: ONLY_APP_UPDATES },
       install,
     ];
@@ -225,11 +225,11 @@ export function pages(input: PagesInput): Page[] {
   const { data } = input;
   const models = ['T3 default', ...data.modelChoices.flatMap((g) => g.models.map((m) => `${g.name} · ${m.label}`))];
   return [
-    { id: 'general', label: 'General', icon: <Settings2 />, groups: [
+    { id: 'general', label: 'General', icon: <Settings2 />, description: 'How the board refreshes, what Start may do on its own, and how the app sits on your Mac.', groups: [
       { title: 'Board', rows: [
         { id: 'refresh', title: 'Refresh every', description: "How often the board reads each repository's items and .lar-factory.json, through gh on GitHub and az on Azure DevOps.", control: refreshEvery(data.refreshSeconds) },
         { id: 'done-window', title: 'Done shows', description: 'Items closed within this window stay on the board.', control: { type: 'select', options: ['3 days', '7 days', '14 days', '30 days'], value: '7 days' } },
-        { id: 'open-in', title: 'Open an item in', control: { type: 'segmented', options: ['GitHub', 'T3 thread', 'Ask'], value: 'T3 thread' } },
+        { id: 'open-in', title: 'Open an item in', control: { type: 'radio', options: ['GitHub', 'T3 thread', 'Ask'], value: 'T3 thread' } },
         { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon closes a GitHub issue as not planned, or moves an Azure DevOps work item to Removed.', control: { type: 'switch', value: true } },
       ] },
       { title: 'Flow limits', description: 'Start holds back when the factory is full, so work lands before more starts.', rows: [
@@ -242,14 +242,14 @@ export function pages(input: PagesInput): Page[] {
         { id: 'menu-bar', title: 'Show in the menu bar', description: 'A lar icon with the Needs you count; click for a quick list.', control: { type: 'switch', value: true } },
         { id: 'dock-badge', title: 'Dock badge', control: { type: 'select', options: ['Needs you count', 'In flight count', 'Off'], value: 'Needs you count' } },
         { id: 'float', title: 'Keep above T3 Code', description: 'Floats the window over T3 Code, like a palette.', control: { type: 'switch', value: false } },
-        { id: 'dock-side', title: 'Dock beside T3 Code', description: 'Snaps the window to T3 Code’s edge and follows it.', control: { type: 'segmented', options: ['Off', 'Left', 'Right'], value: 'Off' } },
+        { id: 'dock-side', title: 'Dock beside T3 Code', description: 'Snaps the window to T3 Code’s edge and follows it.', control: { type: 'radio', options: ['Off', 'Left', 'Right'], value: 'Off' } },
       ] },
     ] },
-    { id: 'appearance', label: 'Appearance', icon: <Palette />, groups: [
+    { id: 'appearance', label: 'Appearance', icon: <Palette />, description: 'The board’s theme, density and what each item shows.', groups: [
       { title: 'Theme', rows: [
-        { id: 'scheme', title: 'Color scheme', control: { type: 'segmented', options: ['System', 'Light', 'Dark'], value: 'System' } },
+        { id: 'scheme', title: 'Color scheme', control: { type: 'radio', options: ['System', 'Light', 'Dark'], value: 'System' } },
         { id: 'follow-t3', title: 'Follow T3 Code’s theme', description: 'Reads T3 Code’s theme, contrast and glass opacity, so the two windows match.', control: { type: 'switch', value: true } },
-        { id: 'density', title: 'Density', control: { type: 'segmented', options: ['Comfortable', 'Compact'], value: 'Comfortable' } },
+        { id: 'density', title: 'Density', control: { type: 'radio', options: ['Comfortable', 'Compact'], value: 'Comfortable' } },
         { id: 'font-size', title: 'Interface font size', control: { type: 'number', value: 13, suffix: 'px' } },
       ] },
       { title: 'Items show', rows: [
@@ -262,7 +262,7 @@ export function pages(input: PagesInput): Page[] {
         // A title that already is owner/name needs no line repeating it.
         description: repoName(r.repo, data.repos) === r.repo ? undefined : r.repo, control: custom(() => <RepoTag repo={r.repo} repos={data.repos} />) })) },
     ] },
-    { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, groups: [
+    { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, description: 'The repositories the board reads, and the command line logins it reads them through.', groups: [
       { title: 'Command line tools', description: 'The board reads each provider through your own login and never stores a token.', rows: [
         { id: 'gh', title: 'GitHub CLI', description: toolDescription('gh, for repositories on GitHub.', data.tools?.gh),
           control: custom(() => <ToolState {...toolState(data.tools?.gh, true)} />) },
@@ -271,24 +271,24 @@ export function pages(input: PagesInput): Page[] {
       ] },
       repositoryGroup(data),
     ] },
-    { id: 't3', label: 'T3 Code', icon: <Plug />, groups: [
+    { id: 't3', label: 'T3 Code', icon: <Plug />, description: 'How the board reads T3 Code, and what Start opens there.', groups: [
       { title: 'Connection', rows: [
         { id: 't3-app', title: 'T3 Code (Nightly)', description: '~/.t3/userdata · read for thread stats and the model list', control: { type: 'status', text: 'Connected', tone: 'success' } },
         { id: 't3-stats', title: 'Read thread stats', description: 'Agent time, tokens and cost on each item.', control: { type: 'switch', value: true } },
       ] },
       { title: 'Start', description: 'What Start does when it opens a lar-work thread.', rows: [
         { id: 'model', title: 'Default model', control: { type: 'select', options: models, value: 'T3 default' } },
-        { id: 'workspace', title: 'Workspace', control: { type: 'segmented', options: ['New worktree', 'Local checkout'], value: 'New worktree' } },
+        { id: 'workspace', title: 'Workspace', control: { type: 'radio', options: ['New worktree', 'Local checkout'], value: 'New worktree' } },
         { id: 'base', title: 'Base branch', control: { type: 'text', value: 'main', mono: true } },
         { id: 'title', title: 'Thread title', control: { type: 'text', value: '{ref} {title}', mono: true } },
         { id: 'switch-after', title: 'Switch to T3 Code after Start', control: { type: 'switch', value: true } },
       ] },
     ] },
-    { id: 'skills', label: 'Skills', icon: <Sparkles />, groups: [
+    { id: 'skills', label: 'Skills', icon: <Sparkles />, description: 'The skills and checklists Lar Factory installs, and the Claude profiles that get them.', groups: [
       profileGroup(input),
       bundledGroup(input),
     ] },
-    { id: 'notifications', label: 'Notifications', icon: <Bell />, groups: [
+    { id: 'notifications', label: 'Notifications', icon: <Bell />, description: 'Which changes on the board tell you, and when.', groups: [
       { title: 'Tell me when', rows: [
         { id: 'n-needs-you', title: 'An item needs me', control: { type: 'switch', value: true } },
         { id: 'n-verify', title: 'A build is ready to verify', control: { type: 'switch', value: true } },
@@ -302,22 +302,22 @@ export function pages(input: PagesInput): Page[] {
         { id: 'sound', title: 'Sound', control: { type: 'select', options: ['None', 'Glass', 'Tink', 'Pop'], value: 'Glass' } },
       ] },
     ] },
-    { id: 'keybindings', label: 'Keybindings', icon: <Keyboard />, groups: [
+    { id: 'keybindings', label: 'Keybindings', icon: <Keyboard />, description: 'The board’s keyboard shortcuts.', groups: [
       { title: 'Keybindings', rows: ([
         ['Add item', ['⌘', 'N']], ['Search items', ['⌘', 'K']], ['Refresh', ['⌘', 'R']], ['Next item', ['J']], ['Previous item', ['K']],
         ['Start in T3 Code', ['⌘', '↵']], ['Queue', ['Q']], ['Open on GitHub', ['⌘', 'O']], ['Switch to T3 Code', ['⌘', '⇧', 'T']], ['Settings', ['⌘', ',']],
       ] as [string, string[]][]).map(([t, k]) => ({ id: `kb-${t}`, title: t, control: { type: 'kbd', keys: k } })) },
     ] },
-    { id: 'updates', label: 'Updates', icon: <RefreshCw />, groups: [
+    { id: 'updates', label: 'Updates', icon: <RefreshCw />, description: 'Which Releases Lar Factory offers, and when it installs them.', groups: [
       { title: 'Updates', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) },
     ] },
-    { id: 'archive', label: 'Archive', icon: <Archive />, groups: [
+    { id: 'archive', label: 'Archive', icon: <Archive />, description: 'Items abandoned from the board, which you can restore.', groups: [
       { title: 'Abandoned', description: 'Items closed as not planned from the board, last 30 days.', rows: [
         { id: 'ab-1', title: '#88 Bonjour discovery fallback', description: 'Server · abandoned 4 days ago', control: { type: 'button', label: 'Restore' }, reason: notBuilt('Restore') },
         { id: 'ab-2', title: '#41 Picture-in-picture on iPad', description: 'Apple · abandoned 12 days ago', control: { type: 'button', label: 'Restore' }, reason: notBuilt('Restore') },
       ] },
     ] },
-    { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, groups: [
+    { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, description: 'The commands the board runs, and its server.', groups: [
       { title: 'Tools', rows: [
         ...DIAGNOSED.map(([name, does]): Row => ({
           id: `d-${name}`, title: name, description: toolDescription(does, data.tools?.[name]), control: custom(() => <ToolState {...toolState(data.tools?.[name])} />),

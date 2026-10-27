@@ -166,6 +166,14 @@ const main = async () => {
     }
     return output({ name: labelPath[2] });
   }
+  if (args[0] === 'label' && args[1] === 'list') return output((options.repoLabels?.[args[args.indexOf('-R') + 1]] ?? []).map((name) => ({ name })));
+  if (args[0] === 'label' && args[1] === 'edit') {
+    const repo = args[args.indexOf('--repo') + 1];
+    const to = args[args.indexOf('--name') + 1];
+    options.repoLabels = { ...options.repoLabels, [repo]: (options.repoLabels?.[repo] ?? []).map((name) => name === args[2] ? to : name) };
+    fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    return;
+  }
   if (args[0] === 'label' && args[1] === 'create') {
     if (options.fail === 'label-create') {
       process.stderr.write('HTTP 403: Must have admin rights to Repository.');

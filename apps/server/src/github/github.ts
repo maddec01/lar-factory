@@ -353,6 +353,23 @@ export async function createStatusLabel(repo: string, status: Exclude<Status, 'D
   }
 }
 
+/** The names of every label a repository has. */
+export async function listLabels(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<string[]> {
+  const labels = JSON.parse(await run(['label', 'list', '-R', repo, '--limit', '1000', '--json', 'name'])) as { name: string }[];
+  return labels.map((l) => l.name);
+}
+
+/** Creates a label in a repository with its colour and description. */
+export async function createLabel(repo: string, label: { name: string; color: string; description: string },
+  run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  await run(['label', 'create', label.name, '-R', repo, '--color', label.color, '--description', label.description]);
+}
+
+/** Renames a repository's label; every issue that carries it keeps it under the new name. */
+export async function renameLabel(repo: string, from: string, to: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  await run(['label', 'edit', from, '--name', to, '--repo', repo]);
+}
+
 /** Swaps the status labels an issue carries for `status`'s in one edit; returns the error, or null when GitHub accepted it. */
 export async function setStatusLabel(repo: string, number: number, status: Exclude<Status, 'Done'>, carried: readonly Status[],
   run: (args: string[]) => Promise<string> = gh): Promise<string | null> {

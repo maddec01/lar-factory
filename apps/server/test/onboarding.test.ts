@@ -190,9 +190,23 @@ test("onboarding's Clash agent runs on a fresh fetch of origin's default branch,
   assert.equal(bad.status, 400);
 });
 
-test('the sample board runs no onboarding check, finds no Clash, runs no Clash agent', async (t) => {
+test("the Labels step reads a repository's labels, creates the missing workflow labels and renames an old one", async (t) => {
+  const board = await startBoard(t, { repoLabels: { 'maddec01/lar-web': ['bug', 'decision: grill', 'needs-triage'] } } as object);
+  const labels = async (path: string, body: object = {}) => {
+    const response = await board.post({ repo: 'maddec01/lar-web', ...body }, board.url, path);
+    return [response.status, (await response.json() as { labels: string[] }).labels] as const;
+  };
+  assert.deepEqual(await labels('/api/onboarding/labels'), [200, ['bug', 'decision: grill', 'needs-triage']]);
+  const [status, created] = await labels('/api/onboarding/labels/create', { itemSource: { kind: 'issues' }, renaming: ['decision: grill'] });
+  assert.equal(status, 200);
+  assert.ok(created!.includes('blocked') && created!.includes('status-list') && !created!.includes('decision-grill'));
+  const [, renamed] = await labels('/api/onboarding/labels/rename', { names: ['decision: grill'] });
+  assert.ok(renamed!.includes('decision-grill') && !renamed!.includes('decision: grill') && renamed!.includes('needs-triage'));
+});
+
+test('the sample board runs no onboarding check, finds no Clash, runs no Clash agent and touches no label', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs']) {
+  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs', '/api/onboarding/labels', '/api/onboarding/labels/create', '/api/onboarding/labels/rename']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }

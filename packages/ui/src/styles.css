@@ -14,6 +14,7 @@
 @source "./dialog";
 @source "./form";
 @source "./progress";
+@source "./rich-text";
 
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;

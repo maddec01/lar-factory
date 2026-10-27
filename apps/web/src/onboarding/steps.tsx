@@ -298,7 +298,7 @@ type CheckStatus = 'waiting' | 'running' | 'passed' | 'failed';
 function StatusIcon({ status }: { status: CheckStatus }) {
   switch (status) {
     case 'passed': return <span className="grid size-5 shrink-0 place-items-center rounded-full bg-success/16 text-success"><Check className="size-3.5" /></span>;
-    case 'failed': return <span className="grid size-5 shrink-0 place-items-center rounded-full bg-destructive/16 text-destructive"><X className="size-3.5" /></span>;
+    case 'failed': return <span className="grid size-5 shrink-0 place-items-center rounded-full bg-danger/16 text-danger"><X className="size-3.5" /></span>;
     case 'running': return <LoaderCircle className="size-5 shrink-0 animate-spin text-info" />;
     default: return <span className="size-5 shrink-0 rounded-full border border-dashed" />;
   }
@@ -332,7 +332,7 @@ function CheckList({ title, rows }: { title: string; rows: CheckRow[] }) {
             </div>
             {row.status === 'failed' && (
               <Alert tone="danger" title={row.problem} action={row.retry && <Button variant="secondary" onClick={row.retry} leftIcon={<RotateCw />}>Retry</Button>}><span>{row.fix}</span>
-                  {row.command && <span className="flex items-center gap-2"><code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{row.command}</code>
+                  {row.command && <span className="flex items-center gap-2"><code className="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs">{row.command}</code>
                     <CopyButton text={row.command} label={`Copy ${row.command}`} /></span>}
                 </Alert>
             )}
@@ -391,10 +391,10 @@ function ChecksStep({ run }: { run: Run }) {
 function EditPreview({ clash }: { clash: Clash }) {
   const { edit } = clash;
   return (
-    <pre data-edit-preview className={`m-0 ml-7 overflow-x-auto rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs ${clash.wontApply ? 'opacity-60' : ''}`}>
+    <pre data-edit-preview className={`m-0 ml-7 overflow-x-auto rounded-md bg-base-200 px-2.5 py-1.5 font-mono text-xs ${clash.wontApply ? 'opacity-60' : ''}`}>
       {edit.kind === 'lines' ? (<>
         {edit.remove.map((line, i) => <div key={`-${i}`} className="text-(--lar-danger-text)">- {line}</div>)}
-        {edit.add.map((line, i) => <div key={`+${i}`} className="text-success-foreground">+ {line}</div>)}
+        {edit.add.map((line, i) => <div key={`+${i}`} className="text-(--lar-success-text)">+ {line}</div>)}
       </>) : edit.kind === 'delete' ? <div className="text-(--lar-danger-text)">Delete {clash.file}</div>
         : <div>Rename {clash.file} to {edit.to}</div>}
     </pre>
@@ -435,7 +435,7 @@ function SkillClashPick({ skill, picks, clashes }: { skill: SkillClash; picks: R
           <div data-skill-pick="rename"><RadioGroupItem value="rename" label="Rename it" /></div>
         </RadioGroup>
         {pick?.kind === 'rename' && (
-          <div className="mt-1 w-full text-foreground">
+          <div className="mt-1 w-full text-base-content">
             <Field name="skill-name" label="New skill name" problem={problem ?? undefined} invalid={typed}
               hint={<>The PR moves it to <span className="font-mono">{skillsDir(skill.path)}{isSkillName(name) ? name : '…'}/</span> and sets <span className="font-mono">name:</span> in its SKILL.md.</>}>
               {(described) => <Input className="font-mono" value={name} {...described} onBlur={() => setTyped(true)}
@@ -595,7 +595,7 @@ function AlwaysWritten({ reused, azure }: { reused: boolean; azure: boolean }) {
   return (
     <div data-always-written className="grid gap-1">
       <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">Always written</h4>
-      <ul className="m-0 grid list-none gap-1 rounded-lg border bg-muted/40 p-3 text-sm">
+      <ul className="m-0 grid list-none gap-1 rounded-lg border bg-base-200/40 p-3 text-sm">
         {rows.map((row) => (
           <li key={row.file} data-written={row.file} className="flex items-start gap-2"><Lock className="mt-0.5 size-3 shrink-0 text-base-700" />
             <PathAndWhat path={row.file} what={row.what} /></li>
@@ -706,7 +706,7 @@ function PrStep({ run }: { run: Run }) {
         <p className="m-0 text-xs text-base-700">Its one commit is made on {project.provider} from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
         {listed && (<>
           <PrChangeList />
-          {!project.config && <pre className="m-0 overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>}
+          {!project.config && <pre className="m-0 overflow-x-auto rounded-lg border bg-base-200/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>}
         </>)}
       </div>
       {run.prUrl && prClosed(run, data) ? (

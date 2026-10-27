@@ -51,7 +51,7 @@ export function Field({ name, label, hint, problem, invalid = false, children }:
 export function Group({ legend, hint, children }: { legend: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <Fieldset unstyled className="grid gap-2">
-      <FieldsetLegend className="mb-0 font-medium">{legend}</FieldsetLegend>
+      <FieldsetLegend>{legend}</FieldsetLegend>
       {hint && <p className="m-0 -mt-1 text-xs text-base-700">{hint}</p>}
       {children}
     </Fieldset>

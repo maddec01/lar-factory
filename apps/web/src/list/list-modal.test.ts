@@ -3,13 +3,6 @@
 
 import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, moved, mountPage, push, sample, settle, text } from '../../test/support.ts';
-
-// jsdom has no ResizeObserver, which the copied Modal's scroll fade observes with, and with one Base UI's scroll
-// areas (in the item dialog) call getAnimations, which jsdom lacks too.
-beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
-  Element.prototype.getAnimations = () => [];
-});
 afterEach(() => {
   delete (Element.prototype as Partial<Element>).getAnimations;
 });

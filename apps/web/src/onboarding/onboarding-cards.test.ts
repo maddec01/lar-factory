@@ -1,4 +1,4 @@
-// The board's card for each repository still onboarding, whose Resume reopens the dialog where it stopped.
+// The board's card for each repository still onboarding, titled with its name, whose Resume reopens the dialog where it stopped.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, mountPage, sample, settle, text, toast } from '../../test/support.ts';
@@ -12,15 +12,13 @@ const card = () => $('[data-onboarding-card="maddec01/lar-web"]');
 
 async function resume(): Promise<void> {
   await settle(() => card()!.querySelector<HTMLButtonElement>('[data-resume]')!.click());
-  // Base UI moves focus on the next frame.
-  await settle(() => vi.advanceTimersByTime(50));
 }
 
 test('a repository still onboarding shows its card with its step instead of the empty state', async () => {
   serve(waiting(empty), []);
   await mountPage(waiting(empty));
   expect($('[data-empty-state]')).toBeNull();
-  expect(text(card()!.querySelector('[data-repo]'))).toBe('maddec01/lar-web');
+  expect(text(card()!.querySelector('h2'))).toBe('maddec01/lar-web');
   expect(text(card())).toContain('Onboarding');
   expect(text(card())).toContain('Stopped at Provider and item source');
   expect(text(card()!.querySelector('[data-resume]'))).toBe('Resume');
@@ -41,7 +39,7 @@ test("an Azure DevOps repository's card shows its name decoded, and its Labels s
   serve(data, []);
   await mountPage(data);
   const azure = $(`[data-onboarding-card="${repo}"]`)!;
-  expect(text(azure.querySelector('[data-repo]'))).toBe('contoso/Fabrikam Fiber/lar-api');
+  expect(text(azure.querySelector('h2'))).toBe('contoso/Fabrikam Fiber/lar-api');
   expect(text(azure)).toContain('Stopped at Tags');
 });
 

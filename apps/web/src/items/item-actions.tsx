@@ -54,7 +54,7 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
   return <>
     <Button variant="destructive-quiet" className="link-action disabled:pointer-events-auto" data-abandon={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
       {...state} onClick={() => askAbandon(item.id)}>{verb}</Button>
-    {refusal && <span id={reason} className="text-muted-foreground" data-abandon-refusal>{refusal}</span>}
+    {refusal && <span id={reason} className="text-base-700" data-abandon-refusal>{refusal}</span>}
   </>;
 }
 

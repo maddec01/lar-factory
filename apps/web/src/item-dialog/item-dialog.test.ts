@@ -38,7 +38,7 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   expect(text(slices.querySelector('h2'))).toBe('Slices 1/3 done');
   expect([...slices.querySelectorAll('li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
   expect(text(inDialog('section:last-of-type'))).toBe('Agent workNo T3 thread has worked on this yet.');
-  expect(text(inDialog('[data-slot="dialog-panel"] > p'))).toBe('build');
+  expect(text(inDialog('[data-labels]'))).toBe('build');
 });
 
 test('the dialog of an untagged item two repositories read tags it with both', async () => {

@@ -6,11 +6,26 @@ import { join } from 'node:path';
 import { act } from 'react';
 import { afterEach, beforeAll, beforeEach, vi } from 'vite-plus/test';
 import { pageWithData } from '@lar-factory/shared';
-import type { BoardData, BoardAppBridge, Status, ToolChecks, UpdateState } from '@lar-factory/shared';
+import type { BoardData, BoardAppBridge, ItemDetails, Status, ToolChecks, UpdateState } from '@lar-factory/shared';
 import template from '../index.html?raw';
 import sampleJson from '@lar-factory/shared/test/sample.json' with { type: 'json' };
+import sampleDetailsJson from '@lar-factory/shared/test/sample-details.json' with { type: 'json' };
 
 export const sample = sampleJson as unknown as BoardData;
+/** The details sample mode serves, by item id. */
+const sampleDetails = sampleDetailsJson as unknown as Record<string, ItemDetails>;
+/** The details of an item the sample holds none for. */
+const noDetails: ItemDetails = { body: '', format: 'markdown', author: null, assignees: [], createdAt: null, subTickets: [], comments: [], hasOlderComments: false, olderCursor: null };
+
+/** Whether a request is the item dialog's read of an item's details, and which item's. */
+export const detailsRead = (url: string): string | null => (url.startsWith('/api/item-details') ? new URL(url, 'http://board').searchParams.get('itemId') : null);
+/** The board's answer to the read of `itemId`'s details: the sample's, or none. */
+export const detailsReply = (itemId: string): Response => new Response(JSON.stringify({ details: sampleDetails[itemId] ?? noDetails }));
+/** The board's answer to a read the page makes without a test's say: the item's details, else the sample board. */
+const answerRead = (url: string): Response => {
+  const itemId = detailsRead(url);
+  return itemId ? detailsReply(itemId) : new Response(JSON.stringify(sample));
+};
 
 /** Every command check passing, with the ones given in its place. */
 export const toolChecks = (checks: Partial<ToolChecks> = {}): ToolChecks => ({
@@ -35,7 +50,7 @@ class FakeEventSource extends EventTarget {
 }
 
 export const stream = () => FakeEventSource.current!;
-export const fetchMock = vi.fn(async (_url: string) => new Response(JSON.stringify(sample)));
+export const fetchMock = vi.fn(async (url: string) => answerRead(url));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -76,7 +91,7 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const [target, type, listener, options] of pageListeners.splice(0)) target.removeEventListener(type, listener, options);
-  fetchMock.mockImplementation(async () => new Response(JSON.stringify(sample)));
+  fetchMock.mockImplementation(async (url: string) => answerRead(url));
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -118,6 +133,8 @@ let answerPost: ((body: object, status?: number) => Promise<void>) | undefined;
 export function holdPosts(board: BoardData = sample): void {
   fetchMock.mockImplementation(async (url: string) => {
     if (url === '/api/board') return new Response(JSON.stringify(board));
+    const itemId = detailsRead(url);
+    if (itemId) return detailsReply(itemId);
     return new Promise<Response>((resolve) => {
       answerPost = (body, status = 200) => settle(() => resolve(new Response(JSON.stringify(body), { status })));
     });
@@ -126,7 +143,7 @@ export function holdPosts(board: BoardData = sample): void {
 /** Answers the POST in flight with `body`. */
 export const answer = (body: object, status?: number) => answerPost!(body, status);
 /** Each request but the board reads, as its path and parsed body. */
-export const posted = () => fetchMock.mock.calls.filter(([url]) => url !== '/api/board').map((call) => {
+export const posted = () => fetchMock.mock.calls.filter(([url]) => url !== '/api/board' && !detailsRead(url)).map((call) => {
   const [url, init] = call as unknown as [string, RequestInit | undefined];
   return [url, init?.body && JSON.parse(init.body as string)];
 });

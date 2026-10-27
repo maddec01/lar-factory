@@ -1,6 +1,8 @@
-// The item dialog: every item, wherever it's listed, opens here over the page. It shows the item's repository,
-// status, track, hint, slices, pull requests, agent work and labels. Its footer has GitHub, or Azure DevOps for a work
-// item, and the one action the item's status asks for, with Back to List and Abandon at its left.
+// The item dialog: every item, wherever it's listed, opens here over the page, as a wide modal. It shows the item's
+// repository, status, track and hint, then its description and comments beside a sidebar of people, labels, dates,
+// milestone or iteration and area, sub-tickets, slices, pull requests and agent work. The board's fields show at once;
+// the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work item,
+// and the one action the item's status asks for, with Back to List and Abandon at its left.
 
 import { useEffect, useRef } from 'react';
 import { ExternalLink, Play } from 'lucide-react';
@@ -17,7 +19,9 @@ import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
+import { ItemFields, ItemText } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
+import { useItemDetails } from './use-item-details.ts';
 
 /** The one thing the item's status asks of you; an item carrying more than one status asks you to keep one. */
 function StatusAction({ item, data }: { item: Item; data: BoardData }) {
@@ -48,7 +52,8 @@ function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   return <>{!carriesTwoStatuses(item) && <BackToListButton item={item} data={data} />}<AbandonButton item={item} data={data} /></>;
 }
 
-function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now: number }) {
+function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData; now: number; open: boolean }) {
+  const read = useItemDetails(item.id, open);
   const hint = carriesTwoStatuses(item) ? keepOneText(item.statuses) : HINTS[item.status];
   return (
     <>
@@ -69,15 +74,20 @@ function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now:
             <span className="flex-1 font-medium text-(--warning-foreground)">{hint}</span>
           </div>
         )}
-        {item.slices.length > 0 && (
-          <section className="grid gap-2">
-            <h2 className="m-0 text-[13px] font-medium">Slices <span className="text-(--muted-foreground)">{item.slices.filter((s) => s.progress === 'done').length}/{item.slices.length} done</span></h2>
-            <SliceList item={item} />
-          </section>
-        )}
-        {item.linkedPrs.length > 0 && <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Pull requests</h2><PrList item={item} /></section>}
-        <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Agent work</h2><StatsGrid item={item} /></section>
-        {item.labels.length > 0 && <p className="m-0 flex flex-wrap gap-1">{item.labels.map((l) => <span key={l} className="rounded-(--radius-sm) border border-(--input) px-1.5 text-[11px] text-(--muted-foreground)">{l}</span>)}</p>}
+        <div className="grid min-w-0 gap-8 md:grid-cols-[minmax(0,1fr)_15rem]">
+          <article className="grid min-w-0 content-start gap-6"><ItemText read={read} now={now} /></article>
+          <aside className="grid min-w-0 content-start gap-5 md:border-l md:border-(--border) md:pl-6">
+            <ItemFields item={item} read={read} now={now} />
+            {item.slices.length > 0 && (
+              <section className="grid gap-2">
+                <h2 className="m-0 text-[13px] font-medium">Slices <span className="text-(--muted-foreground)">{item.slices.filter((s) => s.progress === 'done').length}/{item.slices.length} done</span></h2>
+                <SliceList item={item} />
+              </section>
+            )}
+            {item.linkedPrs.length > 0 && <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Pull requests</h2><PrList item={item} /></section>}
+            <section className="grid gap-2"><h2 className="m-0 text-[13px] font-medium">Agent work</h2><StatsGrid item={item} /></section>
+          </aside>
+        </div>
         <ActionError item={item} />
         <StartMessage item={item} kind={item.status === 'Ready' ? 'build' : 'refine'} />
         <StartAfterError item={item} data={data} />
@@ -107,8 +117,8 @@ export function ItemDialog() {
   const item = kept.current;
   return (
     <Dialog open={Boolean(opened)} onOpenChange={(open) => !open && close()}>
-      <DialogPopup className="max-w-2xl" data-item-dialog>
-        {item && <ItemDialogBody item={item} data={data} now={now} />}
+      <DialogPopup className="h-[88vh] max-w-5xl" data-item-dialog>
+        {item && <ItemDialogBody item={item} data={data} now={now} open={Boolean(opened)} />}
       </DialogPopup>
     </Dialog>
   );

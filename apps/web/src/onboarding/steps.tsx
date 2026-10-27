@@ -1,12 +1,17 @@
 // The body of each onboarding step, which the dialog shows one at a time. Each field sits on its own row with its
-// label and one line of help. The Pull request step opens the PR that adds .lar-factory.json, then waits for its merge.
+// label and one line of help. The Cleanup step lists each Clash the fixed checks find, with its edit to tick, and asks
+// Delete or Rename for each project skill named like a bundled skill. The Pull request step opens the PR that adds .lar-factory.json, then waits for its merge.
 
 import { useId, useState, type ReactNode } from 'react';
-import { Check, CircleAlert, FolderPlus, GitPullRequest, Info, LoaderCircle, RotateCw, X } from 'lucide-react';
-import { SETUP_CHECKS, isOnboarding, onboardingConfigFile, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting } from '@lar-factory/shared';
+import { Check, CircleAlert, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, X } from 'lucide-react';
+import {
+  SETUP_CHECKS, isOnboarding, isSkillName, onboardingConfigFile, type Clash, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting,
+  type SkillClash,
+} from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
+import { Checkbox } from '@lar-factory/ui/checkbox';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { Input } from '@lar-factory/ui/input';
 import { Progress } from '@lar-factory/ui/progress';
@@ -15,8 +20,8 @@ import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import {
-  COMMAND_CHECKS, type Checks, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, onboarded, pickedProject, prClosed, setupProblems, suggestedShow,
-  unpickable, useWizardStore,
+  COMMAND_CHECKS, type Clashes, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, onboarded, pickedProject, prClosed,
+  setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
 } from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
@@ -334,15 +339,138 @@ function ChecksStep({ run }: { run: Run }) {
       )}
       <CheckList title="Required commands" rows={commands} />
       <CheckList title="Setup" rows={setup} />
-      <FinishProblem checks={checks} />
     </div>
   );
 }
 
-/** Why Finish couldn't put the repository on the board. */
-function FinishProblem({ checks }: { checks: Checks }) {
-  if (!checks.finishError) return null;
-  return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t finish onboarding</AlertTitle><AlertDescription>{checks.finishError}</AlertDescription></Alert>;
+/** A Clash's edit, as the PR would make it: the lines it swaps, or the delete or rename of its file or folder. */
+function EditPreview({ clash }: { clash: Clash }) {
+  const { edit } = clash;
+  return (
+    <pre className="m-0 ml-7 overflow-x-auto rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs">
+      {edit.kind === 'lines' ? (<>
+        {edit.remove.map((line, i) => <div key={`-${i}`} className="text-destructive-foreground">- {line}</div>)}
+        {edit.add.map((line, i) => <div key={`+${i}`} className="text-success-foreground">+ {line}</div>)}
+      </>) : edit.kind === 'delete' ? <div className="text-destructive-foreground">Delete {clash.file}</div>
+        : <div>Rename {clash.file} to {edit.to}</div>}
+    </pre>
+  );
+}
+
+/** One Clash: its tick, file and line, reason and edit. */
+function ClashRow({ clash, picks }: { clash: Clash; picks: Run['cleanup'] }) {
+  const tick = useWizardStore((s) => s.tick);
+  return (
+    <li data-clash={clash.id} className="grid gap-2 px-3 py-2.5">
+      <label className="flex cursor-pointer items-start gap-2.5">
+        <Checkbox checked={ticked(clash, picks)} onCheckedChange={(on) => tick(clash.id, on)} className="mt-0.5" />
+        <span className="grid min-w-0 flex-1 gap-0.5">
+          <span className="font-mono text-xs">{clash.file}{clash.line !== undefined && `:${clash.line}`}</span>
+          <span className="text-xs text-muted-foreground">{clash.reason}</span>
+        </span>
+      </label>
+      <EditPreview clash={clash} />
+    </li>
+  );
+}
+
+/** A project skill named like a bundled skill: Delete it in the PR, or Rename it, with what Next waits for. */
+function SkillClashPick({ skill, picks, clashes }: { skill: SkillClash; picks: Run['cleanup']; clashes: Extract<Clashes, { state: 'read' }> }) {
+  const pickSkill = useWizardStore((s) => s.pickSkill);
+  const pick = picks?.skills[skill.path];
+  const problem = skillProblem(skill, picks, clashes);
+  const name = pick?.kind === 'rename' ? pick.name : '';
+  // A name restored on Resume counts as typed, so its problem shows as an error straight away.
+  const [typed, setTyped] = useState(name !== '');
+  return (
+    <Alert data-skill-clash={skill.path} variant={problem ? 'warning' : 'default'}><CircleAlert />
+      <AlertTitle>Project skill <span className="font-mono">{skill.name}</span> is named like a bundled skill</AlertTitle>
+      <AlertDescription>
+        <span><span className="font-mono">{skill.path}</span> would shadow the factory’s <span className="font-mono">{skill.name}</span>. Onboarding can’t go on until you pick one:</span>
+        <RadioGroup value={pick?.kind ?? ''} onValueChange={(kind) => pickSkill(skill.path, kind === 'delete' ? { kind } : { kind: 'rename', name })} className="mt-1 gap-2">
+          <label data-skill-pick="delete" className="flex items-center gap-2 text-sm text-foreground"><Radio value="delete" /> Delete it in the PR</label>
+          <label data-skill-pick="rename" className="flex items-center gap-2 text-sm text-foreground"><Radio value="rename" /> Rename it</label>
+        </RadioGroup>
+        {pick?.kind === 'rename' && (
+          <div className="mt-1 w-full text-foreground">
+            <Field name="skill-name" label="New skill name" problem={problem ?? undefined} invalid={typed}
+              hint={<>The PR moves it to <span className="font-mono">{skillsDir(skill.path)}{isSkillName(name) ? name : '…'}/</span> and sets <span className="font-mono">name:</span> in its SKILL.md.</>}>
+              {(described) => <Input size="sm" font="mono" value={name} {...described} onBlur={() => setTyped(true)}
+                onChange={(e) => { setTyped(true); pickSkill(skill.path, { kind: 'rename', name: e.target.value }); }} />}
+            </Field>
+          </div>
+        )}
+        {problem && pick?.kind !== 'rename' && <span data-problem className="text-xs">{problem}</span>}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/**
+ * A path and what happens to it: side by side from `sm` up, the path kept whole; stacked below, where a long path
+ * breaks anywhere rather than pushing the row wider.
+ */
+function PathAndWhat({ path, what }: { path: string; what: string }) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+      <span className="font-mono text-xs break-all sm:shrink-0 sm:break-normal">{path}</span>
+      <span className="min-w-0 text-xs text-muted-foreground">{what}</span>
+    </span>
+  );
+}
+
+/** What the PR writes whatever is ticked; a reused .lar-factory.json stays as it is. */
+function AlwaysWritten({ reused }: { reused: boolean }) {
+  const rows = [
+    { file: '## Agent skills', what: 'In CLAUDE.md if the repository has one, else in AGENTS.md; replaces the block where one is.' },
+    { file: 'docs/agents/issue-tracker.md', what: 'Where the factory tracks issues; replaces the file if there is one.' },
+    { file: 'docs/agents/triage-labels.md', what: 'The factory’s labels and triage roles; replaces the file if there is one.' },
+    { file: 'docs/agents/domain.md', what: 'Where the domain docs live; replaces the file if there is one.' },
+    { file: '.lar-factory.json', what: reused ? 'Kept as it is.' : 'The Repository config: role, item source and show setting.' },
+  ];
+  return (
+    <div data-always-written className="grid gap-1">
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Always written</h4>
+      <ul className="m-0 grid list-none gap-1 rounded-lg border bg-muted/40 p-3 text-sm">
+        {rows.map((row) => (
+          <li key={row.file} data-written={row.file} className="flex items-start gap-2"><Lock className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+            <PathAndWhat path={row.file} what={row.what} /></li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * The fixed checks' Clashes, each with its edit to tick, and Delete or Rename for each project skill named like a
+ * bundled skill, which Next waits for; then what the PR always writes. A failed run shows the board's problem with Retry.
+ */
+function CleanupStep({ run }: { run: Run }) {
+  const { projects, clashes, finishing, findClashes } = useWizardStore();
+  if (projects.state !== 'loaded') return <ProjectsPending />;
+  const project = pickedProject(run, projects);
+  if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  return (
+    <div data-cleanup-step className="grid gap-6">
+      <p className="m-0 text-sm text-muted-foreground">Fixed checks look on {project.repo}’s default branch for known Clashes: things that make agents work against the factory. Only the edits you tick go into the PR.</p>
+      {(!clashes || clashes.state === 'reading') ? (
+        <p data-reading-clashes className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Running the fixed checks…</p>
+      ) : clashes.state === 'failed' ? (
+        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t run the fixed checks</AlertTitle><AlertDescription>{clashes.error}</AlertDescription>
+          <AlertAction><Button size="xs" variant="outline" onClick={() => void findClashes()}><RotateCw /> Retry</Button></AlertAction></Alert>
+      ) : (<>
+        {clashes.found.skillClashes.map((skill) => <SkillClashPick key={skill.path} skill={skill} picks={run.cleanup} clashes={clashes} />)}
+        <div className="grid gap-1">
+          <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Fixed checks</h4>
+          {clashes.found.clashes.length
+            ? <ul className="m-0 list-none divide-y rounded-lg border p-0">{clashes.found.clashes.map((clash) => <ClashRow key={clash.id} clash={clash} picks={run.cleanup} />)}</ul>
+            : <p className="m-0 text-sm text-muted-foreground">The fixed checks found no Clash.</p>}
+        </div>
+      </>)}
+      <AlwaysWritten reused={!!project.config} />
+      {finishing.error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t finish onboarding</AlertTitle><AlertDescription>{finishing.error}</AlertDescription></Alert>}
+    </div>
+  );
 }
 
 /** The PR's place, `owner/name#n`, from its URL. */
@@ -418,5 +546,6 @@ export function StepBody({ run, step }: { run: Run; step: StepId }) {
   if (step === 'project') return <ProjectStep run={run} />;
   if (step === 'setup') return <SetupStep run={run} />;
   if (step === 'checks') return <ChecksStep run={run} />;
+  if (step === 'cleanup') return <CleanupStep run={run} />;
   return <PrStep run={run} />;
 }

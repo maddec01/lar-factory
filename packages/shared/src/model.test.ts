@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { applicability, validateDraft } from './add-item.ts';
@@ -371,4 +371,14 @@ test('Add item refuses an unlisted repository, an unknown kind, a blank title an
 test(".lar-factory.json as onboarding writes it has the answers, version 1 and no labels until build #383's label step", () => {
   assert.equal(onboardingConfigFile({ itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' }),
     '{\n  "version": 1,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "show": "opted-in",\n  "labels": []\n}\n');
+});
+
+test('a skill Clash renames only to a valid name no bundled skill, no other project skill and no rename beside it has', () => {
+  const bundled = ['code-review', 'tdd'];
+  assert.equal(skillRenameProblem('web-review', bundled, ['code-review', 'ours'], ['web-tdd']), null);
+  assert.match(skillRenameProblem('Web_Review', bundled, [], [])!, /lowercase letters, digits and single hyphens/);
+  assert.match(skillRenameProblem('..', bundled, [], [])!, /lowercase letters/);
+  assert.equal(skillRenameProblem('tdd', bundled, [], []), 'tdd is a bundled skill’s name too.');
+  assert.equal(skillRenameProblem('ours', bundled, ['Ours'], []), 'Another project skill is named ours.');
+  assert.equal(skillRenameProblem('web-skill', bundled, [], ['web-skill']), 'Another skill in its folder is renamed web-skill too.');
 });

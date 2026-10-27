@@ -2,24 +2,27 @@
 // has given, with T3's projects as the server lists them and the folder Create a new T3 project adds. Closing before a
 // project is picked, or an offered run before Next or any change, drops the run; closing after keeps its repository on
 // this Mac's list as onboarding, with where it stopped, and Resume reopens it there. The Checks step runs the command checks, then the setup checks, and holds Next
-// until each passes; a run that reuses its .lar-factory.json finishes there, with no PR. Any other run opens the
+// until each passes. The Cleanup step runs the fixed checks for known Clashes, keeps the user's ticks and skill picks
+// with the run, and holds Next until each project skill named like a bundled skill is deleted or renamed. A run that
+// reuses its .lar-factory.json finishes there, with no PR, until build #384's PR writer. Any other run opens the
 // onboarding PR on the Pull request step, then waits for the board to finish the onboarding once the PR merges. A PR
 // the board finds closed without merging offers Reopen PR, or Start over, which opens a new one.
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, isOnboarding, sameRepo, type BoardData, type CheckedTool, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
-  type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type ToolChecks,
+  SETUP_CHECKS, isOnboarding, sameRepo, skillRenameProblem, type BoardData, type CheckedTool, type Clash, type CleanupPicks, type FixedClashes, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
+  type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type SkillClash, type SkillPick, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
 
-/** The steps in order. Builds #383 (labels) and #384 (cleanup) add theirs here. */
+/** The steps in order. Build #383 (labels) adds its own here. */
 export const STEPS = [
   { id: 'project', label: 'T3 project' },
   { id: 'setup', label: 'Provider and item source' },
   { id: 'checks', label: 'Checks' },
+  { id: 'cleanup', label: 'Cleanup' },
   { id: 'pr', label: 'Pull request' },
 ] as const;
 export type StepId = (typeof STEPS)[number]['id'];
@@ -43,6 +46,8 @@ export interface Run {
   savedAs: string | null;
   /** The Provider and item source step's answers; null until that step first shows. */
   setup: SetupAnswers | null;
+  /** The Cleanup step's picks; null until that step first shows. */
+  cleanup: CleanupPicks | null;
   /** The onboarding PR, once it is open. */
   prUrl: string | null;
 }
@@ -129,13 +134,11 @@ export function commandPasses(name: (typeof COMMAND_CHECKS)[number], tools: Tool
 /** A setup check on the Checks step: waiting for the checks before it, running, or done with its result. */
 type SetupCheckState = { state: 'waiting' } | { state: 'running' } | { state: 'done'; result: SetupCheckResult };
 
-/** The Checks step's checks, and Finish for a run that reuses its .lar-factory.json. */
+/** The Checks step's checks. */
 export interface Checks {
   /** The command checks, which the board runs again; once done, their results are the board's tools. */
   commands: { state: 'running' } | { state: 'done' } | { state: 'failed'; error: string };
   setup: Record<SetupCheckId, SetupCheckState>;
-  finishing: boolean;
-  finishError: string | null;
 }
 
 /** Whether every check on the Checks step passed. */
@@ -144,16 +147,48 @@ export function checksPassed(checks: Checks | null, tools: ToolChecks | undefine
     && SETUP_CHECKS.every((id) => { const c = checks.setup[id]; return c.state === 'done' && c.result.passed; });
 }
 
-/** Whether the run finishes on the Checks step: it reuses its .lar-factory.json, so it opens no PR until build #383's labels. */
-export const finishesOnChecks = (run: Run, projects: Projects): boolean => run.step === 'checks' && !!pickedProject(run, projects)?.config;
+/**
+ * The Cleanup step's fixed checks: running, or read with the bundled skill names the board had then, or the board's
+ * problem.
+ */
+export type Clashes = { state: 'reading' } | { state: 'read'; found: FixedClashes; bundled: string[] } | { state: 'failed'; error: string };
 
-/** Whether the run's step lets Next move past it. The later steps wait for the slices that fill them in. */
-export function stepReady(run: Run, projects: Projects, checks: Checks | null = null, tools?: ToolChecks): boolean {
+/** Whether a Clash's edit goes in the PR: the user's tick, else as the check offers it. */
+export const ticked = (clash: Clash, picks: CleanupPicks | null): boolean => picks?.ticks[clash.id] ?? clash.ticked;
+
+/** The folder that holds a skill's folder, such as `.claude/skills/`. */
+export const skillsDir = (path: string) => path.replace(/[^/]+\/$/, '');
+
+/**
+ * What Next waits for from a skill Clash, or null once it's picked: Delete, or Rename to a valid name that no bundled
+ * skill, no other project skill, and no other rename into the same folder has.
+ */
+export function skillProblem(skill: SkillClash, picks: CleanupPicks | null, clashes: Extract<Clashes, { state: 'read' }>): string | null {
+  const pick = picks?.skills[skill.path];
+  if (!pick) return 'Next needs Delete it in the PR, or Rename it.';
+  if (pick.kind === 'delete') return null;
+  const renamedBeside = clashes.found.skillClashes.flatMap((other) => {
+    const picked = picks.skills[other.path];
+    return other.path !== skill.path && skillsDir(other.path) === skillsDir(skill.path) && picked?.kind === 'rename' ? [picked.name] : [];
+  });
+  return skillRenameProblem(pick.name, clashes.bundled, clashes.found.projectSkills, renamedBeside);
+}
+
+/** Whether the fixed checks ran and each skill Clash is picked. */
+const cleanupDone = (run: Run, clashes: Clashes | null): boolean =>
+  clashes?.state === 'read' && clashes.found.skillClashes.every((skill) => !skillProblem(skill, run.cleanup, clashes));
+
+/** Whether the run finishes on the Cleanup step: it reuses its .lar-factory.json, so it opens no PR until build #384's PR writer. */
+export const finishesOnCleanup = (run: Run, projects: Projects): boolean => run.step === 'cleanup' && !!pickedProject(run, projects)?.config;
+
+/** Whether the run's step lets Next move past it. */
+export function stepReady(run: Run, projects: Projects, checks: Checks | null = null, tools?: ToolChecks, clashes: Clashes | null = null): boolean {
   const project = pickedProject(run, projects);
   if (!project) return false;
   if (run.step === 'project') return true;
   if (run.step === 'setup') return !!project.config || asksSetup(project) && setupAnswered(run.setup);
   if (run.step === 'checks') return checksPassed(checks, tools, itemSourceOf(run, project));
+  if (run.step === 'cleanup') return cleanupDone(run, clashes);
   return false;
 }
 
@@ -165,6 +200,10 @@ interface WizardState {
   creating: Creating | null;
   /** The Checks step's checks; null until the run first reaches it. */
   checks: Checks | null;
+  /** The Cleanup step's fixed checks; null until the run first reaches it. */
+  clashes: Clashes | null;
+  /** Finish for a run that reuses its .lar-factory.json: whether it's running, and why the board refused it. */
+  finishing: { running: boolean; error: string | null };
   /** The button that opened the dialog, which gets focus back when it closes. */
   opener: HTMLElement | null;
   /** Opens a new run, with the offered T3 project picked when it comes from an offer. */
@@ -188,7 +227,13 @@ interface WizardState {
   runChecks: () => Promise<void>;
   /** Runs one setup check again. */
   retryCheck: (id: SetupCheckId) => Promise<void>;
-  /** Finishes a run that reuses its .lar-factory.json once its checks pass, so its repository goes on the board. */
+  /** Runs the fixed checks for known Clashes on the run's repository. */
+  findClashes: () => Promise<void>;
+  /** Ticks or unticks a Clash's edit, by its id. */
+  tick: (id: string, on: boolean) => void;
+  /** Picks Delete or Rename for a skill Clash, by its path. */
+  pickSkill: (path: string, pick: SkillPick) => void;
+  /** Finishes a run that reuses its .lar-factory.json once its Cleanup step is done, so its repository goes on the board. */
   finish: () => Promise<void>;
   /**
    * Opening or reopening the onboarding PR, and why the board couldn't; Check now while it waits for the board's read,
@@ -209,8 +254,15 @@ interface WizardState {
 let reads = 0;
 /** Counts check runs, so a check answered after a newer run or a close is dropped. */
 let checkRuns = 0;
+/** Counts fixed check runs, so one answered after a newer run or a close is dropped. */
+let clashReads = 0;
 /** The run an offer opened, until Next or a change replaces it; closing it then keeps nothing. */
 let untouchedOffer: Run | null = null;
+
+const NOT_FINISHING: WizardState['finishing'] = { running: false, error: null };
+
+/** The Cleanup step's picks before any is changed. */
+const NO_PICKS: CleanupPicks = { ticks: {}, skills: {} };
 
 const IDLE: WizardState['pr'] = { opening: false, reopening: false, checking: false, checkedAt: null, error: null };
 
@@ -248,7 +300,8 @@ const focused = (): HTMLElement | null => document.activeElement instanceof HTML
 /** The run a kept onboarding resumes; a step this dialog doesn't have, as a newer board's, resumes on the T3 project step. */
 function resumed(repo: string, progress: OnboardingProgress): Run {
   return { step: isStep(progress.step) ? progress.step : 'project', done: progress.done.filter(isStep), projectId: progress.answers.projectId, repo,
-    provider: progress.answers.provider ?? null, savedAs: repo, setup: progress.answers.setup ?? null, prUrl: progress.prUrl ?? null };
+    provider: progress.answers.provider ?? null, savedAs: repo, setup: progress.answers.setup ?? null, cleanup: progress.answers.cleanup ?? null,
+    prUrl: progress.prUrl ?? null };
 }
 
 /** The setup step's answers before any is given: a GitHub Project of the repository's owner, with its suggested show setting. */
@@ -258,7 +311,8 @@ const firstSetup = (repo: string | null): SetupAnswers => ({
 
 /** Where the run stopped, as the board keeps it. */
 const progressOf = (run: Run & { projectId: string }): OnboardingProgress => ({ step: run.step, done: run.done,
-  answers: { projectId: run.projectId, ...run.provider && { provider: run.provider }, ...run.setup && { setup: run.setup } }, ...run.prUrl && { prUrl: run.prUrl } });
+  answers: { projectId: run.projectId, ...run.provider && { provider: run.provider }, ...run.setup && { setup: run.setup }, ...run.cleanup && { cleanup: run.cleanup } },
+  ...run.prUrl && { prUrl: run.prUrl } });
 
 /** The onboarding a run kept under another repository replaces, to send with its repository. */
 const replacing = (run: Run & { repo: string }) => run.savedAs && !sameRepo(run.savedAs, run.repo) ? { replaces: run.savedAs } : {};
@@ -275,13 +329,14 @@ async function keep(run: Run & { projectId: string; repo: string }): Promise<voi
 
 export const useWizardStore = create<WizardState>()((set, get) => {
   const move = (by: 1 | -1) => {
-    const { run, projects, checks } = get();
+    const { run, projects, checks, clashes } = get();
     // Once its PR is open, the run stays on the Pull request step.
-    if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools))) return;
+    if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes))) return;
     const to = STEPS[STEPS.findIndex((s) => s.id === run.step) + by]?.id;
     if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done,
-      setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo) : null) } });
+      setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo) : null), cleanup: run.cleanup ?? (to === 'cleanup' ? NO_PICKS : null) } });
     if (to === 'checks') void get().runChecks();
+    if (to === 'cleanup') void get().findClashes();
   };
 
   /** The run's checks while `runId` is the latest check run and the run is open. */
@@ -306,30 +361,36 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     projects: { state: 'loading' },
     creating: null,
     checks: null,
+    clashes: null,
+    finishing: NOT_FINISHING,
     pr: IDLE,
     opener: null,
     start: (offer) => {
       checkRuns++;
       // The board offers only GitHub repositories until build #386.
+      clashReads++;
       const run: Run = { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer ? 'GitHub' : null,
-        savedAs: null, setup: null, prUrl: null };
+        savedAs: null, setup: null, cleanup: null, prUrl: null };
       untouchedOffer = offer ? run : null;
-      set({ run, creating: null, checks: null, pr: IDLE, opener: focused() });
+      set({ run, creating: null, checks: null, clashes: null, finishing: NOT_FINISHING, pr: IDLE, opener: focused() });
       void get().loadProjects();
     },
     resume: (repo) => {
       const kept = useBoardStore.getState().data.onboarding?.find((o) => sameRepo(o.repo, repo));
       if (!kept) return;
       checkRuns++;
-      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, pr: IDLE, opener: focused() });
-      // The checks read the picked project, so they wait for T3's projects.
+      clashReads++;
+      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, clashes: null, finishing: NOT_FINISHING, pr: IDLE, opener: focused() });
+      // The checks read the picked project, so they wait for T3's projects; the fixed checks read only the repository.
+      if (get().run!.step === 'cleanup') void get().findClashes();
       void get().loadProjects().then(() => { if (get().run?.step === 'checks') void get().runChecks(); });
     },
     close: () => {
       const { run } = get();
       reads++;
       checkRuns++;
-      set({ run: null, checks: null });
+      clashReads++;
+      set({ run: null, checks: null, clashes: null });
       // A run whose PR merged is onboarded, so there's no onboarding left to keep.
       if (run?.projectId && run.repo && run !== untouchedOffer && !onboarded(run, useBoardStore.getState().data)) {
         void keep({ ...run, projectId: run.projectId, repo: run.repo });
@@ -389,7 +450,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     back: () => move(-1),
     runChecks: async () => {
       const runId = ++checkRuns;
-      set({ checks: { commands: { state: 'running' }, setup: WAITING, finishing: false, finishError: null } });
+      set({ checks: { commands: { state: 'running' }, setup: WAITING } });
       const rechecked = await postAction('/api/recheck', {});
       receive(rechecked);
       const checks = current(runId);
@@ -398,19 +459,40 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       for (const id of SETUP_CHECKS) await runSetupCheck(id, runId);
     },
     retryCheck: (id) => runSetupCheck(id, checkRuns),
+    findClashes: async () => {
+      const { run } = get();
+      if (!run?.repo) return;
+      const read = ++clashReads;
+      set({ clashes: { state: 'reading' } });
+      const answer = await postAction<FixedClashes>('/api/onboarding/clashes', { repo: run.repo });
+      if (read !== clashReads || !get().run) return;
+      const { clashes, skillClashes, projectSkills } = answer;
+      if (answer.error || !clashes || !skillClashes || !projectSkills) return set({ clashes: { state: 'failed', error: answer.error ?? 'The board sent no Clashes.' } });
+      // A checklist, `references/<file>`, is no skill.
+      const bundled = (useBoardStore.getState().data.bundledSkills ?? []).map((skill) => skill.name).filter((name) => !name.includes('/'));
+      set({ clashes: { state: 'read', found: { clashes, skillClashes, projectSkills }, bundled } });
+    },
+    tick: (id, on) => {
+      const { run } = get();
+      if (run?.cleanup) set({ run: { ...run, cleanup: { ...run.cleanup, ticks: { ...run.cleanup.ticks, [id]: on } } } });
+    },
+    pickSkill: (path, pick) => {
+      const { run } = get();
+      if (run?.cleanup) set({ run: { ...run, cleanup: { ...run.cleanup, skills: { ...run.cleanup.skills, [path]: pick } } } });
+    },
     finish: async () => {
-      const { run, projects, checks } = get();
-      if (!run?.repo || !checks || checks.finishing || !finishesOnChecks(run, projects)
-        || !stepReady(run, projects, checks, useBoardStore.getState().data.tools)) return;
-      const runId = checkRuns;
-      set({ checks: { ...checks, finishing: true, finishError: null } });
+      const { run, projects, checks, clashes, finishing } = get();
+      if (!run?.repo || finishing.running || !finishesOnCleanup(run, projects)
+        || !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes)) return;
+      set({ finishing: { running: true, error: null } });
       const result = await postAction('/api/onboarding/finish', { repo: run.repo, ...replacing({ ...run, repo: run.repo }) });
       receive(result);
-      const now = current(runId);
-      if (!now) return;
-      if (result.error) return set({ checks: { ...now, finishing: false, finishError: result.error } });
+      // The run closed while the board finished it.
+      if (get().run?.repo !== run.repo) return;
+      if (result.error) return set({ finishing: { running: false, error: result.error } });
       checkRuns++;
-      set({ run: null, checks: null });
+      clashReads++;
+      set({ run: null, checks: null, clashes: null, finishing: NOT_FINISHING });
       showToast({ slot: 'onboarding', what: `Onboarded ${run.repo}`, body: `Onboarded ${run.repo}. Its items show once the board reads them.` });
     },
     openPr: async () => {

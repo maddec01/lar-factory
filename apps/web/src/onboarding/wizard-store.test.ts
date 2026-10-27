@@ -3,7 +3,8 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { fetchMock, sample, settle, toolChecks } from '../../test/support.ts';
-import type { BoardData, ProjectChoice, SetupAnswers, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
+import type { Clashes } from './wizard-store.ts';
+import type { BoardData, BundledSkill, Clash, FixedClashes, ProjectChoice, SetupAnswers, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
 
 const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
@@ -19,15 +20,15 @@ async function store(reply: () => Response = () => new Response(JSON.stringify({
   return useWizardStore;
 }
 
-test('the steps are the T3 project, Provider and item source, Checks, then Pull request', async () => {
+test('the steps are the T3 project, Provider and item source, Checks, Cleanup, then Pull request', async () => {
   const { STEPS } = await import('./wizard-store.ts');
-  expect(STEPS.map((s) => s.label)).toEqual(['T3 project', 'Provider and item source', 'Checks', 'Pull request']);
+  expect(STEPS.map((s) => s.label)).toEqual(['T3 project', 'Provider and item source', 'Checks', 'Cleanup', 'Pull request']);
 });
 
 test("starting a run opens it on the T3 project step and reads T3's projects", async () => {
   const wizard = await store();
   await settle(() => wizard.getState().start());
-  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, prUrl: null });
+  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, cleanup: null, prUrl: null });
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/onboarding/projects']);
   expect(wizard.getState().projects).toEqual({ state: 'loaded', projects: PROJECTS });
 });
@@ -36,7 +37,7 @@ test('starting a run from an offer opens it with the offered project picked', as
   const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-web', { hasConfig: true })] })));
   const { stepReady } = await import('./wizard-store.ts');
   await settle(() => wizard.getState().start({ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }));
-  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: null, prUrl: null });
+  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: null, cleanup: null, prUrl: null });
   expect(stepReady(wizard.getState().run!, wizard.getState().projects)).toBe(true);
 });
 
@@ -80,7 +81,7 @@ test('Next waits for a project that can be picked, then moves on; Back returns',
   wizard.getState().pick('lar-web');
   expect(ready()).toBe(true);
   wizard.getState().next();
-  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: SETUP, prUrl: null });
+  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: SETUP, cleanup: null, prUrl: null });
   expect(ready(), 'the step waits for its answers').toBe(false);
   wizard.getState().back();
   expect(wizard.getState().run!.step).toBe('project');
@@ -88,7 +89,7 @@ test('Next waits for a project that can be picked, then moves on; Back returns',
 
 test('a project whose repository is onboarding already says to use its Resume', async () => {
   const { unpickable } = await import('./wizard-store.ts');
-  const run = { step: 'project' as const, done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, prUrl: null };
+  const run = { step: 'project' as const, done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, cleanup: null, prUrl: null };
   const data = { onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-server' } } }] };
   expect(unpickable(project('lar-server', { onBoard: true }), run, data)).toBe('It’s onboarding already: close this and press its Resume.');
   expect(unpickable(project('lar-server', { onBoard: true }), run, { onboarding: [] })).toBe('Its repository is on the board already.');
@@ -178,7 +179,7 @@ test('Resume reopens the run on its step with its answers, and its own project c
   useBoardStore.getState().receive({ ...sample,
     onboarding: [{ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web', provider: 'GitHub', setup } } }] });
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
-  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: 'maddec01/lar-web', setup, prUrl: null });
+  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: 'maddec01/lar-web', setup, cleanup: null, prUrl: null });
   expect(wizard.getState().projects.state, "T3's projects are read again").toBe('loaded');
   wizard.getState().back();
   wizard.getState().pick('lar-apple');
@@ -200,8 +201,8 @@ test('a resumed run that picks another project replaces the onboarding it was ke
 test("a stored step the dialog doesn't have resumes on the T3 project step", async () => {
   const wizard = await store();
   const { useBoardStore } = await import('../board/board-store.ts');
-  useBoardStore.getState().receive({ ...onboardingBoard('cleanup'), onboarding: [{ repo: 'maddec01/lar-web',
-    progress: { step: 'cleanup', done: ['project', 'cleanup'], answers: { projectId: 'lar-web' } } }] });
+  useBoardStore.getState().receive({ ...onboardingBoard('labels'), onboarding: [{ repo: 'maddec01/lar-web',
+    progress: { step: 'labels', done: ['project', 'labels'], answers: { projectId: 'lar-web' } } }] });
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
   expect(wizard.getState().run).toMatchObject({ step: 'project', done: ['project'] });
 });
@@ -266,17 +267,21 @@ test("a new project that can't be picked stays on the form with the reason", asy
 const PASS: SetupCheckResult = { passed: true, detail: 'fine' };
 const json = (body: object) => new Response(JSON.stringify(body));
 
+/** What the fixed checks find when there's nothing to clean up. */
+const NONE: FixedClashes = { clashes: [], skillClashes: [], projectSkills: [] };
+
 /**
  * The store, fresh, with `projects` as T3's, the commands rechecked as `tools`, each setup check answered from `results`
- * (passing when it isn't named) and Finish answered with `finish`.
+ * (passing when it isn't named), Finish answered with `finish` and the fixed checks with `clashes`.
  */
 async function checkingStore(projects: ProjectChoice[], results: Partial<Record<SetupCheckId, SetupCheckResult>> = {},
-  tools = toolChecks(), finish: object = { board: { ...sample, onboarding: [] }, error: null }) {
+  tools = toolChecks(), finish: object = { board: { ...sample, onboarding: [] }, error: null }, clashes: object = { ...NONE, error: null }) {
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
     if (url === '/api/onboarding/projects') return json({ projects });
     if (url === '/api/recheck') return json({ board: { ...sample, tools }, error: null });
     if (url === '/api/onboarding/checks') return json({ result: results[(JSON.parse(String(init!.body)) as { check: SetupCheckId }).check] ?? PASS, error: null });
     if (url === '/api/onboarding/finish') return json(finish);
+    if (url === '/api/onboarding/clashes') return json(clashes);
     return json({ error: null });
   });
   const { useWizardStore } = await import('./wizard-store.ts');
@@ -329,7 +334,7 @@ test('a failed check holds Next until its Retry passes, and Retry reruns only th
 test('a failing command holds Next; gh without the project scope passes only for issues', async () => {
   const { checksPassed } = await import('./wizard-store.ts');
   const checks = { commands: { state: 'done' as const }, setup: { checkout: { state: 'done' as const, result: PASS }, source: { state: 'done' as const, result: PASS },
-    push: { state: 'done' as const, result: PASS } }, finishing: false, finishError: null };
+    push: { state: 'done' as const, result: PASS } } };
   const noScope = toolChecks({ gh: { result: 'no-project-scope', fix: 'gh auth refresh -s project' } });
   expect(checksPassed(checks, noScope, { kind: 'issues' })).toBe(true);
   expect(checksPassed(checks, noScope, { kind: 'github-project', owner: 'maddec01', number: 3 })).toBe(false);
@@ -337,30 +342,132 @@ test('a failing command holds Next; gh without the project scope passes only for
   expect(checksPassed({ ...checks, commands: { state: 'running' } }, toolChecks(), { kind: 'issues' })).toBe(false);
 });
 
+const bundled = (name: string): BundledSkill => ({ name, author: 'Lar', licence: 'MIT', source: `https://github.com/maddec01/lar-factory/tree/main/skills/${name}` });
+const BUNDLED = ['code-review', 'tdd', 'references/review-checklist.md'].map(bundled);
+const CONTEXT: Clash = { id: 'context', file: 'CONTEXT.md', ticked: true, edit: { kind: 'rename', to: 'GLOSSARY.md' }, reason: 'CONTEXT.md is its old name.' };
+const SCRATCH: Clash = { id: 'scratch', file: '.scratch/', ticked: false, edit: { kind: 'delete' }, reason: '.scratch/ holds 2 files.' };
+const SKILL = { name: 'code-review', path: '.claude/skills/code-review/' };
+const FOUND: FixedClashes = { clashes: [CONTEXT, SCRATCH], skillClashes: [SKILL], projectSkills: ['code-review', 'web-deploy'] };
+
+/** Passes Checks with the board's tools and bundled skills, moves to Cleanup and waits for the fixed checks. */
+async function toCleanup(wizard: Awaited<ReturnType<typeof checkingStore>>, name: string): Promise<void> {
+  await toChecks(wizard, name);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), bundledSkills: BUNDLED }));
+  await settle(() => wizard.getState().next());
+  await vi.waitFor(() => expect(wizard.getState().clashes?.state).not.toBe('reading'));
+}
+
+/** The fixed checks once read. */
+function read(clashes: Clashes | null): Extract<Clashes, { state: 'read' }> {
+  if (clashes?.state !== 'read') throw new Error(`The fixed checks are ${clashes?.state ?? 'not run'}.`);
+  return clashes;
+}
+
+const clashPosts = () => (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/onboarding/clashes')
+  .map(([, init]) => JSON.parse(String(init.body)) as object);
+
+test('passing Checks moves to Cleanup, which runs the fixed checks on the repository', async () => {
+  const wizard = await checkingStore([project('lar-web')], {}, toolChecks(), undefined, { ...FOUND, error: null });
+  await toCleanup(wizard, 'lar-web');
+  expect(wizard.getState().run).toMatchObject({ step: 'cleanup', done: ['project', 'setup', 'checks'], cleanup: { ticks: {}, skills: {} } });
+  expect(clashPosts()).toEqual([{ repo: 'maddec01/lar-web' }]);
+  expect(wizard.getState().clashes).toEqual({ state: 'read', found: FOUND, bundled: ['code-review', 'tdd'] });
+});
+
+test("each Clash starts ticked as the fixed checks offer it, and a changed tick is kept with the run's progress", async () => {
+  const wizard = await checkingStore([project('lar-web')], {}, toolChecks(), undefined, { ...FOUND, skillClashes: [], error: null });
+  const { ticked } = await import('./wizard-store.ts');
+  await toCleanup(wizard, 'lar-web');
+  const ticks = () => [CONTEXT, SCRATCH].map((clash) => ticked(clash, wizard.getState().run!.cleanup));
+  expect(ticks(), "CONTEXT.md's rename ticked, .scratch/'s delete not").toEqual([true, false]);
+  wizard.getState().tick('context', false);
+  wizard.getState().tick('scratch', true);
+  expect(ticks()).toEqual([false, true]);
+  await settle(() => wizard.getState().close());
+  expect(kept()).toMatchObject([{ progress: { step: 'cleanup', answers: { cleanup: { ticks: { context: false, scratch: true }, skills: {} } } } }]);
+});
+
+test('a project skill named like a bundled skill holds Next until Delete it, or a rename to a name no other skill has', async () => {
+  const wizard = await checkingStore([project('lar-web')], {}, toolChecks(), undefined, { ...FOUND, error: null });
+  const { skillProblem, stepReady } = await import('./wizard-store.ts');
+  await toCleanup(wizard, 'lar-web');
+  const problem = () => skillProblem(SKILL, wizard.getState().run!.cleanup, read(wizard.getState().clashes));
+  const ready = () => stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes);
+  expect([problem(), ready()]).toEqual(['Next needs Delete it in the PR, or Rename it.', false]);
+  for (const [name, why] of [
+    ['', 'Next needs a new name: lowercase letters, digits and single hyphens, like web-code-review.'],
+    ['Web Review', 'Next needs a new name: lowercase letters, digits and single hyphens, like web-code-review.'],
+    ['tdd', 'tdd is a bundled skill’s name too.'],
+    ['web-deploy', 'Another project skill is named web-deploy.'],
+  ]) {
+    wizard.getState().pickSkill(SKILL.path, { kind: 'rename', name: name! });
+    expect([problem(), ready()], name).toEqual([why, false]);
+  }
+  wizard.getState().pickSkill(SKILL.path, { kind: 'rename', name: 'web-code-review' });
+  expect([problem(), ready()]).toEqual([null, true]);
+  wizard.getState().pickSkill(SKILL.path, { kind: 'delete' });
+  expect([problem(), ready()]).toEqual([null, true]);
+});
+
+test('two skill Clashes in one folder renamed to the same name hold Next', async () => {
+  const tdd = { name: 'tdd', path: '.claude/skills/tdd/' };
+  const mirrored = { name: 'tdd', path: '.agents/skills/tdd/' };
+  const wizard = await checkingStore([project('lar-web')], {}, toolChecks(), undefined, { ...FOUND, skillClashes: [SKILL, tdd, mirrored], error: null });
+  const { skillProblem } = await import('./wizard-store.ts');
+  await toCleanup(wizard, 'lar-web');
+  for (const skill of [SKILL, tdd, mirrored]) wizard.getState().pickSkill(skill.path, { kind: 'rename', name: 'web-skill' });
+  const problems = () => [SKILL, tdd, mirrored].map((skill) => skillProblem(skill, wizard.getState().run!.cleanup, read(wizard.getState().clashes)));
+  expect(problems()).toEqual(['Another skill in its folder is renamed web-skill too.', 'Another skill in its folder is renamed web-skill too.', null]);
+});
+
+test("fixed checks the board can't run hold Next with its problem, and Retry runs them again", async () => {
+  const wizard = await checkingStore([project('lar-web')], {}, toolChecks(), undefined, { error: "Can't read maddec01/lar-web's default branch: HTTP 502" });
+  const { stepReady } = await import('./wizard-store.ts');
+  await toCleanup(wizard, 'lar-web');
+  expect(wizard.getState().clashes).toEqual({ state: 'failed', error: "Can't read maddec01/lar-web's default branch: HTTP 502" });
+  expect(stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes)).toBe(false);
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/clashes' ? json({ ...NONE, error: null }) : served(url, init));
+  await settle(() => wizard.getState().findClashes());
+  expect(wizard.getState().clashes).toMatchObject({ state: 'read', found: NONE });
+  expect(stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes)).toBe(true);
+});
+
+test('Resume on Cleanup brings back the ticks and skill picks, and runs the fixed checks again', async () => {
+  const wizard = await checkingStore([project('lar-web', { onBoard: true })], {}, toolChecks(), undefined, { ...FOUND, error: null });
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const cleanup = { ticks: { scratch: true }, skills: { [SKILL.path]: { kind: 'rename' as const, name: 'web-code-review' } } };
+  const progress = { step: 'cleanup', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web', setup: { ...SETUP, itemSource: 'issues' as const, role: 'Web client' }, cleanup } };
+  useBoardStore.getState().receive({ ...sample, bundledSkills: BUNDLED, onboarding: [{ repo: 'maddec01/lar-web', progress }] });
+  await settle(() => wizard.getState().resume('maddec01/lar-web'));
+  await vi.waitFor(() => expect(wizard.getState().clashes?.state).toBe('read'));
+  expect(wizard.getState().run).toMatchObject({ step: 'cleanup', cleanup });
+  expect(clashPosts()).toEqual([{ repo: 'maddec01/lar-web' }]);
+});
+
 const REUSED = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } });
 
-test("a reused .lar-factory.json's item source is the one checked, and Finish ends the run with no PR and keeps nothing", async () => {
+test("a reused .lar-factory.json's run goes on from Checks to Cleanup, whose Finish ends the run with no PR and keeps nothing", async () => {
   const wizard = await checkingStore([REUSED]);
   await toChecks(wizard, 'lar-web');
   expect(checkPosts()[2]).toMatchObject({ check: 'source', itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 } });
-  const { finishesOnChecks } = await import('./wizard-store.ts');
-  expect(finishesOnChecks(wizard.getState().run!, wizard.getState().projects)).toBe(true);
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks() }));
+  const { finishesOnCleanup } = await import('./wizard-store.ts');
+  expect(finishesOnCleanup(wizard.getState().run!, wizard.getState().projects), 'not on Checks').toBe(false);
+  await toCleanup(wizard, 'lar-web');
+  expect(finishesOnCleanup(wizard.getState().run!, wizard.getState().projects)).toBe(true);
   await settle(() => wizard.getState().finish());
   const posts = (fetchMock.mock.calls as unknown as [string, RequestInit?][]).filter(([url]) => url.startsWith('/api/onboarding/finish') || url === '/api/onboarding/repositories');
   expect(posts.map(([url, init]) => [url, JSON.parse(String(init!.body))])).toEqual([['/api/onboarding/finish', { repo: 'maddec01/lar-web' }]]);
   expect(wizard.getState().run).toBeNull();
 });
 
-test("Finish that the board refuses keeps the run on Checks with the board's reason", async () => {
+test("Finish that the board refuses keeps the run on Cleanup with the board's reason", async () => {
   const wizard = await checkingStore([REUSED], {}, toolChecks(), { error: 'maddec01/lar-web has no .lar-factory.json on its default branch to reuse.' });
-  await toChecks(wizard, 'lar-web');
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks() }));
+  await toCleanup(wizard, 'lar-web');
   await settle(() => wizard.getState().finish());
-  expect(wizard.getState().run!.step).toBe('checks');
-  expect(wizard.getState().checks).toMatchObject({ finishing: false, finishError: 'maddec01/lar-web has no .lar-factory.json on its default branch to reuse.' });
+  expect(wizard.getState().run!.step).toBe('cleanup');
+  expect(wizard.getState().finishing).toEqual({ running: false, error: 'maddec01/lar-web has no .lar-factory.json on its default branch to reuse.' });
 });
 
 test('Resume on the Checks step runs the checks again once it has read the projects', async () => {
@@ -376,28 +483,29 @@ test('Resume on the Checks step runs the checks again once it has read the proje
 const PR = 'https://github.com/maddec01/lar-web/pull/14';
 const SETUP_DONE = { ...SETUP, itemSource: 'issues' as const, show: 'opted-in' as const, role: 'Web client' };
 /** lar-web still onboarding, kept on the Pull request step with its PR. */
-const ON_PR = { repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web', provider: 'GitHub' as const, setup: SETUP_DONE }, prUrl: PR } };
+const ON_PR = { repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks', 'cleanup'],
+  answers: { projectId: 'lar-web', provider: 'GitHub' as const, setup: SETUP_DONE, cleanup: { ticks: {}, skills: {} } }, prUrl: PR } };
 
 /** The store on the Pull request step of lar-web, with the PR opening answered by `opened`. */
 async function onPr(opened: object = { prUrl: PR, board: { ...sample, onboarding: [ON_PR] }, error: null }) {
   const wizard = await checkingStore([project('lar-web')]);
   const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr' ? json(opened) : served(url, init));
-  await toChecks(wizard, 'lar-web');
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks() }));
+  await toCleanup(wizard, 'lar-web');
   wizard.getState().next();
+  const { useBoardStore } = await import('../board/board-store.ts');
   return { wizard, useBoardStore };
 }
 
 const prPosts = () => (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/onboarding/pr')
   .map(([, init]) => JSON.parse(String(init.body)) as object);
 
-test("passing Checks with a new file moves to the Pull request step, and Open the PR sends the run's progress and .lar-factory.json's values", async () => {
+test("passing Cleanup with a new file moves to the Pull request step, and Open the PR sends the run's progress and .lar-factory.json's values", async () => {
   const { wizard } = await onPr();
   expect(wizard.getState().run!.step).toBe('pr');
   await settle(() => wizard.getState().openPr());
-  expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web', provider: 'GitHub', setup: SETUP_DONE } },
+  expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks', 'cleanup'],
+    answers: { projectId: 'lar-web', provider: 'GitHub', setup: SETUP_DONE, cleanup: { ticks: {}, skills: {} } } },
     config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' } }]);
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR, savedAs: 'maddec01/lar-web' });
   expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error: null });

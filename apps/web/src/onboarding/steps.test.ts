@@ -1,11 +1,12 @@
 // The T3 project step: T3's projects, each with its provider and whether its repository has .lar-factory.json, and
 // the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
-// and role, or the values of a .lar-factory.json it reuses. The Checks step: each check with its state, a failure's
-// fix with Retry, and Finish for a reused .lar-factory.json. The Pull request step: the file it adds, Open the PR,
+// and role, or the values of a .lar-factory.json it reuses. The Checks step: each check with its state and a failure's
+// fix with Retry. The Cleanup step: each fixed Clash with its tick, Delete or Rename for a project skill named like a
+// bundled skill, what the PR always writes, and Finish for a reused .lar-factory.json. The Pull request step: the file it adds, Open the PR,
 // gh's message with Retry, the wait for the merge, and Reopen PR and Start over for a PR closed without merging.
 
 import { expect, test, vi } from 'vite-plus/test';
-import type { ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
+import type { BundledSkill, FixedClashes, ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
 import { $, fetchMock, mountPage, sample, settle, text, toolChecks } from '../../test/support.ts';
 import { dialog, openOnboarding, project, serve } from './onboarding-support.ts';
 
@@ -310,12 +311,137 @@ test('a failed check shows its problem, fix and Retry, and Next stays disabled u
   expect(nextButton().disabled).toBe(false);
 });
 
-test('with a reused .lar-factory.json the Checks step ends in Finish, which puts the repository on the board with no PR', async () => {
-  await openSetup(project('lar-web', { hasConfig: true,
-    config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } }));
+const NONE: FixedClashes = { clashes: [], skillClashes: [], projectSkills: [] };
+const FOUND: FixedClashes = {
+  clashes: [
+    { id: 'context', file: 'CONTEXT.md', ticked: true, edit: { kind: 'rename', to: 'GLOSSARY.md' }, reason: "The factory's domain docs read GLOSSARY.md, and CONTEXT.md is its old name." },
+    { id: 'scratch', file: '.scratch/', ticked: false, edit: { kind: 'delete' }, reason: '.scratch/ holds 2 files from Matt Pocock\'s local tracker.' },
+  ],
+  skillClashes: [{ name: 'code-review', path: '.claude/skills/code-review/' }],
+  projectSkills: ['code-review', 'web-deploy'],
+};
+const BUNDLED: BundledSkill[] = ['code-review', 'tdd'].map((name) => ({ name, author: 'Lar', licence: 'MIT', source: `https://github.com/maddec01/lar-factory/tree/main/skills/${name}` }));
+
+/** Answers the fixed checks with `answer`, what they found or the board's problem. */
+function answerClashes(answer: FixedClashes | { error: string }): void {
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/clashes'
+    ? new Response(JSON.stringify('error' in answer ? answer : { ...answer, error: null }), { status: 'error' in answer ? 502 : 200 }) : served(url, init));
+}
+
+/** Answers the setup step for `chosen` when it asks, passes Checks, and moves to Cleanup with the fixed checks answered by `answer`. */
+async function openCleanup(chosen: ProjectChoice, answer: FixedClashes | { error: string } = NONE): Promise<void> {
+  await openSetup(chosen);
+  if (!chosen.config) {
+    await settle(() => choice('issues').querySelector<HTMLElement>('[role="radio"]')!.click());
+    await type(input('role')!, 'Web client');
+  }
   answerChecks();
   await openChecks();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED }));
+  answerClashes(answer);
+  await settle(() => nextButton().click());
+  await settle();
+}
+
+const cleanup = () => dialog()!.querySelector<HTMLElement>('[data-cleanup-step]')!;
+const clashRow = (id: string) => cleanup().querySelector<HTMLElement>(`[data-clash="${id}"]`)!;
+const checkbox = (id: string) => clashRow(id).querySelector<HTMLElement>('[role="checkbox"]')!;
+const skillClash = () => cleanup().querySelector<HTMLElement>('[data-skill-clash]');
+const skillPick = (pick: string) => skillClash()!.querySelector<HTMLElement>(`[data-skill-pick="${pick}"] [role="radio"]`)!;
+
+test("the Cleanup step lists each fixed Clash with its file, reason and edit, CONTEXT.md's rename ticked and .scratch/'s delete not", async () => {
+  await openCleanup(project('lar-web'), { ...FOUND, skillClashes: [] });
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Cleanup');
+  expect(text(clashRow('context'))).toContain('CONTEXT.md');
+  expect(text(clashRow('context'))).toContain('Rename CONTEXT.md to GLOSSARY.md');
+  expect(text(clashRow('scratch'))).toContain("from Matt Pocock's local tracker");
+  expect(text(clashRow('scratch'))).toContain('Delete .scratch/');
+  expect([checkbox('context'), checkbox('scratch')].map((c) => c.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+  await settle(() => checkbox('scratch').click());
+  expect(checkbox('scratch').getAttribute('aria-checked')).toBe('true');
+  const { useWizardStore } = await import('./wizard-store.ts');
+  expect(useWizardStore.getState().run!.cleanup).toEqual({ ticks: { scratch: true }, skills: {} });
+  expect(nextButton().disabled).toBe(false);
+});
+
+test('the Always written list names the Agent skills block, the three docs/agents/ files and .lar-factory.json', async () => {
+  await openCleanup(project('lar-web'));
+  const written = [...cleanup().querySelectorAll<HTMLElement>('[data-written]')];
+  expect(written.map((w) => w.dataset.written)).toEqual(['## Agent skills', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md', '.lar-factory.json']);
+  expect(text(written[0])).toContain('In CLAUDE.md if the repository has one, else in AGENTS.md');
+  expect(text(written[4])).toContain('The Repository config');
+  expect(text(cleanup())).toContain('The fixed checks found no Clash.');
+});
+
+test('a project skill named like a bundled skill keeps Next disabled until Delete it, or a rename to a name no other skill has', async () => {
+  await openCleanup(project('lar-web'), FOUND);
+  expect(text(skillClash())).toContain('.claude/skills/code-review/');
+  expect(text(skillClash())).toContain('Next needs Delete it in the PR, or Rename it.');
+  expect(nextButton().disabled).toBe(true);
+  await settle(() => skillPick('rename').click());
+  const name = () => skillClash()!.querySelector<HTMLInputElement>('[data-field="skill-name"] input')!;
+  await type(name(), 'Web Review');
+  expect(text(skillClash()), 'no path from an invalid name').toContain('.claude/skills/…/');
+  for (const [typed, why] of [['tdd', 'tdd is a bundled skill’s name too.'], ['web-deploy', 'Another project skill is named web-deploy.']]) {
+    await type(name(), typed!);
+    expect(text(skillClash()!.querySelector('[data-problem]')), typed).toBe(why);
+    expect(name().getAttribute('aria-invalid'), typed).toBe('true');
+    expect(nextButton().disabled, typed).toBe(true);
+  }
+  await type(name(), 'web-code-review');
+  expect(skillClash()!.querySelector('[data-problem]')).toBeNull();
+  expect(text(skillClash())).toContain('.claude/skills/web-code-review/');
+  expect(nextButton().disabled).toBe(false);
+  await settle(() => skillPick('delete').click());
+  expect(nextButton().disabled).toBe(false);
+});
+
+test('a refused rename restored on Resume shows its problem as an error straight away', async () => {
+  await openCleanup(project('lar-web'), FOUND);
+  await settle(() => skillPick('rename').click());
+  await type(skillClash()!.querySelector<HTMLInputElement>('[data-field="skill-name"] input')!, 'tdd');
+  await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
+  const { useWizardStore } = await import('./wizard-store.ts');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const kept = JSON.parse(String((fetchMock.mock.calls as unknown as [string, RequestInit][])
+    .findLast(([url]) => url === '/api/onboarding/repositories')![1].body)) as { repo: string; progress: never };
+  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, onboarding: [kept] }));
+  await settle(() => useWizardStore.getState().resume('maddec01/lar-web'));
+  await settle();
+  const name = skillClash()!.querySelector<HTMLInputElement>('[data-field="skill-name"] input')!;
+  expect(name.value).toBe('tdd');
+  expect(name.getAttribute('aria-invalid')).toBe('true');
+  expect(skillClash()!.querySelector('[data-problem]')!.className).toContain('text-destructive-foreground');
+});
+
+test('fixed checks the board can\'t run show why with Retry, and Next waits until Retry runs them', async () => {
+  await openCleanup(project('lar-web'), { error: "Can't read maddec01/lar-web's default branch: HTTP 502" });
+  const alert = cleanup().querySelector('[role="alert"]')!;
+  expect(text(alert)).toContain("Can't read maddec01/lar-web's default branch: HTTP 502");
+  expect(nextButton().disabled).toBe(true);
+  answerClashes(NONE);
+  await settle(() => [...alert.querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
+  await settle();
+  expect(cleanup().querySelector('[role="alert"]')).toBeNull();
+  expect(nextButton().disabled).toBe(false);
+});
+
+test('with a reused .lar-factory.json, Checks goes on to Cleanup, which keeps the file and ends in Finish with no PR', async () => {
+  const reused = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } });
+  await openSetup(reused);
+  answerChecks();
+  await openChecks();
+  expect(footerButton('Finish'), 'no Finish on Checks').toBeUndefined();
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED }));
+  answerClashes(NONE);
+  await settle(() => nextButton().click());
+  await settle();
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Cleanup');
   expect(footerButton('Next'), 'no Pull request step').toBeUndefined();
+  expect(text(cleanup().querySelector('[data-written=".lar-factory.json"]'))).toContain('Kept as it is.');
   const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/finish'
     ? new Response(JSON.stringify({ board: { ...sample, onboarding: [] }, error: null })) : served(url, init));
@@ -339,13 +465,9 @@ function answerPr(answer: { prUrl: string } | { error: string }): void {
   });
 }
 
-/** Answers the setup step with the repository's issues and a role, passes Checks and opens the Pull request step. */
+/** Answers the setup step with the repository's issues and a role, passes Checks and Cleanup, and opens the Pull request step. */
 async function openPrStep(): Promise<void> {
-  await openSetup(project('lar-web'));
-  await settle(() => choice('issues').querySelector<HTMLElement>('[role="radio"]')!.click());
-  await type(input('role')!, 'Web client');
-  answerChecks();
-  await openChecks();
+  await openCleanup(project('lar-web'));
   await settle(() => nextButton().click());
 }
 
@@ -464,7 +586,7 @@ test('once the PR merges the step says the repository is onboarded, and Go to th
   await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [] }));
   expect(text(prStep())).toContain('maddec01/lar-web is onboarded');
   const bar = dialog()!.querySelector('[data-slot="dialog-header"] [data-slot="progress"]')!;
-  expect([bar.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow'), text(bar.querySelector('[data-slot="progress-caption"]'))], 'the Pull request step is done too').toEqual(['4', 'Onboarded']);
+  expect([bar.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow'), text(bar.querySelector('[data-slot="progress-caption"]'))], 'the Pull request step is done too').toEqual(['5', 'Onboarded']);
   fetchMock.mockClear();
   await settle(() => footerButton('Go to the board')!.click());
   expect(dialog()).toBeNull();

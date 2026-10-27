@@ -14,9 +14,9 @@ test('the dialog is 768px wide with a scrolling body, the step, its place and th
   expect(dialog()!.classList.contains('max-w-3xl'), '48rem is 768px').toBe(true);
   expect(inDialog('[data-slot="dialog-panel"]')).not.toBeNull();
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('T3 project');
-  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard a repository · step 1 of 4');
+  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard a repository · step 1 of 5');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('0');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label'), 'the bar is named by its caption').toBe('0 of 4 done');
+  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label'), 'the bar is named by its caption').toBe('0 of 5 done');
 });
 
 test('Next is disabled until a project is picked, then shows the next step, and Back returns', async () => {
@@ -27,7 +27,7 @@ test('Next is disabled until a project is picked, then shows the next step, and 
   expect(button('Next')!.disabled).toBe(false);
   await settle(() => button('Next')!.click());
   expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('Provider and item source');
-  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 4');
+  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 5');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('1');
   expect(button('Next')!.disabled, 'the step waits for its answers').toBe(true);
   await settle(() => button('Back')!.click());
@@ -39,9 +39,9 @@ test('a run that reuses its .lar-factory.json counts no Pull request step', asyn
   await openOnboarding([project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client' } })]);
   await settle(() => radio('lar-web').click());
   await settle(() => button('Next')!.click());
-  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 3');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuemax')).toBe('3');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label')).toBe('1 of 3 done');
+  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 4');
+  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuemax')).toBe('4');
+  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label')).toBe('1 of 4 done');
 });
 
 test('Onboard a repository after a close starts a new run', async () => {

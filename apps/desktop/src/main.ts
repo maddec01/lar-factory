@@ -30,6 +30,7 @@ import * as LaunchSecret from "./board-server/launch-secret.ts";
 import * as RestartDialog from "./updates/restart-dialog.ts";
 import * as ShellEnvironment from "./shell-environment/ShellEnvironment.ts";
 import * as StartingPage from "./window/starting-page.ts";
+import * as WindowBackground from "./window/window-background.ts";
 import * as AppUpdates from "./updates/AppUpdates.ts";
 import * as ChannelSetting from "./updates/channel-setting.ts";
 import * as ElectronUpdater from "./updates/ElectronUpdater.ts";
@@ -67,6 +68,8 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
     minWidth: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.width,
     minHeight: MainWindowBounds.MIN_MAIN_WINDOW_SIZE.height,
     title: "Lar Factory",
+    // The design system's background, so no white shows before a page paints or between the pages.
+    backgroundColor: WindowBackground.color(Electron.nativeTheme.shouldUseDarkColors),
     // Shown once the first page paints, already maximized if restoring that, so it doesn't open small and then grow.
     show: false,
     ...WindowTitleBar.options(process.platform),
@@ -77,6 +80,9 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
       sandbox: true,
     },
   });
+  const followTheme = () => window.setBackgroundColor(WindowBackground.color(Electron.nativeTheme.shouldUseDarkColors));
+  Electron.nativeTheme.on("updated", followTheme);
+  window.once("closed", () => Electron.nativeTheme.off("updated", followTheme));
   window.once("ready-to-show", () => {
     // A window whose saved bounds no longer fit a display opens as a new one, not maximized.
     if (persisted.mainWindowMaximized && bounds === persisted.mainWindowBounds) window.maximize();

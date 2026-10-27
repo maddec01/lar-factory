@@ -15,6 +15,23 @@ export interface WorkItem {
   area?: string;
   /** The ids of the pull requests linked to it, each read from `pullRequests`. */
   prs?: number[];
+  /** Its description, and the format Azure DevOps says it is in, which only a 7.2-preview.3 read returns. */
+  description?: string;
+  descriptionFormat?: 'Markdown' | 'Html';
+  createdBy?: string;
+  assignedTo?: string;
+  created?: string;
+  iteration?: string;
+  /** Its comments, oldest first; a comment without a format is one a 7.1-preview.4 read gives none. */
+  comments?: FakeComment[];
+}
+
+export interface FakeComment {
+  id: number;
+  by: string;
+  date: string;
+  text: string;
+  format?: 'markdown' | 'html';
 }
 
 /** The fake team's area path, which its area paths include with their children unless a test says otherwise. */
@@ -60,10 +77,12 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   const byId = new Map(items.map((i) => [i.id, i]));
   const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
   const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
-  const raw = (i: WorkItem) => ({
-    id: i.id, rev: 1, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
+  const raw = (i: WorkItem, version?: string) => ({
+    id: i.id, rev: 1, ...version === '7.2-preview.3' && i.descriptionFormat && { multilineFieldsFormat: { 'System.Description': i.descriptionFormat } }, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
     fields: {
       'System.WorkItemType': i.type, 'System.State': i.state, 'System.AreaPath': i.area ?? TEAM_AREA, 'System.Title': i.title ?? `Item ${i.id}`, 'System.ChangedDate': '2026-10-21T08:00:00Z',
+      ...i.description !== undefined && { 'System.Description': i.description }, ...i.createdBy && { 'System.CreatedBy': { displayName: i.createdBy, uniqueName: `${i.createdBy}@contoso.com` } },
+      ...i.assignedTo && { 'System.AssignedTo': { displayName: i.assignedTo } }, ...i.created && { 'System.CreatedDate': i.created }, ...i.iteration && { 'System.IterationPath': i.iteration },
       ...i.tags && { 'System.Tags': i.tags }, ...i.parent && { 'System.Parent': i.parent }, ...i.closed && { 'Microsoft.VSTS.Common.ClosedDate': i.closed },
     },
     relations: [
@@ -125,7 +144,21 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         const id = Number(route(args, 'id'));
         if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
         if (args.includes('--http-method')) patches.push({ id, ops: JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as unknown[] });
-        return JSON.stringify(raw(byId.get(id)!));
+        return JSON.stringify(raw(byId.get(id)!, flag(args, '--api-version')));
+      }
+      if (resource === 'wit/comments') {
+        // Newest first, $top at a time; the continuation token is how many it has already given.
+        const id = Number(route(args, 'workItemId'));
+        if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
+        const query = Object.fromEntries(args.slice(args.indexOf('--query-parameters') + 1).filter((a) => !a.startsWith('--')).map((q) => q.split('=') as [string, string]));
+        const newest = [...byId.get(id)!.comments ?? []].reverse();
+        const from = Number(query.continuationToken ?? 0);
+        const top = Number(query['$top']);
+        const page = newest.slice(from, from + top);
+        const withFormat = flag(args, '--api-version').startsWith('7.1-preview');
+        return JSON.stringify({ totalCount: newest.length, count: page.length,
+          comments: page.map((c) => ({ id: c.id, text: c.text, createdDate: c.date, createdBy: { displayName: c.by }, ...withFormat && c.format && { format: c.format } })),
+          ...from + top < newest.length && { continuationToken: String(from + top), nextPage: 'https://dev.azure.com/contoso/_apis/wit/workItems/1/comments?continuationToken=x' } });
       }
       if (resource === 'wit/tags' && args.includes('--http-method')) {
         const from = route(args, 'tagIdOrName')!;

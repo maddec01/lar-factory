@@ -50,6 +50,8 @@ export interface HttpDeps {
   previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | { status: number; error: string }>;
   /** Reopens an onboarding's PR that closed without merging, returning the repositories still onboarding, or gh's problem. */
   reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
+  /** Reset of a repository still onboarding: closes its open onboarding PR and drops its entry, returning the repositories still onboarding, or gh's problem. */
+  resetOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /**
    * Edit's load: an onboarded repository's .lar-factory.json values and its labels, or why it can't. The values come
    * from its open Edit PR's branch, which `editPr` names, while there is one, else from its default branch.
@@ -133,7 +135,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
   runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
-  readEditConfig, openEditPr }: HttpDeps): BoardServer {
+  resetOnboarding, readEditConfig, openEditPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -261,6 +263,16 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         const reopened = await reopenOnboardingPr(input);
         if ('error' in reopened) return { status: reopened.status, body: { error: reopened.error } };
         board.update({ onboarding: reopened.onboarding });
+        board.push();
+        return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+    '/api/onboarding/reset': {
+      what: 'the onboarding to reset', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const reset = await resetOnboarding(input);
+        if ('error' in reset) return { status: reset.status, body: { error: reset.error } };
+        board.update({ onboarding: reset.onboarding });
         board.push();
         return { status: 200, body: withBoard({ error: null }) };
       },

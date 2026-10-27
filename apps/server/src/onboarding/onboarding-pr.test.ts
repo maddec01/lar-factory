@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRepositoryList, saveOnboarding, savePrClosed } from '../config/repository-config.ts';
 import { WORKFLOW_LABELS } from '@lar-factory/shared';
-import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr } from './onboarding-pr.ts';
+import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr, resetOnboarding } from './onboarding-pr.ts';
 
 const progress = { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-web' } };
 const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: ['app: music'] };
@@ -376,4 +376,51 @@ test("Reopen PR that gh refuses answers with gh's message and keeps the mark; on
   assert.deepEqual(readRepositoryList(dir)[0], { repo: 'maddec01/lar-web', onboarding: closed });
   assert.deepEqual(await reopenOnboardingPr({ repo: 'maddec01/lar-cli' }, dir, refusing), { status: 409, error: 'maddec01/lar-cli has no onboarding PR to reopen.' });
   assert.deepEqual(await reopenOnboardingPr({ repo: 'lar-cli' }, dir, refusing), { status: 400, error: 'Send the repository whose onboarding PR to reopen.' });
+});
+
+const RESET = 'Reset on the lar Factory board dropped this onboarding, so it closed this PR.';
+
+test('Reset closes an onboarding\'s open PR with a comment, then drops its entry and keeps the others', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } },
+    { repo: 'maddec01/lar-cli', onboarding: progress }]);
+  const gh = github({ [PR]: 'OPEN' });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, gh.run), { onboarding: [{ repo: 'maddec01/lar-cli', progress }] });
+  assert.deepEqual(gh.changed, [['pr', 'close', PR, '--comment', RESET]]);
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
+});
+
+test('Reset of an onboarding whose PR closed without merging, or that has no PR yet, only drops its entry', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
+  const gh = github({ [PR]: 'CLOSED' });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, gh.run), { onboarding: [{ repo: 'maddec01/lar-cli', progress }] });
+  const none = async () => assert.fail('no PR, no gh call');
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-cli' }, dir, none), { onboarding: [] });
+  assert.deepEqual(gh.changed, []);
+  assert.deepEqual(readRepositoryList(dir), []);
+});
+
+test("Reset whose PR gh can't close or read answers with gh's message and keeps the entry", async (t) => {
+  const waiting = { ...progress, step: 'pr', prUrl: PR };
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: waiting }]);
+  const refusing = async (args: string[]) => {
+    if (args[1] === 'view') return 'OPEN\n';
+    throw new Error('gh pr close failed: HTTP 403: Resource not accessible');
+  };
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, refusing),
+    { status: 502, error: "Can't close maddec01/lar-web's onboarding PR: gh pr close failed: HTTP 403: Resource not accessible" });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, github({}).run),
+    { status: 502, error: "Can't close maddec01/lar-web's onboarding PR: gh pr view failed: HTTP 502" });
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: waiting }]);
+});
+
+test('Reset of an onboarding whose PR merged, of an onboarded repository, or of no repository is refused and keeps the list', async (t) => {
+  const waiting = { ...progress, step: 'pr', prUrl: PR };
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: waiting }, { repo: 'maddec01/lar-factory' }]);
+  const gh = github({ [PR]: 'MERGED' });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, gh.run),
+    { status: 409, error: 'maddec01/lar-web\'s onboarding PR merged, so the board finishes its onboarding on its next refresh.' });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-factory' }, dir, gh.run), { status: 409, error: 'maddec01/lar-factory is not onboarding.' });
+  assert.deepEqual(await resetOnboarding({ repo: 'lar-web' }, dir, gh.run), { status: 400, error: 'Send the repository whose onboarding to reset.' });
+  assert.deepEqual(gh.changed, []);
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: waiting }, { repo: 'maddec01/lar-factory' }]);
 });

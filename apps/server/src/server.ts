@@ -20,7 +20,7 @@ import { createClashRuns } from './onboarding/clash-runs.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
-import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr } from './onboarding/onboarding-pr.ts';
+import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr, resetOnboarding } from './onboarding/onboarding-pr.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { findFixedClashes } from './onboarding/fixed-clashes.ts';
 import { createCustomLabel, createRepositoryLabels, readRepositoryLabels, renameRepositoryLabels } from './onboarding/repository-labels.ts';
@@ -327,6 +327,7 @@ const { server, endStreams } = createBoardServer({
   findFixedClashes: (input) => findFixedClashes(input),
   startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo),
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
+  resetOnboarding: (input) => resetOnboarding(input),
   readEditConfig: (input) => readEditConfig(input), openEditPr: (input) => openEditPr(input),
 });
 

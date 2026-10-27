@@ -195,7 +195,7 @@ test("no current iteration, a logged-out az and a missing azure-devops extension
     'no extension': fakeAz({ items: SPRINT, fail: (args) => args[0] === 'boards' ? new Error("az boards iteration failed: ERROR: 'boards' is misspelled or not recognized by the system.") : undefined }),
   };
   const expected = {
-    'no iteration': { repo: REPO, problem: `Team ${TEAM} has no current iteration in contoso/Fabrikam Fiber. Give the team a sprint whose dates cover today in its project settings, or name another team in .lar-factory.json.` },
+    'no iteration': { repo: REPO, problem: `Team ${TEAM} has no current iteration in contoso/Fabrikam Fiber. Give the team a sprint whose dates cover today in its project settings, or Edit the repository in Settings › Repositories to name another team.` },
     'logged out': { repo: REPO, problem: 'az is logged out.', fix: 'az login' },
     'no extension': { repo: REPO, problem: 'az has no azure-devops extension.', fix: 'az extension add --name azure-devops' },
   };

@@ -147,6 +147,18 @@ test('an onboarding setup check answers with its result', async (t) => {
   assert.deepEqual([unknown.status, await unknown.json()], [400, { error: 'Send the check to run, the repository, its T3 project and its item source.' }]);
 });
 
+test("onboarding's fixed checks answer with the default branch's Clashes, or gh's problem", async (t) => {
+  const board = await startBoard(t, { files: ['CONTEXT.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/web-deploy/SKILL.md'] });
+  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/clashes');
+  const found = await response.json() as { clashes: { id: string }[]; skillClashes: unknown; projectSkills: string[] };
+  assert.deepEqual([response.status, found.clashes.map((c) => c.id), found.skillClashes, found.projectSkills],
+    [200, ['context'], [{ name: 'tdd', path: '.claude/skills/tdd/' }], ['tdd', 'web-deploy']]);
+  await board.update({ fail: 'tree' });
+  const failed = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/clashes');
+  assert.equal(failed.status, 502);
+  assert.match((await failed.json() as { error: string }).error, /^Can't read maddec01\/lar-web's default branch: .*HTTP 502/);
+});
+
 test('finishing an onboarding that reuses .lar-factory.json puts its repository on the board', async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
@@ -160,9 +172,9 @@ test('finishing an onboarding that reuses .lar-factory.json puts its repository 
   assert.deepEqual(data.repos.map((r) => r.repo), ['maddec01/lar-factory', 'maddec01/lar-web']);
 });
 
-test('the sample board runs no onboarding check and finishes no onboarding', async (t) => {
+test('the sample board runs no onboarding check, finds no Clash and finishes no onboarding', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/checks', '/api/onboarding/finish']) {
+  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/finish']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }

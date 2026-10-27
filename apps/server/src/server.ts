@@ -21,6 +21,7 @@ import { finishOnboarding } from './onboarding/finish-onboarding.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import { createPrOpener, followOnboardingPrs, reopenOnboardingPr } from './onboarding/onboarding-pr.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
+import { findFixedClashes } from './onboarding/fixed-clashes.ts';
 import { runSetupCheck } from './onboarding/setup-checks.ts';
 import { loadBuild } from './page/page.ts';
 import { boardDataDir, recordBoard } from './port/board-record.ts';
@@ -310,7 +311,7 @@ const { server, endStreams } = createBoardServer({
   recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
-  runSetupCheck: (input) => runSetupCheck(input), finishOnboarding: (input) => finishOnboarding(input, undefined, undefined, configChecks.forget),
+  runSetupCheck: (input) => runSetupCheck(input), findFixedClashes: (input) => findFixedClashes(input), finishOnboarding: (input) => finishOnboarding(input, undefined, undefined, configChecks.forget),
   openOnboardingPr: createPrOpener(), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
 });
 

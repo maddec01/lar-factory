@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, type FixedClashes, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -35,6 +35,8 @@ export interface HttpDeps {
   createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | { status: number; error: string }>;
   /** Runs one of onboarding's setup checks on the body's repository, T3 project and item source, or says why it can't. */
   runSetupCheck(input: Record<string, unknown>): Promise<{ result: SetupCheckResult } | { status: number; error: string }>;
+  /** Runs onboarding's fixed checks for known Clashes on the body's repository's default branch, or says why it can't. */
+  findFixedClashes(input: Record<string, unknown>): Promise<FixedClashes | { status: number; error: string }>;
   /** Finishes an onboarding that reuses its .lar-factory.json, returning the repositories still onboarding, or why it can't. */
   finishOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
@@ -116,7 +118,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  runSetupCheck, finishOnboarding, openOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
+  runSetupCheck, findFixedClashes, finishOnboarding, openOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -192,6 +194,13 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       async run(input) {
         const checked = await runSetupCheck(input);
         return 'error' in checked ? { status: checked.status, body: { error: checked.error } } : { status: 200, body: { ...checked, error: null } };
+      },
+    },
+    '/api/onboarding/clashes': {
+      what: 'the repository to check', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const found = await findFixedClashes(input);
+        return 'error' in found ? { status: found.status, body: { error: found.error } } : { status: 200, body: { ...found, error: null } };
       },
     },
     '/api/onboarding/finish': {

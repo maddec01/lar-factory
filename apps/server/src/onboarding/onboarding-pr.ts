@@ -6,6 +6,7 @@
 // or whose default branch got a .lar-factory.json another way when the PR adds one, closing the PR then, and marks a
 // PR closed without merging, which the Pull request step offers to reopen. Reset closes an onboarding's open PR and
 // drops the onboarding from the list; on an onboarded repository it opens the reset PR and marks the entry resetting.
+// Each refresh drops a resetting entry once its reset PR merged or closed unmerged.
 
 import {
   isRecord, isSkillName, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
@@ -285,6 +286,26 @@ export async function followOnboardingPrs(list: OnboardedRepository[], dir = boa
       } else if ((state === 'CLOSED') !== !!onboarding.prClosed) {
         savePrClosed(repo, state === 'CLOSED', dir);
       }
+    } catch (err) {
+      failed(repo, message(err));
+    }
+  }
+  return followed.length ? readRepositoryList(dir) : list;
+}
+
+/**
+ * Follows each reset PR in `list` and returns the list as the file has it then. A repository whose reset PR merged, or
+ * closed without merging, is dropped from the list, and `dropped` hears it; an open PR leaves the entry resetting. A PR
+ * that can't be read leaves its entry as it is, and `failed` hears why.
+ */
+export async function followResetPrs(list: OnboardedRepository[], dir = boardDataDir(), run?: Run, { failed = () => {}, dropped = () => {} }: {
+  failed?: (repo: string, problem: string) => void; dropped?: (repo: string) => void } = {}): Promise<OnboardedRepository[]> {
+  const followed = list.flatMap(({ repo, resetting }) => resetting ? [{ repo, prUrl: resetting.prUrl }] : []);
+  for (const { repo, prUrl } of followed) {
+    try {
+      if (await prState(prUrl, run) === 'OPEN') continue;
+      dropRepository(repo, dir);
+      dropped(repo);
     } catch (err) {
       failed(repo, message(err));
     }

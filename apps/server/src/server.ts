@@ -20,7 +20,9 @@ import { createClashRuns } from './onboarding/clash-runs.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
-import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr, resetOnboarding } from './onboarding/onboarding-pr.ts';
+import {
+  createPrOpener, followOnboardingPrs, followResetPrs, previewOnboardingPr, reopenOnboardingPr, resetOnboarding,
+} from './onboarding/onboarding-pr.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { findFixedClashes } from './onboarding/fixed-clashes.ts';
 import { createCustomLabel, createRepositoryLabels, readRepositoryLabels, renameRepositoryLabels } from './onboarding/repository-labels.ts';
@@ -84,6 +86,17 @@ const items = onboardedSources(async () => {
     },
     // A finished onboarding has its .lar-factory.json now, which the kept answer may not say.
     finished: configChecks.forget });
+  // A reset PR that merged or closed unmerged drops its entry, so offerOnboarding, which runs after this read, offers the
+  // repository again while its default branch has a .lar-factory.json. A problem logs once until it changes or the PR reads.
+  const resetProblems = new Map<string, string>();
+  list = await followResetPrs(list, undefined, undefined, {
+    failed: (repo, problem) => {
+      if (resetFollowProblems.get(repo) !== problem) log(`can't follow ${repo}'s reset PR: ${problem}`);
+      resetProblems.set(repo, problem);
+    },
+    // The merge took its .lar-factory.json away, which the kept answer may still have.
+    dropped: configChecks.forget });
+  resetFollowProblems = resetProblems;
   // A repository still onboarding has no Repository config on its default branch until its PR merges, and one
   // resetting is off the board though its default branch still has one. Each refresh asks gh for every open Edit PR, so
   // its row's mark survives a restart and goes once the PR merges or closes.
@@ -96,6 +109,8 @@ const items = onboardedSources(async () => {
   });
   return read;
 });
+/** Each resetting repository's problem following its reset PR on the last read, so a problem that lasts logs once. */
+let resetFollowProblems = new Map<string, string>();
 /** Each repository's .lar-factory.json answer for onboarding, kept until Recheck. */
 const configChecks = createConfigChecks();
 /** T3's projects as onboarding offers them, as the list is now. */

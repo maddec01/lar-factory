@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRepositoryList, saveOnboarding, savePrClosed } from '../config/repository-config.ts';
 import { WORKFLOW_LABELS } from '@lar-factory/shared';
-import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr, resetOnboarding } from './onboarding-pr.ts';
+import {
+  createPrOpener, followOnboardingPrs, followResetPrs, previewOnboardingPr, reopenOnboardingPr, resetOnboarding,
+} from './onboarding-pr.ts';
 
 const progress = { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-web' } };
 const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: ['app: music'] };
@@ -357,6 +359,40 @@ test('an onboarding that reuses its .lar-factory.json finishes only once its PR 
   assert.deepEqual(await follow(dir, gh), [{ repo: 'maddec01/lar-web', onboarding: kept }]);
   assert.deepEqual(gh.changed, []);
   assert.deepEqual(await follow(dir, github({ [PR]: 'MERGED' })), [{ repo: 'maddec01/lar-web' }]);
+});
+
+const followReset = (dir: string, gh: ReturnType<typeof github>, failed: (repo: string, problem: string) => void = () => assert.fail(),
+  dropped: (repo: string) => void = () => {}) =>
+  followResetPrs(readRepositoryList(dir), dir, gh.run, { failed, dropped });
+
+test('a repository whose reset PR merged or closed unmerged is dropped from the list; one whose PR is open stays resetting', async (t) => {
+  const merged = 'https://github.com/maddec01/lar-cli/pull/3';
+  const closed = 'https://github.com/maddec01/lar-docs/pull/4';
+  const resetting = { repo: 'maddec01/lar-web', resetting: { prUrl: PR } };
+  const onboarding = { repo: 'maddec01/lar-apple', onboarding: { ...progress, step: 'pr', prUrl: 'https://github.com/maddec01/lar-apple/pull/5' } };
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-factory' }, resetting, { repo: 'maddec01/lar-cli', resetting: { prUrl: merged } },
+    { repo: 'maddec01/lar-docs', resetting: { prUrl: closed } }, onboarding]);
+  const dropped: string[] = [];
+  const list = await followReset(dir, github({ [PR]: 'OPEN', [merged]: 'MERGED', [closed]: 'CLOSED' }), undefined, (repo) => dropped.push(repo));
+  const expected = [{ repo: 'maddec01/lar-factory' }, resetting, onboarding];
+  assert.deepEqual(list, expected);
+  assert.deepEqual(readRepositoryList(dir), expected);
+  assert.deepEqual(dropped, ['maddec01/lar-cli', 'maddec01/lar-docs']);
+});
+
+test("a reset PR whose state can't be read leaves its entry as it is and reports why", async (t) => {
+  const resetting = { repo: 'maddec01/lar-web', resetting: { prUrl: PR } };
+  const dir = await dataDir(t, [resetting]);
+  const problems: string[] = [];
+  assert.deepEqual(await followReset(dir, github({}), (repo, problem) => problems.push(`${repo}: ${problem}`)), [resetting]);
+  assert.deepEqual(readRepositoryList(dir), [resetting]);
+  assert.deepEqual(problems, ['maddec01/lar-web: gh pr view failed: HTTP 502']);
+});
+
+test('a list with no repository resetting is returned as it is, without asking gh', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-factory' }]);
+  const list = readRepositoryList(dir);
+  assert.equal(await followResetPrs(list, dir, async () => assert.fail('gh was asked')), list);
 });
 
 test("Reopen PR runs gh pr reopen on the onboarding's PR and drops its closed mark", async (t) => {

@@ -546,9 +546,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     opener: null,
     start: (offer) => {
       checkRuns++;
-      // The board offers only GitHub repositories until build #386.
       clashReads++;
-      const run: Run = { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer ? 'GitHub' : null,
+      const run: Run = { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer?.provider ?? null,
         savedAs: null, setup: null, customLabels: [], cleanup: null, prUrl: null };
       untouchedOffer = offer ? run : null;
       stopAgentReads();

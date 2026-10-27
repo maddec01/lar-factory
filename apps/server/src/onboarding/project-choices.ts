@@ -15,7 +15,7 @@ function providerOf(origin: string): Provider | null {
 }
 
 /**
- * T3's live projects as onboarding offers them, in T3's order, with `configOf` telling whether a GitHub repository has
+ * T3's live projects as onboarding offers them, in T3's order, with `configOf` telling whether a repository has
  * .lar-factory.json on its default branch; throws when T3's projects can't be read.
  */
 export async function projectChoices(list: readonly { repo: string }[], configOf: (repo: string) => Promise<ConfigAnswer>,
@@ -27,14 +27,13 @@ export async function projectChoices(list: readonly { repo: string }[], configOf
   return Promise.all(found.map(async ({ id, title, folder, origin }) => {
     const provider = origin ? providerOf(origin) : null;
     const repo = provider === 'GitHub' ? githubRepo(origin) : provider === 'Azure DevOps' ? azureRepo(origin!) : null;
-    // Reading an Azure DevOps repository's file waits for build #386.
-    const config = repo && provider === 'GitHub' ? await configOf(repo) : { hasConfig: null };
+    const config = repo ? await configOf(repo) : { hasConfig: null };
     return { id, name: title, folder, repo, provider: repo ? provider : null, ...config, onBoard: !!repo && listed.has(repo.toLowerCase()) };
   }));
 }
 
-/** An offer for each T3 project whose GitHub repository has .lar-factory.json and isn't on the list. Azure DevOps waits for build #386. */
+/** An offer for each T3 project whose repository has .lar-factory.json and isn't on the list. */
 export function onboardingOffers(choices: readonly ProjectChoice[]): OnboardingOffer[] {
-  return choices.filter((c) => c.provider === 'GitHub' && c.hasConfig === true && !c.onBoard && c.repo)
-    .map(({ id, name, repo }) => ({ projectId: id, name, repo: repo! }));
+  return choices.filter((c) => c.provider && c.hasConfig === true && !c.onBoard && c.repo)
+    .map(({ id, name, repo, provider }) => ({ projectId: id, name, repo: repo!, provider: provider! }));
 }

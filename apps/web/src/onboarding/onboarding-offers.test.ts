@@ -6,7 +6,7 @@ import { $, $$, mountPage, sample, settle, text } from '../../test/support.ts';
 import type { BoardData } from '@lar-factory/shared';
 import { dialog, empty, project, serve } from './onboarding-support.ts';
 
-const offered = (data: BoardData): BoardData => ({ ...data, onboardingOffers: [{ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }] });
+const offered = (data: BoardData): BoardData => ({ ...data, onboardingOffers: [{ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub' as const }] });
 const offer = () => $('[data-onboarding-offer="maddec01/lar-web"]');
 
 test('the empty board offers to onboard a T3 project whose repository has .lar-factory.json', async () => {

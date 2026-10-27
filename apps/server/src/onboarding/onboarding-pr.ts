@@ -4,13 +4,14 @@
 // branch is lar-factory/onboarding; when that is taken, its open PR is reused with the branch moved to the new commit,
 // and with none the first free lar-factory/onboarding-N is used. Each refresh finishes an onboarding whose PR merged,
 // or whose default branch got a .lar-factory.json another way when the PR adds one, closing the PR then, and marks a
-// PR closed without merging, which the Pull request step offers to reopen.
+// PR closed without merging, which the Pull request step offers to reopen. Reset closes an onboarding's open PR and
+// drops the onboarding from the list.
 
 import {
   isRecord, isSkillName, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
 } from '@lar-factory/shared';
 import {
-  type OnboardedRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed,
+  type OnboardedRepository, dropRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed,
   stillOnboarding,
 } from '../config/repository-config.ts';
 import {
@@ -24,6 +25,7 @@ import { workflowLabelsProblem } from './repository-labels.ts';
 
 const ONBOARDING_BRANCH = 'lar-factory/onboarding';
 const TITLE = 'chore: onboard to lar Factory';
+const RESET = 'Reset on the lar Factory board dropped this onboarding, so it closed this PR.';
 const LANDED = '`.lar-factory.json` reached the default branch without this PR, so lar Factory finished onboarding with that file '
   + 'and closed this PR.';
 
@@ -201,6 +203,33 @@ export async function reopenOnboardingPr(input: Record<string, unknown>, dir = b
   try { await reopenPr(prUrl, run); }
   catch (err) { return { status: 502, error: `Can't reopen ${repo}'s onboarding PR: ${message(err)}` }; }
   try { return { onboarding: stillOnboarding(savePrClosed(repo, false, dir)) }; }
+  catch (err) { return { status: 409, error: message(err) }; }
+}
+
+/**
+ * Reset of the body's `repo` while it is still onboarding: closes its onboarding PR with a comment while the PR is
+ * open, then drops its entry from the list, and returns the repositories still onboarding. Opens no PR. Refuses an
+ * onboarded repository and one whose PR merged, and keeps the entry, with gh's message, when gh can't read or close the PR.
+ */
+export async function resetOnboarding(input: Record<string, unknown>, dir = boardDataDir(), run?: Run):
+  Promise<{ onboarding: OnboardingRepository[] } | Refused> {
+  const { repo } = input;
+  if (!isRepo(repo)) return { status: 400, error: 'Send the repository whose onboarding to reset.' };
+  let entry;
+  try { entry = readRepositoryList(dir).find((e) => sameRepo(e.repo, repo)); }
+  catch (err) { return { status: 409, error: message(err) }; }
+  if (!entry?.onboarding) return { status: 409, error: `${repo} is not onboarding.` };
+  const { prUrl } = entry.onboarding;
+  if (prUrl) {
+    try {
+      const state = await prState(prUrl, run);
+      if (state === 'MERGED') return { status: 409, error: `${repo}'s onboarding PR merged, so the board finishes its onboarding on its next refresh.` };
+      if (state === 'OPEN') await closePr(prUrl, RESET, run);
+    } catch (err) {
+      return { status: 502, error: `Can't close ${repo}'s onboarding PR: ${message(err)}` };
+    }
+  }
+  try { return { onboarding: stillOnboarding(dropRepository(repo, dir)) }; }
   catch (err) { return { status: 409, error: message(err) }; }
 }
 

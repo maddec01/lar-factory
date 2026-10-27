@@ -1,6 +1,6 @@
 // The board's title bar, in the board app and in a browser: the brand, the scope menu, the Refreshed time, the
-// counters, the List button, Add item, the "for T3 Code" tag, the update button and Settings, past the traffic lights;
-// above the missing-t3 notice only the brand and Settings.
+// counters, the List button, Add item, the "for T3 Code" tag, the update pill while there's an update, and Settings, past
+// the traffic lights; above the missing-t3 notice only the brand and Settings.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { clock } from '@lar-factory/shared';
@@ -29,25 +29,23 @@ const tooltip = async () => {
 /** The title bar's controls, left to right, by name. */
 const CONTROLS = {
   brand: '.brand', scope: 'button.scope', refreshed: '.refreshed', counters: '.counters', list: '.list-button',
-  'add item': '.add-item', 't3 tag': '.t3-tag', update: '.update-button, .update-stand-in', settings: '.open-settings',
+  'add item': '.add-item', 't3 tag': '.t3-tag', update: '.update-button', settings: '.open-settings',
 } as const;
 const controls = () => [...titleBar().querySelectorAll(Object.values(CONTROLS).join(', '))]
   .map((el) => Object.entries(CONTROLS).find(([, selector]) => el.matches(selector))![0]);
 const inset = () => titleBar().className.split(' ').includes('pl-[74px]');
 
-test('the title bar holds the brand, Scope, Refreshed, the counters, List, Add item, the T3 tag, the update button and Settings, in that order', async () => {
-  stubApp({});
+test('the title bar holds the brand, Scope, Refreshed, the counters, List, Add item, the T3 tag, the update pill and Settings, in that order', async () => {
+  stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'available' as const, availableVersion: '1.1.0', message: null })) });
   await mountPage();
   expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 't3 tag', 'update', 'settings']);
   expect(text(titleBar().querySelector('.t3-tag'))).toBe('for T3 Code');
   expect(titleBar().querySelector('header')!.className.split(' ')).toContain('h-13');
 });
 
-test('in a browser the update button is a still stand-in, in the same place', async () => {
+test('in a browser, where nothing updates, there\'s no update pill', async () => {
   await mountPage();
-  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 't3 tag', 'update', 'settings']);
-  const standIn = titleBar().querySelector('.update-stand-in')!;
-  expect([standIn.getAttribute('aria-label'), standIn.getAttribute('aria-disabled')]).toEqual(['Check for updates', 'true']);
+  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 't3 tag', 'settings']);
 });
 
 test('the brand reads "lar Factory": the copied BrandMark, then Factory on its baseline', async () => {

@@ -1,6 +1,6 @@
-// Which action the update button runs and the tooltip it shows, copied from T3 Code's
-// apps/web/src/components/desktopUpdate.logic.ts at 9a391eb, without the release URLs, the Intel build
-// warning and the not-applied update, which the board app's state doesn't have.
+// Which action the update pill runs, copied from T3 Code's apps/web/src/components/desktopUpdate.logic.ts at
+// 9a391eb, without the release URLs, the Intel build warning and the not-applied update, which the board app's
+// state doesn't have. The pill's states and its words are the board's.
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
 
@@ -27,34 +27,41 @@ export function resolveUpdateButtonAction(state: UpdateState): UpdateButtonActio
   return 'none';
 }
 
-export function isUpdateButtonDisabled(state: UpdateState | null): boolean {
-  return state?.status === 'downloading';
+/** The title bar's update pill: hidden with no update, then available, downloading, and ready to restart. A background
+ *  check keeps a downloaded update's pill, which does nothing until the check ends. */
+export type UpdatePill = 'none' | 'available' | 'downloading' | 'ready';
+
+export function resolveUpdatePill(state: UpdateState | null): UpdatePill {
+  if (!state) return 'none';
+  if (state.status === 'downloading') return 'downloading';
+  const action = resolveUpdateButtonAction(state);
+  if (action === 'install' || (state.status === 'checking' && state.downloadedVersion)) return 'ready';
+  return action === 'download' ? 'available' : 'none';
 }
 
-export function getUpdateButtonTooltip(state: UpdateState): string {
-  if (state.status === 'available') {
-    return `Update ${state.availableVersion ?? 'available'} ready to download`;
+/** A download's whole percentage, 0 before the app reports one. */
+export function downloadPercent(state: Pick<UpdateState, 'downloadPercent'>): number {
+  const percent = state.downloadPercent;
+  if (percent === null || !Number.isFinite(percent)) return 0;
+  return Math.floor(Math.min(100, Math.max(0, percent)));
+}
+
+/** What the updater last found, in words: Settings › Updates' status and the changelog's heading. */
+export function updateStatusText(state: UpdateState): string {
+  // A failed download or install keeps its update available or downloaded, with the error.
+  if ((state.errorContext === 'download' || state.errorContext === 'install') && state.message !== null) {
+    const verb = state.errorContext === 'install' ? 'install' : 'download';
+    return `Couldn't ${verb} ${state.downloadedVersion ?? state.availableVersion}: ${state.message}`;
   }
-  if (state.status === 'downloading') {
-    const progress = typeof state.downloadPercent === 'number' ? ` (${Math.floor(state.downloadPercent)}%)` : '';
-    return `Downloading update${progress}`;
+  switch (state.status) {
+    case 'disabled': case 'error': return state.message ?? '';
+    case 'idle': return '';
+    case 'checking': return 'Checking for updates…';
+    case 'up-to-date': return `Up to date on ${state.currentVersion}.`;
+    case 'available': return `${state.availableVersion} is available.`;
+    case 'downloading': return `Downloading ${state.availableVersion}… ${downloadPercent(state)}%`;
+    case 'downloaded': return `${state.downloadedVersion} is ready to install.`;
   }
-  if (state.status === 'downloaded') {
-    return `Update ${state.downloadedVersion ?? state.availableVersion ?? 'ready'} downloaded. Click to restart and install.`;
-  }
-  if (state.status === 'error') {
-    if (state.errorContext === 'download' && state.availableVersion) {
-      return `Download failed for ${state.availableVersion}. Click to retry.`;
-    }
-    if (state.errorContext === 'install' && state.downloadedVersion) {
-      return `Install failed for ${state.downloadedVersion}. Click to retry.`;
-    }
-    if (state.downloadedVersion) {
-      return `Update ${state.downloadedVersion} downloaded. Click to restart and install.`;
-    }
-    return state.message ?? 'Update failed';
-  }
-  return 'Up to date';
 }
 
 /** The board's wording, not T3's running-tasks warning. */
@@ -78,11 +85,4 @@ export function canCheckForUpdate(state: UpdateState | null): boolean {
 export function getUpdateDisabledReason(state: Pick<UpdateState, 'enabled' | 'status' | 'message'> | null): string | null {
   if (!state || (state.enabled && state.status !== 'disabled')) return null;
   return state.message?.trim() || 'Automatic updates are not available in this build.';
-}
-
-export function getUpdateIdleTooltip(state: Pick<UpdateState, 'enabled' | 'status' | 'message'> | null) {
-  const disabledReason = getUpdateDisabledReason(state);
-  return disabledReason
-    ? { title: 'Updates unavailable', detail: disabledReason }
-    : { title: 'Check for updates', detail: null };
 }

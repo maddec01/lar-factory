@@ -32,7 +32,6 @@
 @source "./title-bar";
 @source "./updates/UpdateButton.tsx";
 @source "./updates/UpdateStatusIcon.tsx";
-@source "./updates/refresh-icon.tsx";
 
 code { font: var(--text-xs) var(--font-mono); }
 @layer base {

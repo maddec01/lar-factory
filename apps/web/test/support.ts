@@ -160,7 +160,7 @@ export const posted = () => fetchMock.mock.calls.filter(([url]) => url !== '/api
   return [url, init?.body && JSON.parse(init.body as string)];
 });
 
-/** The updater in a `pnpm run dev` app: off, so the update button shows dimmed with the reason. */
+/** The updater in a `pnpm run dev` app: off, so there is no update pill and Settings gives the reason. */
 export const updatesOff: UpdateState = {
   enabled: false, status: 'disabled', channel: 'latest', currentVersion: '0.0.0', availableVersion: null,
   downloadedVersion: null, releaseNotes: [], omittedReleaseCount: 0, downloadPercent: null, checkedAt: null,

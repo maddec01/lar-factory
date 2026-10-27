@@ -2,12 +2,12 @@
 // label and one line of help. The Cleanup step lists each Clash the fixed checks find, with its edit to tick, and asks
 // Delete or Rename for each project skill named like a bundled skill. Its Clash agent asks for a provider and model,
 // then shows its run's latest message and thread, and the agent's Clashes once the run is done, or why it ended without
-// them with Retry, which starts a new thread. The Pull request step opens the PR that adds .lar-factory.json, then waits for its merge.
+// them with Retry, which starts a new thread. The Pull request step lists what the PR changes, opens it, then waits for its merge.
 
-import { useId, useState, type ReactNode } from 'react';
-import { Check, CircleAlert, ExternalLink, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { Check, CircleAlert, ExternalLink, FileText, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
-  SETUP_CHECKS, isOnboarding, isSkillName, onboardingConfigFile, threadLink, type Clash, type ClashRun, type ModelChoice, type ModelGroup, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting,
+  SETUP_CHECKS, isOnboarding, isSkillName, onboardingConfigFile, threadLink, type Clash, type ClashRun, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting,
   type SkillClash,
 } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
@@ -24,7 +24,7 @@ import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import {
   COMMAND_CHECKS, type Clashes, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, latestRun, nextModel, onboarded, pickedProject,
-  prClosed, setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
+  picksOf, prClosed, setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
 } from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
@@ -576,7 +576,7 @@ function AlwaysWritten({ reused }: { reused: boolean }) {
  * bundled skill, which Next waits for; then the Clash agent and what the PR always writes. A failed run shows the board's problem with Retry.
  */
 function CleanupStep({ run }: { run: Run }) {
-  const { projects, clashes, finishing, findClashes } = useWizardStore();
+  const { projects, clashes, findClashes } = useWizardStore();
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
   if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
@@ -599,7 +599,6 @@ function CleanupStep({ run }: { run: Run }) {
       </>)}
       <ClashAgent run={run} />
       <AlwaysWritten reused={!!project.config} />
-      {finishing.error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t finish onboarding</AlertTitle><AlertDescription>{finishing.error}</AlertDescription></Alert>}
     </div>
   );
 }
@@ -607,18 +606,55 @@ function CleanupStep({ run }: { run: Run }) {
 /** The PR's place, `owner/name#n`, from its URL. */
 const prName = (url: string) => url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
 
+/** A change of the PR as its list shows it: the path, then what the PR does to it. */
+function changeRow(change: OnboardingPrChange): { path: string; what: string } {
+  if (change.kind === 'agent-skills') return { path: change.path, what: 'Writes the ## Agent skills block.' };
+  if (change.kind === 'write') return { path: change.path, what: change.created ? 'Adds the file.' : 'Replaces the file.' };
+  if (change.kind === 'edit') return { path: change.path, what: `Edits line ${change.line}: ${change.reason}` };
+  if (change.kind === 'delete') return { path: change.path, what: 'Deletes it.' };
+  return { path: change.path, what: `Renames it to ${change.to}` };
+}
+
+/** What the PR changes against the default branch, as the board previews it, with Retry when the board can't. */
+function PrChangeList() {
+  const { changes, readPrChanges } = useWizardStore();
+  if (!changes || changes.state === 'reading') {
+    return <p data-reading-changes className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading what the PR changes…</p>;
+  }
+  if (changes.state === 'failed') {
+    return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t list the PR’s changes</AlertTitle><AlertDescription>{changes.error}</AlertDescription>
+      <AlertAction><Button size="xs" variant="outline" onClick={() => void readPrChanges()}><RotateCw /> Retry</Button></AlertAction></Alert>;
+  }
+  return (
+    <ul data-pr-changes className="m-0 grid list-none gap-1 rounded-lg border p-3 text-sm">
+      {changes.changes.map(changeRow).map((row, i) => (
+        <li key={i} data-change={row.path} className="flex items-start gap-2"><FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+          <PathAndWhat path={row.path} what={row.what} /></li>
+      ))}
+    </ul>
+  );
+}
+
 /**
- * The PR that adds .lar-factory.json: what it adds, Open the PR, then the wait for its merge, which the board finishes.
- * A PR closed without merging offers Reopen PR and Start over.
+ * The PR: what it changes, Open the PR with the Cleanup step's picks, then the wait for its merge, which the board
+ * finishes. A PR closed without merging offers Reopen PR and Start over.
  */
 function PrStep({ run }: { run: Run }) {
-  const { projects, pr, openPr, reopenPr, startOver, checkMerge } = useWizardStore();
+  const { projects, clashes, agent, changes, pr, openPr, reopenPr, startOver, checkMerge, readPrChanges } = useWizardStore();
   const data = useBoardStore((s) => s.data);
+  // An open PR's body lists its changes, so the step shows neither the list nor the file it writes until the PR closes.
+  const listed = !run.prUrl || prClosed(run, data);
+  // Resumed, the step has read no changes, nor the picks they need; with the PR open, it reads them once the PR closes.
+  useEffect(() => {
+    if (projects.state === 'loaded' && listed && changes === null) void readPrChanges();
+  }, [projects.state, listed, changes, readPrChanges]);
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
-  const config = project && configOf(run, project);
+  const config = project && (project.config ?? configOf(run, project));
   if (!project?.repo || !config) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
   const { repo } = project;
+  // Open the PR waits for its changes to be listed, so the PR holds only what the step shows.
+  const openable = !pr.opening && !!picksOf(run, clashes, agent) && changes?.state === 'read';
   if (run.prUrl && onboarded(run, data)) {
     return (
       <div data-pr-step>
@@ -631,8 +667,11 @@ function PrStep({ run }: { run: Run }) {
     <div data-pr-step className="grid gap-4">
       <div className="grid gap-1">
         <h4 className="m-0 text-xs font-medium text-muted-foreground">One PR on {repo}, branch lar-factory/onboarding</h4>
-        <p className="m-0 text-xs text-muted-foreground">It adds .lar-factory.json, made on GitHub from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
-        <pre className="m-0 overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>
+        <p className="m-0 text-xs text-muted-foreground">Its one commit is made on GitHub from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
+        {listed && (<>
+          <PrChangeList />
+          {!project.config && <pre className="m-0 overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>}
+        </>)}
       </div>
       {run.prUrl && prClosed(run, data) ? (
         <Alert variant="warning" data-pr-closed><CircleAlert /><AlertTitle>{prName(run.prUrl)} closed without merging</AlertTitle>
@@ -643,7 +682,7 @@ function PrStep({ run }: { run: Run }) {
           <AlertAction>
             <Button size="xs" variant="outline" disabled={pr.reopening || pr.opening} onClick={() => void reopenPr()}>
               {pr.reopening ? <LoaderCircle className="animate-spin" /> : <RotateCw />} Reopen PR</Button>
-            <Button size="xs" variant="outline" disabled={pr.reopening || pr.opening} onClick={() => void startOver()}><GitPullRequest /> Start over</Button>
+            <Button size="xs" variant="outline" disabled={pr.reopening || !openable} onClick={() => void startOver()}><GitPullRequest /> Start over</Button>
           </AlertAction></Alert>
       ) : run.prUrl ? (
         <div className="grid gap-3 rounded-lg border p-3">
@@ -664,9 +703,9 @@ function PrStep({ run }: { run: Run }) {
         </div>
       ) : pr.error ? (
         <Alert variant="error"><CircleAlert /><AlertTitle>Can’t open the PR</AlertTitle><AlertDescription>{pr.error}</AlertDescription>
-          <AlertAction><Button size="xs" variant="outline" disabled={pr.opening} onClick={() => void openPr()}><RotateCw /> Retry</Button></AlertAction></Alert>
+          <AlertAction><Button size="xs" variant="outline" disabled={!openable} onClick={() => void openPr()}><RotateCw /> Retry</Button></AlertAction></Alert>
       ) : (
-        <Button className="justify-self-start" disabled={pr.opening} onClick={() => void openPr()}>
+        <Button className="justify-self-start" disabled={!openable} onClick={() => void openPr()}>
           {pr.opening ? <><LoaderCircle className="animate-spin" /> Opening the PR…</> : <><GitPullRequest /> Open the PR</>}</Button>
       )}
     </div>

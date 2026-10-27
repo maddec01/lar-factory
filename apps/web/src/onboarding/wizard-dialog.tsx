@@ -2,14 +2,14 @@
 // The empty board, an offer and Resume open it; closing it drops the run until a T3 project is picked, or an offered run until Next or a change, then keeps it to resume.
 
 import { useEffect, useRef } from 'react';
-import { ArrowLeft, ArrowRight, Check, LoaderCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { Button } from '@lar-factory/ui/button';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
 import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { sameRepo } from '@lar-factory/shared';
-import { type Run, type StepId, STEPS, finishesOnCleanup, onboarded, pickedProject, prClosed, stepReady, useWizardStore } from './wizard-store.ts';
+import { type Run, type StepId, STEPS, onboarded, pickedProject, prClosed, stepReady, useWizardStore } from './wizard-store.ts';
 
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
@@ -24,12 +24,11 @@ function closedFocus(opener: HTMLElement | null, repo: string | null): HTMLEleme
 }
 
 /**
- * Back, and Next, which is Finish on the Cleanup step of a run that reuses its .lar-factory.json. Once the PR is open
- * the run stays on its step, with Close and wait, then Go to the board once it merged, or Close once it closed without
+ * Back and Next. Once the PR is open the run stays on its step, with Close and wait, then Go to the board once it merged, or Close once it closed without
  * merging.
  */
 function Nav({ run }: { run: Run }) {
-  const { projects, checks, clashes, agent, finishing, next, back, finish, close } = useWizardStore();
+  const { projects, checks, clashes, agent, next, back, close } = useWizardStore();
   const data = useBoardStore((s) => s.data);
   const ready = stepReady(run, projects, checks, data.tools, clashes, agent);
   if (run.prUrl) {
@@ -40,10 +39,7 @@ function Nav({ run }: { run: Run }) {
   return (
     <>
       {indexOf(run) > 0 && <Button variant="outline" size="sm" onClick={back}><ArrowLeft /> Back</Button>}
-      {finishesOnCleanup(run, projects)
-        ? <Button data-finish size="sm" disabled={!ready || finishing.running} onClick={() => void finish()}>
-          {finishing.running ? <><LoaderCircle className="animate-spin" /> Finishing…</> : <>Finish <Check /></>}</Button>
-        : <Button size="sm" disabled={!ready} onClick={next}>Next <ArrowRight /></Button>}
+      <Button size="sm" disabled={!ready} onClick={next}>Next <ArrowRight /></Button>
     </>
   );
 }
@@ -64,8 +60,7 @@ export function WizardDialog() {
   });
   const data = useBoardStore((s) => s.data);
   const step = run && STEPS[indexOf(run)];
-  // A run that reuses its .lar-factory.json finishes on the Cleanup step, with no PR to open.
-  const steps = run && pickedProject(run, projects)?.config ? STEPS.length - 1 : STEPS.length;
+  const steps = STEPS.length;
   // Once its PR merged, the Pull request step is done too.
   const finished = !!run && onboarded(run, data);
   const doneCount = finished ? steps : run?.done.length ?? 0;

@@ -667,6 +667,26 @@ export interface OnboardingAnswers {
 /** What the user picked for a skill Clash: delete the skill's folder in the PR, or rename the skill. */
 export type SkillPick = { kind: 'delete' } | { kind: 'rename'; name: string };
 
+/** A skill name as SKILL.md's `name:` takes it: lowercase letters, digits and single hyphens, at most 64 characters. */
+const SKILL_NAME = /^(?=.{1,64}$)[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** Whether `name` is a skill name SKILL.md's `name:` takes. */
+export const isSkillName = (name: string) => SKILL_NAME.test(name);
+
+/**
+ * Why a skill Clash can't be renamed to `name`, or null when it can: the name must be valid and match no `bundled`
+ * skill, no other skill in `projectSkills`, the repository's project skills by name, and none of `renamedBeside`, the
+ * new names of the other skill Clashes renamed in the same skills folder, which would move into one folder.
+ */
+export function skillRenameProblem(name: string, bundled: readonly string[], projectSkills: readonly string[],
+  renamedBeside: readonly string[]): string | null {
+  if (!isSkillName(name)) return 'Next needs a new name: lowercase letters, digits and single hyphens, like web-code-review.';
+  if (bundled.some((other) => other.toLowerCase() === name)) return `${name} is a bundled skill’s name too.`;
+  if (projectSkills.some((other) => other.toLowerCase() === name)) return `Another project skill is named ${name}.`;
+  if (renamedBeside.includes(name)) return `Another skill in its folder is renamed ${name} too.`;
+  return null;
+}
+
 /** The Cleanup step's picks: the ticks the user changed, by Clash id, and each skill Clash's pick, by its path. */
 export interface CleanupPicks {
   ticks: Record<string, boolean>;

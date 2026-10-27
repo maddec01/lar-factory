@@ -9,7 +9,7 @@ import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { sameRepo } from '@lar-factory/shared';
-import { type Run, type StepId, STEPS, finishesOnChecks, onboarded, pickedProject, prClosed, stepReady, useWizardStore } from './wizard-store.ts';
+import { type Run, type StepId, STEPS, finishesOnCleanup, onboarded, pickedProject, prClosed, stepReady, useWizardStore } from './wizard-store.ts';
 
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
@@ -24,14 +24,14 @@ function closedFocus(opener: HTMLElement | null, repo: string | null): HTMLEleme
 }
 
 /**
- * Back, and Next, which is Finish on the Checks step of a run that reuses its .lar-factory.json. Once the PR is open
+ * Back, and Next, which is Finish on the Cleanup step of a run that reuses its .lar-factory.json. Once the PR is open
  * the run stays on its step, with Close and wait, then Go to the board once it merged, or Close once it closed without
  * merging.
  */
 function Nav({ run }: { run: Run }) {
-  const { projects, checks, next, back, finish, close } = useWizardStore();
+  const { projects, checks, clashes, finishing, next, back, finish, close } = useWizardStore();
   const data = useBoardStore((s) => s.data);
-  const ready = stepReady(run, projects, checks, data.tools);
+  const ready = stepReady(run, projects, checks, data.tools, clashes);
   if (run.prUrl) {
     return onboarded(run, data) ? <Button size="sm" onClick={close}><Check /> Go to the board</Button>
       : <Button variant="outline" size="sm" onClick={close}>{prClosed(run, data) ? 'Close' : 'Close and wait'}</Button>;
@@ -40,9 +40,9 @@ function Nav({ run }: { run: Run }) {
   return (
     <>
       {indexOf(run) > 0 && <Button variant="outline" size="sm" onClick={back}><ArrowLeft /> Back</Button>}
-      {finishesOnChecks(run, projects)
-        ? <Button data-finish size="sm" disabled={!ready || !!checks?.finishing} onClick={() => void finish()}>
-          {checks?.finishing ? <><LoaderCircle className="animate-spin" /> Finishing…</> : <>Finish <Check /></>}</Button>
+      {finishesOnCleanup(run, projects)
+        ? <Button data-finish size="sm" disabled={!ready || finishing.running} onClick={() => void finish()}>
+          {finishing.running ? <><LoaderCircle className="animate-spin" /> Finishing…</> : <>Finish <Check /></>}</Button>
         : <Button size="sm" disabled={!ready} onClick={next}>Next <ArrowRight /></Button>}
     </>
   );
@@ -64,7 +64,7 @@ export function WizardDialog() {
   });
   const data = useBoardStore((s) => s.data);
   const step = run && STEPS[indexOf(run)];
-  // A run that reuses its .lar-factory.json finishes on the Checks step, with no PR to open.
+  // A run that reuses its .lar-factory.json finishes on the Cleanup step, with no PR to open.
   const steps = run && pickedProject(run, projects)?.config ? STEPS.length - 1 : STEPS.length;
   // Once its PR merged, the Pull request step is done too.
   const finished = !!run && onboarded(run, data);

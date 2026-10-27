@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { draftItem, onboarded, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { projectIssue } from '@lar-factory/shared/test/raw-items';
-import type { ItemDetails } from '@lar-factory/shared';
+import type { ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
 
 const SAMPLE_DETAILS = JSON.parse(readFileSync(new URL(import.meta.resolve('@lar-factory/shared/test/sample-details.json')), 'utf8')) as Record<string, ItemDetails>;
 
@@ -59,4 +59,45 @@ test('an item GitHub no longer has answers 404', async (t) => {
   const [item] = (await until(board, (d) => d.items.length === 1)).items;
   const response = await details(board, `?itemId=${item!.id}`);
   assert.deepEqual([response.status, await response.json()], [404, { error: 'GitHub has no such item.' }]);
+});
+
+const SAMPLE_OLDER = (SAMPLE_DETAILS as unknown as Record<string, Record<string, ItemComment[]>>)['$older']!['I_sample13']!;
+const olderComments = (board: Board, query: string) => fetch(`${board.url}/api/item-comments${query}`);
+
+test('sample mode pages an item\'s older comments 10 at a time from the cursor its details gave, to the end', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const first = await olderComments(board, `?itemId=I_sample13&before=${SAMPLE_DETAILS['I_sample13']!.olderCursor}`);
+  assert.deepEqual([first.status, await first.json()], [200, { page: { comments: SAMPLE_OLDER.slice(0, 10), olderCursor: '10' } }]);
+  const last = await olderComments(board, '?itemId=I_sample13&before=10');
+  assert.deepEqual([last.status, await last.json()], [200, { page: { comments: SAMPLE_OLDER.slice(10), olderCursor: null } }]);
+  assert.ok(SAMPLE_OLDER.length > 10);
+});
+
+test('sample mode answers an item with no older comments an empty page', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const response = await olderComments(board, '?itemId=I_sample26&before=0');
+  assert.deepEqual([response.status, await response.json()], [200, { page: { comments: [], olderCursor: null } }]);
+});
+
+test('older comments of an item the board does not hold are 404, and a request naming no item or cursor is 400', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const unknown = await olderComments(board, '?itemId=I_nope&before=0');
+  assert.deepEqual([unknown.status, await unknown.json()], [404, { error: 'That item is not on the board.' }]);
+  for (const query of ['', '?itemId=', '?before=0']) {
+    const missing = await olderComments(board, query);
+    assert.deepEqual([missing.status, await missing.json()], [400, { error: 'Name the item whose comments to read.' }], query);
+  }
+  const noCursor = await olderComments(board, '?itemId=I_sample13');
+  assert.deepEqual([noCursor.status, await noCursor.json()], [400, { error: 'Name where the older comments start.' }]);
+});
+
+test('outside sample mode older comments are one graphql call for the page before the cursor', async (t) => {
+  const node = { __typename: 'Issue', comments: { pageInfo: { hasPreviousPage: true, startCursor: 'C0' }, nodes: [{ id: 'IC_1', author: { login: 'claude-bot' }, createdAt: '2026-10-13T08:00:00Z', body: 'Older.' }] } };
+  const board = await startBoard(t, { items: [projectIssue(12, 'List')], details: { I_12: node } });
+  await onboarded(board);
+  const [item] = (await until(board, (d) => d.items.length === 1)).items;
+  const before = (await board.calls()).length;
+  const response = await olderComments(board, `?itemId=${item!.id}&before=C1`);
+  assert.deepEqual([response.status, ((await response.json()) as { page: ItemCommentsPage }).page.olderCursor], [200, 'C0']);
+  assert.equal((await board.calls()).length - before, 1);
 });

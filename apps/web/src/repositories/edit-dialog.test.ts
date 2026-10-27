@@ -4,7 +4,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle, text, toast } from '../../test/support.ts';
-import { WORKFLOW_LABELS } from '@lar-factory/shared';
+import { WORKFLOW_LABELS, type BoardData } from '@lar-factory/shared';
 
 const REPO = 'maddec01/lar-server';
 const PR = 'https://github.com/maddec01/lar-server/pull/21';
@@ -17,11 +17,12 @@ type Answer = { status?: number; body: object };
  * Serves the sample as the board, `load` for Edit's load and `pr` for its Save, once it settles, and returns the bodies
  * each got.
  */
-function serve(load: Answer = { body: { config: CONFIG, labels: LABELS, error: null } }, pr: Answer | Promise<Answer> = { body: { prUrl: PR, error: null } }) {
+function serve(load: Answer = { body: { config: CONFIG, labels: LABELS, error: null } }, pr: Answer | Promise<Answer> = { body: { prUrl: PR, error: null } },
+  board: BoardData = sample) {
   const sent: Record<string, object[]> = {};
   fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
     const pending = url === '/api/repositories/config' ? load : url === '/api/repositories/config/pr' ? pr : null;
-    if (!pending) return new Response(JSON.stringify(sample));
+    if (!pending) return new Response(JSON.stringify(board));
     (sent[url] ??= []).push(JSON.parse(String(init?.body)));
     const answer = await pending;
     return new Response(JSON.stringify(answer.body), { status: answer.status ?? 200 });
@@ -45,12 +46,12 @@ async function press(el: Element, key: string): Promise<void> {
   await settle(() => el.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true })));
 }
 
-/** Opens Settings › Repositories and presses the repository's Edit. */
-async function openEdit(): Promise<void> {
-  await mountPage(sample);
+/** Opens Settings › Repositories over `board` and presses `repo`'s Edit. */
+async function openEdit(repo = REPO, board: BoardData = sample): Promise<void> {
+  await mountPage(board);
   await settle(() => $<HTMLButtonElement>('.open-settings')!.click());
   await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Repositories')!.click());
-  const row = $(`.settings-row[data-row="repo-${REPO}"]`)!;
+  const row = $(`.settings-row[data-row="repo-${repo}"]`)!;
   await settle(() => [...row.querySelectorAll('button')].find((b) => text(b) === 'Edit')!.click());
   await settle(() => vi.advanceTimersByTime(50));
 }
@@ -154,4 +155,23 @@ test("a load that fails shows the server's problem, and Retry reads again", asyn
   expect(save().disabled).toBe(true);
   await settle(() => [...dialog()!.querySelectorAll('button')].find((b) => text(b) === 'Retry')!.click());
   expect(sent['/api/repositories/config']).toHaveLength(2);
+});
+
+test('Edit on an Azure DevOps repository offers the team’s sprint and backlog with its Team, and custom tags, which Save doesn’t create', async () => {
+  const azure = 'contoso/Fabrikam%20Fiber/lar-api';
+  const board: BoardData = { ...sample, repos: [...sample.repos, { ...sample.repos[0]!, repo: azure, role: 'API', labels: [] }] };
+  serve({ body: { config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['app: music'] },
+    labels: ['app: music', 'status-list', 'repo-lar-api', 'web'], error: null } }, undefined, board);
+  await openEdit(azure, board);
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Edit contoso/Fabrikam Fiber/lar-api');
+  expect($('[data-edit-dialog] [data-custom="repo-lar-api"]'), 'a repo- tag routes items; it is no custom tag').toBeNull();
+  expect(checked('[data-choice="azure-sprint"] [role="radio"]')).toBe('true');
+  expect($('[data-edit-dialog] [data-choice="github-project"]')).toBeNull();
+  expect(input('team').value).toBe('Fabrikam Team');
+  expect(text($('[data-edit-dialog] [data-custom-labels] h4'))).toBe('Custom tags');
+  expect(text(dialog()!.querySelector('[data-slot="dialog-description"]'))).not.toMatch(/creates the custom labels/);
+  await settle(() => $('[data-edit-dialog] [data-custom="web"] [role="checkbox"]')!.click());
+  await settle(() => save().click());
+  await settle(() => vi.advanceTimersByTime(500));
+  expect(text(toast()!)).toContain('contoso/Fabrikam Fiber/lar-api’s Edit PR');
 });

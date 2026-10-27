@@ -137,3 +137,39 @@ test("a Reset that closed the Edit PR but can't open the reset PR drops that Edi
   expect(dialog()!.querySelector('[data-closes-edit-pr]')).toBeNull();
   expect(row(ONBOARDED)!.querySelector('[data-edit-pr]')).toBeNull();
 });
+
+test('Reset of an Azure DevOps onboarding says it abandons the PR and leaves the project’s tags', async () => {
+  const azure = 'contoso/Fabrikam%20Fiber/lar-api';
+  const prUrl = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api/pullrequest/7';
+  const data: BoardData = { ...sample, onboarding: [{ repo: azure, progress: { ...waiting, prUrl } }] };
+  serve(data);
+  await openReset(data, azure);
+  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-title"]'))).toBe('Reset contoso/Fabrikam Fiber/lar-api?');
+  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toMatch(
+    /^Reset abandons contoso\/Fabrikam Fiber\/lar-api’s onboarding PR, .+ It opens no PR, and leaves alone the T3 project and the project’s tags\.$/);
+});
+
+test('Reset of an Azure DevOps onboarding with no PR yet says it has none to abandon', async () => {
+  const azure = 'contoso/Fabrikam%20Fiber/lar-api';
+  const data: BoardData = { ...sample, onboarding: [{ repo: azure, progress }] };
+  serve(data);
+  await openReset(data, azure);
+  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toBe(
+    'Reset drops contoso/Fabrikam Fiber/lar-api’s onboarding from this Mac’s list, with its Resume. It has no open PR to abandon, so it changes nothing on Azure DevOps, and leaves alone the T3 project and the project’s tags.');
+});
+
+test('Reset of an onboarded Azure DevOps repository names it as Azure shows it, in the confirmation and the toast', async () => {
+  const azure = 'contoso/Fabrikam%20Fiber/lar-api';
+  const resetPr = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api/pullrequest/8';
+  const data: BoardData = { ...sample, repos: [...sample.repos, { ...sample.repos[0]!, repo: azure }] };
+  serve(data, { body: { error: null, prUrl: resetPr, board: sample } });
+  await openReset(data, azure);
+  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-title"]'))).toBe('Reset contoso/Fabrikam Fiber/lar-api?');
+  expect([...dialog()!.querySelectorAll('[data-slot="alert-dialog-description"] li')].map(text).slice(1)).toEqual([
+    'drops contoso/Fabrikam Fiber/lar-api from this Mac’s list and hides its items;',
+    'makes others who onboarded contoso/Fabrikam Fiber/lar-api lose its Repository config once the PR merges.',
+  ]);
+  await settle(() => button(dialog()!, 'Reset').click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(text(toast()!)).toContain('Opened contoso/Fabrikam Fiber/lar-api’s reset PR.');
+});

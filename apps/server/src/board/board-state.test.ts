@@ -9,7 +9,7 @@ const item = (id: string, status: Status): Item => ({
   linkedPrs: [], slices: [],
 });
 
-const empty = (): BoardData => ({ project: { title: 'lar' }, repos: [], refreshSeconds: 60, fetchedAt: null, error: null, items: [], modelChoices: [] });
+const empty = (): BoardData => ({ project: { title: 'lar' }, repos: [], refreshSeconds: 60, fetchedAt: null, error: null, items: [], firstRead: { step: 'repositories', running: [], settled: false }, modelChoices: [] });
 const statuses = (data: BoardData) => data.items.map((i) => `${i.id}:${i.status}`);
 
 test('a change stays until GitHub reports it, or for three reads at most', () => {

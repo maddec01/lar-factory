@@ -372,6 +372,24 @@ export interface ItemSourceProblem {
   fix?: string;
 }
 
+/**
+ * What the first read is doing: `repositories` loads each repository's config and onboarding PR, `items` reads their
+ * items, and `finishing` reads what the board shows besides them. The page maps each id to its line of text.
+ */
+export type FirstReadStep = 'repositories' | 'items' | 'finishing';
+
+/** The board server's first read of every repository since it started, and whether it has settled. */
+export interface FirstRead {
+  step: FirstReadStep;
+  /** The item sources still being read, named by their repositories or Project; each drops off as its read finishes. */
+  running: string[];
+  /** Whether the read finished, failed, or gh blocked it. A settled first read stays settled until the server restarts. */
+  settled: boolean;
+}
+
+/** The first read once it has settled, which is how sample mode starts. */
+export const SETTLED_FIRST_READ: FirstRead = { step: 'finishing', running: [], settled: true };
+
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
@@ -392,6 +410,8 @@ export interface BoardData {
   /** Error from the latest read if it failed; the items are then from fetchedAt. */
   error: string | null;
   items: Item[];
+  /** The first read's progress; the board page shows its loading screen until `settled`. */
+  firstRead: FirstRead;
   /** The model choices Start offers besides "T3 default"; empty when T3's settings or model list can't be read. */
   modelChoices: ModelGroup[];
   /** Build threads this board run started, by hand or through Start after, by item id; kept apart from `started`'s refining threads. */

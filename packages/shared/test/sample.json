@@ -19,6 +19,7 @@
   "refreshSeconds": 45,
   "fetchedAt": "2026-10-21T09:40:00.000Z",
   "error": "gh api graphql failed: error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com",
+  "firstRead": { "step": "finishing", "running": [], "settled": true },
   "modelChoices": [],
   "t3EnvironmentId": "sample-environment",
   "items": [

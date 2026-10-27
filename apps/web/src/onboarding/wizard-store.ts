@@ -16,11 +16,12 @@
 import { create } from 'zustand';
 import {
   SETUP_CHECKS, customLabelProblem, isOnboarding, labelPlan, labelsToCreate, missingCustomLabels, sameRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
-  type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type SkillClash, type SkillPick, type ToolChecks,
+  type SetupAnswers, type SetupCheckId, type SetupCheckResult, type SkillClash, type SkillPick, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
+import { answerSetup, setupProblems, suggestedShow, type SetupChange } from './setup-answers.ts';
 
 /** The steps in order. */
 export const STEPS = [
@@ -86,24 +87,8 @@ export function pickedProject(run: Run, projects: Projects): ProjectChoice | nul
   return projects.state === 'loaded' ? projects.projects.find((p) => p.id === run.projectId) ?? null : null;
 }
 
-/** The show setting suggested for an item source: All items for a GitHub Project, Opted-in items for issues. */
-export const suggestedShow = (itemSource: SetupAnswers['itemSource']): ShowSetting => itemSource === 'github-project' ? 'all' : 'opted-in';
-
 /** Whether the setup step asks its questions: a GitHub repository with no .lar-factory.json to reuse. */
 export const asksSetup = (project: ProjectChoice): boolean => project.provider === 'GitHub' && project.hasConfig === false;
-
-/** A GitHub login, as .lar-factory.json's itemSource.owner takes it. */
-const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
-
-/** What each of the setup step's answers that Next waits for needs: a role, and for a GitHub Project its owner and a positive whole number. */
-export function setupProblems(setup: SetupAnswers): Partial<Record<'projectOwner' | 'projectNumber' | 'role', string>> {
-  const project = setup.itemSource === 'github-project';
-  return {
-    ...project && !GITHUB_LOGIN.test(setup.projectOwner) && { projectOwner: 'Next needs a GitHub login: letters, digits and single hyphens, not at either end.' },
-    ...project && !/^[1-9]\d*$/.test(setup.projectNumber) && { projectNumber: 'Next needs the number, a positive whole number like 3.' },
-    ...!setup.role.trim() && { role: 'Next needs the repository’s role.' },
-  };
-}
 
 /** Whether the setup step's answers are whole, as setupProblems says. */
 const setupAnswered = (setup: SetupAnswers | null): boolean => !!setup && Object.keys(setupProblems(setup)).length === 0;
@@ -316,7 +301,7 @@ interface WizardState {
   /** Adds the form's folder as a T3 project and picks it. */
   createProject: () => Promise<void>;
   /** Changes the setup step's answers. A new item source brings its suggested show setting until one is picked. */
-  answer: (change: Partial<Omit<SetupAnswers, 'showPicked'>>) => void;
+  answer: (change: SetupChange) => void;
   next: () => void;
   back: () => void;
   /** Reads the repository's labels for the Labels step; on Azure DevOps it reads nothing. */
@@ -651,10 +636,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     answer: (change) => {
       const { run } = get();
       if (!run?.setup) return;
-      const setup = { ...run.setup, ...change };
-      if (change.show) setup.showPicked = true;
-      else if (change.itemSource && !setup.showPicked) setup.show = suggestedShow(change.itemSource);
-      set({ run: { ...run, setup } });
+      set({ run: { ...run, setup: answerSetup(run.setup, change) } });
     },
     next: () => move(1),
     back: () => move(-1),

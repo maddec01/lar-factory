@@ -29,7 +29,7 @@ async function currentConfig(repo: string, run?: Run, branch?: string): Promise<
 }
 
 /** The URL of the repository's open Edit PR, the open PR from lar-factory/edit-config, or null when it has none. */
-const editPrOf = (repo: string, run?: Run) => openPrFrom(repo, EDIT_BRANCH, run);
+export const editPrOf = (repo: string, run?: Run) => openPrFrom(repo, EDIT_BRANCH, run);
 
 /**
  * Each repository's open Edit PR, by repository, as gh finds it now; a repository whose PR gh can't read has none, and

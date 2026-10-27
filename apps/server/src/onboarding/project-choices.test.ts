@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
+import type { OnboardedRepository } from '../config/repository-config.ts';
 import { createConfigChecks } from './config-checks.ts';
 import { onboardingOffers, projectChoices } from './project-choices.ts';
 import { checkouts } from '../../test/repo-support.ts';
@@ -60,6 +61,15 @@ test('a project with no origin, another host or a worktree folder names no repos
   const db = projectsDb(t, ['bare', 'gitlab', 'plain'].map((name) => ({ id: name, root: join(home, 'Developer/lar', name) })));
   const choices = await projectChoices([], gh({}), { ...env, T3_STATE_DB: db });
   assert.deepEqual(choices.map((c) => [c.name, c.repo, c.provider, c.hasConfig]), [['bare', null, null, null], ['gitlab', null, null, null], ['plain', null, null, null]]);
+});
+
+test('a resetting repository is on the list, so the board offers no onboarding though its default branch still has .lar-factory.json', async (t) => {
+  const { env } = t3Home(t, { 'lar-web': 'git@github.com:maddec01/lar-web.git' });
+  const list: OnboardedRepository[] = [{ repo: 'maddec01/lar-web', resetting: { prUrl: 'https://github.com/maddec01/lar-web/pull/9' } }];
+  const choices = await projectChoices(list,
+    gh({ 'maddec01/lar-web': 'file' }), env);
+  assert.equal(choices[0]!.onBoard, true);
+  assert.deepEqual(onboardingOffers(choices), []);
 });
 
 test("T3's projects that can't be read are an error that names the database", async () => {

@@ -138,6 +138,20 @@ test("a part whose repository is still onboarding can't be armed, and one armed 
   assert.deepEqual(await board.t3Calls(), []);
 });
 
+test('an armed start whose repository Reset takes off the board drops on the next read and never starts, also after a restart', async (t) => {
+  const { board, env } = await armableBoard(t, [blockedBuild()], { files: ['.lar-factory.json'] });
+  assert.equal((await arm(board, 'I_12', OPUS)).status, 200);
+  assert.equal((await board.post({ repo: 'maddec01/lar-factory' }, board.url, '/api/onboarding/reset')).status, 200);
+  await board.update({ items: [blockedBuild(['CLOSED', 'CLOSED'])] });
+  const data = await read(board);
+  assert.deepEqual([data.items, data.armed], [[], {}]);
+  assert.deepEqual(armedFile(env.HOME!), {});
+  await board.stop();
+  const again = await startBoard(t, { items: [blockedBuild(['CLOSED', 'CLOSED'])] }, false, false, env);
+  assert.deepEqual((await read(again)).items, []);
+  assert.deepEqual([await board.t3Calls(), await again.t3Calls()], [[], []]);
+});
+
 test('only a blocked Ready or Queued issue, on an offered model, from this page and session, can be armed', async (t) => {
   const { board } = await armableBoard(t, [blockedBuild(), rawIssue('PVTI_13', 13, 'Ready', []),
     blockedIssue(14, 'In progress', [], ['OPEN', 'OPEN'])]);

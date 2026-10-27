@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
-import { readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
+import { onTheBoard, readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
@@ -84,10 +84,11 @@ const items = onboardedSources(async () => {
     },
     // A finished onboarding has its .lar-factory.json now, which the kept answer may not say.
     finished: configChecks.forget });
-  // A repository still onboarding has no Repository config on its default branch until its PR merges. Each refresh
-  // asks gh for every open Edit PR, so its row's mark survives a restart and goes once the PR merges or closes.
-  const onboarded = list.filter((e) => !e.onboarding);
-  const [read, editPrs] = await Promise.all([readOnboardedConfigs(onboarded),
+  // A repository still onboarding has no Repository config on its default branch until its PR merges, and one
+  // resetting is off the board though its default branch still has one. Each refresh asks gh for every open Edit PR, so
+  // its row's mark survives a restart and goes once the PR merges or closes.
+  const onboarded = onTheBoard(list);
+  const [read, editPrs] = await Promise.all([readOnboardedConfigs(list),
     readEditPrs(onboarded.map((e) => e.repo), undefined, (repo, problem) => log(`can't read ${repo}'s Edit PR: ${problem}`))]);
   board.update({
     repos: read.configs.map((config) => ({ ...repoView(config), ...editPrs.has(config.repo) && { editPr: editPrs.get(config.repo) } })),

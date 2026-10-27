@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { AGENT_SKILLS_BLOCK, agentSetupWrites } from './agent-setup.ts';
+import { AGENT_DOC_PATHS, AGENT_SKILLS_BLOCK, agentSetupWrites, withoutAgentSkills } from './agent-setup.ts';
 
 const DOCS = ['docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md'];
 
@@ -61,4 +61,27 @@ test("triage-labels.md lists every workflow label and maps Matt Pocock's triage 
     ['wontfix', 'not planned'], ['bug', '`bug`'], ['enhancement', '`feature` or `improvement`'], ['ready-for-agent', 'board']]) {
     assert.match(labels, new RegExp(`^\\| \`${role}\` \\| .*${factory}`, 'm'), role);
   }
+});
+
+test('the docs/agents/ paths are the three files the setup writes', () => {
+  assert.deepEqual(AGENT_DOC_PATHS, DOCS);
+});
+
+test('removing the block at the start of a file leaves the file from the next level one heading on', () => {
+  assert.equal(withoutAgentSkills('## Agent skills\n\nOld pointers.\n\n# lar-web\n\nUse pnpm.\n'), '# lar-web\n\nUse pnpm.\n');
+});
+
+test('removing the block in the middle keeps the sections around it byte for byte, past a fenced ## line inside the block', () => {
+  const before = '# lar-web\r\n\nRead the README.  \n\n';
+  const after = '## Testing\n\nRun `pnpm test`.\n';
+  const block = '## Agent skills\n\n### Issue tracker\nLinear.\n\n```md\n## Not a heading\n```\n\n';
+  assert.equal(withoutAgentSkills(`${before}${block}${after}`), `${before}${after}`);
+});
+
+test('removing the block at the end of a file keeps everything before it', () => {
+  assert.equal(withoutAgentSkills(`# lar-web\n\nUse pnpm.\n\n${AGENT_SKILLS_BLOCK}`), '# lar-web\n\nUse pnpm.\n\n');
+});
+
+test('a file with no block has nothing to remove', () => {
+  assert.equal(withoutAgentSkills('# lar-web\n\n### Agent skills\n'), null);
 });

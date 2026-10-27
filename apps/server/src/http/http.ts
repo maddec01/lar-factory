@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, type ClashRun, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type ClashRun, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { isRepo } from '../config/repository-config.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
@@ -50,8 +50,11 @@ export interface HttpDeps {
   previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | { status: number; error: string }>;
   /** Reopens an onboarding's PR that closed without merging, returning the repositories still onboarding, or gh's problem. */
   reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
-  /** Reset of a repository still onboarding: closes its open onboarding PR and drops its entry, returning the repositories still onboarding, or gh's problem. */
-  resetOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
+  /**
+   * Reset: closes a repository's open onboarding PR and drops its entry while it is still onboarding, or opens its reset
+   * PR, returning its URL, and marks it resetting once onboarded; returns the repositories still onboarding, or gh's problem.
+   */
+  resetOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[]; prUrl?: string } | { status: number; error: string }>;
   /**
    * Edit's load: an onboarded repository's .lar-factory.json values and its labels, or why it can't. The values come
    * from its open Edit PR's branch, which `editPr` names, while there is one, else from its default branch.
@@ -272,9 +275,13 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       async run(input) {
         const reset = await resetOnboarding(input);
         if ('error' in reset) return { status: reset.status, body: { error: reset.error } };
-        board.update({ onboarding: reset.onboarding });
+        // A reset repository leaves the board at once, with its items; the read then sees it resetting.
+        const gone = (repo: string | null) => repo !== null && sameRepo(repo, input.repo as string);
+        const { repos, items } = board.snapshot();
+        board.update({ onboarding: reset.onboarding, repos: repos.filter((r) => !gone(r.repo)), items: items.filter((i) => !gone(i.repo)) });
         board.push();
-        return { status: 200, body: withBoard({ error: null }) };
+        readSoon();
+        return { status: 200, body: withBoard({ ...reset.prUrl && { prUrl: reset.prUrl }, error: null }) };
       },
     },
     '/api/repositories/config': {

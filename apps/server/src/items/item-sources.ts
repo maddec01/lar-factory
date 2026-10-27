@@ -98,8 +98,8 @@ export interface OnboardedSources extends ItemSource {
 /**
  * The item source the onboarded repositories name as `load` reads their configs now: each read loads them first and
  * builds the merged source again when they changed, so a config merged to a default branch shows on the next read. A
- * read leaves out the items of each repository whose config `load` couldn't read, which a Project may still list. A
- * write goes through the source the last read built.
+ * read leaves out the items of each repository whose config `load` couldn't read or that is resetting, which a Project
+ * may still list. A write goes through the source the last read built.
  */
 export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = configuredSources): OnboardedSources {
   let configs: RepositoryConfig[] = [];
@@ -113,7 +113,7 @@ export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = 
         current = build(configs);
         key = JSON.stringify(configs);
       }
-      const leftOff = new Set(loaded.problems.map((p) => p.repo.toLowerCase()));
+      const leftOff = new Set([...loaded.problems.map((p) => p.repo), ...loaded.resetting].map((repo) => repo.toLowerCase()));
       const read = await current.read();
       return { ...read, items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')) };
     },

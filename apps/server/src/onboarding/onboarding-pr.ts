@@ -5,27 +5,30 @@
 // and with none the first free lar-factory/onboarding-N is used. Each refresh finishes an onboarding whose PR merged,
 // or whose default branch got a .lar-factory.json another way when the PR adds one, closing the PR then, and marks a
 // PR closed without merging, which the Pull request step offers to reopen. Reset closes an onboarding's open PR and
-// drops the onboarding from the list.
+// drops the onboarding from the list; on an onboarded repository it opens the reset PR and marks the entry resetting.
 
 import {
   isRecord, isSkillName, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
 } from '@lar-factory/shared';
 import {
   type OnboardedRepository, dropRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed,
-  stillOnboarding,
+  saveResetting, stillOnboarding,
 } from '../config/repository-config.ts';
 import {
   branchExists, closePr, commitTree, createBranch, createCommit, createPr, createTree, defaultBranchHead, editPrBody, message, moveBranch, openPrFrom,
   prState, readBlob, reopenPr,
 } from '../github/github.ts';
+import { editPrOf } from '../config/edit-config.ts';
 import { boardDataDir } from '../port/board-record.ts';
 import { bundledSkillNames } from '../skills/bundled-skills.ts';
 import { planPrChanges, type PrPlan } from './pr-changes.ts';
+import { openResetPr } from './reset-pr.ts';
 import { workflowLabelsProblem } from './repository-labels.ts';
 
 const ONBOARDING_BRANCH = 'lar-factory/onboarding';
 const TITLE = 'chore: onboard to lar Factory';
 const RESET = 'Reset on the lar Factory board dropped this onboarding, so it closed this PR.';
+const RESET_EDIT = 'Reset on the lar Factory board opened a PR that removes `.lar-factory.json`, so it closed this Edit PR.';
 const LANDED = '`.lar-factory.json` reached the default branch without this PR, so lar Factory finished onboarding with that file '
   + 'and closed this PR.';
 
@@ -207,18 +210,39 @@ export async function reopenOnboardingPr(input: Record<string, unknown>, dir = b
 }
 
 /**
- * Reset of the body's `repo` while it is still onboarding: closes its onboarding PR with a comment while the PR is
- * open, then drops its entry from the list, and returns the repositories still onboarding. Opens no PR. Refuses an
- * onboarded repository and one whose PR merged, and keeps the entry, with gh's message, when gh can't read or close the PR.
+ * Reset of the body's `repo`, returning the repositories still onboarding, and the reset PR's URL when it opens one.
+ * While it is still onboarding, Reset closes its onboarding PR with a comment while the PR is open, then drops its
+ * entry, opening no PR. Once it is onboarded, Reset closes its open Edit PR with a comment, so that PR can't bring .lar-factory.json back, then opens the reset PR
+ * and marks its entry resetting with the PR's URL. Refuses a repository off the list or resetting already, and one
+ * whose onboarding PR merged, and keeps the entry, with gh's message, when gh can't read or close the onboarding PR or
+ * the Edit PR, or open the reset PR, then saying that the Edit PR it closed is closed now.
  */
 export async function resetOnboarding(input: Record<string, unknown>, dir = boardDataDir(), run?: Run):
-  Promise<{ onboarding: OnboardingRepository[] } | Refused> {
+  Promise<{ onboarding: OnboardingRepository[]; prUrl?: string } | Refused> {
   const { repo } = input;
   if (!isRepo(repo)) return { status: 400, error: 'Send the repository whose onboarding to reset.' };
   let entry;
   try { entry = readRepositoryList(dir).find((e) => sameRepo(e.repo, repo)); }
   catch (err) { return { status: 409, error: message(err) }; }
-  if (!entry?.onboarding) return { status: 409, error: `${repo} is not onboarding.` };
+  if (!entry) return { status: 409, error: `${repo} is not on this Mac's list.` };
+  if (entry.resetting) return { status: 409, error: `${repo} is resetting already.` };
+  if (!entry.onboarding) {
+    let editPr;
+    try {
+      editPr = await editPrOf(entry.repo, run);
+      if (editPr) await closePr(editPr, RESET_EDIT, run);
+    } catch (err) {
+      return { status: 502, error: `Can't close ${repo}'s Edit PR: ${message(err)}` };
+    }
+    let prUrl;
+    try { prUrl = await openResetPr(entry.repo, run); }
+    catch (err) {
+      const problem = editPr ? `${message(err).replace(/\.$/, '')}. Its Edit PR, ${editPr}, is closed now.` : message(err);
+      return { status: 502, error: `Can't open ${repo}'s reset PR: ${problem}` };
+    }
+    try { return { onboarding: stillOnboarding(saveResetting(repo, prUrl, dir)), prUrl }; }
+    catch (err) { return { status: 409, error: `Opened ${repo}'s reset PR, ${prUrl}, but can't mark it resetting: ${message(err)}` }; }
+  }
   const { prUrl } = entry.onboarding;
   if (prUrl) {
     try {

@@ -413,14 +413,73 @@ test("Reset whose PR gh can't close or read answers with gh's message and keeps 
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: waiting }]);
 });
 
-test('Reset of an onboarding whose PR merged, of an onboarded repository, or of no repository is refused and keeps the list', async (t) => {
+test('Reset of an onboarding whose PR merged, of a repository resetting or off the list, or of no repository is refused and keeps the list', async (t) => {
   const waiting = { ...progress, step: 'pr', prUrl: PR };
-  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: waiting }, { repo: 'maddec01/lar-factory' }]);
+  const resetting = { repo: 'maddec01/lar-factory', resetting: { prUrl: PR } };
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: waiting }, resetting]);
   const gh = github({ [PR]: 'MERGED' });
   assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, gh.run),
     { status: 409, error: 'maddec01/lar-web\'s onboarding PR merged, so the board finishes its onboarding on its next refresh.' });
-  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-factory' }, dir, gh.run), { status: 409, error: 'maddec01/lar-factory is not onboarding.' });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-factory' }, dir, gh.run), { status: 409, error: 'maddec01/lar-factory is resetting already.' });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-cli' }, dir, gh.run), { status: 409, error: "maddec01/lar-cli is not on this Mac's list." });
   assert.deepEqual(await resetOnboarding({ repo: 'lar-web' }, dir, gh.run), { status: 400, error: 'Send the repository whose onboarding to reset.' });
   assert.deepEqual(gh.changed, []);
-  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: waiting }, { repo: 'maddec01/lar-factory' }]);
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: waiting }, resetting]);
+});
+
+test('Reset of an onboarded repository opens the reset PR, then keeps its URL in the entry and answers it, which leaves the repositories still onboarding alone', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web' }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
+  const { calls, run } = gh({}, {}, { '.lar-factory.json': LAR_CONFIG, 'AGENTS.md': RULES });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, run), { onboarding: [{ repo: 'maddec01/lar-cli', progress }], prUrl: PR });
+  assert.deepEqual(field(calls.find((args) => args[1] === 'repos/maddec01/lar-web/git/trees')!, 'tree[][path]'), ['.lar-factory.json']);
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', resetting: { prUrl: PR } }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
+});
+
+test('Reset of an onboarded repository closes its open Edit PR with a comment before it opens the reset PR', async (t) => {
+  const edit = 'https://github.com/maddec01/lar-web/pull/9';
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web' }]);
+  const { calls, run } = gh({}, { 'lar-factory/edit-config': edit }, { '.lar-factory.json': LAR_CONFIG });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, run), { onboarding: [], prUrl: PR });
+  const close = calls.findIndex((args) => args[0] === 'pr' && args[1] === 'close');
+  assert.deepEqual(calls[close], ['pr', 'close', edit, '--comment',
+    'Reset on the lar Factory board opened a PR that removes `.lar-factory.json`, so it closed this Edit PR.']);
+  assert.ok(close < calls.findIndex((args) => args[0] === 'pr' && args[1] === 'create'));
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', resetting: { prUrl: PR } }]);
+});
+
+test("Reset of an onboarded repository whose Edit PR can't be closed answers with gh's message, opens no reset PR and keeps the entry", async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web' }]);
+  const { calls, run } = gh({ 'pr close': 'HTTP 403' }, { 'lar-factory/edit-config': 'https://github.com/maddec01/lar-web/pull/9' }, { '.lar-factory.json': LAR_CONFIG });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, run), { status: 502, error: "Can't close maddec01/lar-web's Edit PR: HTTP 403" });
+  assert.ok(!calls.some((args) => args[0] === 'pr' && args[1] === 'create'));
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web' }]);
+});
+
+test("Reset of an onboarded repository whose PR can't be opened after it closed the Edit PR says that PR is closed now, after gh's message less its period", async (t) => {
+  const edit = 'https://github.com/maddec01/lar-web/pull/9';
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web' }]);
+  const { run } = gh({ 'pr create': 'pull request create failed: HTTP 403.' }, { 'lar-factory/edit-config': edit }, { '.lar-factory.json': LAR_CONFIG });
+  assert.deepEqual(await resetRepository({ repo: 'maddec01/lar-web' }, dir, run),
+    { status: 502, error: `Can't open maddec01/lar-web's reset PR: pull request create failed: HTTP 403. Its Edit PR, ${edit}, is closed now.` });
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web' }]);
+});
+
+test("Reset of an onboarded repository whose entry can't be marked resetting names the reset PR it opened", async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web' }]);
+  const { run } = gh({}, {}, { '.lar-factory.json': LAR_CONFIG });
+  const marking = async (args: string[]) => {
+    const out = await run(args);
+    if (args[0] === 'pr' && args[1] === 'create') await writeFile(join(dir, 'repositories.json'), '{');
+    return out;
+  };
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, marking),
+    { status: 409, error: `Opened maddec01/lar-web's reset PR, ${PR}, but can't mark it resetting: ${join(dir, 'repositories.json')} isn't valid JSON.` });
+});
+
+test("Reset of an onboarded repository whose PR can't be opened answers with gh's message and keeps the entry onboarded", async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web' }]);
+  const { run } = gh({ 'pr create': 'pull request create failed: HTTP 403' }, {}, { '.lar-factory.json': LAR_CONFIG });
+  assert.deepEqual(await resetOnboarding({ repo: 'maddec01/lar-web' }, dir, run),
+    { status: 502, error: "Can't open maddec01/lar-web's reset PR: pull request create failed: HTTP 403" });
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web' }]);
 });

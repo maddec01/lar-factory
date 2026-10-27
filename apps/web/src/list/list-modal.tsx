@@ -21,6 +21,7 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
+import { CONTROL } from '../title-bar/control.ts';
 import { matchesSearch } from './list-search.ts';
 
 const DRAFT = repoKey({ repo: null });
@@ -165,7 +166,7 @@ export function ListButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="quiet" className="list-button" leftIcon={<Inbox />} title="List" onClick={() => setOpen(true)}>
+      <Button variant="quiet" className={`list-button ${CONTROL} px-2`} leftIcon={<Inbox />} title="List" onClick={() => setOpen(true)}>
         <span className="@max-[70rem]:sr-only [.title-bar:has(.update-button)_&]:@max-[74rem]:sr-only">List</span><Badge>{count}</Badge>
       </Button>
       {open && <ListModal onClose={() => setOpen(false)} />}

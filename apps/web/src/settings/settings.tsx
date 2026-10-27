@@ -16,6 +16,7 @@ import { useUpdateStore } from '../updates/update-store.ts';
 import { ShownControl, notBuilt } from './controls.tsx';
 import { type Group, type Page, pages } from './settings-pages.tsx';
 import { useSettingsStore } from './settings-store.ts';
+import { ICON_CONTROL } from '../title-bar/control.ts';
 
 /** The section list's groups, by section id. */
 const NAV: { label: string; ids: string[] }[] = [
@@ -27,7 +28,7 @@ const NAV: { label: string; ids: string[] }[] = [
 /** The title bar's last button, which opens Settings: lar-server's header icon button, its label in its title. */
 export function SettingsButton() {
   return (
-    <IconButton variant="header" className="open-settings" aria-label="Settings" title="Settings" icon={<SettingsIcon />}
+    <IconButton variant="header" className={`open-settings ${ICON_CONTROL}`} aria-label="Settings" title="Settings" icon={<SettingsIcon />}
       onClick={() => useSettingsStore.getState().setOpen(true)} />
   );
 }

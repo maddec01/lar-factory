@@ -1,12 +1,13 @@
-// The board's title bar, laid out as lar-server's AppTitleBar on the copied TitleBar: the brand, then the scope menu
-// ("All repositories", or the repository the menu or the List modal scoped it to), the Refreshed time and the
-// counters, then the List button, Add item, the "for T3 Code" tag, the update pill while there's an update, and
-// Settings. It starts past the traffic lights and drags the window, except on its controls. Above the missing-t3 notice
-// there's no board to scope, count or add to, so it holds only the brand and Settings.
+// The board's title bar, laid out as lar-server's AppTitleBar on the copied TitleBar: on the left the brand, the scope
+// menu ("All repositories", or the repository the menu or the List modal scoped it to) and the Refreshed time; on the
+// right the counters, the List button, Add item, the "for T3 Code" tag, the update pill while there's an update, and
+// Settings. Every control is 28 px tall (./control.ts). It starts past the traffic lights and drags the window, except
+// on its controls. Above the missing-t3 notice there's no board to scope, count or add to, so it holds only the brand
+// and Settings.
 // Every control keeps its own width, and the bar folds by its own width (the copied TitleBar is the container
-// queried) instead: the counters' labels go first, then the "for T3 Code" tag and the List and Add item labels (kept
-// for screen readers), then Spend, Queued and Shipped, then the Refreshed text, and on a narrow page Building and the
-// Refreshed dot. Scope truncates in what's left.
+// queried) instead: the "for T3 Code" tag and the List and Add item labels (kept for screen readers) go first, then
+// Spend, Queued and Shipped, then the Refreshed text, and on a narrow page Building and the Refreshed dot. Scope
+// truncates in what's left.
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -25,6 +26,7 @@ import { repoTone } from '../items/item-parts.tsx';
 import { ListButton } from '../list/list-modal.tsx';
 import { SettingsButton } from '../settings/settings.tsx';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
+import { CONTROL } from './control.ts';
 import { Counters } from './counters.tsx';
 import { TrafficLights, useWindowControlsInset } from './window-controls.tsx';
 
@@ -49,7 +51,7 @@ function Scope() {
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger asChild>
-        <Button variant="quiet" className="scope min-w-0" aria-label={`Scope: ${shown}`} rightIcon={<ChevronDown />}>
+        <Button variant="quiet" className={`scope ${CONTROL} min-w-0 px-2`} aria-label={`Scope: ${shown}`} rightIcon={<ChevronDown />}>
           <span className="min-w-0 truncate">{shown}</span>
         </Button>
       </DropdownMenu.Trigger>
@@ -113,7 +115,7 @@ function Refreshed({ data }: { data: BoardData }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <span tabIndex={0}
-          className="refreshed inline-flex shrink-0 @max-[40rem]:hidden items-center gap-1.5 whitespace-nowrap rounded-sm px-1 text-xs tabular-nums text-base-700 outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          className="refreshed inline-flex h-7 shrink-0 @max-[40rem]:hidden items-center gap-1.5 whitespace-nowrap rounded-sm px-1 text-xs tabular-nums text-base-700 outline-none focus-visible:ring-2 focus-visible:ring-primary">
           <span className="relative grid size-2 place-items-center">
             {landed > 0 && health === 'live' && (
               <span key={landed} data-ping className="absolute size-1.5 rounded-full bg-success motion-safe:animate-[refreshed-ping_1.2s_ease-out_forwards]" />
@@ -149,16 +151,16 @@ export function TitleBar() {
           <>
             <Scope />
             <Refreshed data={data} />
-            <div className="flex flex-1 items-center justify-center"><Counters /></div>
           </>
         )}
         actions={(
           <>
             {board && (
               <>
+                <Counters />
                 <ListButton />
                 <AddItem />
-                <Badge className="t3-tag @max-[70rem]:hidden [.title-bar:has(.update-button)_&]:@max-[74rem]:hidden .idden">for T3 Code</Badge>
+                <Badge className="t3-tag h-7 px-2 @max-[70rem]:hidden [.title-bar:has(.update-button)_&]:@max-[74rem]:hidden">for T3 Code</Badge>
                 <UpdateButton />
               </>
             )}

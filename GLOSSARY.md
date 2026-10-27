@@ -269,7 +269,7 @@ The board server's first read of every repository after it starts. It settles wh
 _Avoid_: initial load, first sync
 
 **Title bar**:
-The bar at the top of the board, in the board app and in a browser. It holds the brand, the scope, the Refreshed time, the counters, the List button, Add item, the Update button and Settings.
+The bar at the top of the board, in the board app and in a browser. It holds the brand, the scope and the Refreshed time on the left, then the counters, the List button, Add item, the Update button and Settings on the right.
 _Avoid_: toolbar, top bar
 
 **List modal**:

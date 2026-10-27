@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0027
+---
+
 # Copy T3's base components unchanged
 
 Settled in issue #267.
@@ -11,3 +15,5 @@ The design system copies the base components the board uses from T3 Code's `apps
 Rewriting each copy's `~` and extensionless imports into the board's style was rejected. It needs no alias or second tsconfig, but every update from upstream would need the same edits again.
 
 Keeping `apps/web` on `nodenext` was rejected. Node's resolution needs an extension on every relative import, and the copies have none, so `apps/web` could only type-check them through declaration files built from `packages/ui`, a build step a source-only package doesn't have.
+
+Superseded by [ADR 0027](0027-copy-the-design-system-from-lar-server.md): the design system is now a copy of lar-server's, and the T3 and coss Copies are gone.

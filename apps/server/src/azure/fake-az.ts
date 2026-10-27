@@ -13,6 +13,8 @@ export interface WorkItem {
   closed?: string;
   /** Its area path; the team's own area when absent. */
   area?: string;
+  /** The ids of the pull requests linked to it, each read from `pullRequests`. */
+  prs?: number[];
 }
 
 /** The fake team's area path, which its area paths include with their children unless a test says otherwise. */
@@ -31,16 +33,18 @@ export const STATES: Record<string, [string, string][]> = {
 /**
  * A fake az for one team whose current sprint holds `sprint`'s ids and whose requirement backlog lists `backlog`'s,
  * reading `items` (listed or not), with `requirement` its requirement backlog level's type and `areas` its area paths.
- * It records each call and each work item patch, and `fail` throws for a call it matches.
+ * `pullRequests` are the PRs az repos pr show prints. It records each call and each work item patch, and `fail` throws for a
+ * call it matches.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
-  requirement = 'User Story', areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], fail }: {
+  requirement = 'User Story', areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], fail }: {
   items: WorkItem[];
   sprint?: number[];
   backlog?: number[];
   requirement?: string;
   areas?: { value: string; includeChildren: boolean }[];
   iterations?: { id: string; name: string }[];
+  pullRequests?: FakePr[];
   fail?: (args: string[]) => Error | undefined;
 }) {
   const calls: string[][] = [];
@@ -63,6 +67,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         .map((child) => ({ rel: 'System.LinkTypes.Hierarchy-Forward', url: `https://dev.azure.com/contoso/_apis/wit/workItems/${child.id}`, attributes: {} })),
       ...(i.predecessors ?? []).map((p) => ({ rel: 'System.LinkTypes.Dependency-Reverse', url: `https://dev.azure.com/contoso/_apis/wit/workItems/${p}`, attributes: {} })),
       { rel: 'ArtifactLink', url: 'vstfs:///Git/Commit/x', attributes: {} },
+      ...(i.prs ?? []).map((id) => ({ rel: 'ArtifactLink', url: `vstfs:///Git/PullRequestId/p-guid%2Fr-guid%2F${id}`, attributes: { name: 'Pull Request' } })),
     ],
   });
   const run = async (args: string[]) => {
@@ -78,6 +83,11 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
           ? { rel: 'System.LinkTypes.Hierarchy-Forward', source: { id: parent }, target: { id } }
           : { rel: null, source: null, target: { id } };
       }) });
+    }
+    if (command === 'repos pr show --id') {
+      const pr = pullRequests.find((p) => p.pullRequestId === Number(flag(args, '--id')));
+      if (!pr) throw new Error('az repos pr show failed: TF401180: The requested pull request was not found.');
+      return JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'lar-api', webUrl: REPO_URL } });
     }
     if (args[0] === 'devops' && args[1] === 'invoke') {
       const resource = `${flag(args, '--area')}/${flag(args, '--resource')}`;

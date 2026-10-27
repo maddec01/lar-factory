@@ -4,9 +4,9 @@
 
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { isRecord, type Clash, type ClashRun, type ClashRunState, type ModelChoice, type ModelGroup } from '@lar-factory/shared';
+import { isRecord, onAzure, type Clash, type ClashRun, type ClashRunState, type ModelChoice, type ModelGroup } from '@lar-factory/shared';
 import { AZURE_REPOS } from '../azure/azure-repos.ts';
-import { isRepo, onAzure } from '../config/repository-config.ts';
+import { isRepo } from '../config/repository-config.ts';
 import { defaultBranchHead, message as errorMessage } from '../github/github.ts';
 import { liveProjects, threadByTitle } from '../t3/t3-db.ts';
 import { statsDbPath } from '../t3/t3-settings.ts';

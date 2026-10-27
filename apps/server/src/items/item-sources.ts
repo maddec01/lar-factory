@@ -1,12 +1,12 @@
 // Every item source the onboarded repositories' configs name, as the one item source the board server reads and writes through.
 // A GitHub Project or a repository's issues read through gh, and an Azure DevOps team's sprint or backlog through az.
 
-import type { Item, RepoConfig } from '@lar-factory/shared';
+import { decodePart, type Item, type RepoConfig } from '@lar-factory/shared';
 import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
 import { azureBacklog } from '../azure/azure-backlog.ts';
-import { az, decoded, type Az } from '../azure/azure-items.ts';
+import { az, type Az } from '../azure/azure-items.ts';
 import { azureSprint } from '../azure/azure-sprint.ts';
 import { ReadProblem, type ItemSource, type ItemsRead } from './item-source.ts';
 
@@ -39,7 +39,7 @@ export function repoView({ repo, role, itemSource, show, labels }: RepositoryCon
 export function configuredSources(configs: readonly RepositoryConfig[], run: Az = az): ItemSource {
   const projects = new Map<string, ItemSource>();
   // Azure DevOps names ignore case.
-  const teamKey = (repo: string, kind: string, team: string) => [kind, ...repo.split('/').slice(0, 2).map(decoded), team].join('/').toLowerCase();
+  const teamKey = (repo: string, kind: string, team: string) => [kind, ...repo.split('/').slice(0, 2).map(decodePart), team].join('/').toLowerCase();
   const teams = new Map<string, string[]>();
   for (const { repo, itemSource } of configs) {
     if (itemSource.kind !== 'azure-sprint' && itemSource.kind !== 'azure-backlog') continue;

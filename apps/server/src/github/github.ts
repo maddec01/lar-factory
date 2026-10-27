@@ -478,6 +478,18 @@ export async function createBranch(repo: string, branch: string, sha: string, ru
   await run(['api', `repos/${repo}/git/refs`, '--method', 'POST', '-f', `ref=refs/heads/${branch}`, '-f', `sha=${sha}`]);
 }
 
+/**
+ * Makes one commit on `parent` with the entries changed, with the Git data API, and puts `branch` on it: the branch is
+ * made there, or moved there from its head whether or not the commit follows from it. azure-repos.ts's pushCommit does
+ * the same on Azure Repos.
+ */
+export async function pushCommit(repo: string, branch: string, commit: { message: string; parent: string; entries: TreeEntry[] },
+  run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  const [head, tree] = await Promise.all([branchHead(repo, branch, run), commitTree(repo, commit.parent, run)]);
+  const sha = await createCommit(repo, commit.message, await createTree(repo, tree.sha, commit.entries, run), commit.parent, run);
+  await (head === null ? createBranch : moveBranch)(repo, branch, sha, run);
+}
+
 /** The commit at the head of the repository's branch on GitHub, or null when it has no such branch. */
 export async function branchHead(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
   try {

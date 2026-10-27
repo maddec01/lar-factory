@@ -9,7 +9,7 @@ import {
   type RepositoryConfigAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
 import { problemOf } from '../azure/azure-items.ts';
-import { readDefaultBranchFile as readAzureFile } from '../azure/azure-repos.ts';
+import { readBranchFile as readAzureFile } from '../azure/azure-repos.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { readBranchFile } from '../github/github.ts';
 import { boardDataDir } from '../port/board-record.ts';
@@ -51,8 +51,6 @@ const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 /** Whether a value is a repository of the form owner/name or organization/project/repository. */
 export const isRepo = (value: unknown): value is string => typeof value === 'string' && REPO.test(value);
 
-// Whether a repository is on Azure DevOps, which shared answers for the page too.
-export { onAzure };
 
 const isTeam = (value: unknown): value is string => typeof value === 'string' && value !== '';
 
@@ -285,12 +283,12 @@ class RepositoryConfigError extends Error {
 
 /**
  * The repository's .lar-factory.json from its default branch, or from `branch` when given, never a checkout, with
- * defaults filled in; null when it has none, or why the one it has is wrong. An Azure DevOps repository's default-branch
- * file is read with az, any other's with gh, and `run` stands in for that tool. Throws any other failure, such as a
+ * defaults filled in; null when it has none, or why the one it has is wrong. An Azure DevOps repository's file is read
+ * with az, any other's with gh, and `run` stands in for that tool. Throws any other failure, such as a
  * logged-out gh or az.
  */
 export async function findRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>, branch?: string): Promise<RepositoryConfig | { problem: string } | null> {
-  const text = await (onAzure(repo) && branch === undefined ? readAzureFile(repo, '.lar-factory.json', run) : readBranchFile(repo, '.lar-factory.json', branch, run));
+  const text = await (onAzure(repo) ? readAzureFile : readBranchFile)(repo, '.lar-factory.json', branch, run);
   if (text === null) return null;
   let raw: unknown;
   try { raw = JSON.parse(text); }

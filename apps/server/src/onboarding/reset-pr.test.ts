@@ -1,5 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
+import { REPO_URL, fakeAzRepos } from '../azure/fake-az.ts';
 import { AGENT_SKILLS_BLOCK } from './agent-setup.ts';
 import { openResetPr } from './reset-pr.ts';
 
@@ -116,4 +117,15 @@ test('a default branch with nothing of the setup opens no PR', async () => {
 test("a gh call that fails throws gh's message", async () => {
   const { run } = gh({ '.lar-factory.json': '{}' }, { fails: { 'pr create': 'pull request create failed: HTTP 403' } });
   await assert.rejects(openResetPr('maddec01/lar-web', run), { message: 'pull request create failed: HTTP 403' });
+});
+
+test('on Azure Repos, one push makes the reset commit on lar-factory/reset, and an active PR from it gets the new description', async () => {
+  const az = fakeAzRepos({ files: { '/.lar-factory.json': '{}', '/AGENTS.md': `# lar-api\n\n${AGENT_SKILLS_BLOCK}`, '/README.md': '# lar-api\n' },
+    branches: { 'lar-factory/reset': 'old789' }, prs: [{ pullRequestId: 7, status: 'active', sourceRefName: 'refs/heads/lar-factory/reset' }] });
+  assert.equal(await openResetPr('contoso/Fabrikam%20Fiber/lar-api', az.run), `${REPO_URL}/pullrequest/7`);
+  assert.deepEqual(az.pushes.map(({ ref, oldObjectId, parents, changes }) => ({ ref, oldObjectId, parents, changes })), [{
+    ref: 'refs/heads/lar-factory/reset', oldObjectId: 'old789', parents: ['abc123'],
+    changes: [{ changeType: 'delete', path: '/.lar-factory.json' }, { changeType: 'edit', path: '/AGENTS.md', content: '# lar-api\n\n' }],
+  }]);
+  assert.match(az.prs[0]!.description!, /^This PR:\n\n- Deletes `.lar-factory.json`/);
 });

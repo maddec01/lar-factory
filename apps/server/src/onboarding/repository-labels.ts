@@ -6,9 +6,9 @@
 // On Azure DevOps the labels are the project's tags, read and renamed through az. It creates none: the board writes a
 // tag the first time a work item needs it, so a missing one holds nothing back.
 
-import { customLabelProblem, labelPlan, labelsToCreate, missingCustomLabels, shownRepo, workflowLabelsMissing } from '@lar-factory/shared';
+import { customLabelProblem, labelPlan, labelsToCreate, missingCustomLabels, onAzure, shownRepo, workflowLabelsMissing } from '@lar-factory/shared';
 import { listTags, renameTag } from '../azure/azure-tags.ts';
-import { isItemSource, isRepo, onAzure } from '../config/repository-config.ts';
+import { isItemSource, isRepo } from '../config/repository-config.ts';
 import { createLabel, listLabels, message, renameLabel } from '../github/github.ts';
 
 type Run = (args: string[]) => Promise<string>;

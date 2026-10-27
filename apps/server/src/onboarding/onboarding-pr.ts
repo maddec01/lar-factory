@@ -10,18 +10,15 @@
 // reset PR and marks the entry resetting. Each refresh drops a resetting entry once its reset PR merged or closed unmerged.
 
 import {
-  isRecord, isSkillName, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
+  isRecord, isSkillName, onAzure, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
 } from '@lar-factory/shared';
-import { AZURE_REPOS } from '../azure/azure-repos.ts';
 import {
-  type OnboardedRepository, dropRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, onAzure, readRepositoryList, saveOnboarded, saveOnboarding,
+  type OnboardedRepository, dropRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, readRepositoryList, saveOnboarded, saveOnboarding,
   savePrClosed, saveResetting, stillOnboarding,
 } from '../config/repository-config.ts';
-import {
-  branchExists, closePr, commitTree, createBranch, createCommit, createPr, createTree, defaultBranchHead, editPrBody, message, moveBranch, openPrFrom,
-  prState, readBlob, reopenPr,
-} from '../github/github.ts';
+import { createBranch, createCommit, createTree, message, moveBranch } from '../github/github.ts';
 import { editPrOf, type Refused } from '../config/edit-config.ts';
+import { prHost as host } from '../config/pr-host.ts';
 import { boardDataDir } from '../port/board-record.ts';
 import { bundledSkillNames } from '../skills/bundled-skills.ts';
 import { planPrChanges, type PrPlan } from './pr-changes.ts';
@@ -52,11 +49,6 @@ function describe(change: OnboardingPrChange): string {
 
 const prBody = (changes: OnboardingPrChange[]) =>
   `This PR:\n\n${changes.map((change) => `- ${describe(change)}`).join('\n')}\n\nOnboarding finishes on the board once this PR merges.`;
-
-const GITHUB = { branchExists, closePr, commitTree, createPr, defaultBranchHead, editPrBody, openPrFrom, prState, readBlob, reopenPr };
-
-/** The calls that open and follow the repository's PR: az's on Azure DevOps, gh's on GitHub. `run` stands in for that tool. */
-const host = (repo: string): typeof GITHUB => (onAzure(repo) ? AZURE_REPOS : GITHUB);
 
 /**
  * How far opening a repository's PR with one set of answers got, so Retry goes on from the gh or az call that failed;
@@ -161,7 +153,7 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
     const answered = JSON.stringify([config, picks]);
     const opening: Opening = kept?.key === answered ? kept : { key: answered };
     openings.set(key, opening);
-    const { createPr, defaultBranchHead, editPrBody } = host(repo);
+    const { createPr, defaultBranchHead, editPrBody, pushCommit } = host(repo);
     const azure = onAzure(repo);
     try {
       opening.head ??= await defaultBranchHead(repo, run);
@@ -181,7 +173,7 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
       if (!opening.branch) {
         const { branch, prUrl } = await onboardingBranch(repo, run);
         // On Azure Repos one push makes the commit and makes or moves the branch.
-        if (azure) await AZURE_REPOS.pushCommit(repo, branch, { message: TITLE, parent: opening.head.sha, entries: opening.plan.entries }, run);
+        if (azure) await pushCommit(repo, branch, { message: TITLE, parent: opening.head.sha, entries: opening.plan.entries }, run);
         if (prUrl) {
           if (!azure) await moveBranch(repo, branch, opening.commit!, run);
           await editPrBody(prUrl, body, run);
@@ -230,8 +222,8 @@ export async function reopenOnboardingPr(input: Record<string, unknown>, dir = b
  * While it is still onboarding, Reset closes its onboarding PR with a comment while the PR is open, then drops its
  * entry, opening no PR. Once it is onboarded, Reset closes its open Edit PR with a comment, so that PR can't bring .lar-factory.json back, then opens the reset PR
  * and marks its entry resetting with the PR's URL. Refuses a repository off the list or resetting already, and one
- * whose onboarding PR merged, and keeps the entry, with gh's message, when gh can't read or close the onboarding PR or
- * the Edit PR, or open the reset PR, then saying that the Edit PR it closed is closed now, with `editPrClosed`.
+ * whose onboarding PR merged, and keeps the entry, with gh's or az's message, when the call can't read or close the
+ * onboarding PR or the Edit PR, or open the reset PR, then saying that the Edit PR it closed is closed now, with `editPrClosed`.
  */
 export async function resetRepository(input: Record<string, unknown>, dir = boardDataDir(), run?: Run):
   Promise<{ onboarding: OnboardingRepository[]; prUrl?: string } | (Refused & { editPrClosed?: true })> {
@@ -242,6 +234,7 @@ export async function resetRepository(input: Record<string, unknown>, dir = boar
   catch (err) { return { status: 409, error: message(err) }; }
   if (!entry) return { status: 409, error: `${repo} is not on this Mac's list.` };
   if (entry.resetting) return { status: 409, error: `${repo} is resetting already.` };
+  const { closePr, prState } = host(entry.repo);
   if (!entry.onboarding) {
     let editPr;
     try {
@@ -320,7 +313,7 @@ export async function followResetPrs(list: OnboardedRepository[], dir = boardDat
   const followed = list.flatMap(({ repo, resetting }) => resetting ? [{ repo, prUrl: resetting.prUrl }] : []);
   for (const { repo, prUrl } of followed) {
     try {
-      if (await prState(prUrl, run) === 'OPEN') continue;
+      if (await host(repo).prState(prUrl, run) === 'OPEN') continue;
       dropRepository(repo, dir);
       dropped(repo);
     } catch (err) {

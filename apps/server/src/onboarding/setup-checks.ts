@@ -3,12 +3,12 @@
 // item source can be read; and that the login, gh's or on Azure DevOps az's, can push to the repository. A failed check
 // names its fix.
 
-import { SETUP_CHECKS, sameRepo, shownRepo, type RepositoryItemSource, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
-import { az, decoded, type Az } from '../azure/azure-items.ts';
+import { SETUP_CHECKS, decodePart, onAzure, sameRepo, shownRepo, type RepositoryItemSource, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
+import { az, type Az } from '../azure/azure-items.ts';
 import { azureBacklog } from '../azure/azure-backlog.ts';
 import { canPush as azureCanPush } from '../azure/azure-repos.ts';
 import { SPRINT_FIX, azureSprint } from '../azure/azure-sprint.ts';
-import { isItemSource, isRepo, onAzure } from '../config/repository-config.ts';
+import { isItemSource, isRepo } from '../config/repository-config.ts';
 import { canPush, fetchProject, fetchRepoIssues, message } from '../github/github.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { type Checkout, azureRepo, checkouts, githubRepo, onAzureDevOps } from '../t3/repository-project.ts';
@@ -74,7 +74,7 @@ function sourceName(repo: string, source: RepositoryItemSource): string {
 function sourceFix(repo: string, source: RepositoryItemSource): string {
   if (source.kind === 'github-project') return "Check the Project's owner and number, and that gh's login can read the Project.";
   if (source.kind === 'issues') return `Check that gh's login can read ${repo}'s issues.`;
-  return `Check the team's name, and that az's login can read ${decoded(repo.split('/')[1]!)}'s boards.`;
+  return `Check the team's name, and that az's login can read ${decodePart(repo.split('/')[1]!)}'s boards.`;
 }
 
 async function checkSource(repo: string, source: RepositoryItemSource, reads: SetupCheckReads): Promise<SetupCheckResult> {

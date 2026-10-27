@@ -629,3 +629,52 @@ test("on Azure Repos, a failed push answers with az's message, and Retry goes on
     await writeFile(join(dir, 'repositories.json'), JSON.stringify({ repositories: [{ repo: AZURE, onboarding: progress }] }));
   }
 });
+
+const AZURE_EDIT = `${REPO_URL}/pullrequest/7`;
+const RESET_PUSH = { ref: 'refs/heads/lar-factory/reset', parents: ['abc123'], paths: [['delete', '/.lar-factory.json']] };
+const pushed = (az: ReturnType<typeof fakeAzRepos>) => az.pushes.map(({ ref, parents, changes }) => ({ ref, parents, paths: changes.map((c) => [c.changeType, c.path]) }));
+
+test("on Azure Repos, Reset abandons the open Edit PR after a comment, pushes the reset commit and opens its PR set to complete work items, with no gh call", async (t) => {
+  const dir = await dataDir(t, [{ repo: AZURE }]);
+  const az = fakeAzRepos({ files: { '/.lar-factory.json': '{}' }, branches: { 'lar-factory/edit-config': 'old789' },
+    prs: [{ pullRequestId: 7, status: 'active', sourceRefName: 'refs/heads/lar-factory/edit-config' }] });
+  const resetPr = `${REPO_URL}/pullrequest/101`;
+  assert.deepEqual(await resetRepository({ repo: AZURE }, dir, az.run), { onboarding: [], prUrl: resetPr });
+  assert.equal(az.prs[0]!.status, 'abandoned');
+  assert.match(az.comments[0]!.content, /closed this Edit PR/);
+  assert.deepEqual(pushed(az), [RESET_PUSH]);
+  const create = az.calls.find((args) => args.slice(0, 3).join(' ') === 'repos pr create')!;
+  assert.equal(create[create.indexOf('--transition-work-items') + 1], 'true');
+  assert.deepEqual(readRepositoryList(dir), [{ repo: AZURE, resetting: { prUrl: resetPr } }]);
+});
+
+test('on Azure Repos, Reset of a repository still onboarding abandons its active PR and drops it, and keeps one whose PR completed', async (t) => {
+  const dir = await dataDir(t, [{ repo: AZURE, onboarding: { ...progress, step: 'pr', prUrl: AZURE_EDIT } }]);
+  const az = fakeAzRepos({ prs: [{ pullRequestId: 7, status: 'active', sourceRefName: 'refs/heads/lar-factory/onboarding' }] });
+  assert.deepEqual(await resetRepository({ repo: AZURE }, dir, az.run), { onboarding: [] });
+  assert.equal(az.prs[0]!.status, 'abandoned');
+  assert.deepEqual(readRepositoryList(dir), []);
+  const merged = await dataDir(t, [{ repo: AZURE, onboarding: { ...progress, step: 'pr', prUrl: AZURE_EDIT } }]);
+  const completed = fakeAzRepos({ prs: [{ pullRequestId: 7, status: 'completed', sourceRefName: 'refs/heads/lar-factory/onboarding' }] });
+  assert.equal((await resetRepository({ repo: AZURE }, merged, completed.run) as { status: number }).status, 409);
+});
+
+test("on Azure Repos, a refused az call keeps the entry with az's message", async (t) => {
+  const dir = await dataDir(t, [{ repo: AZURE }]);
+  const az = fakeAzRepos({ files: { '/.lar-factory.json': '{}' },
+    fail: (args) => (args.join(' ').includes('--resource pushes') ? new Error('TF401027: You need the Git Contribute permission.') : undefined) });
+  assert.deepEqual(await resetRepository({ repo: AZURE }, dir, az.run),
+    { status: 502, error: `Can't open ${AZURE}'s reset PR: TF401027: You need the Git Contribute permission.` });
+  assert.deepEqual(readRepositoryList(dir), [{ repo: AZURE }]);
+});
+
+test('on Azure Repos, each refresh drops a resetting entry whose reset PR completed or was abandoned, and keeps an active one', async (t) => {
+  const web = 'contoso/Fabrikam%20Fiber/lar-web';
+  const dir = await dataDir(t, [{ repo: AZURE, resetting: { prUrl: `${REPO_URL}/pullrequest/7` } }, { repo: web, resetting: { prUrl: `${REPO_URL}/pullrequest/8` } }]);
+  const az = fakeAzRepos({ prs: [{ pullRequestId: 7, status: 'completed', sourceRefName: 'refs/heads/lar-factory/reset' },
+    { pullRequestId: 8, status: 'active', sourceRefName: 'refs/heads/lar-factory/reset' }] });
+  const dropped: string[] = [];
+  assert.deepEqual(await followResetPrs(readRepositoryList(dir), dir, az.run, { failed: () => assert.fail(), dropped: (repo) => dropped.push(repo) }),
+    [{ repo: web, resetting: { prUrl: `${REPO_URL}/pullrequest/8` } }]);
+  assert.deepEqual(dropped, [AZURE]);
+});

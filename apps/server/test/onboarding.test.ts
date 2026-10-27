@@ -190,22 +190,9 @@ test("onboarding's Clash agent runs on a fresh fetch of origin's default branch,
   assert.equal(bad.status, 400);
 });
 
-test('finishing an onboarding that reuses .lar-factory.json puts its repository on the board', async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  writeList(home, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: progress }]);
-  const board = await startBoard(t, {}, false, false, { HOME: home });
-  await until(board, (d) => d.fetchedAt !== null);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/finish');
-  assert.equal(response.status, 200);
-  assert.deepEqual((await response.json() as { board: BoardData }).board.onboarding, []);
-  const data = await until(board, (d) => d.repos.length === 2);
-  assert.deepEqual(data.repos.map((r) => r.repo), ['maddec01/lar-factory', 'maddec01/lar-web']);
-});
-
-test('the sample board runs no onboarding check, finds no Clash, runs no Clash agent and finishes no onboarding', async (t) => {
+test('the sample board runs no onboarding check, finds no Clash, runs no Clash agent', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs', '/api/onboarding/finish']) {
+  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }

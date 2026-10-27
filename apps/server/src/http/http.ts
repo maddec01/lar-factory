@@ -42,8 +42,6 @@ export interface HttpDeps {
   startClashRun(input: Record<string, unknown>): Promise<{ runs: ClashRun[] } | { status: number; error: string }>;
   /** The repository's Clash agent runs, oldest first. */
   clashRuns(repo: string): ClashRun[];
-  /** Finishes an onboarding that reuses its .lar-factory.json, returning the repositories still onboarding, or why it can't. */
-  finishOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
   openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /** What an onboarding's PR would change against its default branch with the body's answers and picks, or why it can't say. */
@@ -125,7 +123,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  runSetupCheck, findFixedClashes, startClashRun, clashRuns, finishOnboarding, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
+  runSetupCheck, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -215,18 +213,6 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       async run(input) {
         const started = await startClashRun(input);
         return 'error' in started ? { status: started.status, body: { error: started.error } } : { status: 200, body: { ...started, error: null } };
-      },
-    },
-    '/api/onboarding/finish': {
-      what: 'the onboarding to finish', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const finished = await finishOnboarding(input);
-        if ('error' in finished) return { status: finished.status, body: { error: finished.error } };
-        board.update({ onboarding: finished.onboarding });
-        board.push();
-        // The finished repository goes on the board with the next read, which reads its .lar-factory.json.
-        readSoon();
-        return { status: 200, body: withBoard({ error: null }) };
       },
     },
     '/api/onboarding/pr': {

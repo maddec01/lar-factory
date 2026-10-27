@@ -1,5 +1,6 @@
-// The item dialog: opened through its store, it shows an item's repository, status, track, slices, pull
-// requests, agent work and labels, and its footer carries GitHub and the action the item's status asks for.
+// The item dialog: opened through its store, it shows an item's repository, status, track and a meta area of labels and
+// agent work under the title, then slices and pull requests in a sidebar, and its footer carries GitHub and the action
+// the item's status asks for.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
@@ -10,6 +11,8 @@ const inDialog = <T extends Element = HTMLElement>(selector: string) => dialog()
 const footer = () => inDialog('[data-slot="dialog-footer"]')!;
 /** The item dialog's `attr` button, not the board's behind it. */
 const button = (attr: string, id: string) => inDialog<HTMLButtonElement>(`[data-${attr}="${id}"]`)!;
+/** A sidebar section by the start of its heading. */
+const section = (heading: string) => $$('[data-item-dialog] aside section').find((s) => text(s.querySelector('h2')).startsWith(heading))!;
 const press = async (el: HTMLElement) => {
   el.focus();
   await settle(() => el.click());
@@ -34,11 +37,42 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   const [track, names] = $$('[data-item-dialog] [data-slot="dialog-panel"] > div:first-child ol');
   expect(track!.children).toHaveLength(10);
   expect(text(names!.querySelector('.font-semibold'))).toBe('Ready');
-  const slices = inDialog('section')!;
+  const slices = section('Slices');
   expect(text(slices.querySelector('h2'))).toBe('Slices 1/3 done');
   expect([...slices.querySelectorAll('li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
-  expect(text(inDialog('section:last-of-type'))).toBe('Agent workNo T3 thread has worked on this yet.');
+  expect(text(inDialog('[data-meta]'))).toContain('No T3 thread has worked on this yet.');
   expect(text(inDialog('[data-labels]'))).toBe('build');
+});
+
+test('the labels, people, dates and agent work sit in a meta area under the title, and the sidebar holds only relations', async () => {
+  await mountPage();
+  await openItem('I_sample13');
+  const meta = text(inDialog('[data-meta]'));
+  expect(meta).toMatch(/Author.*maddec01.*Assignees.*maddec01.*claude-bot.*Labels.*build.*Milestone.*Cloud v0\.1.*Created.*Updated/);
+  expect(inDialog('[data-meta]')!.closest('aside'), 'not in the sidebar').toBeNull();
+  expect([...$$('[data-item-dialog] aside h2').map(text)]).toEqual(['Sub-tickets', 'Slices 1/3 done']);
+  expect(text(inDialog('aside'))).not.toMatch(/Author|Assignees|Labels|Created|Updated|Agent work/);
+});
+
+test('an item with no slices, pull requests or sub-tickets has no sidebar', async () => {
+  await mountPage();
+  await openItem('I_sample01');
+  expect(inDialog('aside')).toBeNull();
+});
+
+test('the track names every step only in a wide dialog; a narrow one names the current step alone', async () => {
+  await mountPage();
+  await openItem('I_sample13');
+  expect(text(inDialog('[data-step]'))).toBe('Ready · step 5 of 10');
+  expect(inDialog('[data-step]')!.className, 'hidden once the dialog is wide enough for every name').toContain('@min-[48rem]:hidden');
+  expect(text(inDialog('[data-slot="dialog-panel"] > div:first-child ol:last-of-type')).startsWith('List')).toBe(true);
+});
+
+test('the dialog lays out by its own width and never hides an overflow', async () => {
+  await mountPage();
+  await openItem('I_sample13');
+  expect(dialog()!.classList.contains('@container')).toBe(true);
+  expect(inDialog('[data-slot="dialog-panel"]')!.className).not.toMatch(/overflow/);
 });
 
 test('the dialog of an untagged item two repositories read tags it with both', async () => {
@@ -52,7 +86,7 @@ test('the dialog of an untagged item two repositories read tags it with both', a
 test('the slice rows are 13px with the status word at 11px', async () => {
   await mountPage();
   await openItem('I_sample13');
-  const rows = [...inDialog('section')!.querySelectorAll('li')];
+  const rows = [...section('Slices').querySelectorAll('li')];
   expect(rows).toHaveLength(3);
   for (const row of rows) {
     expect(row.classList.contains('text-[13px]')).toBe(true);
@@ -64,13 +98,14 @@ test('the dialog shows the hint, each pull request with its checks, and the agen
   await mountPage();
   await openItem('I_sample14');
   expect(text(inDialog('[data-slot="dialog-header"] > div'))).toMatch(/^lar-apple In progress · updated 25m ago$/);
-  const pr = inDialog('section li')!;
+  const pr = section('Pull requests').querySelector('li')!;
   expect([text(pr), pr.querySelector('a')!.getAttribute('href')]).toEqual(['PR #33 (draft)checks running', 'https://github.com/maddec01/lar-apple/pull/33']);
-  expect($$('[data-item-dialog] dl > div').map(text)).toEqual(['Agent time2h 14m', 'Wall time1h 20m', 'Tokens16.6M', 'Cost$24.18']);
+  expect($$('[data-item-dialog] dl > div').map(text)).toEqual(['Cost$24.18', 'Agent time2h 14m', 'Tokens16.6M', 'Wall time1h 20m']);
 
   await openItem('I_sample16');
   expect(text(inDialog('[data-slot="dialog-panel"] > div:nth-child(2)')), 'the hint').toBe('Test it with the steps in the PR, then merge');
-  expect(text(inDialog('dl') ?? inDialog('section:last-of-type p')), 'unreadable stats say so').toBe('The T3 Code database could not be read');
+  expect(inDialog('dl'), 'no figures').toBeNull();
+  expect(text(inDialog('[data-meta]')), 'unreadable stats say so').toContain('The T3 Code database could not be read');
 });
 
 /** The footer's buttons and links, left to right, as their text, with " (disabled: <title>)" on a disabled one. */

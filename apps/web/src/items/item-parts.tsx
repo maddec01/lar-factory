@@ -1,10 +1,10 @@
 // The bits every view draws for an item: its numbered title, title link, status track and slice bar, and the item
-// dialog's repository tag, slices, pull requests with checks, and agent work. The tag is T3's Badge; the board's CSS
+// dialog's repository tag, slices, pull requests, checks, and agent work. The tag is T3's Badge; the board's CSS
 // adds the coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
 import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
-import type { Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
+import type { Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/badge';
 import { STATUS_COLOR } from './status-glyph.tsx';
 
@@ -34,11 +34,15 @@ export function ItemTitle({ item }: { item: Item }) {
   return <><span className="font-normal text-(--muted-foreground) tabular-nums">{ref(item)}</span> {item.title}</>;
 }
 
-/** Ten steps as a track; the past filled, the current one in its colour and, with `labels`, named. */
+/**
+ * Ten steps as a track; the past filled, the current one in its colour and, with `labels`, named. Named, it sits in a
+ * container (the item dialog's popup): once that is 48rem wide every step has its name, and below that only the
+ * current step does, since ten names don't fit.
+ */
 export function StepTrack({ status, labels }: { status: Status; labels?: boolean }) {
   const at = STATUSES.indexOf(status);
   return (
-    <div className="grid gap-1.5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
       <ol className="m-0 flex list-none gap-[3px] p-0">
         {STATUSES.map((s, i) => (
           <li key={s} title={s} className="h-1.5 flex-1 rounded-full"
@@ -46,9 +50,12 @@ export function StepTrack({ status, labels }: { status: Status; labels?: boolean
         ))}
       </ol>
       {labels && (
-        <ol className="m-0 flex list-none gap-[3px] p-0 text-[10px] text-(--muted-foreground)">
-          {STATUSES.map((s, i) => <li key={s} className={`flex-1 truncate ${i === at ? 'font-semibold text-(--foreground)' : ''}`}>{s}</li>)}
-        </ol>
+        <>
+          <p data-step className="m-0 text-xs text-(--muted-foreground) @min-[48rem]:hidden"><span className="font-medium text-(--foreground)">{status}</span> · step {at + 1} of {STATUSES.length}</p>
+          <ol className="m-0 hidden list-none gap-[3px] p-0 text-[10px] text-(--muted-foreground) @min-[48rem]:flex">
+            {STATUSES.map((s, i) => <li key={s} className={`flex-1 truncate ${i === at ? 'font-semibold text-(--foreground)' : ''}`}>{s}</li>)}
+          </ol>
+        </>
       )}
     </div>
   );
@@ -73,15 +80,15 @@ export function SliceList({ item }: { item: Item }) {
   return (
     <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-0.5 p-0">
       {item.slices.map((s) => (
-        <li key={s.number} className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px] hover:bg-(--soft)">
-          <span className="grid size-4 place-items-center rounded-full border-[1.5px]"
+        <li key={s.number} className="flex items-start gap-2 rounded-md px-2 py-1 text-[13px] hover:bg-(--soft)">
+          <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border-[1.5px]"
             style={{ borderColor: SLICE_COLOR[s.progress], background: s.progress === 'done' ? 'var(--st-done)' : 'transparent' }}>
             {s.progress === 'done' && <Check className="size-2.5 text-white" strokeWidth={3} />}
             {s.progress === 'active' && <span className="status-pulse size-1.5 rounded-full bg-(--st-now)" />}
           </span>
-          <span className="text-(--muted-foreground) tabular-nums">#{s.number}</span>
-          <span className={`min-w-0 flex-1 truncate ${s.progress === 'done' ? 'text-(--muted-foreground) line-through' : s.progress === 'active' ? 'font-medium' : ''}`}>{s.title}</span>
-          <span className="text-[11px] text-(--muted-foreground)">{s.progress}</span>
+          <span className="shrink-0 text-(--muted-foreground) tabular-nums">#{s.number}</span>
+          <span className={`min-w-0 flex-1 wrap-anywhere ${s.progress === 'done' ? 'text-(--muted-foreground) line-through' : s.progress === 'active' ? 'font-medium' : ''}`}>{s.title}</span>
+          <span className="mt-px shrink-0 text-[11px] text-(--muted-foreground)">{s.progress}</span>
         </li>
       ))}
     </ul>
@@ -90,31 +97,39 @@ export function SliceList({ item }: { item: Item }) {
 
 const CHECKS_COLOR = { failed: 'var(--error)', running: 'var(--warning)', passed: 'var(--st-done)' } as const;
 
+/** A pull request's checks as a coloured dot and their state, with the passed count when `counts`; nothing when it has none. */
+export function ChecksBadge({ checks, counts }: { checks: Checks | null; counts?: boolean }) {
+  const state = checkState(checks);
+  if (!checks || !state) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-(--muted-foreground)">
+      <span className="size-2 rounded-full" style={{ background: CHECKS_COLOR[state] }} />checks {state}{counts && <span className="tabular-nums">· {checks.passed}/{checks.total} passed</span>}
+    </span>
+  );
+}
+
 export function PrList({ item }: { item: Item }) {
   return (
     <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-1 p-0">
-      {item.linkedPrs.map((pr) => {
-        const state = checkState(pr.checks);
-        return (
-          <li key={pr.number} className="flex items-center gap-2 rounded-lg border border-(--border) bg-(--card) px-3 py-2">
-            <GitPullRequest className="size-4 text-(--st-done)" />
-            <a href={pr.url} target="_blank" rel="noopener" className="min-w-0 flex-1 truncate font-medium hover:underline">{prLabel(pr)}</a>
-            {state && <span className="inline-flex items-center gap-1.5 text-xs text-(--muted-foreground)"><span className="size-2 rounded-full" style={{ background: CHECKS_COLOR[state] }} />checks {state}</span>}
-          </li>
-        );
-      })}
+      {item.linkedPrs.map((pr) => (
+        <li key={pr.number} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-(--border) bg-(--card) px-3 py-2">
+          <GitPullRequest className="size-4 shrink-0 text-(--st-done)" />
+          <a href={pr.url} target="_blank" rel="noopener" className="min-w-0 flex-1 basis-24 font-medium wrap-anywhere hover:underline">{prLabel(pr)}</a>
+          <ChecksBadge checks={pr.checks} />
+        </li>
+      ))}
     </ul>
   );
 }
 
-/** Agent time, wall time, tokens and cost, one cell each; a line instead when no thread worked on the item or T3's database can't be read. */
-export function StatsGrid({ item }: { item: Item }) {
+/** Cost, agent time, tokens and wall time as chips; a line instead when no thread worked on the item or T3's database can't be read. */
+export function StatChips({ item }: { item: Item }) {
   const s = item.stats;
   if (!s || s === 'unavailable') return <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : 'No T3 thread has worked on this yet.'}</p>;
-  const cells = [['Agent time', duration(s.agentMs)], ['Wall time', s.wallMs ? duration(s.wallMs) : '–'], ['Tokens', formatTokens(s.tokens)], ['Cost', s.costUsd !== undefined ? formatUsd(s.costUsd) : '–']];
+  const chips = [['Cost', s.costUsd !== undefined ? formatUsd(s.costUsd) : '–'], ['Agent time', duration(s.agentMs)], ['Tokens', formatTokens(s.tokens)], ['Wall time', s.wallMs ? duration(s.wallMs) : '–']];
   return (
-    <dl className="m-0 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-(--border) bg-(--border)">
-      {cells.map(([k, v]) => <div key={k} className="bg-(--card) px-3 py-2"><dt className="text-[11px] text-(--muted-foreground)">{k}</dt><dd className="m-0 text-sm font-medium tabular-nums">{v}</dd></div>)}
+    <dl className="m-0 flex flex-wrap gap-1.5">
+      {chips.map(([k, v]) => <div key={k} className="flex items-baseline gap-1.5 rounded-md border border-(--border) bg-(--card) px-2 py-1"><dt className="text-[11px] text-(--muted-foreground)">{k}</dt><dd className="m-0 text-xs font-medium tabular-nums">{v}</dd></div>)}
     </dl>
   );
 }

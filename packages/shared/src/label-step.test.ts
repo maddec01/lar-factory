@@ -53,6 +53,11 @@ test('the custom labels to pick from are the labels left alone, less the status 
   assert.deepEqual(customLabelChoices(plan), ['app: music', 'web']);
 });
 
+test('the custom tags to pick from leave out the repo- tags that route Azure work items', () => {
+  const plan = labelPlan(['repo-fabrikam-api', 'Repo-Fabrikam Web', 'web'], 'azure-sprint');
+  assert.deepEqual(customLabelChoices(plan), ['web']);
+});
+
 test('a custom label may hold a colon, but is no workflow or status label and not empty', () => {
   assert.equal(customLabelProblem('app: music'), null);
   assert.match(customLabelProblem('  ')!, /name/);

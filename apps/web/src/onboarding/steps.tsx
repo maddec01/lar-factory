@@ -9,7 +9,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Check, CircleAlert, ExternalLink, FileText, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
-  SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, threadLink, type Clash, type ClashRun, type CheckedTool, type LabelPlan, type LabelRow,
+  SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, shownRepo, threadLink, type Clash, type ClashRun, type CheckedTool, type LabelPlan, type LabelRow,
   type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupCheckId,
   type SkillClash,
 } from '@lar-factory/shared';
@@ -24,10 +24,10 @@ import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
 import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
-import { CUSTOM_LABELS_HELP, Choice, azureProject, CustomLabelPicker, CustomLabelsTitle, Field, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
+import { Choice, CustomLabelPicker, CustomLabelsTitle, Field, customLabelsHelp, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
 import {
   commandChecks, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, customLabelsToCreate, itemSourceOf, labelsPlan, latestRun,
-  nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, skillProblem, skillsDir, ticked, unpickable, useWizardStore,
+  nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, skillProblem, skillsDir, ticked, typedLabelProblem, unpickable, useWizardStore,
 } from './wizard-store.ts';
 
 /** Whether the project's repository has .lar-factory.json. */
@@ -94,7 +94,7 @@ function ProjectStep({ run }: { run: Run }) {
               {p.provider && <Badge variant="outline" size="sm">{p.provider}</Badge>}
               <ConfigBadge project={p} />
               {p.onBoard && <Badge variant="secondary" size="sm">{kept ? 'onboarding' : 'on the board'}</Badge>}</span>}>
-              <span className="font-mono">{p.folder}</span>{p.repo ? ` · ${p.repo}` : ` · ${reason}`}{p.repo && kept && reason && ` · ${reason}`}
+              <span className="font-mono">{p.folder}</span>{p.repo ? ` · ${shownRepo(p.repo)}` : ` · ${reason}`}{p.repo && kept && reason && ` · ${reason}`}
             </Choice>
           );
         })}
@@ -115,7 +115,7 @@ function ProviderRow({ project }: { project: ProjectChoice }) {
     <div data-field="provider" className="grid gap-1.5">
       <span className="text-sm font-medium">Provider</span>
       <Badge variant="outline" className="justify-self-start">{project.provider}</Badge>
-      <span className="text-xs text-muted-foreground">From the host of {project.repo}’s origin; it can’t be changed.</span>
+      <span className="text-xs text-muted-foreground">From the host of {shownRepo(project.repo!)}’s origin; it can’t be changed.</span>
     </div>
   );
 }
@@ -146,16 +146,19 @@ function SetupStep({ run }: { run: Run }) {
     <div className="grid gap-6">
       <ProviderRow project={project} />
       {project.configProblem ? (
-        <Problem title="Can’t reuse .lar-factory.json">{project.configProblem} Fix the file on {project.repo}’s default branch, then Retry.</Problem>
+        <Problem title="Can’t reuse .lar-factory.json">{project.configProblem} Fix the file on {shownRepo(project.repo)}’s default branch, then Retry.</Problem>
       ) : !asksSetup(project) ? (
-        <Problem title="Can’t check .lar-factory.json">Couldn’t read whether {project.repo} has .lar-factory.json on its default branch.</Problem>
+        <Problem title="Can’t check .lar-factory.json">Couldn’t read whether {shownRepo(project.repo)} has .lar-factory.json on its default branch.</Problem>
       ) : run.setup && <SetupFields repo={project.repo} azure={project.provider === 'Azure DevOps'} setup={run.setup} onAnswer={answer} />}
     </div>
   );
 }
 
-/** One label the step needs: its name and what it does, then whether the repository has it, or Rename for its old name. */
-function LabelItem({ row, labels }: { row: LabelRow; labels: Labels }) {
+/**
+ * One label the step needs: its name and what it does, then whether the repository has it, or Rename for its old name.
+ * On Azure DevOps a missing tag is one no work item carries yet.
+ */
+function LabelItem({ row, labels, azure }: { row: LabelRow; labels: Labels; azure: boolean }) {
   const toggleRename = useWizardStore((s) => s.toggleRename);
   return (
     <li data-label={row.label.name} data-state={row.state} className="flex items-center gap-2.5 px-3 py-2 text-sm">
@@ -167,26 +170,26 @@ function LabelItem({ row, labels }: { row: LabelRow; labels: Labels }) {
           <Checkbox checked={!labels.kept.includes(row.oldName)} disabled={!!labels.busy} onCheckedChange={() => toggleRename(row.oldName)} />
           Rename <code className="font-mono break-all">{row.oldName}</code>
         </label>
-      ) : <Badge variant={row.state === 'present' ? 'success' : 'warning'} size="sm">{row.state}</Badge>}
+      ) : <Badge variant={row.state === 'present' ? 'success' : 'warning'} size="sm">{azure && row.state === 'missing' ? 'not used yet' : row.state}</Badge>}
     </li>
   );
 }
 
-function LabelList({ title, note, rows, labels }: { title: string; note?: string; rows: LabelRow[]; labels: Labels }) {
+function LabelList({ title, note, rows, labels, azure }: { title: string; note?: string; rows: LabelRow[]; labels: Labels; azure: boolean }) {
   return (
     <div className="grid gap-1">
       <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
       {note && <p className="m-0 text-xs text-muted-foreground">{note}</p>}
-      <ul className="m-0 grid list-none divide-y rounded-lg border p-0">{rows.map((row) => <LabelItem key={row.label.name} row={row} labels={labels} />)}</ul>
+      <ul className="m-0 grid list-none divide-y rounded-lg border p-0">{rows.map((row) => <LabelItem key={row.label.name} row={row} labels={labels} azure={azure} />)}</ul>
     </div>
   );
 }
 
 /**
  * The labels the step changes nothing on, less the custom labels it lists; an old name beside its new label keeps its
- * issues until the user moves them.
+ * issues, or work items on Azure DevOps, until the user moves them.
  */
-function LeftAlone({ labels }: { labels: LeftAloneLabel[] }) {
+function LeftAlone({ labels, azure }: { labels: LeftAloneLabel[]; azure: boolean }) {
   if (!labels.length) return null;
   return (
     <div data-left-alone className="grid gap-1">
@@ -194,7 +197,7 @@ function LeftAlone({ labels }: { labels: LeftAloneLabel[] }) {
       <ul className="m-0 grid list-none gap-1 p-0 text-sm">
         {labels.map((l) => (
           <li key={l.name} data-left={l.name} className="min-w-0 break-all"><code className="font-mono">{l.name}</code>
-            {l.keptBeside && <span className="text-xs text-muted-foreground"> · The repository has {l.keptBeside} too, so it can’t be renamed. Its issues keep {l.name} until you move them to {l.keptBeside}.</span>}
+            {l.keptBeside && <span className="text-xs text-muted-foreground"> · The {azure ? 'project' : 'repository'} has {l.keptBeside} too, so it can’t be renamed. Its {azure ? 'work items' : 'issues'} keep {l.name} until you move them to {l.keptBeside}.</span>}
           </li>
         ))}
       </ul>
@@ -204,21 +207,23 @@ function LeftAlone({ labels }: { labels: LeftAloneLabel[] }) {
 
 /**
  * The custom labels: a reused .lar-factory.json's, listed; else the custom label picker, whose Add creates the typed
- * label on the repository and picks it.
+ * label on the repository and picks it. On Azure DevOps they are tags, which the step creates none of: Add only picks one.
  */
 function CustomLabels({ run, project, plan, labels }: { run: Run; project: ProjectChoice; plan: LabelPlan; labels: Labels }) {
   const { toggleCustomLabel, typeCustomLabel, addCustomLabel } = useWizardStore();
+  const azure = project.provider === 'Azure DevOps';
   if (project.config) {
     const { labels: names } = project.config;
     const missing = customLabelsToCreate(project, labels);
     return (
       <div data-custom-labels className="grid gap-1">
-        <CustomLabelsTitle />
-        <p className="m-0 text-xs text-muted-foreground">{CUSTOM_LABELS_HELP} These are the ones {project.repo}’s .lar-factory.json lists; change them with Edit in Settings › Repositories once onboarding finishes. Create makes the missing ones, with GitHub’s colour, but none that can’t be a custom label.</p>
+        <CustomLabelsTitle noun={azure ? 'tag' : 'label'} />
+        <p className="m-0 text-xs text-muted-foreground">{customLabelsHelp(azure ? 'tag' : 'label')} These are the ones {shownRepo(project.repo!)}’s .lar-factory.json lists; change them with Edit in Settings › Repositories once onboarding finishes. {azure
+          ? 'The board writes each the first time a work item needs it.' : 'Create makes the missing ones, with GitHub’s colour, but none that can’t be a custom label.'}</p>
         {names.length ? (
           <ul className="m-0 grid list-none divide-y rounded-lg border p-0">
             {names.map((name) => {
-              const problem = customLabelProblem(name);
+              const problem = typedLabelProblem(project, name);
               const state = problem ? 'problem' : missing.includes(name) ? 'missing' : 'present';
               return (
                 <li key={name} data-custom={name} data-state={state} className="flex items-center gap-2.5 px-3 py-2 text-sm">
@@ -227,7 +232,7 @@ function CustomLabels({ run, project, plan, labels }: { run: Run; project: Proje
                     {problem && <span data-problem className="text-xs text-destructive-foreground">{problem}</span>}
                   </span>
                   <Badge variant={state === 'present' ? 'success' : state === 'missing' ? 'warning' : 'error'} size="sm">
-                    {problem ? 'can’t create' : state}</Badge>
+                    {problem ? azure ? 'can’t use' : 'can’t create' : azure && state === 'missing' ? 'not used yet' : state}</Badge>
                 </li>
               );
             })}
@@ -237,45 +242,46 @@ function CustomLabels({ run, project, plan, labels }: { run: Run; project: Proje
     );
   }
   return (
-    <CustomLabelPicker repo={project.repo!} offered={customLabelChoices(plan)} picked={run.customLabels} typed={labels.typed} adding={labels.busy === 'custom'} busy={!!labels.busy}
+    <CustomLabelPicker repo={project.repo!} azure={azure} offered={customLabelChoices(plan)} picked={run.customLabels} typed={labels.typed} adding={labels.busy === 'custom'} busy={!!labels.busy}
       error={labels.error?.action === 'custom' ? labels.error : null} onToggle={toggleCustomLabel} onType={typeCustomLabel} onAdd={() => void addCustomLabel()} />
   );
 }
 
 const STATUS_LABELS_NOTE = 'The board keeps each item’s status in one of these labels, as build #379 set up. Create makes the missing ones, but Next doesn’t wait for them.';
+const STATUS_TAGS_NOTE = 'The board keeps each work item’s status in one of these tags, and writes one the first time a work item needs it.';
 
 /**
  * The Labels step: each workflow label with what it does and whether the repository has it, the status labels for
- * a repository that reads its issues, Create and Rename, the custom labels, then the labels it leaves alone. On Azure DevOps it waits for
- * build #386.
+ * a repository that reads its issues, Create and Rename, the custom labels, then the labels it leaves alone. On Azure
+ * DevOps it shows the project's tags, with the status tags, and offers Rename but no Create.
  */
 function LabelsStep({ run }: { run: Run }) {
   const { projects, labels, loadLabels, createLabels, renameLabels } = useWizardStore();
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
   if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
-  if (project.provider === 'Azure DevOps') {
-    return <Alert variant="info" data-labels-azure><Info /><AlertTitle>Azure DevOps tags arrive in build #386</AlertTitle>
-      <AlertDescription>Until then this step creates no tag on Azure DevOps, and Next goes on.</AlertDescription></Alert>;
-  }
+  const azure = project.provider === 'Azure DevOps';
+  const nouns = azure ? 'tags' : 'labels';
   if (!labels || labels.read.state === 'loading') {
-    return <p className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading {project.repo}’s labels…</p>;
+    return <p className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading {shownRepo(project.repo)}’s {nouns}…</p>;
   }
   if (labels.read.state === 'failed') {
-    return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t read {project.repo}’s labels</AlertTitle><AlertDescription>{labels.read.error}</AlertDescription>
+    return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t read {shownRepo(project.repo)}’s {nouns}</AlertTitle><AlertDescription>{labels.read.error}</AlertDescription>
       <AlertAction><Button size="xs" variant="outline" onClick={() => void loadLabels()}><RotateCw /> Retry</Button></AlertAction></Alert>;
   }
   const plan = labelsPlan(run, project, labels)!;
-  const creates = labelsToCreate(plan, renaming(plan, labels)).length + customLabelsToCreate(project, labels).length;
+  const creates = azure ? 0 : labelsToCreate(plan, renaming(plan, labels)).length + customLabelsToCreate(project, labels).length;
   // The custom labels the step lists as picked, a reused file's or the run's, which Left alone leaves out.
   const chosen = new Set((project.config?.labels ?? run.customLabels).map((l) => l.toLowerCase()));
   const renames = renaming(plan, labels).length;
   const retry = labels.error?.action === 'rename' ? renameLabels : createLabels;
   return (
     <div className="grid gap-4">
-      <p className="m-0 text-xs text-muted-foreground">lar-work and the board read these labels on {project.repo}. Next waits until it has every workflow label. A rename keeps the label on every issue that carries it.</p>
-      <LabelList title="Workflow labels" rows={plan.workflow} labels={labels} />
-      {plan.status.length > 0 && <LabelList title="Status labels" note={STATUS_LABELS_NOTE} rows={plan.status} labels={labels} />}
+      <p className="m-0 text-xs text-muted-foreground">{azure
+        ? `lar-work and the board read these tags on ${shownRepo(project.repo)}’s project. The board writes a tag the first time a work item needs it, so Next doesn’t wait for one. A rename renames the tag in the project, and every work item that carries it keeps it.`
+        : `lar-work and the board read these labels on ${shownRepo(project.repo)}. Next waits until it has every workflow label. A rename keeps the label on every issue that carries it.`}</p>
+      <LabelList title={`Workflow ${nouns}`} rows={plan.workflow} labels={labels} azure={azure} />
+      {plan.status.length > 0 && <LabelList title={`Status ${nouns}`} note={azure ? STATUS_TAGS_NOTE : STATUS_LABELS_NOTE} rows={plan.status} labels={labels} azure={azure} />}
       {(creates > 0 || renames > 0) && <div className="flex gap-2">
         {creates > 0 && <Button data-create-labels size="sm" disabled={!!labels.busy} onClick={() => void createLabels()}>
           {labels.busy === 'create' ? <><LoaderCircle className="animate-spin" /> Creating…</> : `Create ${creates} missing`}</Button>}
@@ -283,12 +289,12 @@ function LabelsStep({ run }: { run: Run }) {
           {labels.busy === 'rename' ? <><LoaderCircle className="animate-spin" /> Renaming…</> : `Rename ${renames}`}</Button>}
       </div>}
       {labels.error && labels.error.action !== 'custom' && (
-        <Alert variant="error"><CircleAlert /><AlertTitle>{labels.error.action === 'create' ? 'Can’t create the labels' : 'Can’t rename the labels'}</AlertTitle>
+        <Alert variant="error"><CircleAlert /><AlertTitle>{labels.error.action === 'create' ? `Can’t create the ${nouns}` : `Can’t rename the ${nouns}`}</AlertTitle>
           <AlertDescription>{labels.error.message}</AlertDescription>
           <AlertAction><Button size="xs" variant="outline" disabled={!!labels.busy} onClick={() => void retry()}><RotateCw /> Retry</Button></AlertAction></Alert>
       )}
       <CustomLabels run={run} project={project} plan={plan} labels={labels} />
-      <LeftAlone labels={plan.leftAlone.filter((l) => !labels.created.includes(l.name) && !chosen.has(l.name.toLowerCase()))} />
+      <LeftAlone labels={plan.leftAlone.filter((l) => !labels.created.includes(l.name) && !chosen.has(l.name.toLowerCase()))} azure={azure} />
     </div>
   );
 }
@@ -627,7 +633,7 @@ function CleanupStep({ run }: { run: Run }) {
   if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
   return (
     <div data-cleanup-step className="grid gap-6">
-      <p className="m-0 text-sm text-muted-foreground">Fixed checks look on {project.repo}’s default branch for known Clashes: things that make agents work against the factory. Then the Clash agent looks for the rest. Only the edits you tick go into the PR.</p>
+      <p className="m-0 text-sm text-muted-foreground">Fixed checks look on {shownRepo(project.repo)}’s default branch for known Clashes: things that make agents work against the factory. Then the Clash agent looks for the rest. Only the edits you tick go into the PR.</p>
       {(!clashes || clashes.state === 'reading') ? (
         <p data-reading-clashes className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Running the fixed checks…</p>
       ) : clashes.state === 'failed' ? (
@@ -653,7 +659,7 @@ export function prName(url: string): string {
   const azure = /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)$/.exec(url);
   if (!azure) return url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
   const [, organization, project, repository, id] = azure;
-  return `${organization}/${azureProject(`/${project}`)}/${repository}!${id}`;
+  return `${shownRepo(`${organization}/${project}/${repository}`)}!${id}`;
 }
 
 /** A change of the PR as its list shows it: the path, then what the PR does to it. */
@@ -702,7 +708,7 @@ function PrStep({ run }: { run: Run }) {
   const project = pickedProject(run, projects);
   const config = project && (project.config ?? configOf(run, project));
   if (!project?.repo || !config) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
-  const { repo } = project;
+  const repo = shownRepo(project.repo);
   // Open the PR waits for its changes to be listed, so the PR holds only what the step shows.
   const openable = !pr.opening && !!picksOf(run, clashes, agent) && changes?.state === 'read';
   if (run.prUrl && onboarded(run, data)) {

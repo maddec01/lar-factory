@@ -3,8 +3,9 @@
 // project is picked, or an offered run before Next or any change, drops the run; closing after keeps its repository on
 // this Mac's list as onboarding, with where it stopped, and Resume reopens it there. The Labels step reads the
 // repository's labels, creates the missing workflow labels and renames old ones, and holds Next while one is missing;
-// it also picks the custom labels the PR's .lar-factory.json lists, creating any typed one. On Azure DevOps it waits for
-// build #386 and lets Next through. The Checks step runs the command checks, then the setup checks, and holds Next
+// it also picks the custom labels the PR's .lar-factory.json lists, creating any typed one. On Azure DevOps it reads
+// the project's tags and renames old ones, but creates none, as the board writes a tag the first time a work item needs
+// it: Next doesn't wait for one, and a typed custom tag is only picked. The Checks step runs the command checks, then the setup checks, and holds Next
 // until each passes. The Cleanup step runs the fixed checks for known Clashes and reads the Clash agent's runs, which the
 // board keeps going while the dialog is closed, asking again every few seconds while one runs. It keeps the user's ticks
 // and skill picks with the run, and holds Next until the latest agent run is done and each project skill named like a
@@ -15,7 +16,7 @@
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, customLabelProblem, isOnboarding, labelPlan, labelsToCreate, missingCustomLabels, sameRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
+  SETUP_CHECKS, customLabelProblem, customTagProblem, isOnboarding, labelPlan, labelsToCreate, missingCustomLabels, sameRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
   type SetupAnswers, type SetupCheckId, type SetupCheckResult, type SkillClash, type SkillPick, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -34,10 +35,14 @@ export const STEPS = [
 ] as const;
 export type StepId = (typeof STEPS)[number]['id'];
 
+/** A step's title: the Labels step is Tags on Azure DevOps, whose projects have tags rather than labels. */
+export const stepTitle = (id: StepId, provider: Provider | null | undefined): string =>
+  id === 'labels' && provider === 'Azure DevOps' ? 'Tags' : (STEPS.find((s) => s.id === id) ?? STEPS[0]).label;
+
 /** Where a kept onboarding stopped, as a phrase: waiting for its PR to merge, its PR closed without merging, or stopped at its step. */
-export function stoppedAt({ step, prUrl, prClosed }: OnboardingProgress): string {
+export function stoppedAt({ step, prUrl, prClosed, answers }: OnboardingProgress): string {
   if (prUrl) return prClosed ? 'its PR closed without merging' : 'waiting for its PR to merge';
-  return `stopped at ${(STEPS.find((s) => s.id === step) ?? STEPS[0]).label}`;
+  return `stopped at ${stepTitle(isStep(step) ? step : 'project', answers.provider)}`;
 }
 
 export interface Run {
@@ -251,6 +256,10 @@ export function labelsPlan(run: Run, project: ProjectChoice, labels: Labels | nu
 export const customLabelsToCreate = (project: ProjectChoice, labels: Labels): string[] =>
   project.config && labels.read.state === 'loaded' ? missingCustomLabels(labels.read.names, project.config.labels) : [];
 
+/** Why the typed custom label can't be one, or null; on Azure DevOps a tag, which can't hold a comma or semicolon either. */
+export const typedLabelProblem = (project: ProjectChoice, typed: string): string | null =>
+  (project.provider === 'Azure DevOps' ? customTagProblem : customLabelProblem)(typed);
+
 /** The old names Rename moves: each the plan offers, less those unticked. */
 export const renaming = (plan: LabelPlan, labels: Labels): string[] =>
   plan.workflow.flatMap((r) => r.state === 'rename' && !labels.kept.includes(r.oldName) ? [r.oldName] : []);
@@ -263,9 +272,8 @@ export function stepReady(run: Run, projects: Projects, checks: Checks | null = 
   if (run.step === 'project') return true;
   if (run.step === 'setup') return !!project.config || asksSetup(project) && setupAnswered(run.setup);
   if (run.step === 'labels') {
-    if (project.provider === 'Azure DevOps') return true;
     const plan = labelsPlan(run, project, labels);
-    return !!plan && !workflowLabelsMissing(plan);
+    return !!plan && (project.provider === 'Azure DevOps' || !workflowLabelsMissing(plan));
   }
   if (run.step === 'checks') return checksPassed(checks, tools, itemSourceOf(run, project));
   if (run.step === 'cleanup') return cleanupDone(run, clashes, agent);
@@ -307,11 +315,11 @@ interface WizardState {
   answer: (change: SetupChange) => void;
   next: () => void;
   back: () => void;
-  /** Reads the repository's labels for the Labels step; on Azure DevOps it reads nothing. */
+  /** Reads the repository's labels for the Labels step, or its project's tags on Azure DevOps. */
   loadLabels: () => Promise<void>;
   /** Ticks or unticks an old name for Rename. */
   toggleRename: (oldName: string) => void;
-  /** Creates the missing labels, less the old names Rename moves. */
+  /** Creates the missing labels, less the old names Rename moves; nothing on Azure DevOps. */
   createLabels: () => Promise<void>;
   /** Renames each ticked old name to its new one. */
   renameLabels: () => Promise<void>;
@@ -319,7 +327,7 @@ interface WizardState {
   toggleCustomLabel: (name: string) => void;
   /** Changes the new custom label's field. */
   typeCustomLabel: (typed: string) => void;
-  /** Creates the typed custom label on the repository, unless it has it already, and picks it. */
+  /** Creates the typed custom label on the repository, unless it has it already, and picks it; on Azure DevOps it only picks it. */
   addCustomLabel: () => Promise<void>;
   /** Runs the command checks, then each setup check in turn. */
   runChecks: () => Promise<void>;
@@ -650,7 +658,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     loadLabels: async () => {
       const { run, projects } = get();
       const project = run && pickedProject(run, projects);
-      if (!project || project.provider === 'Azure DevOps') return;
+      if (!project) return;
       set({ labels: { read: { state: 'loading' }, kept: get().labels?.kept ?? [], typed: get().labels?.typed ?? '', created: get().labels?.created ?? [], busy: null, error: null } });
       await labelsPost('/api/onboarding/labels', {}, null);
     },
@@ -661,7 +669,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     createLabels: async () => {
       const step = labelStep();
       const custom = step ? customLabelsToCreate(step.project, step.labels) : [];
-      if (!step || !labelsToCreate(step.plan, renaming(step.plan, step.labels)).length && !custom.length) return;
+      if (!step || step.project.provider === 'Azure DevOps' || !labelsToCreate(step.plan, renaming(step.plan, step.labels)).length && !custom.length) return;
       set({ labels: { ...step.labels, busy: 'create', error: null } });
       await labelsPost('/api/onboarding/labels/create', { itemSource: itemSourceOf(step.run, step.project), renaming: renaming(step.plan, step.labels), custom }, 'create');
     },
@@ -683,8 +691,12 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     },
     addCustomLabel: async () => {
       const step = labelStep();
-      if (!step || customLabelProblem(step.labels.typed)) return;
+      if (!step || typedLabelProblem(step.project, step.labels.typed)) return;
       const name = step.labels.typed.trim();
+      if (step.project.provider === 'Azure DevOps') {
+        const kept = step.run.customLabels.find((n) => n.toLowerCase() === name.toLowerCase());
+        return set({ run: { ...step.run, customLabels: kept ? step.run.customLabels : [...step.run.customLabels, name] }, labels: { ...step.labels, typed: '' } });
+      }
       set({ labels: { ...step.labels, busy: 'custom', error: null } });
       const names = await labelsPost('/api/onboarding/labels/custom', { name }, 'custom', name);
       const { run, labels } = get();

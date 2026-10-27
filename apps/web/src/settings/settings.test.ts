@@ -198,18 +198,23 @@ test('a repository with an open Edit PR shows it on its row, with its link, unti
   expect(row(`repo-${sample.repos[0]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
 });
 
-test('each onboarded repository has Edit and Reset, and Add repository opens the onboarding dialog in Settings\' place until it closes', async () => {
+test('each onboarded repository has Edit and Reset, and Add repository opens the onboarding dialog over Settings', async () => {
   serve(sample, [project('lar-web')]);
   await open('Repositories', sample);
   expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
     ...sample.repos.flatMap(() => [['Edit', false], ['Reset', false]]), [' Add repository', false]]);
-  await settle(() => $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === ' Add repository')!.click());
+  const add = $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === ' Add repository')!;
+  // A click focuses the button it presses.
+  add.focus();
+  await settle(() => add.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('T3 project');
-  expect(modal(), 'Settings steps aside, so the two dialogs don\'t fight over focus').toBeNull();
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('T3 project');
+  expect(dialog()!.contains(document.activeElement), 'the onboarding dialog holds focus').toBe(true);
+  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2')), 'Settings stays under it').toBe('Repositories');
   await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(text(modal()!.querySelector('[data-slot="modal-header"] h2')), 'and comes back where it was').toBe('Repositories');
+  expect(dialog()).toBeNull();
+  expect(document.activeElement, 'focus goes back to Add repository').toBe(add);
 });
 
 test('an Azure DevOps repository still onboarding names its team’s sprint or backlog', async () => {
@@ -246,7 +251,7 @@ test('a repository still onboarding is listed with its provider, the answers it 
   await push(data);
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Provider and item source');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Provider and item source');
 });
 
 const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];

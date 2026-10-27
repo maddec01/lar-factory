@@ -57,9 +57,9 @@ test('Resume reopens the dialog on the stored step with the stored project', asy
   serve(waiting(empty), [project('lar-web', { onBoard: true })]);
   await mountPage(waiting(empty));
   await resume();
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Provider and item source');
-  expect(text(dialog()!.querySelector('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 6');
-  await settle(() => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).includes('Back'))!.click());
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Provider and item source');
+  expect(text(dialog()!.querySelector('#onboarding-place'))).toBe('Onboard lar-web · step 2 of 6');
+  await settle(() => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).includes('Back'))!.click());
   const radio = dialog()!.querySelector('[data-choice="lar-web"] [role="radio"]')!;
   expect(radio.getAttribute('aria-checked')).toBe('true');
   expect(radio.hasAttribute('data-disabled'), 'its own project stays pickable').toBe(false);

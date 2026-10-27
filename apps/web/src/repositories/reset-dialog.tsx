@@ -3,14 +3,12 @@
 // removes, what Reset drops from this Mac and what it leaves, and that it closes the open Edit PR while there is one,
 // after the prototype's ResetDialog. On Azure DevOps it names Azure DevOps and tags, and says it abandons a PR.
 
-import { useRef, type ReactNode } from 'react';
-import { CircleAlert, LoaderCircle } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { onAzure, sameRepo, shownRepo } from '@lar-factory/shared';
-import { Alert, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
-import {
-  AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
-} from '@lar-factory/ui/alert-dialog';
-import { Button } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { Alert } from '@lar-factory/ui/design-system/Alert';
+import { Modal } from '@lar-factory/ui/design-system/Modal';
+import { Text } from '@lar-factory/ui/design-system/Typography';
 import { useBoardStore } from '../board/board-store.ts';
 import { prName } from '../onboarding/steps.tsx';
 import { useResetStore } from './reset-store.ts';
@@ -47,28 +45,28 @@ export function ResetDialog() {
   const { reset, close, confirm } = useResetStore();
   const onboarding = useBoardStore((s) => s.data.onboarding);
   const repos = useBoardStore((s) => s.data.repos);
-  const progress = reset && onboarding?.find((o) => sameRepo(o.repo, reset.repo))?.progress;
+  if (!reset) return null;
+  const progress = onboarding?.find((o) => sameRepo(o.repo, reset.repo))?.progress;
   const prUrl = progress?.prUrl && !progress.prClosed ? progress.prUrl : null;
-  // Focus starts on Cancel, not a PR link, so Enter doesn't open GitHub.
-  const cancel = useRef<HTMLButtonElement>(null);
   return (
-    <AlertDialog open={!!reset} onOpenChange={(open) => !open && close()}>
-      <AlertDialogPopup data-reset-dialog initialFocus={cancel}>
-        {reset && (<>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset {shownRepo(reset.repo)}?</AlertDialogTitle>
-            {progress ? <AlertDialogDescription>{resetDetail(reset.repo, prUrl)}</AlertDialogDescription>
-              : <AlertDialogDescription render={<div />} className="grid gap-2 text-start"><OnboardedDetail repo={reset.repo}
-                editPr={repos.find((r) => sameRepo(r.repo, reset.repo))?.editPr} /></AlertDialogDescription>}
-            {reset.error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t reset</AlertTitle><AlertDescription>{reset.error}</AlertDescription></Alert>}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogClose ref={cancel} disabled={reset.resetting} render={<Button variant="outline" size="xs" />}>Cancel</AlertDialogClose>
-            <Button variant="destructive" size="xs" disabled={reset.resetting} onClick={() => void confirm()}>
-              {reset.resetting ? <><LoaderCircle className="animate-spin" /> Resetting…</> : 'Reset'}</Button>
-          </AlertDialogFooter>
-        </>)}
-      </AlertDialogPopup>
-    </AlertDialog>
+    <Modal loading={reset.resetting} onClose={close}>
+      {/* ninna-ui's Modal drops the description from aria-describedby, so the detail names itself. */}
+      <Modal.Content data-reset-dialog role="alertdialog" title={`Reset ${shownRepo(reset.repo)}?`} aria-describedby="reset-detail"
+        closeOnOverlayClick={false} focusFirstField={false}>
+        <Modal.Body>
+          <div className="grid gap-3">
+            <Text as="div" id="reset-detail" tone="muted" className="grid gap-2">
+              {progress ? resetDetail(reset.repo, prUrl) : <OnboardedDetail repo={reset.repo} editPr={repos.find((r) => sameRepo(r.repo, reset.repo))?.editPr} />}
+            </Text>
+            {reset.error && <Alert tone="danger" title="Can’t reset">{reset.error}</Alert>}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          {/* Focus starts on Cancel, not a PR link, so Enter doesn't open GitHub; the Modal keeps focus already inside it. */}
+          <Button autoFocus variant="secondary" disabled={reset.resetting} onClick={close}>Cancel</Button>
+          <Button variant="destructive" loading={reset.resetting} onClick={() => void confirm()}>{reset.resetting ? 'Resetting…' : 'Reset'}</Button>
+        </Modal.Footer>
+      </Modal.Content>
+    </Modal>
   );
 }

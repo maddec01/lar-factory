@@ -3,7 +3,7 @@
 // so then, and Save opens the PR, keeping the dialog and its answers with gh's message when that fails.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, checkedOf, fetchMock, mountPage, sample, settle, text, toast } from '../../test/support.ts';
 import { WORKFLOW_LABELS, type BoardData } from '@lar-factory/shared';
 
 const REPO = 'maddec01/lar-server';
@@ -33,7 +33,7 @@ function serve(load: Answer = { body: { config: CONFIG, labels: LABELS, error: n
 const dialog = () => $('[data-edit-dialog]');
 const save = () => $<HTMLButtonElement>('[data-edit-dialog] [data-save]')!;
 const input = (field: string) => $<HTMLInputElement>(`[data-edit-dialog] [data-field="${field}"] input`)!;
-const checked = (selector: string) => $(`[data-edit-dialog] ${selector}`)!.getAttribute('aria-checked');
+const checked = (selector: string) => checkedOf($(`[data-edit-dialog] ${selector}`)!);
 
 async function type(into: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(into, value);
@@ -60,12 +60,12 @@ test("Edit opens with the default branch's item source, Project, show setting, r
   const sent = serve();
   await openEdit();
   expect(sent['/api/repositories/config']).toEqual([{ repo: REPO }]);
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe(`Edit ${REPO}`);
-  expect(dialog()!.getAttribute('aria-labelledby')).toBe(dialog()!.querySelector('[data-slot="dialog-title"]')!.id);
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Edit ${REPO}`);
+  expect(text(document.getElementById(dialog()!.getAttribute('aria-labelledby')!)), 'the title names the dialog').toBe(`Edit ${REPO}`);
   expect(checked('[data-choice="github-project"] [role="radio"]')).toBe('true');
   expect([input('project-owner').value, input('project-number').value, input('role').value]).toEqual(['maddec01', '3', 'Backend API server']);
   expect(checked('[data-choice="all"] [role="radio"]')).toBe('true');
-  expect($$('[data-edit-dialog] [data-custom]').map((li) => [li.getAttribute('data-custom'), li.querySelector('[role="checkbox"]')!.getAttribute('aria-checked')]))
+  expect($$('[data-edit-dialog] [data-custom]').map((li) => [li.getAttribute('data-custom'), checkedOf(li.querySelector('input[type="checkbox"]')!)]))
     .toEqual([['area: server', 'true'], ['area: web', 'false']]);
   expect(save().disabled, 'nothing changed yet').toBe(true);
   expect(text(dialog()!.querySelector('[data-no-changes]'))).toBe('No changes yet');
@@ -92,7 +92,7 @@ test('Save sends the answers with the labels picked and typed, then closes, says
   const sent = serve(undefined, { body: { prUrl: PR, error: null, board: { ...sample, repos: sample.repos.map((r) => r.repo === REPO ? { ...r, editPr: PR } : r) } } });
   await openEdit();
   await settle(() => $('[data-edit-dialog] [data-choice="issues"] [role="radio"]')!.click());
-  await settle(() => $('[data-edit-dialog] [data-custom="area: web"] [role="checkbox"]')!.click());
+  await settle(() => $('[data-edit-dialog] [data-custom="area: web"] input[type="checkbox"]')!.click());
   await type($<HTMLInputElement>('[data-edit-dialog] [data-new-custom]')!, 'area: docs');
   await settle(() => $<HTMLButtonElement>('[data-edit-dialog] [data-add-custom]')!.click());
   expect(sent['/api/onboarding/labels/custom'], 'Add creates nothing until Save').toBeUndefined();
@@ -128,8 +128,8 @@ test('while Save runs, the fields, choices, custom labels and Cancel are disable
   expect([input('role').matches(':disabled'), $<HTMLInputElement>('[data-edit-dialog] [data-new-custom]')!.matches(':disabled'), cancel.disabled])
     .toEqual([true, true, true]);
   await press($('[data-edit-dialog] [data-choice="issues"] [role="radio"]')!, ' ');
-  await press($('[data-edit-dialog] [data-custom="area: web"] [role="checkbox"]')!, ' ');
-  expect([checked('[data-choice="github-project"] [role="radio"]'), checked('[data-custom="area: web"] [role="checkbox"]')], 'the answers Save sends stay').toEqual(['true', 'false']);
+  await press($('[data-edit-dialog] [data-custom="area: web"] input[type="checkbox"]')!, ' ');
+  expect([checked('[data-choice="github-project"] [role="radio"]'), checked('[data-custom="area: web"] input[type="checkbox"]')], 'the answers Save sends stay').toEqual(['true', 'false']);
   await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await settle(() => vi.advanceTimersByTime(500));
   expect(dialog()).not.toBeNull();
@@ -163,14 +163,14 @@ test('Edit on an Azure DevOps repository offers the team’s sprint and backlog 
   serve({ body: { config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['app: music'] },
     labels: ['app: music', 'status-list', 'repo-lar-api', 'web'], error: null } }, undefined, board);
   await openEdit(azure, board);
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Edit contoso/Fabrikam Fiber/lar-api');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Edit contoso/Fabrikam Fiber/lar-api');
   expect($('[data-edit-dialog] [data-custom="repo-lar-api"]'), 'a repo- tag routes items; it is no custom tag').toBeNull();
   expect(checked('[data-choice="azure-sprint"] [role="radio"]')).toBe('true');
   expect($('[data-edit-dialog] [data-choice="github-project"]')).toBeNull();
   expect(input('team').value).toBe('Fabrikam Team');
   expect(text($('[data-edit-dialog] [data-custom-labels] h4'))).toBe('Custom tags');
-  expect(text(dialog()!.querySelector('[data-slot="dialog-description"]'))).not.toMatch(/creates the custom labels/);
-  await settle(() => $('[data-edit-dialog] [data-custom="web"] [role="checkbox"]')!.click());
+  expect(text(dialog()!.querySelector('#edit-description'))).not.toMatch(/creates the custom labels/);
+  await settle(() => $('[data-edit-dialog] [data-custom="web"] input[type="checkbox"]')!.click());
   await settle(() => save().click());
   await settle(() => vi.advanceTimersByTime(500));
   expect(text(toast()!)).toContain('contoso/Fabrikam Fiber/lar-api’s Edit PR');

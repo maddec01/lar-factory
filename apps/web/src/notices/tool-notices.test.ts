@@ -28,7 +28,7 @@ test('a missing t3 replaces the main area with a notice and Recheck', async () =
   const notice = $('main .tool-missing .tool-missing-box')!;
   expect(notice.getAttribute('role')).toBe('alert');
   expect(notice.querySelector('h1')!.textContent).toBe('T3 Code not found');
-  expect(notice.querySelector('h1 svg.brand-mark')).not.toBeNull();
+  expect(notice.querySelector('.lar-brand-mark')!.getAttribute('aria-label')).toBe('lar');
   expect(notice.querySelector('p')!.textContent).toBe("The board starts threads through T3 Code's t3 command and didn't find it on the login shell's PATH, "
     + 'in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck. The board also looks again every 10 seconds.');
   expect(recheckButton().textContent).toBe('Recheck');

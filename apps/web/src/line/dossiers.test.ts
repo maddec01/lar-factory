@@ -294,6 +294,7 @@ test('an item with sub-issues on the board is coupled work; with no map, it says
 
 test('the dossiers take the main area\'s scope', async () => {
   await mountPage();
-  await press($$('button.scope').find((b) => text(b).includes('lar-apple'))!);
+  const { useScopeStore } = await import('../board/scope-store.ts');
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect($$('[data-dossier]').map((d) => d.getAttribute('data-dossier')), '#180 through its Apple build').toEqual([C180]);
 });

@@ -1,3 +1,12 @@
+/* The traffic lights' grey stand-ins, in a browser. */
+:root {
+  --traffic-stand-in: var(--color-zinc-300);
+
+  @variant dark {
+    --traffic-stand-in: var(--color-zinc-700);
+  }
+}
+
 /* The Refreshed time's dot pings once when a newer read lands: a ring growing from the dot and fading. */
 @keyframes refreshed-ping {
   from { transform: scale(1); opacity: 0.6; }

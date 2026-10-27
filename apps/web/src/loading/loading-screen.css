@@ -14,7 +14,7 @@
 }
 .loading-screen.is-leaving { opacity: 0; pointer-events: none; transition: opacity 600ms ease-in-out; }
 
-/* --- The lockup: the sidebar Brand's, scaled up. The mark is 0.705em, the cap height, and sits on the baseline, so
+/* --- The lockup: the title bar Brand's, scaled up. The mark is 0.705em, the cap height, and sits on the baseline, so
    its top meets the top of the "l"; the box is trimmed to cap height and baseline, so the screen centres the lockup
    on what you see, not on the font's line box. "lar" bold, "Factory" medium in the muted colour. -------------------- */
 

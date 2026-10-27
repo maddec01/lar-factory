@@ -1,63 +1,78 @@
-// The main area's title bar: a 52 px drag bar with the scope menu ("All repositories", or the repository the menu or
-// the sidebar scoped it to), the Refreshed time, the counters, the List button and This week. While the sidebar is hidden it starts
-// T3's gap past the toggle. Clicks on its buttons and on the time never drag the window; the rest of the bar does.
-// Above the missing-t3 notice there's no board to scope or count, so the bar is empty.
+// The board's title bar, laid out as lar-server's AppTitleBar on the copied TitleBar: the brand, then the scope menu
+// ("All repositories", or the repository the menu or the List modal scoped it to), the Refreshed time and the
+// counters, then the List button, Add item, the "for T3 Code" tag, the update button and Settings. It starts past the
+// traffic lights and drags the window, except on its controls. Above the missing-t3 notice there's no board to scope,
+// count or add to, so it holds only the brand and Settings.
+// Every control keeps its own width, and the bar folds by its own width (the copied TitleBar is the container
+// queried) instead: the counters' labels go first, then the "for T3 Code" tag and the List and Add item labels (kept
+// for screen readers), then Spend, Queued and Shipped, then the Refreshed text, and on a narrow page Building and the
+// Refreshed dot. Scope truncates in what's left.
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { boardSections, clock, failedCheck, isStale, repoName, shortAgo } from '@lar-factory/shared';
+import { boardApp, boardSections, clock, failedCheck, isStale, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/button';
-import { Menu, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuSeparator, MenuTrigger } from '@lar-factory/ui/menu';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
+import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
+import { TitleBar as LarTitleBar } from '@lar-factory/ui/design-system/TitleBar';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
+import { AddItem } from '../add-item/add-item.tsx';
 import { useBoardStore } from '../board/board-store.ts';
+import { useScopeStore } from '../board/scope-store.ts';
 import { repoTone } from '../items/item-parts.tsx';
 import { ListButton } from '../list/list-modal.tsx';
-import { useSidebarStore } from '../sidebar/sidebar-store.ts';
-import { useTitlebarInset } from '../sidebar/window-controls.tsx';
+import { SettingsButton } from '../settings/settings.tsx';
+import { UpdateButton } from '../updates/UpdateButton.tsx';
+import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { Counters } from './counters.tsx';
+import { TrafficLights, useWindowControlsInset } from './window-controls.tsx';
 
-const NO_DRAG = '[-webkit-app-region:no-drag]';
-const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-(--ring) focus-visible:ring-offset-1 focus-visible:ring-offset-(--background)';
+/** "lar Factory": the copied BrandMark, the mark and "lar", then a muted "Factory" on the same baseline, in
+ *  BrandMark's size and type. Screen readers skip it: the page's hidden h1 names the page. */
+function Brand() {
+  return (
+    <span className="brand lar-brand-mark inline-flex shrink-0 items-baseline text-xl leading-none" aria-hidden="true">
+      <BrandMark label="lar" />
+      <span className="ml-[0.24em] font-medium tracking-[-0.02em] text-base-700">Factory</span>
+    </span>
+  );
+}
 
-/** The menu that sets the scope: All repositories, then a repository for each sidebar group, in the sidebar's order. */
+/** The menu that sets the scope: All repositories, then a repository for each List group, in the List's order. */
 function Scope() {
   const data = useBoardStore((state) => state.data);
   const now = useBoardStore((state) => state.now);
-  const { scope, setScope } = useSidebarStore();
+  const { scope, setScope } = useScopeStore();
   const groups = boardSections(data, now).listGroups;
   const shown = scope ? repoName(scope, data.repos) : 'All repositories';
   return (
-    <Menu modal={false}>
-      <MenuTrigger render={<button type="button" />} aria-label={`Scope: ${shown}`}
-        className={`scope -ml-1.5 inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-sm font-medium hover:bg-(--accent) data-[popup-open]:bg-(--accent) ${FOCUS_RING} ${NO_DRAG}`}>
-        {shown}
-        <ChevronDown className="size-3.5 text-(--muted-foreground)" />
-      </MenuTrigger>
-      <MenuPopup align="start">
-        <MenuRadioGroup value={scope ?? ''} onValueChange={(value: string) => setScope(value || null)}>
-          <MenuGroupLabel>Show</MenuGroupLabel>
-          <MenuRadioItem value="" closeOnClick>
-            <span className="flex items-center gap-2"><span className="flex-1">All repositories</span><MenuRadioItemIndicator /></span>
-          </MenuRadioItem>
-          <MenuSeparator />
+    <DropdownMenu>
+      <DropdownMenu.Trigger asChild>
+        <Button variant="quiet" className="scope min-w-0" aria-label={`Scope: ${shown}`} rightIcon={<ChevronDown />}>
+          <span className="min-w-0 truncate">{shown}</span>
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content align="start">
+        <DropdownMenu.Label>Show</DropdownMenu.Label>
+        <DropdownMenu.RadioGroup value={scope ?? ''} onValueChange={(value) => setScope(value || null)}>
+          <DropdownMenu.RadioItem value="">All repositories</DropdownMenu.RadioItem>
+          <DropdownMenu.Separator />
           {groups.map(({ repo, name }) => (
-            <MenuRadioItem key={repo} value={repo} closeOnClick>
-              <span className="flex items-center gap-2">
-                <span className={`${repoTone(repo, data.repos)} size-2 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} aria-hidden="true" />
-                <span className="flex-1">{name}</span>
-                <MenuRadioItemIndicator />
-              </span>
-            </MenuRadioItem>
+            <DropdownMenu.RadioItem key={repo} value={repo}>
+              <span className={`${repoTone(repo, data.repos)} size-2 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} aria-hidden="true" />
+              {name}
+            </DropdownMenu.RadioItem>
           ))}
-        </MenuRadioGroup>
-      </MenuPopup>
-    </Menu>
+        </DropdownMenu.RadioGroup>
+      </DropdownMenu.Content>
+    </DropdownMenu>
   );
 }
 
 type Health = 'waiting' | 'live' | 'stale';
-const DOT = { waiting: 'bg-(--muted-foreground)/50', live: 'bg-success', stale: 'bg-amber-500' } as const;
+const DOT = { waiting: 'bg-base-500', live: 'bg-success', stale: 'bg-amber-500' } as const;
 
 /** How many reads landed after this page opened: a newer `fetchedAt` than the one shown. */
 function useLandedReads(fetchedAt: string | null) {
@@ -75,7 +90,7 @@ function RefreshDetails({ data, now }: { data: BoardData; now: number }) {
   return (
     <span className="flex flex-col gap-0.5">
       <span data-line>{data.fetchedAt ? `Updated ${shortAgo(data.fetchedAt, now)} · ${clock(data.fetchedAt, undefined)}` : 'Not read yet'}</span>
-      <span data-line className="text-(--muted-foreground)">
+      <span data-line className="text-base-700">
         {data.error ? `Last read failed: ${data.error.split('\n')[0]}` : `Reads every ${data.refreshSeconds}s`}
       </span>
     </span>
@@ -97,40 +112,77 @@ function Refreshed({ data }: { data: BoardData }) {
   const ago = fetchedAt ? shortAgo(fetchedAt, now) : null;
   return (
     <Tooltip>
-      <TooltipTrigger render={<span tabIndex={0} />}
-        className={`refreshed inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm text-xs tabular-nums text-(--muted-foreground) ${FOCUS_RING} ${NO_DRAG}`}>
-        <span className="relative grid size-2 place-items-center">
-          {landed > 0 && health === 'live' && (
-            <span key={landed} data-ping className="absolute size-1.5 rounded-full bg-success motion-safe:animate-[refreshed-ping_1.2s_ease-out_forwards]" />
-          )}
-          <span data-dot className={`size-1.5 rounded-full ${DOT[health]}`} />
+      <TooltipTrigger asChild>
+        <span tabIndex={0}
+          className="refreshed inline-flex shrink-0 @max-[40rem]:hidden items-center gap-1.5 whitespace-nowrap rounded-sm px-1 text-xs tabular-nums text-base-700 outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <span className="relative grid size-2 place-items-center">
+            {landed > 0 && health === 'live' && (
+              <span key={landed} data-ping className="absolute size-1.5 rounded-full bg-success motion-safe:animate-[refreshed-ping_1.2s_ease-out_forwards]" />
+            )}
+            <span data-dot className={`size-1.5 rounded-full ${DOT[health]}`} />
+          </span>
+          <span className="@max-[48rem]:sr-only">
+            {!fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
+          </span>
         </span>
-        {!fetchedAt ? 'Not read yet' : <time dateTime={fetchedAt}>{health === 'stale' ? `Stale · ${ago}` : ago}</time>}
       </TooltipTrigger>
       <TooltipPopup side="bottom"><RefreshDetails data={data} now={now} /></TooltipPopup>
     </Tooltip>
   );
 }
 
-export function TitleBar() {
-  const data = useBoardStore((state) => state.data);
-  const inset = useTitlebarInset();
+/** The board app's update button; in a browser, where the app can't update, a still stand-in. */
+function Update() {
+  if (boardApp()) return <UpdateButton />;
   return (
-    <header className={`title-bar flex h-13 shrink-0 select-none items-center gap-2 border-b border-(--border) pr-3 ${inset} [-webkit-app-region:drag]`}>
-      {failedCheck(data.tools, 't3')?.result !== 'missing' && (
-        <>
-          {/* The sidebar's brand is hidden from screen readers, so the page's heading is here, for them only. A closing dialog
-              whose opener went away puts focus on it. */}
-          <h1 className="sr-only" tabIndex={-1}>Lar Factory</h1>
-          <Scope />
-          <Refreshed data={data} />
-          <div className="flex min-w-0 flex-1 items-center justify-center"><Counters /></div>
-          <span className="flex items-center gap-1.5 [-webkit-app-region:no-drag]">
-            <ListButton />
-            <Button variant="outline" size="xs" disabled title="This week isn't built yet">This week</Button>
-          </span>
-        </>
-      )}
-    </header>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" aria-label="Check for updates" aria-disabled="true"
+          className="update-stand-in inline-flex size-8 items-center justify-center rounded-full text-base-700 hover:bg-base-200 hover:text-base-content">
+          <UpdateStatusIcon status="idle" />
+        </button>
+      </TooltipTrigger>
+      <TooltipPopup side="bottom">Check for updates</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/** The window drags from the bar, but never from a control in it. */
+const DRAG = '[-webkit-app-region:drag] [&_:is(button,a,[tabindex])]:[-webkit-app-region:no-drag]';
+
+export function TitleBar() {
+  const board = useBoardStore((state) => failedCheck(state.data.tools, 't3')?.result !== 'missing');
+  const data = useBoardStore((state) => state.data);
+  const inset = useWindowControlsInset();
+  return (
+    <div className={`title-bar shrink-0 select-none border-b border-base-300 ${inset} ${DRAG}`}>
+      <TrafficLights />
+      {/* The brand is hidden from screen readers, so the page's heading is here, for them only. A closing dialog whose
+          opener went away puts focus on it. The missing-t3 notice has its own. */}
+      {board && <h1 className="sr-only" tabIndex={-1}>Lar Factory</h1>}
+      <LarTitleBar
+        brand={<Brand />}
+        title={board && (
+          <>
+            <Scope />
+            <Refreshed data={data} />
+            <div className="flex flex-1 items-center justify-center"><Counters /></div>
+          </>
+        )}
+        actions={(
+          <>
+            {board && (
+              <>
+                <ListButton />
+                <AddItem />
+                <Badge className="t3-tag @max-[70rem]:hidden [.title-bar:has(.update-button)_&]:@max-[74rem]:hidden .idden">for T3 Code</Badge>
+                <Update />
+              </>
+            )}
+            <SettingsButton />
+          </>
+        )}
+      />
+    </div>
   );
 }

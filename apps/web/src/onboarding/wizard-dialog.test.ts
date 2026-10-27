@@ -93,9 +93,9 @@ async function finishFromResume(after: BoardData): Promise<void> {
   await settle(() => vi.advanceTimersByTime(500));
 }
 
-test('Go to the board, with the Resume that opened the dialog gone, focuses the new repository in the sidebar', async () => {
+test('Go to the board, with the Resume that opened the dialog gone, focuses the main heading', async () => {
   await finishFromResume({ ...sample, onboarding: [] });
-  expect(document.activeElement).toBe($(`.list-group[data-repo="${waiting.repo}"] .scope`));
+  expect(document.activeElement).toBe($('.title-bar h1'));
 });
 
 test('Go to the board, before the board has read the new repository, focuses the main heading', async () => {

@@ -1,17 +1,16 @@
-// Settings, as lar-server's SettingsDialog: the sidebar's Settings button opens a modal over the board with the
+// Settings, as lar-server's SettingsDialog: the title bar's Settings button opens a modal over the board with the
 // sections on the left, in groups, and the open section on the right under its title and description. Search settings,
 // on top of the sections and focused by /, keeps the sections whose name or a row matches, or says none does. Closing it
 // returns to the board as it was, since the board stays rendered under it.
 
 import { useEffect, useRef, useState } from 'react';
-import { Settings as SettingsIcon } from 'lucide-react';
 import { boardApp } from '@lar-factory/shared';
+import { IconButton } from '@lar-factory/ui/design-system/IconButton';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { SidebarNavigationItem } from '@lar-factory/ui/design-system/SidebarNavigationItem';
 import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-system/SidebarPane';
-import { SidebarMenuButton } from '@lar-factory/ui/sidebar';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
+import { SettingsIcon } from '@lar-factory/ui/design-system/NavigationIcons';
 import { useBoardStore } from '../board/board-store.ts';
 import { useWizardStore } from '../onboarding/wizard-store.ts';
 import { useEditStore } from '../repositories/edit-store.ts';
@@ -28,13 +27,11 @@ const NAV: { label: string; ids: string[] }[] = [
   { label: 'App', ids: ['updates', 'archive', 'diagnostics'] },
 ];
 
-/** The sidebar's foot button that opens Settings: T3's SidebarUtilityItem, a 32 px icon button with its label in a tooltip. */
+/** The title bar's last button, which opens Settings: lar-server's header icon button, its label in its title. */
 export function SettingsButton() {
   return (
-    <Tooltip>
-      <TooltipTrigger render={<SidebarMenuButton size="icon" aria-label="Settings" className="open-settings" onClick={() => useSettingsStore.getState().setOpen(true)}><SettingsIcon /></SidebarMenuButton>} />
-      <TooltipPopup side="top">Settings</TooltipPopup>
-    </Tooltip>
+    <IconButton variant="header" className="open-settings" aria-label="Settings" title="Settings" icon={<SettingsIcon />}
+      onClick={() => useSettingsStore.getState().setOpen(true)} />
   );
 }
 
@@ -73,7 +70,7 @@ function SettingsModal() {
   const profiles = useSettingsStore((state) => state.profiles);
   const version = useUpdateStore((state) => state.state?.currentVersion ?? null);
   const { section, setSection, setOpen } = useSettingsStore();
-  // The sidebar's update button follows the updater too, but it isn't there above the missing-t3 notice.
+  // The title bar's Update pill follows the updater too, but it isn't there above the missing-t3 notice.
   const follow = useUpdateStore((state) => state.follow);
   useEffect(follow, [follow]);
   const all = pages({ data, app: !!boardApp(), profiles, version });

@@ -1,7 +1,7 @@
 // The page shell: first paint, the control room, live data, and what a re-render keeps.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, bannerText, fetchMock, mountPage, push, sample, settle, stream } from '../test/support.ts';
+import { $, $$, NOW, bannerText, fetchMock, mountPage, push, sample, settle, stream, text } from '../test/support.ts';
 import { BRAND_BLOCK_COLOR, BRAND_MARK_BLOCK, BRAND_MARK_L } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -10,7 +10,7 @@ const fresh: BoardData = { ...sample, error: null, fetchedAt: new Date(NOW).toIS
 test('the first paint shows the board data the server put in the page, with no fetch', async () => {
   await mountPage(fresh);
   expect($$('.desk-card')).toHaveLength(8);
-  expect($$('.sidebar button[data-item]')).toHaveLength(4);
+  expect(text($('.list-button')), 'the List counts its 4 items').toBe('List4');
   expect(fetchMock).not.toHaveBeenCalled();
   expect($('#board-data')).not.toBeNull();
 });
@@ -31,6 +31,9 @@ test('an entered title round-trips through the inline board data without closing
   const script = $('#board-data')!;
   expect(script.innerHTML).not.toContain('</script>');
   expect((JSON.parse(script.textContent!) as BoardData).items[0]!.title).toBe(title);
+  // The item is in List, which the List modal shows; jsdom has no ResizeObserver, which the modal observes with.
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  await settle(() => $<HTMLButtonElement>('.list-button')!.click());
   expect(document.body.textContent).toContain(title);
 });
 
@@ -44,9 +47,8 @@ test('stale data and a failed read show no banner, the title bar carries them', 
   expect($('.banner')).toBeNull();
 });
 
-test('the page is the control room, with no tabs: the sidebar, then the title bar, banners, desk and line', async () => {
+test('the page is the control room, with no tabs: the title bar, banners, desk and line', async () => {
   await mountPage();
-  expect($('.sidebar')!.compareDocumentPosition($('main')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect([...$('main')!.querySelectorAll('.title-bar, .banners, .desk, .line')].map((el) => el.classList[0])).toEqual(['title-bar', 'banners', 'desk', 'line']);
   expect($$('[role="tablist"], [role="tab"], [role="tabpanel"]')).toEqual([]);
 });
@@ -65,7 +67,7 @@ test('data pushed over /api/events replaces the board, and the open stream stops
   expect($('.refreshed')!.textContent).toBe('1m ago');
 
   await settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify({ ...fresh, items: fresh.items.slice(0, 1) }) })));
-  expect($$('.sidebar button[data-item]')).toHaveLength(1);
+  expect(text($('.list-button'))).toBe('List1');
   expect($$('.desk-card')).toHaveLength(0);
 });
 
@@ -116,13 +118,10 @@ test("the lost server's banner closes, and the next failure after the server ans
   expect(bannerText($('.banner[role="alert"]')!)[0]).toBe("Can't reach the board server.");
 });
 
-test('new data keeps focus and the groups the user collapsed', async () => {
+test('new data keeps focus', async () => {
   await mountPage(fresh);
-  const chevron = () => $<HTMLButtonElement>('.list-group[data-repo="maddec01/lar-server"] button[aria-expanded]')!;
-  await settle(() => chevron().click());
   $('.add-item')!.focus();
 
   await push({ ...fresh, items: [...fresh.items].reverse() });
-  expect(chevron().getAttribute('aria-expanded')).toBe('false');
   expect(document.activeElement).toBe($('.add-item'));
 });

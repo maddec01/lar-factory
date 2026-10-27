@@ -352,6 +352,17 @@ test('the board groups the List by repository, keyed by owner/name and named by 
   ]);
 });
 
+test('the List groups repositories by their items in List, most first, ties in configured order, and Draft last', () => {
+  const repos = ['o/a', 'o/b', 'o/c'].map((repo) => ({ repo, role: 'app', labels: [] }));
+  const items = [
+    item('List', [], { id: 'd1', repo: null }), item('List', [], { id: 'd2', repo: null }), item('List', [], { id: 'd3', repo: null }),
+    item('List', [], { id: 'c1', repo: 'o/c' }), item('List', [], { id: 'c2', repo: 'o/c' }),
+    item('List', [], { id: 'b1', repo: 'o/b' }), item('Queued', [], { id: 'b2', repo: 'o/b' }), item('Queued', [], { id: 'b3', repo: 'o/b' }),
+  ];
+  const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
+  assert.deepEqual(groups.map((g) => [g.repo, g.items.length]), [['o/c', 2], ['o/b', 1], ['o/a', 0], ['Draft', 3]]);
+});
+
 test("an untagged Azure work item shows in the List of every repository reading its item source, and a tagged one only in its repository's", () => {
   const repos = [{ repo: 'contoso/Fabrikam/web', role: 'app', labels: [] }, { repo: 'contoso/Fabrikam/api', role: 'api', labels: [] }];
   const items = [

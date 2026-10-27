@@ -61,8 +61,8 @@ test('with nothing in flight, the table says so', async () => {
 
 test('the table takes the main area\'s scope', async () => {
   await mountPage();
-  const scope = $$('button.scope').find((b) => text(b).includes('lar-apple'))!;
-  await press(scope);
+  const { useScopeStore } = await import('../board/scope-store.ts');
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect(rows().map((r) => numberOf(r.dataset.item!))).toEqual([31, 34, 30, 22, 23]);
 });
 

@@ -55,7 +55,7 @@ export const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';')
 const STATUS_TAGS = new Set(STATUSES.flatMap((s) => (s === 'Done' ? [] : [statusLabel(s)])));
 
 /** A name with its URL encoding undone, or as it is when that encoding is broken. */
-function decoded(name: string): string {
+export function decoded(name: string): string {
   try { return decodeURIComponent(name); }
   catch { return name; }
 }

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRepositoryList, saveOnboarding, savePrClosed } from '../config/repository-config.ts';
 import { WORKFLOW_LABELS } from '@lar-factory/shared';
+import { REPO_URL, fakeAzRepos } from '../azure/fake-az.ts';
 import {
   createPrOpener, followOnboardingPrs, followResetPrs, previewOnboardingPr, reopenOnboardingPr, resetRepository,
 } from './onboarding-pr.ts';
@@ -518,4 +519,31 @@ test("Reset of an onboarded repository whose PR can't be opened answers with gh'
   assert.deepEqual(await resetRepository({ repo: 'maddec01/lar-web' }, dir, run),
     { status: 502, error: "Can't open maddec01/lar-web's reset PR: pull request create failed: HTTP 403" });
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web' }]);
+});
+
+const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
+const azureConfig = { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API' };
+
+test('on Azure Repos, a completed PR finishes onboarding, an abandoned one is marked closed and reactivated by Reopen PR', async (t) => {
+  const merged = `${REPO_URL}/pullrequest/7`;
+  const abandoned = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-web/pullrequest/8';
+  const dir = await dataDir(t, [{ repo: AZURE, onboarding: { ...progress, step: 'pr', prUrl: merged } },
+    { repo: 'contoso/Fabrikam%20Fiber/lar-web', onboarding: { ...progress, step: 'pr', prUrl: abandoned } }]);
+  const az = fakeAzRepos({ prs: [{ pullRequestId: 7, status: 'completed', sourceRefName: 'refs/heads/x' }, { pullRequestId: 8, status: 'abandoned', sourceRefName: 'refs/heads/x' }] });
+  const kept = { ...progress, step: 'pr', prUrl: abandoned };
+  assert.deepEqual(await followOnboardingPrs(readRepositoryList(dir), dir, az.run, { failed: () => assert.fail() }),
+    [{ repo: AZURE }, { repo: 'contoso/Fabrikam%20Fiber/lar-web', onboarding: { ...kept, prClosed: true } }]);
+  assert.deepEqual(await reopenOnboardingPr({ repo: 'contoso/Fabrikam%20Fiber/lar-web' }, dir, az.run),
+    { onboarding: [{ repo: 'contoso/Fabrikam%20Fiber/lar-web', progress: kept }] });
+  assert.equal(az.prs[1]!.status, 'active');
+});
+
+test('on Azure Repos, a .lar-factory.json that lands another way finishes onboarding and abandons the active PR after a comment', async (t) => {
+  const pr = `${REPO_URL}/pullrequest/7`;
+  const dir = await dataDir(t, [{ repo: AZURE, onboarding: { ...progress, step: 'pr', prUrl: pr } }]);
+  const az = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify(azureConfig) }, prs: [{ pullRequestId: 7, status: 'active', sourceRefName: 'refs/heads/x' }] });
+  assert.deepEqual(await followOnboardingPrs(readRepositoryList(dir), dir, az.run, { failed: () => assert.fail() }), [{ repo: AZURE }]);
+  assert.equal(az.prs[0]!.status, 'abandoned');
+  assert.equal(az.comments.length, 1);
+  assert.match(az.comments[0]!.content, /reached the default branch without this PR/);
 });

@@ -563,3 +563,69 @@ test('on Azure Repos, a .lar-factory.json that lands another way finishes onboar
   assert.equal(az.comments.length, 1);
   assert.match(az.comments[0]!.content, /reached the default branch without this PR/);
 });
+
+const AZURE_PR = `${REPO_URL}/pullrequest/100`;
+const azFiles = { '/AGENTS.md': RULES, '/CONTEXT.md': '# Terms\n', '/.scratch/todo.md': 'x',
+  '/.claude/skills/code-review/SKILL.md': '---\nname: code-review\n---\n', '/.claude/skills/code-review/notes.md': 'Notes\n' };
+const azPicks = { skills: { '.claude/skills/code-review/': { kind: 'rename', name: 'api-review' } }, clashes: [pushRule,
+  { id: 'context', file: 'CONTEXT.md', ticked: true, reason: 'Old name.', edit: { kind: 'rename', to: 'GLOSSARY.md' } },
+  { id: 'scratch', file: '.scratch/', ticked: true, reason: 'Local tracker.', edit: { kind: 'delete' } }] };
+
+test('on Azure Repos, one push makes the commit with every change on lar-factory/onboarding, then az opens the PR, with no gh call', async (t) => {
+  const dir = await dataDir(t, [{ repo: AZURE, onboarding: progress }]);
+  const az = fakeAzRepos({ files: azFiles });
+  const opened = await createPrOpener(dir, az.run)({ repo: AZURE, progress, config, picks: azPicks });
+  assert.equal((opened as { prUrl: string }).prUrl, AZURE_PR);
+  assert.equal(readRepositoryList(dir)[0]!.onboarding?.prUrl, AZURE_PR);
+  assert.equal(az.pushes.length, 1);
+  const [push] = az.pushes;
+  assert.deepEqual([push!.ref, push!.oldObjectId, push!.parents, push!.comment],
+    ['refs/heads/lar-factory/onboarding', '0'.repeat(40), ['abc123'], 'chore: onboard to lar Factory']);
+  const change = (path: string) => push!.changes.find((c) => c.path === path);
+  assert.deepEqual(['/.scratch/todo.md', '/CONTEXT.md', '/.claude/skills/code-review/SKILL.md', '/.claude/skills/code-review/notes.md'].map(change),
+    ['/.scratch/todo.md', '/CONTEXT.md', '/.claude/skills/code-review/SKILL.md', '/.claude/skills/code-review/notes.md'].map((path) => ({ changeType: 'delete', path })));
+  assert.deepEqual(change('/GLOSSARY.md'), { changeType: 'add', path: '/GLOSSARY.md', content: '# Terms\n' });
+  assert.deepEqual(change('/.claude/skills/api-review/notes.md'), { changeType: 'add', path: '/.claude/skills/api-review/notes.md', content: 'Notes\n' });
+  assert.equal(change('/.claude/skills/api-review/SKILL.md')?.content, '---\nname: api-review\n---\n');
+  assert.equal(change('/AGENTS.md')?.changeType, 'edit');
+  assert.match(change('/AGENTS.md')!.content!, /^# lar-web\n\n- Open a PR when done.\n\n## Agent skills/);
+  assert.equal(change('/.lar-factory.json')?.changeType, 'add');
+  assert.equal(az.heads.get('lar-factory/onboarding'), 'pushed1');
+  const create = az.calls.find((args) => args.slice(0, 3).join(' ') === 'repos pr create')!;
+  assert.deepEqual([create[create.indexOf('--source-branch') + 1], create[create.indexOf('--target-branch') + 1]], ['lar-factory/onboarding', 'main']);
+  // The title and description go joined to their flags, so one starting with - is no option.
+  assert.ok(create.includes('--title=chore: onboard to lar Factory') && !create.includes('--title'), create.join(' '));
+  assert.ok(create.find((arg) => arg.startsWith('--description='))!.includes('- Renames `CONTEXT.md` to `GLOSSARY.md`.'));
+  assert.ok(az.calls.every((args) => args[0] === 'devops' || args[0] === 'repos'), 'every call is az devops or az repos');
+  assert.ok(az.calls.filter((args) => args[1] === 'invoke').every((args) => args.includes('--api-version')));
+});
+
+test('on Azure Repos, a taken lar-factory/onboarding with an active PR is pushed to a commit on the default branch\'s head and the PR gets the new description', async (t) => {
+  const dir = await dataDir(t, [{ repo: AZURE, onboarding: progress }]);
+  const az = fakeAzRepos({ files: { '/AGENTS.md': RULES }, branches: { 'lar-factory/onboarding': 'old789' },
+    prs: [{ pullRequestId: 7, status: 'active', sourceRefName: 'refs/heads/lar-factory/onboarding', description: 'This PR:\n\n- Old.' }] });
+  const opened = await createPrOpener(dir, az.run)({ repo: AZURE, progress, config, picks });
+  assert.equal((opened as { prUrl: string }).prUrl, `${REPO_URL}/pullrequest/7`);
+  assert.deepEqual(az.pushes.map((p) => [p.ref, p.oldObjectId, p.parents]), [['refs/heads/lar-factory/onboarding', 'old789', ['abc123']]]);
+  assert.match(az.prs[0]!.description!, /^This PR:\n\n- Writes lar Factory's/);
+  assert.equal(az.prs.length, 1, 'it opens no PR');
+});
+
+test("on Azure Repos, a failed push answers with az's message, and Retry goes on from the call that failed", async (t) => {
+  const dir = await dataDir(t, [{ repo: AZURE, onboarding: progress }]);
+  for (const [failing, retried] of [['pushes', ['repos ref list', 'repos ref list', 'invoke git/commits', 'invoke git/trees', 'invoke git/pushes', 'repos pr create']],
+    ['repos pr create', ['repos pr create']]] as const) {
+    let fails = true;
+    const message = `az ${failing} failed: TF401027: You need the Git 'GenericContribute' permission.`;
+    const az = fakeAzRepos({ files: { '/AGENTS.md': RULES }, fail: (args) => (fails && args.join(' ').includes(failing) ? new Error(message) : undefined) });
+    const open = createPrOpener(dir, az.run);
+    assert.deepEqual(await open({ repo: AZURE, progress, config, picks }), { status: 502, error: `Can't open ${AZURE}'s onboarding PR: ${message}` });
+    assert.deepEqual(readRepositoryList(dir), [{ repo: AZURE, onboarding: progress }]);
+    fails = false;
+    az.calls.length = 0;
+    assert.equal((await open({ repo: AZURE, progress, config, picks }) as { prUrl: string }).prUrl, AZURE_PR);
+    assert.deepEqual(az.calls.map((args) => (args[0] === 'devops' ? `invoke ${args[args.indexOf('--area') + 1]}/${args[args.indexOf('--resource') + 1]}` : args.slice(0, 3).join(' '))), retried);
+    assert.equal(az.pushes.length, 1);
+    await writeFile(join(dir, 'repositories.json'), JSON.stringify({ repositories: [{ repo: AZURE, onboarding: progress }] }));
+  }
+});

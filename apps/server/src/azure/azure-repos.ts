@@ -1,10 +1,10 @@
-// Azure Repos through az, beside github.ts's gh calls: the default branch's head, files and blobs, and onboarding's branch,
-// file and PR, opened without touching any checkout. A repository is organization/project/repository as its origin URL has them.
+// Azure Repos through az, beside github.ts's gh calls: the default branch's head, files and blobs, and onboarding's commit,
+// branch and PR, made without touching any checkout. A repository is organization/project/repository as its origin URL has them.
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { CommitTree } from '../github/github.ts';
+import type { CommitTree, TreeEntry } from '../github/github.ts';
 import { az, decoded, withFile, type Az } from './azure-items.ts';
 import { prStateOf, type AzurePr } from './azure-prs.ts';
 
@@ -96,17 +96,42 @@ async function defaultBranchFiles(repo: string, run: Az = az): Promise<string[]>
   return [...(await commitTree(repo, sha, run)).files.keys()];
 }
 
-/** A blob's text; az devops invoke writes an answer that isn't JSON only to a new --out-file. */
-async function readBlob(repo: string, sha: string, run: Az = az): Promise<string> {
+/** A blob's bytes; az devops invoke writes an answer that isn't JSON only to a new --out-file. */
+async function blob(repo: string, sha: string, run: Az): Promise<Buffer> {
   const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
   try {
     const file = join(dir, 'blob');
     await run([...invokeArgs(repo, 'blobs', [`sha1=${sha}`], ['--query-parameters', '$format=octetstream', '--accept-media-type', 'application/octet-stream',
       '--out-file', file]), ...names(repo).org]);
-    return await readFile(file, 'utf8');
+    return await readFile(file);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/** A blob's text. */
+async function readBlob(repo: string, sha: string, run: Az = az): Promise<string> {
+  return (await blob(repo, sha, run)).toString('utf8');
+}
+
+/** The old object id a push gives a branch it makes. */
+const NEW_BRANCH = '0'.repeat(40);
+
+/**
+ * Makes one commit on `parent` with the entries changed and puts `branch` on it in one push: the branch is made there,
+ * or moved there from its head whether or not the commit follows from it. An entry kept at a blob, such as a renamed
+ * file, is added with the blob's bytes. Azure Repos takes no file modes in a push, so each file it writes is a plain file.
+ */
+async function pushCommit(repo: string, branch: string, commit: { message: string; parent: string; entries: TreeEntry[] }, run: Az = az): Promise<void> {
+  const [head, tree] = await Promise.all([branchHead(repo, branch, run), commitTree(repo, commit.parent, run)]);
+  const changes = await Promise.all(commit.entries.map(async (entry) => {
+    const item = { path: `/${entry.path}` };
+    if ('sha' in entry && entry.sha === null) return { changeType: 'delete', item };
+    const bytes = 'content' in entry ? Buffer.from(entry.content) : await blob(repo, entry.sha!, run);
+    return { changeType: tree.files.has(entry.path) ? 'edit' : 'add', item, newContent: { content: bytes.toString('base64'), contentType: 'base64encoded' } };
+  }));
+  await post(run, repo, 'pushes', [], { refUpdates: [{ name: `refs/heads/${branch}`, oldObjectId: head ?? NEW_BRANCH }],
+    commits: [{ comment: commit.message, parents: [commit.parent], changes }] });
 }
 
 /** The Git Repositories security namespace, and its GenericContribute bit, which lets a user push. */
@@ -120,11 +145,6 @@ export async function canPush(repo: string, run: Az = az): Promise<boolean> {
     `securityNamespaceId=${GIT_REPOSITORIES}`, `permissions=${GENERIC_CONTRIBUTE}`, '--query-parameters', `tokens=repoV2/${project.id}/${id}`,
     '--api-version', API_VERSION], repo);
   return value[0] === true;
-}
-
-/** Makes a branch on Azure Repos at the commit, leaving every checkout alone. */
-async function createBranch(repo: string, branch: string, sha: string, run: Az = az): Promise<void> {
-  await repos(run, repo, ['ref', 'create', '--name', `heads/${branch}`, '--object-id', sha]);
 }
 
 /** Whether the repository has the branch on Azure Repos. */
@@ -152,6 +172,12 @@ async function createPr(repo: string, pr: { base: string; head: string; title: s
   return prUrl(repo, created.pullRequestId);
 }
 
+/** Replaces a PR's description, by its URL. */
+async function editPrBody(url: string, body: string, run: Az = az): Promise<void> {
+  const { id, repo } = prOf(url);
+  await json(run, ['repos', 'pr', 'update', '--id', id, `--description=${body}`], repo);
+}
+
 /** Whether a PR, by its URL, is open, merged or closed without merging, as az repos pr show says: active, completed or abandoned. */
 async function prState(url: string, run: Az = az): Promise<'OPEN' | 'MERGED' | 'CLOSED'> {
   const { id, repo } = prOf(url);
@@ -175,5 +201,5 @@ async function reopenPr(url: string, run: Az = az): Promise<void> {
 
 /** The calls that open and follow onboarding's PR on Azure Repos, each named and shaped as github.ts's gh call is. */
 export const AZURE_REPOS = {
-  branchExists, closePr, commitTree, createBranch, createPr, defaultBranchFiles, defaultBranchHead, openPrFrom, prState, readBlob, reopenPr,
+  branchExists, closePr, commitTree, createPr, defaultBranchFiles, defaultBranchHead, editPrBody, openPrFrom, prState, pushCommit, readBlob, reopenPr,
 };

@@ -56,8 +56,10 @@ const main = async () => {
   if (args[0] === 'api' && /\/git\/ref\/heads\/main$/.test(args[1])) return void process.stdout.write('abc123\n');
   // The default branch's files at abc123: options.files, or none.
   if (args[0] === 'api' && /\/git\/trees\/abc123\?recursive=1$/.test(args[1])) {
-    return void (fail('tree', 'HTTP 502: Bad Gateway\n') || output({ truncated: false, tree: (options.files ?? []).map((path) => ({ path, type: 'blob' })) }));
+    return void (fail('tree', 'HTTP 502: Bad Gateway\n') || output({ sha: 'tree0', truncated: false,
+      tree: (options.files ?? []).map((path) => ({ path, mode: '100644', type: 'blob', sha: `blob-${path}` })) }));
   }
+  if (args[0] === 'api' && /\/git\/blobs\/blob-/.test(args[1])) return void process.stdout.write(`# ${args[1].split('/git/blobs/blob-')[1]}\n`);
   const ref = args[0] === 'api' && /\/git\/ref\/heads\/(lar-factory\/.+)$/.exec(args[1])?.[1];
   if (ref) {
     if (options.branches && ref in options.branches) return void process.stdout.write('def456\n');
@@ -74,7 +76,9 @@ const main = async () => {
     return void fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
   }
   if (args[0] === 'api' && /\/git\/refs$/.test(args[1])) return void (fail('branch', 'gh: Reference already exists (HTTP 422)\n') || output({}));
-  if (args[0] === 'api' && args[1].endsWith('/contents/.lar-factory.json') && args.includes('PUT')) return void (fail('file', 'HTTP 409: Conflict\n') || output({}));
+  // Onboarding's PR commit: its tree, then the commit, each answered with its SHA.
+  if (args[0] === 'api' && /\/git\/trees$/.test(args[1])) return void process.stdout.write('tree1\n');
+  if (args[0] === 'api' && /\/git\/commits$/.test(args[1])) return void process.stdout.write('commit1\n');
   if (args[0] === 'pr' && args[1] === 'create') {
     if (fail('pr-create', 'pull request create failed: GraphQL: No commits between main and lar-factory/onboarding\n')) return;
     const url = `https://github.com/${args[args.indexOf('-R') + 1]}/pull/77`;

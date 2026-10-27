@@ -20,7 +20,7 @@ import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { finishOnboarding } from './onboarding/finish-onboarding.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
-import { createPrOpener, followOnboardingPrs, reopenOnboardingPr } from './onboarding/onboarding-pr.ts';
+import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr } from './onboarding/onboarding-pr.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { findFixedClashes } from './onboarding/fixed-clashes.ts';
 import { runSetupCheck } from './onboarding/setup-checks.ts';
@@ -316,7 +316,7 @@ const { server, endStreams } = createBoardServer({
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input), findFixedClashes: (input) => findFixedClashes(input),
   startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo), finishOnboarding: (input) => finishOnboarding(input, undefined, undefined, configChecks.forget),
-  openOnboardingPr: createPrOpener(), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
+  openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
 });
 
 /** Logs why the board can't start and exits. */

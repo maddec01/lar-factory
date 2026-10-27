@@ -222,7 +222,7 @@ test('opening the onboarding PR keeps its URL on the Pull request step, and its 
   writeList(home, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: progress }]);
   const board = await startBoard(t, { repoConfigs: { 'maddec01/lar-web': null } }, false, true, { HOME: home });
   await until(board, (d) => d.fetchedAt !== null);
-  const response = await board.post({ repo: 'maddec01/lar-web', progress, config }, board.url, '/api/onboarding/pr');
+  const response = await board.post({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [], skills: {} } }, board.url, '/api/onboarding/pr');
   assert.equal(response.status, 200);
   const opened = { step: 'pr', done: ['project', 'setup'], answers: { projectId: 'lar-web' }, prUrl: PR };
   const body = await response.json() as { prUrl: string; board: BoardData };
@@ -240,7 +240,7 @@ test("a failing gh pr create answers with gh's message and keeps the onboarding 
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
   writeList(home, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
   const board = await startBoard(t, { fail: 'pr-create' }, false, false, { HOME: home });
-  const response = await board.post({ repo: 'maddec01/lar-web', progress, config }, board.url, '/api/onboarding/pr');
+  const response = await board.post({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [], skills: {} } }, board.url, '/api/onboarding/pr');
   assert.equal(response.status, 502);
   assert.match((await response.json() as { error: string }).error,
     /^Can't open maddec01\/lar-web's onboarding PR: gh pr create failed: .*No commits between main and lar-factory\/onboarding/);
@@ -284,7 +284,7 @@ test('a .lar-factory.json that lands another way finishes onboarding and closes 
 
 test('the sample board opens and reopens no onboarding PR', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/pr', '/api/onboarding/pr/reopen']) {
+  for (const path of ['/api/onboarding/pr', '/api/onboarding/pr/changes', '/api/onboarding/pr/reopen']) {
     const response = await board.post({ repo: 'maddec01/lar-web', progress, config }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }

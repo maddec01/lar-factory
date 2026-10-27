@@ -83,6 +83,16 @@ test("the board marks an onboarding's PR closed; a save with the same PR keeps t
   assert.throws(() => savePrClosed('maddec01/lar-web', true, dir), { message: 'maddec01/lar-web is not onboarding.' });
 });
 
+test("the board marks a PR that keeps the .lar-factory.json; a save with the same PR keeps the mark, and one with another PR drops it", async (t) => {
+  const open = { ...progress('pr'), prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
+  const dir = await dataDir(t);
+  assert.deepEqual(saveOnboarding({ repo: 'maddec01/lar-apple', progress: open }, null, dir, { reusesConfig: true }),
+    [{ repo: 'maddec01/lar-apple', onboarding: { ...open, reusesConfig: true } }]);
+  assert.deepEqual(saveOnboarding({ repo: 'maddec01/lar-apple', progress: open }, null, dir), [{ repo: 'maddec01/lar-apple', onboarding: { ...open, reusesConfig: true } }]);
+  const next = { ...open, prUrl: 'https://github.com/maddec01/lar-apple/pull/5' };
+  assert.deepEqual(saveOnboarding({ repo: 'maddec01/lar-apple', progress: { ...next, reusesConfig: true } }, null, dir), [{ repo: 'maddec01/lar-apple', onboarding: next }]);
+});
+
 test("the repositories still onboarding carry the problem following each one's PR met on this refresh, whatever the case", () => {
   const waiting = { ...progress('pr'), prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
   const list = [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: waiting }, { repo: 'maddec01/lar-docs', onboarding: progress() }];

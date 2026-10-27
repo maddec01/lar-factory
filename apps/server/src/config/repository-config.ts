@@ -75,7 +75,8 @@ export function isProgress(value: unknown): value is OnboardingProgress {
     && (value.answers.provider === undefined || PROVIDERS.includes(value.answers.provider as Provider))
     && typeof value.answers.projectId === 'string' && (value.answers.setup === undefined || isSetup(value.answers.setup))
     && (value.answers.cleanup === undefined || isCleanup(value.answers.cleanup))
-    && (value.prUrl === undefined || typeof value.prUrl === 'string') && (value.prClosed === undefined || value.prClosed === true);
+    && (value.prUrl === undefined || typeof value.prUrl === 'string') && (value.prClosed === undefined || value.prClosed === true)
+    && (value.reusesConfig === undefined || value.reusesConfig === true);
 }
 
 /** repositories.json's entries as the file holds them, checked; none when there is no file. */
@@ -109,13 +110,19 @@ export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] 
 /**
  * Stores where an onboarding stopped in its repository's entry, adding the entry when there is none, and drops the
  * onboarding entry of `replaces`, the repository it was saved under before it picked another T3 project. Keeps every
- * other entry as the file has it, and returns the list. Only the board marks a PR closed, so the progress's own mark is
- * dropped and the saved one kept while the PR is the same. Throws for a repository that is onboarded already.
+ * other entry as the file has it, and returns the list. Only the board marks a PR closed or keeping its
+ * .lar-factory.json, so the progress's own marks are dropped and the saved ones kept while the PR is the same;
+ * `reusesConfig` marks the PR the board opened. Throws for a repository that is onboarded already.
  */
-export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir()): OnboardedRepository[] {
-  const { prClosed: _, ...sent } = progress;
+export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir(),
+  { reusesConfig = false } = {}): OnboardedRepository[] {
+  const { prClosed: _, reusesConfig: __, ...sent } = progress;
   const saved = onboardingOf(repo, dir);
-  return saveEntry({ repo, onboarding: saved?.prClosed && saved.prUrl === sent.prUrl ? { ...sent, prClosed: true } : sent }, replaces, dir);
+  const samePr = saved?.prUrl !== undefined && saved.prUrl === sent.prUrl;
+  return saveEntry({ repo, onboarding: {
+    ...sent, ...samePr && saved.prClosed && { prClosed: true },
+    ...(reusesConfig || samePr && saved.reusesConfig) && { reusesConfig: true },
+  } }, replaces, dir);
 }
 
 /** Marks whether the repository's onboarding PR closed without merging, as the board found it on GitHub, and returns the list. */

@@ -398,13 +398,54 @@ export async function defaultBranchHead(repo: string, run: (args: string[]) => P
   return { branch, sha };
 }
 
+/** A commit's tree: its own SHA, and each file's mode and blob SHA by path. */
+export interface CommitTree {
+  sha: string;
+  files: Map<string, { mode: string; sha: string }>;
+}
+
+/** Every file in the commit's tree; throws when GitHub lists only part of them. */
+export async function commitTree(repo: string, commit: string, run: (args: string[]) => Promise<string> = gh): Promise<CommitTree> {
+  const { sha, truncated, tree } = JSON.parse(await run(['api', `repos/${repo}/git/trees/${commit}?recursive=1`])) as
+    { sha: string; truncated: boolean; tree: { path: string; mode: string; type: string; sha: string }[] };
+  if (truncated) throw new Error('GitHub listed only part of its files, since it has too many.');
+  return { sha, files: new Map(tree.filter((entry) => entry.type === 'blob').map((entry) => [entry.path, { mode: entry.mode, sha: entry.sha }])) };
+}
+
 /** Every file's path on the repository's default branch at its head; throws when GitHub lists only part of them. */
 export async function defaultBranchFiles(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<string[]> {
   const { sha } = await defaultBranchHead(repo, run);
-  const { truncated, tree } = JSON.parse(await run(['api', `repos/${repo}/git/trees/${sha}?recursive=1`])) as
-    { truncated: boolean; tree: { path: string; type: string }[] };
-  if (truncated) throw new Error('GitHub listed only part of its files, since it has too many.');
-  return tree.filter((entry) => entry.type === 'blob').map((entry) => entry.path);
+  return [...(await commitTree(repo, sha, run)).files.keys()];
+}
+
+/** A blob's text, by its SHA. */
+export async function readBlob(repo: string, sha: string, run: (args: string[]) => Promise<string> = gh): Promise<string> {
+  return run(['api', `repos/${repo}/git/blobs/${sha}`, '-H', 'Accept: application/vnd.github.raw']);
+}
+
+/** A file a new tree writes with its text, keeps at a blob, or deletes when its `sha` is null. */
+export type TreeEntry = { path: string; mode: string } & ({ content: string } | { sha: string | null });
+
+/** Makes a tree on GitHub from `base` with the entries changed, and returns its SHA. */
+export async function createTree(repo: string, base: string, entries: TreeEntry[], run: (args: string[]) => Promise<string> = gh): Promise<string> {
+  const fields = entries.flatMap((entry) => [
+    '-f', `tree[][path]=${entry.path}`, '-f', `tree[][mode]=${entry.mode}`, '-f', 'tree[][type]=blob',
+    // -F sends null as JSON's null, which deletes the file; -f sends text and SHAs as they are.
+    ...'content' in entry ? ['-f', `tree[][content]=${entry.content}`] : entry.sha === null ? ['-F', 'tree[][sha]=null'] : ['-f', `tree[][sha]=${entry.sha}`],
+  ]);
+  return (await run(['api', `repos/${repo}/git/trees`, '--method', 'POST', '-f', `base_tree=${base}`, ...fields, '--jq', '.sha'])).trim();
+}
+
+/** Makes a commit on GitHub of the tree with one parent, and returns its SHA. */
+export async function createCommit(repo: string, message: string, tree: string, parent: string,
+  run: (args: string[]) => Promise<string> = gh): Promise<string> {
+  return (await run(['api', `repos/${repo}/git/commits`, '--method', 'POST', '-f', `message=${message}`, '-f', `tree=${tree}`,
+    '-f', `parents[]=${parent}`, '--jq', '.sha'])).trim();
+}
+
+/** Moves a branch on GitHub to the commit, even when the commit doesn't follow from it. */
+export async function moveBranch(repo: string, branch: string, sha: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  await run(['api', `repos/${repo}/git/refs/heads/${branch}`, '--method', 'PATCH', '-f', `sha=${sha}`, '-F', 'force=true']);
 }
 
 /** Makes a branch on GitHub at the commit, leaving every checkout alone. */
@@ -427,13 +468,6 @@ export async function branchExists(repo: string, branch: string, run: (args: str
 export async function openPrFrom(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
   const url = (await run(['pr', 'list', '-R', repo, '--head', branch, '--state', 'open', '--json', 'url', '--jq', '.[0].url // empty'])).trim();
   return url || null;
-}
-
-/** Adds a file to a branch on GitHub in a commit of its own. */
-export async function addFile(repo: string, branch: string, path: string, content: string, commit: string,
-  run: (args: string[]) => Promise<string> = gh): Promise<void> {
-  await run(['api', `repos/${repo}/contents/${path}`, '--method', 'PUT', '-f', `message=${commit}`,
-    '-f', `content=${Buffer.from(content).toString('base64')}`, '-f', `branch=${branch}`]);
 }
 
 /** Opens a PR from `head` into `base` and returns its URL. */

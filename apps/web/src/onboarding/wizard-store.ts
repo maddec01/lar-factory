@@ -609,7 +609,9 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const config = run && project && configOf(run, project);
       if (!run?.repo || !run.projectId || run.step !== 'pr' || run.prUrl || pr.opening || pr.reopening || !config) return;
       set({ pr: { ...IDLE, opening: true } });
-      const body = { repo: run.repo, progress: progressOf({ ...run, projectId: run.projectId }), config, ...replacing({ ...run, repo: run.repo }) };
+      // #450 sends the Cleanup step's picks; until then the PR holds no fixes.
+      const body = { repo: run.repo, progress: progressOf({ ...run, projectId: run.projectId }), config, picks: { clashes: [], skills: {} },
+        ...replacing({ ...run, repo: run.repo }) };
       const result = await postAction<{ prUrl: string }>('/api/onboarding/pr', body);
       receive(result);
       const now = get().run;

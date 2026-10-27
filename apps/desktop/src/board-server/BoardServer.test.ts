@@ -89,6 +89,25 @@ describe("start", () => {
     }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
   );
 
+  it.live("reports starting the server, then polling /healthz once it has a port", () =>
+    Effect.gen(function* () {
+      const steps: Array<string> = [];
+      yield* BoardServer.start(fakeConfig({ FAKE_BOARD_BUSY: "3" }), { progress: (step) => steps.push(step) });
+      assert.deepStrictEqual(steps, ["starting", "healthz"]);
+    }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
+  );
+
+  it.live("reports no /healthz poll when the server exits before it reports a port", () =>
+    Effect.gen(function* () {
+      const steps: Array<string> = [];
+      yield* BoardServer.start(fakeConfig({ FAKE_BOARD: "crash" }), { progress: (step) => steps.push(step) }).pipe(
+        Effect.scoped,
+        Effect.exit,
+      );
+      assert.deepStrictEqual(steps, ["starting"]);
+    }).pipe(Effect.provide(NodeHttpClient.layerUndici)),
+  );
+
   /** The fake server's answer to its skill check, once it comes. */
   const skillAnswer = (url: URL) =>
     Effect.promise(async () => {

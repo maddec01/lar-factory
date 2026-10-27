@@ -24,7 +24,7 @@ function Act({ children }: { children: ReactNode }) {
 function NextAction({ item, data }: { item: Item; data: BoardData }) {
   switch (item.status) {
     case 'Ready': return <Act><StartBuild item={item} data={data} quiet /></Act>;
-    case 'Shaping': case 'In progress': case 'Review': return <Act><OpenThread item={item} data={data} size="xs" variant="outline" /></Act>;
+    case 'Shaping': case 'In progress': case 'Review': return <Act><OpenThread item={item} data={data} variant="secondary" /></Act>;
     default: return null;
   }
 }

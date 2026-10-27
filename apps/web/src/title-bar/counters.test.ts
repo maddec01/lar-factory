@@ -143,5 +143,5 @@ test('picking a row closes the popover and opens that item\'s dialog', async () 
   await openCounter('building');
   await settle(() => popup()!.querySelector<HTMLButtonElement>('li button')!.click());
   expect(popup()).toBeNull();
-  expect(text($('[data-item-dialog] [data-slot="dialog-title"]'))).toBe('#150 Relay for streaming away from home');
+  expect(text($('[data-item-dialog] [data-slot="modal-header"] h2'))).toBe('#150 Relay for streaming away from home');
 });

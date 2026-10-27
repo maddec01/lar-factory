@@ -5,7 +5,7 @@
 import { useId, useRef } from 'react';
 import { canAbandon, ref } from '@lar-factory/shared';
 import type { BoardData, Item, Status } from '@lar-factory/shared';
-import { Button, InlineButton } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { useActionStore, useItemAction } from './action-store.ts';
 import type { ItemAction } from './action-store.ts';
 import { askAbandon, backToList, pickStatus, queueItem } from './card-actions.ts';
@@ -21,7 +21,7 @@ export function writeState(data: BoardData, action?: ItemAction): { disabled?: t
 export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);
   const verb = action?.phase === 'pending' && action.kind === 'queue' ? 'Queuing…' : 'Queue';
-  return <Button size="sm" data-queue={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
+  return <Button data-queue={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
     {...writeState(data, action)} onClick={() => void queueItem(item.id)}>{verb}</Button>;
 }
 
@@ -29,8 +29,8 @@ export function QueueButton({ item, data }: { item: Item; data: BoardData }) {
 export function BackToListButton({ item, data }: { item: Item; data: BoardData }) {
   const action = useItemAction(item.id);
   const moving = action?.phase === 'pending' && action.kind === 'back-to-list';
-  return <InlineButton tone="muted" className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Back to List'} ${ref(item)} ${item.title}`}
-    {...writeState(data, action)} onClick={() => void backToList(item.id)}>{'←'} {moving ? 'Moving to List…' : 'Back to List'}</InlineButton>;
+  return <Button variant="row" className="link-action" data-back-to-list={item.id} aria-label={`${moving ? 'Moving' : 'Back to List'} ${ref(item)} ${item.title}`}
+    {...writeState(data, action)} onClick={() => void backToList(item.id)}>{'←'} {moving ? 'Moving to List…' : 'Back to List'}</Button>;
 }
 
 /** Keep, one per status an item carrying more than one has: the only moves it offers until one is picked. */
@@ -38,7 +38,7 @@ export function PickStatusButtons({ item, data }: { item: Item; data: BoardData 
   const action = useItemAction(item.id);
   const keeping = (status: Status) => action?.phase === 'pending' && action.kind === 'pick-status' && action.status === status;
   return item.statuses.map((status) => (
-    <Button key={status} size="sm" variant="outline" data-pick-status={status} aria-label={`${keeping(status) ? 'Keeping' : 'Keep'} ${status} on ${ref(item)} ${item.title}`}
+    <Button key={status} variant="secondary" data-pick-status={status} aria-label={`${keeping(status) ? 'Keeping' : 'Keep'} ${status} on ${ref(item)} ${item.title}`}
       {...writeState(data, action)} onClick={() => void pickStatus(item.id, status)}>{keeping(status) ? 'Keeping…' : `Keep ${status}`}</Button>
   ));
 }
@@ -52,8 +52,8 @@ export function AbandonButton({ item, data }: { item: Item; data: BoardData }) {
   const refusal = item.abandonRefusal;
   const state = refusal ? { disabled: true as const, title: refusal, 'aria-describedby': reason } : writeState(data, action);
   return <>
-    <InlineButton tone="destructive" className="link-action danger disabled:pointer-events-auto" data-abandon={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
-      {...state} onClick={() => askAbandon(item.id)}>{verb}</InlineButton>
+    <Button variant="destructive-quiet" className="link-action disabled:pointer-events-auto" data-abandon={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`}
+      {...state} onClick={() => askAbandon(item.id)}>{verb}</Button>
     {refusal && <span id={reason} className="text-muted-foreground" data-abandon-refusal>{refusal}</span>}
   </>;
 }

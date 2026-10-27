@@ -15,6 +15,6 @@ export function PartStart({ part, data, build = 'Start build', afterOnly }: { pa
   if (item.status === 'Ready') return <StartBuild item={item} data={data} label={build} quiet afterOnly={afterOnly} />;
   if (item.status !== 'Queued' || !workMessage(item)) return null;
   // A thread already at work on the item would get a second one.
-  if (hasLiveThread(item)) return <OpenThread item={item} data={data} size="xs" variant="outline" />;
+  if (hasLiveThread(item)) return <OpenThread item={item} data={data} variant="secondary" />;
   return <StartOrAfter item={item} data={data} quiet afterOnly={afterOnly} />;
 }

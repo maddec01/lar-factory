@@ -68,7 +68,7 @@ test('Load 10 more reads the page before the details\' cursor and appends it in 
   await settle(() => loadMore()!.click());
   expect(pageReads()).toEqual([{ itemId: 'I_sample13', before: '0' }]);
   expect(loadMore()!.disabled, 'disabled while it loads').toBe(true);
-  expect(loadMore()!.querySelector('svg.animate-spin'), 'with a spinner').not.toBeNull();
+  expect(loadMore()!.querySelector('.animate-spin'), 'with a spinner').not.toBeNull();
   await release();
   expect(bodies().slice(3)).toEqual(OLDER.slice(0, 10).map((c) => c.body));
   expect(authors()).toHaveLength(13);

@@ -3,11 +3,12 @@
 
 import { itemPr } from '@lar-factory/shared';
 import type { Item } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { LinkButton } from './link-button.tsx';
 
-export function PrLink({ item, label, size = 'sm' }: { item: Item; label: string; size?: 'xs' | 'sm' }) {
+export function PrLink({ item, label }: { item: Item; label: string }) {
   const url = itemPr(item)?.url;
   // Pointer events stay on while it's disabled, so its title says why.
-  if (!url) return <Button size={size} className="disabled:pointer-events-auto" data-pr-link={item.id} disabled title="No pull request is linked to this item yet">{label}</Button>;
-  return <Button size={size} data-pr-link={item.id} render={<a href={url} target="_blank" rel="noopener" />}>{label}</Button>;
+  if (!url) return <Button className="disabled:pointer-events-auto" data-pr-link={item.id} disabled title="No pull request is linked to this item yet">{label}</Button>;
+  return <LinkButton data-pr-link={item.id} href={url} target="_blank" rel="noopener">{label}</LinkButton>;
 }

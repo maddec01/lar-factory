@@ -2,8 +2,8 @@
 
 import { create } from 'zustand';
 
-/** The item dialog while it's open: Base UI marks its popup `data-open` until it starts closing. */
-export const OPEN_ITEM_DIALOG = '[data-item-dialog][data-open]';
+/** The item dialog while it's open: Radix marks the Modal's content `data-state="open"` until it closes. */
+export const OPEN_ITEM_DIALOG = '[data-item-dialog][data-state="open"]';
 
 interface ItemDialogState {
   /** The id of the item on show, or `null` while the dialog is closed. */

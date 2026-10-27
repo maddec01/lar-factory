@@ -81,12 +81,12 @@ test('Abandon asks first, naming the issue it deletes or the draft it removes; C
   await press(button('abandon', 'I_sample01'));
   const dialog = $('#abandon-dialog')!;
   expect(dialog.getAttribute('role')).toBe('alertdialog');
-  expect(text($('#abandon-heading'))).toBe(`Delete #61 ${sample.items[0]!.title}?`);
-  expect(text($('#abandon-detail'))).toBe("This permanently deletes the issue from maddec01/lar-server on GitHub. It can't be undone.");
-  expect($$('#abandon-dialog button').map(text)).toEqual(['Cancel', 'Delete issue']);
+  expect(text($('#abandon-dialog h2'))).toBe(`Delete #61 ${sample.items[0]!.title}?`);
+  expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe("This permanently deletes the issue from maddec01/lar-server on GitHub. It can't be undone.");
+  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Delete issue']);
   await settle(() => vi.advanceTimersByTime(100));
-  expect(document.activeElement, 'Cancel takes focus').toBe($$('#abandon-dialog button')[0]);
-  await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[0]!.click());
+  expect(document.activeElement, 'Close takes focus, not the destructive button').toBe($('#abandon-dialog [aria-label="Close"]'));
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[0]!.click());
   await settle(() => vi.advanceTimersByTime(100));
   expect($('#abandon-dialog')).toBeNull();
   expect(document.activeElement).toBe(button('abandon', 'I_sample01'));
@@ -94,30 +94,26 @@ test('Abandon asks first, naming the issue it deletes or the draft it removes; C
 
   await openItem('I_sample04');
   await press(button('abandon', 'I_sample04'));
-  expect(text($('#abandon-heading'))).toMatch(/^Remove draft Shared playback history across devices\?$/);
-  expect($$('#abandon-dialog button').map(text)).toEqual(['Cancel', 'Remove draft']);
+  expect(text($('#abandon-dialog h2'))).toMatch(/^Remove draft Shared playback history across devices\?$/);
+  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Remove draft']);
   await settle(() => vi.advanceTimersByTime(100));
   await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await settle(() => vi.advanceTimersByTime(100));
   expect($('#abandon-dialog'), 'Escape cancels').toBeNull();
-  expect($('[data-item-dialog][data-open]'), 'and leaves the item dialog open').not.toBeNull();
+  expect($('[data-item-dialog]'), 'and leaves the item dialog open').not.toBeNull();
 });
 
-test('Abandon opens centred on T3\'s backdrop and glass panel, nothing over the title bar drags, and a click outside leaves it open', async () => {
+test('Abandon opens over an overlay, nothing over the title bar drags, and a click outside leaves it open', async () => {
   await mountPage();
   await openItem('I_sample01');
   await press(button('abandon', 'I_sample01'));
   const { noDrag } = addStylesheet();
   const dialog = $('#abandon-dialog')!;
-  const viewport = dialog.closest('[data-slot="alert-dialog-viewport"]')!;
-  const backdrop = $('[data-slot="alert-dialog-backdrop"]')!;
-  expect(viewport.className).toContain('grid-rows-[1fr_auto_1fr]');
-  expect(dialog.classList).toContain('row-start-2');
-  expect(dialog.classList).toContain('dialog-glass');
-  expect(backdrop.classList).toContain('dialog-backdrop');
-  expect([dialog, viewport, backdrop].map(noDrag)).toEqual([true, true, true]);
+  const overlay = $$('[data-slot="modal-overlay"]').at(-1)!;
+  expect(dialog.getAttribute('data-slot')).toBe('modal-content');
+  expect([dialog, overlay].map(noDrag)).toEqual([true, true]);
   for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
-    await settle(() => viewport.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 })));
+    await settle(() => overlay.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 })));
   }
   await settle(() => vi.advanceTimersByTime(100));
   expect($('#abandon-dialog'), 'still open').not.toBeNull();
@@ -129,7 +125,7 @@ test('confirming Abandon holds Queue without relabelling it, and announces the d
   await mountPage(data);
   await openItem('I_sample01');
   await press(button('abandon', 'I_sample01'));
-  await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
   const abandoning = button('abandon', 'I_sample01');
   expect([text(abandoning), abandoning.getAttribute('aria-disabled')]).toEqual(['Abandoning…', 'true']);
   expect(button('queue', 'I_sample01').getAttribute('aria-disabled')).toBe('true');

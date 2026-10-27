@@ -3,7 +3,7 @@
 
 import { expect, test } from 'vite-plus/test';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { $, $$, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, mountPage, pressMenu, sample, settle, text } from '../../test/support.ts';
 
 const cards = () => $$('.desk-card');
 const card = (id: string) => $(`.desk-card[data-item="${id}"]`)!;
@@ -112,7 +112,9 @@ test('clicks on a card’s buttons, in the menu one opens, or in its start messa
   await mountPage();
   await settle(() => card('I_sample12').querySelector<HTMLElement>('[data-open-thread]')!.click());
   await settle(() => card('I_sample16').querySelector<HTMLElement>('[data-pr-link]')!.click());
-  await settle(() => card('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!.click());
+  const after = card('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  await pressMenu(after);
+  await settle(() => after.click());
   const entry = $('[role="menu"] [role="menuitemradio"]');
   expect(entry).not.toBeNull();
   await settle(() => entry!.click());

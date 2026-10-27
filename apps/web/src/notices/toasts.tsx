@@ -43,7 +43,9 @@ const focusFirst = (selectors: string[]) => {
 
 /** Moves focus to the first of `selectors` on the page, or in the item dialog while it's open, if something took it away with the element that had it. */
 export function refocus(selectors: string[]): void {
-  if (document.activeElement === document.body) focusFirst(selectors);
+  // The item dialog's focus trap catches focus on the dialog itself when the element that had it goes.
+  const lost = document.activeElement === document.body || document.activeElement === document.querySelector(OPEN_ITEM_DIALOG);
+  if (lost) focusFirst(selectors);
 }
 
 /** Moves focus to the first of `next` that's on the page, or to the fallback. */

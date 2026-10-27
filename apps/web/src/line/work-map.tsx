@@ -93,7 +93,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
   const tone = item.status === 'Needs you' ? 'border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] shadow-[inset_3px_0_0_var(--warning)]'
     : isDone(item) ? 'border-(--border) bg-(--muted)' : open.length ? 'border-dashed border-(--input)' : 'border-(--border)';
   let action: ReactNode = null;
-  if (item.status === 'Needs you') action = <OpenThread item={item} data={data} label="Answer in T3" size="xs" />;
+  if (item.status === 'Needs you') action = <OpenThread item={item} data={data} label="Answer in T3" />;
   else if (item.status === 'Ready' || item.status === 'Queued') action = <PartStart part={part} data={data} build="Start" afterOnly />;
   else if (open.length) action = <span className="text-[11px] text-(--muted-foreground)">starts by itself after {waitText(item, open)}</span>;
   else if (thread?.state === 'running') action = <span className="text-[11px] text-(--muted-foreground)">thread working · {shortAgo(thread.updated, now)}</span>;

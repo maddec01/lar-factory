@@ -1,33 +1,31 @@
-// Abandon's confirmation: it names the item it deletes or removes. Cancel or Escape closes it and
+// Abandon's confirmation: it names the item it deletes or removes. Cancel, Close or Escape closes it and
 // focus goes back to Abandon; a click outside leaves it open. The confirm button abandons the item.
 
 import { abandonPrompt } from '@lar-factory/shared';
-import {
-  AlertDialog, AlertDialogClose, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogPopup, AlertDialogTitle,
-} from '@lar-factory/ui/alert-dialog';
-import { Button } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { Modal } from '@lar-factory/ui/design-system/Modal';
+import { Text } from '@lar-factory/ui/design-system/Typography';
 import { useAbandonStore } from './abandon-store.ts';
 import { abandonItem } from './card-actions.ts';
 
 export function AbandonDialog() {
   const { open, item, close } = useAbandonStore();
-  const prompt = item && abandonPrompt(item);
+  if (!open || !item) return null;
+  const prompt = abandonPrompt(item);
   const confirm = () => {
     close();
-    if (item) void abandonItem(item.id);
+    void abandonItem(item.id);
   };
   return (
-    <AlertDialog open={open} onOpenChange={(next) => !next && close()}>
-      <AlertDialogPopup id="abandon-dialog">
-        <AlertDialogHeader>
-          <AlertDialogTitle id="abandon-heading">{prompt?.question}</AlertDialogTitle>
-          <AlertDialogDescription id="abandon-detail">{prompt?.detail}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" size="xs" />}>Cancel</AlertDialogClose>
-          <Button variant="destructive" size="xs" onClick={confirm}>{prompt?.confirm}</Button>
-        </AlertDialogFooter>
-      </AlertDialogPopup>
-    </AlertDialog>
+    <Modal onClose={close}>
+      {/* ninna-ui's Modal drops the description from aria-describedby, so the detail names itself. */}
+      <Modal.Content id="abandon-dialog" role="alertdialog" title={prompt.question} aria-describedby="abandon-detail" closeOnOverlayClick={false}>
+        <Modal.Body><Text id="abandon-detail" tone="muted">{prompt.detail}</Text></Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={close}>Cancel</Button>
+          <Button variant="destructive" onClick={confirm}>{prompt.confirm}</Button>
+        </Modal.Footer>
+      </Modal.Content>
+    </Modal>
   );
 }

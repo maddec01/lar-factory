@@ -8,14 +8,14 @@ import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { blockedText, carriesTwoStatuses, openBlockerRefs, openBlockers, ref, startHold, startRequest } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/button';
-import { Menu, MenuPopup, MenuTrigger } from '@lar-factory/ui/menu';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
 import { useBoardStore } from '../board/board-store.ts';
 import { notify } from '../notices/notices.tsx';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
 import { postAction, receive } from './card-actions.ts';
 import { writeState } from './item-actions.tsx';
-import { StartControl, StartEntries } from './start-control.tsx';
+import { StartControl, StartEntries, opensOnChecked } from './start-control.tsx';
 import type { StartKind } from './start-store.ts';
 
 /** The open blocker Start after names, the last one when several are open, as `#n` or `owner/repo#n`; null once none is. */
@@ -41,8 +41,8 @@ async function setArmed(item: Item, choice: ModelChoice | undefined | null, repo
   });
 }
 
-/** Start after #n, or Starts after #n ✓ while armed. `size` and `variant` follow the Start it sits beside. */
-function StartAfter({ item, data, size = 'xs', variant = 'outline' }: { item: Item; data: BoardData; size?: 'xs' | 'sm'; variant?: 'default' | 'outline' }) {
+/** Start after #n, or Starts after #n ✓ while armed, outlined beside the Start it follows. */
+function StartAfter({ item, data }: { item: Item; data: BoardData }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const after = startsAfter(item);
@@ -57,7 +57,7 @@ function StartAfter({ item, data, size = 'xs', variant = 'outline' }: { item: It
   };
   if (armed) {
     return (
-      <Button size={size} variant={variant} className={SHRINKS} data-start-after={item.id} aria-pressed aria-label={`Starts after ${after}`}
+      <Button variant="secondary" className={SHRINKS} data-start-after={item.id} aria-pressed aria-label={`Starts after ${after}`}
         title={`Starts by itself once ${waitsFor(item)}. Pressing it again disarms it`} {...writes}
         onClick={() => !held && void run(null)}><span className="truncate">Starts after {label}</span> ✓</Button>
     );
@@ -68,13 +68,15 @@ function StartAfter({ item, data, size = 'xs', variant = 'outline' }: { item: It
   };
   // Sample mode keeps the menu open-able, so the model choices can be seen; its entries arm nothing.
   return (
-    <Menu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
-      <MenuTrigger render={<Button size={size} variant={variant} className={SHRINKS} />} data-start-after={item.id} aria-label={`Start ${ref(item)} ${item.title} after ${after}`}
-        title={`Starts by itself once ${waitsFor(item)}`} {...(data.capture?.enabled === false ? {} : writes)}><span className="truncate">Start after {label}</span> ▾</MenuTrigger>
-      <MenuPopup align="end" aria-label={`Start ${ref(item)} after ${after} with`}>
+    <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
+      <DropdownMenu.Trigger asChild>
+        <Button variant="secondary" className={SHRINKS} data-start-after={item.id} aria-label={`Start ${ref(item)} ${item.title} after ${after}`}
+          title={`Starts by itself once ${waitsFor(item)}`} {...(data.capture?.enabled === false ? {} : writes)}><span className="truncate">Start after {label}</span> ▾</Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} after ${after} with`} {...opensOnChecked}>
         <StartEntries item={item} data={data} onPick={pick} />
-      </MenuPopup>
-    </Menu>
+      </DropdownMenu.Content>
+    </DropdownMenu>
   );
 }
 
@@ -87,25 +89,25 @@ function StartAfter({ item, data, size = 'xs', variant = 'outline' }: { item: It
  * fail, so none is offered; one armed before the hold still shows, so it can be disarmed. An item carrying more than
  * one status gets no Start until the user keeps one.
  */
-export function StartOrAfter({ item, data, label = 'Start', size = 'xs', variant, icon, kind = 'refine', quiet, afterOnly }: {
-  item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; variant?: 'default' | 'outline'; icon?: ReactNode; kind?: StartKind;
+export function StartOrAfter({ item, data, label = 'Start', variant, icon, kind = 'refine', quiet, afterOnly }: {
+  item: Item; data: BoardData; label?: string; variant?: 'primary' | 'secondary'; icon?: ReactNode; kind?: StartKind;
   quiet?: boolean; afterOnly?: boolean;
 }) {
   if (carriesTwoStatuses(item)) return null;
   const hold = startHold(data, item.repo);
   const blocked = openBlockers(item).length > 0;
-  if (!blocked && !hold) return <StartControl item={item} data={data} label={label} size={size} variant={variant} icon={icon} kind={kind} />;
+  if (!blocked && !hold) return <StartControl item={item} data={data} label={label} variant={variant} icon={icon} kind={kind} />;
   // Pointer events stay on while it's disabled, so its title says why.
   const start = (
-    <Button size={size} variant={variant ?? (quiet ? 'outline' : undefined)} className="disabled:pointer-events-auto" data-start={item.id} disabled
+    <Button variant={variant ?? (quiet ? 'secondary' : 'primary')} leftIcon={icon} className="disabled:pointer-events-auto" data-start={item.id} disabled
       title={hold ?? blockedText(item) ?? undefined}>
-      {icon}{label}
+      {label}
     </Button>
   );
   if ((hold && !data.armed?.[item.id]) || !blocked) return start;
-  if (afterOnly) return <StartAfter item={item} data={data} size={size} />;
+  if (afterOnly) return <StartAfter item={item} data={data} />;
   // With no room for both, Start after wraps under Start, then truncates.
-  return <span className="inline-flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">{start}<StartAfter item={item} data={data} size={size} /></span>;
+  return <span className="inline-flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">{start}<StartAfter item={item} data={data} /></span>;
 }
 
 /** Why the start the board ran by itself failed; dismissing it clears it on the server. */

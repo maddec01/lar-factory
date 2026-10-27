@@ -2,8 +2,8 @@
 // Start next with their model menu, and what a start shows on the row. Ported from the Queued cases of the old Board
 // view's tests.
 
-import { beforeEach, expect, test } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, moved, mountPage, posted, sample, settle, text, toast } from '../../test/support.ts';
+import { beforeEach, expect, test, vi } from 'vite-plus/test';
+import { $, $$, answer, holdPosts, moved, mountPage, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
 import type { BoardData, Item, ModelGroup } from '@lar-factory/shared';
 
 const MODEL_CHOICES: ModelGroup[] = [
@@ -22,7 +22,10 @@ const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
 const press = async (el: HTMLElement) => {
   el.focus();
-  await settle(() => el.click());
+  await settle(() => {
+    el.click();
+    vi.advanceTimersByTime(0);
+  });
 };
 const sample05 = sample.items.find((i) => i.id === 'I_sample05')!;
 /** A Queued decision under `parent`, a sample item's number. */
@@ -77,7 +80,7 @@ test('an empty Queue says where items come from, and has no Start next', async (
 test('a row opens the item dialog and stays marked while it shows', async () => {
   await mountPage();
   await settle(() => row('I_sample06').querySelector<HTMLButtonElement>('.queue-title')!.click());
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe(`#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`);
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`);
   expect(row('I_sample06').className).toContain('ring-2');
 });
 
@@ -98,8 +101,8 @@ test('the header shows the build slots; while they are full the first row waits 
   expect(slots.querySelectorAll('.slot'), 'a bar per build past the limit').toHaveLength(3);
   expect(text(row('I_sample05')), 'the first row').toContain('next when a build slot frees');
   expect(text(row('I_sample06'))).not.toContain('next when a build slot frees');
-  expect(start().getAttribute('aria-disabled')).toBeNull();
-  expect(startNext().getAttribute('aria-disabled')).toBeNull();
+  expect(start().getAttribute('aria-disabled')).not.toBe('true');
+  expect(startNext().getAttribute('aria-disabled')).not.toBe('true');
 });
 
 test('a Queued item blocked by an open issue has its Start refining disabled, with Start after, and Start next passes over it', async () => {
@@ -180,7 +183,7 @@ test('Start refining sits on Queued issues, primary on the row Start next starts
 test("Start refining opens its menu without opening the dialog, and starts its row's item with the picked model", async () => {
   holdPosts(withChoices);
   await mountPage(withChoices);
-  await press(start('I_sample06'));
+  await pressMenu(start('I_sample06'));
   expect(entries().map(text)).toEqual(['T3 default', 'GPT-5.5', 'Opus 5.5']);
   await press(entries()[2]!);
   expect(dialog(), 'neither the button nor the menu opens the dialog').toBeNull();
@@ -200,7 +203,7 @@ test('Start next starts the first row that can start, with its model menu', asyn
   holdPosts(withChoices);
   await mountPage(withChoices);
   expect([text(startNext()), startNext().getAttribute('aria-label')]).toEqual(['Start next ▾', `Start next #129 ${sample05.title}`]);
-  await press(startNext());
+  await pressMenu(startNext());
   await press(entries()[1]!);
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
 });
@@ -225,7 +228,7 @@ test('while an item has a running or needs-you thread, its row has Open thread i
 test("a failed Start shows on its row with Retry start; closing the error doesn't open the dialog", async () => {
   holdPosts(withChoices);
   await mountPage(withChoices);
-  await press(start());
+  await pressMenu(start());
   await press(entries()[0]!);
   await answer({ thread: null, error: 'T3 is down.' }, 502);
   expect(text(start())).toBe('Retry start ▾');
@@ -239,7 +242,7 @@ test("a failed Start shows on its row with Retry start; closing the error doesn'
 test('a Start that may have run hides Start refining; closing its message leaves a tag', async () => {
   holdPosts(withChoices);
   await mountPage(withChoices);
-  await press(start());
+  await pressMenu(start());
   await press(entries()[0]!);
   await answer({ thread: null, uncertain: true, error: 'Check T3.' });
   expect(row('I_sample05').querySelector('[data-start]')).toBeNull();
@@ -258,7 +261,7 @@ test('a thread another page started shows on its row in place of Start refining'
 test('in sample mode Start refining still opens its menu, which starts nothing', async () => {
   await mountPage({ ...withChoices, capture: { session: 's', enabled: false } });
   expect(start().hasAttribute('disabled')).toBe(false);
-  await press(start());
+  await pressMenu(start());
   expect(entries().every((e) => e.getAttribute('aria-disabled') === 'true')).toBe(true);
   await press(entries()[1]!);
   expect(posted()).toEqual([]);
@@ -291,13 +294,13 @@ test('Abandon from the dialog takes the item off the Queue; a failed one is a to
   await mountPage(data);
   await settle(() => row('I_sample06').click());
   await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="I_sample06"]')!);
-  await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
   await answer({ error: 'Could not delete #20.' }, 502);
   expect(text(toast())).toMatch(/^Couldn't abandon #20 .*\. Could not delete #20\.$/);
   expect(rows().map((r) => r.dataset.item)).toContain('I_sample06');
 
   await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="I_sample06"]')!);
-  await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
   await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample06') } });
   expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample05', 'I_sample21']);
 });

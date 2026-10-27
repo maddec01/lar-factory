@@ -2,8 +2,8 @@
 // with its agent figures, a build's slices, and its side action. Ports the old Board view's in-flight cards and slice
 // popover tests to the table.
 
-import { beforeEach, expect, test } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, posted, sample, settle, text, toast } from '../../test/support.ts';
+import { beforeEach, expect, test, vi } from 'vite-plus/test';
+import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread, RawItem } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -16,7 +16,11 @@ const numberOf = (id: string) => sample.items.find((i) => i.id === id)!.number;
 const cells = (id: string) => [...row(id).children] as HTMLElement[];
 const side = (id: string) => cells(id)[3]!;
 const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-in-flight] [data-start="${id}"]`)!;
-const press = (el: Element) => settle(() => (el as HTMLElement).click());
+/** Clicks `el`; a menu it closes hands focus back on the next tick. */
+const press = (el: Element) => settle(() => {
+  (el as HTMLElement).click();
+  vi.advanceTimersByTime(0);
+});
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
 const boardOf = (raws: RawItem[], keys: { active?: number[]; blocked?: number[] } = {}): BoardData => {
@@ -113,7 +117,7 @@ test('the Agent column shows agent time over tokens and cost, or a dash before a
 test('a row opens the item dialog and stays marked while it shows', async () => {
   await mountPage(loose);
   await press(row('I_sample14'));
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('#30 Chapter markers in the scrubber');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('#30 Chapter markers in the scrubber');
   expect(row('I_sample14').className).toContain('ring-(--primary)');
   expect(row('I_sample15').className).not.toContain('ring-(--primary)');
 });
@@ -135,7 +139,7 @@ test('Start after on a blocked Ready row arms its start on the picked model, the
   holdPosts(blocked);
   await mountPage(blocked);
   const after = () => side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
-  await press(after());
+  await pressMenu(after());
   expect(dialog(), 'the menu opens without the dialog').toBeNull();
   await press(entries()[1]!);
   expect(posted()).toEqual([['/api/arm', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
@@ -197,7 +201,7 @@ test("a start the board ran by itself and that failed shows its error under the 
 test('Open thread on a row opens the latest thread, as an outline button, without opening the dialog', async () => {
   await mountPage(withItem('I_sample14', { threads: [thread('t1', 'running')] }, withItem('I_sample15', { threads: [] })));
   const open = side('I_sample14').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
-  expect([open.getAttribute('href'), open.className.includes('border-input')]).toEqual(['t3code://threads/sample-environment/t1', true]);
+  expect([open.getAttribute('href'), open.className.includes('border-base-400/90')]).toEqual(['t3code://threads/sample-environment/t1', true]);
   await press(open);
   expect(dialog()).toBeNull();
   const none = side('I_sample15').querySelector<HTMLButtonElement>('[data-open-thread]')!;
@@ -208,7 +212,7 @@ test('Start build is disabled while a blocker is open, its title naming it, and 
   await mountPage(loose);
   expect([text(startBuild()), startBuild().disabled, startBuild().title]).toEqual(['Start build', true, 'Blocked by #202 until it closes']);
   expect(startBuild().className).toContain('disabled:pointer-events-auto');
-  expect(startBuild().className, 'an outline button, as the line draws a held action').toContain('border-input');
+  expect(startBuild().className, 'an outline button, as the line draws a held action').toContain('border-base-400/90');
   const many = withItem('I_sample13', { blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
     { number: 12, repo: 'maddec01/lar-apple', state: 'open' },
@@ -240,7 +244,7 @@ test('a done thread leaves Start build', async () => {
 test('Start build sends the build with the chosen model, then shows the thread it started in a tag and a toast', async () => {
   holdPosts(unblocked());
   await mountPage(unblocked());
-  await press(startBuild());
+  await pressMenu(startBuild());
   expect(dialog(), 'the menu opens without the dialog').toBeNull();
   expect(entries().map(text)).toEqual(['T3 default', 'GPT-5.5']);
   await press(entries()[1]!);
@@ -259,7 +263,7 @@ test('Start build sends the build with the chosen model, then shows the thread i
 test('a failed Start build shows its error under the row and offers Retry start; closing the error brings Start build back', async () => {
   holdPosts(unblocked());
   await mountPage(unblocked());
-  await press(startBuild());
+  await pressMenu(startBuild());
   await press(entries()[0]!);
   expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13' }]]);
   await answer({ thread: null, error: 'T3 is down.' }, 502);
@@ -275,7 +279,7 @@ test('a failed Start build shows its error under the row and offers Retry start;
 test('a Start build that may have run hides Start build; closing its message leaves a tag', async () => {
   holdPosts(unblocked());
   await mountPage(unblocked());
-  await press(startBuild());
+  await pressMenu(startBuild());
   await press(entries()[0]!);
   await answer({ thread: null, uncertain: true, error: 'Check T3.' });
   expect(startBuild()).toBeNull();
@@ -294,7 +298,7 @@ test('in sample mode, Start build opens its menu and no entry starts anything', 
   holdPosts();
   await mountPage({ ...unblocked(), capture: { session: 's', enabled: false } });
   expect(startBuild().disabled).toBe(false);
-  await press(startBuild());
+  await pressMenu(startBuild());
   expect(entries().every((e) => e.getAttribute('aria-disabled') === 'true' && e.title === 'Disabled in sample mode')).toBe(true);
   await press(entries()[1]!);
   expect(posted()).toEqual([]);

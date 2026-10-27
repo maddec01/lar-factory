@@ -1,11 +1,11 @@
 // The bits every view draws for an item: its numbered title, title link, status track and slice bar, and the item
-// dialog's repository tag, slices, pull requests, checks, and agent work. The tag is T3's Badge; the board's CSS
-// adds the coloured dot.
+// dialog's repository tag, slices, pull requests, checks, and agent work. The tag is the design system's Badge; the
+// board's CSS adds the coloured dot.
 
 import { Check, GitPullRequest } from 'lucide-react';
 import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
 import type { Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/badge';
+import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { STATUS_COLOR } from './status-glyph.tsx';
 
 const REPO_TONES = 8;
@@ -19,7 +19,7 @@ export function repoTone(repo: string, repos: readonly RepoConfig[]): string {
 
 /** The control room's repository badge, with a medium label. */
 export function RepoTag({ repo, repos }: { repo: string; repos: readonly RepoConfig[] }) {
-  return <Badge variant="outline" size="sm" className={`repo-tag ${repoTone(repo, repos)} gap-1.5 font-medium`}>{repoName(repo, repos)}</Badge>;
+  return <Badge className={`repo-tag ${repoTone(repo, repos)} gap-1.5`}>{repoName(repo, repos)}</Badge>;
 }
 
 export function TitleLink({ item, className = 'title' }: { item: Item; className?: string }) {

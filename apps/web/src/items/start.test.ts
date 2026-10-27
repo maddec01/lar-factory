@@ -2,7 +2,7 @@
 // and what a start shows in the dialog and in a toast. Ported from the Start cases of test/render.test.ts.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, posted, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
 import type { BoardData, ModelGroup } from '@lar-factory/shared';
 
 const MODEL_CHOICES: ModelGroup[] = [
@@ -21,10 +21,14 @@ const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const checked = () => entries().filter((e) => e.getAttribute('aria-checked') === 'true').map(text);
 const key = async (el: Element, k: string) => {
   await settle(() => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })));
-  // Base UI moves focus in the next frame.
+  // Radix moves focus on the next tick.
   await settle(() => vi.advanceTimersByTime(20));
 };
-const press = (el: Element) => settle(() => (el as HTMLElement).click());
+/** Clicks `el`; a menu it closes hands focus back on the next tick. */
+const press = (el: Element) => settle(() => {
+  (el as HTMLElement).click();
+  vi.advanceTimersByTime(0);
+});
 /** A press outside the menu, which closes it before the click lands. */
 const pressOutside = (el: Element) => settle(() => {
   el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }));
@@ -42,7 +46,7 @@ async function mountItem(data?: BoardData, id = 'I_sample05'): Promise<void> {
 }
 const open = async (id = 'I_sample05') => {
   start(id).focus();
-  await press(start(id));
+  await pressMenu(start(id));
 };
 
 beforeEach(() => {
@@ -65,7 +69,7 @@ test("Start refining opens a menu: 'T3 default' first, then each provider instan
     ['claude-opus-5-5[1m]', 'false', 'I_sample05', 'claudeAgent', 'claude-opus-5-5[1m]'],
   ]);
   const label = (g: Element) => text(document.getElementById(g.getAttribute('aria-labelledby')!));
-  expect(label($('[role="menu"] > * > [role="group"]')!), 'the entries are a group, headed "Start with"').toBe('Start with');
+  expect(label($('[role="menu"] > [role="group"]')!), 'the entries are a group, headed "Start with"').toBe('Start with');
   const groups = $$('[role="menu"] [role="group"] [role="group"][aria-labelledby]');
   expect(groups.map(label), 'grouped by instance, by its name').toEqual(['Codex', 'VI <work>']);
   expect(document.activeElement, 'focus is on the highlighted entry').toBe(entries()[0]);
@@ -137,13 +141,13 @@ test('picking an entry starts the item with that model, shows the thread, and re
   expect([text(start()), start().getAttribute('aria-disabled')]).toEqual(['Starting…', 'true']);
   expect(document.activeElement, 'focus is back on Start').toBe(start());
   expect(footer(), 'no Back to List or Abandon while Start is pending').toBeNull();
-  await press(start());
+  await pressMenu(start());
   expect(menu(), 'no menu while a start is in flight').toBeNull();
 
   const thread = { threadId: 'thread-1', title: '#129 Run more than one 4K HDR to 1080p stream at a time' };
   await answer({ thread, error: null });
   const tag = card().querySelector('[data-start-result]')!;
-  expect([tag.classList.contains('started-tag'), tag.getAttribute('data-slot'), tag.className.includes('bg-success/8'), text(tag), tag.getAttribute('title')])
+  expect([tag.classList.contains('started-tag'), tag.getAttribute('data-slot'), tag.className.includes('bg-success/10'), text(tag), tag.getAttribute('title')])
     .toEqual([true, 'badge', true, 'Started', 'T3 thread thread-1']);
   expect(card().querySelector('[data-start]'), 'the dialog keeps only a quiet tag').toBeNull();
   expect(footer()).toBeNull();
@@ -198,7 +202,7 @@ test('a Start that may have run hides Start, Back to List and Abandon; closing i
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!), 'it may have started, so the choice is kept').toEqual({ instanceId: 'codex', model: 'gpt-5.5' });
   await settle(() => message.querySelector<HTMLButtonElement>('button.dismiss')!.click());
   const tag = card().querySelector('.started-tag.unsure')!;
-  expect([tag.getAttribute('data-slot'), tag.className.includes('bg-warning/8'), text(tag), tag.getAttribute('title')])
+  expect([tag.getAttribute('data-slot'), tag.className.includes('bg-warning/12'), text(tag), tag.getAttribute('title')])
     .toEqual(['badge', true, 'May have started', 'Check T3 before starting it again']);
   expect(card().querySelector('[data-start]')).toBeNull();
   expect(footer()).toBeNull();

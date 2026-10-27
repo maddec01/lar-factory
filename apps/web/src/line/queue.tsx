@@ -7,7 +7,7 @@ import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
 import { carriesTwoStatuses, isKindLabel, itemRepoNames, openBlockers, repoKey, sameRepo, startHold, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
@@ -43,8 +43,8 @@ const canStart = (data: BoardData) => (item: Item) => Boolean(workMessage(item))
 /** A row's action: Start refining, Open thread while the item has a live thread, or why a draft can't start. */
 function RowAction({ item, data, first }: { item: Item; data: BoardData; first: boolean }) {
   if (!workMessage(item)) return <span className="queue-hint shrink-0 text-[11px] text-(--muted-foreground)" title={DRAFT_HINT}>Needs an issue to start</span>;
-  if (hasLiveThread(item)) return <OpenThread item={item} data={data} size="xs" />;
-  return <StartOrAfter item={item} data={data} label="Start refining" variant={first ? 'default' : 'outline'} />;
+  if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
+  return <StartOrAfter item={item} data={data} label="Start refining" variant={first ? 'primary' : 'secondary'} />;
 }
 
 /** `first` marks the row Start next starts, whose Start is the primary one. */
@@ -100,7 +100,7 @@ function Header({ items, building, next, data }: { items: Item[]; building: numb
           <span className="relative h-3 w-5 rounded-full bg-(--input)"><span className="absolute left-0.5 top-0.5 size-2 rounded-full bg-(--card)" /></span>Auto-start
         </button>
         {next ? <StartControl item={next} data={data} label="Start next" />
-          : items.length > 0 && <Button size="xs" className="disabled:pointer-events-auto" disabled title={NONE_STARTS}>Start next</Button>}
+          : items.length > 0 && <Button className="disabled:pointer-events-auto" disabled title={NONE_STARTS}>Start next</Button>}
       </span>
     </header>
   );

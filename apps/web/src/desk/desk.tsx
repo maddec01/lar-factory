@@ -23,12 +23,12 @@ import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 function Actions({ item, data }: { item: Item; data: BoardData }) {
   // StartBuild shows Open thread itself for a live thread, which would put it on the card twice.
   const next = item.status === 'Ready' ? !hasLiveThread(item) && !carriesTwoStatuses(item) && <StartBuild item={item} data={data} />
-    : item.status === 'Verify' || item.status === 'Ready to merge' ? <PrLink item={item} label="Open PR" size="xs" />
+    : item.status === 'Verify' || item.status === 'Ready to merge' ? <PrLink item={item} label="Open PR" />
     : null;
   return (
     // A click beside the buttons opens the item dialog, as anywhere else on the card.
     <KeepClicks className="desk-actions flex min-w-0 flex-wrap gap-2" passEmpty>
-      <OpenThread item={item} data={data} size="xs" variant={next ? 'outline' : undefined} />{next}
+      <OpenThread item={item} data={data} variant={next ? 'secondary' : 'primary'} />{next}
     </KeepClicks>
   );
 }

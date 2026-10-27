@@ -12,10 +12,10 @@ import { StartOrAfter } from './start-after.tsx';
  * `quiet` draws Open thread and a held Start build as outline buttons, as the line does; a dossier names it `label`.
  * `afterOnly` shows Start after alone while a blocker is open, as a dossier's map does.
  */
-export function StartBuild({ item, data, label = 'Start build', size = 'xs', icon, quiet, afterOnly }: {
-  item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; icon?: ReactNode; quiet?: boolean; afterOnly?: boolean;
+export function StartBuild({ item, data, label = 'Start build', icon, quiet, afterOnly }: {
+  item: Item; data: BoardData; label?: string; icon?: ReactNode; quiet?: boolean; afterOnly?: boolean;
 }) {
   // A thread already at work on the item would get a second one.
-  if (hasLiveThread(item)) return <OpenThread item={item} data={data} size={size} variant={quiet ? 'outline' : undefined} />;
-  return <StartOrAfter item={item} data={data} label={label} size={size} icon={icon} kind="build" quiet={quiet} afterOnly={afterOnly} />;
+  if (hasLiveThread(item)) return <OpenThread item={item} data={data} variant={quiet ? 'secondary' : 'primary'} />;
+  return <StartOrAfter item={item} data={data} label={label} icon={icon} kind="build" quiet={quiet} afterOnly={afterOnly} />;
 }

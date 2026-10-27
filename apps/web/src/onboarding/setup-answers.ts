@@ -9,8 +9,16 @@ export type SetupAction = 'Next' | 'Save';
 /** A change to the answers, as a setup field gives it; picking a show setting is what sets `showPicked`. */
 export type SetupChange = Partial<Omit<SetupAnswers, 'showPicked'>>;
 
-/** The show setting suggested for an item source: All items for a GitHub Project, Opted-in items for issues. */
-export const suggestedShow = (itemSource: SetupAnswers['itemSource']): ShowSetting => itemSource === 'github-project' ? 'all' : 'opted-in';
+/**
+ * The show setting suggested for an item source: All items for a GitHub Project or an Azure DevOps sprint, Opted-in
+ * items for issues or an Azure DevOps backlog.
+ */
+export const suggestedShow = (itemSource: SetupAnswers['itemSource']): ShowSetting =>
+  itemSource === 'github-project' || itemSource === 'azure-sprint' ? 'all' : 'opted-in';
+
+/** Whether an item source is an Azure DevOps team's, so it is named by its team. */
+export const byTeam = (itemSource: SetupAnswers['itemSource']): itemSource is 'azure-sprint' | 'azure-backlog' =>
+  itemSource === 'azure-sprint' || itemSource === 'azure-backlog';
 
 /** The answers with `change` given: a picked show setting stays, and until one is picked a new item source takes its suggested one. */
 export function answerSetup(setup: SetupAnswers, change: SetupChange): SetupAnswers {
@@ -23,16 +31,20 @@ export function answerSetup(setup: SetupAnswers, change: SetupChange): SetupAnsw
 /** A GitHub login, as .lar-factory.json's itemSource.owner takes it. */
 const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 
-/** What each answer `action` waits for needs: a role, and for a GitHub Project its owner and a positive whole number. */
-export function setupProblems(setup: SetupAnswers, action: SetupAction = 'Next'): Partial<Record<'projectOwner' | 'projectNumber' | 'role', string>> {
+/**
+ * What each answer `action` waits for needs: a role, for a GitHub Project its owner and a positive whole number, and
+ * for an Azure DevOps sprint or backlog its team.
+ */
+export function setupProblems(setup: SetupAnswers, action: SetupAction = 'Next'): Partial<Record<'projectOwner' | 'projectNumber' | 'team' | 'role', string>> {
   const project = setup.itemSource === 'github-project';
   return {
     ...project && !GITHUB_LOGIN.test(setup.projectOwner) && { projectOwner: `${action} needs a GitHub login: letters, digits and single hyphens, not at either end.` },
     ...project && !/^[1-9]\d*$/.test(setup.projectNumber) && { projectNumber: `${action} needs the number, a positive whole number like 3.` },
+    ...byTeam(setup.itemSource) && !setup.team?.trim() && { team: `${action} needs the team’s name.` },
     ...!setup.role.trim() && { role: `${action} needs the repository’s role.` },
   };
 }
 
 /** The item source the answers name, once setupProblems finds nothing in them. */
-export const setupItemSource = (setup: SetupAnswers): RepositoryItemSource => setup.itemSource === 'issues'
-  ? { kind: 'issues' } : { kind: 'github-project', owner: setup.projectOwner, number: Number(setup.projectNumber) };
+export const setupItemSource = (setup: SetupAnswers): RepositoryItemSource => byTeam(setup.itemSource) ? { kind: setup.itemSource, team: setup.team!.trim() }
+  : setup.itemSource === 'issues' ? { kind: 'issues' } : { kind: 'github-project', owner: setup.projectOwner, number: Number(setup.projectNumber) };

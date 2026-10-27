@@ -30,11 +30,11 @@ import {
   nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, skillProblem, skillsDir, ticked, unpickable, useWizardStore,
 } from './wizard-store.ts';
 
-/** Whether the project's repository has .lar-factory.json; reading an Azure DevOps repository waits for build #386. */
+/** Whether the project's repository has .lar-factory.json. */
 function ConfigBadge({ project }: { project: ProjectChoice }) {
   if (project.hasConfig) return <Badge variant="info" size="sm">has .lar-factory.json</Badge>;
   if (project.hasConfig === false) return <Badge variant="outline" size="sm">no .lar-factory.json</Badge>;
-  return project.provider === 'GitHub' && <Badge variant="outline" size="sm">couldn’t check .lar-factory.json</Badge>;
+  return !!project.provider && <Badge variant="outline" size="sm">couldn’t check .lar-factory.json</Badge>;
 }
 
 /** A problem with Retry, which reads T3's projects and their Repository configs again. */
@@ -145,14 +145,11 @@ function SetupStep({ run }: { run: Run }) {
   return (
     <div className="grid gap-6">
       <ProviderRow project={project} />
-      {project.provider === 'Azure DevOps' ? (
-        <Alert variant="info"><Info /><AlertTitle>Azure DevOps arrives in build #386</AlertTitle>
-          <AlertDescription>Until then, onboarding offers no item source for a repository on Azure DevOps.</AlertDescription></Alert>
-      ) : project.configProblem ? (
+      {project.configProblem ? (
         <Problem title="Can’t reuse .lar-factory.json">{project.configProblem} Fix the file on {project.repo}’s default branch, then Retry.</Problem>
       ) : !asksSetup(project) ? (
         <Problem title="Can’t check .lar-factory.json">Couldn’t read whether {project.repo} has .lar-factory.json on its default branch.</Problem>
-      ) : run.setup && <SetupFields repo={project.repo} setup={run.setup} onAnswer={answer} />}
+      ) : run.setup && <SetupFields repo={project.repo} azure={project.provider === 'Azure DevOps'} setup={run.setup} onAnswer={answer} />}
     </div>
   );
 }

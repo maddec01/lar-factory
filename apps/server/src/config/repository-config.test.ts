@@ -39,10 +39,18 @@ test('the list file names the onboarded repositories, each still onboarding with
   assert.deepEqual(readRepositoryList(await dataDir(t)), []);
 });
 
+test("an onboarding's setup answers may name an Azure DevOps team's sprint or backlog", async (t) => {
+  for (const itemSource of ['azure-sprint', 'azure-backlog']) {
+    const onboarding = { ...progress(), answers: { projectId: 'lar-api', provider: 'Azure DevOps', setup: { ...setup, itemSource, team: 'Fabrikam Team' } } };
+    const list = { repositories: [{ repo: 'contoso/Fabrikam/lar-api', onboarding }] };
+    assert.deepEqual(readRepositoryList(await dataDir(t, { 'repositories.json': JSON.stringify(list) })), [{ repo: 'contoso/Fabrikam/lar-api', onboarding }]);
+  }
+});
+
 test("an onboarding that isn't progress is refused, naming its entry", async (t) => {
   for (const onboarding of [true, { step: 'setup', done: ['project'] }, { step: 3, done: [], answers: { projectId: 'x' } },
     { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} }, { ...progress(), prUrl: 4 }, { ...progress(), prClosed: false },
-    ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { projectNumber: 3 }, { showPicked: 'yes' }].map((wrong) =>
+    ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { projectNumber: 3 }, { showPicked: 'yes' }, { team: 3 }].map((wrong) =>
       ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } },
     { ...progress(), answers: { projectId: 'x', customLabels: 'app: music' } },
     ...[{ ticks: [] }, { ticks: { context: 'yes' } }, { skills: { tdd: { kind: 'keep' } } }, { skills: { tdd: { kind: 'rename' } } }].map((wrong) =>

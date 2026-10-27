@@ -10,7 +10,7 @@ const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoic
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
 });
 /** The setup step's answers before any is given: a GitHub Project of the repository's owner, with All items suggested. */
-const SETUP: SetupAnswers = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '', show: 'all', showPicked: false, role: '' };
+const SETUP: SetupAnswers = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '', team: '', show: 'all', showPicked: false, role: '' };
 const PROJECTS = [project('lar-web'), project('lar-server', { onBoard: true }), project('notes', { repo: null, provider: null, hasConfig: null })];
 
 /** The store, fresh, with T3's projects answered by `reply`; each onboarding it keeps is kept. */
@@ -164,15 +164,41 @@ test("Next needs a role, and for a GitHub Project an owner's login and a number"
   expect(wizard.getState().run).toMatchObject({ step: 'labels', done: ['project', 'setup'] });
 });
 
-test(".lar-factory.json's values pass the step with no answers; an Azure DevOps origin or a file that can't be reused can't", async () => {
+test(".lar-factory.json's values pass the step with no answers; a file that can't be read or reused can't", async () => {
   const config = { itemSource: { kind: 'issues' as const }, show: 'opted-in' as const, role: 'Web client', labels: [] };
   expect((await onSetup([project('lar-web', { hasConfig: true, config })])).ready()).toBe(true);
-  for (const parts of [{ provider: 'Azure DevOps' as const, repo: 'Fabrikam/lar-web', hasConfig: null },
+  for (const parts of [{ provider: 'Azure DevOps' as const, repo: 'contoso/Fabrikam/lar-web', hasConfig: null },
     { hasConfig: true, configProblem: '.lar-factory.json isn’t valid JSON.' }, { hasConfig: null }]) {
     const { wizard, ready } = await onSetup([project('lar-web', parts)]);
     wizard.getState().answer({ itemSource: 'issues', role: 'Web client' });
     expect(ready(), JSON.stringify(parts)).toBe(false);
   }
+});
+
+const AZURE = project('lar-web', { repo: 'contoso/Fabrikam/lar-web', provider: 'Azure DevOps' });
+
+test("an Azure DevOps origin starts on the team's current sprint with All items suggested, and the backlog suggests Opted-in items", async () => {
+  const { wizard } = await onSetup([AZURE]);
+  const setup = () => wizard.getState().run!.setup!;
+  expect(setup()).toEqual({ itemSource: 'azure-sprint', projectOwner: '', projectNumber: '', team: '', show: 'all', showPicked: false, role: '' });
+  wizard.getState().answer({ itemSource: 'azure-backlog' });
+  expect(setup()).toMatchObject({ itemSource: 'azure-backlog', show: 'opted-in' });
+  wizard.getState().answer({ itemSource: 'azure-sprint' });
+  expect(setup().show).toBe('all');
+});
+
+test("Next waits for an Azure DevOps sprint's or backlog's team, and the item source names it", async () => {
+  const { itemSourceOf } = await import('./wizard-store.ts');
+  const { wizard, ready } = await onSetup([AZURE]);
+  const source = () => itemSourceOf(wizard.getState().run!, AZURE);
+  wizard.getState().answer({ role: 'API server', team: '  ' });
+  expect(ready(), 'a blank team').toBe(false);
+  expect(source()).toBeNull();
+  wizard.getState().answer({ team: ' Fabrikam Team ' });
+  expect(ready()).toBe(true);
+  expect(source()).toEqual({ kind: 'azure-sprint', team: 'Fabrikam Team' });
+  wizard.getState().answer({ itemSource: 'azure-backlog' });
+  expect(source()).toEqual({ kind: 'azure-backlog', team: 'Fabrikam Team' });
 });
 
 const onboardingBoard = (step: string): BoardData => ({ ...sample,

@@ -731,11 +731,16 @@ export const CONFIG_VERSION = 1;
 export const onboardingConfigFile = ({ role, itemSource, show, labels }: RepositoryConfigAnswers, version = CONFIG_VERSION): string =>
   `${JSON.stringify({ version, role, itemSource, show, labels }, null, 2)}\n`;
 
-/** What the Provider and item source step has answered so far, as typed; the GitHub Project's fields count only for a Project. */
+/**
+ * What the Provider and item source step has answered so far, as typed; the GitHub Project's fields count only for a
+ * Project, and the team only for an Azure DevOps sprint or backlog.
+ */
 export interface SetupAnswers {
   itemSource: RepositoryItemSource['kind'];
   projectOwner: string;
   projectNumber: string;
+  /** The Azure DevOps team whose sprint or backlog is the item source; absent in answers saved before the team was asked. */
+  team?: string;
   show: ShowSetting;
   /** Whether the show setting was picked, so a new item source no longer changes it to the one suggested. */
   showPicked: boolean;

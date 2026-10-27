@@ -19,6 +19,7 @@ import { OnboardingCards } from './onboarding/onboarding-cards.tsx';
 import { OnboardingOffers } from './onboarding/onboarding-offers.tsx';
 import { WizardDialog } from './onboarding/wizard-dialog.tsx';
 import { EditDialog } from './repositories/edit-dialog.tsx';
+import { ResetDialog } from './repositories/reset-dialog.tsx';
 import { SettingsMain } from './settings/settings.tsx';
 import { useSettingsStore } from './settings/settings-store.ts';
 import { SidebarLayout } from './sidebar/sidebar.tsx';
@@ -64,6 +65,7 @@ export function App() {
       <AbandonDialog />
       <WizardDialog />
       <EditDialog />
+      <ResetDialog />
     </SidebarLayout>
   );
 }

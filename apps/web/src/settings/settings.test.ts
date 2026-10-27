@@ -1,6 +1,6 @@
 // The Settings page: the sidebar's section list with search and Back, the breadcrumb over each section's rows, the
 // Claude profiles with their switches and what a change did, the bundled skills with their last updates and install
-// states, the update channel, version and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog has its own test), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
+// states, the update channel, version and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the profiles and updates show disabled.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
@@ -166,11 +166,11 @@ test('a repository with an open Edit PR shows it on its row, with its link, unti
   expect(row(`repo-${sample.repos[0]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
 });
 
-test('Reset waits for build #385, and Add repository opens the onboarding dialog over Settings', async () => {
+test('Reset of an onboarded repository waits for build #385, and Add repository opens the onboarding dialog over Settings', async () => {
   serve(sample, [project('lar-web')]);
   await open('Repositories', sample);
   expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled, b.title])).toEqual([
-    ...sample.repos.flatMap(() => [['Edit', false, ''], ['Reset', true, 'Resetting a repository arrives in build #385']]),
+    ...sample.repos.flatMap(() => [['Edit', false, ''], ['Reset', true, 'Resetting an onboarded repository arrives in build #385']]),
     [' Add repository', false, '']]);
   await settle(() => $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === ' Add repository')!.click());
   await settle(() => vi.advanceTimersByTime(50));

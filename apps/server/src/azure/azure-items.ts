@@ -7,7 +7,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { STATUSES, labelStatuses, repoTag, statusLabel } from '@lar-factory/shared';
+import { STATUSES, decodePart, labelStatuses, repoTag, statusLabel } from '@lar-factory/shared';
 import type { Blocker, IssueRef, Item, LinkedPr } from '@lar-factory/shared';
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -20,7 +20,9 @@ import { azureWrites } from './azure-writes.ts';
 export type Az = (args: string[]) => Promise<string>;
 
 /** The REST API version every `az devops invoke` call passes, as invoke's own default is 5.0. */
-const API_VERSION = '7.1';
+export const API_VERSION = '7.1';
+/** The flags every az call ends with: the organization, no organization read from the checkout, and JSON output. */
+export const orgFlags = (organization: string): string[] => ['--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json'];
 /** The most ids one workitemsbatch call reads. */
 const BATCH = 200;
 /** How long a source keeps its team's backlog levels and each type's states, which change only when someone edits the process. */
@@ -114,12 +116,6 @@ function placement(tags: readonly string[], repos: readonly string[]): Placement
   return repo === undefined ? null : { repo };
 }
 
-/** A name with its URL encoding undone, or as it is when that encoding is broken. */
-export function decoded(name: string): string {
-  try { return decodeURIComponent(name); }
-  catch { return name; }
-}
-
 /** The team's backlog levels: the requirement level's id, types and default type, and the task level's types. */
 interface BacklogConfiguration {
   requirementBacklog: { id: string; workItemTypes: { name: string }[]; defaultWorkItemType: { name: string } };
@@ -160,8 +156,8 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
   now: () => number = Date.now): ItemSource {
   const [organization, encoded] = repos[0]!.split('/') as [string, string];
   // The repository's name keeps its origin URL's encoding; az takes the project's name itself.
-  const project = decoded(encoded);
-  const org = ['--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json'];
+  const project = decodePart(encoded);
+  const org = orgFlags(organization);
   const call = async <T>(args: string[]): Promise<T> => {
     try { return JSON.parse(await run([...args, ...org])) as T; }
     catch (err) { throw problemOf(err); }

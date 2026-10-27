@@ -2,9 +2,9 @@
 // checkout: an old CONTEXT.md, Matt Pocock's .scratch/ tracker, and each project skill named like a bundled skill. A
 // multi-context repository's GLOSSARY-MAP.md is the factory's layout, so it raises nothing.
 
-import type { Clash, FixedClashes, SkillClash } from '@lar-factory/shared';
+import { onAzure, type Clash, type FixedClashes, type SkillClash } from '@lar-factory/shared';
 import { AZURE_REPOS } from '../azure/azure-repos.ts';
-import { isRepo, onAzure } from '../config/repository-config.ts';
+import { isRepo } from '../config/repository-config.ts';
 import { defaultBranchFiles, message } from '../github/github.ts';
 import { bundledSkillNames } from '../skills/bundled-skills.ts';
 

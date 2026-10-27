@@ -1,20 +1,18 @@
-// Azure Repos through az, beside github.ts's gh calls: the default branch's head, files and blobs, and onboarding's commit,
-// branch and PR, made without touching any checkout. A repository is organization/project/repository as its origin URL has them.
+// Azure Repos through az, beside github.ts's gh calls: the default branch's head, files and blobs, and the commit, branch
+// and PR of onboarding, Edit and Reset, made without touching any checkout. A repository is organization/project/repository as its origin URL has them.
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { decodePart } from '@lar-factory/shared';
 import type { CommitTree, TreeEntry } from '../github/github.ts';
-import { az, decoded, withFile, type Az } from './azure-items.ts';
+import { API_VERSION, az, orgFlags, withFile, type Az } from './azure-items.ts';
 import { prStateOf, type AzurePr } from './azure-prs.ts';
-
-/** The REST API version every `az devops invoke` call passes, as invoke's own default is 5.0. */
-const API_VERSION = '7.1';
 
 /** The az flags that name the repository's organization, with its project and repository names as az takes them. */
 function names(repo: string) {
   const [organization, project, repository] = repo.split('/') as [string, string, string];
-  return { org: ['--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json'], project: decoded(project), repository: decoded(repository) };
+  return { org: orgFlags(organization), project: decodePart(project), repository: decodePart(repository) };
 }
 
 /** A PR's id and organization, from its URL https://dev.azure.com/<org>/<project>/_git/<repository>/pullrequest/<id>. */
@@ -51,10 +49,14 @@ function repos<T>(run: Az, repo: string, args: string[]): Promise<T> {
   return json<T>(run, ['repos', ...args, '--repository', repository, '--project', project], repo);
 }
 
-/** A file's text on the repository's default branch, read through the items API without a version; null when it has none there. */
-export async function readDefaultBranchFile(repo: string, path: string, run: Az = az): Promise<string | null> {
+/**
+ * A file's text on `branch`, or on the repository's default branch without one, read through the items API, which
+ * reads the default branch when given no version; null when it has none there.
+ */
+export async function readBranchFile(repo: string, path: string, branch?: string, run: Az = az): Promise<string | null> {
+  const version = branch === undefined ? [] : [`versionDescriptor.version=${branch}`, 'versionDescriptor.versionType=branch'];
   try {
-    return (await invoke<{ content: string }>(run, repo, 'items', [], ['--query-parameters', `path=/${path}`, 'includeContent=true'])).content;
+    return (await invoke<{ content: string }>(run, repo, 'items', [], ['--query-parameters', `path=/${path}`, 'includeContent=true', ...version])).content;
   } catch (err) {
     // TF401174 is Azure's "item could not be found".
     if (/TF401174/.test(err instanceof Error ? err.message : String(err))) return null;
@@ -63,7 +65,7 @@ export async function readDefaultBranchFile(repo: string, path: string, run: Az 
 }
 
 /** The branch's head, or null when the repository has no such branch; az's --filter matches the start of each name. */
-async function branchHead(repo: string, branch: string, run: Az): Promise<string | null> {
+async function branchHead(repo: string, branch: string, run: Az = az): Promise<string | null> {
   const refs = await repos<{ name: string; objectId: string }[]>(run, repo, ['ref', 'list', '--filter', `heads/${branch}`]);
   return refs.find((r) => r.name === `refs/heads/${branch}`)?.objectId ?? null;
 }
@@ -199,7 +201,7 @@ async function reopenPr(url: string, run: Az = az): Promise<void> {
   await json(run, ['repos', 'pr', 'update', '--id', id, '--status', 'active'], repo);
 }
 
-/** The calls that open and follow onboarding's PR on Azure Repos, each named and shaped as github.ts's gh call is. */
+/** The calls that open and follow the board's PRs on Azure Repos, each named and shaped as github.ts's gh call is. */
 export const AZURE_REPOS = {
-  branchExists, closePr, commitTree, createPr, defaultBranchFiles, defaultBranchHead, editPrBody, openPrFrom, prState, pushCommit, readBlob, reopenPr,
+  branchExists, branchHead, closePr, commitTree, createPr, defaultBranchFiles, defaultBranchHead, editPrBody, openPrFrom, prState, pushCommit, readBlob, reopenPr,
 };

@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CONFIG_VERSION } from '@lar-factory/shared';
+import { REPO_URL, fakeAzRepos } from '../azure/fake-az.ts';
 import { notEditable, openConfigUpdatePr as openUpdate, openEditPr as openEdit, readEditConfig as readEdit, readEditPrs } from './edit-config.ts';
 
 const REPO = 'maddec01/lar-web';
@@ -202,4 +203,74 @@ test('Edit, its Save and the config update PR refuse a repository off the list, 
     assert.deepEqual(calls, []);
   }
   assert.equal(notEditable('MADDEC01/lar-web', ONBOARDED), null);
+});
+
+const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
+const AZURE_PR = `${REPO_URL}/pullrequest/7`;
+const AZURE_FILE = JSON.stringify({ version: 2, role: 'API', itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', labels: ['app: music'] });
+const AZURE_PR_FILE = JSON.stringify({ version: 3, role: 'API on the PR', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', labels: [] });
+const azureConfig = { itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', role: ' API ', labels: ['app: music', 'app: video'] };
+const AZURE_LISTED = listDir([{ repo: AZURE }]);
+
+/**
+ * A fake az over AZURE, whose default branch holds AZURE_FILE and whose project has two tags; with `open`,
+ * lar-factory/edit-config is at old789, holds AZURE_PR_FILE and has the active PR 7.
+ */
+const azRepos = ({ open = false, fail }: { open?: boolean; fail?: (args: string[]) => Error | undefined } = {}) => fakeAzRepos({
+  files: { '/.lar-factory.json': AZURE_FILE }, tags: ['app: music', 'status-list'], fail,
+  ...open && { branches: { 'lar-factory/edit-config': 'old789' }, branchFiles: { 'lar-factory/edit-config': { '/.lar-factory.json': AZURE_PR_FILE } },
+    prs: [{ pullRequestId: 7, status: 'active', sourceRefName: 'refs/heads/lar-factory/edit-config' }] },
+});
+const pushedFile = (push: { changes: { path: string; content?: string }[] }) => JSON.parse(push.changes[0]!.content!) as Record<string, unknown>;
+const created = (calls: string[][]) => calls.filter((args) => args.slice(0, 3).join(' ') === 'repos pr create');
+
+test("on Azure, Edit loads the default branch's .lar-factory.json and the project's tags through az, and an open Edit PR's branch file", async () => {
+  assert.deepEqual(await readEdit({ repo: AZURE }, azRepos().run, AZURE_LISTED), {
+    config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['app: music'] },
+    labels: ['app: music', 'status-list'],
+  });
+  assert.deepEqual(await readEdit({ repo: AZURE }, azRepos({ open: true }).run, AZURE_LISTED), {
+    config: { itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', role: 'API on the PR', labels: [] },
+    labels: ['app: music', 'status-list'],
+    editPr: AZURE_PR,
+  });
+});
+
+test('on Azure, Save pushes one commit with only .lar-factory.json to lar-factory/edit-config and opens a PR that completes its work items, creating no tag', async () => {
+  const az = azRepos();
+  const opened = await openEdit({ repo: AZURE, config: azureConfig }, az.run, AZURE_LISTED);
+  assert.deepEqual(opened, { prUrl: `${REPO_URL}/pullrequest/100` });
+  assert.deepEqual(az.pushes.map(({ ref, oldObjectId, parents, changes }) => ({ ref, oldObjectId, parents, paths: changes.map((c) => [c.changeType, c.path]) })),
+    [{ ref: 'refs/heads/lar-factory/edit-config', oldObjectId: '0'.repeat(40), parents: ['abc123'], paths: [['edit', '/.lar-factory.json']] }]);
+  assert.deepEqual(pushedFile(az.pushes[0]!),
+    { version: CONFIG_VERSION, role: 'API', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', labels: ['app: music', 'app: video'] });
+  const [create] = created(az.calls);
+  assert.deepEqual([create![create!.indexOf('--source-branch') + 1], create![create!.indexOf('--target-branch') + 1]], ['lar-factory/edit-config', 'main']);
+  assert.equal(create![create!.indexOf('--transition-work-items') + 1], 'true');
+  assert.ok(!az.calls.some((args) => args.includes('tags')));
+});
+
+test("on Azure, a second Save pushes onto the open Edit PR's branch and opens no second PR, and the PR shows on the row", async () => {
+  const az = azRepos({ open: true });
+  assert.deepEqual(await openEdit({ repo: AZURE, config: azureConfig }, az.run, AZURE_LISTED), { prUrl: AZURE_PR });
+  assert.deepEqual(az.pushes.map(({ oldObjectId, parents }) => [oldObjectId, parents]), [['old789', ['old789']]]);
+  assert.deepEqual(created(az.calls), []);
+  assert.deepEqual(await readEditPrs([AZURE], azRepos({ open: true }).run), new Map([[AZURE, AZURE_PR]]));
+});
+
+test("on Azure, the config update PR rewrites .lar-factory.json at the app's version through one push and az's PR", async () => {
+  const az = azRepos();
+  assert.deepEqual(await openUpdate({ repo: AZURE }, az.run, 4, AZURE_LISTED), { prUrl: `${REPO_URL}/pullrequest/100` });
+  assert.deepEqual(pushedFile(az.pushes[0]!), { ...JSON.parse(AZURE_FILE), version: 4 });
+  assert.equal(created(az.calls)[0]!.includes('--transition-work-items'), true);
+});
+
+test("on Azure, a refused push or PR shows az's message", async () => {
+  const refused = (match: string, message: string) => azRepos({ fail: (args) => (args.join(' ').includes(match) ? new Error(message) : undefined) }).run;
+  assert.deepEqual(await openEdit({ repo: AZURE, config: azureConfig }, refused('--resource pushes', 'TF401027: You need the Git Contribute permission.'), AZURE_LISTED),
+    { status: 502, error: `Can't open ${AZURE}'s Edit PR: TF401027: You need the Git Contribute permission.` });
+  assert.deepEqual(await openUpdate({ repo: AZURE }, refused('pr create', 'TF401179: An active pull request already exists.'), 4, AZURE_LISTED),
+    { status: 502, error: `Can't open ${AZURE}'s Edit PR: TF401179: An active pull request already exists.` });
+  assert.deepEqual(await readEdit({ repo: AZURE }, refused('--resource tags', 'Please run az login.'), AZURE_LISTED),
+    { status: 502, error: `Can't read ${AZURE}'s .lar-factory.json and tags: Please run az login.` });
 });

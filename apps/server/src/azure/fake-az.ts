@@ -170,14 +170,17 @@ export const REPO_URL = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar
 
 /**
  * A fake az for one Azure Repos repository whose default branch, `defaultBranch` or main, is at abc123 and holds `files`,
- * with `branches` besides it, by name and head, and `prs`; `canPush` is whether az's login may push to it. Each commit's
+ * with `branches` besides it, by name and head, whose files a read gets from `branchFiles`, and `prs`, in a project
+ * whose tags are `tags`; `canPush` is whether az's login may push to it. Each commit's
  * tree lists `files`, in part when `partialTree`. Pushes and PRs change it, and it records each call. A push whose old head is out of date fails, and `fail`
  * throws for a call it matches.
  */
-export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {}, prs = [], canPush = true, partialTree = false, fail }: {
+export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {}, branchFiles = {}, prs = [], tags = [], canPush = true, partialTree = false, fail }: {
   files?: Record<string, string>;
   defaultBranch?: string;
   branches?: Record<string, string>;
+  branchFiles?: Record<string, Record<string, string>>;
+  tags?: string[];
   prs?: FakePr[];
   canPush?: boolean;
   partialTree?: boolean;
@@ -206,8 +209,10 @@ export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {},
       const resource = `${flag(args, '--area')}/${flag(args, '--resource')}`;
       if (resource === 'git/items') {
         const path = route(args, 'path')!;
-        if (!(path in files)) throw new Error(`az devops invoke failed: TF401174: The item ${path} could not be found in the repository.`);
-        return JSON.stringify({ path, content: files[path] });
+        const version = route(args, 'versionDescriptor.version');
+        const read = version === undefined || version === defaultBranch ? files : branchFiles[version] ?? {};
+        if (!(path in read)) throw new Error(`az devops invoke failed: TF401174: The item ${path} could not be found in the repository.`);
+        return JSON.stringify({ path, content: read[path] });
       }
       if (resource === 'git/commits') return JSON.stringify({ commitId: route(args, 'commitId'), treeId: `tree-${route(args, 'commitId')}` });
       if (resource === 'git/trees') {
@@ -236,6 +241,9 @@ export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {},
           ...c.newContent && { content: Buffer.from(c.newContent.content, c.newContent.contentType === 'base64encoded' ? 'base64' : 'utf8').toString() } })) });
         heads.set(branch, `pushed${pushes.length}`);
         return JSON.stringify({ pushId: pushes.length });
+      }
+      if (resource === 'wit/tags' && !args.includes('--http-method')) {
+        return JSON.stringify({ count: tags.length, value: tags.map((name, at) => ({ id: `tag-${at}`, name, active: true })) });
       }
       if (resource === 'security/permissions') {
         // The Git Repositories namespace's GenericContribute bit, on the repository's token, for the caller.

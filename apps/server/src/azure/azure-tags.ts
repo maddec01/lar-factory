@@ -1,7 +1,8 @@
 // A project's work item tags through az, for onboarding's Labels step. Azure DevOps has no label list: a tag exists once
 // a work item carries it, and the Tags API lists the project's tags and renames one, which every work item keeps.
 
-import { az, decoded, withFile, type Az } from './azure-items.ts';
+import { decodePart } from '@lar-factory/shared';
+import { az, orgFlags, withFile, type Az } from './azure-items.ts';
 
 /** The Tags API is a preview one. */
 const TAGS_API_VERSION = '7.1-preview.1';
@@ -9,8 +10,8 @@ const TAGS_API_VERSION = '7.1-preview.1';
 /** `az devops invoke` on the tags of the project of `repo`, organization/project/repository. */
 function tags<T>(run: Az, repo: string, route: string[], more: string[] = []): Promise<T> {
   const [organization, project] = repo.split('/') as [string, string];
-  return run(['devops', 'invoke', '--area', 'wit', '--resource', 'tags', '--route-parameters', `project=${decoded(project)}`, ...route, ...more,
-    '--api-version', TAGS_API_VERSION, '--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json'])
+  return run(['devops', 'invoke', '--area', 'wit', '--resource', 'tags', '--route-parameters', `project=${decodePart(project)}`, ...route, ...more,
+    '--api-version', TAGS_API_VERSION, ...orgFlags(organization)])
     .then((text) => JSON.parse(text) as T);
 }
 

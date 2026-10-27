@@ -623,7 +623,7 @@ export const pickRepoText = (data: Pick<BoardData, 'repos'>, item: Item): string
 export const onAzure = (repo: string): boolean => repo.split('/').length === 3;
 
 /** A part of a repository's key as people read it: an Azure DevOps origin's `Fabrikam%20Fiber` is `Fabrikam Fiber`. */
-const decodePart = (part: string): string => {
+export const decodePart = (part: string): string => {
   try { return decodeURIComponent(part); } catch { return part; }
 };
 

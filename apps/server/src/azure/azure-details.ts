@@ -2,7 +2,7 @@
 // azure-items.ts leaves them out and stays on API_VERSION.
 
 import { decodePart, onAzure } from '@lar-factory/shared';
-import type { Item, ItemComment, ItemDetails, TextFormat } from '@lar-factory/shared';
+import type { Item, ItemComment, ItemCommentsPage, ItemDetails, TextFormat } from '@lar-factory/shared';
 import type { Refused } from '../config/edit-config.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { az, orgFlags, problemOf, type Az, type RawWorkItem } from './azure-items.ts';
@@ -49,44 +49,62 @@ const comment = (raw: RawComment): ItemComment => {
   return { id: String(raw.id), author: nameOf(raw.createdBy) ?? 'unknown', createdAt: raw.createdDate, body, format: formatOf(raw.format, body) };
 };
 
-/**
- * Reads one work item's details, or says why it can't: the item's repository is not on Azure DevOps, or the `az` error.
- * The work item is read at DETAIL_API_VERSION and its last COMMENT_LIMIT comments at COMMENTS_API_VERSION, newest first.
- * `run` stands in for az in tests.
- */
-export async function readAzureItemDetails(item: Item, run: Az = az): Promise<ItemDetails | Refused> {
+/** One `az devops invoke` of the work item tracking area, its answer parsed. */
+type Call = <R>(resource: string, route: string[], version: string, more?: string[]) => Promise<R>;
+
+/** Runs `use` with a call for an Azure DevOps item, or says why it can't: the item is not a work item, or the `az` error. */
+async function inArea<T>(item: Item, run: Az, use: (call: Call) => Promise<T>): Promise<T | Refused> {
   if (!item.repo || !onAzure(item.repo) || item.number === null) return { status: 404, error: 'That item is not an Azure DevOps work item.' };
   const [organization, project] = item.repo.split('/') as [string, string];
-  const call = async <T>(resource: string, route: string[], version: string, more: string[] = []): Promise<T> => {
+  const call = async <R>(resource: string, route: string[], version: string, more: string[] = []): Promise<R> => {
     try {
       return JSON.parse(await run(['devops', 'invoke', '--area', 'wit', '--resource', resource, '--route-parameters', `project=${decodePart(project)}`, ...route,
-        ...more, '--api-version', version, ...orgFlags(organization)])) as T;
+        ...more, '--api-version', version, ...orgFlags(organization)])) as R;
     } catch (err) { throw problemOf(err); }
   };
   try {
-    const [workItem, read] = await Promise.all([
-      call<RawWorkItem & { multilineFieldsFormat?: Record<string, string> }>('workitems', [`id=${item.number}`], DETAIL_API_VERSION),
-      call<RawComments>('comments', [`workItemId=${item.number}`], COMMENTS_API_VERSION, ['--query-parameters', `$top=${COMMENT_LIMIT}`, 'order=desc']),
-    ]);
-    const body = typeof workItem.fields['System.Description'] === 'string' ? workItem.fields['System.Description'] : '';
-    const text = (name: string) => (typeof workItem.fields[name] === 'string' ? workItem.fields[name] : undefined);
-    const olderCursor = read.continuationToken || null;
-    const assignee = nameOf(workItem.fields['System.AssignedTo']);
-    return {
-      body,
-      format: formatOf(workItem.multilineFieldsFormat?.['System.Description'], body),
-      author: nameOf(workItem.fields['System.CreatedBy']),
-      assignees: assignee ? [assignee] : [],
-      createdAt: text('System.CreatedDate') ?? null,
-      ...text('System.IterationPath') && { iteration: text('System.IterationPath') },
-      ...text('System.AreaPath') && { area: text('System.AreaPath') },
-      subTickets: [],
-      comments: read.comments.filter((c) => !c.isDeleted).map(comment),
-      hasOlderComments: olderCursor !== null,
-      olderCursor,
-    };
+    return await use(call);
   } catch (err) {
     if (err instanceof ReadProblem) return { status: 502, error: `${err.message}${err.fix ? ` Run ${err.fix}.` : ''}` };
     return { status: 502, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/** The comments call for a work item: COMMENT_LIMIT newest first from `token`, or from the newest when none. */
+const readComments = (call: Call, item: Item, token?: string) =>
+  call<RawComments>('comments', [`workItemId=${item.number}`], COMMENTS_API_VERSION, ['--query-parameters', `$top=${COMMENT_LIMIT}`, 'order=desc', ...token ? [`continuationToken=${token}`] : []]);
+
+/**
+ * Reads one work item's details, or says why it can't: the item's repository is not on Azure DevOps, or the `az` error.
+ * The work item is read at DETAIL_API_VERSION and its last COMMENT_LIMIT comments at COMMENTS_API_VERSION, newest first.
+ * `run` stands in for az in tests.
+ */
+export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDetails | Refused> => inArea(item, run, async (call) => {
+  const [workItem, read] = await Promise.all([
+    call<RawWorkItem & { multilineFieldsFormat?: Record<string, string> }>('workitems', [`id=${item.number}`], DETAIL_API_VERSION),
+    readComments(call, item),
+  ]);
+  const body = typeof workItem.fields['System.Description'] === 'string' ? workItem.fields['System.Description'] : '';
+  const text = (name: string) => (typeof workItem.fields[name] === 'string' ? workItem.fields[name] : undefined);
+  const olderCursor = read.continuationToken || null;
+  const assignee = nameOf(workItem.fields['System.AssignedTo']);
+  return {
+    body,
+    format: formatOf(workItem.multilineFieldsFormat?.['System.Description'], body),
+    author: nameOf(workItem.fields['System.CreatedBy']),
+    assignees: assignee ? [assignee] : [],
+    createdAt: text('System.CreatedDate') ?? null,
+    ...text('System.IterationPath') && { iteration: text('System.IterationPath') },
+    ...text('System.AreaPath') && { area: text('System.AreaPath') },
+    subTickets: [],
+    comments: read.comments.filter((c) => !c.isDeleted).map(comment),
+    hasOlderComments: olderCursor !== null,
+    olderCursor,
+  };
+});
+
+/** Reads the COMMENT_LIMIT comments after the continuation token `before`, newest first, or says why it can't. */
+export const readAzureOlderComments = (item: Item, before: string, run: Az = az): Promise<ItemCommentsPage | Refused> => inArea(item, run, async (call) => {
+  const read = await readComments(call, item, before);
+  return { comments: read.comments.filter((c) => !c.isDeleted).map(comment), olderCursor: read.continuationToken || null };
+});

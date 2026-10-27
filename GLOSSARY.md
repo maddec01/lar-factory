@@ -92,6 +92,18 @@ _Avoid_: initialization, setup
 Something in a repository that makes agents work against the factory, such as a rule to push to main, another tracker's setup, or a project skill named like a bundled one.
 _Avoid_: conflict
 
+**Kind**:
+The type of an item: bug, feature, improvement or concept, carried as a label on every provider.
+_Avoid_: type, work item type
+
+**Workflow label**:
+A label the factory needs in every repository: a kind, a decision method, build, active or blocked. On Azure DevOps it is a tag.
+_Avoid_: system label, default tag
+
+**Custom label**:
+A label the user chooses for one repository so Add item can offer it, such as the part of the product an item touches.
+_Avoid_: area label, applicability
+
 **Overlay**:
 The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.
@@ -112,7 +124,7 @@ The conversation in the issue's repository project that resolves an issue's open
 decisions and produces a passing brief, then stops at Ready.
 
 **Decision thread**:
-A top-level thread, started from the board, running `/lar-work` on one `decision: *` sub-issue of a map,
+A top-level thread, started from the board, running `/lar-work` on one `decision-*` sub-issue of a map,
 in the repo's main checkout, writing only to issues.
 _Avoid_: Decision session
 

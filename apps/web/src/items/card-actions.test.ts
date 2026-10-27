@@ -90,7 +90,7 @@ test('Abandon asks first, naming the issue it deletes or the draft it removes; C
   await settle(() => vi.advanceTimersByTime(100));
   expect($('#abandon-dialog')).toBeNull();
   expect(document.activeElement).toBe(button('abandon', 'I_sample01'));
-  expect(fetchMock, 'nothing posted').not.toHaveBeenCalled();
+  expect(posted(), 'nothing posted').toEqual([]);
 
   await openItem('I_sample04');
   await press(button('abandon', 'I_sample04'));

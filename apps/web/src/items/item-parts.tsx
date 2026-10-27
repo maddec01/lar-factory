@@ -113,7 +113,7 @@ export function StatsGrid({ item }: { item: Item }) {
   if (!s || s === 'unavailable') return <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : 'No T3 thread has worked on this yet.'}</p>;
   const cells = [['Agent time', duration(s.agentMs)], ['Wall time', s.wallMs ? duration(s.wallMs) : '–'], ['Tokens', formatTokens(s.tokens)], ['Cost', s.costUsd !== undefined ? formatUsd(s.costUsd) : '–']];
   return (
-    <dl className="m-0 grid grid-cols-4 gap-px overflow-hidden rounded-lg border border-(--border) bg-(--border)">
+    <dl className="m-0 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-(--border) bg-(--border)">
       {cells.map(([k, v]) => <div key={k} className="bg-(--card) px-3 py-2"><dt className="text-[11px] text-(--muted-foreground)">{k}</dt><dd className="m-0 text-sm font-medium tabular-nums">{v}</dd></div>)}
     </dl>
   );

@@ -1,14 +1,14 @@
 // Every item source the onboarded repositories' configs name, as the one item source the board server reads and writes through.
 // A GitHub Project or a repository's issues read through gh, and an Azure DevOps team's sprint or backlog through az.
 
-import { decodePart, type Item, type RepoConfig } from '@lar-factory/shared';
+import { decodePart, shownRepo, type Item, type RepoConfig } from '@lar-factory/shared';
 import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
 import { azureBacklog } from '../azure/azure-backlog.ts';
 import { az, type Az } from '../azure/azure-items.ts';
 import { azureSprint } from '../azure/azure-sprint.ts';
-import { ReadProblem, type ItemSource, type ItemsRead } from './item-source.ts';
+import { ReadProblem, type ItemSource, type ItemsRead, type ReadProgress } from './item-source.ts';
 
 /** Who writes for a repository no source names, on a board that reads no Project. */
 const NOT_ONBOARDED = "That item's repository isn't onboarded.";
@@ -89,7 +89,18 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
   const sources = [...new Set([...projects, ...byRepo.values()])];
   const named = new Map<ItemSource, string[]>();
   for (const [repo, source] of byRepo) if (!projects.includes(source)) named.set(source, [...named.get(source) ?? [], repo]);
-  const readOf = (source: ItemSource): Promise<ItemsRead> => {
+  /** How a read names the source: its own name, else the repositories it stands for, else a Project no one named. */
+  const nameOf = (source: ItemSource) => source.name ?? named.get(source)?.map((repo) => shownRepo(repo).split('/').at(-1)).join(', ') ?? 'a Project';
+  const readOf = async (source: ItemSource, progress?: ReadProgress): Promise<ItemsRead> => {
+    const name = nameOf(source);
+    progress?.started(name);
+    try {
+      return await readNamed(source);
+    } finally {
+      progress?.finished(name);
+    }
+  };
+  const readNamed = (source: ItemSource): Promise<ItemsRead> => {
     const repos = named.get(source);
     return repos === undefined ? source.read() : source.read().catch((err: unknown) => {
       if (err instanceof ReadProblem) return { title: '', items: [], problems: repos.map((repo) => ({ repo, problem: err.message, ...err.fix !== undefined && { fix: err.fix } })) };
@@ -101,8 +112,8 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
   const forRepo = (repo: string | null) => (repo && sourceByRepo.get(repo.toLowerCase())) || projects[0] || unlisted;
   const sourceOf = (item: Item) => listedBy.get(item.id) ?? forRepo(item.repo);
   return {
-    async read() {
-      const reads = await Promise.all(sources.map(readOf));
+    async read(progress) {
+      const reads = await Promise.all(sources.map((source) => readOf(source, progress)));
       const listed = new Map<string, ItemSource>();
       const items = reads.flatMap((read, index) => read.items.filter((item) => {
         if (listed.has(item.id)) return false;
@@ -140,7 +151,7 @@ export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = 
   let current = build(configs);
   let key = JSON.stringify(configs);
   return {
-    async read() {
+    async read(progress) {
       const loaded = await load();
       configs = loaded.configs;
       if (JSON.stringify(configs) !== key) {
@@ -148,7 +159,7 @@ export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = 
         key = JSON.stringify(configs);
       }
       const leftOff = new Set([...loaded.problems.map((p) => p.repo), ...loaded.resetting].map((repo) => repo.toLowerCase()));
-      const read = await current.read();
+      const read = await current.read(progress);
       return { ...read, items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')) };
     },
     repos: () => configs.map(repoView),

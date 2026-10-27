@@ -11,6 +11,12 @@ export interface ItemsRead {
   problems?: ItemSourceProblem[];
 }
 
+/** Reports which item sources a read is reading: each source starts and finishes under its name, in whatever order its reads end. */
+export interface ReadProgress {
+  started(name: string): void;
+  finished(name: string): void;
+}
+
 /**
  * A read failure the user fixes outside the board, such as a logged-out az: the merged read leaves only this source's
  * repository off and shows the problem and its fix command, when one fixes it.
@@ -28,7 +34,10 @@ export const DONE_REFUSED = 'Could not set Done. The board never stores Done. Cl
 
 /** Every write returns the error to show, or null when the provider accepted it. */
 export interface ItemSource {
-  read(): Promise<ItemsRead>;
+  /** What a read reports for this source; absent for a source its repositories name, as the merged source then does. */
+  name?: string;
+  /** Reads the source's items, reporting to `progress` for each source it reads on its way, if it merges several. */
+  read(progress?: ReadProgress): Promise<ItemsRead>;
   /** Sets the item's status, dropping every other status it carries. Callers check `statusRefusal` first. */
   setStatus(item: Item, status: Status): Promise<string | null>;
   /** Why a status write on an item, or on a parent that isn't on the board, would be refused before it runs; null when it may run. */

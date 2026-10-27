@@ -269,12 +269,12 @@ The board server's first read of every repository after it starts. It settles wh
 _Avoid_: initial load, first sync
 
 **Title bar**:
-The bar at the top of the main area, in the board app and in a browser. It holds the scope, the Refreshed time and the counters. The brand sits in the sidebar's top row.
+The bar at the top of the board, in the board app and in a browser. It holds the brand, the scope, the Refreshed time, the counters, the List button, Add item, the Update button and Settings.
 _Avoid_: toolbar, top bar
 
-**Sidebar**:
-The resizable column on the left of the board, beside the main area. The brand sits in its top row; Settings and the Update button sit in its foot.
-_Avoid_: drawer, nav, side panel
+**List modal**:
+The modal the title bar's List button opens, showing the items in List: repositories and Draft on the left, the chosen group's items on the right.
+_Avoid_: sidebar, list panel, drawer
 
 **Provider**:
 The service that hosts a repository and its tickets: GitHub or Azure DevOps. A thread's agent runs on a provider instance instead (see Model choice).
@@ -293,7 +293,7 @@ A repository's choice to show only items that carry a status, instead of every o
 _Avoid_: filter, allowlist
 
 **Scope**:
-The repository the board shows, picked in the title bar or the sidebar, or all repositories.
+The repository the board shows, picked in the title bar or the List modal, or all repositories.
 _Avoid_: project, filter, platform
 
 **Desk**:
@@ -324,13 +324,13 @@ Arming a blocked part's start, so the board starts it once every issue it's bloc
 _Avoid_: auto-start (for this)
 
 **Design system**:
-The package that holds every token, style and base component of the board page and the board app's loading screen; nothing outside it sets its own colours or spacing.
+The package that holds every token, style and base component of the board page and the board app's loading screen, copied from lar-server's design system; nothing outside it sets its own colours or spacing.
 _Avoid_: UI kit, component library, theme
 
 ### Upstream files
 
 **Copy**:
-A file taken unchanged from an upstream source and recorded in its folder's record (UPSTREAM.md for skills and checklists, the copy record for design system components); it changes only through a fresh copy from upstream.
+A file taken unchanged from an upstream source and recorded in its folder's record (UPSTREAM.md for skills and checklists, the copy record for the design system copied from lar-server); it changes only through a fresh copy from upstream.
 _Avoid_: vendored file, dependency
 
 **Override**:

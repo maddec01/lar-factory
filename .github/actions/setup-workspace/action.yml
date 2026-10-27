@@ -1,0 +1,22 @@
+# Sets up pnpm and Node with pnpm's store cache, then installs the workspace.
+# Call it after actions/checkout, which puts this file in the workspace.
+name: Set up workspace
+description: Set up pnpm and Node, then run pnpm install --frozen-lockfile.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up pnpm
+      uses: pnpm/action-setup@v6
+      with:
+        package_json_file: package.json
+
+    - name: Set up Node
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: .node-version
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

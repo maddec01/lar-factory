@@ -3,12 +3,14 @@
 // placeholder, and a failed read shows its error in the description's place; the board's own fields never wait.
 
 import type { ReactNode } from 'react';
-import { CircleCheck, CircleDot } from 'lucide-react';
+import { CircleCheck, CircleDot, LoaderCircle } from 'lucide-react';
 import { onAzure, shortAgo } from '@lar-factory/shared';
 import type { Item, ItemComment, ItemDetails } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/badge';
+import { Button } from '@lar-factory/ui/button';
 import { RichText } from '@lar-factory/ui/rich-text';
 import type { ItemDetailsRead } from './use-item-details.ts';
+import { useOlderComments } from './use-older-comments.ts';
 
 const Heading = ({ children }: { children: ReactNode }) => <h2 className="m-0 text-[13px] font-medium text-(--muted-foreground)">{children}</h2>;
 
@@ -45,23 +47,38 @@ function Comment({ comment, now }: { comment: ItemComment; now: number }) {
   );
 }
 
+/** The comments, newest first: the latest the details hold, then each page "Load 10 more" fetched. Remounts with each load of the details. */
+function Comments({ itemId, details, now }: { itemId: string; details: ItemDetails; now: number }) {
+  const older = useOlderComments(itemId, details.olderCursor);
+  const comments = [...details.comments, ...older.comments];
+  return (
+    <div className="grid min-w-0 gap-2" data-comments>
+      <Heading>Comments{comments.length > 0 && ` · ${comments.length}`}</Heading>
+      {comments.length > 0
+        ? <ol className="m-0 grid list-none gap-3 p-0">{comments.map((c) => <Comment key={c.id} comment={c} now={now} />)}</ol>
+        : <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>}
+      {older.hasMore && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="sm" disabled={older.loading} onClick={older.loadMore}>{older.loading && <LoaderCircle className="animate-spin" />}Load 10 more</Button>
+          {older.error && <p className="m-0 text-xs text-(--error-foreground)" role="alert">Could not load older comments: {older.error}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The description and the comments, newest first. */
-export function ItemText({ read, now }: { read: ItemDetailsRead; now: number }) {
+export function ItemText({ itemId, read, now }: { itemId: string; read: ItemDetailsRead; now: number }) {
   if (read.state === 'loading') return <Loading />;
   if (read.state === 'failed') return <p className="m-0 text-sm text-(--error-foreground)" role="alert">Could not load the details: {read.error}</p>;
-  const { body, format, comments } = read.details;
+  const { body, format } = read.details;
   return (
     <>
       <div className="grid min-w-0 gap-2" data-description>
         <Heading>Description</Heading>
         {body ? <RichText text={body} format={format} /> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
       </div>
-      <div className="grid min-w-0 gap-2" data-comments>
-        <Heading>Comments{comments.length > 0 && ` · ${comments.length}`}</Heading>
-        {comments.length > 0
-          ? <ol className="m-0 grid list-none gap-3 p-0">{comments.map((c) => <Comment key={c.id} comment={c} now={now} />)}</ol>
-          : <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>}
-      </div>
+      <Comments itemId={itemId} details={read.details} now={now} />
     </>
   );
 }

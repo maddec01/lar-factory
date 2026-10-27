@@ -4,8 +4,8 @@
 import { statusLabel } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, ItemDraft } from '@lar-factory/shared';
 import { ReadProblem } from '../items/item-source.ts';
-import type { AzureCalls, RawWorkItem } from './azure-items.ts';
-import { withFile, writeFailure } from './azure-writes.ts';
+import { withFile, type AzureCalls, type RawWorkItem } from './azure-items.ts';
+import { writeFailure } from './azure-writes.ts';
 
 /** The REST API version of the create call, the first that takes a markdown description. */
 const CREATE_API_VERSION = '7.2-preview.3';

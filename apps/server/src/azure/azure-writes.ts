@@ -2,13 +2,10 @@
 // in System.Tags and moves State only across state categories, a label is a tag, and Abandon moves State to the type's
 // Removed-category state. Each write is one JSON patch that fails if the work item changed since the board read it.
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { DONE_REFUSED, ReadProblem, type ItemSource } from '../items/item-source.ts';
-import { field, tagsOf, type AzureCalls, type RawWorkItem } from './azure-items.ts';
+import { field, tagsOf, withFile, type AzureCalls, type RawWorkItem } from './azure-items.ts';
 
 /** The most tags Azure DevOps lets one work item hold. */
 const TAG_LIMIT = 100;
@@ -25,18 +22,6 @@ export function writeFailure(what: string, project: string, err: unknown): strin
     return `${what} You have no right to create tags in ${project}. Ask a project administrator to allow you Create tag definition, then try again.`;
   }
   return `${what} ${text}`;
-}
-
-/** Runs `use` on a temporary file holding `body` as JSON, for az's --in-file, and removes the file after. */
-export async function withFile<T>(body: unknown, use: (file: string) => Promise<T>): Promise<T> {
-  const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
-  try {
-    const file = join(dir, 'body.json');
-    await writeFile(file, JSON.stringify(body));
-    return await use(file);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
 }
 
 type Operation = { op: 'test' | 'replace'; path: string; value: unknown };

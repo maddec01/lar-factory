@@ -1,10 +1,7 @@
 // Azure Repos through az, beside github.ts's gh calls: a file on the default branch, and onboarding's branch, file and
 // PR, opened without touching any checkout. A repository is organization/project/repository as its origin URL has them.
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { az, decoded, type Az } from './azure-items.ts';
+import { az, decoded, withFile, type Az } from './azure-items.ts';
 import { prStateOf, type AzurePr } from './azure-prs.ts';
 
 /** The REST API version every `az devops invoke` call passes, as invoke's own default is 5.0. */
@@ -35,15 +32,8 @@ function invoke<T>(run: Az, repo: string, resource: string, route: string[], mor
 }
 
 /** `invoke` posting `body`, written to a file of its own for az's --in-file. */
-async function post<T>(run: Az, repo: string, resource: string, route: string[], body: unknown): Promise<T> {
-  const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
-  try {
-    const file = join(dir, 'body.json');
-    await writeFile(file, JSON.stringify(body));
-    return await invoke<T>(run, repo, resource, route, ['--http-method', 'POST', '--in-file', file]);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+function post<T>(run: Az, repo: string, resource: string, route: string[], body: unknown): Promise<T> {
+  return withFile(body, (file) => invoke<T>(run, repo, resource, route, ['--http-method', 'POST', '--in-file', file]));
 }
 
 /** `az repos <args>` on the repository. */

@@ -1,18 +1,17 @@
 // The item dialog's details for one item. Sample mode serves them from a file beside the board's fixture; otherwise
-// each provider reads its own; Azure DevOps says its details are not available yet.
+// each provider reads its own.
 
 import { readFileSync } from 'node:fs';
 import { onAzure } from '@lar-factory/shared';
 import type { Item, ItemDetails } from '@lar-factory/shared';
 import type { Refused } from '../config/edit-config.ts';
+import { readAzureItemDetails } from '../azure/azure-details.ts';
 import { readGithubItemDetails } from '../github/github-details.ts';
 
 /** Reads one item's details, or says why it can't. */
 export type ReadItemDetails = (item: Item) => Promise<ItemDetails | Refused>;
 
 const NO_DETAILS: ItemDetails = { body: '', format: 'markdown', author: null, assignees: [], createdAt: null, subTickets: [], comments: [], hasOlderComments: false, olderCursor: null };
-
-const notAvailable: ReadItemDetails = async () => ({ status: 501, error: 'Item details are not available yet.' });
 
 /** The details file next to the board fixture: `sample.json` has `sample-details.json`. */
 export const detailsFileFor = (fixture: string): string => fixture.replace(/\.json$/, '-details.json');
@@ -30,6 +29,6 @@ function fromFile(file: string): ReadItemDetails {
 export function createItemDetails(sampleFile: string | null): ReadItemDetails {
   if (sampleFile) return fromFile(sampleFile);
   const github: ReadItemDetails = (item) => readGithubItemDetails(item);
-  const azure = notAvailable;
+  const azure: ReadItemDetails = (item) => readAzureItemDetails(item);
   return (item) => (item.repo && onAzure(item.repo) ? azure : github)(item);
 }

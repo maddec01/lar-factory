@@ -1,0 +1,84 @@
+import { test } from 'vite-plus/test';
+import assert from 'node:assert/strict';
+import type { Item } from '@lar-factory/shared';
+import { readAzureItemDetails } from './azure-details.ts';
+import { fakeAz, type FakeComment, type WorkItem } from './fake-az.ts';
+
+const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+const item = (number: number): Item => ({ id: `azure:contoso/${number}`, content: 'ticket', repo: REPO, number } as Item);
+const workItem = (extra: Partial<WorkItem> = {}): WorkItem => ({ id: 5, type: 'User Story', state: 'Active', createdBy: 'Ana Silva', assignedTo: 'Rui Costa',
+  created: '2026-10-12T09:14:00Z', iteration: 'Fabrikam Fiber\\Sprint 12', ...extra });
+const comment = (id: number, extra: Partial<FakeComment> = {}): FakeComment => ({ id, by: 'Ana Silva', date: `2026-10-${10 + id}T08:00:00Z`, text: `Comment ${id}`, format: 'markdown', ...extra });
+
+test('a markdown description answers with its people, dates, iteration and area', async () => {
+  const az = fakeAz({ items: [workItem({ description: '## Export\n\nAs **CSV**.', descriptionFormat: 'Markdown' })] });
+  assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
+    body: '## Export\n\nAs **CSV**.', format: 'markdown', author: 'Ana Silva', assignees: ['Rui Costa'], createdAt: '2026-10-12T09:14:00Z',
+    iteration: 'Fabrikam Fiber\\Sprint 12', area: 'Fabrikam Fiber\\Fabrikam Team', subTickets: [], comments: [], hasOlderComments: false, olderCursor: null,
+  });
+});
+
+test('an HTML description is answered as HTML', async () => {
+  const az = fakeAz({ items: [workItem({ description: '<div>As <b>CSV</b>.</div>', descriptionFormat: 'Html' })] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual([details.body, details.format], ['<div>As <b>CSV</b>.</div>', 'html']);
+});
+
+test('a description whose format is missing is HTML when it opens with a tag, else markdown', async () => {
+  for (const [description, format] of [['<div>Hi</div>', 'html'], ['  <p>Hi</p>', 'html'], ['Hi <b>there</b>', 'markdown'], ['# Hi', 'markdown'], ['', 'markdown']]) {
+    const az = fakeAz({ items: [workItem({ description })] });
+    const details = await readAzureItemDetails(item(5), az.run);
+    assert.ok(!('error' in details));
+    assert.equal(details.format, format, description);
+  }
+});
+
+test('the work item is read at 7.2-preview.3 and its comments at 7.1-preview.4, 10 newest first', async () => {
+  const az = fakeAz({ items: [workItem()] });
+  await readAzureItemDetails(item(5), az.run);
+  const version = (resource: string) => { const call = az.calls.find((args) => args.includes(resource))!; return call[call.indexOf('--api-version') + 1]; };
+  assert.deepEqual([version('workitems'), version('comments')], ['7.2-preview.3', '7.1-preview.4']);
+  const comments = az.calls.find((args) => args.includes('comments'))!;
+  assert.deepEqual(comments.slice(comments.indexOf('--query-parameters') + 1, comments.indexOf('--query-parameters') + 3), ['$top=10', 'order=desc']);
+  assert.ok(comments.includes('workItemId=5') && comments.includes('project=Fabrikam Fiber') && comments.includes('https://dev.azure.com/contoso'));
+});
+
+test('comments of mixed formats answer newest first, each in its own format', async () => {
+  const az = fakeAz({ items: [workItem({ comments: [comment(1), comment(2, { format: 'html', text: '<p>Two</p>' }), comment(3, { format: undefined, text: '<div>Three</div>' }), comment(4, { format: undefined })] })] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual(details.comments.map((c) => [c.id, c.format]), [['4', 'markdown'], ['3', 'html'], ['2', 'html'], ['1', 'markdown']]);
+  assert.deepEqual(details.comments[0], { id: '4', author: 'Ana Silva', createdAt: '2026-10-14T08:00:00Z', body: 'Comment 4', format: 'markdown' });
+  assert.deepEqual([details.hasOlderComments, details.olderCursor], [false, null]);
+});
+
+test('more than 10 comments answer the newest 10 and the token of the older ones', async () => {
+  const az = fakeAz({ items: [workItem({ comments: Array.from({ length: 12 }, (_, i) => comment(i + 1)) })] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual([details.comments.length, details.comments[0]!.id, details.comments[9]!.id, details.hasOlderComments, details.olderCursor], [10, '12', '3', true, '10']);
+});
+
+test('a work item with no description, people or comments answers empty details', async () => {
+  const az = fakeAz({ items: [{ id: 5, type: 'Task', state: 'New' }] });
+  assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
+    body: '', format: 'markdown', author: null, assignees: [], createdAt: null, area: 'Fabrikam Fiber\\Fabrikam Team', subTickets: [], comments: [], hasOlderComments: false, olderCursor: null,
+  });
+});
+
+test('an az failure answers its message', async () => {
+  const az = fakeAz({ items: [workItem()], fail: (args) => (args.includes('comments') ? new Error('az devops invoke failed: timed out') : undefined) });
+  assert.deepEqual(await readAzureItemDetails(item(5), az.run), { status: 502, error: 'az devops invoke failed: timed out' });
+});
+
+test('a logged-out az answers the fix', async () => {
+  const az = fakeAz({ items: [workItem()], fail: () => new Error('Please run az login to setup account.') });
+  const answer = await readAzureItemDetails(item(5), az.run);
+  assert.ok('error' in answer && /az login/.test(answer.error));
+});
+
+test('an item without an Azure DevOps repository answers 404', async () => {
+  const az = fakeAz({ items: [] });
+  assert.deepEqual(await readAzureItemDetails({ ...item(5), repo: 'maddec01/lar' }, az.run), { status: 404, error: 'That item is not an Azure DevOps work item.' });
+});

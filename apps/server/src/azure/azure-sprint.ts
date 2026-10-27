@@ -4,13 +4,13 @@ import { ReadProblem, type ItemSource } from '../items/item-source.ts';
 import { az, azureItems, type Az } from './azure-items.ts';
 
 /**
- * The current sprint of `team` in the project of `repo`, an Azure DevOps repository named organization/project/repository
- * as its origin URL has them, Completed items as Done.
+ * The current sprint of `team` in the project of `repos`, the Azure DevOps repositories reading it, each named
+ * organization/project/repository as its origin URL has them, Completed items as Done.
  * `run` stands in for az in tests. No current iteration, a logged-out az and a missing azure-devops extension are each a
  * ReadProblem with its fix.
  */
-export function azureSprint(repo: string, team: string, run: Az = az): ItemSource {
-  return azureItems(repo, team, async ({ organization, project, boards, workItems }) => {
+export function azureSprint(repos: readonly string[], team: string, run: Az = az): ItemSource {
+  return azureItems(repos, team, async ({ organization, project, boards, workItems }) => {
     const [iteration] = await boards<{ id: string; name: string }[]>(['list', '--timeframe', 'current']);
     if (!iteration) {
       throw new ReadProblem(`Team ${team} has no current iteration in ${organization}/${project}. `

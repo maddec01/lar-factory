@@ -5,7 +5,7 @@
 import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { DONE_REFUSED, ReadProblem, type ItemSource } from '../items/item-source.ts';
-import { field, tagsOf, withFile, type AzureCalls, type RawWorkItem } from './azure-items.ts';
+import { field, isRepoTag, tagsOf, withFile, type AzureCalls, type RawWorkItem } from './azure-items.ts';
 
 /** The most tags Azure DevOps lets one work item hold. */
 const TAG_LIMIT = 100;
@@ -26,15 +26,14 @@ export function writeFailure(what: string, project: string, err: unknown): strin
 
 type Operation = { op: 'test' | 'replace'; path: string; value: unknown };
 
-/** The writes of an Azure item source on `project`, through its `invoke`. */
-export function azureWrites(project: string, invoke: AzureCalls['invoke']):
+/** The writes of an Azure item source on `project`, through its `invoke` and its kept `statesOf`. */
+export function azureWrites(project: string, invoke: AzureCalls['invoke'], typeStates: (type: string) => Promise<{ value: { name: string; category: string }[] }>):
   Pick<ItemSource, 'setStatus' | 'statusRefusal' | 'addLabel' | 'setParentStatus' | 'abandon'> {
   const read = (id: number) => invoke<RawWorkItem & { rev: number }>('wit', 'workitems', [`id=${id}`]);
   const full = (id: number) => new Error(`Work item ${id} has ${TAG_LIMIT} tags, Azure's limit. Remove a tag in Azure DevOps, then try again.`);
 
   /** The states of the work item's type, each with its category, in the type's order. */
-  const statesOf = async (raw: RawWorkItem) =>
-    (await invoke<{ value: { name: string; category: string }[] }>('wit', 'workitemtypestates', [`type=${field(raw, 'System.WorkItemType')}`])).value;
+  const statesOf = async (raw: RawWorkItem) => (await typeStates(field(raw, 'System.WorkItemType'))).value;
 
   /** Writes the operations to the work item read at `raw`, failing if it changed since. */
   const patch = (raw: RawWorkItem & { rev: number }, ops: Operation[]) =>
@@ -91,6 +90,10 @@ export function azureWrites(project: string, invoke: AzureCalls['invoke']):
         const raw = await read(item.number!);
         const tags = tagsOf(raw);
         if (tags.includes(label)) return;
+        // A work item is for one repository: its own tag in another case is already there, another's refuses this one.
+        const tagged = isRepoTag(label) && tags.find(isRepoTag);
+        if (tagged && tagged.toLowerCase() === label.toLowerCase()) return;
+        if (tagged) return `${what} Work item ${raw.id} is already tagged for ${tagged.slice('repo-'.length)}. Remove ${tagged} in Azure DevOps to take it for another repository.`;
         if (tags.length >= TAG_LIMIT) throw full(raw.id);
         await patch(raw, [{ op: 'replace', path: '/fields/System.Tags', value: [...tags, label].join('; ') }]);
       });

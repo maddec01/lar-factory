@@ -9,6 +9,8 @@ export interface ItemDraft {
   title: string;
   description: string;
   labels: string[];
+  /** Only for <repo>: the new Azure work item is tagged for its repository, so no other repository's List shows it. */
+  onlyFor?: true;
 }
 
 export interface CreationProgress {
@@ -41,6 +43,10 @@ export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft {
     value.labels.some((l: unknown) => typeof l !== 'string' || !allowed.includes(l))) {
     throw new Error("Choose only the selected repository's custom labels.");
   }
+  const azure = repo.items === 'sprint' || repo.items === 'backlog';
+  if (value.onlyFor !== undefined && value.onlyFor !== false && (value.onlyFor !== true || !azure)) {
+    throw new Error('Only an item on Azure DevOps can be only for its repository.');
+  }
   return { repo: repo.repo, kind: value.kind as ItemDraft['kind'], title: value.title.trim(),
-    description: value.description, labels: [...new Set(value.labels as string[])] };
+    description: value.description, labels: [...new Set(value.labels as string[])], ...value.onlyFor === true && { onlyFor: true as const } };
 }

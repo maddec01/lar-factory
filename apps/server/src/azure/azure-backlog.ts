@@ -1,7 +1,7 @@
 // The Azure DevOps backlog item source: reads one team's requirement backlog through az; azure-writes.ts writes its work items.
 
 import type { ItemSource } from '../items/item-source.ts';
-import { az, azureItems, field, linked, type Az, type RawWorkItem } from './azure-items.ts';
+import { az, azureItems, field, type Az, type RawWorkItem } from './azure-items.ts';
 
 /** The field that places a work item in a team, System.AreaPath unless the project says otherwise, and the team's values of it. */
 interface TeamFieldValues {
@@ -18,20 +18,19 @@ function owns({ field: { referenceName }, values }: TeamFieldValues, raw: RawWor
 }
 
 /**
- * The open requirement-level work items on `team`'s backlog in the project of `repo`, an Azure DevOps repository named
- * organization/project/repository as its origin URL has them, in any sprint or none, each with its Tasks.
+ * The open requirement-level work items on `team`'s backlog in the project of `repos`, the Azure DevOps repositories reading it,
+ * each named organization/project/repository as its origin URL has them, in any sprint or none, each with its Tasks.
  * The backlog can list a parent from another team's area path, which the team field values leave out.
  * `run` stands in for az in tests. A logged-out az and a missing azure-devops extension are each a ReadProblem with its fix.
  */
-export function azureBacklog(repo: string, team: string, run: Az = az): ItemSource {
-  return azureItems(repo, team, async ({ invoke, workItems, backlog }) => {
+export function azureBacklog(repos: readonly string[], team: string, run: Az = az): ItemSource {
+  return azureItems(repos, team, async ({ invoke, workItems, backlog }) => {
     const route = [`team=${team}`];
     const [levels, areas] = await Promise.all([backlog, invoke<TeamFieldValues>('work', 'teamfieldvalues', route)]);
     const listed = await invoke<{ workItems: { target: { id: number } }[] }>('work', 'workitems', [...route, `backlogId=${levels.requirementBacklog.id}`]);
     const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
     const top = (await workItems([...new Set(listed.workItems.map((w) => w.target.id))]))
       .filter((raw) => requirements.has(field(raw, 'System.WorkItemType')) && owns(areas, raw));
-    const tasks = await workItems([...new Set(top.flatMap((raw) => linked(raw, 'System.LinkTypes.Hierarchy-Forward')))]);
-    return { title: `${team} backlog`, items: [...top, ...tasks], completed: false };
+    return { title: `${team} backlog`, items: top, completed: false };
   }, run);
 }

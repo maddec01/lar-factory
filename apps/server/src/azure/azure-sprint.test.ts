@@ -27,13 +27,13 @@ const SPRINT: WorkItem[] = [
 
 test("a sprint read lists the team's requirement-level items with their Tasks as children, a Completed item as Done, and no Removed item", async () => {
   const az = fakeAz({ items: SPRINT, sprint: [1, 11, 12, 13, 2, 3, 4, 5, 6] });
-  const read = await azureSprint(REPO, TEAM, az.run).read();
+  const read = await azureSprint([REPO], TEAM, az.run).read();
   assert.equal(read.title, 'Fabrikam Team Sprint 12');
   assert.deepEqual(shown(read.items), [[1, 'Shaping', null], [11, 'List', 1], [12, 'Done', 1], [2, 'Done', null], [5, 'Queued', null], [6, 'List', null]]);
   const seek = read.items[0]!;
   assert.deepEqual({ ...seek, parent: undefined }, {
     id: 'azure:contoso/1', status: 'Shaping', statuses: ['Shaping'], content: 'ticket', number: 1, title: 'Seek',
-    url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/1', repo: REPO, labels: ['area-api'], state: 'open', closedAs: null,
+    url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/1', repo: REPO, untaggedFor: [REPO], labels: ['area-api'], state: 'open', closedAs: null,
     parent: undefined, subIssues: { total: 2, completed: 1 },
     blockers: [{ number: 2, repo: REPO, state: 'closed' }, { number: 99, repo: REPO, state: 'open' }],
     updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [],
@@ -44,9 +44,18 @@ test("a sprint read lists the team's requirement-level items with their Tasks as
   assert.deepEqual(az.batches, [[1, 11, 12, 13, 2, 3, 4, 5, 6], [99]]);
 });
 
+test("a sprint item's Task in another iteration shows under it, read through its child links", async () => {
+  const az = fakeAz({ items: SPRINT, sprint: [1, 11, 2] });
+  const read = await azureSprint([REPO], TEAM, az.run).read();
+  assert.deepEqual(shown(read.items), [[1, 'Shaping', null], [11, 'List', 1], [12, 'Done', 1], [2, 'Done', null]]);
+  assert.deepEqual(read.items[0]!.subIssues, { total: 2, completed: 1 });
+  // The sprint's items, then the Tasks outside it, then the predecessors outside both.
+  assert.deepEqual(az.batches, [[1, 11, 2], [12, 13], [99]]);
+});
+
 test("every az call names the team's organization and project, and every invoke passes --api-version", async () => {
   const az = fakeAz({ items: SPRINT, sprint: [1, 11, 12, 13, 2, 3, 4, 5, 6] });
-  await azureSprint(REPO, TEAM, az.run).read();
+  await azureSprint([REPO], TEAM, az.run).read();
   for (const call of az.calls) {
     assert.equal(call[call.indexOf('--org') + 1], 'https://dev.azure.com/contoso', call.join(' '));
     if (call[0] === 'devops') {
@@ -65,7 +74,7 @@ test("each process's requirement type shows at the top level, and only the team'
     const [open, done] = STATES[requirement]!.filter(([, category]) => category === 'InProgress' || category === 'Completed').map(([name]) => name);
     const items: WorkItem[] = [{ id: 1, type: requirement, state: open! }, { id: 2, type: requirement, state: done! },
       { id: 3, type: requirement === 'User Story' ? 'Epic' : 'User Story', state: 'Active' }, { id: 4, type: 'Task', state: 'Active', parent: 1 }];
-    const read = await azureSprint(REPO, TEAM, fakeAz({ items, requirement }).run).read();
+    const read = await azureSprint([REPO], TEAM, fakeAz({ items, requirement }).run).read();
     assert.deepEqual(shown(read.items), [[1, 'List', null], [4, 'List', 1], [2, 'Done', null]], requirement);
   }
 });
@@ -73,7 +82,7 @@ test("each process's requirement type shows at the top level, and only the team'
 test('a read of more than 200 ids reads their fields in batches of at most 200', async () => {
   const items = Array.from({ length: 450 }, (_, i): WorkItem => ({ id: i + 1, type: 'User Story', state: 'New' }));
   const az = fakeAz({ items });
-  const read = await azureSprint(REPO, TEAM, az.run).read();
+  const read = await azureSprint([REPO], TEAM, az.run).read();
   assert.equal(read.items.length, 450);
   assert.deepEqual(az.batches.map((ids) => ids.length).sort(), [200, 200, 50]);
   const calls = invokes(az.calls, 'workitemsbatch');
@@ -82,7 +91,7 @@ test('a read of more than 200 ids reads their fields in batches of at most 200',
 });
 
 test('status tags give the statuses and every other tag is a label; an item carrying two refuses a move with the two-status warning', async () => {
-  const sprint = azureSprint(REPO, TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run);
+  const sprint = azureSprint([REPO], TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run);
   const read = await sprint.read();
   const two = read.items.find((i) => i.number === 5)!;
   assert.deepEqual([two.statuses, two.labels], [['Queued', 'Review'], []]);
@@ -90,7 +99,7 @@ test('status tags give the statuses and every other tag is a label; an item carr
 });
 
 test('a repository showing Opted-in items hides an item with no status tag', async () => {
-  const source = mergeSources([], new Map([[REPO, azureSprint(REPO, TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run)]]), [REPO.toUpperCase()]);
+  const source = mergeSources([], new Map([[REPO, azureSprint([REPO], TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run)]]), [REPO.toUpperCase()]);
   assert.deepEqual((await source.read()).items.map((i) => i.number), [1, 5]);
 });
 
@@ -115,7 +124,7 @@ test("no current iteration, a logged-out az and a missing azure-devops extension
     'no extension': { repo: REPO, problem: 'az has no azure-devops extension.', fix: 'az extension add --name azure-devops' },
   };
   for (const [name, az] of Object.entries(failing)) {
-    const source = mergeSources([], new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint(REPO, TEAM, az.run)]]));
+    const source = mergeSources([], new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint([REPO], TEAM, az.run)]]));
     const read = await source.read();
     assert.deepEqual(read.items.map((i) => i.repo), ['maddec01/lar-apple'], name);
     assert.deepEqual(read.problems, [expected[name as keyof typeof expected]], name);
@@ -124,7 +133,7 @@ test("no current iteration, a logged-out az and a missing azure-devops extension
 
 test('any other az failure fails the read, naming the repository', async () => {
   const az = fakeAz({ items: SPRINT, fail: () => new Error('az boards iteration failed: TF400813: not authorized') });
-  const source = mergeSources([], new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint(REPO, TEAM, az.run)]]));
+  const source = mergeSources([], new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint([REPO], TEAM, az.run)]]));
   await assert.rejects(source.read(), { message: `${REPO}: az boards iteration failed: TF400813: not authorized` });
 });
 
@@ -133,7 +142,7 @@ test("a work item's linked PRs show their state from az repos pr show, a draft a
   const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'Active', prs: [41, 42, 43, 44, 45] }, { id: 11, type: 'Task', state: 'Active', parent: 1, prs: [41] }],
     pullRequests: [pr(41, 'active'), pr(42, 'active', { isDraft: true, mergeStatus: 'conflicts' }),
       pr(43, 'completed', { closedDate: '2026-10-22T09:00:00Z', description: 'Closes it' }), pr(44, 'abandoned', { mergeStatus: 'rejectedByPolicy' })] });
-  const [story, task] = (await azureSprint(REPO, TEAM, az.run).read()).items;
+  const [story, task] = (await azureSprint([REPO], TEAM, az.run).read()).items;
   const url = (id: number) => `${REPO_URL}/pullrequest/${id}`;
   assert.deepEqual(story!.linkedPrs, [
     { number: 41, url: url(41), state: 'open', isDraft: false, body: '', mergedAt: null, checks: null, mergeState: 'can merge' },

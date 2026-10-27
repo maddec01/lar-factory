@@ -6,6 +6,7 @@ import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-co
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
 import { azureBacklog } from '../azure/azure-backlog.ts';
+import { az, decoded, type Az } from '../azure/azure-items.ts';
 import { azureSprint } from '../azure/azure-sprint.ts';
 import { ReadProblem, type ItemSource, type ItemsRead } from './item-source.ts';
 
@@ -31,14 +32,29 @@ export function repoView({ repo, role, itemSource, show, labels }: RepositoryCon
 
 /**
  * Each repository's item source as its config names it, merged, showing each repository's items as its show setting
- * says. Repositories that name the same Project share one adapter, so one read.
+ * says. Repositories that name the same Project share one adapter, so one read, and so do repositories that read the
+ * same Azure DevOps team's sprint or backlog, which then sorts the team's work items among them by their repo- tags.
+ * `run` stands in for az in tests.
  */
-function configuredSources(configs: readonly RepositoryConfig[]): ItemSource {
+export function configuredSources(configs: readonly RepositoryConfig[], run: Az = az): ItemSource {
   const projects = new Map<string, ItemSource>();
+  // Azure DevOps names ignore case.
+  const teamKey = (repo: string, kind: string, team: string) => [kind, ...repo.split('/').slice(0, 2).map(decoded), team].join('/').toLowerCase();
+  const teams = new Map<string, string[]>();
+  for (const { repo, itemSource } of configs) {
+    if (itemSource.kind !== 'azure-sprint' && itemSource.kind !== 'azure-backlog') continue;
+    const key = teamKey(repo, itemSource.kind, itemSource.team);
+    teams.set(key, [...teams.get(key) ?? [], repo]);
+  }
+  const azure = new Map<string, ItemSource>();
+  const teamSource = (repo: string, kind: 'azure-sprint' | 'azure-backlog', team: string) => {
+    const key = teamKey(repo, kind, team);
+    if (!azure.has(key)) azure.set(key, (kind === 'azure-sprint' ? azureSprint : azureBacklog)(teams.get(key)!, team, run));
+    return azure.get(key)!;
+  };
   const byRepo = new Map(configs.map(({ repo, itemSource }): [string, ItemSource] => {
     if (itemSource.kind === 'issues') return [repo, repoIssues(repo)];
-    if (itemSource.kind === 'azure-sprint') return [repo, azureSprint(repo, itemSource.team)];
-    if (itemSource.kind === 'azure-backlog') return [repo, azureBacklog(repo, itemSource.team)];
+    if (itemSource.kind === 'azure-sprint' || itemSource.kind === 'azure-backlog') return [repo, teamSource(repo, itemSource.kind, itemSource.team)];
     const key = `${itemSource.owner.toLowerCase()}/${itemSource.number}`;
     if (!projects.has(key)) projects.set(key, githubProject(itemSource));
     return [repo, projects.get(key)!];
@@ -53,22 +69,31 @@ function configuredSources(configs: readonly RepositoryConfig[]): ItemSource {
  * once, as the first lists it, Projects first. A write goes to the source that last listed the item, or, for an item
  * none has listed, to the source its repository names, else the first Project. A read fails whole when any source's
  * read fails, so items never vanish on a passing error; a source other than a Project starts its error with its
- * repository, so the user knows which repository to fix. A ReadProblem from a source other than a Project leaves out
- * only that source's items instead, and the read names the problem under its repository. A read leaves out each item from a repository in `optedIn`
- * that carries no status, except a closed item a Project lists: being in a Project opts it in.
+ * repositories, so the user knows which repository to fix. A ReadProblem from a source other than a Project leaves out
+ * only that source's items instead, and the read names the problem under each of its repositories. A read leaves out
+ * each item from a repository in `optedIn` that carries no status, except a closed item a Project lists: being in a
+ * Project opts it in. An untagged item that carries no status leaves the opted-in repositories of its `untaggedFor`.
  */
 export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = []): ItemSource {
   const sourceByRepo = new Map([...byRepo].map(([repo, source]) => [repo.toLowerCase(), source]));
   const optIn = new Set(optedIn.map((repo) => repo.toLowerCase()));
-  const shows = (item: Item, source: ItemSource) => item.statuses.length > 0 || !optIn.has(item.repo?.toLowerCase() ?? '')
-    || (item.state === 'closed' && projects.includes(source));
+  const optedOut = (repo: string | null) => optIn.has(repo?.toLowerCase() ?? '');
+  /** The item as a read shows it, or null when it's left out. */
+  const shown = (item: Item, source: ItemSource): Item | null => {
+    if (item.statuses.length > 0 || (item.state === 'closed' && projects.includes(source))) return item;
+    if (!item.untaggedFor) return optedOut(item.repo) ? null : item;
+    const kept = item.untaggedFor.filter((repo) => !optedOut(repo));
+    if (kept.length === item.untaggedFor.length) return item;
+    return kept.length ? { ...item, repo: kept[0]!, untaggedFor: kept } : null;
+  };
   const sources = [...new Set([...projects, ...byRepo.values()])];
-  const named = new Map([...byRepo].filter(([, source]) => !projects.includes(source)).map(([repo, source]) => [source, repo]));
+  const named = new Map<ItemSource, string[]>();
+  for (const [repo, source] of byRepo) if (!projects.includes(source)) named.set(source, [...named.get(source) ?? [], repo]);
   const readOf = (source: ItemSource): Promise<ItemsRead> => {
-    const repo = named.get(source);
-    return repo === undefined ? source.read() : source.read().catch((err: unknown) => {
-      if (err instanceof ReadProblem) return { title: '', items: [], problems: [{ repo, problem: err.message, ...err.fix !== undefined && { fix: err.fix } }] };
-      throw new Error(`${repo}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
+    const repos = named.get(source);
+    return repos === undefined ? source.read() : source.read().catch((err: unknown) => {
+      if (err instanceof ReadProblem) return { title: '', items: [], problems: repos.map((repo) => ({ repo, problem: err.message, ...err.fix !== undefined && { fix: err.fix } })) };
+      throw new Error(`${repos.join(', ')}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
     });
   };
   /** The source that listed each item, by Item.id, in the last read. */
@@ -86,7 +111,7 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       }));
       listedBy = listed;
       const problems = reads.flatMap((read) => read.problems ?? []);
-      return { title: reads[0]?.title ?? '', items: items.filter((item) => shows(item, listed.get(item.id)!)), ...problems.length > 0 && { problems } };
+      return { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item, listed.get(item.id)!) ?? []), ...problems.length > 0 && { problems } };
     },
     setStatus: (item, status) => sourceOf(item).setStatus(item, status),
     statusRefusal: (item) => ('id' in item ? sourceOf(item) : forRepo(item.repo)).statusRefusal(item),

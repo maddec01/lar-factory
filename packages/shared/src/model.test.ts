@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { inRepo, repoTag, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -341,6 +341,23 @@ test('the board groups the List by repository, keyed by owner/name and named by 
   ]);
 });
 
+test("an untagged Azure work item shows in the List of every repository reading its item source, and a tagged one only in its repository's", () => {
+  const repos = [{ repo: 'contoso/Fabrikam/web', role: 'app', labels: [] }, { repo: 'contoso/Fabrikam/api', role: 'api', labels: [] }];
+  const items = [
+    item('List', [], { id: 'a', repo: 'contoso/Fabrikam/web', untaggedFor: ['contoso/Fabrikam/web', 'contoso/Fabrikam/api'] }),
+    item('List', [], { id: 'b', repo: 'contoso/Fabrikam/web' }),
+  ];
+  const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
+  assert.deepEqual(groups.map((g) => [g.repo, g.items.map((i) => i.id)]), [['contoso/Fabrikam/web', ['a', 'b']], ['contoso/Fabrikam/api', ['a']]]);
+  assert.equal(inRepo(items[0]!, 'Contoso/Fabrikam/API'), true);
+  assert.equal(inRepo(items[1]!, 'contoso/Fabrikam/api'), false);
+});
+
+test("an Azure work item's repository tag is repo- and the repository's name as Azure shows it", () => {
+  assert.equal(repoTag('contoso/Fabrikam/WebShop'), 'repo-WebShop');
+  assert.equal(repoTag('contoso/Fabrikam%20Fiber/Web%20Shop'), 'repo-Web Shop');
+});
+
 test("a repository's owner/name matches whatever its case, as GitHub's does, so a hand-written spelling still finds its items", () => {
   assert.equal(sameRepo('Maddec01/Lar-Factory', 'maddec01/lar-factory'), true);
   assert.equal(sameRepo('maddec01/lar-factory', 'maddec01/lar-server'), false);
@@ -360,6 +377,14 @@ test("Add item accepts only the chosen repository's custom labels, which may hol
   assert.throws(() => validateDraft({ ...draft, labels: ['bug'] }, repos), /custom labels/, 'a workflow label is no custom label');
   assert.throws(() => validateDraft({ ...draft, repo: 'maddec01/lar-factory' }, repos), /custom labels/, 'a repository with no labels takes none');
   assert.deepEqual(validateDraft({ ...draft, repo: 'maddec01/lar-factory', labels: [] }, repos).labels, []);
+});
+
+test('Add item keeps Only for <repo> on an Azure repository and refuses it on a GitHub one', () => {
+  const repos = [...sample.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'sprint' as const, team: 'Web', show: 'all' as const, labels: [] }];
+  const draft = { repo: 'contoso/Fabrikam/web', kind: 'feature', title: 'Export', description: '', labels: [] };
+  assert.equal(validateDraft(draft, repos).onlyFor, undefined, 'unticked, the draft is for every repository reading the source');
+  assert.equal(validateDraft({ ...draft, onlyFor: true }, repos).onlyFor, true);
+  assert.throws(() => validateDraft({ ...draft, repo: 'maddec01/lar-server', onlyFor: true }, repos), /Azure DevOps/);
 });
 
 test('Add item refuses an unlisted repository, an unknown kind, a blank title and labels from another repository', () => {

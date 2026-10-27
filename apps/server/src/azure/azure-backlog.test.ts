@@ -26,7 +26,7 @@ const BACKLOG: WorkItem[] = [
 
 test("a backlog read lists the team's open requirement-level items under its area paths, in any sprint or none", async () => {
   const az = fakeAz({ items: BACKLOG, backlog: [1, 2, 3, 4, 5, 6, 7] });
-  const read = await azureBacklog(REPO, TEAM, az.run).read();
+  const read = await azureBacklog([REPO], TEAM, az.run).read();
   assert.equal(read.title, 'Fabrikam Team backlog');
   // 4 is Completed, 5 Removed, 6 an Epic and 7 under another team's area path.
   assert.deepEqual(shown(read.items), [[1, 'Shaping', null], [11, 'List', 1], [12, 'Done', 1], [2, 'List', null], [3, 'List', null]]);
@@ -34,7 +34,7 @@ test("a backlog read lists the team's open requirement-level items under its are
 
 test("Tasks show under their parent, read through its child links, and Predecessors as blockers", async () => {
   const az = fakeAz({ items: BACKLOG, backlog: [1] });
-  const [seek, task] = (await azureBacklog(REPO, TEAM, az.run).read()).items;
+  const [seek, task] = (await azureBacklog([REPO], TEAM, az.run).read()).items;
   assert.deepEqual(seek!.subIssues, { total: 2, completed: 1 });
   assert.deepEqual(seek!.blockers, [{ number: 2, repo: REPO, state: 'open' }, { number: 99, repo: REPO, state: 'closed' }]);
   assert.deepEqual(task!.parent, { number: 1, title: 'Seek', url: seek!.url, repo: REPO, state: 'open' });
@@ -44,12 +44,12 @@ test("Tasks show under their parent, read through its child links, and Predecess
 
 test("an area path the team doesn't include with its children leaves out the items under it", async () => {
   const az = fakeAz({ items: BACKLOG, backlog: [1, 2, 3], areas: [{ value: TEAM_AREA, includeChildren: false }] });
-  assert.deepEqual((await azureBacklog(REPO, TEAM, az.run).read()).items.filter((i) => !i.parent).map((i) => i.number), [1, 2]);
+  assert.deepEqual((await azureBacklog([REPO], TEAM, az.run).read()).items.filter((i) => !i.parent).map((i) => i.number), [1, 2]);
 });
 
 test("the backlog's calls name the team and its requirement backlog, and every invoke passes --api-version", async () => {
   const az = fakeAz({ items: BACKLOG, backlog: [1, 2] });
-  await azureBacklog(REPO, TEAM, az.run).read();
+  await azureBacklog([REPO], TEAM, az.run).read();
   for (const call of az.calls) {
     assert.equal(call[call.indexOf('--org') + 1], 'https://dev.azure.com/contoso', call.join(' '));
     assert.ok(call.includes('project=Fabrikam Fiber') && call[call.indexOf('--api-version') + 1], call.join(' '));
@@ -61,10 +61,10 @@ test("the backlog's calls name the team and its requirement backlog, and every i
 
 test('a logged-out az names its fix, and a move on the backlog writes its work item', async () => {
   const out = fakeAz({ items: BACKLOG, fail: () => new Error("az devops invoke failed: ERROR: Please run 'az login' to setup account.") });
-  assert.deepEqual((await mergeSources([], new Map([[REPO, azureBacklog(REPO, TEAM, out.run)]])).read()).problems,
+  assert.deepEqual((await mergeSources([], new Map([[REPO, azureBacklog([REPO], TEAM, out.run)]])).read()).problems,
     [{ repo: REPO, problem: 'az is logged out.', fix: 'az login' }]);
   const az = fakeAz({ items: BACKLOG, backlog: [2] });
-  const backlog = azureBacklog(REPO, TEAM, az.run);
+  const backlog = azureBacklog([REPO], TEAM, az.run);
   const [item] = (await backlog.read()).items;
   assert.equal(await backlog.setStatus(item!, 'Queued'), null);
   assert.deepEqual(az.patches.map((p) => p.id), [2]);

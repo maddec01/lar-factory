@@ -23,14 +23,14 @@ test('each project shows its folder, repository, provider and whether it has .la
     project('lar-web', { hasConfig: true }),
     project('lar-cli', { hasConfig: false }),
     project('lar-ios', { hasConfig: null }),
-    project('lar-api', { repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: null }),
+    project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: null }),
   ]);
   expect(rows().map((r) => r.dataset.choice)).toEqual(['lar-web', 'lar-cli', 'lar-ios', 'lar-api', 'new']);
   expect(text(row('lar-web'))).toContain('/Users/me/Developer/lar-web · maddec01/lar-web');
   expect(badges('lar-web')).toEqual(['GitHub', 'has .lar-factory.json']);
   expect(badges('lar-cli')).toEqual(['GitHub', 'no .lar-factory.json']);
   expect(badges('lar-ios')).toEqual(['GitHub', 'couldn’t check .lar-factory.json']);
-  expect(badges('lar-api'), 'reading Azure DevOps waits for build #386').toEqual(['Azure DevOps']);
+  expect(badges('lar-api')).toEqual(['Azure DevOps', 'couldn’t check .lar-factory.json']);
 });
 
 test("a repository already on the board, or a folder with no provider's origin, shows but can't be picked", async () => {
@@ -228,12 +228,34 @@ test("a .lar-factory.json that can't be reused shows its problem with Retry, and
   expect(nextButton().disabled).toBe(true);
 });
 
-test('an Azure DevOps origin says Azure DevOps arrives in build #386 and offers no item source', async () => {
-  await openSetup(project('lar-api', { repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: null }));
+const AZURE = project('lar-api', { repo: 'contoso/Fabrikam%20Fiber/lar-api', provider: 'Azure DevOps' });
+const choices = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-choice]')].map((c) => c.dataset.choice);
+
+test("an Azure DevOps origin offers the team's current sprint and backlog with a Team field, and Next waits for a team", async () => {
+  await openSetup(AZURE);
   expect(text(field('provider'))).toContain('Azure DevOps');
-  expect(text(dialog()!.querySelector('[data-slot="dialog-panel"]'))).toContain('build #386');
-  expect(dialog()!.querySelector('[data-choice]'), 'no item source').toBeNull();
-  expect(nextButton().disabled).toBe(true);
+  expect(choices()).toEqual(['azure-sprint', 'azure-backlog', 'all', 'opted-in']);
+  expect(choice('azure-sprint').querySelector('[role="radio"]')!.getAttribute('aria-checked')).toBe('true');
+  expect(suggested()).toEqual(['all']);
+  expect(text(field('team'))).toContain('The Azure DevOps team in Fabrikam Fiber whose sprint the board reads.');
+  expect(input('team')!.placeholder, 'the placeholder reads as an example, not a value').toBe('e.g. Fabrikam Fiber Team');
+  await type(input('role')!, 'API server');
+  expect(nextButton().disabled, 'no team').toBe(true);
+  expect(text(field('team')!.querySelector('[data-problem]'))).toBe('Next needs the team’s name.');
+  await type(input('team')!, 'Fabrikam Team');
+  expect(nextButton().disabled).toBe(false);
+
+  await settle(() => choice('azure-backlog').querySelector<HTMLElement>('[role="radio"]')!.click());
+  expect(suggested()).toEqual(['opted-in']);
+  expect(choice('opted-in').querySelector('[role="radio"]')!.getAttribute('aria-checked'), 'the suggestion applies').toBe('true');
+  expect(text(choice('opted-in'))).toContain('the status-list tag');
+  expect(input('team')!.value, 'the team stays').toBe('Fabrikam Team');
+});
+
+test('a GitHub origin offers no Azure DevOps item source or Team field', async () => {
+  await openSetup(project('lar-web'));
+  expect(choices()).toEqual(['github-project', 'issues', 'all', 'opted-in']);
+  expect(field('team')).toBeNull();
 });
 
 test('Resume shows the answers the step had when it closed', async () => {

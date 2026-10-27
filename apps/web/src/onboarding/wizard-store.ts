@@ -87,8 +87,8 @@ export function pickedProject(run: Run, projects: Projects): ProjectChoice | nul
   return projects.state === 'loaded' ? projects.projects.find((p) => p.id === run.projectId) ?? null : null;
 }
 
-/** Whether the setup step asks its questions: a GitHub repository with no .lar-factory.json to reuse. */
-export const asksSetup = (project: ProjectChoice): boolean => project.provider === 'GitHub' && project.hasConfig === false;
+/** Whether the setup step asks its questions: a repository on a provider, with no .lar-factory.json to reuse. */
+export const asksSetup = (project: ProjectChoice): boolean => !!project.provider && project.hasConfig === false;
 
 /** Whether the setup step's answers are whole, as setupProblems says. */
 const setupAnswered = (setup: SetupAnswers | null): boolean => !!setup && Object.keys(setupProblems(setup)).length === 0;
@@ -434,10 +434,15 @@ function resumed(repo: string, progress: OnboardingProgress): Run {
     prUrl: progress.prUrl ?? null };
 }
 
-/** The setup step's answers before any is given: a GitHub Project of the repository's owner, with its suggested show setting. */
-const firstSetup = (repo: string | null): SetupAnswers => ({
-  itemSource: 'github-project', projectOwner: repo?.split('/')[0] ?? '', projectNumber: '', show: suggestedShow('github-project'), showPicked: false, role: '',
-});
+/**
+ * The setup step's answers before any is given, with the item source's suggested show setting: a GitHub Project of the
+ * repository's owner, or on Azure DevOps a team's current sprint.
+ */
+function firstSetup(repo: string | null, provider: Provider | null): SetupAnswers {
+  const itemSource = provider === 'Azure DevOps' ? 'azure-sprint' : 'github-project';
+  return { itemSource, projectOwner: provider === 'Azure DevOps' ? '' : repo?.split('/')[0] ?? '', projectNumber: '', team: '', show: suggestedShow(itemSource),
+    showPicked: false, role: '' };
+}
 
 /** Where the run stopped, as the board keeps it. */
 const progressOf = (run: Run & { projectId: string }): OnboardingProgress => ({ step: run.step, done: run.done,
@@ -465,7 +470,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes, agent, labels))) return;
     const to = STEPS[STEPS.findIndex((s) => s.id === run.step) + by]?.id;
     if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done,
-      setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo) : null), cleanup: run.cleanup ?? (to === 'cleanup' ? NO_PICKS : null) } });
+      setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo, run.provider) : null), cleanup: run.cleanup ?? (to === 'cleanup' ? NO_PICKS : null) } });
     if (to === 'labels') void get().loadLabels();
     if (to === 'checks') void get().runChecks();
     if (to === 'cleanup') {

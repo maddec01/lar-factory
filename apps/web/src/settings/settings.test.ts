@@ -5,7 +5,7 @@
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
-import { clock, day, type BoardData, type BundledSkill, type ProfilesResult, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
+import { clock, day, type BoardData, type BundledSkill, type OnboardingProgress, type ProfilesResult, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { dialog, project, serve } from '../onboarding/onboarding-support.ts';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
@@ -180,6 +180,21 @@ test('each onboarded repository has Edit and Reset, and Add repository opens the
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('T3 project');
   expect(body().closest('[hidden]'), 'Settings stays open under the dialog').toBeNull();
+});
+
+test('an Azure DevOps repository still onboarding names its team’s sprint or backlog', async () => {
+  const setup = { projectOwner: 'contoso', projectNumber: '', team: 'Fabrikam Team', show: 'all' as const, showPicked: true, role: 'API' };
+  const progress = (itemSource: 'azure-sprint' | 'azure-backlog'): OnboardingProgress =>
+    ({ step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-api', provider: 'Azure DevOps', setup: { ...setup, itemSource } } });
+  const data: BoardData = { ...sample, onboarding: [
+    { repo: 'contoso/Fabrikam%20Fiber/lar-api', progress: progress('azure-sprint') },
+    { repo: 'contoso/Fabrikam%20Fiber/lar-web', progress: progress('azure-backlog') },
+  ] };
+  serve(data, []);
+  await open('Repositories', data);
+  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api'))).toBe(
+    'contoso/Fabrikam Fiber/lar-apiAzure DevOps · Fabrikam Team’s current sprint · All items · Onboarding, stopped at ChecksResumeReset');
+  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-web'))).toContain('Azure DevOps · Fabrikam Team’s backlog · All items');
 });
 
 test('a repository still onboarding is listed with its provider, the answers it has passed and its step, and Resume reopens the dialog there', async () => {

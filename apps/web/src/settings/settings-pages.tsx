@@ -98,6 +98,8 @@ const ITEM_SOURCES = { project: 'GitHub Project', issues: 'Issues', sprint: 'Cur
 const sourceName = (kind: keyof typeof ITEM_SOURCES, project?: { owner: string; number: number | string }, team?: string) =>
   kind === 'project' && project ? `${ITEM_SOURCES.project} ${project.owner} #${project.number}`
     : kind === 'sprint' && team ? `${team}’s current sprint` : kind === 'backlog' && team ? `${team}’s backlog` : ITEM_SOURCES[kind];
+/** Settings' name for each item source the setup step offers. */
+const SETUP_SOURCES = { 'github-project': 'project', issues: 'issues', 'azure-sprint': 'sprint', 'azure-backlog': 'backlog' } as const;
 const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
 
 /**
@@ -106,8 +108,8 @@ const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
  */
 function onboardingDescription(progress: OnboardingProgress): string {
   const { done, answers: { provider, setup } } = progress;
-  const answered = setup && done.includes('setup') ? [setup.itemSource === 'github-project'
-    ? sourceName('project', { owner: setup.projectOwner, number: setup.projectNumber }) : ITEM_SOURCES.issues, SHOWN[setup.show]] : [];
+  const answered = setup && done.includes('setup')
+    ? [sourceName(SETUP_SOURCES[setup.itemSource], { owner: setup.projectOwner, number: setup.projectNumber }, setup.team), SHOWN[setup.show]] : [];
   return [provider, ...answered, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
 }
 

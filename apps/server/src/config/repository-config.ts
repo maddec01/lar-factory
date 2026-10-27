@@ -80,10 +80,12 @@ function readJson(file: string): unknown {
 
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
+const SETUP_SOURCES: readonly SetupAnswers['itemSource'][] = ['github-project', 'issues', 'azure-sprint', 'azure-backlog'];
+
 /** Whether the Provider and item source step's answers have their shape. */
 function isSetup(value: unknown): value is SetupAnswers {
-  return isRecord(value) && (value.itemSource === 'github-project' || value.itemSource === 'issues')
-    && typeof value.projectOwner === 'string' && typeof value.projectNumber === 'string' && SHOW_SETTINGS.includes(value.show as ShowSetting)
+  return isRecord(value) && SETUP_SOURCES.includes(value.itemSource as SetupAnswers['itemSource'])
+    && (value.team === undefined || typeof value.team === 'string') && typeof value.projectOwner === 'string' && typeof value.projectNumber === 'string' && SHOW_SETTINGS.includes(value.show as ShowSetting)
     && typeof value.showPicked === 'boolean' && typeof value.role === 'string';
 }
 

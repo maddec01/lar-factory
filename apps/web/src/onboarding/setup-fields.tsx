@@ -12,7 +12,7 @@ import { Checkbox } from '@lar-factory/ui/checkbox';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { Input } from '@lar-factory/ui/input';
 import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
-import { setupProblems, suggestedShow, type SetupAction, type SetupChange } from './setup-answers.ts';
+import { byTeam, setupProblems, suggestedShow, type SetupAction, type SetupChange } from './setup-answers.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
 export function Choice({ value, title, children, disabled }: { value: string; title: ReactNode; children?: ReactNode; disabled?: boolean }) {
@@ -63,13 +63,19 @@ export const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opt
 
 type TextAnswer = keyof ReturnType<typeof setupProblems>;
 
+/** An Azure DevOps repository's project, as people read it: organization/project/repository's middle part, decoded. */
+function azureProject(repo: string): string {
+  const project = repo.split('/')[1] ?? '';
+  try { return decodeURIComponent(project); } catch { return project; }
+}
+
 /**
- * The setup fields for `repo`: item source, show setting with the suggested one marked, and Repository role. A text
- * answer's problem names `action`, the button that waits for it, and is muted help until its field is edited or left.
- * `disabled` locks the choices, which a disabled fieldset doesn't reach.
+ * The setup fields for `repo`: item source, with a Team field for an Azure DevOps one when `azure`, show setting with
+ * the suggested one marked, and Repository role. A text answer's problem names `action`, the button that waits for it,
+ * and is muted help until its field is edited or left. `disabled` locks the choices, which a disabled fieldset doesn't reach.
  */
-export function SetupFields({ repo, setup, action = 'Next', disabled, onAnswer }: {
-  repo: string; setup: SetupAnswers; action?: SetupAction; disabled?: boolean; onAnswer: (change: SetupChange) => void;
+export function SetupFields({ repo, azure = false, setup, action = 'Next', disabled, onAnswer }: {
+  repo: string; azure?: boolean; setup: SetupAnswers; action?: SetupAction; disabled?: boolean; onAnswer: (change: SetupChange) => void;
 }) {
   const suggested = suggestedShow(setup.itemSource);
   const problems = setupProblems(setup, action);
@@ -78,18 +84,29 @@ export function SetupFields({ repo, setup, action = 'Next', disabled, onAnswer }
   /** A text answer's problem, whether it's marked, and the handlers that mark it. */
   const textAnswer = (key: TextAnswer) => ({
     field: { problem: problems[key], invalid: touched.has(key) },
-    control: { value: setup[key], onBlur: () => touch(key), onChange: (e: { target: { value: string } }) => { touch(key); onAnswer({ [key]: e.target.value }); } },
+    control: { value: setup[key] ?? '', onBlur: () => touch(key), onChange: (e: { target: { value: string } }) => { touch(key); onAnswer({ [key]: e.target.value }); } },
   });
   const owner = textAnswer('projectOwner');
   const number = textAnswer('projectNumber');
+  const team = textAnswer('team');
   const role = textAnswer('role');
   return (<>
     <Group legend="Item source" hint="Where the board finds this repository’s items. It lists the items that can show.">
       <RadioGroup value={setup.itemSource} onValueChange={(v) => onAnswer({ itemSource: v as SetupAnswers['itemSource'] })} className="gap-2">
-        <Choice value="github-project" title="A GitHub Project" disabled={disabled}>A Project named by its owner and number, which other repositories may name too.</Choice>
-        <Choice value="issues" title="The repository’s issues" disabled={disabled}>{repo}’s own issues, with no extra fields.</Choice>
+        {azure ? (<>
+          <Choice value="azure-sprint" title="The team’s current sprint" disabled={disabled}>The requirement-level work items in the team’s current iteration, with their Tasks.</Choice>
+          <Choice value="azure-backlog" title="The team’s backlog" disabled={disabled}>The open requirement-level work items under the team’s area paths, in any sprint.</Choice>
+        </>) : (<>
+          <Choice value="github-project" title="A GitHub Project" disabled={disabled}>A Project named by its owner and number, which other repositories may name too.</Choice>
+          <Choice value="issues" title="The repository’s issues" disabled={disabled}>{repo}’s own issues, with no extra fields.</Choice>
+        </>)}
       </RadioGroup>
     </Group>
+    {byTeam(setup.itemSource) && (
+      <Field name="team" label="Team" hint={`The Azure DevOps team in ${azureProject(repo)} whose ${setup.itemSource === 'azure-sprint' ? 'sprint' : 'backlog'} the board reads.`} {...team.field}>
+        {(described) => <Input placeholder={`e.g. ${azureProject(repo)} Team`} {...team.control} {...described} />}
+      </Field>
+    )}
     {setup.itemSource === 'github-project' && (<>
       <Field name="project-owner" label="Project owner" hint="The GitHub user or organization that owns the Project." {...owner.field}>
         {(described) => <Input font="mono" {...owner.control} {...described} />}
@@ -103,7 +120,7 @@ export function SetupFields({ repo, setup, action = 'Next', disabled, onAnswer }
         {(['all', 'opted-in'] as const).map((show) => (
           <Choice key={show} value={show} disabled={disabled} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge variant="secondary" size="sm">Suggested</Badge>}</span>}>
             {show === 'all' ? 'Every open item from the item source; an item with no status counts as List.'
-              : `Only items that carry a status show; someone opts an item in by giving it ${setup.itemSource === 'github-project' ? 'the List Status' : 'the status-list label'}.`}
+              : `Only items that carry a status show; someone opts an item in by giving it ${setup.itemSource === 'github-project' ? 'the List Status' : azure ? 'the status-list tag' : 'the status-list label'}.`}
           </Choice>
         ))}
       </RadioGroup>

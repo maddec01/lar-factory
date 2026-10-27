@@ -1,0 +1,81 @@
+/* The loading screen over the board page: the lar Factory lockup, whose L draws itself, over the step line. */
+
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: --spacing(13) --spacing(6) --spacing(6); /* the title bar's height on top */
+  background: var(--background);
+  color: var(--foreground);
+  user-select: none;
+  -webkit-app-region: drag; /* nothing here is a control, so the window moves by it */
+}
+.loading-screen.is-leaving { opacity: 0; pointer-events: none; transition: opacity 600ms ease-in-out; }
+
+/* --- The lockup: the sidebar Brand's, scaled up. The mark is 0.705em, the cap height, and sits on the baseline, so
+   its top meets the top of the "l"; the box is trimmed to cap height and baseline, so the screen centres the lockup
+   on what you see, not on the font's line box. "lar" bold, "Factory" medium in the muted colour. -------------------- */
+
+.loading-lockup { --lockup: clamp(2.5rem, 9vw, 4rem); position: relative; font-size: var(--lockup); }
+.loading-wordmark { width: max-content; line-height: 1; text-box: trim-both cap alphabetic; }
+.loading-mark { display: inline; overflow: visible; width: 0.705em; height: 0.705em; vertical-align: baseline; }
+.loading-lar { margin-left: 0.266em; font-weight: 700; letter-spacing: -0.03em; }
+.loading-factory { margin-left: 0.26em; font-weight: 500; color: var(--muted-foreground); }
+
+/* The step line hangs below the baseline by half the lockup's size, clear of the "y", under the lockup's middle,
+   without moving the lockup off centre. Its slot stacks the old text and the new, so the line stays centred. */
+.loading-line {
+  position: absolute;
+  top: calc(100% + var(--lockup) * 0.5);
+  left: 50%;
+  translate: -50% 0;
+  font-size: var(--text-sm);
+  line-height: --spacing(5);
+  width: max-content; /* as wide as the text, up to the window, then it wraps */
+  max-width: min(36rem, calc(100vw - --spacing(12)));
+  text-align: center;
+  overflow-wrap: anywhere;
+  color: var(--muted-foreground);
+}
+.loading-line-slot { display: grid; justify-items: center; }
+.loading-line-slot > span { grid-area: 1 / 1; }
+
+/* The mark's finished state is the base: the filled L, the block and the words, with no trace. A screen that has
+   not drawn yet starts them hidden and plays the draw, unless the user prefers reduced motion. */
+.loading-mark-trace { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .loading-screen:not(.is-drawn) .loading-mark-trace {
+    display: inline;
+    stroke-dasharray: 1 2; /* a gap longer than the path, so a zero-length round cap paints no dot */
+    stroke-dashoffset: 1;
+    opacity: 0;
+    animation: loading-trace 900ms cubic-bezier(0.42, 0, 0.58, 1) 150ms forwards; /* SwiftUI's easeInOut(0.9).delay(0.15) */
+  }
+  .loading-screen:not(.is-drawn) .loading-mark-block {
+    opacity: 0;
+    transform: scale(0.6);
+    transform-box: fill-box;
+    transform-origin: right top; /* LarLogoMark's .topTrailing anchor */
+    animation: loading-settle 500ms cubic-bezier(0.2, 0.9, 0.3, 1) 800ms forwards; /* .spring(duration: 0.5), no bounce */
+  }
+  /* The filled L replaces the trace once it ends; the stroke covers the same outline, so the swap doesn't show. */
+  .loading-screen:not(.is-drawn) .loading-mark-fill { opacity: 0; animation: loading-show 0ms linear 1050ms forwards; }
+  .loading-screen:not(.is-drawn) :is(.loading-lar, .loading-factory) { opacity: 0; animation: loading-show 500ms ease-out 800ms forwards; }
+
+  /* A step change: the old line rolls up and out with a slight blur while the new one rolls in from below. */
+  .loading-roll-in { animation: loading-roll-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .loading-roll-out { animation: loading-roll-out 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+}
+
+@keyframes loading-trace {
+  0% { opacity: 0; stroke-dashoffset: 1; }
+  1% { opacity: 1; }
+  100% { opacity: 1; stroke-dashoffset: 0; }
+}
+@keyframes loading-settle { to { opacity: 1; transform: scale(1); } }
+@keyframes loading-show { to { opacity: 1; } }
+@keyframes loading-roll-in { from { opacity: 0; translate: 0 0.75em; filter: blur(--spacing(0.75)); } }
+@keyframes loading-roll-out { to { opacity: 0; translate: 0 -0.75em; filter: blur(--spacing(0.75)); } }

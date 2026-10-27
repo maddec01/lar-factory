@@ -83,9 +83,9 @@ afterEach(() => {
   vi.resetModules();
 });
 
-/** Serves the page with `data` at `hash`, then runs its entry until the first paint. */
-export async function mountPage(data: BoardData = sample, hash = ''): Promise<void> {
-  history.replaceState(null, '', `/${hash}`);
+/** Serves the page with `data` at `hash` and `search`, then runs its entry until the first paint. */
+export async function mountPage(data: BoardData = sample, hash = '', search = ''): Promise<void> {
+  history.replaceState(null, '', `/${search}${hash}`);
   const html = pageWithData(template, data);
   document.documentElement.innerHTML = new DOMParser().parseFromString(html, 'text/html').documentElement.innerHTML;
   await act(async () => {

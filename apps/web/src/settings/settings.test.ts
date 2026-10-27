@@ -166,12 +166,11 @@ test('a repository with an open Edit PR shows it on its row, with its link, unti
   expect(row(`repo-${sample.repos[0]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
 });
 
-test('Reset of an onboarded repository waits for build #385, and Add repository opens the onboarding dialog over Settings', async () => {
+test('each onboarded repository has Edit and Reset, and Add repository opens the onboarding dialog over Settings', async () => {
   serve(sample, [project('lar-web')]);
   await open('Repositories', sample);
-  expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled, b.title])).toEqual([
-    ...sample.repos.flatMap(() => [['Edit', false, ''], ['Reset', true, 'Resetting an onboarded repository arrives in build #385']]),
-    [' Add repository', false, '']]);
+  expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
+    ...sample.repos.flatMap(() => [['Edit', false], ['Reset', false]]), [' Add repository', false]]);
   await settle(() => $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === ' Add repository')!.click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('T3 project');

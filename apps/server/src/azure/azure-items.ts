@@ -7,10 +7,11 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { STATUSES, labelStatuses, statusLabel } from '@lar-factory/shared';
-import type { Blocker, IssueRef, Item } from '@lar-factory/shared';
+import type { Blocker, IssueRef, Item, LinkedPr } from '@lar-factory/shared';
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
+import { linkedPr, prIds, type AzurePr } from './azure-prs.ts';
 import { azureWrites } from './azure-writes.ts';
 
 /** Runs az with these arguments and resolves with its output, or throws its error. */
@@ -132,6 +133,17 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
     return (type, state) => byType.get(type)?.get(state);
   }
 
+  /** The PRs the work items link, each read once, by id; a PR az no longer finds is left out. */
+  async function prsOf(raws: readonly RawWorkItem[]): Promise<Map<number, LinkedPr>> {
+    const ids = [...new Set(raws.flatMap(prIds))];
+    const read = await Promise.all(ids.map((id) => call<AzurePr>(['repos', 'pr', 'show', '--id', String(id)]).catch((err: unknown) => {
+      // TF401180 is Azure's "pull request was not found".
+      if (err instanceof Error && /TF401180/.test(err.message)) return null;
+      throw err;
+    })));
+    return new Map(read.flatMap((pr) => (pr ? [[pr.pullRequestId, linkedPr(pr)] as const] : [])));
+  }
+
   return {
     async read() {
       const backlog = invoke<BacklogConfiguration>('work', 'backlogconfiguration', [`team=${team}`]);
@@ -180,10 +192,11 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
           blockers: linked(raw, 'System.LinkTypes.Dependency-Reverse').map(blocker),
           updatedAt: field(raw, 'System.ChangedDate'),
           closedAt: closed ? field(raw, 'Microsoft.VSTS.Common.ClosedDate') || field(raw, 'System.ChangedDate') : null,
-          linkedPrs: [],
+          linkedPrs: prIds(raw).flatMap((id) => shownPrs.get(id) ?? []),
           slices: [],
         };
       };
+      const shownPrs = await prsOf([...top, ...top.flatMap(childrenOf)]);
       const items = top.flatMap((raw) => {
         const children = childrenOf(raw);
         return [item(raw, null, children), ...children.map((child) => item(child, raw, []))];

@@ -4,7 +4,7 @@ import type { Item } from '@lar-factory/shared';
 import { mergeSources } from '../items/item-sources.ts';
 import type { ItemSource } from '../items/item-source.ts';
 import { azureSprint } from './azure-sprint.ts';
-import { STATES, fakeAz, type WorkItem } from './fake-az.ts';
+import { REPO_URL, STATES, fakeAz, type FakePr, type WorkItem } from './fake-az.ts';
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
 const TEAM = 'Fabrikam Team';
@@ -126,4 +126,24 @@ test('any other az failure fails the read, naming the repository', async () => {
   const az = fakeAz({ items: SPRINT, fail: () => new Error('az boards iteration failed: TF400813: not authorized') });
   const source = mergeSources([], new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint(REPO, TEAM, az.run)]]));
   await assert.rejects(source.read(), { message: `${REPO}: az boards iteration failed: TF400813: not authorized` });
+});
+
+test("a work item's linked PRs show their state from az repos pr show, a draft as open, with no checks; a deleted PR is left out", async () => {
+  const pr = (pullRequestId: number, status: FakePr['status'], more: Partial<FakePr> = {}): FakePr => ({ pullRequestId, status, sourceRefName: 'refs/heads/x', ...more });
+  const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'Active', prs: [41, 42, 43, 44, 45] }, { id: 11, type: 'Task', state: 'Active', parent: 1, prs: [41] }],
+    pullRequests: [pr(41, 'active'), pr(42, 'active', { isDraft: true, mergeStatus: 'conflicts' }),
+      pr(43, 'completed', { closedDate: '2026-10-22T09:00:00Z', description: 'Closes it' }), pr(44, 'abandoned', { mergeStatus: 'rejectedByPolicy' })] });
+  const [story, task] = (await azureSprint(REPO, TEAM, az.run).read()).items;
+  const url = (id: number) => `${REPO_URL}/pullrequest/${id}`;
+  assert.deepEqual(story!.linkedPrs, [
+    { number: 41, url: url(41), state: 'open', isDraft: false, body: '', mergedAt: null, checks: null, mergeState: 'can merge' },
+    { number: 42, url: url(42), state: 'open', isDraft: true, body: '', mergedAt: null, checks: null, mergeState: 'conflicts' },
+    { number: 43, url: url(43), state: 'merged', isDraft: false, body: 'Closes it', mergedAt: '2026-10-22T09:00:00Z', checks: null, mergeState: 'can merge' },
+    { number: 44, url: url(44), state: 'closed', isDraft: false, body: '', mergedAt: null, checks: null, mergeState: 'blocked' },
+  ]);
+  assert.deepEqual(task!.linkedPrs.map((p) => p.number), [41]);
+  // One az repos pr show per PR, however many items link it.
+  const shows = az.calls.filter((c) => c.slice(0, 3).join(' ') === 'repos pr show');
+  assert.deepEqual(shows.map((c) => c[c.indexOf('--id') + 1]).sort(), ['41', '42', '43', '44', '45']);
+  assert.ok(shows.every((c) => c[c.indexOf('--org') + 1] === 'https://dev.azure.com/contoso'));
 });

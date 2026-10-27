@@ -23,7 +23,8 @@ clarification questions and failures. On resume, reuse the existing plan and IDs
    prefer a matching open concept.
 3. Before drafting titles, bodies, context comments or the source record, read
    the destination's issue conventions and visibility/redaction rules.
-   Read each destination's visibility (`gh repo view --json visibility`). Every
+   Read each destination's visibility (`gh repo view --json visibility`, or on
+   Azure DevOps `az devops project show --project <project> --organization <org> --query visibility`). Every
    public surface, a Factory source record included, stays public-safe: no
    private logs, credentials, private hostnames, or sensitive paths or details.
    Source links, and destinations/URLs that expose private work, appear only
@@ -82,7 +83,9 @@ than repeat a possibly successful mutation.
    recorded. Keep the issue's status; call no `status.sh` for reuse.
 3. Otherwise create one issue with an actionable title, the selected
    improvement, useful context, safe provenance and the exact selection ID in
-   its body. First follow [label setup](issue-tracker.md#label-setup) for the
+   its body. An Azure DevOps destination gets a work item with
+   tags for labels and no label setup ([Azure DevOps](issue-tracker.md#azure-devops)).
+   On GitHub, first follow [label setup](issue-tracker.md#label-setup) for the
    **destination** repository, including the factory repository for a
    cross-repository concept captured from another repository. Do this after persisting the
    source plan; if setup fails, leave capture pending and retry setup before

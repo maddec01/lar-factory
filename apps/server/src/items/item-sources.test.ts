@@ -125,11 +125,11 @@ test('each read loads the configs first and builds the sources again only when t
   assert.deepEqual(sources.repos(), []);
   assert.equal((await sources.read()).title, 'maddec01/lar-apple');
   await sources.read();
-  configs = [config('maddec01/lar-apple', 'opted-in'), config('maddec01/lar-server')];
+  configs = [{ ...config('maddec01/lar-apple', 'opted-in'), labels: ['app: music'] }, config('maddec01/lar-server')];
   assert.equal((await sources.read()).title, 'maddec01/lar-apple,maddec01/lar-server');
   assert.deepEqual(built, [[], ['maddec01/lar-apple all'], ['maddec01/lar-apple opted-in', 'maddec01/lar-server all']]);
-  assert.deepEqual(sources.repos(), [{ repo: 'maddec01/lar-apple', role: 'role', items: 'issues', show: 'opted-in' },
-    { repo: 'maddec01/lar-server', role: 'role', items: 'issues', show: 'all' }]);
+  assert.deepEqual(sources.repos(), [{ repo: 'maddec01/lar-apple', role: 'role', items: 'issues', show: 'opted-in', labels: ['app: music'] },
+    { repo: 'maddec01/lar-server', role: 'role', items: 'issues', show: 'all', labels: [] }]);
 });
 
 test("a read whose configs can't be loaded fails, and writes keep going to the last sources", async () => {

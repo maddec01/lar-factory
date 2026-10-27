@@ -65,10 +65,9 @@ new build or `src/` change.
   update stay while their cause lasts. Closing is per page: a reload shows
   again whatever still holds.
 - **Add item** creates an issue in a configured repository and adds it to List.
-  Choose its kind and optional applicability labels. Empty applicability groups
-  mean all apps, all operating systems, or both server areas. The form keeps
-  your draft while the board refreshes. If project assignment fails after the
-  issue is created, its link and **Retry this submission** finish the same issue.
+  Choose its kind and any of the repository's custom labels, the `labels` in its
+  `.lar-factory.json`. The form keeps your draft while the board refreshes. If
+  project assignment fails after the issue is created, its link and **Retry this submission** finish the same issue.
 
 Creation and Queue use the same local `gh` login as reads and need permission
 to create issues and edit the lar project. Start runs the local `t3` CLI and

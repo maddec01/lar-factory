@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { SquarePen } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { applicability, ITEM_KINDS, noneOnboarded, repoName } from '@lar-factory/shared';
+import { ITEM_KINDS, noneOnboarded, repoName } from '@lar-factory/shared';
 import type { RepoConfig } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Checkbox } from '@lar-factory/ui/checkbox';
@@ -22,18 +22,18 @@ import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
 import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 
-/** The applicability checkboxes of one repo, each group with the hint for choosing none. Base UI's checkboxes
- * don't follow a native fieldset's disabled, so they take it themselves. */
-function Applicability({ repo, disabled }: { repo: RepoConfig; disabled: boolean }) {
-  return applicability(repo.repo).map((group, g) => (
-    <Fieldset className="applicability" aria-describedby={`item-hint-${g}`} key={group.title}>
-      <FieldsetLegend>{group.title}</FieldsetLegend>
+/** The repo's custom labels as toggles, none when it has none. Base UI's checkboxes don't follow a native
+ * fieldset's disabled, so they take it themselves. */
+function CustomLabels({ repo, disabled }: { repo: RepoConfig; disabled: boolean }) {
+  if (!repo.labels.length) return null;
+  return (
+    <Fieldset className="custom-labels">
+      <FieldsetLegend>Labels</FieldsetLegend>
       <div className="choices">
-        {group.labels.map((label) => <Label key={label}><Checkbox name="labels" value={label} disabled={disabled} />{label}</Label>)}
+        {repo.labels.map((label) => <Label key={label}><Checkbox name="labels" value={label} disabled={disabled} />{label}</Label>)}
       </div>
-      <p className="form-hint" id={`item-hint-${g}`}>{group.hint}</p>
     </Fieldset>
-  ));
+  );
 }
 
 function Result({ message }: { message: ResultMessage }) {
@@ -90,8 +90,8 @@ function AddItemForm() {
               </NativeSelect>
             </div>
           </div>
-          {/* Keyed by repo, so another repo's groups start unchecked. */}
-          {selected && <Applicability repo={selected} disabled={locked} key={selected.repo} />}
+          {/* Keyed by repo, so another repo's labels start unchecked. */}
+          {selected && <CustomLabels repo={selected} disabled={locked} key={selected.repo} />}
           <div className="form-field">
             <Label htmlFor="item-title">Title <span className="required-note">(required)</span></Label>
             <Input id="item-title" name="title" required maxLength={256} autoComplete="off" nativeInput />

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
-import { applicability, validateDraft } from './add-item.ts';
+import { validateDraft } from './add-item.ts';
 import { day, formatTokens, formatUsd, shortAgo } from './format.ts';
 
 function item(status: Status, labels: string[] = [], extra: Partial<Item> = {}): Item {
@@ -294,9 +294,9 @@ test('gh blocks every read while missing or logged out, and only Project reads w
   }
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'project'), true);
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'issues'), false);
-  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app' }), 'project');
-  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'project' }), 'project');
-  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'issues' }), 'issues');
+  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', labels: [] }), 'project');
+  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'project', labels: [] }), 'project');
+  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'issues', labels: [] }), 'issues');
 });
 
 test("a status's label is status- and its name in lowercase with hyphens for spaces", () => {
@@ -320,7 +320,7 @@ test('an item carrying more than one status moves only once one is kept, and say
 });
 
 test('a repository goes by its name, or by owner/name when another board repository shares the name; Draft stays Draft', () => {
-  const repos = [{ repo: 'maddec01/lar-server', role: 'api' }, { repo: 'maddec01/lar', role: 'app' }, { repo: 'fabrikam/lar', role: 'app' }];
+  const repos = [{ repo: 'maddec01/lar-server', role: 'api', labels: [] }, { repo: 'maddec01/lar', role: 'app', labels: [] }, { repo: 'fabrikam/lar', role: 'app', labels: [] }];
   assert.equal(repoName('maddec01/lar-server', repos), 'lar-server');
   assert.equal(repoName('maddec01/lar', repos), 'maddec01/lar');
   assert.equal(repoName('fabrikam/lar', repos), 'fabrikam/lar');
@@ -330,7 +330,7 @@ test('a repository goes by its name, or by owner/name when another board reposit
 });
 
 test('the board groups the List by repository, keyed by owner/name and named by name, then Draft', () => {
-  const repos = [{ repo: 'maddec01/lar', role: 'app' }, { repo: 'fabrikam/lar', role: 'app' }];
+  const repos = [{ repo: 'maddec01/lar', role: 'app', labels: [] }, { repo: 'fabrikam/lar', role: 'app', labels: [] }];
   const items = [item('List', [], { id: 'a', repo: 'fabrikam/lar' }), item('List', [], { id: 'b', repo: null }), item('List', [], { id: 'c', repo: 'maddec01/lar' })];
   const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
   assert.deepEqual(groups.map((g) => [g.repo, g.name, g.items.map((i) => i.id)]), [
@@ -341,22 +341,22 @@ test('the board groups the List by repository, keyed by owner/name and named by 
 test("a repository's owner/name matches whatever its case, as GitHub's does, so a hand-written spelling still finds its items", () => {
   assert.equal(sameRepo('Maddec01/Lar-Factory', 'maddec01/lar-factory'), true);
   assert.equal(sameRepo('maddec01/lar-factory', 'maddec01/lar-server'), false);
-  const repos = [{ repo: 'Maddec01/lar', role: 'app' }, { repo: 'fabrikam/lar', role: 'app' }];
+  const repos = [{ repo: 'Maddec01/lar', role: 'app', labels: [] }, { repo: 'fabrikam/lar', role: 'app', labels: [] }];
   assert.equal(repoName('maddec01/lar', repos), 'maddec01/lar', 'the same repository in another case is not a second one');
-  assert.equal(repoName('maddec01/lar', [{ repo: 'Maddec01/lar', role: 'app' }]), 'lar');
+  assert.equal(repoName('maddec01/lar', [{ repo: 'Maddec01/lar', role: 'app', labels: [] }]), 'lar');
   const items = [item('List', [], { id: 'a', repo: 'maddec01/lar' }), item('List', [], { id: 'b', repo: 'fabrikam/lar' })];
   const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
   assert.deepEqual(groups.map((g) => [g.repo, g.items.map((i) => i.id)]), [['Maddec01/lar', ['a']], ['fabrikam/lar', ['b']]]);
 });
 
-test('Add item offers apps and OSes for lar-apple, areas for lar-server and nothing for any other repository', () => {
-  assert.deepEqual(applicability('maddec01/lar-apple').map((g) => g.title), ['Apps', 'Operating systems']);
-  assert.deepEqual(applicability('maddec01/lar-server').map((g) => g.title), ['Areas']);
-  assert.deepEqual(applicability('fabrikam/lar-apple'), []);
-  assert.deepEqual(applicability('maddec01/lar-factory'), []);
-  const draft = { repo: 'maddec01/lar-server', kind: 'bug', title: 't', description: '', labels: ['area: web'] };
-  assert.deepEqual(validateDraft(draft, sample.repos).labels, ['area: web']);
-  assert.throws(() => validateDraft({ ...draft, labels: ['app: music'] }, sample.repos), /applicability/);
+test("Add item accepts only the chosen repository's custom labels, which may hold a colon", () => {
+  const repos = [{ repo: 'maddec01/lar-apple', role: 'app', labels: ['app: music', 'os: ios'] }, { repo: 'maddec01/lar-factory', role: 'factory', labels: [] }];
+  const draft = { repo: 'maddec01/lar-apple', kind: 'bug', title: 't', description: '', labels: ['app: music', 'app: music'] };
+  assert.deepEqual(validateDraft(draft, repos).labels, ['app: music']);
+  assert.throws(() => validateDraft({ ...draft, labels: ['area: web'] }, repos), /custom labels/);
+  assert.throws(() => validateDraft({ ...draft, labels: ['bug'] }, repos), /custom labels/, 'a workflow label is no custom label');
+  assert.throws(() => validateDraft({ ...draft, repo: 'maddec01/lar-factory' }, repos), /custom labels/, 'a repository with no labels takes none');
+  assert.deepEqual(validateDraft({ ...draft, repo: 'maddec01/lar-factory', labels: [] }, repos).labels, []);
 });
 
 test('Add item refuses an unlisted repository, an unknown kind, a blank title and labels from another repository', () => {

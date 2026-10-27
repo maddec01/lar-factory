@@ -313,6 +313,8 @@ export interface RepoConfig {
   project?: { owner: string; number: number };
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
+  /** Its custom labels, the `labels` in its .lar-factory.json, which Add item offers and the queue shows. */
+  labels: string[];
 }
 
 export const ITEM_SOURCE_KINDS = ['project', 'issues'] as const;

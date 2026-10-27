@@ -5,7 +5,7 @@ import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle } from
 import type { BoardData } from '@lar-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [
-  ...sample.repos, { repo: 'maddec01/lar-factory', role: 'The factory' },
+  ...sample.repos, { repo: 'maddec01/lar-factory', role: 'The factory', labels: [] }, { repo: 'maddec01/lar-empty', role: 'Empty', labels: [] },
 ] };
 const addButton = () => $<HTMLButtonElement>('.add-item')!;
 const dialog = () => $('#add-item-dialog');
@@ -41,14 +41,15 @@ const respond = (body: object, status = 200) => fetchMock.mockImplementationOnce
 const created = { number: 501, html_url: 'https://github.com/maddec01/lar-server/issues/501' };
 const posted = () => JSON.parse(String((fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>;
 
-test('Add item opens a dialog with the configured repositories, kinds, and the selected repo\'s applicability', async () => {
+test('Add item opens a dialog with the configured repositories, kinds, and the selected repo\'s custom labels', async () => {
   await open();
   const popup = dialog()!;
   expect(popup.getAttribute('role')).toBe('dialog');
   expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Add item');
   expect(document.activeElement, 'focus starts on the repo select').toBe(field('item-repo'));
   expect($$<HTMLOptionElement>('#item-repo option').map((o) => [o.value, o.textContent])).toEqual([
-    ['maddec01/lar-server', 'lar-server'], ['maddec01/lar-apple', 'lar-apple'], ['maddec01/lar-factory', 'lar-factory']]);
+    ['maddec01/lar-server', 'lar-server'], ['maddec01/lar-apple', 'lar-apple'], ['maddec01/lar-factory', 'lar-factory'],
+    ['maddec01/lar-empty', 'lar-empty']]);
   expect($$<HTMLOptionElement>('#item-kind option').map((o) => o.value)).toEqual(['', 'bug', 'feature', 'improvement']);
   expect($('label[for="item-title"]')!.textContent).toBe('Title (required)');
   expect(field('item-title').required).toBe(true);
@@ -57,12 +58,10 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
   expect(popup.textContent).toContain('Create an issue in lar-server and add it to List.');
 
   expect(labels()).toEqual(['area: server', 'area: web']);
-  expect(popup.textContent).toContain('Selecting neither means both server and web.');
-  const hint = $('.applicability')!.getAttribute('aria-describedby')!;
-  expect(document.getElementById(hint)!.textContent).toBe('Selecting neither means both server and web.');
+  expect($('.custom-labels')!.textContent).toBe('Labelsarea: serverarea: web');
 });
 
-test('changing the repo shows its applicability, unchecked, and a repo with none shows no group', async () => {
+test('changing the repo shows its custom labels, unchecked, and a repo with none or an empty list shows no toggles', async () => {
   await open();
   await settle(() => box('area: web').click());
   await enter(field<HTMLSelectElement>('item-kind'), 'bug');
@@ -70,11 +69,11 @@ test('changing the repo shows its applicability, unchecked, and a repo with none
   expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-apple');
   expect(field<HTMLSelectElement>('item-kind').value, 'the kind stays').toBe('bug');
   expect(labels()).toEqual(['app: music', 'app: video', 'app: photos', 'app: books', 'os: ios', 'os: macos', 'os: tvos', 'os: watchos']);
-  expect(dialog()!.textContent).toContain('No apps selected means all apps.');
-  expect(dialog()!.textContent).toContain('No OSes selected means all OSes.');
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-factory');
   expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-factory');
-  expect($('.applicability')).toBeNull();
+  expect($('.custom-labels'), 'no .lar-factory.json labels').toBeNull();
+  await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-empty');
+  expect($('.custom-labels'), 'an empty labels').toBeNull();
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-server');
   expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-server');
   expect(field<HTMLSelectElement>('item-kind').value, 'the kind stays').toBe('bug');

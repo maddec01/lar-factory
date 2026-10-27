@@ -6,12 +6,14 @@
     {
       "repo": "maddec01/lar-server",
       "path": "~/test/lar-server",
-      "role": "Backend API server"
+      "role": "Backend API server",
+      "labels": ["area: server", "area: web"]
     },
     {
       "repo": "maddec01/lar-apple",
       "path": "~/test/lar-apple",
-      "role": "Apple client app"
+      "role": "Apple client app",
+      "labels": ["app: music", "app: video", "app: photos", "app: books", "os: ios", "os: macos", "os: tvos", "os: watchos"]
     }
   ],
   "refreshSeconds": 45,

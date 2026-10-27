@@ -269,3 +269,11 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(false);
   expect(submit().textContent).toBe('Add to List');
 });
+
+test('on an Azure repository, the custom tags are headed Tags', async () => {
+  const azure: BoardData = { ...withFactory, capture: { session: 's1', enabled: true },
+    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: ['area: web'] }] };
+  await open(azure);
+  await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam/web');
+  expect($('.custom-labels')!.textContent).toBe('Tagsarea: web');
+});

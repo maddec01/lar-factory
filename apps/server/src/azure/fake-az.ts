@@ -33,8 +33,8 @@ export const STATES: Record<string, [string, string][]> = {
 /**
  * A fake az for one team whose current sprint holds `sprint`'s ids and whose requirement backlog lists `backlog`'s,
  * reading `items` (listed or not), with `requirement` its requirement backlog level's type and `areas` its area paths.
- * `pullRequests` are the PRs az repos pr show prints. It records each call and each work item patch, and `fail` throws for a
- * call it matches.
+ * `pullRequests` are the PRs az repos pr show prints. It records each call, each work item patch and each work item created,
+ * and `fail` throws for a call it matches.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
   requirement = 'User Story', areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], fail }: {
@@ -52,6 +52,8 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   const batches: number[][] = [];
   /** Each work item patch's id and operations, read from its --in-file while the file exists. */
   const patches: { id: number; ops: unknown[] }[] = [];
+  /** Each work item created, with its id, type and operations; it joins the items the fake reads. */
+  const created: { id: number; type: string; ops: { path: string; value: unknown }[] }[] = [];
   const byId = new Map(items.map((i) => [i.id, i]));
   const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
   const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
@@ -92,7 +94,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
     if (args[0] === 'devops' && args[1] === 'invoke') {
       const resource = `${flag(args, '--area')}/${flag(args, '--resource')}`;
       if (resource === 'work/backlogconfiguration') {
-        return JSON.stringify({ requirementBacklog: { id: 'Microsoft.RequirementCategory', workItemTypes: [{ name: requirement }] },
+        return JSON.stringify({ requirementBacklog: { id: 'Microsoft.RequirementCategory', workItemTypes: [{ name: requirement }], defaultWorkItemType: { name: requirement } },
           taskBacklog: { id: 'Microsoft.TaskCategory', workItemTypes: [{ name: 'Task' }] } });
       }
       if (resource === 'work/workitems' && route(args, 'backlogId') === 'Microsoft.RequirementCategory') {
@@ -107,6 +109,15 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         const found = ids.flatMap((id) => byId.has(id) ? [raw(byId.get(id)!)] : []);
         return JSON.stringify({ count: found.length, value: found });
       }
+      if (resource === 'wit/workitems' && route(args, 'type')) {
+        const type = route(args, 'type')!;
+        const ops = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { path: string; value: unknown }[];
+        const value = (path: string) => ops.find((op) => op.path === path)?.value as string | undefined;
+        const id = Math.max(100, ...byId.keys()) + 1;
+        created.push({ id, type, ops });
+        byId.set(id, { id, type, state: STATES[type]![0]![0], title: value('/fields/System.Title'), tags: value('/fields/System.Tags') });
+        return JSON.stringify(raw(byId.get(id)!));
+      }
       if (resource === 'wit/workitems') {
         const id = Number(route(args, 'id'));
         if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
@@ -120,7 +131,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
     }
     throw new Error(`fake az: unexpected ${args.join(' ')}`);
   };
-  return { calls, batches, patches, run };
+  return { calls, batches, patches, created, run };
 }
 
 /** A pull request on the fake repository, as az repos pr show prints it. */

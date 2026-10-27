@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { SquarePen } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { ITEM_KINDS, noneOnboarded, repoName } from '@lar-factory/shared';
+import { ITEM_KINDS, noneOnboarded, onAzure, repoName } from '@lar-factory/shared';
 import type { RepoConfig } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Checkbox } from '@lar-factory/ui/checkbox';
@@ -22,13 +22,13 @@ import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
 import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 
-/** The repo's custom labels as toggles, none when it has none. Base UI's checkboxes don't follow a native
+/** The repo's custom labels, or tags on Azure DevOps, as toggles, none when it has none. Base UI's checkboxes don't follow a native
  * fieldset's disabled, so they take it themselves. */
 function CustomLabels({ repo, disabled }: { repo: RepoConfig; disabled: boolean }) {
   if (!repo.labels.length) return null;
   return (
     <Fieldset className="custom-labels">
-      <FieldsetLegend>Labels</FieldsetLegend>
+      <FieldsetLegend>{onAzure(repo.repo) ? 'Tags' : 'Labels'}</FieldsetLegend>
       <div className="choices">
         {repo.labels.map((label) => <Label key={label}><Checkbox name="labels" value={label} disabled={disabled} />{label}</Label>)}
       </div>

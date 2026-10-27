@@ -11,6 +11,7 @@ import type { Blocker, IssueRef, Item, LinkedPr } from '@lar-factory/shared';
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
+import { azureCreate } from './azure-create.ts';
 import { linkedPr, prIds, type AzurePr } from './azure-prs.ts';
 import { azureWrites } from './azure-writes.ts';
 
@@ -21,7 +22,6 @@ export type Az = (args: string[]) => Promise<string>;
 const API_VERSION = '7.1';
 /** The most ids one workitemsbatch call reads. */
 const BATCH = 200;
-const NO_CREATE = 'The board does not create Azure DevOps work items yet. Create it in Azure DevOps.';
 
 export async function az(args: string[]): Promise<string> {
   const command = toolCommand('az');
@@ -61,9 +61,9 @@ export function decoded(name: string): string {
   catch { return name; }
 }
 
-/** The team's backlog levels: the requirement level's id and types, and the task level's types. */
+/** The team's backlog levels: the requirement level's id, types and default type, and the task level's types. */
 interface BacklogConfiguration {
-  requirementBacklog: { id: string; workItemTypes: { name: string }[] };
+  requirementBacklog: { id: string; workItemTypes: { name: string }[]; defaultWorkItemType: { name: string } };
   taskBacklog: { workItemTypes: { name: string }[] };
 }
 
@@ -74,8 +74,8 @@ export interface AzureCalls {
   project: string;
   /** `az boards iteration team <args>` for the team. */
   boards: <T>(args: string[]) => Promise<T>;
-  /** `az devops invoke` on the area's resource, routed to the project and then `route`. */
-  invoke: <T>(area: string, resource: string, route: string[], more?: string[]) => Promise<T>;
+  /** `az devops invoke` on the area's resource, routed to the project and then `route`, at REST API `version` (7.1 by default). */
+  invoke: <T>(area: string, resource: string, route: string[], more?: string[], version?: string) => Promise<T>;
   /** The work items' fields and links, reading at most 200 ids a call; an id az no longer finds is left out. */
   workItems: (ids: readonly number[]) => Promise<RawWorkItem[]>;
   /** The team's backlog levels, read once a read. */
@@ -105,8 +105,12 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
     catch (err) { throw problemOf(err); }
   };
   const boards = <T>(args: string[]) => call<T>(['boards', 'iteration', 'team', ...args, '--team', team, '--project', project]);
-  const invoke = <T>(area: string, resource: string, route: string[], more: string[] = []) =>
-    call<T>(['devops', 'invoke', '--area', area, '--resource', resource, '--route-parameters', `project=${project}`, ...route, ...more, '--api-version', API_VERSION]);
+  const invoke = <T>(area: string, resource: string, route: string[], more: string[] = [], version = API_VERSION) =>
+    call<T>(['devops', 'invoke', '--area', area, '--resource', resource, '--route-parameters', `project=${project}`, ...route, ...more, '--api-version', version]);
+  const backlogOf = () => invoke<BacklogConfiguration>('work', 'backlogconfiguration', [`team=${team}`]);
+  const url = (id: number) => `https://dev.azure.com/${organization}/${encoded}/_workitems/edit/${id}`;
+  const itemId = (id: number) => `azure:${organization.toLowerCase()}/${id}`;
+  const labelsOf = (raw: RawWorkItem) => tagsOf(raw).filter((t) => !STATUS_TAGS.has(t));
 
   /** The work items' fields and links, reading at most BATCH ids a call; an id az no longer finds is left out. */
   async function workItems(ids: readonly number[]): Promise<RawWorkItem[]> {
@@ -146,7 +150,7 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
 
   return {
     async read() {
-      const backlog = invoke<BacklogConfiguration>('work', 'backlogconfiguration', [`team=${team}`]);
+      const backlog = backlogOf();
       const [{ title, items: listed, completed }, levels] = await Promise.all([
         list({ organization, project, boards, invoke, workItems, backlog }), backlog]);
       const inListing = new Set(listed.map((raw) => raw.id));
@@ -159,7 +163,6 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
       const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
       const tasks = new Set(levels.taskBacklog.workItemTypes.map((t) => t.name));
 
-      const url = (id: number) => `https://dev.azure.com/${organization}/${encoded}/_workitems/edit/${id}`;
       const done = (raw: RawWorkItem) => category(raw) === 'Completed';
       const ref = (raw: RawWorkItem): IssueRef => ({ number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), repo, state: done(raw) ? 'closed' : 'open' });
       const blocker = (id: number): Blocker => {
@@ -176,7 +179,7 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
         const statuses = labelStatuses(tags);
         const closed = done(raw);
         return {
-          id: `azure:${organization.toLowerCase()}/${raw.id}`,
+          id: itemId(raw.id),
           status: closed ? 'Done' : statuses[0] ?? 'List',
           statuses,
           content: 'ticket',
@@ -184,7 +187,7 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
           title: field(raw, 'System.Title'),
           url: url(raw.id),
           repo,
-          labels: tags.filter((t) => !STATUS_TAGS.has(t)),
+          labels: labelsOf(raw),
           state: closed ? 'closed' : 'open',
           closedAs: closed ? 'done' : null,
           parent: parent && ref(parent),
@@ -204,6 +207,11 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
       return { title, items };
     },
     ...azureWrites(project, invoke),
-    create: async () => ({ item: null, issueUrl: null, error: NO_CREATE }),
+    // A new work item is in its type's first state, Proposed, so it shows open in List.
+    create: azureCreate(project, invoke, async () => (await backlogOf()).requirementBacklog.defaultWorkItemType.name, (raw) => ({
+      id: itemId(raw.id), status: 'List', statuses: ['List'], content: 'ticket', number: raw.id, title: field(raw, 'System.Title'),
+      url: url(raw.id), repo, labels: labelsOf(raw), state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 },
+      blockers: [], updatedAt: field(raw, 'System.ChangedDate'), closedAt: null, linkedPrs: [], slices: [],
+    })),
   };
 }

@@ -144,7 +144,10 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         const id = Number(route(args, 'id'));
         if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
         if (args.includes('--http-method')) patches.push({ id, ops: JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as unknown[] });
-        return JSON.stringify(raw(byId.get(id)!, flag(args, '--api-version')));
+        // A single work item read carries its links only when asked with $expand=relations.
+        const read = raw(byId.get(id)!, flag(args, '--api-version'));
+        const expanded = args.some((a) => /^\$expand=(relations|all)$/i.test(a));
+        return JSON.stringify(args.includes('--http-method') || expanded ? read : { ...read, relations: undefined });
       }
       if (resource === 'wit/comments') {
         // Newest first, $top at a time; the continuation token is how many it has already given.

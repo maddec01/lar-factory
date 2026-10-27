@@ -18,7 +18,6 @@ import { log } from './log.ts';
 import { createClashRuns } from './onboarding/clash-runs.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
-import { finishOnboarding } from './onboarding/finish-onboarding.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr } from './onboarding/onboarding-pr.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
@@ -315,7 +314,7 @@ const { server, endStreams } = createBoardServer({
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input), findFixedClashes: (input) => findFixedClashes(input),
-  startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo), finishOnboarding: (input) => finishOnboarding(input, undefined, undefined, configChecks.forget),
+  startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo),
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
 });
 

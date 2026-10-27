@@ -1,22 +1,26 @@
 // Edit's dialog over Settings › Repositories: onboarding's setup fields and custom label picker, filled in from the
-// repository's .lar-factory.json on its default branch, then Cancel and Save, which opens a PR on that file.
+// repository's .lar-factory.json on its open Edit PR's branch or else its default branch, then Cancel and Save, which
+// opens a PR on that file or adds a commit to the open one. While Save runs the fields, Cancel and Esc wait for it.
 
 import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Button } from '@lar-factory/ui/button';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
 import { CustomLabelPicker, SetupFields } from '../onboarding/setup-fields.tsx';
-import { type EditForm, canSave, useEditStore } from './edit-store.ts';
+import { prName } from '../onboarding/steps.tsx';
+import { type EditForm, canSave, unchanged, useEditStore } from './edit-store.ts';
 
 function Form({ repo, form }: { repo: string; form: EditForm }) {
   const { answer, toggle, type, add } = useEditStore();
   return (
-    <div className="grid gap-5">
-      <SetupFields repo={repo} setup={form.setup} action="Save" onAnswer={answer} />
-      <CustomLabelPicker repo={repo} offered={form.offered} picked={form.picked} typed={form.typed} adding={false} busy={form.saving} error={null}
+    <fieldset disabled={form.saving} className="m-0 grid min-w-0 gap-5 border-0 p-0">
+      {form.editPr && <p data-edit-pr className="m-0 text-sm">These values come from <a className="font-medium underline" href={form.editPr} target="_blank" rel="noopener">
+        {prName(form.editPr)}</a>, its open Edit PR. Save adds a commit to that PR.</p>}
+      <SetupFields repo={repo} setup={form.setup} action="Save" disabled={form.saving} onAnswer={answer} />
+      <CustomLabelPicker repo={repo} offered={form.offered} picked={form.picked} typed={form.typed} adding={false} busy={form.saving} error={null} disabled={form.saving}
         onToggle={toggle} onType={type} onAdd={add} />
       {form.error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t save</AlertTitle><AlertDescription>{form.error}</AlertDescription></Alert>}
-    </div>
+    </fieldset>
   );
 }
 
@@ -40,7 +44,8 @@ export function EditDialog() {
             {form?.state === 'loaded' && <Form repo={edit.repo} form={form} />}
           </DialogPanel>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" size="sm" />}>Cancel</DialogClose>
+            {form?.state === 'loaded' && unchanged(form) && <span data-no-changes className="self-center text-xs text-muted-foreground sm:me-auto">No changes yet</span>}
+            <DialogClose disabled={form?.state === 'loaded' && form.saving} render={<Button variant="outline" size="sm" />}>Cancel</DialogClose>
             <Button data-save size="sm" disabled={form?.state !== 'loaded' || !canSave(form)} onClick={() => void save()}>
               {form?.state === 'loaded' && form.saving ? <><LoaderCircle className="animate-spin" /> Saving…</> : 'Save'}</Button>
           </DialogFooter>

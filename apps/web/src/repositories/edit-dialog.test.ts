@@ -1,6 +1,6 @@
 // Edit in Settings › Repositories: the dialog loads the repository's .lar-factory.json values and labels into
-// onboarding's setup fields and custom label picker, holds Save while a field has a problem or nothing changed, and
-// Save opens the PR, keeping the dialog and its answers with gh's message when that fails.
+// onboarding's setup fields and custom label picker, holds Save while a field has a problem or nothing changed, saying
+// so then, and Save opens the PR, keeping the dialog and its answers with gh's message when that fails.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, fetchMock, mountPage, sample, settle, text, toast } from '../../test/support.ts';
@@ -13,13 +13,17 @@ const LABELS = [...WORKFLOW_LABELS.map((l) => l.name), 'area: server', 'area: we
 
 type Answer = { status?: number; body: object };
 
-/** Serves the sample as the board, `load` for Edit's load and `pr` for its Save, and returns the bodies each got. */
-function serve(load: Answer = { body: { config: CONFIG, labels: LABELS, error: null } }, pr: Answer = { body: { prUrl: PR, error: null } }) {
+/**
+ * Serves the sample as the board, `load` for Edit's load and `pr` for its Save, once it settles, and returns the bodies
+ * each got.
+ */
+function serve(load: Answer = { body: { config: CONFIG, labels: LABELS, error: null } }, pr: Answer | Promise<Answer> = { body: { prUrl: PR, error: null } }) {
   const sent: Record<string, object[]> = {};
   fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
-    const answer = url === '/api/repositories/config' ? load : url === '/api/repositories/config/pr' ? pr : null;
-    if (!answer) return new Response(JSON.stringify(sample));
+    const pending = url === '/api/repositories/config' ? load : url === '/api/repositories/config/pr' ? pr : null;
+    if (!pending) return new Response(JSON.stringify(sample));
     (sent[url] ??= []).push(JSON.parse(String(init?.body)));
+    const answer = await pending;
     return new Response(JSON.stringify(answer.body), { status: answer.status ?? 200 });
   }) as typeof fetchMock);
   return sent;
@@ -33,6 +37,12 @@ const checked = (selector: string) => $(`[data-edit-dialog] ${selector}`)!.getAt
 async function type(into: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(into, value);
   await settle(() => into.dispatchEvent(new Event('input', { bubbles: true })));
+}
+
+/** Presses `key` on `el`, as a keyboard does. */
+async function press(el: Element, key: string): Promise<void> {
+  await settle(() => el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+  await settle(() => el.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true })));
 }
 
 /** Opens Settings › Repositories and presses the repository's Edit. */
@@ -57,6 +67,11 @@ test("Edit opens with the default branch's item source, Project, show setting, r
   expect($$('[data-edit-dialog] [data-custom]').map((li) => [li.getAttribute('data-custom'), li.querySelector('[role="checkbox"]')!.getAttribute('aria-checked')]))
     .toEqual([['area: server', 'true'], ['area: web', 'false']]);
   expect(save().disabled, 'nothing changed yet').toBe(true);
+  expect(text(dialog()!.querySelector('[data-no-changes]'))).toBe('No changes yet');
+  await type(input('role'), 'API server');
+  expect(dialog()!.querySelector('[data-no-changes]')).toBeNull();
+  await type(input('role'), 'Backend API server');
+  expect(text(dialog()!.querySelector('[data-no-changes]')), 'back to the file’s values').toBe('No changes yet');
 });
 
 test('a field problem holds Save as it holds Next in onboarding', async () => {
@@ -72,8 +87,8 @@ test('a field problem holds Save as it holds Next in onboarding', async () => {
   expect(save().disabled).toBe(false);
 });
 
-test('Save sends the answers with the labels picked and typed, then closes and says where the PR is', async () => {
-  const sent = serve();
+test('Save sends the answers with the labels picked and typed, then closes, says where the PR is and shows it on the row', async () => {
+  const sent = serve(undefined, { body: { prUrl: PR, error: null, board: { ...sample, repos: sample.repos.map((r) => r.repo === REPO ? { ...r, editPr: PR } : r) } } });
   await openEdit();
   await settle(() => $('[data-edit-dialog] [data-choice="issues"] [role="radio"]')!.click());
   await settle(() => $('[data-edit-dialog] [data-custom="area: web"] [role="checkbox"]')!.click());
@@ -86,6 +101,40 @@ test('Save sends the answers with the labels picked and typed, then closes and s
   await settle(() => vi.advanceTimersByTime(500));
   expect(dialog()).toBeNull();
   expect(toast()!.querySelector('a')!.getAttribute('href')).toBe(PR);
+  expect($(`.settings-row[data-row="repo-${REPO}"] [data-edit-pr]`)!.getAttribute('href')).toBe(PR);
+});
+
+test("Edit with an Edit PR open says its values come from that PR, and Save says it added them to it", async () => {
+  serve({ body: { config: CONFIG, labels: LABELS, editPr: PR, error: null } });
+  await openEdit();
+  const note = dialog()!.querySelector('[data-edit-pr]')!;
+  expect(text(note)).toBe('These values come from maddec01/lar-server#21, its open Edit PR. Save adds a commit to that PR.');
+  expect(note.querySelector('a')!.getAttribute('href')).toBe(PR);
+  await type(input('role'), 'API server');
+  await settle(() => save().click());
+  await settle(() => vi.advanceTimersByTime(500));
+  expect(text(toast()!)).toContain('Added the new values to maddec01/lar-server’s Edit PR.');
+  expect(toast()!.querySelector('a')!.getAttribute('href')).toBe(PR);
+});
+
+test('while Save runs, the fields, choices, custom labels and Cancel are disabled and Esc keeps the dialog open', async () => {
+  let answer!: (answer: Answer) => void;
+  serve(undefined, new Promise<Answer>((resolve) => { answer = resolve; }));
+  await openEdit();
+  await type(input('role'), 'API server');
+  await settle(() => save().click());
+  const cancel = [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === 'Cancel')!;
+  expect([input('role').matches(':disabled'), $<HTMLInputElement>('[data-edit-dialog] [data-new-custom]')!.matches(':disabled'), cancel.disabled])
+    .toEqual([true, true, true]);
+  await press($('[data-edit-dialog] [data-choice="issues"] [role="radio"]')!, ' ');
+  await press($('[data-edit-dialog] [data-custom="area: web"] [role="checkbox"]')!, ' ');
+  expect([checked('[data-choice="github-project"] [role="radio"]'), checked('[data-custom="area: web"] [role="checkbox"]')], 'the answers Save sends stay').toEqual(['true', 'false']);
+  await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await settle(() => vi.advanceTimersByTime(500));
+  expect(dialog()).not.toBeNull();
+  await settle(() => answer({ body: { prUrl: PR, error: null } }));
+  await settle(() => vi.advanceTimersByTime(500));
+  expect(dialog()).toBeNull();
 });
 
 test("a Save that fails shows gh's message and keeps the dialog open with the answers", async () => {

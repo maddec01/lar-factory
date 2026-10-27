@@ -66,8 +66,11 @@ type TextAnswer = keyof ReturnType<typeof setupProblems>;
 /**
  * The setup fields for `repo`: item source, show setting with the suggested one marked, and Repository role. A text
  * answer's problem names `action`, the button that waits for it, and is muted help until its field is edited or left.
+ * `disabled` locks the choices, which a disabled fieldset doesn't reach.
  */
-export function SetupFields({ repo, setup, action = 'Next', onAnswer }: { repo: string; setup: SetupAnswers; action?: SetupAction; onAnswer: (change: SetupChange) => void }) {
+export function SetupFields({ repo, setup, action = 'Next', disabled, onAnswer }: {
+  repo: string; setup: SetupAnswers; action?: SetupAction; disabled?: boolean; onAnswer: (change: SetupChange) => void;
+}) {
   const suggested = suggestedShow(setup.itemSource);
   const problems = setupProblems(setup, action);
   const [touched, setTouched] = useState<ReadonlySet<TextAnswer>>(new Set());
@@ -83,8 +86,8 @@ export function SetupFields({ repo, setup, action = 'Next', onAnswer }: { repo: 
   return (<>
     <Group legend="Item source" hint="Where the board finds this repository’s items. It lists the items that can show.">
       <RadioGroup value={setup.itemSource} onValueChange={(v) => onAnswer({ itemSource: v as SetupAnswers['itemSource'] })} className="gap-2">
-        <Choice value="github-project" title="A GitHub Project">A Project named by its owner and number, which other repositories may name too.</Choice>
-        <Choice value="issues" title="The repository’s issues">{repo}’s own issues, with no extra fields.</Choice>
+        <Choice value="github-project" title="A GitHub Project" disabled={disabled}>A Project named by its owner and number, which other repositories may name too.</Choice>
+        <Choice value="issues" title="The repository’s issues" disabled={disabled}>{repo}’s own issues, with no extra fields.</Choice>
       </RadioGroup>
     </Group>
     {setup.itemSource === 'github-project' && (<>
@@ -98,7 +101,7 @@ export function SetupFields({ repo, setup, action = 'Next', onAnswer }: { repo: 
     <Group legend="Show" hint="Which of the item source’s items show on the board.">
       <RadioGroup value={setup.show} onValueChange={(v) => onAnswer({ show: v as ShowSetting })} className="gap-2">
         {(['all', 'opted-in'] as const).map((show) => (
-          <Choice key={show} value={show} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge variant="secondary" size="sm">Suggested</Badge>}</span>}>
+          <Choice key={show} value={show} disabled={disabled} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge variant="secondary" size="sm">Suggested</Badge>}</span>}>
             {show === 'all' ? 'Every open item from the item source; an item with no status counts as List.'
               : `Only items that carry a status show; someone opts an item in by giving it ${setup.itemSource === 'github-project' ? 'the List Status' : 'the status-list label'}.`}
           </Choice>
@@ -122,6 +125,8 @@ export interface CustomLabelPicks {
   busy: boolean;
   /** An Add that failed: the label it was adding and gh's message. */
   error: { name?: string; message: string } | null;
+  /** Whether the picks are locked, which a disabled fieldset doesn't reach. */
+  disabled?: boolean;
 }
 
 /** What the picker calls back with: a toggled label, the new label's field as typed, and Add. */
@@ -141,7 +146,7 @@ export function CustomLabelsTitle() {
  * The custom label picker for `repo`: a toggle for each label it offers and each pick, then a field whose Add takes a
  * new label, which shows why it can't be one as it's typed.
  */
-export function CustomLabelPicker({ repo, offered, picked, typed, adding, busy, error, onToggle, onType, onAdd }: { repo: string } & CustomLabelPicks & CustomLabelHandlers) {
+export function CustomLabelPicker({ repo, offered, picked, typed, adding, busy, error, disabled: locked, onToggle, onType, onAdd }: { repo: string } & CustomLabelPicks & CustomLabelHandlers) {
   const choices = [...offered, ...picked.filter((name) => !offered.some((o) => o.toLowerCase() === name.toLowerCase()))];
   const problem = typed.trim() ? customLabelProblem(typed) : null;
   const disabled = !typed.trim() || !!problem || adding || busy;
@@ -154,7 +159,7 @@ export function CustomLabelPicker({ repo, offered, picked, typed, adding, busy, 
           {choices.map((name) => (
             <li key={name} data-custom={name}>
               <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={picked.includes(name)} onCheckedChange={() => onToggle(name)} />
+                <Checkbox checked={picked.includes(name)} disabled={locked} onCheckedChange={() => onToggle(name)} />
                 <code className="min-w-0 break-all font-mono">{name}</code>
               </label>
             </li>

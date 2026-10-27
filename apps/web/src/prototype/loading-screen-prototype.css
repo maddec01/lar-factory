@@ -1,4 +1,4 @@
-/* PROTOTYPE (#476, throwaway): the loading screen variants' styles, using only the design system's tokens. */
+/* PROTOTYPE (#476 round 2, throwaway): the loading screen variants' styles, using only the design system's tokens. */
 
 /* The bar's light/dark toggle: the design system's light and dark tokens, pinned over the system's choice. */
 html[data-proto-theme="light"] {
@@ -52,7 +52,11 @@ html[data-proto-theme="dark"] {
   --shadow-composer: var(--shadow-composer-dark);
 }
 
-/* --- The screen: over everything, fading into the board -------------------------------------------------------- */
+/* --- The screen: over the board, leaving by one of three exits ---------------------------------------------------- */
+
+.proto-board { position: fixed; inset: 0; }
+.proto-board.is-scaling { animation: proto-board-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes proto-board-in { from { scale: 0.98; } }
 
 .proto-screen {
   position: fixed;
@@ -61,12 +65,20 @@ html[data-proto-theme="dark"] {
   display: grid;
   place-items: center;
   padding: 3.25rem 1.5rem 1.5rem; /* the title bar's height on top, as the starting page has */
-  background: var(--background);
   color: var(--foreground);
   user-select: none;
-  transition: opacity 600ms ease-in-out;
 }
-.proto-screen.is-leaving { opacity: 0; }
+.proto-backdrop { position: absolute; inset: 0; background: var(--background); }
+.proto-screen.exit-fade { opacity: 0; transition: opacity 600ms ease-in-out; }
+.proto-screen.exit-blur { opacity: 0; filter: blur(12px); transition: opacity 500ms ease-out, filter 500ms ease-out; }
+/* Dock: the step line goes first, the backdrop fades to show the board, and the lockup flies onto the sidebar's
+   Brand, then hands over to it. */
+.proto-screen.exit-dock .proto-backdrop { opacity: 0; transition: opacity 500ms ease-in-out 100ms; }
+.proto-screen.exit-dock .proto-line { opacity: 0; transition: opacity 180ms ease-out; }
+.proto-screen.exit-dock .proto-wordmark {
+  transition: transform 560ms cubic-bezier(0.32, 0.72, 0, 1);
+  animation: proto-out 120ms linear 480ms forwards;
+}
 
 /* --- The mark: the L traced along its centre line, the block springing in, then the filled mark breathing ------- */
 
@@ -96,71 +108,71 @@ html[data-proto-theme="dark"] {
 @keyframes proto-show { to { opacity: 1; } }
 @keyframes proto-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-/* Reduced motion: the finished mark at once, no breathing; only opacity fades remain. */
+/* --- The lockup: the sidebar Brand's, scaled up. The mark is 0.705em, the cap height, and sits on the baseline,
+   so its top meets the top of the "l"; the box is trimmed to cap height and baseline, so the screen centres the
+   lockup on what you see, not on the font's line box. "lar" bold, "factory" medium in the muted colour. ---------- */
+
+.proto-lockup { --lockup: clamp(2.5rem, 9vw, 4rem); position: relative; z-index: 1; font-size: var(--lockup); }
+.proto-wordmark {
+  width: max-content;
+  line-height: 1;
+  text-box: trim-both cap alphabetic;
+  transform-origin: 0 0;
+}
+.proto-wordmark .proto-mark { display: inline; width: 0.705em; height: 0.705em; vertical-align: baseline; }
+.proto-lar { margin-left: 0.266em; font-weight: 700; letter-spacing: -0.03em; }
+.proto-factory { margin-left: 0.26em; font-weight: 500; color: var(--muted-foreground); }
+.proto-lar, .proto-factory { opacity: 0; animation: proto-show 500ms ease-out 800ms forwards; }
+
+/* The step line hangs below the baseline by half the lockup's size, clear of the "y", without moving the lockup off
+   centre. Centred: under the lockup's middle. Left: on the "l" of "lar", nudged by the bold l's side bearing. */
+.proto-line {
+  position: absolute;
+  top: calc(100% + var(--lockup) * 0.5);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+.line-center .proto-line { left: 50%; translate: -50% 0; }
+.line-left .proto-line { left: calc(var(--lockup) * (0.705 + 0.266 + 0.04)); }
+.proto-line-slot { display: grid; }
+.line-center .proto-line-slot { justify-items: center; }
+.proto-line-slot > span { grid-area: 1 / 1; }
+
+/* A1: roll. */
+.proto-roll-in { animation: proto-roll-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.proto-roll-out { animation: proto-roll-out 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes proto-roll-in { from { opacity: 0; translate: 0 0.75em; filter: blur(3px); } }
+@keyframes proto-roll-out { to { opacity: 0; translate: 0 -0.75em; filter: blur(3px); } }
+
+/* A2: type. */
+.proto-type { opacity: 0; animation: proto-show 0ms linear forwards; }
+.proto-clear { animation: proto-out 140ms ease-out both; }
+
+/* A3: shimmer, a highlight in the text colour sweeping across the muted line. */
+.proto-shimmer {
+  background: linear-gradient(90deg, var(--muted-foreground) 40%, var(--foreground) 50%, var(--muted-foreground) 60%) 100% 0 / 250% 100%;
+  background-clip: text;
+  color: transparent;
+  animation: proto-shimmer 1800ms linear infinite;
+}
+@keyframes proto-shimmer { to { background-position: 0% 0; } }
+
+@keyframes proto-out { to { opacity: 0; } }
+
+/* Reduced motion: the finished mark at once, no breathing, no roll, typing or shimmer; the line swaps and every exit
+   is the fade. */
 @media (prefers-reduced-motion: reduce) {
   .proto-mark-trace { display: none; }
-  .proto-mark-block, .proto-mark-fill { animation: none; opacity: 1; transform: none; }
+  .proto-mark-block, .proto-mark-fill, .proto-lar, .proto-factory, .proto-type { animation: none; opacity: 1; transform: none; }
   .proto-screen.is-drawn .proto-mark-breath { animation: none; }
-  .proto-slide-in, .proto-slide-out { translate: none !important; }
-  .proto-b-hairline::after { animation: none; inset-inline: 0; opacity: 0.4; }
+  .proto-roll-out, .proto-clear { display: none; }
+  .proto-roll-in { animation: none; }
+  .proto-shimmer { animation: none; background: none; color: inherit; }
 }
 
-.proto-error, .proto-c-line.proto-error { color: var(--error-foreground); }
-
-/* --- A: the Apple splash's lockup, the line small and muted below, cross-fading -------------------------------- */
-
-.proto-a { display: grid; justify-items: center; gap: 1.25rem; }
-.proto-a-lockup { display: flex; align-items: flex-end; gap: calc(85.7px * 0.266); }
-.proto-a-name {
-  font: 700 85.7px/0.8 var(--font-sans, -apple-system, system-ui, sans-serif); /* the lockup: "lar" at 60 / 0.705, 700 weight, -0.03em */
-  letter-spacing: -0.03em;
-  opacity: 0;
-  animation: proto-show 500ms ease-out 800ms forwards;
-}
-.proto-a-line { display: grid; font-size: 0.75rem; color: var(--muted-foreground); min-height: 1lh; max-width: 36rem; text-align: center; }
-.proto-a-line > span { grid-area: 1 / 1; }
-.proto-fade-in { animation: proto-in 320ms ease-out both; }
-.proto-fade-out { animation: proto-out 320ms ease-out both; }
-@keyframes proto-in { from { opacity: 0; } }
-@keyframes proto-out { to { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .proto-a-name { animation: none; opacity: 1; } }
-
-/* --- B: a larger mark, the line sliding up, an indeterminate hairline -------------------------------------------- */
-
-.proto-b { display: grid; justify-items: center; gap: 2.25rem; }
-.proto-b-stack { display: grid; justify-items: center; gap: 0.75rem; }
-.proto-b-line { display: grid; overflow: hidden; font-size: 0.875rem; min-height: 1lh; max-width: 36rem; text-align: center; }
-.proto-b-line > span { grid-area: 1 / 1; }
-.proto-slide-in { animation: proto-slide-in 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.proto-slide-out { animation: proto-slide-out 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-@keyframes proto-slide-in { from { opacity: 0; translate: 0 100%; } }
-@keyframes proto-slide-out { to { opacity: 0; translate: 0 -100%; } }
-.proto-b-hairline { position: relative; width: 10rem; height: 1px; overflow: hidden; background: var(--border); }
-.proto-b-hairline::after {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  width: 35%;
-  background: var(--muted-foreground);
-  animation: proto-sweep 1400ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-.proto-b-hairline.is-error::after { background: var(--error); }
-@keyframes proto-sweep { from { left: -35%; } to { left: 100%; } }
-
-/* --- C: a small mark over one left-aligned terminal line --------------------------------------------------------- */
-
-.proto-c { display: grid; justify-items: start; gap: 1rem; width: min(32rem, 100%); }
-.proto-c-line {
-  display: flex;
-  gap: 0.6ch;
-  font: 0.75rem / 1.5 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
-  color: var(--muted-foreground);
-  animation: proto-in 160ms ease-out both;
-}
-.proto-c-prompt { color: var(--foreground); }
-.proto-c-dots { display: inline-block; width: 3ch; overflow: hidden; vertical-align: bottom; animation: proto-dots 1200ms steps(4, jump-none) infinite; }
-@keyframes proto-dots { from { width: 0; } to { width: 3ch; } }
-@media (prefers-reduced-motion: reduce) { .proto-c-dots { animation: none; } }
+.proto-error { color: var(--error-foreground); }
 
 /* --- The prototype's switcher bar: inverted, so it reads as outside the design ----------------------------------- */
 
@@ -170,20 +182,21 @@ html[data-proto-theme="dark"] {
   left: 50%;
   translate: -50% 0;
   z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
   padding: 0.3rem 0.5rem;
-  border-radius: 999px;
+  border-radius: 1rem;
   background: var(--foreground);
   color: var(--background);
   font: 0.75rem / 1 var(--font-sans, -apple-system, system-ui, sans-serif);
   box-shadow: 0 8px 24px -8px rgb(0 0 0 / 50%);
   white-space: nowrap;
 }
+.proto-bar-row { display: flex; align-items: center; gap: 0.25rem; }
 .proto-bar button { padding: 0.35rem 0.6rem; border-radius: 999px; color: inherit; background: transparent; cursor: pointer; }
 .proto-bar button:hover { background: color-mix(in srgb, var(--background) 15%, transparent); }
 .proto-bar button.is-on { background: color-mix(in srgb, var(--background) 25%, transparent); }
-.proto-bar-label { min-width: 12rem; text-align: center; font-weight: 600; }
+.proto-bar-label { min-width: 7rem; text-align: center; font-weight: 600; }
 .proto-bar-sep { width: 1px; align-self: stretch; margin: 0.2rem 0.3rem; background: color-mix(in srgb, var(--background) 30%, transparent); }
 .proto-bar-state { padding-inline: 0.5rem; opacity: 0.6; }

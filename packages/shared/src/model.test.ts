@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, repoTag, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -328,8 +328,19 @@ test('a repository goes by its name, or by owner/name when another board reposit
   const azure = [...repos, { repo: 'contoso/Fabrikam/lar-api', role: 'api', labels: [] }, { repo: 'contoso/Fabrikam/lar', role: 'app', labels: [] }];
   assert.equal(repoName('contoso/Fabrikam/lar-api', azure), 'lar-api', 'an Azure DevOps repository goes by its last part');
   assert.equal(repoName('contoso/Fabrikam/lar', azure), 'contoso/Fabrikam/lar');
+  assert.equal(repoName('contoso/Fabrikam%20Fiber/lar', [...azure, { repo: 'contoso/Fabrikam%20Fiber/lar', role: 'app', labels: [] }]),
+    'contoso/Fabrikam Fiber/lar', 'a shown key is decoded');
+  assert.equal(repoName('contoso/Fabrikam/lar%20web', azure), 'lar web');
   assert.equal(repoName(repoKey(item('List', [], { repo: null })), repos), 'Draft');
   assert.equal(repoKey(item('List')), 'maddec01/lar-server');
+});
+
+test('a repository shows with each part of its key decoded, and is on Azure DevOps when its key has three parts', () => {
+  assert.equal(shownRepo('contoso/Fabrikam%20Fiber/lar-api'), 'contoso/Fabrikam Fiber/lar-api');
+  assert.equal(shownRepo('maddec01/lar'), 'maddec01/lar');
+  assert.equal(shownRepo('contoso/100%/lar'), 'contoso/100%/lar', 'a part that is no valid encoding shows as it is');
+  assert.equal(onAzure('contoso/Fabrikam%20Fiber/lar-api'), true);
+  assert.equal(onAzure('maddec01/lar'), false);
 });
 
 test('the board groups the List by repository, keyed by owner/name and named by name, then Draft', () => {
@@ -351,6 +362,25 @@ test("an untagged Azure work item shows in the List of every repository reading 
   assert.deepEqual(groups.map((g) => [g.repo, g.items.map((i) => i.id)]), [['contoso/Fabrikam/web', ['a', 'b']], ['contoso/Fabrikam/api', ['a']]]);
   assert.equal(inRepo(items[0]!, 'Contoso/Fabrikam/API'), true);
   assert.equal(inRepo(items[1]!, 'contoso/Fabrikam/api'), false);
+});
+
+test("an untagged item two repositories read shows both as its repositories, and any other item its own", () => {
+  const repos = [{ repo: 'contoso/p/web', role: 'app', labels: [] }, { repo: 'contoso/p/api', role: 'api', labels: [] }];
+  const both = { repo: 'contoso/p/web', untaggedFor: ['contoso/p/web', 'contoso/p/api'] };
+  assert.deepEqual(itemRepos(both), ['contoso/p/web', 'contoso/p/api']);
+  assert.equal(itemRepoNames(both, repos), 'web or api');
+  assert.equal(itemRepoNames({ repo: 'contoso/p/web', untaggedFor: ['contoso/p/web'] }, repos), 'web');
+  assert.equal(itemRepoNames({ repo: 'contoso/p/api' }, repos), 'api');
+  assert.equal(itemRepoNames({ repo: null }, repos), 'Draft');
+});
+
+test("a start runs in the item's repository, or in the one picked among an untagged item's, or in its only one", () => {
+  const both = { repo: 'contoso/p/web', untaggedFor: ['contoso/p/web', 'contoso/p/api'] };
+  assert.equal(startRepo(both, 'Contoso/P/API'), 'contoso/p/api');
+  assert.equal(startRepo(both), undefined);
+  assert.equal(startRepo(both, 'contoso/p/docs'), undefined);
+  assert.equal(startRepo({ repo: 'contoso/p/web', untaggedFor: ['contoso/p/web'] }), 'contoso/p/web');
+  assert.equal(startRepo({ repo: 'maddec01/lar' }, 'contoso/p/api'), 'maddec01/lar');
 });
 
 test("an Azure work item's repository tag is repo- and the repository's name as Azure shows it", () => {

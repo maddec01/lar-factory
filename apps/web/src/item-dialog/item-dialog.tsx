@@ -1,10 +1,10 @@
 // The item dialog: every item, wherever it's listed, opens here over the page. It shows the item's repository,
-// status, track, hint, slices, pull requests, agent work and labels; its footer has GitHub and the one action
-// the item's status asks for, with Back to List and Abandon at its left.
+// status, track, hint, slices, pull requests, agent work and labels. Its footer has GitHub, or Azure DevOps for a work
+// item, and the one action the item's status asks for, with Back to List and Abandon at its left.
 
 import { useEffect, useRef } from 'react';
 import { ExternalLink, Play } from 'lucide-react';
-import { HINTS, carriesTwoStatuses, keepOneText, openBlockers, repoKey, shortAgo, workMessage } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
@@ -54,7 +54,7 @@ function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now:
     <>
       <DialogHeader>
         <div className="flex flex-wrap items-center gap-2 pr-8 text-xs text-(--muted-foreground)">
-          <RepoTag repo={repoKey(item)} repos={data.repos} />
+          {itemRepos(item).map((repo) => <RepoTag key={repo} repo={repo} repos={data.repos} />)}
           <ItemStatusGlyph item={item} /> <span className="font-medium text-(--foreground)">{item.status}</span> · updated {shortAgo(item.updatedAt, now)}
           {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {openBlockers(item).length}</span>}
         </div>
@@ -85,7 +85,7 @@ function ItemDialogBody({ item, data, now }: { item: Item; data: BoardData; now:
       <DialogFooter>
         <span className="mr-auto inline-flex items-center gap-3 text-xs"><MoveActions item={item} data={data} /></span>
         <span className="inline-flex items-center gap-1.5">
-          {item.url && <Button variant="outline" size="sm" render={<a href={item.url} target="_blank" rel="noopener" />}><ExternalLink /> GitHub</Button>}
+          {item.url && <Button variant="outline" size="sm" render={<a href={item.url} target="_blank" rel="noopener" />}><ExternalLink /> {item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}</Button>}
           <StatusAction item={item} data={data} />
         </span>
       </DialogFooter>

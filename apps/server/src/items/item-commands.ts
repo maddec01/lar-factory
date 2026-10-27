@@ -3,7 +3,7 @@
 // blocks which lives in this file.
 
 import { join } from 'node:path';
-import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDraft, isOnboarding, validateDraft, workMessage } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDraft, isOnboarding, pickRepoText, repoTag, startRepo, validateDraft, workMessage } from '@lar-factory/shared';
 import type { BoardData, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
@@ -28,8 +28,11 @@ export interface ItemCommands {
   backToList(itemId: string): Promise<Reply>;
   /** Keeps one of the statuses an issue carrying more than one has, and drops the others: the one move such an issue allows. */
   pickStatus(itemId: string, status: unknown): Promise<Reply>;
-  /** Starts a T3 thread for a Queued item that nothing open blocks, at most once per board run. */
-  start(itemId: string, model: unknown): Promise<Reply>;
+  /**
+   * Starts a T3 thread for a Queued item that nothing open blocks, at most once per board run. An untagged Azure work
+   * item is tagged first for `repo`, one of the repositories reading it, or for the only one that does.
+   */
+  start(itemId: string, model: unknown, repo?: unknown): Promise<Reply>;
   /**
    * Starts a Ready build's thread in a new worktree, at most once per board run, once nothing open blocks it, as
    * lar-work's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
@@ -51,6 +54,10 @@ export interface ItemCommandsDeps {
    * why the build can't start, or null. Missing without a bundle, so Start build checks nothing.
    */
   checkSkills?: () => Promise<string | null>;
+  /** The repository's T3 project as the onboarded repositories are now; tests stand in for it. */
+  projectOf?: (repo: string) => Promise<RepositoryProject>;
+  /** Starts a T3 thread; tests stand in for t3. */
+  startThread?: typeof startThread;
 }
 
 type Action = 'queue' | 'back to List' | 'pick' | 'start' | 'abandon';
@@ -102,7 +109,8 @@ async function currentRepositoryProject(repo: string): Promise<RepositoryProject
   return repositoryProject(repo, repos);
 }
 
-export function createItemCommands({ board, items, repos, offerModelChoices, checkSkills }: ItemCommandsDeps): ItemCommands {
+export function createItemCommands({ board, items, repos, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
+  startThread: startIn = startThread }: ItemCommandsDeps): ItemCommands {
   const submissions = new Map<string, {
     draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
   }>();
@@ -158,6 +166,17 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
     if (error) return withBoard(502, { error });
     board.showChanged({ ...item, status: picked, statuses: [picked] });
     return withBoard(200, { error: null });
+  }
+
+  /**
+   * The item a start runs on: as it is, or an untagged Azure work item for the repository `picked` names among those
+   * reading it, or for the only one; a refusal asking which when that names none of them.
+   */
+  function startingItem(item: Item, picked: unknown): Item | Reply {
+    const { untaggedFor, ...rest } = item;
+    if (!untaggedFor) return item;
+    const repo = startRepo(item, picked);
+    return repo ? { ...rest, repo } : withBoard(409, { error: pickRepoText(board.snapshot(), item) });
   }
 
   /**
@@ -260,17 +279,27 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
     backToList: (itemId) => move(itemId, BACK_TO_LIST),
     pickStatus,
 
-    start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {
-      if (item.status !== 'Queued') return reply(409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
+    start: (itemId, model, picked) => startOnce(starts, 'started', itemId, model, (listed, choice) => {
+      if (listed.status !== 'Queued') return reply(409, { error: `Only Queued items can be started; this one is in ${listed.status}.` });
       const busy = busyReason(itemId, 'start');
       if (busy) return withBoard(409, { error: busy });
+      const item = startingItem(listed, picked);
+      if ('body' in item) return item;
       const blocked = blockedReply(item);
       if (blocked) return blocked;
       const message = workMessage(item);
       if (!message || !item.repo) return reply(409, { error: 'This item needs an issue before it can start.' });
+      const repo = item.repo;
       return async () => {
-        const repoProject = await currentRepositoryProject(item.repo!);
-        return repoProject.error === undefined ? startThread(repoProject.projectId, message, choice) : { thread: null, error: repoProject.error, refused: true };
+        const repoProject = await projectOf(repo);
+        if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
+        // The tag comes first, so an item that fails to take it starts nothing; the board never tags an item by itself.
+        if (listed.untaggedFor) {
+          const error = await items.addLabel(listed, repoTag(repo));
+          if (error) return { thread: null, error };
+          board.showChanged(item);
+        }
+        return startIn(repoProject.projectId, message, choice);
       };
     }),
 
@@ -288,7 +317,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
         const skills = await checkSkills?.();
         if (skills) return { thread: null, error: skills, refused: true };
-        const repoProject = await currentRepositoryProject(repo);
+        const repoProject = await projectOf(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
         const parent = await parentInProgress(item);
         if (parent && 'error' in parent) return { thread: null, ...parent };
@@ -299,7 +328,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
         }
         const error = await parent?.move();
         if (error) return { thread: null, error };
-        return startThread(repoProject.projectId, message, choice, { base: 'main', branch });
+        return startIn(repoProject.projectId, message, choice, { base: 'main', branch });
       };
     }),
 
@@ -311,6 +340,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
         if (!item && board.removed(itemId)) return withBoard(200, { error: null });
         if (!item) return withBoard(404, { error: GONE });
         if (!canAbandon(item)) return reply(409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${aType(item)} in ${item.status}.` });
+        if (item.abandonRefusal) return reply(409, { error: item.abandonRefusal });
         const busy = busyReason(itemId, 'abandon');
         if (busy) return withBoard(409, { error: busy });
         const work = items.abandon(item).then((error) => {

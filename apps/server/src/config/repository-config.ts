@@ -5,8 +5,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigAnswers,
-  type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
+  PROVIDERS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider,
+  type RepositoryConfigAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
 import { problemOf } from '../azure/azure-items.ts';
 import { readDefaultBranchFile as readAzureFile } from '../azure/azure-repos.ts';
@@ -51,8 +51,8 @@ const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 /** Whether a value is a repository of the form owner/name or organization/project/repository. */
 export const isRepo = (value: unknown): value is string => typeof value === 'string' && REPO.test(value);
 
-/** Whether a repository is on Azure DevOps: organization/project/repository, not GitHub's owner/name. */
-export const onAzure = (repo: string): boolean => repo.split('/').length === 3;
+// Whether a repository is on Azure DevOps, which shared answers for the page too.
+export { onAzure };
 
 const isTeam = (value: unknown): value is string => typeof value === 'string' && value !== '';
 

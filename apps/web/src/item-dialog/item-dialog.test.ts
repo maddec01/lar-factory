@@ -41,6 +41,14 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   expect(text(inDialog('[data-slot="dialog-panel"] > p'))).toBe('build');
 });
 
+test('the dialog of an untagged item two repositories read tags it with both', async () => {
+  const [web, api] = ['contoso/Fabrikam/web', 'contoso/Fabrikam/api'];
+  await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'sprint', team: 'Web', show: 'all', labels: [] }],
+    items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, repo: web, untaggedFor: [web, api] } : i)) });
+  await openItem('I_sample05');
+  expect([...inDialog('[data-slot="dialog-header"] > div')!.querySelectorAll('.repo-tag')].map(text)).toEqual(['web', 'api']);
+});
+
 test('the slice rows are 13px with the status word at 11px', async () => {
   await mountPage();
   await openItem('I_sample13');
@@ -103,6 +111,13 @@ test('GitHub opens the item, and Verify build and Merge PR open its pull request
   expect(links).toEqual([['GitHub', 'https://github.com/maddec01/lar-apple/issues/31', '_blank'], ['Verify build', 'https://github.com/maddec01/lar-apple/pull/32', '_blank']]);
   await openItem('I_sample17');
   expect(footer().querySelector('a:last-child')!.getAttribute('href')).toMatch(/\/pull\/\d+$/);
+});
+
+test('an Azure work item\'s footer opens it on Azure DevOps', async () => {
+  const url = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/31';
+  await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample01' ? { ...i, repo: 'contoso/Fabrikam%20Fiber/lar-apple', url } : i)) });
+  await openItem('I_sample01');
+  expect([...footer().querySelectorAll('a')].map((a) => [text(a).trim(), a.getAttribute('href')])).toEqual([['Azure DevOps', url]]);
 });
 
 test('a Queued item blocked by an open issue has Start refining disabled in the footer, with Start after', async () => {
@@ -203,6 +218,18 @@ test('a Queued issue with two statuses keeps Abandon, which deletes it, but not 
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, statuses: ['Queued', 'Review'] as Item['statuses'] } : i)) });
   await openItem('I_sample05');
   expect(footerControls()).toEqual(['Abandon', 'GitHub', 'Keep Queued', 'Keep Review']);
+});
+
+test("Abandon is greyed out with the reason on an item whose type can't be abandoned", async () => {
+  const refusal = "Issue has no Removed state in Fabrikam Fiber, so the board can't abandon it. Close or delete it in Azure DevOps.";
+  await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample01' ? { ...i, abandonRefusal: refusal } : i)) });
+  await openItem('I_sample01');
+  expect(footerControls()).toEqual([`Abandon (disabled: ${refusal})`, 'GitHub', 'Queue']);
+  const abandon = button('abandon', 'I_sample01');
+  expect(abandon.className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
+  const reason = footer().querySelector<HTMLElement>('[data-abandon-refusal]')!;
+  expect(text(reason), 'a visible line says why').toBe(refusal);
+  expect(abandon.getAttribute('aria-describedby')).toBe(reason.id);
 });
 
 test('Keep posts the status picked, shows it in flight, then shows the item with that status alone and says so', async () => {

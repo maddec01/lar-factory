@@ -1,6 +1,6 @@
 // The Settings sections and their grouped rows, from the control room prototype. Most rows aren't built yet: they
 // show the prototype's value, disabled. The working rows are the Claude profiles, the update channel, version and
-// Check now, the command check rows, the gh and az logins, each repository with Edit, which opens Edit's dialog, Resume and Add repository, which open the onboarding dialog, and the
+// Check now, the command check rows, the gh and az logins, each repository with Edit, which opens Edit's dialog, Resume and Add repository, which open the onboarding dialog, Reset on one still onboarding, and the
 // bundled skills with their authors, licences, last updates, install states and sources. In a browser the profiles
 // and updates, which only the board app has, show the prototype's values, disabled with that reason.
 
@@ -12,6 +12,7 @@ import { Button } from '@lar-factory/ui/button';
 import { RepoTag } from '../items/item-parts.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { useEditStore } from '../repositories/edit-store.ts';
+import { useResetStore } from '../repositories/reset-store.ts';
 import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, SmallButton, ToolState, notBuilt } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
@@ -92,8 +93,8 @@ const sourceName = (kind: keyof typeof ITEM_SOURCES, project?: { owner: string; 
   kind === 'project' && project ? `${ITEM_SOURCES.project} ${project.owner} #${project.number}` : ITEM_SOURCES[kind];
 const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
 
-/** Reset, which waits for a later slice of build #385. */
-const reset = <SmallButton reason="Resetting a repository arrives in build #385">Reset</SmallButton>;
+/** An onboarded repository's Reset, which waits for a later slice of build #385. */
+const resetOnboarded = <SmallButton reason="Resetting an onboarded repository arrives in build #385">Reset</SmallButton>;
 
 /**
  * A repository still onboarding: its provider, its item source and show setting once it has passed the step that asks
@@ -108,7 +109,8 @@ function onboardingDescription(progress: OnboardingProgress): string {
 
 /**
  * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting and
- * Edit, which opens Edit's dialog, one still onboarding with what it has answered, the step it stopped at and Resume. Add repository opens the onboarding dialog. The board
+ * Edit, which opens Edit's dialog, one still onboarding with what it has answered, the step it stopped at, Resume and
+ * Reset, which opens Reset's confirmation. Add repository opens the onboarding dialog. The board
  * reads only GitHub repositories until build #386.
  */
 function repositoryGroup(data: BoardData): Group {
@@ -116,13 +118,14 @@ function repositoryGroup(data: BoardData): Group {
     id: `repo-${r.repo}`, title: r.repo, description: <>GitHub · {sourceName(itemSource(r), r.project)} · {SHOWN[r.show ?? 'all']}
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     control: custom(() => <span className="flex items-center gap-2">
-      <Button variant="outline" size="xs" onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>{reset}
+      <Button variant="outline" size="xs" onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>{resetOnboarded}
     </span>),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
     id: `repo-${repo}`, title: repo, description: onboardingDescription(progress),
     control: custom(() => <span className="flex items-center gap-2">
-      <Button size="xs" onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>{reset}
+      <Button size="xs" onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>
+      <Button variant="outline" size="xs" onClick={() => useResetStore.getState().open(repo)}>Reset</Button>
     </span>),
   }));
   return { title: 'Repositories', description: 'Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list.',

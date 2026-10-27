@@ -39,6 +39,18 @@ export function problemOf(err: unknown): unknown {
   return err;
 }
 
+/** Runs `use` on a temporary file holding `body` as JSON, for az's --in-file, and removes the file after. */
+export async function withFile<T>(body: unknown, use: (file: string) => Promise<T>): Promise<T> {
+  const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
+  try {
+    const file = join(dir, 'body.json');
+    await writeFile(file, JSON.stringify(body));
+    return await use(file);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 export interface RawWorkItem {
   id: number;
   fields: Record<string, unknown>;
@@ -115,18 +127,10 @@ export function azureItems(repo: string, team: string, list: (calls: AzureCalls)
   /** The work items' fields and links, reading at most BATCH ids a call; an id az no longer finds is left out. */
   async function workItems(ids: readonly number[]): Promise<RawWorkItem[]> {
     if (!ids.length) return [];
-    const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
-    try {
-      const batches = Array.from({ length: Math.ceil(ids.length / BATCH) }, (_, i) => ids.slice(i * BATCH, (i + 1) * BATCH));
-      const reads = await Promise.all(batches.map(async (batch, i) => {
-        const file = join(dir, `batch-${i}.json`);
-        await writeFile(file, JSON.stringify({ ids: batch, $expand: 'Relations', errorPolicy: 'Omit' }));
-        return invoke<{ value: (RawWorkItem | null)[] }>('wit', 'workitemsbatch', [], ['--http-method', 'POST', '--in-file', file]);
-      }));
-      return reads.flatMap((read) => read.value.filter((raw): raw is RawWorkItem => raw !== null));
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    const batches = Array.from({ length: Math.ceil(ids.length / BATCH) }, (_, i) => ids.slice(i * BATCH, (i + 1) * BATCH));
+    const reads = await Promise.all(batches.map((batch) => withFile({ ids: batch, $expand: 'Relations', errorPolicy: 'Omit' }, (file) =>
+      invoke<{ value: (RawWorkItem | null)[] }>('wit', 'workitemsbatch', [], ['--http-method', 'POST', '--in-file', file]))));
+    return reads.flatMap((read) => read.value.filter((raw): raw is RawWorkItem => raw !== null));
   }
 
   /** Each type's state categories, by type and state name. */

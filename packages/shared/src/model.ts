@@ -216,6 +216,11 @@ export interface Item {
   title: string;
   url: string | null;
   repo: string | null;
+  /**
+   * An Azure work item with no repository tag: every repository reading its item source, whose Lists all show it, and
+   * one of which Start tags it for. `repo` is the first of them. Absent on every other item.
+   */
+  untaggedFor?: string[];
   labels: string[];
   /** A draft is open. */
   state: 'open' | 'closed';
@@ -583,6 +588,17 @@ export const repoKey = (item: Pick<Item, 'repo'>): string => item.repo ?? 'Draft
 
 /** Whether two `owner/name`s, or repository keys, are the same repository: GitHub ignores case, so the board does too. */
 export const sameRepo = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+/** Whether the item shows in the repository's List and Scope: it's the item's repository, or one of its untagged repositories. */
+export const inRepo = (item: Pick<Item, 'repo' | 'untaggedFor'>, repo: string): boolean =>
+  sameRepo(repoKey(item), repo) || Boolean(item.untaggedFor?.some((r) => sameRepo(r, repo)));
+
+/** The tag that records an Azure work item's repository: repo- and the repository's name as Azure shows it. */
+export const repoTag = (repo: string): string => {
+  const name = repo.split('/').at(-1)!;
+  try { return `repo-${decodeURIComponent(name)}`; }
+  catch { return `repo-${name}`; }
+};
 
 /**
  * A repository's shown name: the part after the last `/` of `owner/name` or `organization/project/repository`, or all

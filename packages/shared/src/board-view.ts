@@ -1,7 +1,7 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
 // Abandon asks.
 
-import { STATUSES, isDraft, isRecentlyDone, kindOf, ref, repoKey, repoName, sameRepo } from './model.ts';
+import { STATUSES, inRepo, isDraft, isRecentlyDone, kindOf, ref, repoKey, repoName, sameRepo } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
 import { slug } from './format.ts';
 
@@ -59,7 +59,7 @@ export function boardSections(data: BoardData, now: number): BoardSections {
     queued: inStatus('Queued'),
     list,
     listGroups: repos.map((repo) => ({
-      repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && sameRepo(repoKey(i), repo)),
+      repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)),
     })),
     done: items
       .filter((i) => isRecentlyDone(i, now))

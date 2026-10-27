@@ -1,9 +1,10 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { Item, Status } from '@lar-factory/shared';
-import type { ItemSource } from './item-source.ts';
+import { ReadProblem, type ItemSource } from './item-source.ts';
 import type { RepositoryConfig } from '../config/repository-config.ts';
-import { mergeSources, onboardedSources } from './item-sources.ts';
+import { fakeAz } from '../azure/fake-az.ts';
+import { configuredSources, mergeSources, onboardedSources } from './item-sources.ts';
 
 const item = (id: string, repo: string, status: Status = 'List'): Item => ({
   id, status, statuses: [status], content: 'ticket', number: Number(id.slice(2)), title: id, url: `https://github.com/${repo}/issues/${id.slice(2)}`, repo,
@@ -159,4 +160,31 @@ test('a read leaves out the items of a resetting repository, though its Project 
   const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')], problems: [], resetting: ['maddec01/lar-apple'] }),
     () => fakeSource('lar', listed, []));
   assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
+});
+
+const azure = (repo: string, team = 'Fabrikam Team', show: RepositoryConfig['show'] = 'all'): RepositoryConfig =>
+  ({ repo, version: 1, role: 'role', itemSource: { kind: 'azure-sprint', team }, show, labels: [] });
+
+test("repositories reading one team's sprint share one read, and an untagged item from it is for each of them", async () => {
+  const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 2, type: 'User Story', state: 'New', tags: 'repo-api' }] });
+  const sources = configuredSources([azure('contoso/Fabrikam/web'), azure('Contoso/fabrikam/api', 'fabrikam team'), azure('contoso/Fabrikam/docs', 'Docs Team')], az.run);
+  const read = await sources.read();
+  // The docs team's sprint is the same fake sprint, read apart; its copy of an item the web sprint listed shows once.
+  assert.deepEqual(read.items.map((i) => [i.number, i.repo, i.untaggedFor ?? null]), [
+    [1, 'contoso/Fabrikam/web', ['contoso/Fabrikam/web', 'Contoso/fabrikam/api']], [2, 'Contoso/fabrikam/api', null],
+  ]);
+  assert.equal(az.calls.filter((c) => c[3] === 'list-work-items').length, 2, 'one sprint read per team');
+});
+
+test("with Opted-in items, an untagged item that carries no status leaves the Lists of the opted-in repositories", async () => {
+  const bare = (id: string, untaggedFor: string[]): Item => ({ ...item(id, untaggedFor[0]!), statuses: [], untaggedFor });
+  const sprint = fakeSource('sprint', [bare('I_1', ['contoso/p/web', 'contoso/p/api']), bare('I_2', ['contoso/p/web']), { ...bare('I_3', ['contoso/p/web']), statuses: ['List'] }], []);
+  const read = await mergeSources([], new Map([['contoso/p/web', sprint], ['contoso/p/api', sprint]]), ['Contoso/P/Web']).read();
+  assert.deepEqual(read.items.map((i) => [i.id, i.repo, i.untaggedFor]), [['I_1', 'contoso/p/api', ['contoso/p/api']], ['I_3', 'contoso/p/web', ['contoso/p/web']]]);
+});
+
+test('a problem with a source that repositories share shows under each of them', async () => {
+  const sprint: ItemSource = { ...fakeSource('sprint', [], []), read: async () => { throw new ReadProblem('az is logged out.', 'az login'); } };
+  const read = await mergeSources([], new Map([['contoso/p/web', sprint], ['contoso/p/api', sprint]])).read();
+  assert.deepEqual(read.problems, [{ repo: 'contoso/p/web', problem: 'az is logged out.', fix: 'az login' }, { repo: 'contoso/p/api', problem: 'az is logged out.', fix: 'az login' }]);
 });

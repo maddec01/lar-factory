@@ -1,7 +1,8 @@
 // Add item on Azure DevOps: creates a work item of the team's requirement backlog level's default type, as slice.sh
-// creates a Task, in one call. Its kind, labels and status-list are its tags, and its description is markdown.
+// creates a Task, in one call. Its kind, labels and status-list are its tags, with its repository's repo- tag when
+// Only for <repo> is ticked, and its description is markdown.
 
-import { statusLabel } from '@lar-factory/shared';
+import { repoTag, statusLabel } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, ItemDraft } from '@lar-factory/shared';
 import { ReadProblem } from '../items/item-source.ts';
 import { withFile, type AzureCalls, type RawWorkItem } from './azure-items.ts';
@@ -17,9 +18,9 @@ const refused = (err: unknown) => err instanceof ReadProblem || /\b(?:TF|VS)\d{5
 
 /**
  * The create of an Azure item source on `project`: `type` reads the type to create, and `item` is the board's item for
- * the work item created. A retry resumes from `progress`, so it never creates a second work item.
+ * the work item the draft created. A retry resumes from `progress`, so it never creates a second work item.
  */
-export function azureCreate(project: string, invoke: AzureCalls['invoke'], type: () => Promise<string>, item: (raw: RawWorkItem) => Item) {
+export function azureCreate(project: string, invoke: AzureCalls['invoke'], type: () => Promise<string>, item: (raw: RawWorkItem, draft: ItemDraft) => Item) {
   return async (draft: ItemDraft, progress: CreationProgress): Promise<CreationResult> => {
     if (progress.creationUncertain) return { item: null, issueUrl: null, uncertain: true, error: UNCERTAIN };
     if (progress.item) return { item: progress.item, issueUrl: progress.item.url, error: null };
@@ -28,7 +29,7 @@ export function azureCreate(project: string, invoke: AzureCalls['invoke'], type:
         { op: 'add', path: '/fields/System.Title', value: draft.title },
         { op: 'add', path: '/fields/System.Description', value: draft.description },
         { op: 'add', path: '/multilineFieldsFormat/System.Description', value: 'Markdown' },
-        { op: 'add', path: '/fields/System.Tags', value: [draft.kind, ...draft.labels, statusLabel('List')].join('; ') },
+        { op: 'add', path: '/fields/System.Tags', value: [draft.kind, ...draft.labels, statusLabel('List'), ...draft.onlyFor ? [repoTag(draft.repo)] : []].join('; ') },
       ];
       const created = `type=${await type()}`;
       const raw = await withFile(ops, (file) => {
@@ -38,7 +39,7 @@ export function azureCreate(project: string, invoke: AzureCalls['invoke'], type:
           ['--http-method', 'POST', '--media-type', 'application/json-patch+json', '--in-file', file], CREATE_API_VERSION);
       });
       progress.creationUncertain = false;
-      progress.item = item(raw);
+      progress.item = item(raw, draft);
       return { item: progress.item, issueUrl: progress.item.url, error: null };
     } catch (err) {
       if (refused(err)) progress.creationUncertain = false;

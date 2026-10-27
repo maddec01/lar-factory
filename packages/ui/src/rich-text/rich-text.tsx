@@ -58,9 +58,9 @@ const body = cn(
   '[&_a]:text-info-foreground [&_a]:underline [&_a]:underline-offset-2',
   '[&_blockquote]:border-s-2 [&_blockquote]:ps-3 [&_blockquote]:text-muted-foreground',
   '[&_hr]:my-4',
-  '[&_pre]:my-2 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs',
+  '[&_pre]:my-2 [&_pre]:max-w-full [&_pre]:overflow-x-hidden [&_pre]:whitespace-pre-wrap [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs',
   '[&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-xs',
-  '[&_table]:my-2 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:text-start [&_td]:border [&_td]:px-2 [&_td]:py-1',
+  '[&_table]:my-2 [&_table]:w-full [&_table]:max-w-full [&_table]:table-fixed [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:text-start [&_td]:border [&_td]:px-2 [&_td]:py-1',
   '[&_details]:my-2 [&_summary]:cursor-pointer [&_summary]:font-medium',
 );
 

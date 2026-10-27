@@ -150,11 +150,11 @@ describe('layout', () => {
     expect(html('')).toBe('');
   });
 
-  test('the container wraps long words and scrolls code and tables inside their own block', () => {
+  test('the container wraps long words, code and tables so nothing scrolls sideways', () => {
     const out = markdown('x');
     expect(out).toMatch(/^<div [^>]*class="[^"]*\bmin-w-0\b[^"]*\bmax-w-full\b[^"]*"/);
     expect(out).toMatch(/break-words/);
-    expect(out).toMatch(/\[&amp;_pre\]:overflow-x-auto/);
-    expect(out).toMatch(/\[&amp;_table\]:overflow-x-auto/);
+    expect(out).toMatch(/\[&amp;_pre\]:whitespace-pre-wrap/);
+    expect(out).toMatch(/\[&amp;_table\]:table-fixed/);
   });
 });

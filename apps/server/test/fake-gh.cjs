@@ -54,6 +54,10 @@ const main = async () => {
   };
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) && args.includes('.default_branch')) return void process.stdout.write('main\n');
   if (args[0] === 'api' && /\/git\/ref\/heads\/main$/.test(args[1])) return void process.stdout.write('abc123\n');
+  // The default branch's files at abc123: options.files, or none.
+  if (args[0] === 'api' && /\/git\/trees\/abc123\?recursive=1$/.test(args[1])) {
+    return void (fail('tree', 'HTTP 502: Bad Gateway\n') || output({ truncated: false, tree: (options.files ?? []).map((path) => ({ path, type: 'blob' })) }));
+  }
   const ref = args[0] === 'api' && /\/git\/ref\/heads\/(lar-factory\/.+)$/.exec(args[1])?.[1];
   if (ref) {
     if (options.branches && ref in options.branches) return void process.stdout.write('def456\n');

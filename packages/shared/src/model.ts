@@ -734,6 +734,11 @@ export interface Clash {
   edit: ClashEdit;
   /** Whether the fix starts ticked, so the PR holds it. */
   ticked: boolean;
+  /**
+   * Why the agent's edit can't go in the PR, set by the board when its removed lines aren't at its line on the default
+   * branch or another edit touches them; such a Clash is unticked and can't be ticked.
+   */
+  wontApply?: string;
 }
 
 /** A project skill whose folder is named like a bundled skill; onboarding waits until the user picks delete or rename. */
@@ -749,3 +754,19 @@ export interface FixedClashes {
   skillClashes: SkillClash[];
   projectSkills: string[];
 }
+
+/** Where a run of onboarding's Clash agent stands: running with the agent's latest message, done with its Clashes, or ended without them and why. */
+export type ClashRunState =
+  | { state: 'running'; progress: string | null }
+  | { state: 'done'; clashes: Clash[] }
+  | { state: 'failed' | 'timed-out' | 'waiting'; why: string };
+
+/** One run of onboarding's Clash agent in a T3 thread; Retry starts another and keeps this one listed. */
+export type ClashRun = ClashRunState & {
+  /** The thread's title, unique to the run. */
+  title: string;
+  /** The run's T3 thread, once T3 has it. */
+  threadId: string | null;
+  model: ModelChoice;
+  startedAt: string;
+};

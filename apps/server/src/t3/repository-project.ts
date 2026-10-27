@@ -2,7 +2,7 @@
 // folder is a main checkout with the repository as its git origin. Each failure is a
 // hint that names the fix. Only onboarding adds a T3 project, and the board never changes
 // one. The same checkouts tell whether a listed repository is on Azure DevOps, which only
-// then needs az.
+// then needs az. An Azure DevOps repository is named `organization/project/repository`.
 
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,7 +35,7 @@ export async function anyOnAzureDevOps(repos: readonly { repo: string }[], env: 
   try { found = await checkouts(env); }
   catch { return false; }
   const listed = new Set(repos.map(({ repo }) => repo.toLowerCase()));
-  return found.some(({ origin }) => origin !== null && onAzureDevOps(origin) && listed.has(azureRepo(origin)?.toLowerCase() ?? ''));
+  return found.some(({ origin }) => origin !== null && listed.has(azureRepo(origin)?.toLowerCase() ?? ''));
 }
 
 /** Whether an origin URL is on Azure DevOps: dev.azure.com, its ssh host, or an older *.visualstudio.com organization. */
@@ -65,7 +65,7 @@ async function projectFinder(env: NodeJS.ProcessEnv): Promise<(repo: string) => 
   try { projects = await checkouts(env); }
   catch { return () => ({ error: `Can't read T3 Code's projects at ${statsDbPath(env)}` }); }
   return (repo) => {
-    const matches = projects.filter((p) => githubRepo(p.origin)?.toLowerCase() === repo.toLowerCase());
+    const matches = projects.filter((p) => p.origin !== null && originRepo(p.origin)?.toLowerCase() === repo.toLowerCase());
     if (matches.length === 1) return { projectId: matches[0]!.id };
     if (!matches.length) return { error: `No T3 project is a checkout of ${repo}; add the checkout in T3 Code` };
     const folders = matches.map((p) => tilde(p.folder, home)).sort().join(', ');
@@ -89,9 +89,32 @@ export function githubRepo(url: string | null): string | null {
   return url?.match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?\/?$/)?.[1] ?? null;
 }
 
-/** `project/repo` from an https or ssh Azure DevOps URL, whose https URLs put `_git` between them. */
+/**
+ * `organization/project/repository` from an Azure DevOps origin: `https://dev.azure.com/<org>/<project>/_git/<repo>`,
+ * `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` or `https://<org>.visualstudio.com/<project>/_git/<repo>`, each
+ * name decoded; null for any other URL. The organization keeps two organizations' projects apart. A URL without the
+ * project names a repository named after its project.
+ */
 export function azureRepo(url: string): string | null {
-  return githubRepo(url.replace('/_git/', '/'));
+  if (!onAzureDevOps(url)) return null;
+  const host = originHost(url);
+  const path = url.replace(/^(?:[a-z+]+:\/\/)?(?:[^@/]+@)?[^/:]+[:/]/i, '').replace(/(?:\.git)?\/?$/, '');
+  const ssh = path.match(/^v3\/([^/]+)\/([^/]+)\/([^/]+)$/);
+  const https = path.match(/^(?:([^/]+)\/)?(?:([^/]+)\/)?_git\/([^/]+)$/);
+  let parts: (string | undefined)[] | undefined;
+  if (ssh) parts = ssh.slice(1);
+  else if (https && host.endsWith('.visualstudio.com')) {
+    const project = https[2] ?? (https[1]?.toLowerCase() === 'defaultcollection' ? undefined : https[1]);
+    parts = [host.split('.')[0], project ?? https[3], https[3]];
+  } else if (https?.[1]) parts = [https[1], https[2] ?? https[3], https[3]];
+  if (!parts?.every(Boolean)) return null;
+  try { return parts.map((part) => decodeURIComponent(part!)).join('/'); }
+  catch { return null; }
+}
+
+/** The repository an origin URL names: GitHub's `owner/repo`, or Azure DevOps's `organization/project/repository`. */
+function originRepo(url: string): string | null {
+  return onAzureDevOps(url) ? azureRepo(url) : githubRepo(url);
 }
 
 /** `folder` with the home folder shown as `~`. */

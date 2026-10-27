@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'vite-plus/test';
-import { anyOnAzureDevOps, onAzureDevOps, repositoryProjectHints } from './repository-project.ts';
+import { anyOnAzureDevOps, azureRepo, onAzureDevOps, repositoryProjectHints } from './repository-project.ts';
 import { checkouts } from '../../test/repo-support.ts';
 import { projectsDb } from '../../test/stats-db.ts';
 
@@ -34,22 +34,27 @@ test('a listed repository on Azure DevOps needs az; GitHub ones and unlisted Azu
   const env = t3Home(t, { 'lar-factory': GITHUB[0]!, 'lar-api': AZURE[0]! });
   const repo = (name: string) => ({ repo: name, role: 'server' });
   assert.equal(await anyOnAzureDevOps([repo('maddec01/lar-factory')], env), false);
-  assert.equal(await anyOnAzureDevOps([repo('maddec01/lar-factory'), repo('fabrikam/lar-api')], env), true);
+  assert.equal(await anyOnAzureDevOps([repo('maddec01/lar-factory'), repo('Contoso/fabrikam/lar-api')], env), true);
+  assert.equal(await anyOnAzureDevOps([repo('maddec01/lar-factory'), repo('other/Fabrikam/lar-api')], env), false);
   assert.equal(await anyOnAzureDevOps([repo('maddec01/lar-factory')], { ...env, T3_STATE_DB: '/nowhere/state.sqlite' }), false);
 });
 
-test('every Azure DevOps origin form names its project/repo', async (t) => {
-  for (const url of AZURE) {
-    const env = t3Home(t, { 'lar-api': url });
-    assert.equal(await anyOnAzureDevOps([{ repo: 'fabrikam/lar-api' }], env), true, url);
-  }
+test('every Azure DevOps origin form names its organization, project and repository', () => {
+  for (const url of AZURE) assert.equal(azureRepo(url), 'contoso/Fabrikam/lar-api', url);
+  assert.equal(azureRepo('https://dev.azure.com/contoso/Fabrikam/_git/lar-api'), 'contoso/Fabrikam/lar-api');
+  assert.equal(azureRepo('https://contoso.visualstudio.com/DefaultCollection/Fabrikam/_git/lar-api'), 'contoso/Fabrikam/lar-api');
+  assert.equal(azureRepo('https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar%20api'), 'contoso/Fabrikam Fiber/lar api');
+  // A repository named after its project may leave the project out.
+  assert.equal(azureRepo('https://dev.azure.com/contoso/_git/Fabrikam'), 'contoso/Fabrikam/Fabrikam');
+  for (const url of [...GITHUB, 'https://dev.azure.com/contoso', 'https://dev.azure.com/contoso/Fabrikam/_wiki/x']) assert.equal(azureRepo(url), null, url);
 });
 
-test('Start build finds only GitHub checkouts; Azure DevOps naming waits for build #386', async (t) => {
+test('Start finds the checkout of a GitHub or an Azure DevOps repository', async (t) => {
   const env = t3Home(t, { 'lar-factory': GITHUB[0]!, 'lar-api': AZURE[0]! });
   const repo = (name: string) => ({ repo: name, role: 'server', labels: [] });
-  assert.deepEqual(await repositoryProjectHints([repo('maddec01/lar-factory'), repo('Fabrikam/lar-api')], env), {
+  assert.deepEqual(await repositoryProjectHints([repo('maddec01/lar-factory'), repo('contoso/fabrikam/lar-api'), repo('contoso/fabrikam/lar-web')], env), {
     'maddec01/lar-factory': null,
-    'Fabrikam/lar-api': 'No T3 project is a checkout of Fabrikam/lar-api; add the checkout in T3 Code',
+    'contoso/fabrikam/lar-api': null,
+    'contoso/fabrikam/lar-web': 'No T3 project is a checkout of contoso/fabrikam/lar-web; add the checkout in T3 Code',
   });
 });

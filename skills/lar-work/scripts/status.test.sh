@@ -99,7 +99,32 @@ else:
     conn.sendall(b'HTTP/1.1 202 Accepted\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}')
 conn.close()
 PY
-chmod +x "$bin/gh" "$bin/curl"
+# A fake az for an Azure work item: `boards work-item show` answers a User Story
+# at rev 4 in State FAKE_AZ_STATE (default New) with the tags in FAKE_AZ_TAGS
+# ("a; b", none when empty), and fails with FAKE_AZ_ERROR when set. The states
+# read answers the Agile User Story's states, New (Proposed), Active
+# (InProgress), Resolved, Closed (Completed) and Removed, or FAKE_AZ_STATES when
+# set. The PATCH logs "az-patch <args>" and then its JSON patch on one line.
+cat >"$bin/az" <<'AZ'
+#!/bin/bash
+case "$*" in
+"boards work-item show --id 42 --organization https://dev.azure.com/contoso --output json")
+    if [[ -n ${FAKE_AZ_ERROR:-} ]]; then echo "$FAKE_AZ_ERROR" >&2; exit 1; fi
+    jq -n --arg state "${FAKE_AZ_STATE:-New}" --arg tags "${FAKE_AZ_TAGS:-}" '{id: 42, rev: 4, fields: ({"System.WorkItemType": "User Story", "System.State": $state, "System.Title": "Sign in"}
+        + if $tags == "" then {} else {"System.Tags": $tags} end)}' ;;
+"devops invoke --area wit --resource workitemtypestates --organization https://dev.azure.com/contoso --route-parameters project=Fabrikam Fiber type=User Story --api-version 7.1 --output json")
+    agile='{"count": 5, "value": [{"name": "New", "category": "Proposed"}, {"name": "Active", "category": "InProgress"}, {"name": "Resolved", "category": "Resolved"}, {"name": "Closed", "category": "Completed"}, {"name": "Removed", "category": "Removed"}]}'
+    echo "${FAKE_AZ_STATES:-$agile}" ;;
+"devops invoke --area wit --resource workitems --organization https://dev.azure.com/contoso --route-parameters id=42 --http-method PATCH --media-type application/json-patch+json --in-file "*" --api-version 7.1 --output none")
+    echo "az-patch" >>"$FAKE_GH_LOG"
+    args="$*" file=${args#*--in-file }
+    jq -c . "${file%% *}" >>"$FAKE_GH_LOG" ;;
+*)
+    echo "fake az: unexpected $*" >&2
+    exit 1 ;;
+esac
+AZ
+chmod +x "$bin/gh" "$bin/curl" "$bin/az"
 export FAKE_GH_LOG="$log" PATH="$bin:$PATH"
 listeners=
 trap 'kill $listeners 2>/dev/null; rm -rf "$bin"' EXIT
@@ -354,5 +379,170 @@ if ((status != 0)) && [[ -z $writes && $errors == *usage* ]]; then
 else
     fail "a ref that names no issue or PR prints usage: $status $output / $errors / $writes"
 fi
+
+# An Azure work item
+
+work_item=https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/42
+# patched <tags> [state]: passes when the one write was a patch at rev 4 setting these tags, and that State if given.
+patched() {
+    local want
+    want=$(jq -nc --arg tags "$1" --arg state "${2:-}" '[{op: "test", path: "/rev", value: 4}, {op: "replace", path: "/fields/System.Tags", value: $tags}]
+        + if $state == "" then [] else [{op: "replace", path: "/fields/System.State", value: $state}] end')
+    ((status == 0)) && [[ $writes == "az-patch"$'\n'"$want" && -z $projects ]]
+}
+
+FAKE_AZ_STATE=Active FAKE_AZ_TAGS="build; status-shaping; area-api" set_status "$work_item" "Ready to merge"
+if patched "build; area-api; status-ready-to-merge" && [[ $output == "$work_item → Ready to merge" && -z $errors ]]; then
+    pass "on an Azure work item, swaps the status tag and keeps the others, leaving an InProgress State alone"
+else
+    fail "on an Azure work item, swaps the status tag and keeps the others, leaving an InProgress State alone: $status $output / $errors / $writes"
+fi
+
+for bad in Fabrikam%2F..%2Fx %2E%2E Fabrikam%5Cx; do
+    FAKE_AZ_STATE=Active FAKE_AZ_TAGS="status-shaping" set_status "https://dev.azure.com/contoso/$bad/_workitems/edit/42" Review
+    if ((status != 0)) && [[ -z $writes ]]; then
+        pass "refuses a work item whose project $bad decodes to a path, writing nothing"
+    else
+        fail "refuses a work item whose project $bad decodes to a path, writing nothing: $status $output / $errors / $writes"
+    fi
+done
+
+for later in Shaping "Needs you" Ready "In progress" Review Verify "Ready to merge"; do
+    FAKE_AZ_STATE=New FAKE_AZ_TAGS="status-queued" set_status "$work_item" "$later"
+    if patched "$(tr '[:upper:] ' '[:lower:]-' <<<"status-$later")" Active; then
+        pass "$later moves a Proposed-category item to the first InProgress-category state"
+    else
+        fail "$later moves a Proposed-category item to the first InProgress-category state: $status $output / $errors / $writes"
+    fi
+done
+
+for back in List Queued; do
+    for state in Active Resolved Closed; do
+        FAKE_AZ_STATE=$state FAKE_AZ_TAGS="status-review" set_status "$work_item" "$back"
+        if patched "$(tr '[:upper:] ' '[:lower:]-' <<<"status-$back")" New; then
+            pass "$back moves a $state item to the first Proposed-category state"
+        else
+            fail "$back moves a $state item to the first Proposed-category state: $status $output / $errors / $writes"
+        fi
+    done
+done
+
+FAKE_AZ_STATE=New FAKE_AZ_TAGS="status-list" set_status "$work_item" Queued
+if patched "status-queued"; then
+    pass "Queued leaves a Proposed-category State alone"
+else
+    fail "Queued leaves a Proposed-category State alone: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=Removed FAKE_AZ_TAGS="status-review" set_status "$work_item" List
+if patched "status-list"; then
+    pass "List leaves a Removed-category State alone"
+else
+    fail "List leaves a Removed-category State alone: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=Active FAKE_AZ_TAGS="status-verify" set_status "$work_item" Review
+if patched "status-review"; then
+    pass "a status after Queued leaves an InProgress-category State alone"
+else
+    fail "a status after Queued leaves an InProgress-category State alone: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=Proposed FAKE_AZ_TAGS="status-list" \
+    FAKE_AZ_STATES='{"value": [{"name": "Proposed", "category": "Proposed"}, {"name": "Doing", "category": "InProgress"}, {"name": "Active", "category": "InProgress"}, {"name": "Done", "category": "Completed"}]}' \
+    set_status "$work_item" Shaping
+if patched "status-shaping" Doing; then
+    pass "takes the first InProgress-category state in the type's order, whatever its name"
+else
+    fail "takes the first InProgress-category state in the type's order, whatever its name: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=Active set_status "$work_item" Review
+if patched "status-review"; then
+    pass "a work item with no tags gets the status tag"
+else
+    fail "a work item with no tags gets the status tag: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=Active FAKE_AZ_TAGS="status-review" set_status "$work_item" Review
+if patched "status-review"; then
+    pass "a work item that already has the status keeps its tag"
+else
+    fail "a work item that already has the status keeps its tag: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_TAGS="status-shaping; build; status-verify" set_status "$work_item" Review
+if ((status != 0)) && [[ -z $writes && $errors == *"2 status tags: status-shaping status-verify"*"all but one"* ]]; then
+    pass "refuses a work item with two status tags, naming them"
+else
+    fail "refuses a work item with two status tags, naming them: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_TAGS=$(seq -f 'tag-%g' 100 | paste -sd ';' - | sed 's/;/; /g') set_status "$work_item" Review
+if ((status != 0)) && [[ -z $writes && $errors == *"100 tags, Azure's limit"* ]]; then
+    pass "refuses a work item at the 100-tag limit with no status tag to swap"
+else
+    fail "refuses a work item at the 100-tag limit with no status tag to swap: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=Active FAKE_AZ_TAGS="$(seq -f 'tag-%g' 99 | paste -sd ';' - | sed 's/;/; /g'); status-verify" set_status "$work_item" Review
+if ((status == 0)) && [[ $writes == *'"value":"tag-1; '*'; tag-99; status-review"}]' ]]; then
+    pass "a work item at the limit with a status tag swaps it"
+else
+    fail "a work item at the limit with a status tag swaps it: $status $output / $errors / $writes"
+fi
+
+set_status "$work_item" Shipping
+if ((status != 0)) && [[ -z $writes && $errors == *'Unknown status "Shipping"'* ]]; then
+    pass "refuses an unknown status on an Azure work item"
+else
+    fail "refuses an unknown status on an Azure work item: $status $output / $errors / $writes"
+fi
+
+set_status "$work_item" Done
+if ((status != 0)) && [[ -z $writes && $errors == *"Completing the work item makes it Done"* ]]; then
+    pass "refuses Done on an Azure work item"
+else
+    fail "refuses Done on an Azure work item: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=New FAKE_AZ_STATES='{"value": [{"name": "New", "category": "Proposed"}, {"name": "Closed", "category": "Completed"}]}' set_status "$work_item" Shaping
+if ((status != 0)) && [[ -z $writes && $errors == *"User Story in Fabrikam Fiber has no InProgress-category state"* ]]; then
+    pass "a type with no state to move to stops before any write"
+else
+    fail "a type with no state to move to stops before any write: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_ERROR="ERROR: Before you can run Azure DevOps commands, you need to run the login command (az login if using AAD/MSA identity else az devops login if using PAT token) to setup credentials." \
+    set_status "$work_item" Review
+if ((status != 0)) && [[ -z $writes && $errors == "az is logged out. Run az login, then rerun." ]]; then
+    pass "with az logged out, says to run az login"
+else
+    fail "with az logged out, says to run az login: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_ERROR="ERROR: 'boards' is misspelled or not recognized by the system." set_status "$work_item" Review
+if ((status != 0)) && [[ -z $writes && $errors == *"az extension add --name azure-devops"* ]]; then
+    pass "without the azure-devops extension, says to add it"
+else
+    fail "without the azure-devops extension, says to add it: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=Active FAKE_AZ_TAGS="status-verify" set_status https://contoso.visualstudio.com/Fabrikam%20Fiber/_workitems/edit/42 Review
+if patched "status-review"; then
+    pass "takes a work item URL on an older visualstudio.com organization"
+else
+    fail "takes a work item URL on an older visualstudio.com organization: $status $output / $errors / $writes"
+fi
+
+export FAKE_AZ_STATE=Active FAKE_AZ_TAGS="status-verify" FAKE_CURL_OFF=1
+: >"$log"
+output=$(LAR_BOARD_PORT=4999 bash "$status_sh" "$work_item" Review 2>&1) || true
+if grep -q '^curl.*127.0.0.1:4999/api/read' "$log"; then
+    pass "after an Azure write, asks the board for a read"
+else
+    fail "after an Azure write, asks the board for a read: $output / $(cat "$log")"
+fi
+unset FAKE_AZ_STATE FAKE_AZ_TAGS FAKE_CURL_OFF
 
 ((failures == 0))

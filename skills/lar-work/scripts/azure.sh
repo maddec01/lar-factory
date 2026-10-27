@@ -35,6 +35,7 @@ azure_work_item() {
     else
         return 1
     fi
+    azure_name_ok "$az_project"
 }
 
 # azure_name_ok <name>: whether the name, decoded, is one part of a request path:

@@ -53,7 +53,7 @@ function MoveActions({ item, data }: { item: Item; data: BoardData }) {
 }
 
 function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData; now: number; open: boolean }) {
-  const read = useItemDetails(item.id, open);
+  const read = useItemDetails(item.id, item.updatedAt, open);
   const hint = carriesTwoStatuses(item) ? keepOneText(item.statuses) : HINTS[item.status];
   return (
     <>

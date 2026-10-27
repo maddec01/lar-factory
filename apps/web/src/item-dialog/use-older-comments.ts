@@ -1,9 +1,10 @@
 // The older comments the item dialog loads under the details' latest 10, one page of 10 per call, from the cursor the
-// details gave and then the one each page gave. The state lives with the comments list, which the dialog unmounts while
-// the details load again, so reopening starts over at the latest comments; a page for a list that has gone is dropped.
+// details gave and then the one each page gave. The pages loaded stay with the details' cache entry, so reopening an
+// item whose details are reused shows them again; a page for a list that has gone is dropped.
 
 import { useEffect, useRef, useState } from 'react';
 import type { ItemComment, ItemCommentsPage } from '@lar-factory/shared';
+import type { DetailsEntry } from './details-cache.ts';
 
 export interface OlderComments {
   /** The pages loaded so far, in the details' order: each page's comments follow the one before. */
@@ -26,9 +27,12 @@ async function readPage(itemId: string, before: string, signal: AbortSignal): Pr
   }
 }
 
-/** The older comments of `itemId`, starting at `cursor`, the details' `olderCursor`. */
-export function useOlderComments(itemId: string, cursor: string | null): OlderComments {
-  const [state, setState] = useState<{ comments: ItemComment[]; cursor: string | null; loading: boolean; error: string | null }>({ comments: [], cursor, loading: false, error: null });
+/** The older comments of `itemId`: those `entry` holds, then from the cursor after them, else the details' `olderCursor`. */
+export function useOlderComments(itemId: string, entry: DetailsEntry): OlderComments {
+  const [state, setState] = useState<{ comments: ItemComment[]; cursor: string | null; loading: boolean; error: string | null }>({
+    comments: entry.older?.comments ?? [], cursor: entry.older ? entry.older.cursor : entry.details.olderCursor, loading: false, error: null,
+  });
+  useEffect(() => { entry.older = { comments: state.comments, cursor: state.cursor }; }, [entry, state.comments, state.cursor]);
   const reading = useRef<AbortController | null>(null);
   useEffect(() => () => reading.current?.abort(), []);
   const loadMore = () => {

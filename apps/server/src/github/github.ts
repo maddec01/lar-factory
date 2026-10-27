@@ -139,14 +139,14 @@ async function gh(args: string[]): Promise<string> {
   return result.stdout;
 }
 
-async function graphql<T>(query: string, vars: Record<string, string | number | string[] | null>): Promise<T> {
+export async function graphql<T>(query: string, vars: Record<string, string | number | string[] | null>, run: (args: string[]) => Promise<string> = gh): Promise<T> {
   const args = ['api', 'graphql', '-f', `query=${query}`];
   for (const [key, value] of Object.entries(vars)) {
     if (value === null) continue;
     if (Array.isArray(value)) args.push(...value.flatMap((v) => ['-f', `${key}[]=${v}`]));
     else args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`);
   }
-  return JSON.parse(await gh(args)) as T;
+  return JSON.parse(await run(args)) as T;
 }
 
 /** A GitHub Project, by its owner and number, as a repository's .lar-factory.json names it. */

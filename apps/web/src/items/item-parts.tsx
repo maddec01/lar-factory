@@ -34,45 +34,42 @@ export function ItemTitle({ item }: { item: Item }) {
   return <><span className="font-normal text-(--muted-foreground) tabular-nums">{ref(item)}</span> {item.title}</>;
 }
 
-/**
- * Ten steps as a track; the past filled, the current one in its colour and, with `labels`, named. Named, it sits in a
- * container (the item dialog's popup): once that is 48rem wide every step has its name, and below that only the
- * current step does, since ten names don't fit.
- */
-export function StepTrack({ status, labels }: { status: Status; labels?: boolean }) {
+/** Ten steps as a track; the past filled, the current one in its colour. */
+export function StepTrack({ status }: { status: Status }) {
   const at = STATUSES.indexOf(status);
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-1.5">
-      <ol className="m-0 flex list-none gap-[3px] p-0">
-        {STATUSES.map((s, i) => (
-          <li key={s} title={s} className="h-1.5 flex-1 rounded-full"
-            style={{ background: i < at ? 'color-mix(in srgb, var(--foreground) 28%, transparent)' : i === at ? STATUS_COLOR[s] : 'var(--soft)' }} />
-        ))}
-      </ol>
-      {labels && (
-        <>
-          <p data-step className="m-0 text-xs text-(--muted-foreground) @min-[48rem]:hidden"><span className="font-medium text-(--foreground)">{status}</span> · step {at + 1} of {STATUSES.length}</p>
-          <ol className="m-0 hidden list-none gap-[3px] p-0 text-[10px] text-(--muted-foreground) @min-[48rem]:flex">
-            {STATUSES.map((s, i) => <li key={s} className={`flex-1 truncate ${i === at ? 'font-semibold text-(--foreground)' : ''}`}>{s}</li>)}
-          </ol>
-        </>
-      )}
-    </div>
+    <ol className="m-0 flex list-none gap-[3px] p-0">
+      {STATUSES.map((s, i) => (
+        <li key={s} title={s} className="h-1.5 flex-1 rounded-full"
+          style={{ background: i < at ? 'color-mix(in srgb, var(--foreground) 28%, transparent)' : i === at ? STATUS_COLOR[s] : 'var(--soft)' }} />
+      ))}
+    </ol>
   );
 }
 
 const SLICE_COLOR: Record<SliceProgress, string> = { done: 'var(--st-done)', active: 'var(--st-now)', blocked: 'var(--st-review)', waiting: 'var(--input)' };
 
-/** A build's slices as one bar, a segment each, in their colours; the bar's waiting segments are faint. */
-export function SliceBar({ item }: { item: Item }) {
+/** A build's slices as one bar, a segment each, in their colours; the bar's waiting segments are faint. `thick` draws it as tall as a step of the item dialog's progress bar. */
+export function SliceBar({ item, thick }: { item: Item; thick?: boolean }) {
   if (!item.slices.length) return null;
   return (
     <ol className="m-0 flex list-none gap-[2px] p-0">
       {item.slices.map((s) => (
-        <li key={s.number} title={`#${s.number} ${s.title}`} className={`h-1 flex-1 rounded-full ${s.progress === 'active' ? 'status-pulse' : ''}`}
+        <li key={s.number} title={`#${s.number} ${s.title}`} className={`${thick ? 'h-1.5' : 'h-1'} flex-1 rounded-full ${s.progress === 'active' ? 'status-pulse' : ''}`}
           style={{ background: s.progress === 'waiting' ? 'var(--soft)' : SLICE_COLOR[s.progress] }} />
       ))}
     </ol>
+  );
+}
+
+/** A slice's state as a ring: ticked when done, a pulsing dot while active. */
+export function SliceMark({ progress }: { progress: SliceProgress }) {
+  return (
+    <span className="grid size-4 shrink-0 place-items-center rounded-full border-[1.5px]"
+      style={{ borderColor: SLICE_COLOR[progress], background: progress === 'done' ? 'var(--st-done)' : 'transparent' }}>
+      {progress === 'done' && <Check className="size-2.5 text-white" strokeWidth={3} />}
+      {progress === 'active' && <span className="status-pulse size-1.5 rounded-full bg-(--st-now)" />}
+    </span>
   );
 }
 
@@ -81,11 +78,7 @@ export function SliceList({ item }: { item: Item }) {
     <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-0.5 p-0">
       {item.slices.map((s) => (
         <li key={s.number} className="flex items-start gap-2 rounded-md px-2 py-1 text-[13px] hover:bg-(--soft)">
-          <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border-[1.5px]"
-            style={{ borderColor: SLICE_COLOR[s.progress], background: s.progress === 'done' ? 'var(--st-done)' : 'transparent' }}>
-            {s.progress === 'done' && <Check className="size-2.5 text-white" strokeWidth={3} />}
-            {s.progress === 'active' && <span className="status-pulse size-1.5 rounded-full bg-(--st-now)" />}
-          </span>
+          <span className="mt-0.5"><SliceMark progress={s.progress} /></span>
           <span className="shrink-0 text-(--muted-foreground) tabular-nums">#{s.number}</span>
           <span className={`min-w-0 flex-1 wrap-anywhere ${s.progress === 'done' ? 'text-(--muted-foreground) line-through' : s.progress === 'active' ? 'font-medium' : ''}`}>{s.title}</span>
           <span className="mt-px shrink-0 text-[11px] text-(--muted-foreground)">{s.progress}</span>
@@ -122,14 +115,23 @@ export function PrList({ item }: { item: Item }) {
   );
 }
 
-/** Cost, agent time, tokens and wall time as chips; a line instead when no thread worked on the item or T3's database can't be read. */
-export function StatChips({ item }: { item: Item }) {
+/** Cost, agent time, tokens and wall time as one small muted line, each named in the tooltip; nothing when no thread worked on the item or T3's database can't be read. */
+export function AgentWork({ item, className = '' }: { item: Item; className?: string }) {
   const s = item.stats;
-  if (!s || s === 'unavailable') return <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : 'No T3 thread has worked on this yet.'}</p>;
-  const chips = [['Cost', s.costUsd !== undefined ? formatUsd(s.costUsd) : '–'], ['Agent time', duration(s.agentMs)], ['Tokens', formatTokens(s.tokens)], ['Wall time', s.wallMs ? duration(s.wallMs) : '–']];
+  if (!s || s === 'unavailable') return null;
+  const figures: [label: string, value: string, unit: string][] = [];
+  if (s.costUsd !== undefined) figures.push(['Cost', formatUsd(s.costUsd), '']);
+  figures.push(['Agent time', duration(s.agentMs), ''], ['Tokens', formatTokens(s.tokens), ' tokens']);
+  if (s.wallMs) figures.push(['Wall time', duration(s.wallMs), ' wall']);
   return (
-    <dl className="m-0 flex flex-wrap gap-1.5">
-      {chips.map(([k, v]) => <div key={k} className="flex items-baseline gap-1.5 rounded-md border border-(--border) bg-(--card) px-2 py-1"><dt className="text-[11px] text-(--muted-foreground)">{k}</dt><dd className="m-0 text-xs font-medium tabular-nums">{v}</dd></div>)}
-    </dl>
+    <p data-agent-work title={figures.map(([k, v]) => `${k} ${v}`).join(' · ')} className={`m-0 text-xs text-(--muted-foreground) tabular-nums ${className}`}>
+      {figures.map(([, v, unit]) => v + unit).join(' · ')}
+    </p>
   );
+}
+
+/** The line that says why there are no agent work figures: no T3 thread worked on the item, or T3's database can't be read. */
+export function AgentWorkNote({ item }: { item: Item }) {
+  const s = item.stats;
+  return s && s !== 'unavailable' ? null : <p className="m-0 text-xs text-(--muted-foreground)">{s ? UNREADABLE : 'No T3 thread has worked on this yet.'}</p>;
 }

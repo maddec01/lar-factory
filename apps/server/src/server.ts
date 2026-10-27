@@ -15,6 +15,7 @@ import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { onboardedSources, repoView } from './items/item-sources.ts';
 import { log } from './log.ts';
+import { createClashRuns } from './onboarding/clash-runs.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { finishOnboarding } from './onboarding/finish-onboarding.ts';
@@ -302,6 +303,8 @@ function readSoon(): void {
 // Resources/server/dist/, beside Resources/web/dist/.
 const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
+/** Onboarding's Clash agent runs, kept while the board runs so closing the dialog leaves a run going. */
+const clashRuns = createClashRuns(offerModelChoices);
 const commands = createItemCommands({ board, items, repos: items.repos, offerModelChoices, checkSkills: parentSkillCheck() });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
 const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json'),
@@ -311,7 +314,8 @@ const { server, endStreams } = createBoardServer({
   recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
-  runSetupCheck: (input) => runSetupCheck(input), findFixedClashes: (input) => findFixedClashes(input), finishOnboarding: (input) => finishOnboarding(input, undefined, undefined, configChecks.forget),
+  runSetupCheck: (input) => runSetupCheck(input), findFixedClashes: (input) => findFixedClashes(input),
+  startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo), finishOnboarding: (input) => finishOnboarding(input, undefined, undefined, configChecks.forget),
   openOnboardingPr: createPrOpener(), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
 });
 

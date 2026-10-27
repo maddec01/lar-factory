@@ -1,10 +1,11 @@
 import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkouts } from './repo-support.ts';
-import { readsRepositoryConfig, startBoard, until } from './server-support.ts';
+import { readsRepositoryConfig, SAMPLE_MODELS, startBoard, until } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -159,6 +160,36 @@ test("onboarding's fixed checks answer with the default branch's Clashes, or gh'
   assert.match((await failed.json() as { error: string }).error, /^Can't read maddec01\/lar-web's default branch: .*HTTP 502/);
 });
 
+test("onboarding's Clash agent runs on a fresh fetch of origin's default branch, and its runs read back by repository", async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  const origin = join(home, 'origin');
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...args],
+    { env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
+  git('init', '-q', '-b', 'main', origin);
+  git('-C', origin, 'commit', '-q', '--allow-empty', '-m', 'init');
+  checkouts(home, { 'lar-web': origin });
+  const db = projectsDb(t, [{ id: 'lar-web', root: `${home}/Developer/lar/lar-web` }]);
+  const reply = JSON.stringify({ clashes: [{ file: 'AGENTS.md', line: 3, reason: 'Builders would push to main.', remove: ['Push to main.'], add: [] }] });
+  const board = await startBoard(t, { t3: { waited: { reply } } }, false, false, { HOME: home, T3_STATE_DB: db, ...SAMPLE_MODELS });
+  const model = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
+  const started = await board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web', model }, board.url, '/api/onboarding/clash-runs');
+  assert.equal(started.status, 200);
+  let runs: { state: string; threadId: string | null; clashes?: { file: string; line: number }[] }[] = [];
+  for (let i = 0; i < 100 && runs[0]?.state !== 'done'; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    runs = (await (await fetch(`${board.url}/api/onboarding/clash-runs?repo=maddec01/lar-web`)).json() as { runs: typeof runs }).runs;
+  }
+  assert.deepEqual(runs.map(({ state, threadId, clashes }) => [state, threadId, clashes?.map((c) => `${c.file}:${c.line}`)]),
+    [['done', 'thread-1', ['AGENTS.md:3']]]);
+  assert.equal(git('-C', `${home}/Developer/lar/lar-web`, 'rev-parse', 'origin/main').toString(), git('-C', origin, 'rev-parse', 'main').toString());
+  const [start] = (await board.t3Calls()).filter((args) => args[0] === 'thread');
+  assert.deepEqual(start?.slice(4), ['--title', start?.[5], '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5', '--wait', '--json']);
+  assert.match(start![3]!, /git show origin\/main:<path>/);
+  const bad = await board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web' }, board.url, '/api/onboarding/clash-runs');
+  assert.equal(bad.status, 400);
+});
+
 test('finishing an onboarding that reuses .lar-factory.json puts its repository on the board', async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
@@ -172,12 +203,14 @@ test('finishing an onboarding that reuses .lar-factory.json puts its repository 
   assert.deepEqual(data.repos.map((r) => r.repo), ['maddec01/lar-factory', 'maddec01/lar-web']);
 });
 
-test('the sample board runs no onboarding check, finds no Clash and finishes no onboarding', async (t) => {
+test('the sample board runs no onboarding check, finds no Clash, runs no Clash agent and finishes no onboarding', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/finish']) {
+  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs', '/api/onboarding/finish']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }
+  const runs = await fetch(`${board.url}/api/onboarding/clash-runs?repo=maddec01/lar-web`);
+  assert.deepEqual([runs.status, await runs.json()], [403, { error: 'Sample mode onboards no repository.' }]);
 });
 
 const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' };

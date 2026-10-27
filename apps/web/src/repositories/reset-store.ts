@@ -1,9 +1,11 @@
-// Reset in Settings › Repositories on a repository still onboarding: the repository its confirmation names, and
-// whether the server is closing its onboarding PR and dropping its entry. The confirmation closes once the board drops
-// the onboarding, and stays open with gh's message when the close fails.
+// Reset in Settings › Repositories: the repository its confirmation names, and whether the server is resetting it,
+// closing an onboarding PR and dropping the entry of a repository still onboarding, or opening the reset PR of an
+// onboarded one. The confirmation closes once the board drops the repository, with a toast linking the reset PR it
+// opened, and stays open with gh's message when Reset fails.
 
 import { create } from 'zustand';
 import { postAction, receive } from '../items/card-actions.ts';
+import { showPrToast } from '../notices/toasts.tsx';
 
 interface Reset {
   repo: string;
@@ -29,8 +31,10 @@ export const useResetStore = create<ResetState>()((set, get) => ({
     const { reset } = get();
     if (!reset || reset.resetting) return;
     set({ reset: { ...reset, resetting: true, error: null } });
-    const result = await postAction('/api/onboarding/reset', { repo: reset.repo });
+    const result = await postAction<{ prUrl: string }>('/api/onboarding/reset', { repo: reset.repo });
     receive(result);
     set({ reset: result.error ? { ...reset, resetting: false, error: result.error } : null });
+    if (result.error || !result.prUrl) return;
+    showPrToast({ slot: 'reset', what: ` reset PR for ${reset.repo}`, prUrl: result.prUrl, label: `${reset.repo}’s reset PR` });
   },
 }));

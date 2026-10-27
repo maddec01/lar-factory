@@ -1,9 +1,10 @@
-// Reset in Settings › Repositories on a repository still onboarding: the confirmation says whether it closes the
+// Reset in Settings › Repositories. On a repository still onboarding the confirmation says whether it closes the
 // onboarding PR or only drops the onboarding, Reset posts the repository and the board drops its row and card, and a
-// close gh refuses keeps the confirmation open with gh's message.
+// close gh refuses keeps the confirmation open with gh's message. On an onboarded repository it says what the reset PR
+// removes and what Reset leaves, and that it closes an open Edit PR, a toast links the reset PR, and a PR gh can't open keeps the row and shows gh's message.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
+import { $, $$, fetchMock, mountPage, sample, settle, text, toast } from '../../test/support.ts';
 import type { BoardData, OnboardingProgress } from '@lar-factory/shared';
 
 const REPO = 'maddec01/lar-web';
@@ -25,15 +26,15 @@ function serve(data: BoardData, reset: Answer = { body: { error: null, board: { 
 }
 
 const dialog = () => $('[data-reset-dialog]');
-const row = () => $(`.settings-row[data-row="repo-${REPO}"]`);
+const row = (repo = REPO) => $(`.settings-row[data-row="repo-${repo}"]`);
 const button = (within: Element, label: string) => [...within.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!;
 
-/** Opens Settings › Repositories on `data` and presses the onboarding's Reset. */
-async function openReset(data: BoardData): Promise<void> {
+/** Opens Settings › Repositories on `data` and presses `repo`'s Reset. */
+async function openReset(data: BoardData, repo = REPO): Promise<void> {
   await mountPage(data);
   await settle(() => $<HTMLButtonElement>('.open-settings')!.click());
   await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Repositories')!.click());
-  await settle(() => button(row()!, 'Reset').click());
+  await settle(() => button(row(repo)!, 'Reset').click());
   await settle(() => vi.advanceTimersByTime(50));
 }
 
@@ -45,6 +46,7 @@ test('Reset of an onboarding waiting for its PR says it closes the PR, then clos
   expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toBe(
     `Reset closes ${REPO}’s onboarding PR, maddec01/lar-web#14, and drops its onboarding from this Mac’s list, with its Resume. It opens no PR, and leaves alone the T3 project and the repository’s labels.`);
   expect(dialog()!.querySelector('[data-slot="alert-dialog-description"] a')!.getAttribute('href')).toBe(PR);
+  expect(document.activeElement, 'focus starts on Cancel, not the PR link').toBe(button(dialog()!, 'Cancel'));
   await settle(() => button(dialog()!, 'Reset').click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(sent).toEqual([{ repo: REPO }]);
@@ -74,4 +76,51 @@ test("a Reset whose PR gh can't close keeps the confirmation open with gh's mess
   expect(text(dialog()!.querySelector('[data-slot="alert"]'))).toBe(`Can’t resetCan't close ${REPO}'s onboarding PR: HTTP 403: Resource not accessible`);
   expect(row()).not.toBeNull();
   expect(button(dialog()!, 'Reset').disabled).toBe(false);
+});
+
+const ONBOARDED = sample.repos[0]!.repo;
+
+test('Reset of an onboarded repository says what its PR removes, what it drops and what it leaves, then posts it, drops the row and links the PR', async () => {
+  const resetPr = `https://github.com/${ONBOARDED}/pull/30`;
+  const sent = serve(sample, { body: { error: null, prUrl: resetPr, board: { ...sample, repos: sample.repos.slice(1) } } });
+  await openReset(sample, ONBOARDED);
+  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-title"]'))).toBe(`Reset ${ONBOARDED}?`);
+  expect([...dialog()!.querySelectorAll('[data-slot="alert-dialog-description"] li')].map(text)).toEqual([
+    'opens a PR that removes .lar-factory.json, the ## Agent skills block and the docs/agents/ files;',
+    `drops ${ONBOARDED} from this Mac’s list and hides its items;`,
+    `makes others who onboarded ${ONBOARDED} lose its Repository config once the PR merges.`,
+  ]);
+  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toMatch(/It leaves alone the T3 project and the labels and statuses on its items\.$/);
+  await settle(() => button(dialog()!, 'Reset').click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(sent).toEqual([{ repo: ONBOARDED }]);
+  expect(dialog()).toBeNull();
+  expect(row(ONBOARDED)).toBeNull();
+  expect(text(toast()!)).toContain(`Opened ${ONBOARDED}’s reset PR.`);
+  expect(toast()!.querySelector('a')!.getAttribute('href')).toBe(resetPr);
+});
+
+test('Reset of an onboarded repository with an open Edit PR says it closes that PR first, and links it; one without says nothing of it', async () => {
+  const edit = `https://github.com/${ONBOARDED}/pull/9`;
+  const data: BoardData = { ...sample, repos: [{ ...sample.repos[0]!, editPr: edit }, ...sample.repos.slice(1)] };
+  serve(data);
+  await openReset(data, ONBOARDED);
+  const line = dialog()!.querySelector('[data-closes-edit-pr]')!;
+  expect(text(line)).toBe(`closes its open Edit PR, ${ONBOARDED}#9, so it can’t bring .lar-factory.json back;`);
+  expect(line.querySelector('a')!.getAttribute('href')).toBe(edit);
+  expect(document.activeElement, 'focus starts on Cancel, not the Edit PR link').toBe(button(dialog()!, 'Cancel'));
+  await settle(() => button(dialog()!, 'Cancel').click());
+  await settle(() => vi.advanceTimersByTime(50));
+  await settle(() => button(row(sample.repos[1]!.repo)!, 'Reset').click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(dialog()!.querySelector('[data-closes-edit-pr]')).toBeNull();
+});
+
+test("a Reset of an onboarded repository whose PR gh can't open keeps the confirmation open with gh's message, and the row", async () => {
+  serve(sample, { status: 502, body: { error: `Can't open ${ONBOARDED}'s reset PR: HTTP 403` } });
+  await openReset(sample, ONBOARDED);
+  await settle(() => button(dialog()!, 'Reset').click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(text(dialog()!.querySelector('[data-slot="alert"]'))).toBe(`Can’t resetCan't open ${ONBOARDED}'s reset PR: HTTP 403`);
+  expect(row(ONBOARDED)).not.toBeNull();
 });

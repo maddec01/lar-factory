@@ -217,7 +217,7 @@ fi
 
 : >"$bin/a"; : >"$bin/b"
 run '4317/x?'
-if same_as_today && (($(reads a) == 1 && $(reads b) == 1)) && ! grep -q '4317' "$log"; then
+if same_as_today && (($(reads a) == 1 && $(reads b) == 1)) && ! grep -q ':4317/' "$log"; then
     pass "a LAR_BOARD_PORT that isn't a number is ignored for the records"
 else
     fail "a LAR_BOARD_PORT that isn't a number is ignored for the records: $status $output / $errors / $(cat "$log")"

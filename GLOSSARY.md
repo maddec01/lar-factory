@@ -307,6 +307,10 @@ The board's view of the work moving through the factory: the Queue, the dossiers
 A concept, or an item with sub-issues, shown whole on the line: its destination, decisions, parts, what waits on what, and its threads.
 _Avoid_: concept card
 
+**Item dialog**:
+The board page's read-only view of one item, with what its provider shows: description, comments, people, labels, dates, relations and linked PRs.
+_Avoid_: detail modal, issue view, ticket view
+
 **Refining**:
 The line's first stage, covering Shaping and Needs you. Start refining starts an item's shaping thread.
 _Avoid_: shaping (for the stage)

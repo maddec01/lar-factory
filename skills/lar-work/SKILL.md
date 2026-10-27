@@ -59,7 +59,7 @@ verifies visible changes and merges every PR; the rest is yours.
 ## Grilling with docs
 
 Wherever this skill grills (open questions in **2. Size up**,
-[Concepts](concepts.md) step 1, `decision: grill`), load `grilling` and
+[Concepts](concepts.md) step 1, `decision-grill`), load `grilling` and
 `domain-modeling`, as upstream `grill-with-docs` does. Challenge the user's terms
 against the repo's `GLOSSARY.md` and ADRs; capture each resolved term and
 ADR-worthy decision the moment it settles.
@@ -81,7 +81,7 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
   finish only that capture per [Retro capture](retro-capture.md), keeping the
   source status. Rerun no build or retro; start no shaping or thread. Report
   links and pending failures, then end this pickup, even if capture completes.
-- A `decision: *` sub-issue: [Decisions](concepts.md#decisions).
+- A `decision-*` sub-issue: [Decisions](concepts.md#decisions).
 - A `build` sub-issue, or a passing brief in the body, also when resuming a
   shaping handoff: set **Ready** if it isn't and stop; the board starts it
   (**5. Start the build**).
@@ -122,7 +122,7 @@ label. Anything the user adds or corrects is another open question. Then:
   description. Show the variants as below, ask for the user's pick, and record it
   and the branch on the issue.
 
-  **Showing prototypes.** This thread, or the thread of a `decision: prototype`
+  **Showing prototypes.** This thread, or the thread of a `decision-prototype`
   sub-issue, shows every variant inside T3 itself, since the preview and Device
   panel belong to the thread that opens them. The user never receives a file
   path, URL or run command, and nothing opens outside T3. This overrides the

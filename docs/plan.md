@@ -230,8 +230,8 @@ No releases for lar-apple until TestFlight is set up.
       auto-add workflows a free account gets; if it's one, `lar-work` adds
       items itself.
 21. **Claude.** Create the same labels in every repo: `bug`, `feature`,
-    `improvement`, `concept`, `decision: grill`, `decision: prototype`,
-    `decision: research`, `decision: task`, `build`.
+    `improvement`, `concept`, `decision-grill`, `decision-prototype`,
+    `decision-research`, `decision-task`, `build`.
 22. **Claude.** Turn your exported notes into issues in the right repos, all in
     List. Anything that doesn't fit one repo becomes a draft item in the
     Project. **You** check the result.

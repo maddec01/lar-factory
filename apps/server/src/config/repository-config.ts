@@ -162,10 +162,24 @@ function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: str
   const written: Record<string, unknown> = { ...entry };
   const repositories = raw.repositories.flatMap((e, i) => i === at ? [written] : dropped(list[i]!) ? [] : [e]);
   if (at < 0) repositories.push(written);
+  return writeListFile(dir, { ...raw, repositories });
+}
+
+/** Drops the repository's entry, keeping every other entry as the file has it, and returns the list. Throws for a repository the list doesn't name. */
+export function dropRepository(repo: string, dir = boardDataDir()): OnboardedRepository[] {
+  const file = join(dir, 'repositories.json');
+  const { raw, list } = readListFile(file);
+  if (!list.some((e) => sameRepo(e.repo, repo))) throw new Error(`${repo} is not on this Mac's list.`);
+  return writeListFile(dir, { ...raw, repositories: raw.repositories.filter((_, i) => !sameRepo(list[i]!.repo, repo)) });
+}
+
+/** Writes repositories.json with `content` and returns its list. */
+function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {
+  const file = join(dir, 'repositories.json');
   mkdirSync(dir, { recursive: true });
   // Written beside it, then renamed over it, so repo-config.sh never reads half a file.
   const temp = `${file}.${process.pid}.tmp`;
-  writeFileSync(temp, `${JSON.stringify({ ...raw, repositories }, null, 2)}\n`);
+  writeFileSync(temp, `${JSON.stringify(content, null, 2)}\n`);
   renameSync(temp, file);
   return readListFile(file).list;
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed, stillOnboarding } from './repository-config.ts';
+import { dropRepository, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed, stillOnboarding } from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar repository config test '));
@@ -110,6 +110,15 @@ test('finishing an onboarding leaves its entry with the repository alone, in pla
   assert.deepEqual(saveOnboarded('maddec01/lar-web', 'maddec01/lar-cli', dir),
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple' }, { repo: 'maddec01/lar-web' }]);
   assert.throws(() => saveOnboarded('maddec01/lar-apple', null, dir), { message: 'maddec01/lar-apple is onboarded already.' });
+});
+
+test("dropping a repository removes its entry, whatever the case, and keeps every other entry and the file's other keys as the file has them", async (t) => {
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ note: 'kept', repositories: [{ repo: 'maddec01/lar-factory', note: 'kept' },
+    { repo: 'maddec01/lar-apple', onboarding: progress() }, { repo: 'maddec01/lar-cli', onboarding: progress('checks') }] }) });
+  assert.deepEqual(dropRepository('MADDEC01/Lar-Apple', dir), [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-cli', onboarding: progress('checks') }]);
+  assert.deepEqual(JSON.parse(await readFile(join(dir, 'repositories.json'), 'utf8')),
+    { note: 'kept', repositories: [{ repo: 'maddec01/lar-factory', note: 'kept' }, { repo: 'maddec01/lar-cli', onboarding: progress('checks') }] });
+  assert.throws(() => dropRepository('maddec01/lar-apple', dir), { message: "maddec01/lar-apple is not on this Mac's list." });
 });
 
 test('saving an onboarding for a repository that is onboarded already, or into a list that can\'t be read, is refused', async (t) => {

@@ -1,10 +1,11 @@
 // Every item source the onboarded repositories' configs name, as the one item source the board server reads and writes through.
-// A GitHub Project or a repository's issues read through gh, and an Azure DevOps team's sprint through az.
+// A GitHub Project or a repository's issues read through gh, and an Azure DevOps team's sprint or backlog through az.
 
 import type { Item, RepoConfig } from '@lar-factory/shared';
 import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
+import { azureBacklog } from '../azure/azure-backlog.ts';
 import { azureSprint } from '../azure/azure-sprint.ts';
 import { ReadProblem, type ItemSource, type ItemsRead } from './item-source.ts';
 
@@ -24,6 +25,7 @@ const unlisted: ItemSource = {
 export function repoView({ repo, role, itemSource, show, labels }: RepositoryConfig): RepoConfig {
   if (itemSource.kind === 'issues') return { repo, role, items: 'issues', show, labels };
   if (itemSource.kind === 'azure-sprint') return { repo, role, items: 'sprint', team: itemSource.team, show, labels };
+  if (itemSource.kind === 'azure-backlog') return { repo, role, items: 'backlog', team: itemSource.team, show, labels };
   return { repo, role, items: 'project', project: { owner: itemSource.owner, number: itemSource.number }, show, labels };
 }
 
@@ -36,6 +38,7 @@ function configuredSources(configs: readonly RepositoryConfig[]): ItemSource {
   const byRepo = new Map(configs.map(({ repo, itemSource }): [string, ItemSource] => {
     if (itemSource.kind === 'issues') return [repo, repoIssues(repo)];
     if (itemSource.kind === 'azure-sprint') return [repo, azureSprint(repo, itemSource.team)];
+    if (itemSource.kind === 'azure-backlog') return [repo, azureBacklog(repo, itemSource.team)];
     const key = `${itemSource.owner.toLowerCase()}/${itemSource.number}`;
     if (!projects.has(key)) projects.set(key, githubProject(itemSource));
     return [repo, projects.get(key)!];

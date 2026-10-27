@@ -141,7 +141,8 @@ const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3'
 
 test('Repositories shows the command line tools\' logins and each repository with its provider, item source and show setting', async () => {
   const repos = [{ ...sample.repos[0]!, project: { owner: 'maddec01', number: 3 } }, { ...sample.repos[1]!, items: 'issues' as const, show: 'opted-in' as const },
-    { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'sprint' as const, team: 'Fabrikam Team', labels: [] }];
+    { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'sprint' as const, team: 'Fabrikam Team', labels: [] },
+    { repo: 'contoso/Fabrikam/lar-web', role: 'Web', items: 'backlog' as const, team: 'Web Team', labels: [] }];
   await open('Repositories', { ...sample, repos });
   expect(groups()).toEqual([['Command line tools', ['gh', 'az']], ['Repositories', repos.map((r) => `repo-${r.repo}`)]]);
   expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
@@ -155,6 +156,7 @@ test('Repositories shows the command line tools\' logins and each repository wit
     `${repos[0]!.repo}GitHub · GitHub Project maddec01 #3 · All itemsEditReset`,
     `${repos[1]!.repo}GitHub · Issues · Opted-in itemsEditReset`,
     'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team’s current sprint · All itemsEditReset',
+    'contoso/Fabrikam/lar-webAzure DevOps · Web Team’s backlog · All itemsEditReset',
   ]);
 });
 

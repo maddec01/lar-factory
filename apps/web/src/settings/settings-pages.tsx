@@ -89,15 +89,15 @@ function refreshEvery(seconds: number): Control {
   return { type: 'select', options: REFRESH_OPTIONS.includes(value) ? REFRESH_OPTIONS : [...REFRESH_OPTIONS, value], value };
 }
 
-const ITEM_SOURCES = { project: 'GitHub Project', issues: 'Issues', sprint: 'Current sprint' } as const;
+const ITEM_SOURCES = { project: 'GitHub Project', issues: 'Issues', sprint: 'Current sprint', backlog: 'Backlog' } as const;
 
 /**
  * An item source as Settings names it, with a GitHub Project's owner and number when it has them, like `GitHub Project maddec01 #3`,
- * and a sprint's team, like `Fabrikam Team’s current sprint`.
+ * and a sprint's or backlog's team, like `Fabrikam Team’s current sprint`.
  */
 const sourceName = (kind: keyof typeof ITEM_SOURCES, project?: { owner: string; number: number | string }, team?: string) =>
   kind === 'project' && project ? `${ITEM_SOURCES.project} ${project.owner} #${project.number}`
-    : kind === 'sprint' && team ? `${team}’s current sprint` : ITEM_SOURCES[kind];
+    : kind === 'sprint' && team ? `${team}’s current sprint` : kind === 'backlog' && team ? `${team}’s backlog` : ITEM_SOURCES[kind];
 const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
 
 /**
@@ -119,7 +119,7 @@ function onboardingDescription(progress: OnboardingProgress): string {
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: r.repo, description: <>{itemSource(r) === 'sprint' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.project, r.team)} · {SHOWN[r.show ?? 'all']}
+    id: `repo-${r.repo}`, title: r.repo, description: <>{itemSource(r) === 'sprint' || itemSource(r) === 'backlog' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.project, r.team)} · {SHOWN[r.show ?? 'all']}
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     below: <ConfigUpdateNotice repo={r} />,
     control: custom(() => <span className="flex items-center gap-2">

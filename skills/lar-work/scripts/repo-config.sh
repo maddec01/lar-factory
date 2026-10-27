@@ -1,8 +1,11 @@
 #!/bin/bash
-# Usage: repo-config.sh <owner/repo> | --list
-# <owner/repo> prints the repository's Repository config: .lar-factory.json read
-# from its default branch with gh, never from a checkout, with defaults filled in
-# (version 1, itemSource {"kind": "issues"}, show "all", labels []). role has no default.
+# Usage: repo-config.sh <owner/repo> | <Azure repository> | --list
+# <owner/repo> prints the GitHub repository's Repository config: .lar-factory.json
+# read from its default branch with gh, never from a checkout, with defaults filled
+# in (version 1, itemSource {"kind": "issues"}, show "all", labels []). role has no default.
+# An Azure repository is its origin URL or <org>/<project>/<repo>; its file is read
+# with az the same way. Its itemSource has no default: a team's current sprint
+# ({"kind": "azure-sprint", "team": ...}) or that team's backlog ({"kind": "azure-backlog", ...}).
 # --list prints the onboarded repositories, the repositories array of
 # ~/Library/Application Support/Lar Factory/repositories.json, the file the board
 # server reads. A missing file means none: []. It leaves out each entry still
@@ -10,7 +13,7 @@
 # Each error exits nonzero with its reason on stderr.
 set -euo pipefail
 
-usage="usage: repo-config.sh <owner/repo> | --list"
+usage="usage: repo-config.sh <owner/repo> | <Azure repository> | --list"
 # owner/name, each part of letters, digits, ".", "_" or "-", and neither "." nor "..". A jq regex: bash's has no lookahead.
 repo_form='^(?!\.\.?/)[A-Za-z0-9._-]+/(?!\.\.?\z)[A-Za-z0-9._-]+\z'
 arg=${1:-}
@@ -42,26 +45,49 @@ if [[ $arg == --list ]]; then
     exit 0
 fi
 
-if ! jq -en --arg repo "$arg" --arg repo_form "$repo_form" '$repo | test($repo_form)' >/dev/null; then
-    echo "$usage" >&2
-    exit 1
-fi
-repo=$arg
-
-# Without ref, the contents API reads the default branch.
 err=$(mktemp)
 trap 'rm -f "$err"' EXIT
-gh_status=0
-raw=$(gh api -H "Accept: application/vnd.github.raw" "repos/$repo/contents/.lar-factory.json" 2>"$err") || gh_status=$?
-if ((gh_status != 0)); then
-    if [[ $gh_status == 4 || $(cat "$err") == *"gh auth login"* ]]; then
-        echo "gh is logged out. Run gh auth login, then rerun." >&2
-    elif [[ $(cat "$err") == *"HTTP 404"* ]]; then
-        echo "$repo: no .lar-factory.json on its default branch." >&2
-    else
-        echo "$repo: could not read .lar-factory.json. $(cat "$err")" >&2
+read_status=0
+if jq -en --arg repo "$arg" --arg repo_form "$repo_form" '$repo | test($repo_form)' >/dev/null; then
+    provider=github repo=$arg
+    # Without ref, the contents API reads the default branch.
+    raw=$(gh api -H "Accept: application/vnd.github.raw" "repos/$repo/contents/.lar-factory.json" 2>"$err") || read_status=$?
+    if ((read_status != 0)); then
+        if [[ $read_status == 4 || $(cat "$err") == *"gh auth login"* ]]; then
+            echo "gh is logged out. Run gh auth login, then rerun." >&2
+        elif [[ $(cat "$err") == *"HTTP 404"* ]]; then
+            echo "$repo: no .lar-factory.json on its default branch." >&2
+        else
+            echo "$repo: could not read .lar-factory.json. $(cat "$err")" >&2
+        fi
+        exit 1
     fi
-    exit 1
+else
+    # shellcheck source-path=SCRIPTDIR source=azure.sh
+    source "$(dirname "$0")/azure.sh"
+    if ! azure_repo "$arg"; then
+        echo "$usage" >&2
+        exit 1
+    fi
+    provider=azure repo="${az_org##*/}/$az_project/$az_repo"
+    # Without versionDescriptor, the items API reads the default branch.
+    raw=$(az devops invoke --area git --resource items --organization "$az_org" \
+        --route-parameters "project=$(percent_decode "$az_project")" "repositoryId=$(percent_decode "$az_repo")" \
+        --query-parameters path=/.lar-factory.json includeContent=true \
+        --api-version 7.1 --output json 2>"$err") || read_status=$?
+    if ((read_status != 0)); then
+        # TF401174 is Azure's "item could not be found".
+        if [[ $(cat "$err") == *TF401174* ]]; then
+            echo "$repo: no .lar-factory.json on its default branch." >&2
+        else
+            echo "$repo: $(az_failure "could not read .lar-factory.json" "$(cat "$err")")" >&2
+        fi
+        exit 1
+    fi
+    if ! raw=$(jq -er '.content | strings' <<<"$raw" 2>/dev/null); then
+        echo "$repo: could not read .lar-factory.json. az returned no file content." >&2
+        exit 1
+    fi
 fi
 
 if ! jq empty <<<"$raw" 2>/dev/null; then
@@ -73,8 +99,12 @@ problem=$(jq -r '
     elif has("version") and (.version | type) != "number" then "field version must be a number"
     elif (.role | type) != "string" or .role == "" then "field role is missing or not a string"
     elif has("itemSource") and (.itemSource | type) != "object" then "field itemSource must be an object"
-    elif has("itemSource") and (.itemSource.kind | IN("issues", "github-project") | not) then
+    elif $provider == "github" and has("itemSource") and (.itemSource.kind | IN("issues", "github-project") | not) then
         "field itemSource.kind must be \"issues\" or \"github-project\""
+    elif $provider == "azure" and (.itemSource.kind | IN("azure-sprint", "azure-backlog") | not) then
+        "field itemSource.kind must be \"azure-sprint\" or \"azure-backlog\""
+    elif $provider == "azure" and ((.itemSource.team | type) != "string" or .itemSource.team == "") then
+        "field itemSource.team must name the team for an \(.itemSource.kind)"
     elif .itemSource.kind == "github-project"
         and ((.itemSource.owner | type) != "string" or (.itemSource.owner | test("^[A-Za-z0-9](-?[A-Za-z0-9])*\\z") | not)) then
         "field itemSource.owner must be a GitHub login for a github-project"
@@ -84,7 +114,7 @@ problem=$(jq -r '
     elif has("show") and (.show | IN("all", "opted-in") | not) then "field show must be \"all\" or \"opted-in\""
     elif has("labels") and ((.labels | type) != "array" or any(.labels[]; type != "string")) then
         "field labels must be an array of strings"
-    else empty end' <<<"$raw")
+    else empty end' --arg provider "$provider" <<<"$raw")
 if [[ -n $problem ]]; then
     echo "$repo: .lar-factory.json $problem." >&2
     exit 1

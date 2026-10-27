@@ -719,3 +719,33 @@ export type SetupCheckId = (typeof SETUP_CHECKS)[number];
 
 /** A setup check's result: what it found, or the problem with its fix and the command that fixes it, when one does. */
 export type SetupCheckResult = { passed: true; detail: string } | { passed: false; problem: string; fix: string; command?: string };
+
+/** What a Clash's fix does to its file: swaps lines for others, deletes the file or folder, or renames it. */
+export type ClashEdit = { kind: 'lines'; remove: string[]; add: string[] } | { kind: 'delete' } | { kind: 'rename'; to: string };
+
+/** Something in a repository that makes agents work against the factory, with the fix onboarding's PR offers for it. */
+export interface Clash {
+  id: string;
+  /** The path on the default branch; a folder's ends in `/`. */
+  file: string;
+  /** The line the reason points at, from 1. */
+  line?: number;
+  reason: string;
+  edit: ClashEdit;
+  /** Whether the fix starts ticked, so the PR holds it. */
+  ticked: boolean;
+}
+
+/** A project skill whose folder is named like a bundled skill; onboarding waits until the user picks delete or rename. */
+export interface SkillClash {
+  name: string;
+  /** The skill's folder on the default branch, such as `.claude/skills/code-review/`. */
+  path: string;
+}
+
+/** What onboarding's fixed checks find on the default branch, with every project skill's name so a rename avoids them. */
+export interface FixedClashes {
+  clashes: Clash[];
+  skillClashes: SkillClash[];
+  projectSkills: string[];
+}

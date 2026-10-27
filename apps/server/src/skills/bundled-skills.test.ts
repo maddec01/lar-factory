@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { INSTALL_MANIFEST } from '@lar-factory/shared/install-skills';
-import { BUNDLE_URL, bundleUrl, installHome, readBundledSkills, withInstallState } from './bundled-skills.ts';
+import { BUNDLE_URL, bundleUrl, bundledSkillNames, installHome, readBundledSkills, withInstallState } from './bundled-skills.ts';
 
 const UPSTREAM = `# Upstream
 
@@ -64,6 +64,12 @@ test('a source the Authors line misses shows its owner and an unknown licence', 
 test('skills come first, each kind sorted by name', async (t) => {
   const bundle = await bundleWith(t, ['unslop', 'lar-work', 'tdd'], ['security-checklist.md']);
   assert.deepEqual(readBundledSkills(bundle).map((s) => s.name), ['lar-work', 'tdd', 'unslop', 'references/security-checklist.md']);
+});
+
+test('the bundled skill names are the folders in skills/, without its files', async (t) => {
+  const bundle = await bundleWith(t, ['tdd', 'lar-work'], ['security-checklist.md']);
+  await writeFile(join(bundle, 'skills', 'README.md'), '');
+  assert.deepEqual(bundledSkillNames(pathToFileURL(join(bundle, '/'))).sort(), ['lar-work', 'tdd']);
 });
 
 test('the checkout’s bundle lists every skill folder, and every Copy has an author', () => {

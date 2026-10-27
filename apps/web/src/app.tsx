@@ -2,7 +2,8 @@
 // a card for each repository still onboarding, the offers to onboard T3 projects that have a Repository config, the banners, Your desk and the line, scoped to the repository the
 // sidebar picked. While no t3 is found, the notice replaces the main area's content and the sidebar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces it. Settings takes the main area's
-// place, hiding the board rather than closing it, so Back finds it as it was.
+// place, hiding the board rather than closing it, so Back finds it as it was. The loading screen covers all of it
+// until the server's first read has settled.
 
 import { boardSections, failedCheck, inRepo, noneOnboarded } from '@lar-factory/shared';
 import { useBoardStore } from './board/board-store.ts';
@@ -11,6 +12,7 @@ import { Desk } from './desk/desk.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
 import { AbandonDialog } from './items/abandon-dialog.tsx';
 import { Line } from './line/line.tsx';
+import { LoadingScreen } from './loading/loading-screen.tsx';
 import { Banners } from './notices/banners.tsx';
 import { Toasts } from './notices/toasts.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
@@ -66,6 +68,7 @@ export function App() {
       <WizardDialog />
       <EditDialog />
       <ResetDialog />
+      <LoadingScreen />
     </SidebarLayout>
   );
 }

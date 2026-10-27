@@ -3,6 +3,7 @@
    system's tokens and Tailwind's spacing scale. */
 @import "@lar-factory/ui/styles.css";
 @import "./items/items.css";
+@import "./loading/loading-screen.css";
 @import "./sidebar/sidebar.css";
 @import "./notices/notices.css";
 @import "./add-item/add-item.css";

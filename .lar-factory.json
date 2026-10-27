@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "role": "Software factory for AI development",
+  "itemSource": {
+    "kind": "issues"
+  },
+  "show": "all",
+  "labels": []
+}

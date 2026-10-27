@@ -62,3 +62,14 @@ reusing the download cache in `~/Library/Caches/electron`.
   also installs branches from before the workspace, with `board/` and `app/`. It
   leaves a `node_modules` made by npm alone; delete it to switch.
 - Setup changes: run `bash scripts/setup-worktree.test.sh`.
+
+## Agent skills
+
+### Issue tracker
+GitHub issues in this repository, moved through Lar Factory's board. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+Lar Factory's workflow labels, with an item's state kept in its board Status. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+A glossary and ADRs, single-context or multi-context. See `docs/agents/domain.md`.

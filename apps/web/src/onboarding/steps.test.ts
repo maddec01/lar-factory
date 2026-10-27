@@ -1,12 +1,14 @@
 // The T3 project step: T3's projects, each with its provider and whether its repository has .lar-factory.json, and
 // the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
-// and role, or the values of a .lar-factory.json it reuses. The Checks step: each check with its state and a failure's
-// fix with Retry. The Cleanup step: each fixed Clash with its tick, Delete or Rename for a project skill named like a
-// bundled skill, the Clash agent's run with its thread, Clashes or why it ended with Retry, and what the PR always
-// writes. The Pull request step: the PR's changes for a new or a reused .lar-factory.json, Open the PR, gh's message with Retry, the wait for the merge, and Reopen PR and Start over for a PR closed without merging.
+// and role, or the values of a .lar-factory.json it reuses. The Labels step: each label's state, Create and Rename, gh's
+// message with Retry, and the Azure DevOps note. The Checks step: each check with its state and a failure's fix with
+// Retry. The Cleanup step: each fixed Clash with its tick, Delete or Rename for a project skill named like a bundled
+// skill, the Clash agent's run with its thread, Clashes or why it ended with Retry, and what the PR always writes. The
+// Pull request step: the PR's changes for a new or a reused .lar-factory.json, Open the PR, gh's message with Retry, the
+// wait for the merge, and Reopen PR and Start over for a PR closed without merging.
 
 import { expect, test, vi } from 'vite-plus/test';
-import type { BundledSkill, ClashRun, OnboardingPrChange, ClashRunState, FixedClashes, ModelGroup, ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
+import { STATUS_LABELS, WORKFLOW_LABELS, type BundledSkill, type ClashRun, type OnboardingPrChange, type ClashRunState, type FixedClashes, type ModelGroup, type ProjectChoice, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
 import { $, fetchMock, mountPage, sample, settle, text, toolChecks } from '../../test/support.ts';
 import { dialog, openOnboarding, project, serve } from './onboarding-support.ts';
 
@@ -248,11 +250,15 @@ test('Resume shows the answers the step had when it closed', async () => {
   expect(choice('issues').querySelector('[role="radio"]')!.getAttribute('aria-checked')).toBe('true');
 });
 
-/** Answers the command recheck with `tools` and each setup check from `results`, passing when it isn't named. */
+/** Every label the Labels step needs, so it lets Next through. */
+const EVERY_LABEL = [...WORKFLOW_LABELS, ...STATUS_LABELS].map((l) => l.name);
+
+/** Answers the command recheck with `tools`, the labels with every label, and each setup check from `results`, passing when it isn't named. */
 function answerChecks(results: Partial<Record<SetupCheckId, SetupCheckResult>> = {}, tools = toolChecks()): void {
   const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
     if (url === '/api/recheck') return new Response(JSON.stringify({ board: { ...sample, tools }, error: null }));
+    if (url === '/api/onboarding/labels') return new Response(JSON.stringify({ labels: EVERY_LABEL, error: null }));
     if (url === '/api/onboarding/checks') {
       const { check } = JSON.parse(String(init!.body)) as { check: SetupCheckId };
       return new Response(JSON.stringify({ result: results[check] ?? { passed: true, detail: `${check} is fine` }, error: null }));
@@ -264,8 +270,10 @@ function answerChecks(results: Partial<Record<SetupCheckId, SetupCheckResult>> =
 const checkRow = (id: string) => dialog()!.querySelector<HTMLElement>(`[data-check="${id}"]`)!;
 const footerButton = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).trim().startsWith(label));
 
-/** Moves from the Provider and item source step, answered or reused, to Checks, and waits for the checks. */
+/** Moves from the Provider and item source step, answered or reused, past Labels to Checks, and waits for the checks. */
 async function openChecks(): Promise<void> {
+  await settle(() => nextButton().click());
+  await vi.waitFor(() => expect(nextButton().disabled).toBe(false));
   await settle(() => nextButton().click());
   await vi.waitFor(() => expect(checkRow('push').dataset.status).not.toMatch(/waiting|running/));
   await settle();
@@ -604,6 +612,86 @@ test("before the board's first read the Clash agent says it's reading T3 Code's 
   expect(text(agentPart())).toContain('T3 Code offers no provider with a model.');
 });
 
+/** Answers the label read with `names`, and Create and Rename with `changed`, or with gh's problem when `failure` is set. */
+function answerLabels(names: string[], changed: string[] = EVERY_LABEL, failure: string | null = null): void {
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url === '/api/onboarding/labels') return new Response(JSON.stringify({ labels: names, error: null }));
+    if (url.startsWith('/api/onboarding/labels/')) {
+      return failure ? new Response(JSON.stringify({ error: failure }), { status: 502 }) : new Response(JSON.stringify({ labels: changed, error: null }));
+    }
+    return served(url, init);
+  });
+}
+
+const labelRow = (name: string) => dialog()!.querySelector<HTMLElement>(`[data-label="${name}"]`);
+const panelButton = (selector: string) => dialog()!.querySelector<HTMLButtonElement>(selector)!;
+
+/** Opens the Labels step of lar-web, reading its issues, with the repository's labels as `names`. */
+async function openLabels(names: string[], changed?: string[], failure?: string): Promise<void> {
+  await openSetup(project('lar-web'));
+  await settle(() => choice('issues').querySelector<HTMLElement>('[role="radio"]')!.click());
+  await type(input('role')!, 'Web client');
+  answerLabels(names, changed, failure);
+  await settle(() => nextButton().click());
+  await settle();
+}
+
+test('the Labels step shows each workflow label with what it does and whether the repository has it, or Rename for its old name', async () => {
+  await openLabels(['bug', 'decision: grill', 'decision-task', 'decision: task', 'needs-triage', 'status-list']);
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Labels');
+  expect(labelRow('bug')!.dataset.state).toBe('present');
+  expect(text(labelRow('bug'))).toContain('Something broken');
+  expect(labelRow('feature')!.dataset.state).toBe('missing');
+  expect(text(labelRow('feature'))).toContain('missing');
+  const grill = labelRow('decision-grill')!;
+  expect(grill.dataset.state).toBe('rename');
+  expect(text(grill)).toContain('Rename decision: grill');
+  expect(grill.querySelector('[role="checkbox"]')!.getAttribute('aria-checked')).toBe('true');
+  expect(labelRow('decision-task')!.dataset.state).toBe('present');
+  expect(labelRow('status-list')!.dataset.state, 'issues list the status labels').toBe('present');
+  expect(labelRow('status-queued')!.dataset.state).toBe('missing');
+  const left = dialog()!.querySelector<HTMLElement>('[data-left-alone]')!;
+  expect([...left.querySelectorAll<HTMLElement>('[data-left]')].map((l) => l.dataset.left)).toEqual(['decision: task', 'needs-triage']);
+  expect(text(left.querySelector('[data-left="decision: task"]'))).toContain('Its issues keep decision: task until you move them to decision-task.');
+  expect(text(panelButton('[data-rename-labels]'))).toBe('Rename 1');
+  expect(nextButton().disabled).toBe(true);
+});
+
+test('Rename moves the ticked old names, and once every workflow label is there Next goes on', async () => {
+  await openLabels(['decision: grill'], EVERY_LABEL);
+  expect(nextButton().disabled).toBe(true);
+  await settle(() => panelButton('[data-rename-labels]').click());
+  await settle();
+  const renamed = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/onboarding/labels/rename')!;
+  expect(JSON.parse(String(renamed[1].body))).toEqual({ repo: 'maddec01/lar-web', names: ['decision: grill'] });
+  expect(labelRow('decision-grill')!.dataset.state).toBe('present');
+  expect(dialog()!.querySelector('[data-create-labels]'), 'nothing left to create').toBeNull();
+  expect(dialog()!.querySelector('[data-rename-labels]'), 'nothing left to rename').toBeNull();
+  expect(nextButton().disabled).toBe(false);
+});
+
+test("a Create gh refuses shows gh's message with Retry", async () => {
+  await openLabels(['bug'], EVERY_LABEL, "Couldn't create feature in maddec01/lar-web: gh label create failed: HTTP 403");
+  await settle(() => panelButton('[data-create-labels]').click());
+  await settle();
+  const alert = [...dialog()!.querySelectorAll('[role="alert"]')].find((a) => text(a).includes('Can’t create the labels'))!;
+  expect(text(alert)).toContain('HTTP 403');
+  answerLabels(['bug'], EVERY_LABEL);
+  await settle(() => [...alert.querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
+  await settle();
+  expect(nextButton().disabled).toBe(false);
+});
+
+test('on Azure DevOps the Labels step says tags arrive in build #386, reads no label and lets Next through', async () => {
+  await openSetup(project('lar-api', { repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true,
+    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'API' } }));
+  await settle(() => nextButton().click());
+  expect(text(dialog()!.querySelector('[data-labels-azure]'))).toContain('build #386');
+  expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith('/api/onboarding/labels'))).toBe(false);
+  expect(nextButton().disabled).toBe(false);
+});
+
 const PR = 'https://github.com/maddec01/lar-web/pull/14';
 const prStep = () => dialog()!.querySelector<HTMLElement>('[data-pr-step]')!;
 const button = (within: HTMLElement, label: string) => [...within.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b).trim().startsWith(label));
@@ -841,7 +929,7 @@ test('once the PR merges the step says the repository is onboarded, and Go to th
   await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [] }));
   expect(text(prStep())).toContain('maddec01/lar-web is onboarded');
   const bar = dialog()!.querySelector('[data-slot="dialog-header"] [data-slot="progress"]')!;
-  expect([bar.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow'), text(bar.querySelector('[data-slot="progress-caption"]'))], 'the Pull request step is done too').toEqual(['5', 'Onboarded']);
+  expect([bar.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow'), text(bar.querySelector('[data-slot="progress-caption"]'))], 'the Pull request step is done too').toEqual(['6', 'Onboarded']);
   fetchMock.mockClear();
   await settle(() => footerButton('Go to the board')!.click());
   expect(dialog()).toBeNull();

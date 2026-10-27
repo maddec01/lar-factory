@@ -28,9 +28,9 @@ function closedFocus(opener: HTMLElement | null, repo: string | null): HTMLEleme
  * merging.
  */
 function Nav({ run }: { run: Run }) {
-  const { projects, checks, clashes, agent, next, back, close } = useWizardStore();
+  const { projects, checks, clashes, agent, labels, next, back, close } = useWizardStore();
   const data = useBoardStore((s) => s.data);
-  const ready = stepReady(run, projects, checks, data.tools, clashes, agent);
+  const ready = stepReady(run, projects, checks, data.tools, clashes, agent, labels);
   if (run.prUrl) {
     return onboarded(run, data) ? <Button size="sm" onClick={close}><Check /> Go to the board</Button>
       : <Button variant="outline" size="sm" onClick={close}>{prClosed(run, data) ? 'Close' : 'Close and wait'}</Button>;

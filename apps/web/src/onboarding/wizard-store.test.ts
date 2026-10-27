@@ -4,7 +4,7 @@
 import { expect, test, vi } from 'vite-plus/test';
 import { fetchMock, sample, settle, toolChecks } from '../../test/support.ts';
 import type { Clashes } from './wizard-store.ts';
-import type { BoardData, BundledSkill, Clash, OnboardingRepository, ClashRun, ClashRunState, FixedClashes, ProjectChoice, SetupAnswers, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
+import { STATUS_LABELS, WORKFLOW_LABELS, type BoardData, type BundledSkill, type Clash, type OnboardingRepository, type ClashRun, type ClashRunState, type FixedClashes, type ProjectChoice, type SetupAnswers, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
 
 const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
@@ -20,9 +20,9 @@ async function store(reply: () => Response = () => new Response(JSON.stringify({
   return useWizardStore;
 }
 
-test('the steps are the T3 project, Provider and item source, Checks, Cleanup, then Pull request', async () => {
+test('the steps are the T3 project, Provider and item source, Labels, Checks, Cleanup, then Pull request', async () => {
   const { STEPS } = await import('./wizard-store.ts');
-  expect(STEPS.map((s) => s.label)).toEqual(['T3 project', 'Provider and item source', 'Checks', 'Cleanup', 'Pull request']);
+  expect(STEPS.map((s) => s.label)).toEqual(['T3 project', 'Provider and item source', 'Labels', 'Checks', 'Cleanup', 'Pull request']);
 });
 
 test("starting a run opens it on the T3 project step and reads T3's projects", async () => {
@@ -155,7 +155,7 @@ test("Next needs a role, and for a GitHub Project an owner's login and a number"
   wizard.getState().answer({ itemSource: 'issues', projectNumber: '' });
   expect(ready(), "the repository's issues need no Project").toBe(true);
   wizard.getState().next();
-  expect(wizard.getState().run).toMatchObject({ step: 'checks', done: ['project', 'setup'] });
+  expect(wizard.getState().run).toMatchObject({ step: 'labels', done: ['project', 'setup'] });
 });
 
 test(".lar-factory.json's values pass the step with no answers; an Azure DevOps origin or a file that can't be reused can't", async () => {
@@ -201,8 +201,8 @@ test('a resumed run that picks another project replaces the onboarding it was ke
 test("a stored step the dialog doesn't have resumes on the T3 project step", async () => {
   const wizard = await store();
   const { useBoardStore } = await import('../board/board-store.ts');
-  useBoardStore.getState().receive({ ...onboardingBoard('labels'), onboarding: [{ repo: 'maddec01/lar-web',
-    progress: { step: 'labels', done: ['project', 'labels'], answers: { projectId: 'lar-web' } } }] });
+  useBoardStore.getState().receive({ ...onboardingBoard('deploy'), onboarding: [{ repo: 'maddec01/lar-web',
+    progress: { step: 'deploy', done: ['project', 'deploy'], answers: { projectId: 'lar-web' } } }] });
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
   expect(wizard.getState().run).toMatchObject({ step: 'project', done: ['project'] });
 });
@@ -265,6 +265,8 @@ test("a new project that can't be picked stays on the form with the reason", asy
 });
 
 const PASS: SetupCheckResult = { passed: true, detail: 'fine' };
+/** Every label the Labels step needs, so it lets Next through. */
+const EVERY_LABEL = [...WORKFLOW_LABELS, ...STATUS_LABELS].map((l) => l.name);
 const json = (body: object) => new Response(JSON.stringify(body));
 
 /** What the fixed checks find when there's nothing to clean up. */
@@ -287,18 +289,21 @@ async function checkingStore(projects: ProjectChoice[], results: Partial<Record<
     if (url === '/api/onboarding/pr/changes') return json(changes);
     if (url === '/api/onboarding/clashes') return json(clashes);
     if (url.startsWith('/api/onboarding/clash-runs')) return json({ runs: [DONE] });
+    if (url === '/api/onboarding/labels') return json({ labels: EVERY_LABEL, error: null });
     return json({ error: null });
   });
   const { useWizardStore } = await import('./wizard-store.ts');
   return useWizardStore;
 }
 
-/** Picks `name`, passes the setup step, with the repository's issues and a role when it asks, and waits for the checks. */
+/** Picks `name`, passes the setup step, with the repository's issues and a role when it asks, and the Labels step, then waits for the checks. */
 async function toChecks(wizard: Awaited<ReturnType<typeof checkingStore>>, name: string): Promise<void> {
   await settle(() => wizard.getState().start());
   wizard.getState().pick(name);
   wizard.getState().next();
   wizard.getState().answer({ itemSource: 'issues', role: 'Web client' });
+  wizard.getState().next();
+  await vi.waitFor(() => expect(wizard.getState().labels?.read.state).toBe('loaded'));
   wizard.getState().next();
   await vi.waitFor(() => expect(wizard.getState().checks?.setup.push.state).toBe('done'));
 }
@@ -376,7 +381,7 @@ const clashPosts = () => (fetchMock.mock.calls as unknown as [string, RequestIni
 test('passing Checks moves to Cleanup, which runs the fixed checks on the repository', async () => {
   const wizard = await checkingStore([project('lar-web')], {}, toolChecks(), undefined, { ...FOUND, error: null });
   await toCleanup(wizard, 'lar-web');
-  expect(wizard.getState().run).toMatchObject({ step: 'cleanup', done: ['project', 'setup', 'checks'], cleanup: { ticks: {}, skills: {} } });
+  expect(wizard.getState().run).toMatchObject({ step: 'cleanup', done: ['project', 'setup', 'labels', 'checks'], cleanup: { ticks: {}, skills: {} } });
   expect(clashPosts()).toEqual([{ repo: 'maddec01/lar-web' }]);
   expect(wizard.getState().clashes).toEqual({ state: 'read', found: FOUND, bundled: ['code-review', 'tdd'] });
 });
@@ -467,7 +472,7 @@ test('Resume on the Checks step runs the checks again once it has read the proje
 const PR = 'https://github.com/maddec01/lar-web/pull/14';
 const SETUP_DONE = { ...SETUP, itemSource: 'issues' as const, show: 'opted-in' as const, role: 'Web client' };
 /** lar-web still onboarding, kept on the Pull request step with its PR. */
-const ON_PR = { repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks', 'cleanup'],
+const ON_PR = { repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'labels', 'checks', 'cleanup'],
   answers: { projectId: 'lar-web', provider: 'GitHub' as const, setup: SETUP_DONE, cleanup: { ticks: {}, skills: {} } }, prUrl: PR } };
 
 /** The store on the Pull request step of lar-web, with the PR opening answered by `opened`. */
@@ -488,7 +493,7 @@ test("passing Cleanup with a new file moves to the Pull request step, and Open t
   const { wizard } = await onPr();
   expect(wizard.getState().run!.step).toBe('pr');
   await settle(() => wizard.getState().openPr());
-  expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks', 'cleanup'],
+  expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'labels', 'checks', 'cleanup'],
     answers: { projectId: 'lar-web', provider: 'GitHub', setup: SETUP_DONE, cleanup: { ticks: {}, skills: {} } } },
     config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' }, picks: { clashes: [], skills: {} } }]);
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR, savedAs: 'maddec01/lar-web' });
@@ -777,4 +782,98 @@ test('closing during a run stops reading it, and Resume shows its progress, then
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
   expect(latestRun(wizard.getState().agent)).toMatchObject({ state: 'done', clashes: [AGENT_CLASH] });
   expect(agent.requests, 'Resume starts no run').toEqual([GETS, GETS]);
+});
+
+/**
+ * The store with `projects` as T3's and the repository's labels as `names`; Create and Rename answer with `changed`,
+ * or with gh's problem when `failure` is set.
+ */
+async function labelsStore(projects: ProjectChoice[], names: string[], changed: string[] = EVERY_LABEL, failure: string | null = null) {
+  fetchMock.mockImplementation(async (url: string) => {
+    if (url === '/api/onboarding/projects') return json({ projects });
+    if (url === '/api/onboarding/labels') return json({ labels: names, error: null });
+    if (url.startsWith('/api/onboarding/labels/')) return failure ? new Response(JSON.stringify({ error: failure }), { status: 502 }) : json({ labels: changed, error: null });
+    return json({ error: null });
+  });
+  const { useWizardStore } = await import('./wizard-store.ts');
+  return useWizardStore;
+}
+
+/** Picks `name`, answers the setup step with the repository's issues when it asks, and waits on the Labels step for the labels. */
+async function toLabels(wizard: Awaited<ReturnType<typeof labelsStore>>, name: string): Promise<void> {
+  await settle(() => wizard.getState().start());
+  wizard.getState().pick(name);
+  wizard.getState().next();
+  wizard.getState().answer({ itemSource: 'issues', role: 'Web client' });
+  wizard.getState().next();
+  await settle();
+}
+
+const labelPosts = () => (fetchMock.mock.calls as unknown as [string, RequestInit?][])
+  .filter(([url]) => url.startsWith('/api/onboarding/labels')).map(([url, init]) => [url, JSON.parse(String(init!.body))]);
+
+test('reaching Labels reads the repository’s labels, and Next waits while a workflow label is missing', async () => {
+  const wizard = await labelsStore([project('lar-web')], ['bug', 'decision: grill']);
+  const { stepReady } = await import('./wizard-store.ts');
+  await toLabels(wizard, 'lar-web');
+  const ready = () => stepReady(wizard.getState().run!, wizard.getState().projects, null, undefined, null, null, wizard.getState().labels);
+  expect(wizard.getState().run!.step).toBe('labels');
+  expect(labelPosts()).toEqual([['/api/onboarding/labels', { repo: 'maddec01/lar-web' }]]);
+  expect(ready()).toBe(false);
+  wizard.getState().next();
+  expect(wizard.getState().run!.step).toBe('labels');
+  await settle(() => wizard.getState().createLabels());
+  expect(ready()).toBe(true);
+});
+
+test('Create sends the item source and the old names Rename moves; Rename sends each ticked old name', async () => {
+  const wizard = await labelsStore([project('lar-web')], ['decision: grill', 'decision: task']);
+  await toLabels(wizard, 'lar-web');
+  wizard.getState().toggleRename('decision: task');
+  await settle(() => wizard.getState().createLabels());
+  wizard.getState().toggleRename('decision: task');
+  await settle(() => wizard.getState().loadLabels());
+  await settle(() => wizard.getState().renameLabels());
+  expect(labelPosts().filter(([url]) => url !== '/api/onboarding/labels')).toEqual([
+    ['/api/onboarding/labels/create', { repo: 'maddec01/lar-web', itemSource: { kind: 'issues' }, renaming: ['decision: grill'] }],
+    ['/api/onboarding/labels/rename', { repo: 'maddec01/lar-web', names: ['decision: grill', 'decision: task'] }],
+  ]);
+});
+
+test("a Create gh refuses keeps gh's message with the action to retry, and reads the labels again", async () => {
+  const wizard = await labelsStore([project('lar-web')], ['bug'], EVERY_LABEL, "Couldn't create feature in maddec01/lar-web: HTTP 403");
+  await toLabels(wizard, 'lar-web');
+  await settle(() => wizard.getState().createLabels());
+  expect(wizard.getState().labels).toMatchObject({ busy: null, error: { action: 'create', message: "Couldn't create feature in maddec01/lar-web: HTTP 403" } });
+  expect(labelPosts().map(([url]) => url)).toEqual(['/api/onboarding/labels', '/api/onboarding/labels/create', '/api/onboarding/labels']);
+});
+
+test('a reused .lar-factory.json passes through Labels too, which waits for its missing labels', async () => {
+  const wizard = await labelsStore([REUSED], ['bug']);
+  const { stepReady } = await import('./wizard-store.ts');
+  await toLabels(wizard, 'lar-web');
+  expect(wizard.getState().run!.step).toBe('labels');
+  expect(stepReady(wizard.getState().run!, wizard.getState().projects, null, undefined, null, null, wizard.getState().labels)).toBe(false);
+  await settle(() => wizard.getState().createLabels());
+  expect(labelPosts()[1]).toEqual(['/api/onboarding/labels/create', { repo: 'maddec01/lar-web', itemSource: REUSED.config!.itemSource, renaming: [] }]);
+});
+
+test('on Azure DevOps the Labels step reads no label and lets Next through', async () => {
+  const azure = project('lar-api', { repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true, config: REUSED.config });
+  const wizard = await labelsStore([azure], []);
+  await toLabels(wizard, 'lar-api');
+  expect(wizard.getState().run!.step).toBe('labels');
+  expect(labelPosts()).toEqual([]);
+  wizard.getState().next();
+  expect(wizard.getState().run!.step).toBe('checks');
+});
+
+test('Resume on the Labels step reads the labels again once it has read the projects', async () => {
+  const wizard = await labelsStore([project('lar-web')], EVERY_LABEL);
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const progress = { step: 'labels', done: ['project', 'setup'], answers: { projectId: 'lar-web', setup: SETUP_DONE } };
+  useBoardStore.getState().receive({ ...sample, onboarding: [{ repo: 'maddec01/lar-web', progress }] });
+  await settle(() => wizard.getState().resume('maddec01/lar-web'));
+  await vi.waitFor(() => expect(wizard.getState().labels?.read.state).toBe('loaded'));
+  expect(wizard.getState().run!.step).toBe('labels');
 });

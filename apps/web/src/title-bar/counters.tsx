@@ -1,8 +1,9 @@
-// The title bar's five counters, between the Refreshed time and the List button: need you, building, queued, shipped
-// and spend, as lar-server's summary buttons, always for the whole factory whatever repository the board is scoped to.
-// Each icon is the status's own glyph in its own colour, and each opens a popover listing the items behind the number;
-// picking one opens the item dialog. The row keeps its own width; the title bar's width decides what shows: labels go
-// first, then Spend, Queued and Shipped, and on a narrow page Building.
+// The title bar's five counters, on the right before the List button: need you, building, queued, shipped and spend,
+// as lar-server's summary buttons, always for the whole factory whatever repository the board is scoped to. Each shows
+// only its glyph, in the status's own colour, and its number; its label is its accessible name and its tooltip says
+// more. Each opens a popover listing the items behind the number; picking one opens the item dialog. The row keeps its
+// own width; the title bar's width decides what shows: Spend, Queued and Shipped go first, and on a narrow page
+// Building.
 
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
@@ -16,10 +17,11 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
 import { ItemTitle, repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph, STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { CONTROL } from './control.ts';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? item.stats.costUsd ?? 0 : 0);
 
-/** One toolbar counter: a summary button with a glyph, a tabular count and a label that shows only when there's room. */
+/** One toolbar counter: a summary button with a glyph and a tabular count, named by its label. */
 function Counter({ icon, value, label, hint, hideBelow, children }: {
   icon: ReactNode; value: ReactNode; label: string; hint: string; hideBelow?: string; children: ReactNode;
 }) {
@@ -29,11 +31,9 @@ function Counter({ icon, value, label, hint, hideBelow, children }: {
         <TooltipTrigger asChild>
           <Popover.Trigger asChild>
             <Button variant="summary" aria-label={`${label}: ${hint}`}
-              className={`gap-1.5 text-base-700 hover:text-base-content data-[state=open]:text-base-content ${hideBelow ?? ''}`}>
+              className={`${CONTROL} gap-1.5 text-base-700 hover:text-base-content data-[state=open]:text-base-content ${hideBelow ?? ''}`}>
               {icon}
               <span className="font-medium tabular-nums text-base-content">{value}</span>
-              {/* The update pill takes about 9rem, so beside it the labels wait for 10rem more, before Scope would truncate. */}
-              <span className="hidden font-normal @min-[84rem]:inline [.title-bar:has(.update-button)_&]:@max-[94rem]:hidden">{label}</span>
             </Button>
           </Popover.Trigger>
         </TooltipTrigger>
@@ -163,7 +163,7 @@ export function Counters() {
         <span aria-hidden="true" className="mx-1 hidden h-4 w-px shrink-0 bg-(--border) @min-[66rem]:block" />
 
         <Counter label="spend" value={formatUsd(spend)} hideBelow="hidden @min-[66rem]:inline-flex" hint="Agent cost on open and recent items, an API estimate"
-          icon={<CircleDollarSign className="size-3.5 shrink-0" strokeWidth={2.25} />}>
+          icon={<CircleDollarSign className="size-4 shrink-0" strokeWidth={2.25} />}>
           <PopHead icon={<CircleDollarSign className="size-3.5 shrink-0 text-(--muted-foreground)" strokeWidth={2.25} />} title="Agent spend" sub={formatUsd(spend)} />
           {costs.length
             ? <List items={costs.map((c) => c.item)} max={5}>{(i) => row(i, <span className="font-medium text-(--foreground)">{formatUsd(costOf(i))}</span>)}</List>

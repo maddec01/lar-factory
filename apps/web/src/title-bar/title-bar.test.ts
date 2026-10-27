@@ -1,6 +1,6 @@
-// The board's title bar, in the board app and in a browser: the brand, the scope menu, the Refreshed time, the
-// counters, the List button, Add item, the "for T3 Code" tag, the update pill while there's an update, and Settings, past
-// the traffic lights; above the missing-t3 notice only the brand and Settings.
+// The board's title bar, in the board app and in a browser: on the left the brand, the scope menu and the Refreshed
+// time; on the right the counters, the List button, Add item, the "for T3 Code" tag, the update pill while there's an
+// update, and Settings, past the traffic lights; above the missing-t3 notice only the brand and Settings.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { clock } from '@lar-factory/shared';
@@ -35,12 +35,28 @@ const controls = () => [...titleBar().querySelectorAll(Object.values(CONTROLS).j
   .map((el) => Object.entries(CONTROLS).find(([, selector]) => el.matches(selector))![0]);
 const inset = () => titleBar().className.split(' ').includes('pl-[74px]');
 
-test('the title bar holds the brand, Scope, Refreshed, the counters, List, Add item, the T3 tag, the update pill and Settings, in that order', async () => {
+test('the title bar holds the brand, Scope and Refreshed on the left, then the counters, List, Add item, the T3 tag, the update pill and Settings on the right', async () => {
   stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'available' as const, availableVersion: '1.1.0', message: null })) });
   await mountPage();
   expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 't3 tag', 'update', 'settings']);
+  const header = titleBar().querySelector('header')!;
+  const [, , left, right] = [...header.children];
+  expect(left!.contains(refreshed()) && !left!.querySelector('.counters'), 'the left holds Scope and Refreshed, not the counters').toBe(true);
+  expect(right!.firstElementChild!.matches('.counters'), 'the counters open the right, before List').toBe(true);
   expect(text(titleBar().querySelector('.t3-tag'))).toBe('for T3 Code');
-  expect(titleBar().querySelector('header')!.className.split(' ')).toContain('h-13');
+  expect(header.className.split(' ')).toContain('h-13');
+});
+
+// jsdom lays nothing out, so this checks the classes: every control is 28 px tall, an icon-only one 28 px square.
+test('every control in the title bar is 28 px tall', async () => {
+  stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'available' as const, availableVersion: '1.1.0', message: null })) });
+  await mountPage();
+  const classes = (el: Element) => el.className.split(' ');
+  for (const el of titleBar().querySelectorAll('button.scope, .refreshed, .counters button, .list-button, .add-item, .t3-tag, .update-button')) {
+    expect(classes(el), el.className).toContain('h-7');
+    if (el.matches('button')) expect(classes(el), 'the copied Button sets its height again from sm').toContain('sm:h-7');
+  }
+  expect(classes(titleBar().querySelector('.open-settings')!)).toContain('size-7');
 });
 
 test('in a browser, where nothing updates, there\'s no update pill', async () => {
@@ -273,7 +289,8 @@ test('the first read of a page that had none pings, a failed read does not', asy
 });
 
 // jsdom lays nothing out, so this checks the classes behind the fold. Beside the update pill the List and Add item
-// labels and the T3 tag come back at 74rem instead of 70rem, since the pill takes the room Scope needs.
+// labels and the T3 tag come back at 74rem instead of 70rem, since the pill takes the room Scope needs. The counters
+// never show their labels.
 test('the bar folds by its own width instead of squeezing: the counters keep theirs, and labels go before controls', async () => {
   stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'downloaded' as const, availableVersion: '1.1.0', downloadedVersion: '1.1.0', message: null })) });
   await mountPage();
@@ -290,8 +307,7 @@ test('the bar folds by its own width instead of squeezing: the counters keep the
     expect(classes(span ?? null), `${label}'s label stays for screen readers`).toContain('@max-[70rem]:sr-only');
     expect(classes(span ?? null), `beside the update pill ${label}'s label folds sooner`).toContain('[.title-bar:has(.update-button)_&]:@max-[74rem]:sr-only');
   }
-  const label = [...counters.querySelectorAll('button span')].find((s) => text(s) === 'need you')!;
-  expect(classes(label), 'beside the update pill the counters\' labels wait for more room').toContain('[.title-bar:has(.update-button)_&]:@max-[94rem]:hidden');
+  expect(text(counters), 'the counters show no labels').not.toMatch(/need you|building|queued|shipped|spend/);
   expect(classes(trigger())).toContain('min-w-0');
   expect(classes(trigger().querySelector('.truncate')), 'Scope truncates').toContain('min-w-0');
   expect(classes(refreshed().querySelector('time')!.parentElement)).toContain('@max-[48rem]:sr-only');

@@ -21,6 +21,7 @@ import { itemNoun, useAddItemStore } from './add-item-store.ts';
 import type { DraftValues, ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
+import { CONTROL } from '../title-bar/control.ts';
 
 /** The repo's custom labels, or tags on Azure DevOps, as toggles, none when it has none; `picked` start ticked. */
 function CustomLabels({ repo, picked }: { repo: RepoConfig; picked: readonly string[] }) {
@@ -149,7 +150,7 @@ export function AddItem() {
     return () => removeEventListener('keydown', onKey);
   }, []);
   return (<>
-    <Button variant="primary" className="add-item" leftIcon={<SquarePen />} title="Add item (⌘N)" aria-keyshortcuts="Meta+N"
+    <Button variant="primary" className={`add-item ${CONTROL} px-2`} leftIcon={<SquarePen />} title="Add item (⌘N)" aria-keyshortcuts="Meta+N"
       onClick={() => setOpen(true)}><span className="@max-[70rem]:sr-only [.title-bar:has(.update-button)_&]:@max-[74rem]:sr-only">Add item</span></Button>
     {open && (
       <Modal onClose={() => setOpen(false)}>

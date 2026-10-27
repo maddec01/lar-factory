@@ -17,10 +17,11 @@ import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
 import { useUpdateStore } from './update-store.ts';
 import { downloadPercent, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from './update-button-logic.ts';
+import { CONTROL } from '../title-bar/control.ts';
 import { UpdateStatusIcon } from './UpdateStatusIcon.tsx';
 
-/** The pill's shape, over the copied Button's own. */
-const PILL = 'update-button h-7 gap-1.5 rounded-full pl-1 pr-2.5 text-xs font-medium sm:h-7';
+/** The pill's shape, over the copied Button's own, at the title bar's 28 px. */
+const PILL = `update-button ${CONTROL} gap-1.5 rounded-full pl-2 pr-2.5 font-medium`;
 const CLOSE_DELAY_MS = 150;
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;

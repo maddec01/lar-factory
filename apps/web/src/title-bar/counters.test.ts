@@ -17,9 +17,9 @@ async function openCounter(label: string): Promise<HTMLElement> {
   return popup()!;
 }
 
-test('the counters show need you, building over the limit of 2, queued, shipped this week and spend', async () => {
+test('the counters show need you, building over the limit of 2, queued, shipped this week and spend, each by its number and named by its label', async () => {
   await mountPage();
-  expect(counters().map(text)).toEqual(['8need you', '3/2building', '3queued', '4shipped', '$190.25spend']);
+  expect(counters().map(text)).toEqual(['8', '3/2', '3', '4', '$190.25']);
   expect(counters().map((b) => b.getAttribute('aria-label'))).toEqual([
     'need you: 8 items only you can move',
     'building: 1 over the in-flight limit',
@@ -76,7 +76,7 @@ test('building lists the items in progress, its slots and what the limit means',
 
 test('a concept in progress takes no build slot', async () => {
   await mountPage(moved('I_sample09', 'In progress'));
-  expect(text(counter('building'))).toBe('3/2building');
+  expect(text(counter('building'))).toBe('3/2');
   const pop = await openCounter('building');
   expect(rows().map((r) => r.split(' ')[0])).not.toContain('#200');
   expect(head(pop)).toBe('Building3/2');
@@ -121,7 +121,7 @@ test('the spend tooltip says the figure is an API estimate', async () => {
 
 test('with nothing on the board each popover says so', async () => {
   await mountPage({ ...sample, items: [] });
-  expect(counters().map(text)).toEqual(['0need you', '0/2building', '0queued', '0shipped', '$0.00spend']);
+  expect(counters().map(text)).toEqual(['0', '0/2', '0', '0', '$0.00']);
   const empty: [string, string][] = [];
   for (const label of ['need you', 'building', 'queued', 'shipped', 'spend']) {
     const pop = await openCounter(label);

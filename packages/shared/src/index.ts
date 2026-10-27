@@ -16,3 +16,4 @@ export * from './is-record.ts';
 export * from './workflow-labels.ts';
 export * from './label-step.ts';
 export * from './skill-check.ts';
+export * from './item-details.ts';

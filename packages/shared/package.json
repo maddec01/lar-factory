@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./install-skills": "./src/install-skills.ts",
     "./test/sample.json": "./test/sample.json",
+    "./test/sample-details.json": "./test/sample-details.json",
     "./test/raw-items": "./test/raw-items.ts"
   },
   "scripts": {

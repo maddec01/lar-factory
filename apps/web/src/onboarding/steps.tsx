@@ -1,14 +1,16 @@
 // The body of each onboarding step, which the dialog shows one at a time. Each field sits on its own row with its
-// label and one line of help. The Cleanup step lists each Clash the fixed checks find, with its edit to tick, and asks
-// Delete or Rename for each project skill named like a bundled skill. Its Clash agent asks for a provider and model,
-// then shows its run's latest message and thread, and the agent's Clashes once the run is done, or why it ended without
-// them with Retry, which starts a new thread. The Pull request step lists what the PR changes, opens it, then waits for its merge.
+// label and one line of help. The Labels step lists each workflow label, and for a repository that reads its issues
+// each status label, with whether the repository has it, then the labels it leaves alone. The Cleanup step lists each
+// Clash the fixed checks find, with its edit to tick, and asks Delete or Rename for each project skill named like a
+// bundled skill. Its Clash agent asks for a provider and model, then shows its run's latest message and thread, and the
+// agent's Clashes once the run is done, or why it ended without them with Retry, which starts a new thread. The Pull
+// request step lists what the PR changes, opens it, then waits for its merge.
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Check, CircleAlert, ExternalLink, FileText, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
-  SETUP_CHECKS, isOnboarding, isSkillName, onboardingConfigFile, threadLink, type Clash, type ClashRun, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting,
-  type SkillClash,
+  SETUP_CHECKS, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, threadLink, type Clash, type ClashRun, type LabelRow, type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice,
+  type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting, type SkillClash,
 } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
@@ -23,8 +25,8 @@ import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import {
-  COMMAND_CHECKS, type Clashes, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, latestRun, nextModel, onboarded, pickedProject,
-  picksOf, prClosed, setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
+  COMMAND_CHECKS, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, labelsPlan, latestRun, nextModel, onboarded,
+  pickedProject, picksOf, prClosed, renaming, setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
 } from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
@@ -247,6 +249,96 @@ function SetupStep({ run }: { run: Run }) {
       ) : !asksSetup(project) ? (
         <Problem title="Can’t check .lar-factory.json">Couldn’t read whether {project.repo} has .lar-factory.json on its default branch.</Problem>
       ) : run.setup && <SetupQuestions project={project} setup={run.setup} />}
+    </div>
+  );
+}
+
+/** One label the step needs: its name and what it does, then whether the repository has it, or Rename for its old name. */
+function LabelItem({ row, labels }: { row: LabelRow; labels: Labels }) {
+  const toggleRename = useWizardStore((s) => s.toggleRename);
+  return (
+    <li data-label={row.label.name} data-state={row.state} className="flex items-center gap-2.5 px-3 py-2 text-sm">
+      <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: `#${row.label.color}` }} />
+      <span className="grid min-w-0 flex-1 gap-0.5"><span className="font-mono font-medium">{row.label.name}</span>
+        <span className="text-xs text-muted-foreground">{row.label.description}</span></span>
+      {row.state === 'rename' ? (
+        <label className="flex items-center gap-2 text-xs">
+          <Checkbox checked={!labels.kept.includes(row.oldName)} disabled={!!labels.busy} onCheckedChange={() => toggleRename(row.oldName)} />
+          Rename <code className="font-mono">{row.oldName}</code>
+        </label>
+      ) : <Badge variant={row.state === 'present' ? 'success' : 'warning'} size="sm">{row.state}</Badge>}
+    </li>
+  );
+}
+
+function LabelList({ title, rows, labels }: { title: string; rows: LabelRow[]; labels: Labels }) {
+  return (
+    <div className="grid gap-1">
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
+      <ul className="m-0 grid list-none divide-y rounded-lg border p-0">{rows.map((row) => <LabelItem key={row.label.name} row={row} labels={labels} />)}</ul>
+    </div>
+  );
+}
+
+/** The labels the step changes nothing on; an old name beside its new label keeps its issues until the user moves them. */
+function LeftAlone({ labels }: { labels: LeftAloneLabel[] }) {
+  if (!labels.length) return null;
+  return (
+    <div data-left-alone className="grid gap-1">
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Left alone</h4>
+      <ul className="m-0 grid list-none gap-1 p-0 text-sm">
+        {labels.map((l) => (
+          <li key={l.name} data-left={l.name}><code className="font-mono">{l.name}</code>
+            {l.keptBeside && <span className="text-xs text-muted-foreground"> · The repository has {l.keptBeside} too, so it can’t be renamed. Its issues keep {l.name} until you move them to {l.keptBeside}.</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * The Labels step: each workflow label with what it does and whether the repository has it, the status labels for
+ * a repository that reads its issues, Create and Rename, then the labels it leaves alone. On Azure DevOps it waits for
+ * build #386.
+ */
+function LabelsStep({ run }: { run: Run }) {
+  const { projects, labels, loadLabels, createLabels, renameLabels } = useWizardStore();
+  if (projects.state !== 'loaded') return <ProjectsPending />;
+  const project = pickedProject(run, projects);
+  if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  if (project.provider === 'Azure DevOps') {
+    return <Alert variant="info" data-labels-azure><Info /><AlertTitle>Azure DevOps tags arrive in build #386</AlertTitle>
+      <AlertDescription>Until then this step creates no tag on Azure DevOps, and Next goes on.</AlertDescription></Alert>;
+  }
+  if (!labels || labels.read.state === 'loading') {
+    return <p className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading {project.repo}’s labels…</p>;
+  }
+  if (labels.read.state === 'failed') {
+    return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t read {project.repo}’s labels</AlertTitle><AlertDescription>{labels.read.error}</AlertDescription>
+      <AlertAction><Button size="xs" variant="outline" onClick={() => void loadLabels()}><RotateCw /> Retry</Button></AlertAction></Alert>;
+  }
+  const plan = labelsPlan(run, project, labels)!;
+  const creates = labelsToCreate(plan, renaming(plan, labels)).length;
+  const renames = renaming(plan, labels).length;
+  const retry = labels.error?.action === 'rename' ? renameLabels : createLabels;
+  return (
+    <div className="grid gap-4">
+      <p className="m-0 text-xs text-muted-foreground">lar-work and the board read these labels on {project.repo}. Next waits until it has every workflow label. A rename keeps the label on every issue that carries it.</p>
+      <LabelList title="Workflow labels" rows={plan.workflow} labels={labels} />
+      {plan.status.length > 0 && <LabelList title="Status labels" rows={plan.status} labels={labels} />}
+      {(creates > 0 || renames > 0) && <div className="flex gap-2">
+        {creates > 0 && <Button data-create-labels size="sm" disabled={!!labels.busy} onClick={() => void createLabels()}>
+          {labels.busy === 'create' ? <><LoaderCircle className="animate-spin" /> Creating…</> : `Create ${creates} missing`}</Button>}
+        {renames > 0 && <Button data-rename-labels size="sm" variant="outline" disabled={!!labels.busy} onClick={() => void renameLabels()}>
+          {labels.busy === 'rename' ? <><LoaderCircle className="animate-spin" /> Renaming…</> : `Rename ${renames}`}</Button>}
+      </div>}
+      {labels.error && (
+        <Alert variant="error"><CircleAlert /><AlertTitle>{labels.error.action === 'create' ? 'Can’t create the labels' : 'Can’t rename the labels'}</AlertTitle>
+          <AlertDescription>{labels.error.message}</AlertDescription>
+          <AlertAction><Button size="xs" variant="outline" disabled={!!labels.busy} onClick={() => void retry()}><RotateCw /> Retry</Button></AlertAction></Alert>
+      )}
+      <LeftAlone labels={plan.leftAlone} />
     </div>
   );
 }
@@ -715,6 +807,7 @@ function PrStep({ run }: { run: Run }) {
 export function StepBody({ run, step }: { run: Run; step: StepId }) {
   if (step === 'project') return <ProjectStep run={run} />;
   if (step === 'setup') return <SetupStep run={run} />;
+  if (step === 'labels') return <LabelsStep run={run} />;
   if (step === 'checks') return <ChecksStep run={run} />;
   if (step === 'cleanup') return <CleanupStep run={run} />;
   return <PrStep run={run} />;

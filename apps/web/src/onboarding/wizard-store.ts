@@ -1,7 +1,9 @@
 // The onboarding run the dialog shows: its step, the steps it has passed, the T3 project it picked and the answers it
 // has given, with T3's projects as the server lists them and the folder Create a new T3 project adds. Closing before a
 // project is picked, or an offered run before Next or any change, drops the run; closing after keeps its repository on
-// this Mac's list as onboarding, with where it stopped, and Resume reopens it there. The Checks step runs the command checks, then the setup checks, and holds Next
+// this Mac's list as onboarding, with where it stopped, and Resume reopens it there. The Labels step reads the
+// repository's labels, creates the missing workflow labels and renames old ones, and holds Next while one is missing;
+// on Azure DevOps it waits for build #386 and lets Next through. The Checks step runs the command checks, then the setup checks, and holds Next
 // until each passes. The Cleanup step runs the fixed checks for known Clashes and reads the Clash agent's runs, which the
 // board keeps going while the dialog is closed, asking again every few seconds while one runs. It keeps the user's ticks
 // and skill picks with the run, and holds Next until the latest agent run is done and each project skill named like a
@@ -12,17 +14,18 @@
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, isOnboarding, sameRepo, skillRenameProblem, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
+  SETUP_CHECKS, isOnboarding, labelPlan, labelsToCreate, sameRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
   type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type SkillClash, type SkillPick, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
 
-/** The steps in order. Build #383 (labels) adds its own here. */
+/** The steps in order. */
 export const STEPS = [
   { id: 'project', label: 'T3 project' },
   { id: 'setup', label: 'Provider and item source' },
+  { id: 'labels', label: 'Labels' },
   { id: 'checks', label: 'Checks' },
   { id: 'cleanup', label: 'Cleanup' },
   { id: 'pr', label: 'Pull request' },
@@ -228,13 +231,36 @@ function prConfig(run: Run, project: ProjectChoice): RepositoryConfigAnswers | n
 /** The Pull request step's list of the PR's changes, as the board previews them, or the board's problem. */
 type PrChanges = { state: 'reading' } | { state: 'read'; changes: OnboardingPrChange[] } | { state: 'failed'; error: string };
 
+/** The Labels step's read of the repository's labels, the old names Rename leaves, and Create or Rename while it runs or once it failed. */
+export interface Labels {
+  read: { state: 'loading' } | { state: 'loaded'; names: string[] } | { state: 'failed'; error: string };
+  /** The old names unticked for Rename, whose new labels Create makes instead. */
+  kept: string[];
+  busy: 'create' | 'rename' | null;
+  error: { action: 'create' | 'rename'; message: string } | null;
+}
+
+/** The Labels step's plan for the run's repository once its labels are read; null before. */
+export function labelsPlan(run: Run, project: ProjectChoice, labels: Labels | null): LabelPlan | null {
+  return labels?.read.state === 'loaded' ? labelPlan(labels.read.names, itemSourceOf(run, project)?.kind ?? 'github-project') : null;
+}
+
+/** The old names Rename moves: each the plan offers, less those unticked. */
+export const renaming = (plan: LabelPlan, labels: Labels): string[] =>
+  plan.workflow.flatMap((r) => r.state === 'rename' && !labels.kept.includes(r.oldName) ? [r.oldName] : []);
+
 /** Whether the run's step lets Next move past it. */
 export function stepReady(run: Run, projects: Projects, checks: Checks | null = null, tools?: ToolChecks, clashes: Clashes | null = null,
-  agent: Agent | null = null): boolean {
+  agent: Agent | null = null, labels: Labels | null = null): boolean {
   const project = pickedProject(run, projects);
   if (!project) return false;
   if (run.step === 'project') return true;
   if (run.step === 'setup') return !!project.config || asksSetup(project) && setupAnswered(run.setup);
+  if (run.step === 'labels') {
+    if (project.provider === 'Azure DevOps') return true;
+    const plan = labelsPlan(run, project, labels);
+    return !!plan && !workflowLabelsMissing(plan);
+  }
   if (run.step === 'checks') return checksPassed(checks, tools, itemSourceOf(run, project));
   if (run.step === 'cleanup') return cleanupDone(run, clashes, agent);
   return false;
@@ -246,6 +272,8 @@ interface WizardState {
   projects: Projects;
   /** Create a new T3 project's form; null while a listed project is the choice. */
   creating: Creating | null;
+  /** The Labels step's labels; null until the run reaches it. */
+  labels: Labels | null;
   /** The Checks step's checks; null until the run first reaches it. */
   checks: Checks | null;
   /** The Cleanup step's fixed checks; null until the run first reaches it. */
@@ -273,6 +301,14 @@ interface WizardState {
   answer: (change: Partial<Omit<SetupAnswers, 'showPicked'>>) => void;
   next: () => void;
   back: () => void;
+  /** Reads the repository's labels for the Labels step; on Azure DevOps it reads nothing. */
+  loadLabels: () => Promise<void>;
+  /** Ticks or unticks an old name for Rename. */
+  toggleRename: (oldName: string) => void;
+  /** Creates the missing labels, less the old names Rename moves. */
+  createLabels: () => Promise<void>;
+  /** Renames each ticked old name to its new one. */
+  renameLabels: () => Promise<void>;
   /** Runs the command checks, then each setup check in turn. */
   runChecks: () => Promise<void>;
   /** Runs one setup check again. */
@@ -327,6 +363,8 @@ let previews = 0;
 let agentReads = 0;
 /** The next read of the agent's runs while one runs. */
 let agentTimer: ReturnType<typeof setTimeout> | undefined;
+/** Counts label reads and changes, so one answered after a newer one or a close is dropped. */
+let labelRuns = 0;
 /** The run an offer opened, until Next or a change replaces it; closing it then keeps nothing. */
 let untouchedOffer: Run | null = null;
 
@@ -411,12 +449,13 @@ async function keep(run: Run & { projectId: string; repo: string }): Promise<voi
 
 export const useWizardStore = create<WizardState>()((set, get) => {
   const move = (by: 1 | -1) => {
-    const { run, projects, checks, clashes, agent } = get();
+    const { run, projects, checks, clashes, agent, labels } = get();
     // Once its PR is open, the run stays on the Pull request step.
-    if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes, agent))) return;
+    if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes, agent, labels))) return;
     const to = STEPS[STEPS.findIndex((s) => s.id === run.step) + by]?.id;
     if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done,
       setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo) : null), cleanup: run.cleanup ?? (to === 'cleanup' ? NO_PICKS : null) } });
+    if (to === 'labels') void get().loadLabels();
     if (to === 'checks') void get().runChecks();
     if (to === 'cleanup') {
       void get().findClashes();
@@ -429,6 +468,35 @@ export const useWizardStore = create<WizardState>()((set, get) => {
   const showRuns = (runs: ClashRun[], read: number) => {
     set({ agent: { ...get().agent, runs, error: null } });
     if (runs.at(-1)?.state === 'running') agentTimer = setTimeout(() => { if (read === agentReads) void get().readClashRuns(); }, AGENT_POLL_MS);
+  };
+
+  /** The labels while `runId` is the latest label run and the run is open. */
+  const currentLabels = (runId: number) => runId === labelRuns && get().run ? get().labels : null;
+
+  /** Posts a label read or change for the run's repository, and keeps its answer while it's the latest. */
+  const labelsPost = async (path: string, body: object, action: 'create' | 'rename' | null) => {
+    const { run } = get();
+    if (!run?.repo) return;
+    const runId = ++labelRuns;
+    const answer = await postAction<{ labels: string[] }>(path, { repo: run.repo, ...body });
+    const now = currentLabels(runId);
+    if (!now) return;
+    if (answer.labels) return set({ labels: { ...now, read: { state: 'loaded', names: answer.labels }, busy: null, error: null } });
+    const message = answer.error ?? 'The board sent no labels.';
+    if (!action) return set({ labels: { ...now, read: { state: 'failed', error: message } } });
+    set({ labels: { ...now, busy: null, error: { action, message } } });
+    // Some labels may have changed before gh failed, so read them again.
+    const reread = await postAction<{ labels: string[] }>('/api/onboarding/labels', { repo: run.repo });
+    const after = currentLabels(runId);
+    if (after && reread.labels) set({ labels: { ...after, read: { state: 'loaded', names: reread.labels } } });
+  };
+
+  /** The run's project and its label plan, while the Labels step has its labels and no change running. */
+  const labelStep = () => {
+    const { run, projects, labels } = get();
+    const project = run && pickedProject(run, projects);
+    const plan = run && project && labelsPlan(run, project, labels);
+    return run && project && plan && labels && !labels.busy ? { run, project, plan, labels } : null;
   };
 
   /** The run's checks while `runId` is the latest check run and the run is open. */
@@ -456,6 +524,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     clashes: null,
     agent: NO_AGENT,
     changes: null,
+    labels: null,
     pr: IDLE,
     opener: null,
     start: (offer) => {
@@ -467,7 +536,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       untouchedOffer = offer ? run : null;
       stopAgentReads();
       previews++;
-      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, pr: IDLE, opener: focused() });
+      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, labels: null, pr: IDLE, opener: focused() });
       void get().loadProjects();
     },
     resume: (repo) => {
@@ -478,14 +547,15 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       stopAgentReads();
       previews++;
       const run = resumed(kept.repo, kept.progress);
-      // The checks read the picked project, so they wait for T3's projects; the fixed checks and agent runs read only the
-      // repository. The Pull request step reads them with readPrChanges once it lists the PR's changes.
-      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, pr: IDLE, opener: focused() });
+      // The labels and the checks read the picked project, so they wait for T3's projects; the fixed checks and agent runs
+      // read only the repository. The Pull request step reads them with readPrChanges once it lists the PR's changes.
+      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, labels: null, pr: IDLE, opener: focused() });
       if (run.step === 'cleanup') {
         void get().findClashes();
         void get().readClashRuns();
       }
       void get().loadProjects().then(() => {
+        if (get().run?.step === 'labels') void get().loadLabels();
         if (get().run?.step === 'checks') void get().runChecks();
       });
     },
@@ -495,9 +565,10 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       checkRuns++;
       clashReads++;
       previews++;
+      labelRuns++;
       // The board keeps the agent's run going; Resume reads it again.
       stopAgentReads();
-      set({ run: null, checks: null, clashes: null, agent: NO_AGENT, changes: null });
+      set({ run: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, labels: null });
       // A run whose PR merged is onboarded, so there's no onboarding left to keep.
       if (run?.projectId && run.repo && run !== untouchedOffer && !onboarded(run, useBoardStore.getState().data)) {
         void keep({ ...run, projectId: run.projectId, repo: run.repo });
@@ -555,6 +626,30 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     },
     next: () => move(1),
     back: () => move(-1),
+    loadLabels: async () => {
+      const { run, projects } = get();
+      const project = run && pickedProject(run, projects);
+      if (!project || project.provider === 'Azure DevOps') return;
+      set({ labels: { read: { state: 'loading' }, kept: get().labels?.kept ?? [], busy: null, error: null } });
+      await labelsPost('/api/onboarding/labels', {}, null);
+    },
+    toggleRename: (oldName) => {
+      const { labels } = get();
+      if (labels) set({ labels: { ...labels, kept: labels.kept.includes(oldName) ? labels.kept.filter((n) => n !== oldName) : [...labels.kept, oldName] } });
+    },
+    createLabels: async () => {
+      const step = labelStep();
+      if (!step || !labelsToCreate(step.plan, renaming(step.plan, step.labels)).length) return;
+      set({ labels: { ...step.labels, busy: 'create', error: null } });
+      await labelsPost('/api/onboarding/labels/create', { itemSource: itemSourceOf(step.run, step.project), renaming: renaming(step.plan, step.labels) }, 'create');
+    },
+    renameLabels: async () => {
+      const step = labelStep();
+      const names = step ? renaming(step.plan, step.labels) : [];
+      if (!step || !names.length) return;
+      set({ labels: { ...step.labels, busy: 'rename', error: null } });
+      await labelsPost('/api/onboarding/labels/rename', { names }, 'rename');
+    },
     runChecks: async () => {
       const runId = ++checkRuns;
       set({ checks: { commands: { state: 'running' }, setup: WAITING } });

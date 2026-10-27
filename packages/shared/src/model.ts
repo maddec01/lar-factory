@@ -660,6 +660,17 @@ export interface OnboardingAnswers {
   provider?: Provider;
   /** The Provider and item source step's answers, once it has shown. */
   setup?: SetupAnswers;
+  /** The Cleanup step's picks, once it has shown. */
+  cleanup?: CleanupPicks;
+}
+
+/** What the user picked for a skill Clash: delete the skill's folder in the PR, or rename the skill. */
+export type SkillPick = { kind: 'delete' } | { kind: 'rename'; name: string };
+
+/** The Cleanup step's picks: the ticks the user changed, by Clash id, and each skill Clash's pick, by its path. */
+export interface CleanupPicks {
+  ticks: Record<string, boolean>;
+  skills: Record<string, SkillPick>;
 }
 
 /** Where an onboarding stopped when its dialog closed, so Resume reopens it there. */

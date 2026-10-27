@@ -25,9 +25,10 @@ function ghWith(files: Record<string, unknown>): (args: string[]) => Promise<str
 
 const progress = (step = 'setup', projectId = 'lar-apple') => ({ step, done: ['project'], answers: { projectId } });
 const setup = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '3', show: 'all', showPicked: false, role: 'Apple app' };
+const cleanup = { ticks: { context: true, scratch: false }, skills: { '.claude/skills/code-review/': { kind: 'rename', name: 'web-review' }, '.agents/skills/tdd/': { kind: 'delete' } } };
 
 test('the list file names the onboarded repositories, each still onboarding with its progress; a missing one names none', async (t) => {
-  const onboarding = { ...progress(), answers: { projectId: 'lar-apple', provider: 'GitHub', setup }, prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
+  const onboarding = { ...progress(), answers: { projectId: 'lar-apple', provider: 'GitHub', setup, cleanup }, prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
   const list = { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding }] };
   assert.deepEqual(readRepositoryList(await dataDir(t, { 'repositories.json': JSON.stringify(list) })),
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding }]);
@@ -38,7 +39,9 @@ test("an onboarding that isn't progress is refused, naming its entry", async (t)
   for (const onboarding of [true, { step: 'setup', done: ['project'] }, { step: 3, done: [], answers: { projectId: 'x' } },
     { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} }, { ...progress(), prUrl: 4 }, { ...progress(), prClosed: false },
     ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { projectNumber: 3 }, { showPicked: 'yes' }].map((wrong) =>
-      ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } }]) {
+      ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } },
+    ...[{ ticks: [] }, { ticks: { context: 'yes' } }, { skills: { tdd: { kind: 'keep' } } }, { skills: { tdd: { kind: 'rename' } } }].map((wrong) =>
+      ({ ...progress(), answers: { projectId: 'x', cleanup: { ...cleanup, ...wrong } } }))]) {
     const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding }] }) });
     assert.throws(() => readRepositoryList(dir), { message: `${join(dir, 'repositories.json')}: repositories[0] has an onboarding without its step, done steps and T3 project, or with answers it can't use.` },
       JSON.stringify(onboarding));

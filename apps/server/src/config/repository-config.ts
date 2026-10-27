@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigProblem, type RepositoryItemSource,
+  PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigProblem, type RepositoryItemSource,
   type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
 import { readDefaultBranchFile } from '../github/github.ts';
@@ -62,11 +62,19 @@ function isSetup(value: unknown): value is SetupAnswers {
     && typeof value.showPicked === 'boolean' && typeof value.role === 'string';
 }
 
+/** Whether the Cleanup step's picks have their shape. */
+function isCleanup(value: unknown): value is CleanupPicks {
+  return isRecord(value) && isRecord(value.ticks) && Object.values(value.ticks).every((tick) => typeof tick === 'boolean')
+    && isRecord(value.skills) && Object.values(value.skills).every((pick) => isRecord(pick)
+      && (pick.kind === 'delete' || pick.kind === 'rename' && typeof pick.name === 'string'));
+}
+
 /** Whether an entry's onboarding is progress the dialog can resume from. */
 export function isProgress(value: unknown): value is OnboardingProgress {
   return isRecord(value) && typeof value.step === 'string' && strings(value.done) && isRecord(value.answers)
     && (value.answers.provider === undefined || PROVIDERS.includes(value.answers.provider as Provider))
     && typeof value.answers.projectId === 'string' && (value.answers.setup === undefined || isSetup(value.answers.setup))
+    && (value.answers.cleanup === undefined || isCleanup(value.answers.cleanup))
     && (value.prUrl === undefined || typeof value.prUrl === 'string') && (value.prClosed === undefined || value.prClosed === true);
 }
 

@@ -47,6 +47,12 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['I_sample06']);
 });
 
+test("a row shows the item's kind label and its repository's custom labels, colons and all, without case, and hides every other label", async () => {
+  const labelled = { ...sample05, labels: ['needs-triage', 'area: web', 'status-queued', 'Improvement', 'app: music', 'active', 'build', 'Area: Server', 'decision-grill'] };
+  await mountPage({ ...sample, items: sample.items.map((i) => i.id === sample05.id ? labelled : i) });
+  expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · area: web, Improvement, Area: Server');
+});
+
 test("a dossier's parts are left out and show in the dossier; a Queued parent stays, and an item whose parent isn't on the board stays", async () => {
   await mountPage({ ...sample, items: [...sample.items, decision('I_d200', 200), decision('I_d129', 129), decision('I_d999', 999)] });
   expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample05', 'I_sample06', 'I_sample21', 'I_d999']);

@@ -5,7 +5,7 @@
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { carriesTwoStatuses, openBlockers, repoKey, repoName, startHold, shortAgo, workMessage } from '@lar-factory/shared';
+import { carriesTwoStatuses, isKindLabel, openBlockers, repoKey, repoName, sameRepo, startHold, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { useBoardStore } from '../board/board-store.ts';
@@ -20,6 +20,15 @@ import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
 
 const DRAFT_HINT = 'This draft needs an issue before it can start. Convert it to an issue in a repo.';
 const NONE_STARTS = 'Every queued item is blocked, needs an issue or a T3 project, waits for onboarding, or has a thread at work.';
+
+/**
+ * The labels a row shows: the item's kind label and its repository's custom labels, in the item's order; GitHub
+ * matches label names without case.
+ */
+const shownLabels = (item: Item, data: BoardData) => {
+  const custom = new Set(data.repos.find((r) => sameRepo(r.repo, repoKey(item)))?.labels.map((l) => l.toLowerCase()));
+  return item.labels.filter((l) => isKindLabel(l) || custom.has(l.toLowerCase()));
+};
 
 /** Keeps a click on a row's controls from opening the item dialog. */
 const stop = (e: MouseEvent) => e.stopPropagation();
@@ -42,7 +51,7 @@ function RowAction({ item, data, first }: { item: Item; data: BoardData; first: 
 function Row({ item, n, data, now, first, waits }: { item: Item; n: number; data: BoardData; now: number; first: boolean; waits: boolean }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   const repo = repoKey(item);
-  const labels = item.labels.filter((l) => !l.includes(':'));
+  const labels = shownLabels(item, data);
   return (
     <li data-item={item.id} onClick={() => useItemDialogStore.getState().open(item.id)}
       className={`flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 border-b border-(--border) px-3 py-2 last:border-b-0 hover:bg-(--accent) ${picked ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : ''}`}>

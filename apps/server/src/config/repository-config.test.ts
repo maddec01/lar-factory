@@ -28,7 +28,7 @@ const setup = { itemSource: 'github-project', projectOwner: 'maddec01', projectN
 const cleanup = { ticks: { context: true, scratch: false }, skills: { '.claude/skills/code-review/': { kind: 'rename', name: 'web-review' }, '.agents/skills/tdd/': { kind: 'delete' } } };
 
 test('the list file names the onboarded repositories, each still onboarding with its progress; a missing one names none', async (t) => {
-  const onboarding = { ...progress(), answers: { projectId: 'lar-apple', provider: 'GitHub', setup, cleanup }, prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
+  const onboarding = { ...progress(), answers: { projectId: 'lar-apple', provider: 'GitHub', setup, cleanup, customLabels: ['app: music'] }, prUrl: 'https://github.com/maddec01/lar-apple/pull/4' };
   const list = { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding }] };
   assert.deepEqual(readRepositoryList(await dataDir(t, { 'repositories.json': JSON.stringify(list) })),
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding }]);
@@ -40,6 +40,7 @@ test("an onboarding that isn't progress is refused, naming its entry", async (t)
     { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} }, { ...progress(), prUrl: 4 }, { ...progress(), prClosed: false },
     ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { projectNumber: 3 }, { showPicked: 'yes' }].map((wrong) =>
       ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } },
+    { ...progress(), answers: { projectId: 'x', customLabels: 'app: music' } },
     ...[{ ticks: [] }, { ticks: { context: 'yes' } }, { skills: { tdd: { kind: 'keep' } } }, { skills: { tdd: { kind: 'rename' } } }].map((wrong) =>
       ({ ...progress(), answers: { projectId: 'x', cleanup: { ...cleanup, ...wrong } } }))]) {
     const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-apple', onboarding }] }) });

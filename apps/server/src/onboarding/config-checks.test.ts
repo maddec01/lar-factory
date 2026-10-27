@@ -8,7 +8,7 @@ function gh(files: Record<string, 'file' | 'none' | 'fails'>) {
   const run = async (args: string[]) => {
     const repo = args[1]!.match(/^repos\/(.+)\/contents\/\.lar-factory\.json$/)![1]!;
     asked.push(repo);
-    if (files[repo] === 'file') return '{"role":"Web client"}';
+    if (files[repo] === 'file') return '{"role":"Web client","labels":["app: music"]}';
     throw new Error(files[repo] === 'none' ? 'gh: Not Found (HTTP 404)' : 'HTTP 502: Bad Gateway');
   };
   return { run, asked };
@@ -17,7 +17,7 @@ function gh(files: Record<string, 'file' | 'none' | 'fails'>) {
 test("each repository's answer is read once and kept until the checks clear", async () => {
   const { run, asked } = gh({ 'maddec01/lar-web': 'file', 'maddec01/lar-server': 'none' });
   const checks = createConfigChecks(run, () => {});
-  const web = { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client' } };
+  const web = { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['app: music'] } };
   assert.deepEqual(await Promise.all([checks.configOf('maddec01/lar-web'), checks.configOf('maddec01/lar-server'), checks.configOf('Maddec01/Lar-Web')]),
     [web, { hasConfig: false }, web]);
   assert.deepEqual(await Promise.all([checks.configOf('maddec01/lar-web'), checks.configOf('maddec01/lar-server')]), [web, { hasConfig: false }]);

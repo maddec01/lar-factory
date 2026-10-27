@@ -54,7 +54,7 @@ test("Queue on an item from a repository's issues creates the missing label, swa
   const response = await board.post({ itemId: 'I_8' }, board.url, '/api/queue');
   assert.equal(response.status, 200);
   assert.deepEqual(await labelEdits(board), [
-    ['label', 'create', 'status-queued', '-R', APPLE, '--color', 'EDEDED', '--description', 'Status: Queued'],
+    ['label', 'create', '-R', APPLE, '--color', 'EDEDED', '--description', 'Status: Queued', '--', 'status-queued'],
     ['issue', 'edit', '8', '-R', APPLE, '--add-label', 'status-queued', '--remove-label', 'status-list'],
   ]);
   assert.equal((await board.board() as BoardData).items[0]!.status, 'Queued');

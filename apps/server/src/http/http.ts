@@ -42,8 +42,8 @@ export interface HttpDeps {
   startClashRun(input: Record<string, unknown>): Promise<{ runs: ClashRun[] } | { status: number; error: string }>;
   /** The repository's Clash agent runs, oldest first. */
   clashRuns(repo: string): ClashRun[];
-  /** Reads, creates or renames the labels of onboarding's Labels step, answering with the repository's labels, or gh's problem. */
-  repositoryLabels: Record<'read' | 'create' | 'rename', (input: Record<string, unknown>) => Promise<{ labels: string[] } | { status: number; error: string }>>;
+  /** Reads, creates or renames the labels of onboarding's Labels step, or creates a custom label, answering with the repository's labels, or gh's problem. */
+  repositoryLabels: Record<'read' | 'create' | 'rename' | 'custom', (input: Record<string, unknown>) => Promise<{ labels: string[] } | { status: number; error: string }>>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
   openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /** What an onboarding's PR would change against its default branch with the body's answers and picks, or why it can't say. */
@@ -215,6 +215,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     '/api/onboarding/labels': labelsWrite('read'),
     '/api/onboarding/labels/create': labelsWrite('create'),
     '/api/onboarding/labels/rename': labelsWrite('rename'),
+    '/api/onboarding/labels/custom': labelsWrite('custom'),
     '/api/onboarding/clashes': {
       what: 'the repository to check', disabled: 'Sample mode onboards no repository.',
       async run(input) {

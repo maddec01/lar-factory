@@ -75,6 +75,7 @@ export function isProgress(value: unknown): value is OnboardingProgress {
     && (value.answers.provider === undefined || PROVIDERS.includes(value.answers.provider as Provider))
     && typeof value.answers.projectId === 'string' && (value.answers.setup === undefined || isSetup(value.answers.setup))
     && (value.answers.cleanup === undefined || isCleanup(value.answers.cleanup))
+    && (value.answers.customLabels === undefined || strings(value.answers.customLabels))
     && (value.prUrl === undefined || typeof value.prUrl === 'string') && (value.prClosed === undefined || value.prClosed === true)
     && (value.reusesConfig === undefined || value.reusesConfig === true);
 }

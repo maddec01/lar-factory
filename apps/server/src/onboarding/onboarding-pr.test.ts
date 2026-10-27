@@ -4,10 +4,11 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRepositoryList, saveOnboarding, savePrClosed } from '../config/repository-config.ts';
+import { WORKFLOW_LABELS } from '@lar-factory/shared';
 import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr } from './onboarding-pr.ts';
 
 const progress = { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-web' } };
-const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' };
+const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: ['app: music'] };
 const PR = 'https://github.com/maddec01/lar-web/pull/14';
 
 async function dataDir(t: TestContext, entries: object[] = []): Promise<string> {
@@ -16,6 +17,8 @@ async function dataDir(t: TestContext, entries: object[] = []): Promise<string> 
   await writeFile(join(dir, 'repositories.json'), JSON.stringify({ repositories: entries }));
   return dir;
 }
+
+const ALL = WORKFLOW_LABELS.map((l) => l.name);
 
 /** A call's value for a gh api field, such as `ref` for `-f ref=...`; the values of `tree[][path]` for an array's. */
 const field = (args: string[], name: string) => args.filter((a, i) => /^-[fF]$/.test(args[i - 1] ?? '') && a.startsWith(`${name}=`))
@@ -27,11 +30,14 @@ const LAR_CONFIG = JSON.stringify({ version: 1, role: 'Web client', itemSource: 
 /**
  * A gh that records each call and answers it like GitHub, failing the calls `fails` names, by their first two args or
  * their path, with its message. The default branch holds `files`; `branches` are the lar-factory/ branches the
- * repository has, each with its open PR's URL or null.
+ * repository has, each with its open PR's URL or null. It lists `labels` as the repository's, every workflow label unless
+ * a test says otherwise, and records no label list.
  */
-function gh(fails: Record<string, string> = {}, branches: Record<string, string | null> = {}, files: Record<string, string> = { 'AGENTS.md': RULES }) {
+function gh(fails: Record<string, string> = {}, branches: Record<string, string | null> = {}, files: Record<string, string> = { 'AGENTS.md': RULES },
+  labels = ALL) {
   const calls: string[][] = [];
   const run = async (args: string[]) => {
+    if (args[0] === 'label' && args[1] === 'list') return JSON.stringify(labels.map((name) => ({ name })));
     calls.push(args);
     const failure = fails[args.slice(0, 2).join(' ')] ?? fails[args[1]!];
     if (failure) throw new Error(failure);
@@ -80,7 +86,7 @@ test('opening the PR makes one commit on the default branch\'s head with every c
     'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md']);
   assert.ok(field(tree!, 'tree[][content]').some((text) => text.startsWith('# lar-web\n\n- Open a PR when done.\n\n## Agent skills')));
   assert.deepEqual(JSON.parse(field(tree!, 'tree[][content]').find((text) => text.includes('"version"'))!),
-    { version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: [] });
+    { version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: music'] });
   assert.deepEqual([field(commit!, 'tree'), field(commit!, 'parents[]')], [['tree1'], ['abc123']]);
   assert.deepEqual([field(branch!, 'ref'), field(branch!, 'sha')], [['refs/heads/lar-factory/onboarding'], ['commit1']]);
   assert.deepEqual([create![create!.indexOf('--base') + 1], create![create!.indexOf('--head') + 1]], ['main', 'lar-factory/onboarding']);
@@ -208,12 +214,24 @@ test('the preview lists the changes the PR would make against the default branch
     { status: 502, error: "Can't read maddec01/lar-web's default branch: gh api failed: HTTP 502" });
 });
 
+test('a repository that lacks a workflow label, or has one under its old name, gets no PR', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+  for (const labels of [ALL.filter((n) => n !== 'blocked'), [...ALL.filter((n) => n !== 'decision-task'), 'decision: task']]) {
+    const { calls, run } = gh({}, {}, undefined, labels);
+    assert.deepEqual(await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config, picks }),
+      { status: 409, error: 'maddec01/lar-web still lacks a workflow label. Go back to the Labels step and create or rename it.' });
+    assert.deepEqual(calls, []);
+  }
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+});
+
 test('a body without the repository, its progress, a whole Repository config or null, and whole picks is refused', async (t) => {
   const dir = await dataDir(t);
   const open = createPrOpener(dir, gh().run);
   const refused = { status: 400, error: "Send the repository, its .lar-factory.json's values or null to reuse its own, and the Cleanup step's picks." };
   assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, picks, config: { ...config, role: ' ' } }), refused);
   assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, picks, config: { ...config, show: 'some' } }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, picks, config: { ...config, labels: [3] } }), refused);
   assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, picks }), refused);
   assert.deepEqual(await open({ repo: 'lar-web', progress, config, picks }), refused);
   assert.deepEqual(await open({ repo: 'maddec01/lar-web', config, picks }), refused);

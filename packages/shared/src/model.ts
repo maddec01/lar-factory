@@ -637,11 +637,13 @@ export interface RepositoryConfigAnswers {
   itemSource: RepositoryItemSource;
   show: ShowSetting;
   role: string;
+  /** Its custom labels: the file's `labels`, or those the Labels step picked. */
+  labels: string[];
 }
 
-/** The .lar-factory.json onboarding's PR adds; labels wait for build #383's label step. */
-export const onboardingConfigFile = ({ role, itemSource, show }: RepositoryConfigAnswers): string =>
-  `${JSON.stringify({ version: 1, role, itemSource, show, labels: [] }, null, 2)}\n`;
+/** The .lar-factory.json onboarding's PR adds. */
+export const onboardingConfigFile = ({ role, itemSource, show, labels }: RepositoryConfigAnswers): string =>
+  `${JSON.stringify({ version: 1, role, itemSource, show, labels }, null, 2)}\n`;
 
 /** What the Provider and item source step has answered so far, as typed; the GitHub Project's fields count only for a Project. */
 export interface SetupAnswers {
@@ -664,6 +666,8 @@ export interface OnboardingAnswers {
   setup?: SetupAnswers;
   /** The Cleanup step's picks, once it has shown. */
   cleanup?: CleanupPicks;
+  /** The custom labels the Labels step picked, once it has shown. */
+  customLabels?: string[];
 }
 
 /** What the user picked for a skill Clash: delete the skill's folder in the PR, or rename the skill. */

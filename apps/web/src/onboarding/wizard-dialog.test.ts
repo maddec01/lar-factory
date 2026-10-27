@@ -36,7 +36,7 @@ test('Next is disabled until a project is picked, then shows the next step, and 
 });
 
 test('a run that reuses its .lar-factory.json counts the Pull request step too', async () => {
-  await openOnboarding([project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client' } })]);
+  await openOnboarding([project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] } })]);
   await settle(() => radio('lar-web').click());
   await settle(() => button('Next')!.click());
   expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 6');

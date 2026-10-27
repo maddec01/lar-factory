@@ -28,7 +28,7 @@ test('the steps are the T3 project, Provider and item source, Labels, Checks, Cl
 test("starting a run opens it on the T3 project step and reads T3's projects", async () => {
   const wizard = await store();
   await settle(() => wizard.getState().start());
-  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, cleanup: null, prUrl: null });
+  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, customLabels: [], cleanup: null, prUrl: null });
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/onboarding/projects']);
   expect(wizard.getState().projects).toEqual({ state: 'loaded', projects: PROJECTS });
 });
@@ -37,7 +37,7 @@ test('starting a run from an offer opens it with the offered project picked', as
   const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-web', { hasConfig: true })] })));
   const { stepReady } = await import('./wizard-store.ts');
   await settle(() => wizard.getState().start({ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }));
-  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: null, cleanup: null, prUrl: null });
+  expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: null, customLabels: [], cleanup: null, prUrl: null });
   expect(stepReady(wizard.getState().run!, wizard.getState().projects)).toBe(true);
 });
 
@@ -81,7 +81,7 @@ test('Next waits for a project that can be picked, then moves on; Back returns',
   wizard.getState().pick('lar-web');
   expect(ready()).toBe(true);
   wizard.getState().next();
-  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: SETUP, cleanup: null, prUrl: null });
+  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: SETUP, customLabels: [], cleanup: null, prUrl: null });
   expect(ready(), 'the step waits for its answers').toBe(false);
   wizard.getState().back();
   expect(wizard.getState().run!.step).toBe('project');
@@ -89,7 +89,7 @@ test('Next waits for a project that can be picked, then moves on; Back returns',
 
 test('a project whose repository is onboarding already says to use its Resume', async () => {
   const { unpickable } = await import('./wizard-store.ts');
-  const run = { step: 'project' as const, done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, cleanup: null, prUrl: null };
+  const run = { step: 'project' as const, done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, customLabels: [], cleanup: null, prUrl: null };
   const data = { onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-server' } } }] };
   expect(unpickable(project('lar-server', { onBoard: true }), run, data)).toBe('It’s onboarding already: close this and press its Resume.');
   expect(unpickable(project('lar-server', { onBoard: true }), run, { onboarding: [] })).toBe('Its repository is on the board already.');
@@ -159,7 +159,7 @@ test("Next needs a role, and for a GitHub Project an owner's login and a number"
 });
 
 test(".lar-factory.json's values pass the step with no answers; an Azure DevOps origin or a file that can't be reused can't", async () => {
-  const config = { itemSource: { kind: 'issues' as const }, show: 'opted-in' as const, role: 'Web client' };
+  const config = { itemSource: { kind: 'issues' as const }, show: 'opted-in' as const, role: 'Web client', labels: [] };
   expect((await onSetup([project('lar-web', { hasConfig: true, config })])).ready()).toBe(true);
   for (const parts of [{ provider: 'Azure DevOps' as const, repo: 'Fabrikam/lar-web', hasConfig: null },
     { hasConfig: true, configProblem: '.lar-factory.json isn’t valid JSON.' }, { hasConfig: null }]) {
@@ -179,7 +179,7 @@ test('Resume reopens the run on its step with its answers, and its own project c
   useBoardStore.getState().receive({ ...sample,
     onboarding: [{ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web', provider: 'GitHub', setup } } }] });
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
-  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: 'maddec01/lar-web', setup, cleanup: null, prUrl: null });
+  expect(wizard.getState().run).toEqual({ step: 'setup', done: ['project'], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: 'maddec01/lar-web', setup, customLabels: [], cleanup: null, prUrl: null });
   expect(wizard.getState().projects.state, "T3's projects are read again").toBe('loaded');
   wizard.getState().back();
   wizard.getState().pick('lar-apple');
@@ -457,7 +457,7 @@ test('Resume on Cleanup brings back the ticks and skill picks, and runs the fixe
   expect(clashPosts()).toEqual([{ repo: 'maddec01/lar-web' }]);
 });
 
-const REUSED = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } });
+const REUSED = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client', labels: ['app: music'] } });
 
 test('Resume on the Checks step runs the checks again once it has read the projects', async () => {
   const wizard = await checkingStore([project('lar-web')]);
@@ -495,7 +495,7 @@ test("passing Cleanup with a new file moves to the Pull request step, and Open t
   await settle(() => wizard.getState().openPr());
   expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'labels', 'checks', 'cleanup'],
     answers: { projectId: 'lar-web', provider: 'GitHub', setup: SETUP_DONE, cleanup: { ticks: {}, skills: {} } } },
-    config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' }, picks: { clashes: [], skills: {} } }]);
+    config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: [] }, picks: { clashes: [], skills: {} } }]);
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR, savedAs: 'maddec01/lar-web' });
   expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error: null });
 });
@@ -617,7 +617,7 @@ const previewPosts = () => (fetchMock.mock.calls as unknown as [string, RequestI
 test("reaching the Pull request step lists the PR's changes, previewed with .lar-factory.json's values and the Cleanup step's picks", async () => {
   const wizard = await pickedPr();
   const picks = { clashes: [CONTEXT, SCRATCH, AGENT_CLASH], skills: RENAMED };
-  expect(previewPosts()).toEqual([{ repo: 'maddec01/lar-web', config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' }, picks }]);
+  expect(previewPosts()).toEqual([{ repo: 'maddec01/lar-web', config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: [] }, picks }]);
   expect(wizard.getState().changes).toEqual({ state: 'read', changes: CHANGES });
   await settle(() => wizard.getState().openPr());
   expect(prPosts()).toMatchObject([{ config: { role: 'Web client' }, picks }]);
@@ -835,7 +835,7 @@ test('Create sends the item source and the old names Rename moves; Rename sends 
   await settle(() => wizard.getState().loadLabels());
   await settle(() => wizard.getState().renameLabels());
   expect(labelPosts().filter(([url]) => url !== '/api/onboarding/labels')).toEqual([
-    ['/api/onboarding/labels/create', { repo: 'maddec01/lar-web', itemSource: { kind: 'issues' }, renaming: ['decision: grill'] }],
+    ['/api/onboarding/labels/create', { repo: 'maddec01/lar-web', itemSource: { kind: 'issues' }, renaming: ['decision: grill'], custom: [] }],
     ['/api/onboarding/labels/rename', { repo: 'maddec01/lar-web', names: ['decision: grill', 'decision: task'] }],
   ]);
 });
@@ -848,14 +848,23 @@ test("a Create gh refuses keeps gh's message with the action to retry, and reads
   expect(labelPosts().map(([url]) => url)).toEqual(['/api/onboarding/labels', '/api/onboarding/labels/create', '/api/onboarding/labels']);
 });
 
-test('a reused .lar-factory.json passes through Labels too, which waits for its missing labels', async () => {
+test("a reused .lar-factory.json passes through Labels too, which waits for its missing labels, and Create makes the file's missing custom labels", async () => {
   const wizard = await labelsStore([REUSED], ['bug']);
   const { stepReady } = await import('./wizard-store.ts');
   await toLabels(wizard, 'lar-web');
   expect(wizard.getState().run!.step).toBe('labels');
   expect(stepReady(wizard.getState().run!, wizard.getState().projects, null, undefined, null, null, wizard.getState().labels)).toBe(false);
   await settle(() => wizard.getState().createLabels());
-  expect(labelPosts()[1]).toEqual(['/api/onboarding/labels/create', { repo: 'maddec01/lar-web', itemSource: REUSED.config!.itemSource, renaming: [] }]);
+  expect(labelPosts()[1]).toEqual(['/api/onboarding/labels/create', { repo: 'maddec01/lar-web', itemSource: REUSED.config!.itemSource, renaming: [], custom: ['app: music'] }]);
+});
+
+test("Create runs for a reused file's missing custom labels alone, and sends none the repository has", async () => {
+  const wizard = await labelsStore([REUSED], EVERY_LABEL, [...EVERY_LABEL, 'app: music']);
+  await toLabels(wizard, 'lar-web');
+  await settle(() => wizard.getState().createLabels());
+  expect(labelPosts()[1]).toEqual(['/api/onboarding/labels/create', { repo: 'maddec01/lar-web', itemSource: REUSED.config!.itemSource, renaming: [], custom: ['app: music'] }]);
+  await settle(() => wizard.getState().createLabels());
+  expect(labelPosts().length, 'nothing left to create').toBe(2);
 });
 
 test('on Azure DevOps the Labels step reads no label and lets Next through', async () => {
@@ -876,4 +885,46 @@ test('Resume on the Labels step reads the labels again once it has read the proj
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
   await vi.waitFor(() => expect(wizard.getState().labels?.read.state).toBe('loaded'));
   expect(wizard.getState().run!.step).toBe('labels');
+});
+
+test('a picked custom label is kept with the run’s answers, Resume brings it back, and the PR’s .lar-factory.json has it', async () => {
+  const wizard = await labelsStore([project('lar-web')], [...EVERY_LABEL, 'app: music', 'web']);
+  const { configOf } = await import('./wizard-store.ts');
+  await toLabels(wizard, 'lar-web');
+  wizard.getState().toggleCustomLabel('web');
+  wizard.getState().toggleCustomLabel('app: music');
+  wizard.getState().toggleCustomLabel('web');
+  expect(wizard.getState().run!.customLabels).toEqual(['app: music']);
+  expect(configOf(wizard.getState().run!, project('lar-web'))!.labels).toEqual(['app: music']);
+  await settle(() => wizard.getState().close());
+  const { progress } = kept().at(-1) as { progress: { answers: object } };
+  expect(progress.answers).toMatchObject({ customLabels: ['app: music'] });
+  const { useBoardStore } = await import('../board/board-store.ts');
+  useBoardStore.getState().receive({ ...sample, onboarding: [{ repo: 'maddec01/lar-web', progress: progress as never }] });
+  await settle(() => wizard.getState().resume('maddec01/lar-web'));
+  expect(wizard.getState().run!.customLabels).toEqual(['app: music']);
+});
+
+test('a typed custom label, colon and all, is created on the repository and picked', async () => {
+  const wizard = await labelsStore([project('lar-web')], EVERY_LABEL, [...EVERY_LABEL, 'app: music']);
+  await toLabels(wizard, 'lar-web');
+  wizard.getState().typeCustomLabel(' app: music ');
+  await settle(() => wizard.getState().addCustomLabel());
+  expect(labelPosts().at(-1)).toEqual(['/api/onboarding/labels/custom', { repo: 'maddec01/lar-web', name: 'app: music' }]);
+  expect(wizard.getState().run!.customLabels).toEqual(['app: music']);
+  expect(wizard.getState().labels).toMatchObject({ typed: '', created: ['app: music'], busy: null, error: null });
+});
+
+test("a typed label that is a workflow label sends nothing, and one gh refuses keeps gh's message and the name it was adding until the field changes", async () => {
+  const wizard = await labelsStore([project('lar-web')], EVERY_LABEL, EVERY_LABEL, "Couldn't create web in maddec01/lar-web: HTTP 403");
+  await toLabels(wizard, 'lar-web');
+  wizard.getState().typeCustomLabel('build');
+  await settle(() => wizard.getState().addCustomLabel());
+  expect(labelPosts().map(([url]) => url)).toEqual(['/api/onboarding/labels']);
+  wizard.getState().typeCustomLabel('web');
+  await settle(() => wizard.getState().addCustomLabel());
+  expect(wizard.getState().labels).toMatchObject({ typed: 'web', busy: null, error: { action: 'custom', message: "Couldn't create web in maddec01/lar-web: HTTP 403", name: 'web' } });
+  expect(wizard.getState().run!.customLabels).toEqual([]);
+  wizard.getState().typeCustomLabel('web2');
+  expect(wizard.getState().labels!.error).toBeNull();
 });

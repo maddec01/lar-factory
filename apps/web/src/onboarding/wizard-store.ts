@@ -3,7 +3,8 @@
 // project is picked, or an offered run before Next or any change, drops the run; closing after keeps its repository on
 // this Mac's list as onboarding, with where it stopped, and Resume reopens it there. The Labels step reads the
 // repository's labels, creates the missing workflow labels and renames old ones, and holds Next while one is missing;
-// on Azure DevOps it waits for build #386 and lets Next through. The Checks step runs the command checks, then the setup checks, and holds Next
+// it also picks the custom labels the PR's .lar-factory.json lists, creating any typed one. On Azure DevOps it waits for
+// build #386 and lets Next through. The Checks step runs the command checks, then the setup checks, and holds Next
 // until each passes. The Cleanup step runs the fixed checks for known Clashes and reads the Clash agent's runs, which the
 // board keeps going while the dialog is closed, asking again every few seconds while one runs. It keeps the user's ticks
 // and skill picks with the run, and holds Next until the latest agent run is done and each project skill named like a
@@ -14,7 +15,7 @@
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, isOnboarding, labelPlan, labelsToCreate, sameRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
+  SETUP_CHECKS, customLabelProblem, isOnboarding, labelPlan, labelsToCreate, missingCustomLabels, sameRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
   type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type SkillClash, type SkillPick, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -51,6 +52,8 @@ export interface Run {
   savedAs: string | null;
   /** The Provider and item source step's answers; null until that step first shows. */
   setup: SetupAnswers | null;
+  /** The custom labels the Labels step picked, which the PR's .lar-factory.json lists. */
+  customLabels: string[];
   /** The Cleanup step's picks; null until that step first shows. */
   cleanup: CleanupPicks | null;
   /** The onboarding PR, once it is open. */
@@ -115,7 +118,7 @@ export function itemSourceOf(run: Run, project: ProjectChoice): RepositoryItemSo
 /** The .lar-factory.json values the onboarding PR writes, from the setup step's answers; null until they are whole. */
 export function configOf(run: Run, project: ProjectChoice): RepositoryConfigAnswers | null {
   const itemSource = itemSourceOf(run, project);
-  return itemSource && run.setup && { itemSource, show: run.setup.show, role: run.setup.role.trim() };
+  return itemSource && run.setup && { itemSource, show: run.setup.show, role: run.setup.role.trim(), labels: run.customLabels };
 }
 
 /** Whether the run's onboarding finished: its PR is open and the board no longer has its repository onboarding, as the PR merged. */
@@ -231,19 +234,34 @@ function prConfig(run: Run, project: ProjectChoice): RepositoryConfigAnswers | n
 /** The Pull request step's list of the PR's changes, as the board previews them, or the board's problem. */
 type PrChanges = { state: 'reading' } | { state: 'read'; changes: OnboardingPrChange[] } | { state: 'failed'; error: string };
 
-/** The Labels step's read of the repository's labels, the old names Rename leaves, and Create or Rename while it runs or once it failed. */
+/** A change the Labels step makes: Create, Rename, or adding a typed custom label. */
+type LabelAction = 'create' | 'rename' | 'custom';
+
+/**
+ * The Labels step's read of the repository's labels, the old names Rename leaves, the custom label being typed, and a
+ * change while it runs or once it failed.
+ */
 export interface Labels {
   read: { state: 'loading' } | { state: 'loaded'; names: string[] } | { state: 'failed'; error: string };
   /** The old names unticked for Rename, whose new labels Create makes instead. */
   kept: string[];
-  busy: 'create' | 'rename' | null;
-  error: { action: 'create' | 'rename'; message: string } | null;
+  /** The new custom label's field. */
+  typed: string;
+  /** The custom labels the step created on the repository, which it doesn't list as left alone. */
+  created: string[];
+  busy: LabelAction | null;
+  /** A change that failed, with the custom label it was adding for a typed one. */
+  error: { action: LabelAction; message: string; name?: string } | null;
 }
 
 /** The Labels step's plan for the run's repository once its labels are read; null before. */
 export function labelsPlan(run: Run, project: ProjectChoice, labels: Labels | null): LabelPlan | null {
   return labels?.read.state === 'loaded' ? labelPlan(labels.read.names, itemSourceOf(run, project)?.kind ?? 'github-project') : null;
 }
+
+/** The custom labels a reused .lar-factory.json lists that the repository lacks, which Create makes too; none for a run that picks its own. */
+export const customLabelsToCreate = (project: ProjectChoice, labels: Labels): string[] =>
+  project.config && labels.read.state === 'loaded' ? missingCustomLabels(labels.read.names, project.config.labels) : [];
 
 /** The old names Rename moves: each the plan offers, less those unticked. */
 export const renaming = (plan: LabelPlan, labels: Labels): string[] =>
@@ -309,6 +327,12 @@ interface WizardState {
   createLabels: () => Promise<void>;
   /** Renames each ticked old name to its new one. */
   renameLabels: () => Promise<void>;
+  /** Picks or unpicks a custom label. */
+  toggleCustomLabel: (name: string) => void;
+  /** Changes the new custom label's field. */
+  typeCustomLabel: (typed: string) => void;
+  /** Creates the typed custom label on the repository, unless it has it already, and picks it. */
+  addCustomLabel: () => Promise<void>;
   /** Runs the command checks, then each setup check in turn. */
   runChecks: () => Promise<void>;
   /** Runs one setup check again. */
@@ -420,7 +444,8 @@ const focused = (): HTMLElement | null => document.activeElement instanceof HTML
 /** The run a kept onboarding resumes; a step this dialog doesn't have, as a newer board's, resumes on the T3 project step. */
 function resumed(repo: string, progress: OnboardingProgress): Run {
   return { step: isStep(progress.step) ? progress.step : 'project', done: progress.done.filter(isStep), projectId: progress.answers.projectId, repo,
-    provider: progress.answers.provider ?? null, savedAs: repo, setup: progress.answers.setup ?? null, cleanup: progress.answers.cleanup ?? null,
+    provider: progress.answers.provider ?? null, savedAs: repo, setup: progress.answers.setup ?? null, customLabels: progress.answers.customLabels ?? [],
+    cleanup: progress.answers.cleanup ?? null,
     prUrl: progress.prUrl ?? null };
 }
 
@@ -431,7 +456,8 @@ const firstSetup = (repo: string | null): SetupAnswers => ({
 
 /** Where the run stopped, as the board keeps it. */
 const progressOf = (run: Run & { projectId: string }): OnboardingProgress => ({ step: run.step, done: run.done,
-  answers: { projectId: run.projectId, ...run.provider && { provider: run.provider }, ...run.setup && { setup: run.setup }, ...run.cleanup && { cleanup: run.cleanup } },
+  answers: { projectId: run.projectId, ...run.provider && { provider: run.provider }, ...run.setup && { setup: run.setup },
+    ...run.customLabels.length && { customLabels: run.customLabels }, ...run.cleanup && { cleanup: run.cleanup } },
   ...run.prUrl && { prUrl: run.prUrl } });
 
 /** The onboarding a run kept under another repository replaces, to send with its repository. */
@@ -473,18 +499,24 @@ export const useWizardStore = create<WizardState>()((set, get) => {
   /** The labels while `runId` is the latest label run and the run is open. */
   const currentLabels = (runId: number) => runId === labelRuns && get().run ? get().labels : null;
 
-  /** Posts a label read or change for the run's repository, and keeps its answer while it's the latest. */
-  const labelsPost = async (path: string, body: object, action: 'create' | 'rename' | null) => {
+  /**
+   * Posts a label read or change for the run's repository, and keeps its answer while it's the latest; the labels it
+   * answers with, if any. A failed change keeps `name`, the custom label it was adding.
+   */
+  const labelsPost = async (path: string, body: object, action: LabelAction | null, name?: string): Promise<string[] | undefined> => {
     const { run } = get();
     if (!run?.repo) return;
     const runId = ++labelRuns;
     const answer = await postAction<{ labels: string[] }>(path, { repo: run.repo, ...body });
     const now = currentLabels(runId);
     if (!now) return;
-    if (answer.labels) return set({ labels: { ...now, read: { state: 'loaded', names: answer.labels }, busy: null, error: null } });
+    if (answer.labels) {
+      set({ labels: { ...now, read: { state: 'loaded', names: answer.labels }, busy: null, error: null } });
+      return answer.labels;
+    }
     const message = answer.error ?? 'The board sent no labels.';
-    if (!action) return set({ labels: { ...now, read: { state: 'failed', error: message } } });
-    set({ labels: { ...now, busy: null, error: { action, message } } });
+    if (!action) return void set({ labels: { ...now, read: { state: 'failed', error: message } } });
+    set({ labels: { ...now, busy: null, error: { action, message, ...name !== undefined && { name } } } });
     // Some labels may have changed before gh failed, so read them again.
     const reread = await postAction<{ labels: string[] }>('/api/onboarding/labels', { repo: run.repo });
     const after = currentLabels(runId);
@@ -532,7 +564,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       // The board offers only GitHub repositories until build #386.
       clashReads++;
       const run: Run = { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer ? 'GitHub' : null,
-        savedAs: null, setup: null, cleanup: null, prUrl: null };
+        savedAs: null, setup: null, customLabels: [], cleanup: null, prUrl: null };
       untouchedOffer = offer ? run : null;
       stopAgentReads();
       previews++;
@@ -630,7 +662,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const { run, projects } = get();
       const project = run && pickedProject(run, projects);
       if (!project || project.provider === 'Azure DevOps') return;
-      set({ labels: { read: { state: 'loading' }, kept: get().labels?.kept ?? [], busy: null, error: null } });
+      set({ labels: { read: { state: 'loading' }, kept: get().labels?.kept ?? [], typed: get().labels?.typed ?? '', created: get().labels?.created ?? [], busy: null, error: null } });
       await labelsPost('/api/onboarding/labels', {}, null);
     },
     toggleRename: (oldName) => {
@@ -639,9 +671,10 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     },
     createLabels: async () => {
       const step = labelStep();
-      if (!step || !labelsToCreate(step.plan, renaming(step.plan, step.labels)).length) return;
+      const custom = step ? customLabelsToCreate(step.project, step.labels) : [];
+      if (!step || !labelsToCreate(step.plan, renaming(step.plan, step.labels)).length && !custom.length) return;
       set({ labels: { ...step.labels, busy: 'create', error: null } });
-      await labelsPost('/api/onboarding/labels/create', { itemSource: itemSourceOf(step.run, step.project), renaming: renaming(step.plan, step.labels) }, 'create');
+      await labelsPost('/api/onboarding/labels/create', { itemSource: itemSourceOf(step.run, step.project), renaming: renaming(step.plan, step.labels), custom }, 'create');
     },
     renameLabels: async () => {
       const step = labelStep();
@@ -649,6 +682,27 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       if (!step || !names.length) return;
       set({ labels: { ...step.labels, busy: 'rename', error: null } });
       await labelsPost('/api/onboarding/labels/rename', { names }, 'rename');
+    },
+    toggleCustomLabel: (name) => {
+      const { run } = get();
+      if (run) set({ run: { ...run, customLabels: run.customLabels.includes(name) ? run.customLabels.filter((n) => n !== name) : [...run.customLabels, name] } });
+    },
+    typeCustomLabel: (typed) => {
+      const { labels } = get();
+      // Typing clears a failed add, whose title names the label it was adding.
+      if (labels) set({ labels: { ...labels, typed, ...labels.error?.action === 'custom' && { error: null } } });
+    },
+    addCustomLabel: async () => {
+      const step = labelStep();
+      if (!step || customLabelProblem(step.labels.typed)) return;
+      const name = step.labels.typed.trim();
+      set({ labels: { ...step.labels, busy: 'custom', error: null } });
+      const names = await labelsPost('/api/onboarding/labels/custom', { name }, 'custom', name);
+      const { run, labels } = get();
+      // The repository's own spelling, as GitHub matches label names without case.
+      const added = names?.find((n) => n.toLowerCase() === name.toLowerCase());
+      if (!run || !labels || !added) return;
+      set({ run: { ...run, customLabels: run.customLabels.includes(added) ? run.customLabels : [...run.customLabels, added] }, labels: { ...labels, typed: '', created: [...labels.created, added] } });
     },
     runChecks: async () => {
       const runId = ++checkRuns;

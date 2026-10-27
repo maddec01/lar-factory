@@ -35,13 +35,12 @@ test('Next is disabled until a project is picked, then shows the next step, and 
   expect(radio('lar-web').getAttribute('aria-checked'), 'the pick stays').toBe('true');
 });
 
-test('a run that reuses its .lar-factory.json counts no Pull request step', async () => {
+test('a run that reuses its .lar-factory.json counts the Pull request step too', async () => {
   await openOnboarding([project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client' } })]);
   await settle(() => radio('lar-web').click());
   await settle(() => button('Next')!.click());
-  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 4');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuemax')).toBe('4');
-  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label')).toBe('1 of 4 done');
+  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 5');
+  expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuemax')).toBe('5');
 });
 
 test('Onboard a repository after a close starts a new run', async () => {

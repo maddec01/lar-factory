@@ -2,12 +2,11 @@
 // the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
 // and role, or the values of a .lar-factory.json it reuses. The Checks step: each check with its state and a failure's
 // fix with Retry. The Cleanup step: each fixed Clash with its tick, Delete or Rename for a project skill named like a
-// bundled skill, the Clash agent's run with its thread, Clashes or why it ended with Retry, what the PR always writes,
-// and Finish for a reused .lar-factory.json. The Pull request step: the file it adds, Open the PR,
-// gh's message with Retry, the wait for the merge, and Reopen PR and Start over for a PR closed without merging.
+// bundled skill, the Clash agent's run with its thread, Clashes or why it ended with Retry, and what the PR always
+// writes. The Pull request step: the PR's changes for a new or a reused .lar-factory.json, Open the PR, gh's message with Retry, the wait for the merge, and Reopen PR and Start over for a PR closed without merging.
 
 import { expect, test, vi } from 'vite-plus/test';
-import type { BundledSkill, ClashRun, ClashRunState, FixedClashes, ModelGroup, ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
+import type { BundledSkill, ClashRun, OnboardingPrChange, ClashRunState, FixedClashes, ModelGroup, ProjectChoice, SetupCheckId, SetupCheckResult } from '@lar-factory/shared';
 import { $, fetchMock, mountPage, sample, settle, text, toolChecks } from '../../test/support.ts';
 import { dialog, openOnboarding, project, serve } from './onboarding-support.ts';
 
@@ -526,29 +525,6 @@ test.each([
   expect(nextButton().disabled).toBe(false);
 });
 
-test('with a reused .lar-factory.json, Checks goes on to Cleanup, which keeps the file and ends in Finish with no PR', async () => {
-  const reused = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } });
-  await openSetup(reused);
-  answerChecks();
-  await openChecks();
-  expect(footerButton('Finish'), 'no Finish on Checks').toBeUndefined();
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED }));
-  answerClashes(NONE);
-  await settle(() => nextButton().click());
-  await settle();
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Cleanup');
-  expect(footerButton('Next'), 'no Pull request step').toBeUndefined();
-  expect(text(cleanup().querySelector('[data-written=".lar-factory.json"]'))).toContain('Kept as it is.');
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/finish'
-    ? new Response(JSON.stringify({ board: { ...sample, onboarding: [] }, error: null })) : served(url, init));
-  await settle(() => footerButton('Finish')!.click());
-  await settle();
-  expect(dialog()).toBeNull();
-  expect(fetchMock.mock.calls.some(([url]) => url === '/api/onboarding/repositories'), 'a finished run is not kept as onboarding').toBe(false);
-});
-
 test("an agent Clash whose edit won't apply shows why, unticked, and can't be ticked", async () => {
   const wontApply = { ...AGENT_CLASH, id: 'agent-2', line: 30, ticked: false, wontApply: "Line 30 of AGENTS.md on the default branch doesn't have the lines this edit removes." };
   await openCleanup(project('lar-web'), NONE, [run(1, { state: 'done', clashes: [AGENT_CLASH, wontApply] })]);
@@ -558,10 +534,9 @@ test("an agent Clash whose edit won't apply shows why, unticked, and can't be ti
   expect(checkbox('agent-2').getAttribute('aria-checked')).toBe('false');
   await settle(() => checkbox('agent-2').click());
   expect(checkbox('agent-2').getAttribute('aria-checked')).toBe('false');
-  const { latestRun, ticked, useWizardStore } = await import('./wizard-store.ts');
-  const { run: wizardRun, agent } = useWizardStore.getState();
-  const latest = latestRun(agent);
-  expect(latest?.state === 'done' && latest.clashes.filter((clash) => ticked(clash, wizardRun!.cleanup)).map((clash) => clash.id)).toEqual(['agent-1']);
+  const { picksOf, useWizardStore } = await import('./wizard-store.ts');
+  const { run: wizardRun, clashes, agent } = useWizardStore.getState();
+  expect(picksOf(wizardRun!, clashes, agent)!.clashes.map((clash) => clash.id)).toEqual(['agent-1']);
 });
 
 test('a done run offers Look again, on the model picked then, which starts a new run and drops the old ticks', async () => {
@@ -643,13 +618,114 @@ function answerPr(answer: { prUrl: string } | { error: string }): void {
   });
 }
 
-/** Answers the setup step with the repository's issues and a role, passes Checks and Cleanup, and opens the Pull request step. */
-async function openPrStep(): Promise<void> {
-  await openCleanup(project('lar-web'));
-  await settle(() => nextButton().click());
+/** Answers the board's preview of the PR's changes with `changes`, and records each preview's body in `previews`. */
+function answerChanges(changes: OnboardingPrChange[]): object[] {
+  const previews: object[] = [];
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (url !== '/api/onboarding/pr/changes') return served(url, init);
+    previews.push(JSON.parse(String(init!.body)) as object);
+    return new Response(JSON.stringify({ changes, error: null }));
+  });
+  return previews;
 }
 
-test('the Pull request step shows the branch and the .lar-factory.json it adds, then Open the PR waits for the merge', async () => {
+const WRITTEN: OnboardingPrChange[] = [{ kind: 'agent-skills', path: 'CLAUDE.md' }, { kind: 'write', path: 'docs/agents/issue-tracker.md', created: true },
+  { kind: 'write', path: 'docs/agents/triage-labels.md', created: false }, { kind: 'write', path: 'docs/agents/domain.md', created: true }];
+
+/**
+ * Answers the setup step with the repository's issues and a role, passes Checks and Cleanup, and opens the Pull request
+ * step with the PR's changes previewed as `changes`.
+ */
+async function openPrStep(changes: OnboardingPrChange[] = WRITTEN): Promise<object[]> {
+  await openCleanup(project('lar-web'));
+  const previews = answerChanges(changes);
+  await settle(() => nextButton().click());
+  await settle();
+  return previews;
+}
+
+const changeRows = () => [...prStep().querySelectorAll<HTMLElement>('[data-pr-changes] li')].map((li) => text(li));
+
+test("the Pull request step lists the PR's changes with a new .lar-factory.json: the agent setup, the file, each ticked edit and the skill's rename", async () => {
+  await openPrStep([...WRITTEN, { kind: 'write', path: '.lar-factory.json', created: true },
+    { kind: 'edit', path: 'AGENTS.md', line: 12, reason: 'It says to push to main.' }, { kind: 'delete', path: '.scratch/' },
+    { kind: 'rename', path: '.claude/skills/code-review/', to: '.claude/skills/web-code-review/' }]);
+  expect(changeRows()).toEqual([
+    'CLAUDE.mdWrites the ## Agent skills block.', 'docs/agents/issue-tracker.mdAdds the file.', 'docs/agents/triage-labels.mdReplaces the file.',
+    'docs/agents/domain.mdAdds the file.', '.lar-factory.jsonAdds the file.', 'AGENTS.mdEdits line 12: It says to push to main.',
+    '.scratch/Deletes it.', '.claude/skills/code-review/Renames it to .claude/skills/web-code-review/',
+  ]);
+  expect(text(prStep())).not.toContain('It adds .lar-factory.json');
+  expect(prStep().querySelector('[data-pr-changes] .text-success'), 'a change is no success').toBeNull();
+});
+
+test('Open the PR waits while the PR\'s changes are read', async () => {
+  await openCleanup(project('lar-web'));
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  let answer!: (response: Response) => void;
+  fetchMock.mockImplementation((url: string, init?: RequestInit) => url === '/api/onboarding/pr/changes'
+    ? new Promise<Response>((resolve) => { answer = resolve; }) : served(url, init));
+  await settle(() => nextButton().click());
+  expect(prStep().querySelector('[data-reading-changes]')).not.toBeNull();
+  expect(button(prStep(), 'Open the PR')!.disabled).toBe(true);
+  await settle(() => answer(new Response(JSON.stringify({ changes: WRITTEN, error: null }))));
+  expect(button(prStep(), 'Open the PR')!.disabled).toBe(false);
+});
+
+test("with a reused .lar-factory.json, Cleanup goes on to the Pull request step, which lists the changes without the file and opens the PR", async () => {
+  const reused = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client' } });
+  await openCleanup(reused);
+  expect(text(cleanup().querySelector('[data-written=".lar-factory.json"]'))).toContain('Kept as it is.');
+  const previews = answerChanges(WRITTEN);
+  await settle(() => nextButton().click());
+  await settle();
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Pull request');
+  expect(previews).toMatchObject([{ repo: 'maddec01/lar-web', config: null }]);
+  expect(changeRows().map((row) => row.split(/(?=Writes|Adds|Replaces)/)[0])).toEqual(['CLAUDE.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md']);
+  expect(prStep().querySelector('pre'), 'no .lar-factory.json to show').toBeNull();
+  answerPr({ prUrl: PR });
+  await settle(() => button(prStep(), 'Open the PR')!.click());
+  await settle();
+  expect(text(prStep())).toContain('Waiting for its merge');
+});
+
+test("a preview the board refuses shows its problem with Retry", async () => {
+  await openCleanup(project('lar-web'));
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr/changes'
+    ? new Response(JSON.stringify({ error: "AGENTS.md line 12 doesn't have the lines its edit removes. Untick it on Cleanup, or Look again there." }), { status: 409 }) : served(url, init));
+  await settle(() => nextButton().click());
+  await settle();
+  expect(text(prStep().querySelector('[role="alert"]'))).toContain("AGENTS.md line 12 doesn't have the lines its edit removes. Untick it on Cleanup, or Look again there.");
+  expect(button(prStep(), 'Open the PR')!.disabled, 'no PR while its changes are unlisted').toBe(true);
+  answerChanges(WRITTEN);
+  await settle(() => button(prStep(), 'Retry')!.click());
+  await settle();
+  expect(changeRows()).toHaveLength(4);
+});
+
+test("Retry after the fixed checks' read failed reads them again, then lists the PR's changes", async () => {
+  await openCleanup(project('lar-web'));
+  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr/changes'
+    ? new Response(JSON.stringify({ error: 'GitHub answered 502.' }), { status: 502 }) : served(url, init));
+  await settle(() => nextButton().click());
+  await settle();
+  const failing = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
+  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/clashes'
+    ? new Response(JSON.stringify({ error: "Can't read maddec01/lar-web." }), { status: 502 }) : failing(url, init));
+  await settle(() => button(prStep(), 'Retry')!.click());
+  await settle();
+  expect(text(prStep().querySelector('[role="alert"]'))).toContain('Go Back to Cleanup and wait for its checks');
+  fetchMock.mockImplementation(served);
+  answerChanges(WRITTEN);
+  await settle(() => button(prStep(), 'Retry')!.click());
+  await settle();
+  expect(changeRows()).toHaveLength(WRITTEN.length);
+});
+
+test('the Pull request step shows the branch and the .lar-factory.json it writes, then Open the PR waits for the merge', async () => {
   await openPrStep();
   expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Pull request');
   expect(text(prStep())).toContain('lar-factory/onboarding');
@@ -659,6 +735,7 @@ test('the Pull request step shows the branch and the .lar-factory.json it adds, 
   await settle();
   expect(prStep().querySelector<HTMLAnchorElement>(`a[href="${PR}"]`)).not.toBeNull();
   expect(text(prStep())).toContain('Waiting for its merge');
+  expect([prStep().querySelector('[data-pr-changes]'), prStep().querySelector('pre')], "the PR's body lists its changes now").toEqual([null, null]);
   expect(footerButton('Back'), 'an open PR keeps the step').toBeUndefined();
   fetchMock.mockClear();
   await settle(() => button(prStep(), 'Check now')!.click());
@@ -803,6 +880,29 @@ test("a Reopen PR the board refuses shows gh's message and keeps Reopen PR and S
   await settle();
   expect(text(prStep().querySelector('[data-pr-closed]'))).toContain('gh pr reopen failed: HTTP 403');
   expect(button(prStep(), 'Start over')).toBeDefined();
+});
+
+test('resumed while the PR is open, a PR that then closes lists its changes again, so Start over can open a new one', async () => {
+  const previews = await openPrStep();
+  answerPr({ prUrl: PR });
+  await settle(() => button(prStep(), 'Open the PR')!.click());
+  await settle();
+  await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
+  const { useWizardStore } = await import('./wizard-store.ts');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  const kept = JSON.parse(String((fetchMock.mock.calls as unknown as [string, RequestInit][])
+    .findLast(([url]) => url === '/api/onboarding/repositories')![1].body)) as { repo: string; progress: typeof ON_PR.progress };
+  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, onboarding: [kept] }));
+  previews.length = 0;
+  await settle(() => useWizardStore.getState().resume('maddec01/lar-web'));
+  await settle();
+  expect(text(prStep())).toContain('Waiting for its merge');
+  expect([previews.length, useWizardStore.getState().changes], 'an open PR lists nothing').toEqual([0, null]);
+  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, onboarding: [{ ...kept, progress: { ...kept.progress, prClosed: true } }] }));
+  await settle();
+  expect(previews).toHaveLength(1);
+  expect(changeRows()).toHaveLength(WRITTEN.length);
+  expect(button(prStep(), 'Start over')!.disabled).toBe(false);
 });
 
 test('Start over opens a new PR and waits for its merge', async () => {

@@ -5,14 +5,14 @@
 // until each passes. The Cleanup step runs the fixed checks for known Clashes and reads the Clash agent's runs, which the
 // board keeps going while the dialog is closed, asking again every few seconds while one runs. It keeps the user's ticks
 // and skill picks with the run, and holds Next until the latest agent run is done and each project skill named like a
-// bundled skill is deleted or renamed. A run that
-// reuses its .lar-factory.json finishes there, with no PR, until build #384's PR writer. Any other run opens the
-// onboarding PR on the Pull request step, then waits for the board to finish the onboarding once the PR merges. A PR
-// the board finds closed without merging offers Reopen PR, or Start over, which opens a new one.
+// bundled skill is deleted or renamed. The Pull request step lists what the PR changes, as the board previews it with
+// the Cleanup step's picks, opens the PR with those picks, then waits for the board to finish the onboarding once the PR
+// merges, whether the PR writes a .lar-factory.json or reuses the repository's own. A PR the board finds closed without
+// merging offers Reopen PR, or Start over, which opens a new one.
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, isOnboarding, sameRepo, skillRenameProblem, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
+  SETUP_CHECKS, isOnboarding, sameRepo, skillRenameProblem, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
   type SetupAnswers, type SetupCheckId, type SetupCheckResult, type ShowSetting, type SkillClash, type SkillPick, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -206,8 +206,27 @@ export const nextModel = (agent: Agent | null, groups: readonly ModelGroup[]): M
 const cleanupDone = (run: Run, clashes: Clashes | null, agent: Agent | null): boolean =>
   clashes?.state === 'read' && latestRun(agent)?.state === 'done' && clashes.found.skillClashes.every((skill) => !skillProblem(skill, run.cleanup, clashes));
 
-/** Whether the run finishes on the Cleanup step: it reuses its .lar-factory.json, so it opens no PR until build #384's PR writer. */
-export const finishesOnCleanup = (run: Run, projects: Projects): boolean => run.step === 'cleanup' && !!pickedProject(run, projects)?.config;
+/**
+ * The fixes the PR holds, from the Cleanup step: the fixed checks' and the latest agent run's ticked Clashes, and each
+ * skill Clash's pick. Null until the fixed checks are read and the latest agent run is done.
+ */
+export function picksOf(run: Run, clashes: Clashes | null, agent: Agent | null): OnboardingPicks | null {
+  const latest = latestRun(agent);
+  if (clashes?.state !== 'read' || latest?.state !== 'done') return null;
+  const skills = Object.fromEntries(clashes.found.skillClashes.flatMap((skill) => {
+    const pick = run.cleanup?.skills[skill.path];
+    return pick ? [[skill.path, pick]] : [];
+  }));
+  return { clashes: [...clashes.found.clashes, ...latest.clashes].filter((clash) => ticked(clash, run.cleanup)), skills };
+}
+
+/** The .lar-factory.json values the PR writes, null when it reuses the repository's own; undefined until the setup step's answers are whole. */
+function prConfig(run: Run, project: ProjectChoice): RepositoryConfigAnswers | null | undefined {
+  return project.config ? null : configOf(run, project) ?? undefined;
+}
+
+/** The Pull request step's list of the PR's changes, as the board previews them, or the board's problem. */
+type PrChanges = { state: 'reading' } | { state: 'read'; changes: OnboardingPrChange[] } | { state: 'failed'; error: string };
 
 /** Whether the run's step lets Next move past it. */
 export function stepReady(run: Run, projects: Projects, checks: Checks | null = null, tools?: ToolChecks, clashes: Clashes | null = null,
@@ -233,8 +252,8 @@ interface WizardState {
   clashes: Clashes | null;
   /** The Cleanup step's Clash agent. */
   agent: Agent;
-  /** Finish for a run that reuses its .lar-factory.json: whether it's running, and why the board refused it. */
-  finishing: { running: boolean; error: string | null };
+  /** The Pull request step's list of the PR's changes; null until the run first reaches it. */
+  changes: PrChanges | null;
   /** The button that opened the dialog, which gets focus back when it closes. */
   opener: HTMLElement | null;
   /** Opens a new run, with the offered T3 project picked when it comes from an offer. */
@@ -274,8 +293,13 @@ interface WizardState {
   tick: (id: string, on: boolean) => void;
   /** Picks Delete or Rename for a skill Clash, by its path. */
   pickSkill: (path: string, pick: SkillPick) => void;
-  /** Finishes a run that reuses its .lar-factory.json once its Cleanup step is done, so its repository goes on the board. */
-  finish: () => Promise<void>;
+  /** Asks the board what the PR changes with the run's answers and the Cleanup step's picks. */
+  previewPr: () => Promise<void>;
+  /**
+   * On the Pull request step with no changes read, as after Resume, or with their read failed, as on Retry: runs the
+   * fixed checks and reads the agent's runs again for the picks, then asks the board what the PR changes.
+   */
+  readPrChanges: () => Promise<void>;
   /**
    * Opening or reopening the onboarding PR, and why the board couldn't; Check now while it waits for the board's read,
    * and when that read last answered with the PR still open.
@@ -297,14 +321,14 @@ let reads = 0;
 let checkRuns = 0;
 /** Counts fixed check runs, so one answered after a newer run or a close is dropped. */
 let clashReads = 0;
+/** Counts previews of the PR's changes, so one answered after a newer preview or a close is dropped. */
+let previews = 0;
 /** Counts reads of the agent's runs, so one answered after a newer read, a start or a close is dropped, and its next read with it. */
 let agentReads = 0;
 /** The next read of the agent's runs while one runs. */
 let agentTimer: ReturnType<typeof setTimeout> | undefined;
 /** The run an offer opened, until Next or a change replaces it; closing it then keeps nothing. */
 let untouchedOffer: Run | null = null;
-
-const NOT_FINISHING: WizardState['finishing'] = { running: false, error: null };
 
 /** The Cleanup step's picks before any is changed. */
 const NO_PICKS: CleanupPicks = { ticks: {}, skills: {} };
@@ -398,6 +422,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       void get().findClashes();
       void get().readClashRuns();
     } else stopAgentReads();
+    if (to === 'pr') void get().previewPr();
   };
 
   /** Shows the agent's runs as the board answered them, and asks again in a while if the latest still runs. */
@@ -430,7 +455,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     checks: null,
     clashes: null,
     agent: NO_AGENT,
-    finishing: NOT_FINISHING,
+    changes: null,
     pr: IDLE,
     opener: null,
     start: (offer) => {
@@ -441,7 +466,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
         savedAs: null, setup: null, cleanup: null, prUrl: null };
       untouchedOffer = offer ? run : null;
       stopAgentReads();
-      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, finishing: NOT_FINISHING, pr: IDLE, opener: focused() });
+      previews++;
+      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, pr: IDLE, opener: focused() });
       void get().loadProjects();
     },
     resume: (repo) => {
@@ -450,22 +476,28 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       checkRuns++;
       clashReads++;
       stopAgentReads();
-      set({ run: resumed(kept.repo, kept.progress), creating: null, checks: null, clashes: null, agent: NO_AGENT, finishing: NOT_FINISHING, pr: IDLE, opener: focused() });
-      // The checks read the picked project, so they wait for T3's projects; the fixed checks and agent runs read only the repository.
-      if (get().run!.step === 'cleanup') {
+      previews++;
+      const run = resumed(kept.repo, kept.progress);
+      // The checks read the picked project, so they wait for T3's projects; the fixed checks and agent runs read only the
+      // repository. The Pull request step reads them with readPrChanges once it lists the PR's changes.
+      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, pr: IDLE, opener: focused() });
+      if (run.step === 'cleanup') {
         void get().findClashes();
         void get().readClashRuns();
       }
-      void get().loadProjects().then(() => { if (get().run?.step === 'checks') void get().runChecks(); });
+      void get().loadProjects().then(() => {
+        if (get().run?.step === 'checks') void get().runChecks();
+      });
     },
     close: () => {
       const { run } = get();
       reads++;
       checkRuns++;
       clashReads++;
+      previews++;
       // The board keeps the agent's run going; Resume reads it again.
       stopAgentReads();
-      set({ run: null, checks: null, clashes: null, agent: NO_AGENT });
+      set({ run: null, checks: null, clashes: null, agent: NO_AGENT, changes: null });
       // A run whose PR merged is onboarded, so there's no onboarding left to keep.
       if (run?.projectId && run.repo && run !== untouchedOffer && !onboarded(run, useBoardStore.getState().data)) {
         void keep({ ...run, projectId: run.projectId, repo: run.repo });
@@ -587,31 +619,38 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const { run } = get();
       if (run?.cleanup) set({ run: { ...run, cleanup: { ...run.cleanup, skills: { ...run.cleanup.skills, [path]: pick } } } });
     },
-    finish: async () => {
-      const { run, projects, checks, clashes, agent, finishing } = get();
-      if (!run?.repo || finishing.running || !finishesOnCleanup(run, projects)
-        || !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes, agent)) return;
-      set({ finishing: { running: true, error: null } });
-      const result = await postAction('/api/onboarding/finish', { repo: run.repo, ...replacing({ ...run, repo: run.repo }) });
-      receive(result);
-      // The run closed while the board finished it.
-      if (get().run?.repo !== run.repo) return;
-      if (result.error) return set({ finishing: { running: false, error: result.error } });
-      checkRuns++;
-      clashReads++;
-      stopAgentReads();
-      set({ run: null, checks: null, clashes: null, agent: NO_AGENT, finishing: NOT_FINISHING });
-      showToast({ slot: 'onboarding', what: `Onboarded ${run.repo}`, body: `Onboarded ${run.repo}. Its items show once the board reads them.` });
+    previewPr: async () => {
+      const { run, projects, clashes, agent } = get();
+      const project = run && pickedProject(run, projects);
+      if (!run?.repo || !project) return set({ changes: { state: 'failed', error: 'T3 Code no longer has the picked project. Go Back and pick one.' } });
+      const preview = ++previews;
+      const config = prConfig(run, project);
+      const picks = picksOf(run, clashes, agent);
+      if (config === undefined || !picks) {
+        return set({ changes: { state: 'failed', error: 'Go Back to Cleanup and wait for its checks, then come back to see the PR’s changes.' } });
+      }
+      set({ changes: { state: 'reading' } });
+      const answer = await postAction<{ changes: OnboardingPrChange[] }>('/api/onboarding/pr/changes', { repo: run.repo, config, picks });
+      if (preview !== previews || !get().run) return;
+      set({ changes: answer.error || !answer.changes ? { state: 'failed', error: answer.error ?? 'The board sent no changes.' } : { state: 'read', changes: answer.changes } });
+    },
+    readPrChanges: async () => {
+      const { run, changes } = get();
+      if (!run || run.step !== 'pr' || changes && changes.state !== 'failed') return;
+      set({ changes: { state: 'reading' } });
+      await Promise.all([get().findClashes(), get().readClashRuns()]);
+      if (get().run?.repo === run.repo && get().run?.step === 'pr') await get().previewPr();
     },
     openPr: async () => {
-      const { run, projects, pr } = get();
+      const { run, projects, clashes, agent, pr } = get();
       const project = run && pickedProject(run, projects);
-      const config = run && project && configOf(run, project);
-      if (!run?.repo || !run.projectId || run.step !== 'pr' || run.prUrl || pr.opening || pr.reopening || !config) return;
+      const config = run && project ? prConfig(run, project) : undefined;
+      const picks = run && picksOf(run, clashes, agent);
+      // The PR opens only once its changes are listed, so it never holds what the step couldn't show.
+      if (!run?.repo || !run.projectId || run.step !== 'pr' || run.prUrl || pr.opening || pr.reopening || config === undefined || !picks
+        || get().changes?.state !== 'read') return;
       set({ pr: { ...IDLE, opening: true } });
-      // #450 sends the Cleanup step's picks; until then the PR holds no fixes.
-      const body = { repo: run.repo, progress: progressOf({ ...run, projectId: run.projectId }), config, picks: { clashes: [], skills: {} },
-        ...replacing({ ...run, repo: run.repo }) };
+      const body = { repo: run.repo, progress: progressOf({ ...run, projectId: run.projectId }), config, picks, ...replacing({ ...run, repo: run.repo }) };
       const result = await postAction<{ prUrl: string }>('/api/onboarding/pr', body);
       receive(result);
       const now = get().run;
@@ -631,7 +670,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     },
     startOver: async () => {
       const { run } = get();
-      if (!run || !prClosed(run, useBoardStore.getState().data) || get().pr.reopening) return;
+      if (!run || !prClosed(run, useBoardStore.getState().data) || get().pr.reopening || get().changes?.state !== 'read') return;
       set({ run: { ...run, prUrl: null }, pr: IDLE });
       await get().openPr();
     },

@@ -1,0 +1,2 @@
+# Follow the scripts' source of azure.sh without -x.
+external-sources=true

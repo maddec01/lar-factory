@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests repo-config.sh's two forms against a fake gh and a temporary HOME. No network.
+# Tests repo-config.sh's forms against a fake gh, a fake az and a temporary HOME. No network.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -31,7 +31,35 @@ fi
 echo "fake gh: unexpected $*" >&2
 exit 1
 GH
-chmod +x "$bin/gh"
+# A fake az that answers only the git items read of .lar-factory.json, without a
+# version, so from the default branch. It logs its arguments to $FAKE_AZ_LOG and
+# prints the item with the file "$FAKE_FILES/<org>/<project>/<repo>" as its
+# content, or Azure's TF401174 when that file is missing. With FAKE_LOGGED_OUT set
+# it fails as a logged-out az does, and with FAKE_NO_EXTENSION as one without the
+# azure-devops extension.
+cat >"$bin/az" <<'AZ'
+#!/bin/bash
+printf '%s\n' "$*" >>"$FAKE_AZ_LOG"
+if [[ -n ${FAKE_NO_EXTENSION:-} ]]; then
+    echo "ERROR: 'devops' is misspelled or not recognized by the system." >&2
+    exit 2
+fi
+if [[ -n ${FAKE_LOGGED_OUT:-} ]]; then
+    echo "ERROR: Before you can run Azure DevOps commands, you need to run the login command (az login if using AAD/MSA identity else az devops login if using PAT token) to setup credentials." >&2
+    exit 1
+fi
+pattern='^devops invoke --area git --resource items --organization https://dev\.azure\.com/([^ ]+) --route-parameters project=(.+) repositoryId=([^ ]+) --query-parameters path=/\.lar-factory\.json includeContent=true --api-version 7\.1 --output json$'
+if [[ "$*" =~ $pattern ]]; then
+    file="$FAKE_FILES/${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/${BASH_REMATCH[3]}"
+    if [[ -f $file ]]; then jq -n --rawfile content "$file" '{objectId: "abc", path: "/.lar-factory.json", content: $content}'; exit 0; fi
+    echo "ERROR: TF401174: The item '/.lar-factory.json' could not be found in the repository '${BASH_REMATCH[3]}' at the version specified by '<Default branch>'." >&2
+    exit 1
+fi
+echo "fake az: unexpected $*" >&2
+exit 1
+AZ
+chmod +x "$bin/gh" "$bin/az"
+export FAKE_AZ_LOG="$bin/az-log"
 export PATH="$bin:$PATH" HOME="$bin/home"
 data="$HOME/Library/Application Support/Lar Factory"
 list_file="$data/repositories.json"
@@ -188,5 +216,66 @@ done
 
 run
 refuses "no argument shows the usage" "usage: repo-config.sh"
+
+# An Azure repository
+
+sprint='{"role":"web","itemSource":{"kind":"azure-sprint","team":"Web Team"},"show":"all"}'
+file contoso/Fabrikam/web "$sprint"
+want='{"version":1,"role":"web","itemSource":{"kind":"azure-sprint","team":"Web Team"},"show":"all","labels":[]}'
+for origin in https://dev.azure.com/contoso/Fabrikam/_git/web https://contoso@dev.azure.com/contoso/Fabrikam/_git/web \
+    git@ssh.dev.azure.com:v3/contoso/Fabrikam/web https://contoso.visualstudio.com/Fabrikam/_git/web contoso/Fabrikam/web; do
+    : >"$FAKE_AZ_LOG"
+    run "$origin"
+    check "reads an Azure repository's file with az from $origin" "$want"
+done
+if [[ $(wc -l <"$FAKE_AZ_LOG") -eq 1 ]]; then pass "reads the file in one az call"; else fail "reads the file in one az call: $(cat "$FAKE_AZ_LOG")"; fi
+
+file "contoso/Fabrikam Fiber/web" "$sprint"
+run "https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/web"
+check "passes a percent-encoded project name to az as its name" "$want"
+
+file contoso/Fabrikam/api '{"role":"api","itemSource":{"kind":"azure-backlog","team":"API"},"show":"opted-in","labels":["area-api"]}'
+run contoso/Fabrikam/api
+check "keeps a team backlog item source" '{"version":1,"role":"api","itemSource":{"kind":"azure-backlog","team":"API"},"show":"opted-in","labels":["area-api"]}'
+
+run contoso/Fabrikam/missing
+refuses "Azure's missing item names the repository and the missing file" "contoso/Fabrikam/missing: no .lar-factory.json on its default branch"
+
+file contoso/Fabrikam/broken '{"role": '
+run contoso/Fabrikam/broken
+refuses "an Azure file that doesn't parse names the repository" "contoso/Fabrikam/broken: .lar-factory.json isn't valid JSON"
+
+file contoso/Fabrikam/broken '{"role":"web"}'
+run contoso/Fabrikam/broken
+refuses "an Azure repository has no default item source" "contoso/Fabrikam/broken: .lar-factory.json field itemSource.kind must be \"azure-sprint\" or \"azure-backlog\""
+
+file contoso/Fabrikam/broken '{"role":"web","itemSource":{"kind":"issues"}}'
+run contoso/Fabrikam/broken
+refuses "an Azure repository can't read GitHub issues" "field itemSource.kind must be \"azure-sprint\" or \"azure-backlog\""
+
+for kind in azure-sprint azure-backlog; do
+    file contoso/Fabrikam/broken "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\"}}"
+    run contoso/Fabrikam/broken
+    refuses "an $kind without team names itemSource.team" "contoso/Fabrikam/broken: .lar-factory.json field itemSource.team must name the team for an $kind"
+    file contoso/Fabrikam/broken "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\",\"team\":\"\"}}"
+    run contoso/Fabrikam/broken
+    refuses "an $kind with an empty team names itemSource.team" "field itemSource.team must name the team"
+done
+
+file maddec01/broken '{"role":"factory","itemSource":{"kind":"azure-sprint","team":"Web"}}'
+run maddec01/broken
+refuses "a GitHub repository can't read an Azure sprint" "maddec01/broken: .lar-factory.json field itemSource.kind must be \"issues\" or \"github-project\""
+
+FAKE_LOGGED_OUT=1 run contoso/Fabrikam/web
+refuses "with az logged out, says to run az login" "az is logged out. Run az login"
+
+FAKE_NO_EXTENSION=1 run contoso/Fabrikam/web
+refuses "without the azure-devops extension, says to add it" "az extension add --name azure-devops"
+
+for bad in https://dev.azure.com/contoso/Fabrikam/web https://dev.azure.com/contoso/../_git/web contoso/../web 'contoso/Fabrikam/we b' a/b/c/d \
+    contoso/Fabrikam%2F..%2Fx/web contoso/%2E%2E/web contoso/Fabrikam/%5Cweb; do
+    run "$bad"
+    refuses "an Azure repository $bad shows the usage" "usage: repo-config.sh"
+done
 
 ((failures == 0))

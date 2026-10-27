@@ -22,8 +22,9 @@ test('writes reject foreign and missing origins before touching GitHub', async (
     assert.equal(response.status, 403);
   }
   const calls = await board.calls();
-  // Reads and the startup gh probe touch nothing.
-  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && args[0] !== '--version' && args[0] !== 'auth' && !readsRepositoryConfig(args));
+  // Reads and the startup gh probe touch nothing; the startup read's offers look for open PRs.
+  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && args[0] !== '--version' && args[0] !== 'auth' && !readsRepositoryConfig(args)
+    && !(args[0] === 'pr' && args[1] === 'list'));
   assert.equal(writes.length, 0);
 });
 

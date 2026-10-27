@@ -3,7 +3,7 @@
 // issue rather than making two. A created item closes the dialog and shows the Added toast.
 
 import { create } from 'zustand';
-import { validateDraft, writeHeaders } from '@lar-factory/shared';
+import { onAzure, validateDraft, writeHeaders } from '@lar-factory/shared';
 import type { CreationResult, ItemDraft, BoardData } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { notify } from '../notices/notices.tsx';
@@ -30,6 +30,16 @@ interface AddItemState {
   edit: () => void;
   /** Starts a new draft. */
   reset: () => void;
+}
+
+/** What a new item in `repo` is: an issue on GitHub, a work item on Azure DevOps. */
+export const itemNoun = (repo: string | undefined): string => repo && onAzure(repo) ? 'work item' : 'issue';
+
+/** Where to look for an item the board can't confirm it created: the repository's issues, or its Azure DevOps project's work items. */
+function itemsLink(repo: string): Pick<ResultMessage, 'url' | 'label'> {
+  if (!onAzure(repo)) return { url: `https://github.com/${repo}/issues`, label: 'Check repository issues' };
+  const [organization, project] = repo.split('/');
+  return { url: `https://dev.azure.com/${organization}/${project}/_workitems`, label: 'Check the project’s work items' };
 }
 
 const idle = (): ResultMessage => ({
@@ -65,8 +75,9 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
         return;
       }
     }
+    const noun = itemNoun(attempt.draft.repo);
     set({ submission: { phase: 'pending', attempt },
-      message: { text: retrying ? 'Finishing this submission…' : 'Creating the issue and adding it to List…' } });
+      message: { text: retrying ? 'Finishing this submission…' : `Creating the ${noun} and adding it to List…` } });
     // A poll that started before this write would bring older data than its answer.
     useBoardStore.getState().beginWrite();
     try {
@@ -80,20 +91,18 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
         set({ submission: { phase: 'complete' }, open: false });
         notify({ verb: 'Added', item: result.item, to: 'List' });
       } else {
-        const created = result.issueUrl ? 'Issue created. ' : '';
-        const retry = result.issueUrl ? ' Retry to finish this issue.' : '';
+        const created = result.issueUrl ? `${noun[0]!.toUpperCase()}${noun.slice(1)} created. ` : '';
+        const retry = result.issueUrl ? ` Retry to finish this ${noun}.` : '';
+        const text = `${created}${result.error ?? `Request failed (HTTP ${response.status}).`}${retry}`;
         set({
           submission: result.uncertain ? { phase: 'uncertain', attempt } : result.issueUrl ? { phase: 'retry', attempt } : { phase: 'editing' },
-          message: {
-            text: `${created}${result.error ?? `Request failed (HTTP ${response.status}).`}${retry}`,
-            url: result.issueUrl ?? (result.uncertain ? `https://github.com/${attempt.draft.repo}/issues` : undefined),
-            label: result.issueUrl ? 'View created issue' : 'Check repository issues',
-          },
+          message: result.issueUrl ? { text, url: result.issueUrl, label: `View created ${noun}` }
+            : result.uncertain ? { text, ...itemsLink(attempt.draft.repo) } : { text },
         });
       }
     } catch {
       set({ submission: { phase: 'retry', attempt },
-        message: { text: 'The submission response was lost. Retry this submission to recover its result without creating another issue.' } });
+        message: { text: `The submission response was lost. Retry this submission to recover its result without creating another ${noun}.` } });
     }
   },
 }));

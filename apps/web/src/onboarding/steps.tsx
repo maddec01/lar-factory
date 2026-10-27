@@ -1,11 +1,13 @@
 // The body of each onboarding step, which the dialog shows one at a time. Each field sits on its own row with its
 // label and one line of help. The Cleanup step lists each Clash the fixed checks find, with its edit to tick, and asks
-// Delete or Rename for each project skill named like a bundled skill. The Pull request step opens the PR that adds .lar-factory.json, then waits for its merge.
+// Delete or Rename for each project skill named like a bundled skill. Its Clash agent asks for a provider and model,
+// then shows its run's latest message and thread, and the agent's Clashes once the run is done, or why it ended without
+// them with Retry, which starts a new thread. The Pull request step opens the PR that adds .lar-factory.json, then waits for its merge.
 
 import { useId, useState, type ReactNode } from 'react';
-import { Check, CircleAlert, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, X } from 'lucide-react';
+import { Check, CircleAlert, ExternalLink, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
-  SETUP_CHECKS, isOnboarding, isSkillName, onboardingConfigFile, type Clash, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting,
+  SETUP_CHECKS, isOnboarding, isSkillName, onboardingConfigFile, threadLink, type Clash, type ClashRun, type ModelChoice, type ModelGroup, type ProjectChoice, type RepositoryItemSource, type SetupAnswers, type SetupCheckId, type ShowSetting,
   type SkillClash,
 } from '@lar-factory/shared';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
@@ -14,14 +16,15 @@ import { Button } from '@lar-factory/ui/button';
 import { Checkbox } from '@lar-factory/ui/checkbox';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { Input } from '@lar-factory/ui/input';
+import { NativeSelect } from '@lar-factory/ui/native-select';
 import { Progress } from '@lar-factory/ui/progress';
 import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
 import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import {
-  COMMAND_CHECKS, type Clashes, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, onboarded, pickedProject, prClosed,
-  setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
+  COMMAND_CHECKS, type Clashes, type Creating, type Run, type StepId, asksSetup, commandPasses, configOf, itemSourceOf, latestRun, nextModel, onboarded, pickedProject,
+  prClosed, setupProblems, skillProblem, skillsDir, suggestedShow, ticked, unpickable, useWizardStore,
 } from './wizard-store.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
@@ -343,11 +346,11 @@ function ChecksStep({ run }: { run: Run }) {
   );
 }
 
-/** A Clash's edit, as the PR would make it: the lines it swaps, or the delete or rename of its file or folder. */
+/** A Clash's edit, as the PR would make it: the lines it swaps, or the delete or rename of its file or folder; dimmed when it won't apply. */
 function EditPreview({ clash }: { clash: Clash }) {
   const { edit } = clash;
   return (
-    <pre className="m-0 ml-7 overflow-x-auto rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs">
+    <pre data-edit-preview className={`m-0 ml-7 overflow-x-auto rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs ${clash.wontApply ? 'opacity-60' : ''}`}>
       {edit.kind === 'lines' ? (<>
         {edit.remove.map((line, i) => <div key={`-${i}`} className="text-destructive-foreground">- {line}</div>)}
         {edit.add.map((line, i) => <div key={`+${i}`} className="text-success-foreground">+ {line}</div>)}
@@ -357,16 +360,17 @@ function EditPreview({ clash }: { clash: Clash }) {
   );
 }
 
-/** One Clash: its tick, file and line, reason and edit. */
+/** One Clash: its tick, file and line, reason and edit; an edit that won't apply is unticked, can't be ticked and says why. */
 function ClashRow({ clash, picks }: { clash: Clash; picks: Run['cleanup'] }) {
   const tick = useWizardStore((s) => s.tick);
   return (
     <li data-clash={clash.id} className="grid gap-2 px-3 py-2.5">
-      <label className="flex cursor-pointer items-start gap-2.5">
-        <Checkbox checked={ticked(clash, picks)} onCheckedChange={(on) => tick(clash.id, on)} className="mt-0.5" />
+      <label className={`flex items-start gap-2.5 ${clash.wontApply ? '' : 'cursor-pointer'}`}>
+        <Checkbox checked={ticked(clash, picks)} disabled={!!clash.wontApply} onCheckedChange={(on) => tick(clash.id, on)} className="mt-0.5" />
         <span className="grid min-w-0 flex-1 gap-0.5">
           <span className="font-mono text-xs">{clash.file}{clash.line !== undefined && `:${clash.line}`}</span>
           <span className="text-xs text-muted-foreground">{clash.reason}</span>
+          {clash.wontApply && <span data-wont-apply className="text-xs text-warning-foreground">Won’t go in the PR: {clash.wontApply}</span>}
         </span>
       </label>
       <EditPreview clash={clash} />
@@ -403,6 +407,132 @@ function SkillClashPick({ skill, picks, clashes }: { skill: SkillClash; picks: R
         {problem && pick?.kind !== 'rename' && <span data-problem className="text-xs">{problem}</span>}
       </AlertDescription>
     </Alert>
+  );
+}
+
+/** A model choice as T3's picker names it, such as `Claude Opus 4.7`; its ids when T3 no longer offers it. */
+function modelName(groups: readonly ModelGroup[], choice: ModelChoice): string {
+  const group = groups.find((g) => g.instanceId === choice.instanceId);
+  const model = group?.models.find((m) => m.slug === choice.model);
+  return group && model ? `${group.name} ${model.label}` : `${choice.instanceId} ${choice.model}`;
+}
+
+/** Opens a run's T3 thread in T3 Code, or a disabled button whose title says why it can't yet. */
+function ThreadLink({ run }: { run: ClashRun }) {
+  const environment = useBoardStore((s) => s.data.t3EnvironmentId);
+  const reason = !run.threadId ? 'T3 Code hasn’t listed the thread yet' : !environment ? 'T3 Code hasn’t written its environment id' : null;
+  // Pointer events stay on while it's disabled, so its title says why.
+  return reason
+    ? <Button size="xs" variant="ghost" className="disabled:pointer-events-auto" data-thread-link disabled title={reason}><ExternalLink /> Open thread</Button>
+    : <Button size="xs" variant="ghost" data-thread-link render={<a href={threadLink(environment!, run.threadId!)} />}><ExternalLink /> Open thread</Button>;
+}
+
+/** Why a run ended without Clashes, by its state. */
+const ENDED: Record<'failed' | 'timed-out' | 'waiting', string> = {
+  failed: 'The Clash agent’s run failed',
+  'timed-out': 'The Clash agent’s run timed out',
+  waiting: 'The Clash agent is waiting for an answer',
+};
+
+/** How an earlier run ended, by its state. */
+const EARLIER: Record<ClashRun['state'], string> = { running: 'running', done: 'done', failed: 'failed', 'timed-out': 'timed out', waiting: 'waiting for an answer' };
+
+/** The provider and model the next run starts on, as two selects of what T3 offers. */
+function ModelPicker({ model, disabled }: { model: ModelChoice | null; disabled: boolean }) {
+  const groups = useBoardStore((s) => s.data.modelChoices);
+  // The board reads T3's models as it first reads GitHub, so before that read ends it has none to offer yet.
+  const read = useBoardStore((s) => s.data.fetchedAt !== null || s.data.error !== null);
+  const pickModel = useWizardStore((s) => s.pickModel);
+  if (!groups.length && !read) {
+    return <p data-reading-models className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading T3 Code’s models…</p>;
+  }
+  if (!groups.length) return <p className="m-0 text-sm text-muted-foreground">T3 Code offers no provider with a model. Turn one on in T3 Code’s settings.</p>;
+  const group = groups.find((g) => g.instanceId === model?.instanceId);
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field name="agent-provider" label="Provider" hint="The provider whose T3 thread looks for Clashes.">
+        {(described) => <NativeSelect value={model?.instanceId ?? ''} disabled={disabled} {...described} onChange={(e) => {
+          const picked = groups.find((g) => g.instanceId === e.target.value);
+          if (picked?.models[0]) pickModel({ instanceId: picked.instanceId, model: picked.models[0].slug });
+        }}>
+          {!group && <option value={model?.instanceId ?? ''} disabled>{model ? model.instanceId : 'Pick a provider'}</option>}
+          {groups.map((g) => <option key={g.instanceId} value={g.instanceId}>{g.name}</option>)}
+        </NativeSelect>}
+      </Field>
+      <Field name="agent-model" label="Model" hint="The model the thread runs on.">
+        {(described) => <NativeSelect value={model?.model ?? ''} disabled={disabled || !group} {...described}
+          onChange={(e) => group && pickModel({ instanceId: group.instanceId, model: e.target.value })}>
+          {!group?.models.some((m) => m.slug === model?.model) && <option value={model?.model ?? ''} disabled>{model?.model ?? 'Pick a model'}</option>}
+          {group?.models.map((m) => <option key={m.slug} value={m.slug}>{m.label}</option>)}
+        </NativeSelect>}
+      </Field>
+    </div>
+  );
+}
+
+/**
+ * The Clash agent: the provider and model, then Look for Clashes; the latest run's latest message while it runs, its
+ * Clashes once it's done, or why it ended without them with Retry; then each earlier run with its thread.
+ */
+function ClashAgent({ run }: { run: Run }) {
+  const { agent, lookForClashes, readClashRuns } = useWizardStore();
+  const groups = useBoardStore((s) => s.data.modelChoices);
+  const model = nextModel(agent, groups);
+  const latest = latestRun(agent);
+  const running = agent.starting || latest?.state === 'running';
+  const look = () => model && void lookForClashes(model);
+  const earlier = agent.runs?.slice(0, -1) ?? [];
+  return (
+    <div data-clash-agent className="grid gap-3">
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Clash agent</h4>
+      <p className="m-0 text-xs text-muted-foreground">An agent in a T3 thread in this repository’s project reads every instruction file on a fresh fetch of the default branch and reports rules that work against the factory’s. Next waits for its run. You can close this dialog while it runs: the run goes on, and Resume shows it.</p>
+      <ModelPicker model={model} disabled={running} />
+      {/* After a failed start the alert's Retry starts the run, so Look again doesn't offer a second way. */}
+      {(!latest || latest.state === 'done') && agent.error?.call !== 'start' && (
+        <Button data-look-for-clashes className="justify-self-start" variant={latest ? 'outline' : 'default'} disabled={!model || running} onClick={look}>
+          {agent.starting ? <><LoaderCircle className="animate-spin" /> Starting…</> : <><Search /> {latest ? 'Look again' : 'Look for Clashes'}</>}</Button>
+      )}
+      {agent.error && (
+        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t reach the Clash agent</AlertTitle><AlertDescription>{agent.error.message}</AlertDescription>
+          <AlertAction><Button size="xs" variant="outline" disabled={running} onClick={() => agent.error?.call === 'start' ? look() : void readClashRuns()}>
+            <RotateCw /> Retry</Button></AlertAction></Alert>
+      )}
+      {latest?.state === 'running' ? (
+        <div data-agent-run="running" className="grid gap-2 rounded-lg border p-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <LoaderCircle className="size-4 animate-spin text-info" /> Agent running on {modelName(groups, latest.model)}
+            <span className="ml-auto"><ThreadLink run={latest} /></span>
+          </div>
+          <p data-agent-progress className="m-0 whitespace-pre-wrap text-xs text-muted-foreground">{latest.progress ?? 'Waiting for the agent’s first message.'}</p>
+        </div>
+      ) : latest?.state === 'done' ? (
+        <div data-agent-run="done" className="grid gap-1">
+          <div className="flex items-center gap-2 text-sm">
+            <Check className="size-4 text-success" /> {modelName(groups, latest.model)} found {latest.clashes.length === 1 ? '1 Clash' : `${latest.clashes.length} Clashes`}
+            <span className="ml-auto"><ThreadLink run={latest} /></span>
+          </div>
+          {latest.clashes.length
+            ? <ul className="m-0 list-none divide-y rounded-lg border p-0">{latest.clashes.map((clash) => <ClashRow key={clash.id} clash={clash} picks={run.cleanup} />)}</ul>
+            : <p className="m-0 text-sm text-muted-foreground">The agent found no Clash.</p>}
+        </div>
+      ) : latest && (
+        <Alert data-agent-run={latest.state} variant={latest.state === 'failed' ? 'error' : 'warning'}><CircleAlert /><AlertTitle>{ENDED[latest.state]}</AlertTitle>
+          <AlertDescription>{latest.why}</AlertDescription>
+          <AlertAction><ThreadLink run={latest} />
+            <Button size="xs" variant="outline" disabled={!model || running} onClick={look}>{agent.starting ? <LoaderCircle className="animate-spin" /> : <RotateCw />} Retry</Button>
+          </AlertAction></Alert>
+      )}
+      {earlier.length > 0 && (
+        <ul data-earlier-runs className="m-0 grid list-none gap-1 p-0 text-xs text-muted-foreground">
+          {earlier.map((r) => (
+            <li key={r.title} data-earlier-run={r.title} className="flex items-center gap-2">
+              Earlier run on {modelName(groups, r.model)}: {EARLIER[r.state]}
+              <ThreadLink run={r} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -443,7 +573,7 @@ function AlwaysWritten({ reused }: { reused: boolean }) {
 
 /**
  * The fixed checks' Clashes, each with its edit to tick, and Delete or Rename for each project skill named like a
- * bundled skill, which Next waits for; then what the PR always writes. A failed run shows the board's problem with Retry.
+ * bundled skill, which Next waits for; then the Clash agent and what the PR always writes. A failed run shows the board's problem with Retry.
  */
 function CleanupStep({ run }: { run: Run }) {
   const { projects, clashes, finishing, findClashes } = useWizardStore();
@@ -452,7 +582,7 @@ function CleanupStep({ run }: { run: Run }) {
   if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
   return (
     <div data-cleanup-step className="grid gap-6">
-      <p className="m-0 text-sm text-muted-foreground">Fixed checks look on {project.repo}’s default branch for known Clashes: things that make agents work against the factory. Only the edits you tick go into the PR.</p>
+      <p className="m-0 text-sm text-muted-foreground">Fixed checks look on {project.repo}’s default branch for known Clashes: things that make agents work against the factory. Then the Clash agent looks for the rest. Only the edits you tick go into the PR.</p>
       {(!clashes || clashes.state === 'reading') ? (
         <p data-reading-clashes className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Running the fixed checks…</p>
       ) : clashes.state === 'failed' ? (
@@ -467,6 +597,7 @@ function CleanupStep({ run }: { run: Run }) {
             : <p className="m-0 text-sm text-muted-foreground">The fixed checks found no Clash.</p>}
         </div>
       </>)}
+      <ClashAgent run={run} />
       <AlwaysWritten reused={!!project.config} />
       {finishing.error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t finish onboarding</AlertTitle><AlertDescription>{finishing.error}</AlertDescription></Alert>}
     </div>

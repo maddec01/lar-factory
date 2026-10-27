@@ -1,5 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
+import { fakeAzRepos } from '../azure/fake-az.ts';
 import { findFixedClashes } from './fixed-clashes.ts';
 
 const BUNDLED = ['code-review', 'lar-work', 'tdd'];
@@ -85,6 +86,23 @@ test("a gh failure returns gh's problem, not an empty list", async () => {
 test('a tree too big for GitHub to list in full returns that problem', async () => {
   assert.deepEqual(await find(['CONTEXT.md'], { truncated: true }),
     { status: 502, error: "Can't read maddec01/lar-web's default branch: GitHub listed only part of its files, since it has too many." });
+});
+
+const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
+
+test('on Azure Repos, the fixed checks read the default branch through az, with no gh call', async () => {
+  const az = fakeAzRepos({ files: { '/CONTEXT.md': '', '/.scratch/a.md': '', '/.claude/skills/tdd/SKILL.md': '', '/README.md': '' } });
+  const found = await findFixedClashes({ repo: AZURE }, az.run, () => BUNDLED) as { clashes: { id: string }[]; skillClashes: unknown; projectSkills: unknown };
+  assert.deepEqual(found.clashes.map((clash) => clash.id), ['context', 'scratch']);
+  assert.deepEqual(found.skillClashes, [{ name: 'tdd', path: '.claude/skills/tdd/' }]);
+  assert.deepEqual(found.projectSkills, ['tdd']);
+  assert.ok(az.calls.every((args) => args[0] === 'repos' || args[0] === 'devops'));
+  assert.ok(az.calls.filter((args) => args[1] === 'invoke').every((args) => args.includes('--api-version')));
+});
+
+test('a tree Azure DevOps lists only in part returns that problem', async () => {
+  assert.deepEqual(await findFixedClashes({ repo: AZURE }, fakeAzRepos({ files: { '/CONTEXT.md': '' }, partialTree: true }).run, () => BUNDLED),
+    { status: 502, error: `Can't read ${AZURE}'s default branch: Azure DevOps listed only part of its files, since it has too many.` });
 });
 
 test("unreadable bundled skills return the problem, and a body without a repository is refused", async () => {

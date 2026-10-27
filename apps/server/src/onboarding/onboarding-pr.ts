@@ -4,11 +4,11 @@
 // branch is lar-factory/onboarding; when that is taken, its open PR is reused with the branch moved to the new commit,
 // and with none the first free lar-factory/onboarding-N is used. Each refresh finishes an onboarding whose PR merged,
 // or whose default branch got a .lar-factory.json another way when the PR adds one, closing the PR then, and marks a
-// PR closed without merging, which the Pull request step offers to reopen. On Azure Repos, az finds the branch, opens the
-// PR, and follows, closes and reopens it; the workflow labels check and the one commit still go through gh, so opening
-// one there fails until they get an az path. Reset closes an onboarding's open PR and drops the onboarding from the
-// list; on an onboarded repository it opens the reset PR and marks the entry resetting. Each refresh drops a resetting
-// entry once its reset PR merged or closed unmerged.
+// PR closed without merging, which the Pull request step offers to reopen. On Azure Repos, az reads the default branch,
+// finds the branch, opens the PR, and follows, closes and reopens it; the one commit still goes through gh, so opening
+// one there fails until it gets an az path.
+// Reset closes an onboarding's open PR and drops the onboarding from the list; on an onboarded repository it opens the
+// reset PR and marks the entry resetting. Each refresh drops a resetting entry once its reset PR merged or closed unmerged.
 
 import {
   isRecord, isSkillName, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
@@ -54,7 +54,7 @@ function describe(change: OnboardingPrChange): string {
 const prBody = (changes: OnboardingPrChange[]) =>
   `This PR:\n\n${changes.map((change) => `- ${describe(change)}`).join('\n')}\n\nOnboarding finishes on the board once this PR merges.`;
 
-const GITHUB = { branchExists, closePr, createBranch, createPr, defaultBranchHead, openPrFrom, prState, reopenPr };
+const GITHUB = { branchExists, closePr, commitTree, createBranch, createPr, defaultBranchHead, openPrFrom, prState, readBlob, reopenPr };
 
 /** The calls that open and follow the repository's PR: az's on Azure DevOps, gh's on GitHub. `run` stands in for that tool. */
 const host = (repo: string): typeof GITHUB => (onAzure(repo) ? AZURE_REPOS : GITHUB);
@@ -122,6 +122,7 @@ async function plan(repo: string, head: string, config: string | null, picks: On
   let bundled;
   try { bundled = bundledSkillNames(); }
   catch (err) { return { status: 500, error: `Can't read the app's bundled skills: ${message(err)}` }; }
+  const { commitTree, readBlob } = host(repo);
   const planned = await planPrChanges(await commitTree(repo, head, run), (sha) => readBlob(repo, sha, run), config, picks, bundled);
   return 'problem' in planned ? { status: 409, error: planned.problem } : planned;
 }
@@ -133,7 +134,7 @@ export async function previewOnboardingPr(input: Record<string, unknown>, run?: 
   const answers = readAnswers(input);
   if (!answers) return { status: 400, error: ANSWERS };
   try {
-    const planned = await plan(answers.repo, (await defaultBranchHead(answers.repo, run)).sha, answers.config, answers.picks, run);
+    const planned = await plan(answers.repo, (await host(answers.repo).defaultBranchHead(answers.repo, run)).sha, answers.config, answers.picks, run);
     return 'error' in planned ? planned : { changes: planned.changes };
   } catch (err) {
     return { status: 502, error: `Can't read ${answers.repo}'s default branch: ${message(err)}` };
@@ -160,7 +161,7 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
     const answered = JSON.stringify([config, picks]);
     const opening: Opening = kept?.key === answered ? kept : { key: answered };
     openings.set(key, opening);
-    const { createBranch, createPr } = host(repo);
+    const { createBranch, createPr, defaultBranchHead } = host(repo);
     try {
       opening.head ??= await defaultBranchHead(repo, run);
       if (!opening.plan) {

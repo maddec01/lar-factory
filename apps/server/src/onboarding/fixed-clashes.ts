@@ -1,9 +1,10 @@
-// Onboarding's fixed checks for known Clashes, read from the repository's default branch through gh with no checkout:
-// an old CONTEXT.md, Matt Pocock's .scratch/ tracker, and each project skill named like a bundled skill. A multi-context
-// repository's GLOSSARY-MAP.md is the factory's layout, so it raises nothing.
+// Onboarding's fixed checks for known Clashes, read from the repository's default branch through gh or az with no
+// checkout: an old CONTEXT.md, Matt Pocock's .scratch/ tracker, and each project skill named like a bundled skill. A
+// multi-context repository's GLOSSARY-MAP.md is the factory's layout, so it raises nothing.
 
 import type { Clash, FixedClashes, SkillClash } from '@lar-factory/shared';
-import { isRepo } from '../config/repository-config.ts';
+import { AZURE_REPOS } from '../azure/azure-repos.ts';
+import { isRepo, onAzure } from '../config/repository-config.ts';
 import { defaultBranchFiles, message } from '../github/github.ts';
 import { bundledSkillNames } from '../skills/bundled-skills.ts';
 
@@ -36,7 +37,7 @@ export function projectSkills(files: string[]): SkillClash[] {
   });
 }
 
-/** Runs the fixed checks on the body's `repo`, or gives the status and problem when gh or the bundle can't be read. */
+/** Runs the fixed checks on the body's `repo`, or gives the status and problem when gh, az or the bundle can't be read. */
 export async function findFixedClashes(input: Record<string, unknown>, run?: (args: string[]) => Promise<string>,
   bundled: () => string[] = bundledSkillNames): Promise<FixedClashes | { status: number; error: string }> {
   const { repo } = input;
@@ -45,7 +46,7 @@ export async function findFixedClashes(input: Record<string, unknown>, run?: (ar
   try { names = new Set(bundled().map((name) => name.toLowerCase())); }
   catch (err) { return { status: 500, error: `Can't read the app's bundled skills: ${message(err)}` }; }
   let files;
-  try { files = await defaultBranchFiles(repo, run); }
+  try { files = await (onAzure(repo) ? AZURE_REPOS.defaultBranchFiles : defaultBranchFiles)(repo, run); }
   catch (err) { return { status: 502, error: `Can't read ${repo}'s default branch: ${message(err)}` }; }
   const skills = projectSkills(files);
   return {

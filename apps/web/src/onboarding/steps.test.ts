@@ -405,7 +405,7 @@ async function openCleanup(chosen: ProjectChoice, answer: FixedClashes | { error
     await settle(() => choice('issues').querySelector<HTMLElement>('[role="radio"]')!.click());
     await type(input('role')!, 'Web client');
   }
-  answerChecks();
+  answerChecks({}, toolChecks({ az: { result: 'ok' } }));
   await openChecks();
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED, modelChoices: MODELS }));
@@ -440,8 +440,19 @@ test('the Always written list names the Agent skills block, the three docs/agent
   const written = [...cleanup().querySelectorAll<HTMLElement>('[data-written]')];
   expect(written.map((w) => w.dataset.written)).toEqual(['## Agent skills', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md', '.lar-factory.json']);
   expect(text(written[0])).toContain('In CLAUDE.md if the repository has one, else in AGENTS.md');
+  expect(text(written[1])).toContain('Where the factory tracks issues');
+  expect(text(written[2])).toContain('The factory’s labels and triage roles');
   expect(text(written[4])).toContain('The Repository config');
   expect(text(cleanup())).toContain('The fixed checks found no Clash.');
+});
+
+test('on Azure DevOps the Always written list says work items and tags, and the step names the project decoded', async () => {
+  await openCleanup(project('lar-api', { repo: 'contoso/Fabrikam%20Fiber/lar-api', provider: 'Azure DevOps', hasConfig: true,
+    config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: [] } }));
+  const written = (file: string) => text(cleanup().querySelector(`[data-written="${file}"]`));
+  expect(written('docs/agents/issue-tracker.md')).toContain('Where the factory tracks work items');
+  expect(written('docs/agents/triage-labels.md')).toContain('The factory’s tags and triage roles');
+  expect(text(cleanup())).toContain('Fixed checks look on contoso/Fabrikam Fiber/lar-api’s default branch');
 });
 
 test('a project skill named like a bundled skill keeps Next disabled until Delete it, or a rename to a name no other skill has', async () => {
@@ -973,7 +984,7 @@ test("an Azure DevOps repository's PR adds the team's item source, made on Azure
   await settle(() => choice('azure-backlog').querySelector<HTMLElement>('[role="radio"]')!.click());
   await type(input('team')!, 'Fabrikam Team');
   await type(input('role')!, 'API server');
-  answerChecks();
+  answerChecks({}, toolChecks({ az: { result: 'ok' } }));
   await openChecks();
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED, modelChoices: MODELS }));

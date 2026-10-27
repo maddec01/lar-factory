@@ -1,6 +1,6 @@
 // A fake az for the Azure DevOps item sources' tests, answering from a list of work items.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 export interface WorkItem {
   id: number;
@@ -162,15 +162,18 @@ export interface FakePr {
 export const REPO_URL = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api';
 
 /**
- * A fake az for one Azure Repos repository whose default branch is main at abc123 and holds `files`, with `branches`
- * besides main, by name and head, and `prs`; `canPush` is whether az's login may push to it. Pushes, new branches and
- * PRs change it, and it records each call; `fail` throws for a call it matches.
+ * A fake az for one Azure Repos repository whose default branch, `defaultBranch` or main, is at abc123 and holds `files`,
+ * with `branches` besides it, by name and head, and `prs`; `canPush` is whether az's login may push to it. Each commit's
+ * tree lists `files`, in part when `partialTree`. Pushes, new branches and PRs change it, and it records each call; `fail`
+ * throws for a call it matches.
  */
-export function fakeAzRepos({ files = {}, branches = {}, prs = [], canPush = true, fail }: {
+export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {}, prs = [], canPush = true, partialTree = false, fail }: {
   files?: Record<string, string>;
+  defaultBranch?: string;
   branches?: Record<string, string>;
   prs?: FakePr[];
   canPush?: boolean;
+  partialTree?: boolean;
   fail?: (args: string[]) => Error | undefined;
 } = {}) {
   const calls: string[][] = [];
@@ -178,7 +181,7 @@ export function fakeAzRepos({ files = {}, branches = {}, prs = [], canPush = tru
   const pushes: { ref: string; oldObjectId: string; comment: string; files: Record<string, string> }[] = [];
   /** Each comment thread posted on a PR, by the PR's id. */
   const comments: { id: number; content: string }[] = [];
-  const heads = new Map(Object.entries({ main: 'abc123', ...branches }));
+  const heads = new Map(Object.entries({ [defaultBranch]: 'abc123', ...branches }));
   const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
   const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
   const show = (pr: FakePr) => JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'lar-api', webUrl: REPO_URL } });
@@ -198,6 +201,19 @@ export function fakeAzRepos({ files = {}, branches = {}, prs = [], canPush = tru
         const path = route(args, 'path')!;
         if (!(path in files)) throw new Error(`az devops invoke failed: TF401174: The item ${path} could not be found in the repository.`);
         return JSON.stringify({ path, content: files[path] });
+      }
+      if (resource === 'git/commits') return JSON.stringify({ commitId: route(args, 'commitId'), treeId: `tree-${route(args, 'commitId')}` });
+      if (resource === 'git/trees') {
+        // A recursive tree lists each folder too, and each entry's path from the tree's root.
+        const folders = [...new Set(Object.keys(files).flatMap((path) => path.split('/').slice(1, -1).map((_, i, parts) => parts.slice(0, i + 1).join('/'))))];
+        return JSON.stringify({ objectId: route(args, 'sha1'), continuation_token: partialTree ? 'more' : null, treeEntries: [
+          ...folders.map((path) => ({ relativePath: path, mode: '40000', gitObjectType: 'tree', objectId: `tree:${path}` })),
+          ...Object.keys(files).map((path) => ({ relativePath: path.slice(1), mode: '100644', gitObjectType: 'blob', objectId: `blob:${path}` })),
+        ] });
+      }
+      if (resource === 'git/blobs') {
+        writeFileSync(flag(args, '--out-file'), files[route(args, 'sha1')!.replace(/^blob:/, '')]!);
+        return '';
       }
       if (resource === 'git/pushes') {
         const body = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as {
@@ -224,7 +240,7 @@ export function fakeAzRepos({ files = {}, branches = {}, prs = [], canPush = tru
       }
     }
     if (command === 'repos show --repository') {
-      return JSON.stringify({ id: 'repo-1', name: 'lar-api', defaultBranch: 'refs/heads/main', webUrl: REPO_URL, project: { id: 'project-1', name: 'Fabrikam Fiber' } });
+      return JSON.stringify({ id: 'repo-1', name: 'lar-api', defaultBranch: `refs/heads/${defaultBranch}`, webUrl: REPO_URL, project: { id: 'project-1', name: 'Fabrikam Fiber' } });
     }
     if (command === 'repos ref list') {
       // --filter matches the start of each name after refs/.

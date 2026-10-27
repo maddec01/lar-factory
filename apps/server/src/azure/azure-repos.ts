@@ -1,6 +1,10 @@
-// Azure Repos through az, beside github.ts's gh calls: a file on the default branch, and onboarding's branch, file and
-// PR, opened without touching any checkout. A repository is organization/project/repository as its origin URL has them.
+// Azure Repos through az, beside github.ts's gh calls: the default branch's head, files and blobs, and onboarding's branch,
+// file and PR, opened without touching any checkout. A repository is organization/project/repository as its origin URL has them.
 
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { CommitTree } from '../github/github.ts';
 import { az, decoded, withFile, type Az } from './azure-items.ts';
 import { prStateOf, type AzurePr } from './azure-prs.ts';
 
@@ -24,11 +28,16 @@ async function json<T>(run: Az, args: string[], repo: string): Promise<T> {
   return JSON.parse(await run([...args, ...names(repo).org])) as T;
 }
 
-/** `az devops invoke` on a git resource of the repository, routed to its project, repository and then `route`. */
-function invoke<T>(run: Az, repo: string, resource: string, route: string[], more: string[]): Promise<T> {
+/** The args of `az devops invoke` on a git resource of the repository, routed to its project, repository and then `route`. */
+function invokeArgs(repo: string, resource: string, route: string[], more: string[]): string[] {
   const { project, repository } = names(repo);
-  return json<T>(run, ['devops', 'invoke', '--area', 'git', '--resource', resource, '--route-parameters', `project=${project}`, `repositoryId=${repository}`,
-    ...route, ...more, '--api-version', API_VERSION], repo);
+  return ['devops', 'invoke', '--area', 'git', '--resource', resource, '--route-parameters', `project=${project}`, `repositoryId=${repository}`,
+    ...route, ...more, '--api-version', API_VERSION];
+}
+
+/** `az devops invoke` on a git resource of the repository, whose JSON answer it parses. */
+function invoke<T>(run: Az, repo: string, resource: string, route: string[], more: string[]): Promise<T> {
+  return json<T>(run, invokeArgs(repo, resource, route, more), repo);
 }
 
 /** `invoke` posting `body`, written to a file of its own for az's --in-file. */
@@ -65,6 +74,39 @@ async function defaultBranchHead(repo: string, run: Az = az): Promise<{ branch: 
   const sha = await branchHead(repo, branch, run);
   if (!sha) throw new Error(`${repo} has no ${branch} branch to start from.`);
   return { branch, sha };
+}
+
+/** The commit's files, by path, from a recursive read of its tree; throws when Azure DevOps lists only part of them. */
+async function commitTree(repo: string, commit: string, run: Az = az): Promise<CommitTree> {
+  const { treeId } = await invoke<{ treeId: string }>(run, repo, 'commits', [`commitId=${commit}`], []);
+  // invoke sets continuation_token from the X-MS-ContinuationToken header, which a tree too big for one answer gets.
+  const { objectId, treeEntries, continuation_token } = await invoke<{
+    objectId: string;
+    treeEntries: { relativePath: string; mode: string; gitObjectType: string; objectId: string }[];
+    continuation_token?: string | null;
+  }>(run, repo, 'trees', [`sha1=${treeId}`], ['--query-parameters', 'recursive=true']);
+  if (continuation_token) throw new Error('Azure DevOps listed only part of its files, since it has too many.');
+  return { sha: objectId, files: new Map(treeEntries.filter((entry) => entry.gitObjectType === 'blob')
+    .map((entry) => [entry.relativePath, { mode: entry.mode, sha: entry.objectId }])) };
+}
+
+/** The path of each file on the repository's default branch. */
+async function defaultBranchFiles(repo: string, run: Az = az): Promise<string[]> {
+  const { sha } = await defaultBranchHead(repo, run);
+  return [...(await commitTree(repo, sha, run)).files.keys()];
+}
+
+/** A blob's text; az devops invoke writes an answer that isn't JSON only to a new --out-file. */
+async function readBlob(repo: string, sha: string, run: Az = az): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
+  try {
+    const file = join(dir, 'blob');
+    await run([...invokeArgs(repo, 'blobs', [`sha1=${sha}`], ['--query-parameters', '$format=octetstream', '--accept-media-type', 'application/octet-stream',
+      '--out-file', file]), ...names(repo).org]);
+    return await readFile(file, 'utf8');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 /** The Git Repositories security namespace, and its GenericContribute bit, which lets a user push. */
@@ -132,4 +174,6 @@ async function reopenPr(url: string, run: Az = az): Promise<void> {
 }
 
 /** The calls that open and follow onboarding's PR on Azure Repos, each named and shaped as github.ts's gh call is. */
-export const AZURE_REPOS = { branchExists, closePr, createBranch, createPr, defaultBranchHead, openPrFrom, prState, reopenPr };
+export const AZURE_REPOS = {
+  branchExists, closePr, commitTree, createBranch, createPr, defaultBranchFiles, defaultBranchHead, openPrFrom, prState, readBlob, reopenPr,
+};

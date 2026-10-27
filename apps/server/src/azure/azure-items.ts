@@ -31,7 +31,7 @@ export async function az(args: string[]): Promise<string> {
 }
 
 /** A logged-out az or a missing azure-devops extension as the ReadProblem that names its fix; any other error as it is. */
-function problemOf(err: unknown): unknown {
+export function problemOf(err: unknown): unknown {
   const text = err instanceof Error ? err.message : String(err);
   if (/az login/i.test(text)) return new ReadProblem('az is logged out.', 'az login');
   if (/azure-devops|misspelled or not recognized/i.test(text)) return new ReadProblem('az has no azure-devops extension.', 'az extension add --name azure-devops');

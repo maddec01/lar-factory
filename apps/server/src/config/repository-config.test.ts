@@ -306,6 +306,25 @@ test('a repository still onboarding or resetting reads no config and has no prob
   assert.deepEqual(read, ['repos/maddec01/lar-factory/contents/.lar-factory.json']);
 });
 
+test("an Azure repository az can't read is left out with az's problem and fix, and the others still read", async (t) => {
+  const list = { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'contoso/Fabrikam/lar-api' }, { repo: 'contoso/Fabrikam/lar-web' }] };
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify(list) });
+  const gh = ghWith({ 'maddec01/lar-factory': { role: 'The factory' } });
+  const failures: Record<string, string> = { 'repositoryId=lar-api': 'az devops invoke failed: Please run az login to setup account.',
+    'repositoryId=lar-web': 'az devops invoke failed: TF400813: The user is not authorized to access this resource.' };
+  const run = async (args: string[]) => {
+    const failure = Object.entries(failures).find(([route]) => args.includes(route))?.[1];
+    if (failure) throw new Error(failure);
+    return gh(args);
+  };
+  const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), run);
+  assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
+  assert.deepEqual(problems, [
+    { repo: 'contoso/Fabrikam/lar-api', problem: 'az is logged out. Run az login.' },
+    { repo: 'contoso/Fabrikam/lar-web', problem: 'could not read .lar-factory.json. az devops invoke failed: TF400813: The user is not authorized to access this resource.' },
+  ]);
+});
+
 test('a gh failure other than a 404 still fails the whole read', async (t) => {
   const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory' }] }) });
   const gh = async () => { throw new Error('gh api failed: To get started with GitHub CLI, please run:  gh auth login'); };

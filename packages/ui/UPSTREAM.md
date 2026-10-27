@@ -51,6 +51,8 @@ the Copies instead (`docs/adr/0016-copy-t3s-base-components-unchanged.md`).
 | `src/design-system/foundations/theme.css` | maddec01/lar-server | `web/src/shared/design-system/foundations/theme.css` | `4e302af3c8a2` |
 | `src/design-system/icons/NavigationIcons.tsx` | maddec01/lar-server | `web/src/shared/design-system/icons/NavigationIcons.tsx` | `4e302af3c8a2` |
 | `src/design-system/layout/ScrollArea.tsx` | maddec01/lar-server | `web/src/shared/design-system/layout/ScrollArea.tsx` | `4e302af3c8a2` |
+| `src/design-system/layout/sidebar/SidebarNavigationItem.tsx` | maddec01/lar-server | `web/src/shared/design-system/layout/sidebar/SidebarNavigationItem.tsx` | `4e302af3c8a2` |
+| `src/design-system/layout/sidebar/SidebarPane.tsx` | maddec01/lar-server | `web/src/shared/design-system/layout/sidebar/SidebarPane.tsx` | `4e302af3c8a2` |
 | `src/design-system/overlays/ActionModal.tsx` | maddec01/lar-server | `web/src/shared/design-system/overlays/ActionModal.tsx` | `4e302af3c8a2` |
 | `src/design-system/overlays/DropdownMenu.tsx` | maddec01/lar-server | `web/src/shared/design-system/overlays/DropdownMenu.tsx` | `4e302af3c8a2` |
 | `src/design-system/overlays/Modal.tsx` | maddec01/lar-server | `web/src/shared/design-system/overlays/Modal.tsx` | `4e302af3c8a2` |

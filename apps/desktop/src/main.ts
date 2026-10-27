@@ -13,6 +13,7 @@ import * as NodePath from "node:path";
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import { HttpClient } from "effect/http";
 import * as Electron from "electron";
@@ -109,33 +110,71 @@ const createWindow = (boardOrigin: () => string, secret: string) => {
 
 /**
  * Opens the window at once on the starting page, and loads each ready server's page in it.
- * Until the board first shows, the starting page says why its server isn't up yet.
+ * Until the board first shows, the starting page names the launch step and says why its server isn't up yet,
+ * without reloading, so its mark draws once. The board's page opens on the drawn mark.
  */
 const openBoardWindow = (secret: string) => {
   let origin = "";
   let boardShown = false;
+  // Bumped by each ready server and each stop, so a load that waits on the mark's draw is skipped once either comes.
+  let generation = 0;
+  // When the starting page finished loading, which is when its mark starts to draw.
+  let startingShownAt: number | undefined;
   const window = createWindow(() => origin, secret);
   const load = (href: string) =>
     Effect.tryPromise(() => window.loadURL(href)).pipe(
       Effect.catch((error) => Effect.logError(`could not load ${href.slice(0, 100)}: ${String(error)}`)),
     );
+  // Runs a message in the starting page, which the board's page replaces: after that nothing is sent.
+  const tell = (script: string) => {
+    if (boardShown || window.isDestroyed()) return;
+    window.webContents.executeJavaScript(script).catch((error: unknown) => {
+      console.error(`could not update the starting page: ${String(error)}`);
+    });
+  };
   const events: BoardSupervisor.SupervisorEvents = {
     onReady: (url) =>
       Effect.suspend(() => {
-        origin = url.origin;
-        boardShown = true;
-        return load(url.href);
+        const mine = ++generation;
+        // The board's page is held for the tool check, so the starting page stays up while it loads.
+        tell(StartingPage.stepScript(StartingPage.STEPS.tools));
+        // The board's page opens on a finished mark, so the first one waits out the draw. A restart's reload
+        // replaces a board page, which drew long ago.
+        const wait = boardShown ? 0 : StartingPage.drawWait(startingShownAt, Date.now());
+        // Forked, so the supervisor watches the server's exit while the load waits.
+        return Effect.sleep(Duration.millis(wait)).pipe(
+          Effect.andThen(
+            Effect.suspend(() => {
+              if (mine !== generation) return Effect.void;
+              origin = url.origin;
+              boardShown = true;
+              return load(StartingPage.boardUrl(url));
+            }),
+          ),
+          Effect.forkDetach,
+          Effect.asVoid,
+        );
       }),
     onRestart: (reason) =>
       Effect.suspend(() => {
         // The old server is gone: no page gets the secret until the next one is ready.
+        generation += 1;
         origin = "";
-        return boardShown ? Effect.void : load(StartingPage.url(reason));
+        tell(StartingPage.errorScript(reason));
+        return Effect.void;
       }),
   };
+  const progress = (step: BoardServer.StartStep) =>
+    tell(StartingPage.stepScript(step === "starting" ? StartingPage.STEPS.server : StartingPage.STEPS.healthz));
   // A stopped server's page gets no secret, as after a crash.
-  const forgetOrigin = Effect.sync(() => void (origin = ""));
-  return { window, events, origin: () => origin, forgetOrigin, showStarting: load(StartingPage.url()) };
+  const forgetOrigin = Effect.sync(() => {
+    generation += 1;
+    origin = "";
+  });
+  const showStarting = load(StartingPage.url()).pipe(
+    Effect.tap(() => Effect.sync(() => void (startingShownAt = Date.now()))),
+  );
+  return { window, events, progress, origin: () => origin, forgetOrigin, showStarting };
 };
 
 /** The launch's skill checks, or undefined when this run checks nothing: a dev run without the install flag. */
@@ -255,7 +294,7 @@ const program = Effect.gen(function* () {
   }))));
   // Quitting closes the scope, which stops the server or cancels a pending restart.
   const supervisor = yield* BoardSupervisor.makeControl(
-    BoardSupervisor.supervise(BoardServer.start(config, { checkSkills }), board.events),
+    BoardSupervisor.supervise(BoardServer.start(config, { checkSkills, progress: board.progress }), board.events),
   );
   const http = yield* HttpClient.HttpClient;
   const stopBoard = Effect.suspend(() => {

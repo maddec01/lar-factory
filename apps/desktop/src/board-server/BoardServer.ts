@@ -102,19 +102,28 @@ export const makeStartConfig = (input: BoardLocation & {
   },
 });
 
+/** What `start` is doing: "starting" spawns the server and waits for its port, "healthz" polls until it answers. */
+export type StartStep = "starting" | "healthz";
+
 /**
- * Starts the server, reads the port it reports and waits for `/healthz` to answer. `checkSkills` answers each skill
- * check the server asks for with why Start build can't run, or null; if it rejects, the answer is that reason.
- * Closing the scope stops the server: SIGTERM, then SIGKILL after a grace period.
+ * Starts the server, reads the port it reports and waits for `/healthz` to answer, calling `progress` as each step
+ * begins. `checkSkills` answers each skill check the server asks for with why Start build can't run, or null; if it
+ * rejects, the answer is that reason. Closing the scope stops the server: SIGTERM, then SIGKILL after a grace period.
  */
 export const start = Effect.fn("BoardServer.start")(function* (
   config: StartConfig,
-  options?: { readonly portTimeout?: Duration.Input; readonly checkSkills?: (() => Promise<string | null>) | undefined },
+  options?: {
+    readonly portTimeout?: Duration.Input;
+    readonly checkSkills?: (() => Promise<string | null>) | undefined;
+    readonly progress?: ((step: StartStep) => void) | undefined;
+  },
 ): Effect.fn.Return<RunningBoard, BoardServerError, Scope.Scope | HttpClient.HttpClient> {
+  options?.progress?.("starting");
   const child = yield* Effect.acquireRelease(spawn(config), stop);
   if (options?.checkSkills) answerSkillChecks(child, options.checkSkills);
   const port = yield* reportedPort(child, options?.portTimeout ?? DEFAULT_PORT_TIMEOUT);
   const url = new URL(`http://${HOST}:${port}/`);
+  options?.progress?.("healthz");
   yield* waitForHealthz(url);
   return { pid: child.pid!, url, exited: exitReason(child) };
 });

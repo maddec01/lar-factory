@@ -5,3 +5,6 @@ export const BRAND_MARK_VIEWBOX = '0 0 100 100';
 export const BRAND_MARK_L = 'M0 13.76a13.76 13.76 0 0 1 27.52 0V72.48H86.24a13.76 13.76 0 0 1 0 27.52H13.76a13.76 13.76 0 0 1-13.76-13.76z';
 export const BRAND_MARK_BLOCK = 'M54.12 0H88.53a11.47 11.47 0 0 1 11.47 11.47V45.88a11.47 11.47 0 0 1-11.47 11.47H54.12a11.47 11.47 0 0 1-11.47-11.47V11.47a11.47 11.47 0 0 1 11.47-11.47z';
 export const BRAND_BLOCK_COLOR = '#355292';
+/** The L's centre line, from the top of the stem to the end of the foot. Stroked BRAND_MARK_BAR wide with round caps and joins, it covers BRAND_MARK_L. The loading screens trace it. */
+export const BRAND_MARK_BAR = 27.52;
+export const BRAND_MARK_CENTRE_LINE = `M${BRAND_MARK_BAR / 2} ${BRAND_MARK_BAR / 2}V${100 - BRAND_MARK_BAR / 2}H${100 - BRAND_MARK_BAR / 2}`;

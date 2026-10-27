@@ -14,7 +14,7 @@ test.each(sheets)('%s sets no raw colour or pixel value', (path) => {
 
 const baseLayer = () => rules('index.css').match(/@layer base \{([\s\S]*?)\n\}/)?.[1] ?? '';
 
-test("the board's focus outline sits in the base layer, so a T3 control's outline-none wins", () => {
+test("the board's focus outline sits in the base layer, so a copied control's outline-none wins", () => {
   expect(baseLayer()).toMatch(/^\s*:focus-visible \{/m);
 });
 

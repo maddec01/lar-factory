@@ -25,6 +25,4 @@ export async function openOnboarding(projects: ProjectChoice[] | { error: string
   serve(empty, projects);
   await mountPage(empty);
   await settle(() => $<HTMLButtonElement>('[data-onboard]')!.click());
-  // Base UI moves focus on the next frame.
-  await settle(() => vi.advanceTimersByTime(50));
 }

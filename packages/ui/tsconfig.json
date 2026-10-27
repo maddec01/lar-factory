@@ -1,10 +1,12 @@
+// lar-server's Copies import each other extensionless, which needs Bundler resolution, as in lar-server's web/.
 {
   "compilerOptions": {
     "target": "es2023",
     "lib": ["es2023", "dom", "dom.iterable"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "types": ["node"],
+    "jsx": "react-jsx",
     "strict": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
@@ -15,6 +17,5 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["src", "vite.config.ts"],
-  "exclude": ["src/card", "src/coss", "src/components/MorphIcon.tsx", "src/components/ui", "src/design-system", "src/env.ts", "src/form", "src/hooks", "src/lib/visibleAnimation.ts", "src/lib/windowControlsOverlay.ts", "src/progress", "src/rich-text"]
+  "include": ["src", "vite.config.ts"]
 }

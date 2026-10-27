@@ -1,16 +1,18 @@
-// The board's progress bar: a rounded track filled to value / max, then an optional caption. T3 has none, so
-// the board writes it on Base UI's Progress, which sets the fill's width and the progressbar's ARIA values.
-import { Progress as ProgressPrimitive } from '@base-ui/react/progress';
+// The board's progress bar: a rounded track filled to value / max, then an optional caption. lar-server has none, so
+// the board writes it with lar-server's tokens and type, as its StackedMeter is, and sets the progressbar's ARIA values.
 import type * as React from 'react';
-import { cn } from '../lib/utils.ts';
+import { Text } from '../design-system/typography/Typography.tsx';
 
-export function Progress({ className, caption, ...props }: ProgressPrimitive.Root.Props & { caption?: React.ReactNode }) {
+export function Progress({ className = '', caption, value, max = 100, ...props }: Omit<React.ComponentProps<'div'>, 'children'> & {
+  value: number; max?: number; caption?: React.ReactNode;
+}) {
+  const share = max > 0 ? Math.min(Math.max(value / max, 0), 1) : 0;
   return (
-    <div className={cn('flex items-center gap-2', className)} data-slot="progress">
-      <ProgressPrimitive.Root className="h-2 max-w-65 flex-1 overflow-hidden rounded-full bg-(--soft)" data-slot="progress-bar" {...props}>
-        <ProgressPrimitive.Indicator className="rounded-[inherit] bg-(--sub)" data-slot="progress-indicator" />
-      </ProgressPrimitive.Root>
-      {caption && <span className="text-muted-foreground text-xs" data-slot="progress-caption">{caption}</span>}
+    <div className={`flex items-center gap-2 ${className}`} data-slot="progress">
+      <div role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} className="h-2 max-w-65 flex-1 overflow-hidden rounded-full bg-base-200" data-slot="progress-bar" {...props}>
+        <div className="h-full rounded-[inherit] bg-primary" style={{ width: `${share * 100}%` }} data-slot="progress-indicator" />
+      </div>
+      {caption && <Text as="span" variant="caption" tone="muted" data-slot="progress-caption">{caption}</Text>}
     </div>
   );
 }

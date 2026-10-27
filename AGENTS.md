@@ -14,9 +14,9 @@ the flow and `docs/plan.md` for how it was set up.
   `packages/shared` and `packages/ui` (the design system). Apps import only
   packages, never each other. Code sits in feature folders (`src/github/`,
   `src/items/`) with no wrapper folders such as `services/`. File names are
-  kebab-case, except Copies and Ports from T3 Code, which keep T3's names. Unit
+  kebab-case, except Copies and Ports, which keep their source's names. Unit
   tests sit next to the file they test.
-- `packages/ui` holds Copies of T3's base components and coss's toast, listed in its `UPSTREAM.md`.
+- `packages/ui` holds Copies of lar-server's design system, listed in its `UPSTREAM.md`.
   Never edit one: take a fresh copy from upstream and update its row.
 - Nothing secret goes in this public repo or in any repository's Repository config
   (`.lar-factory.json`); the board reads GitHub through the local `gh` login.

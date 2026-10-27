@@ -12,7 +12,6 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { unified } from 'unified';
 import type { PluggableList } from 'unified';
-import { cn } from '../lib/utils.ts';
 
 export type RichTextFormat = 'markdown' | 'html';
 
@@ -49,25 +48,25 @@ const htmlProcessor = unified().use(rehypeParse, { fragment: true }).use(rehypeS
 
 // Tailwind has no typography plugin and its preflight resets headings, lists and tables, so the elements a
 // provider's text holds are styled here. Every class sits in this file, which styles.css lists as a @source.
-const body = cn(
+const body = [
   'min-w-0 max-w-full text-sm leading-relaxed break-words [overflow-wrap:anywhere]',
   '[&>:first-child]:mt-0 [&>:last-child]:mb-0 [&_p]:my-2 [&_ul]:my-2 [&_ol]:my-2 [&_blockquote]:my-2',
   '[&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:text-base [&_h2]:font-semibold',
   '[&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:font-semibold [&_h4]:mt-3 [&_h4]:mb-1.5 [&_h4]:font-semibold [&_h5]:font-semibold [&_h6]:font-semibold',
   '[&_ul]:list-disc [&_ul]:ps-6 [&_ol]:list-decimal [&_ol]:ps-6 [&_li]:my-0.5 [&_.task-list-item]:list-none [&_.task-list-item]:ms-[-1.5rem] [&_input]:me-1.5',
-  '[&_a]:text-info-foreground [&_a]:underline [&_a]:underline-offset-2',
-  '[&_blockquote]:border-s-2 [&_blockquote]:ps-3 [&_blockquote]:text-muted-foreground',
+  '[&_a]:text-(--lar-info-text) [&_a]:underline [&_a]:underline-offset-2',
+  '[&_blockquote]:border-s-2 [&_blockquote]:ps-3 [&_blockquote]:text-base-700',
   '[&_hr]:my-4',
-  '[&_pre]:my-2 [&_pre]:max-w-full [&_pre]:overflow-x-hidden [&_pre]:whitespace-pre-wrap [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs',
-  '[&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-xs',
+  '[&_pre]:my-2 [&_pre]:max-w-full [&_pre]:overflow-x-hidden [&_pre]:whitespace-pre-wrap [&_pre]:rounded-md [&_pre]:bg-base-200 [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-xs',
+  '[&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-base-200 [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-xs',
   '[&_table]:my-2 [&_table]:w-full [&_table]:max-w-full [&_table]:table-fixed [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:text-start [&_td]:border [&_td]:px-2 [&_td]:py-1',
   '[&_details]:my-2 [&_summary]:cursor-pointer [&_summary]:font-medium',
-);
+].join(' ');
 
 export function RichText({ text, format, className }: { text: string; format: RichTextFormat; className?: string }) {
   if (text === '') return null;
   return (
-    <div className={cn(body, className)} data-slot="rich-text">
+    <div className={`${body} ${className ?? ''}`} data-slot="rich-text">
       {format === 'markdown' ? (
         <Markdown rehypePlugins={rehypePlugins} remarkPlugins={[remarkGfm]}>
           {text}

@@ -84,13 +84,8 @@ beforeEach(() => {
   vi.stubGlobal('scrollBy', vi.fn());
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
   Element.prototype.scrollIntoView = vi.fn();
-  // nor does it watch sizes, which lar-server's Modal does for its scroll fade, or animate. Base UI's scroll area asks
-  // for animations once it can watch sizes; its popups, with animations off, still close at once, as before.
+  // nor does it watch sizes, which lar-server's Modal does for its scroll fade.
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
-  Element.prototype.getAnimations = () => [];
-  vi.stubGlobal('BASE_UI_ANIMATIONS_DISABLED', true);
-  // T3's SidebarProvider writes a cookie the board never reads; jsdom has no Cookie Store API.
-  vi.stubGlobal('cookieStore', { set: vi.fn(async () => {}) });
   history.replaceState(null, '', '/');
 });
 

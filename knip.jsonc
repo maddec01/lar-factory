@@ -10,29 +10,15 @@
       // electron-builder runs sign-macos.ts as its sign hook, and the tests spawn fake-board.mjs.
       // Knip's Vitest plugin finds vite.config.ts and the tests.
       "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/fake-board.mjs"]
-    },
-    "packages/ui": {
-      // The Copies import src/ through `~` and coss's toast through `@/registry/default`, which tsconfig.copies.json maps.
-      "paths": {
-        "~/*": ["./src/*"],
-        "@/registry/default/lib/utils": ["./src/lib/utils.ts"],
-        "@/registry/default/ui/button": ["./src/components/ui/button.tsx"]
-      }
     }
   },
   // ensure-electron-runtime.mjs, copied unchanged from T3 Code, runs macOS's `file`;
   // apps/server's server-support test runs `pgrep` to find the board's gh children.
   "ignoreBinaries": ["file", "pgrep"],
   // Ports from T3 Code keep T3's exports, so later T3 fixes port line for line (docs/adr/0011).
-  // Copies keep every export upstream has (docs/adr/0016).
+  // Copies keep every export upstream has (packages/ui/UPSTREAM.md).
   "ignoreIssues": {
-    "packages/ui/src/components/MorphIcon.tsx": ["exports", "types"],
-    "packages/ui/src/components/ui/*": ["exports", "types"],
-    "packages/ui/src/coss/*": ["exports", "types"],
     "packages/ui/src/design-system/**": ["exports", "types"],
-    "packages/ui/src/hooks/*": ["exports", "types"],
-    "packages/ui/src/lib/visibleAnimation.ts": ["exports", "types"],
-    "packages/ui/src/lib/windowControlsOverlay.ts": ["exports", "types"],
     "apps/desktop/src/updates/AppUpdates.ts": ["exports", "types"],
     "apps/desktop/src/updates/updateMachine.ts": ["exports"],
     "apps/web/src/updates/update-button-logic.ts": ["exports"]

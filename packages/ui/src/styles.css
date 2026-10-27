@@ -1,18 +1,12 @@
 /* The design system's tokens and base styles: lar-server's theme (design-system/foundations/theme.css, a Copy), with
    ninna-ui's minimal preset under it, following the system's light or dark setting on html[data-theme="minimal"].
-   The T3 Copies read T3's role tokens (pingdotgg/t3code apps/web/src/index.css at d53873b); this file points each
-   role that theme.css covers at its lar-server token, as theme.css's palette comment pairs them, and keeps the rest
-   of T3's values: the --text-3xs to --text-5xs steps, the muted and secondary fills, the sidebar's tokens and the
-   safe-area and visible-animate-spin utilities. The board's own roles follow those tokens. */
+   On top of it, this file adds only the board's own: the role names its pages read, each pointed at a lar-server
+   token as theme.css's palette comment pairs them, and the board's own roles. */
 /* Tailwind scans only the sources listed, here and in each app's CSS: the page's own class names would
    otherwise turn on Tailwind utilities of the same name. ninna-ui's own @source paths resolve inside pnpm's store,
    where its packages aren't siblings, so its components are listed here. */
 @import "./design-system/foundations/theme.css" source(none);
-@source "./card";
-@source "./coss";
-@source "./components/ui";
 @source "./design-system";
-@source "./dialog";
 @source "./form";
 @source "./progress";
 @source "./rich-text";
@@ -22,218 +16,59 @@
 @source "../node_modules/@ninna-ui/primitives/dist";
 @source "../node_modules/@ninna-ui/react-internal/dist";
 
-/* T3's names for colours ninna-ui also names (primary, success, warning, info, border) are left to ninna-ui's. T3's
-   accent and secondary are fills, ninna-ui's are hues, and the T3 Copies still use them, so T3's win until the
-   board moves off the Copies. */
-@theme inline {
-  /* Two steps below Tailwind's text-xs (12px) for dense UI, after theme.css's 11px --text-2xs. 3xs is 10px, 4xs 8px
-     and 5xs 7px. Registered with tailwind-merge in lib/utils.ts so cn() treats them as font sizes, not colours. */
-  --text-3xs: 0.625rem;
-  --text-3xs--line-height: calc(0.875 / 0.625);
-  --text-4xs: 0.5rem;
-  --text-4xs--line-height: 1;
-  --text-5xs: 0.4375rem;
-  --text-5xs--line-height: 1;
-  --color-zinc-25: oklch(99.2% 0 0);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-warning-surface: var(--warning-surface);
-  --color-error-foreground: var(--error-foreground);
-  --color-error: var(--error);
-  --color-error-surface: var(--error-surface);
-  --color-success-foreground: var(--success-foreground);
-  --color-info-foreground: var(--info-foreground);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-placeholder: var(--placeholder);
-  --color-icon-muted: var(--icon-muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
-  --color-sidebar-control-surface: var(--sidebar-control-surface);
-  --color-sidebar-row-hover: var(--sidebar-row-hover);
-  --color-sidebar-row-active: var(--sidebar-row-active);
-  --color-sidebar-row-selected: var(--sidebar-row-selected);
-  --color-sidebar-border: var(--sidebar-border);
-  --radius-3xl: calc(var(--radius) + 12px);
-}
-
-/* coss's toast (src/coss/toast.tsx): the theme vars and keyframes its registry entry adds
-   (https://coss.com/ui/r/toast.json, cosscom/ui at 3d8ca28), which replay a toast shown again with the same id. */
-@theme {
-  --animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-  --animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-}
-
-@keyframes toast-success-odd {
-  0% { scale: 1; }
-  30% { scale: 1.025; }
-  60% { scale: 0.99; }
-  100% { scale: 1; }
-}
-
-@keyframes toast-success-even {
-  0% { scale: 1; }
-  30% { scale: 1.025; }
-  60% { scale: 0.99; }
-  100% { scale: 1; }
-}
-
-@keyframes toast-error-odd {
-  0% { translate: 0 0; }
-  25% { translate: -3px 0; }
-  50% { translate: 3px 0; }
-  75% { translate: -3px 0; }
-  100% { translate: 0 0; }
-}
-
-@keyframes toast-error-even {
-  0% { translate: 0 0; }
-  25% { translate: -3px 0; }
-  50% { translate: 3px 0; }
-  75% { translate: -3px 0; }
-  100% { translate: 0 0; }
-}
-
+/* The roles the board's pages read as CSS variables. They are plain variables, not Tailwind colours, so ninna-ui's
+   own primary, secondary and accent hues stay as theme.css sets them. */
 :root {
-  --control-radius: 0.5rem;
-  --sidebar-content-inset: 0.5rem;
-  --sidebar-control-gap: 0.5rem;
-  --sidebar-row-content-inset: 0.625rem;
-  --z-sheet: 46;
-  --workspace-topbar-height: 52px;
-  --workspace-controls-top: 0px;
-  --workspace-controls-left: calc(env(safe-area-inset-left) + 0.75rem);
-  --workspace-controls-right: calc(env(safe-area-inset-right) + 0.75rem);
-  --workspace-titlebar-control-size: 1.75rem;
-  --workspace-titlebar-control-gap: 0.75rem;
-  --app-scrollbar-thumb: var(--lar-scrollbar-thumb);
-  --app-scrollbar-thumb-hover: var(--lar-scrollbar-thumb-hover);
   --radius: var(--radius-lg);
   --background: var(--color-base-50);
   --foreground: var(--color-base-content);
   --card: var(--color-base-100);
-  --card-foreground: var(--foreground);
-  --popover: var(--color-base-100);
-  --popover-foreground: var(--foreground);
   --primary: var(--color-primary);
-  --primary-foreground: var(--color-primary-content);
   --secondary: var(--color-zinc-50);
   --secondary-foreground: var(--foreground);
   --muted: var(--color-zinc-50);
   --muted-foreground: var(--color-base-700);
-  --placeholder: var(--muted-foreground);
-  --icon-muted: var(--muted-foreground);
   --accent: var(--color-base-200);
-  --accent-foreground: var(--foreground);
   --error: var(--color-danger);
   --error-foreground: var(--lar-danger-text);
   --error-surface: color-mix(in srgb, var(--error) 8%, transparent);
-  --destructive: var(--error);
+  --destructive-foreground: var(--error-foreground);
   --border: var(--color-border);
   --input: var(--color-base-400);
   --ring: var(--primary);
-  --destructive-foreground: var(--error-foreground);
-  --info: var(--color-info);
-  --info-foreground: var(--lar-info-text);
   --success: var(--color-success);
   --success-foreground: var(--lar-success-text);
   --warning: var(--color-warning);
   --warning-foreground: var(--lar-warning-text);
   --warning-surface: color-mix(in srgb, var(--warning) 8%, transparent);
-  --sidebar-control-surface: var(--color-zinc-100);
-  /* T3 mixes its sidebar's muted text into the sidebar; the board's update button sits on the page. */
-  --sidebar-icon-color: color-mix(in srgb, var(--muted-foreground) 60%, var(--background));
-  /* What the Copies and utilities read directly, at T3's default contrast. */
-  --contrast-foreground: var(--foreground);
-  --contrast-muted-foreground: var(--muted-foreground);
 
   /* The board's own roles. */
   --you: var(--warning);
   --thread: var(--primary);
   --sub: var(--color-violet-500);
-  --sub-text: var(--color-violet-600); /* AA on white */
   --build: var(--success);
   --danger-text: var(--error-foreground);
-  --line: color-mix(in srgb, var(--foreground) 14%, transparent);
   --soft: color-mix(in srgb, var(--foreground) 7%, transparent);
-  /* zinc-200, a step darker than the update pill's zinc-100: T3's zinc-25 row hover is the page's own
-     background here. */
-  --update-hover: var(--color-zinc-200);
 
   @variant dark {
     --secondary: --alpha(var(--color-white) / 3%);
     --muted: --alpha(var(--color-white) / 3%);
     --error-surface: color-mix(in srgb, var(--error) 16%, transparent);
     --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
-    --sidebar-control-surface: var(--muted);
 
     --sub: var(--color-violet-400);
-    --sub-text: var(--sub);
-    --update-hover: var(--accent);
   }
 }
 
+/* A bare border takes the theme's border colour, and an outline the primary's. */
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-primary/50;
   }
 }
 
-@utility visible-animate-spin {
-  animation: var(--animate-spin);
-  animation-play-state: var(--visible-animation-state, paused);
-  will-change: var(--visible-animation-will-change, auto);
-}
-
-/* Safe-area inset utilities for surfaces that opt into edge-to-edge rendering.
-   Insets resolve to 0 when the browser already constrains the layout viewport
-   to the safe area. */
-@utility pt-safe {
-  padding-top: max(env(safe-area-inset-top), 0px);
-}
-@utility pb-safe {
-  padding-bottom: max(env(safe-area-inset-bottom), 0px);
-}
-@utility pl-safe {
-  padding-left: max(env(safe-area-inset-left), 0px);
-}
-@utility pr-safe {
-  padding-right: max(env(safe-area-inset-right), 0px);
-}
-
-/* T3's glass utilities, which the Copies use, are theme.css's: T3's dialog-backdrop has the same name there. */
-@utility dropdown-glass {
-  @apply glass-menu;
-}
-
-@utility dialog-glass {
-  @apply glass-dialog;
-}
-
-/* The board's own: T3's dialog popups don't drag the window, but their viewports and backdrops, which cover the
-   title bar, do in the board app. Neither may, so a click over the bar while a dialog is open reaches the page.
-   lar-server's Modal, its overlay and its content, likewise. */
-[data-slot="dialog-viewport"],
-[data-slot="dialog-backdrop"],
-[data-slot="alert-dialog-viewport"],
-[data-slot="alert-dialog-backdrop"],
+/* The board app's window drags by its title bar; lar-server's Modal, its overlay and its content, which cover the
+   bar, must not, so a click over the bar while a modal is open reaches the page. */
 [data-slot="modal-overlay"],
 [data-slot="modal-content"] {
   -webkit-app-region: no-drag;

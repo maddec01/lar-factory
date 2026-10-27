@@ -2,27 +2,10 @@
   "name": "@lar-factory/ui",
   "private": true,
   "version": "0.1.0",
-  "description": "The design system: the board's tokens, base styles and base components, copied from lar-server, with the T3 Code and coss components the board still uses.",
+  "description": "The design system: the board's tokens, base styles and base components, copied from lar-server.",
   "type": "module",
   "exports": {
-    "./alert": "./src/components/ui/alert.tsx",
-    "./alert-dialog": "./src/components/ui/alert-dialog.tsx",
-    "./badge": "./src/components/ui/badge.tsx",
-    "./button": "./src/components/ui/button.tsx",
-    "./checkbox": "./src/components/ui/checkbox.tsx",
-    "./collapsible": "./src/components/ui/collapsible.tsx",
-    "./dialog": "./src/components/ui/dialog.tsx",
-    "./input": "./src/components/ui/input.tsx",
-    "./label": "./src/components/ui/label.tsx",
-    "./menu": "./src/components/ui/menu.tsx",
-    "./popover": "./src/components/ui/popover.tsx",
-    "./radio-group": "./src/components/ui/radio-group.tsx",
-    "./sidebar": "./src/components/ui/sidebar.tsx",
-    "./textarea": "./src/components/ui/textarea.tsx",
-    "./tooltip": "./src/components/ui/tooltip.tsx",
-    "./toast": "./src/coss/toast.tsx",
     "./toasts": "./src/toasts/toasts.ts",
-    "./card": "./src/card/card.tsx",
     "./fieldset": "./src/form/fieldset.tsx",
     "./native-select": "./src/form/native-select.tsx",
     "./progress": "./src/progress/progress.tsx",
@@ -31,6 +14,7 @@
     "./design-system/IconButton": "./src/design-system/actions/IconButton.tsx",
     "./design-system/Badge": "./src/design-system/display/Badge.tsx",
     "./design-system/BrandMark": "./src/design-system/display/BrandMark.tsx",
+    "./design-system/NoticeCard": "./src/design-system/display/NoticeCard.tsx",
     "./design-system/Alert": "./src/design-system/feedback/Alert.tsx",
     "./design-system/Notifications": "./src/design-system/feedback/Notifications.tsx",
     "./design-system/Checkbox": "./src/design-system/forms/Checkbox.tsx",
@@ -58,7 +42,7 @@
   },
   "scripts": {
     "test": "vp test run",
-    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.copies.json"
+    "typecheck": "tsc --noEmit -p ."
   },
   "devDependencies": {
     "@types/hast": "^3.0.5",
@@ -71,7 +55,6 @@
     "vite-plus": "1.3.0"
   },
   "dependencies": {
-    "@base-ui/react": "^1.4.1",
     "@ninna-ui/core": "^0.6.0",
     "@ninna-ui/feedback": "^0.6.0",
     "@ninna-ui/forms": "^0.6.0",
@@ -79,19 +62,13 @@
     "@ninna-ui/primitives": "^0.6.0",
     "@ninna-ui/react-internal": "^0.6.0",
     "@tailwindcss/node": "4.3.3",
-    "class-variance-authority": "^0.7.1",
-    "effect": "4.0.5",
     "hast-util-to-jsx-runtime": "^2.3.6",
-    "lucide": "^0.564.0",
-    "lucide-react": "^1.61.0",
-    "morphicons": "^1.7.1",
     "react": "19.3.0",
     "react-markdown": "^10.1.0",
     "rehype-parse": "^9.0.1",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "tailwind-merge": "^3.4.0",
     "unified": "^11.0.5"
   }
 }

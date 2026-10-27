@@ -31,8 +31,6 @@ test('the offer opens the onboarding dialog with its project picked', async () =
   serve(offered(empty), [project('lar-web', { hasConfig: true }), project('lar-cli')]);
   await mountPage(offered(empty));
   await settle(() => offer()!.querySelector('button')!.click());
-  // Base UI moves focus on the next frame.
-  await settle(() => vi.advanceTimersByTime(50));
   expect(dialog()).not.toBeNull();
   expect(dialog()!.querySelector('[data-choice="lar-web"] [role="radio"]')!.getAttribute('aria-checked')).toBe('true');
 });

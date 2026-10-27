@@ -40,9 +40,9 @@ code { font: var(--text-xs) var(--font-mono); }
   a { color: inherit; text-decoration: underline; }
   a[data-slot="button"] { text-decoration: none; }
   a:hover { text-decoration-thickness: --spacing(0.5); }
-  /* So a T3 control's outline-none wins and its own focus ring is the only one. */
+  /* So a copied control's outline-none wins and its own focus ring is the only one. */
   :focus-visible { outline: --spacing(0.5) solid var(--ring); outline-offset: --spacing(0.5); border-radius: var(--radius-sm); }
 }
 .sr-only { position: absolute; width: --spacing(0.25); height: --spacing(0.25); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-/* T3's Button takes no pointer events while disabled; one that says why keeps them, so its title shows. */
+/* The copied Button, ninna-ui's, takes no pointer events while disabled; one that says why keeps them, so its title shows. */
 button:disabled[title] { pointer-events: auto; cursor: not-allowed; }

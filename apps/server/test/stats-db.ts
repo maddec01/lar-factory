@@ -251,3 +251,30 @@ export function projectsDb(t: TestContext, projects: FixtureProject[]): string {
   db.close();
   return path;
 }
+
+/** A thread in a project with its messages by role, earliest first, each a minute apart. */
+export interface FixtureProjectThread {
+  id: string;
+  project: string;
+  title: string;
+  createdAt: string;
+  deletedAt?: string;
+  messages?: { role: 'user' | 'assistant'; text: string }[];
+}
+
+/** Writes a database holding only threads with their projects and messages, removed after the test, and returns its path. */
+export function projectThreadsDb(t: TestContext, threads: FixtureProjectThread[]): string {
+  const path = join(tempDir(t, 'lar-threads-'), 'statev2.sqlite');
+  const db = new DatabaseSync(path);
+  db.exec(`CREATE TABLE orchestration_v2_projection_threads (thread_id TEXT PRIMARY KEY, project_id TEXT, title TEXT, created_at TEXT, deleted_at TEXT);
+CREATE TABLE orchestration_v2_projection_messages (message_id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, created_at TEXT, payload_json TEXT);`);
+  const thread = db.prepare('INSERT INTO orchestration_v2_projection_threads VALUES (?, ?, ?, ?, ?)');
+  const message = db.prepare('INSERT INTO orchestration_v2_projection_messages VALUES (?, ?, ?, ?, ?)');
+  for (const th of threads) {
+    thread.run(th.id, th.project, th.title, th.createdAt, th.deletedAt ?? null);
+    (th.messages ?? []).forEach((m, i) => message.run(`${th.id}-m${i}`, th.id, m.role,
+      new Date(Date.parse(th.createdAt) + i * 60_000).toISOString(), JSON.stringify({ text: m.text })));
+  }
+  db.close();
+  return path;
+}

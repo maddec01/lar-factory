@@ -67,6 +67,28 @@ test('a work item with no description, people or comments answers empty details'
   });
 });
 
+test('the child work items answer as sub-tickets, Completed ones closed and Removed ones left out, from one batch read', async () => {
+  const az = fakeAz({ items: [workItem({ type: 'User Story' }),
+    { id: 6, type: 'Task', state: 'Active', parent: 5, title: 'Write the exporter' }, { id: 7, type: 'Task', state: 'Closed', parent: 5, title: 'Add the button' },
+    { id: 8, type: 'Task', state: 'Removed', parent: 5, title: 'Dropped idea' }, { id: 9, type: 'Task', state: 'Active', title: 'Unrelated' }] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual(details.subTickets, [
+    { number: 6, title: 'Write the exporter', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/6', repo: REPO, state: 'open' },
+    { number: 7, title: 'Add the button', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/7', repo: REPO, state: 'closed' },
+  ]);
+  assert.deepEqual(az.batches, [[6, 7, 8]]);
+  const read = az.calls.find((args) => args.includes('workitems'))!;
+  assert.ok(read.slice(read.indexOf('--query-parameters')).some((a) => /^\$expand=relations$/i.test(a)));
+});
+
+test('a work item with no child links reads no batch', async () => {
+  const az = fakeAz({ items: [workItem()] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual([details.subTickets, az.batches], [[], []]);
+});
+
 test('an az failure answers its message', async () => {
   const az = fakeAz({ items: [workItem()], fail: (args) => (args.includes('comments') ? new Error('az devops invoke failed: timed out') : undefined) });
   assert.deepEqual(await readAzureItemDetails(item(5), az.run), { status: 502, error: 'az devops invoke failed: timed out' });

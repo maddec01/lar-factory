@@ -2,10 +2,10 @@
 // azure-items.ts leaves them out and stays on API_VERSION.
 
 import { decodePart, onAzure } from '@lar-factory/shared';
-import type { Item, ItemComment, ItemCommentsPage, ItemDetails, TextFormat } from '@lar-factory/shared';
+import type { IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails, TextFormat } from '@lar-factory/shared';
 import type { Refused } from '../config/edit-config.ts';
 import { ReadProblem } from '../items/item-source.ts';
-import { az, orgFlags, problemOf, type Az, type RawWorkItem } from './azure-items.ts';
+import { API_VERSION, az, field, linked, orgFlags, problemOf, withFile, workItemUrl, type Az, type RawWorkItem } from './azure-items.ts';
 
 /** The first API version that returns a work item's `multilineFieldsFormat`. */
 const DETAIL_API_VERSION = '7.2-preview.3';
@@ -52,8 +52,8 @@ const comment = (raw: RawComment): ItemComment => {
 /** One `az devops invoke` of the work item tracking area, its answer parsed. */
 type Call = <R>(resource: string, route: string[], version: string, more?: string[]) => Promise<R>;
 
-/** Runs `use` with a call for an Azure DevOps item, or says why it can't: the item is not a work item, or the `az` error. */
-async function inArea<T>(item: Item, run: Az, use: (call: Call) => Promise<T>): Promise<T | Refused> {
+/** Runs `use` with a call for an Azure DevOps item, and its repository, or says why it can't: the item is not a work item, or the `az` error. */
+async function inArea<T>(item: Item, run: Az, use: (call: Call, repo: string) => Promise<T>): Promise<T | Refused> {
   if (!item.repo || !onAzure(item.repo) || item.number === null) return { status: 404, error: 'That item is not an Azure DevOps work item.' };
   const [organization, project] = item.repo.split('/') as [string, string];
   const call = async <R>(resource: string, route: string[], version: string, more: string[] = []): Promise<R> => {
@@ -63,7 +63,7 @@ async function inArea<T>(item: Item, run: Az, use: (call: Call) => Promise<T>): 
     } catch (err) { throw problemOf(err); }
   };
   try {
-    return await use(call);
+    return await use(call, item.repo);
   } catch (err) {
     if (err instanceof ReadProblem) return { status: 502, error: `${err.message}${err.fix ? ` Run ${err.fix}.` : ''}` };
     return { status: 502, error: err instanceof Error ? err.message : String(err) };
@@ -74,14 +74,33 @@ async function inArea<T>(item: Item, run: Az, use: (call: Call) => Promise<T>): 
 const readComments = (call: Call, item: Item, token?: string) =>
   call<RawComments>('comments', [`workItemId=${item.number}`], COMMENTS_API_VERSION, ['--query-parameters', `$top=${COMMENT_LIMIT}`, 'order=desc', ...token ? [`continuationToken=${token}`] : []]);
 
+/** The work item's child work items as sub-tickets, from one batch read; the Completed ones are closed and the Removed ones, which the board hides, are left out. */
+async function subTicketsOf(call: Call, repo: string, workItem: RawWorkItem): Promise<IssueRef[]> {
+  const ids = linked(workItem, 'System.LinkTypes.Hierarchy-Forward');
+  if (!ids.length) return [];
+  const [organization, project] = repo.split('/') as [string, string];
+  const { value } = await withFile({ ids, fields: ['System.Title', 'System.State', 'System.WorkItemType'], errorPolicy: 'Omit' }, (file) =>
+    call<{ value: (RawWorkItem | null)[] }>('workitemsbatch', [], API_VERSION, ['--http-method', 'POST', '--in-file', file]));
+  const children = value.filter((raw): raw is RawWorkItem => raw !== null);
+  const types = [...new Set(children.map((raw) => field(raw, 'System.WorkItemType')))];
+  const states = await Promise.all(types.map((type) => call<{ value: { name: string; category: string }[] }>('workitemtypestates', [`type=${type}`], API_VERSION)));
+  const category = new Map(types.map((type, i) => [type, new Map(states[i]!.value.map((s) => [s.name, s.category]))]));
+  return children.flatMap((raw) => {
+    const kind = category.get(field(raw, 'System.WorkItemType'))?.get(field(raw, 'System.State'));
+    if (kind === 'Removed') return [];
+    return [{ number: raw.id, title: field(raw, 'System.Title'), url: workItemUrl(organization, project, raw.id), repo, state: kind === 'Completed' ? 'closed' : 'open' }];
+  });
+}
+
 /**
  * Reads one work item's details, or says why it can't: the item's repository is not on Azure DevOps, or the `az` error.
- * The work item is read at DETAIL_API_VERSION and its last COMMENT_LIMIT comments at COMMENTS_API_VERSION, newest first.
+ * The work item is read at DETAIL_API_VERSION with its links, and its last COMMENT_LIMIT comments at COMMENTS_API_VERSION, newest first.
+ * Its child work items are one more batch read, with a states read per child type.
  * `run` stands in for az in tests.
  */
-export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDetails | Refused> => inArea(item, run, async (call) => {
+export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDetails | Refused> => inArea(item, run, async (call, repo) => {
   const [workItem, read] = await Promise.all([
-    call<RawWorkItem & { multilineFieldsFormat?: Record<string, string> }>('workitems', [`id=${item.number}`], DETAIL_API_VERSION),
+    call<RawWorkItem & { multilineFieldsFormat?: Record<string, string> }>('workitems', [`id=${item.number}`], DETAIL_API_VERSION, ['--query-parameters', '$expand=relations']),
     readComments(call, item),
   ]);
   const body = typeof workItem.fields['System.Description'] === 'string' ? workItem.fields['System.Description'] : '';
@@ -96,7 +115,7 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
     createdAt: text('System.CreatedDate') ?? null,
     ...text('System.IterationPath') && { iteration: text('System.IterationPath') },
     ...text('System.AreaPath') && { area: text('System.AreaPath') },
-    subTickets: [],
+    subTickets: await subTicketsOf(call, repo, workItem),
     comments: read.comments.filter((c) => !c.isDeleted).map(comment),
     hasOlderComments: olderCursor !== null,
     olderCursor,

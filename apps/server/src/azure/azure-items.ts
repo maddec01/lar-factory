@@ -94,8 +94,10 @@ type Category = 'Proposed' | 'InProgress' | 'Resolved' | 'Completed' | 'Removed'
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 export const field = (raw: RawWorkItem, name: string) => text(raw.fields[name]);
+/** A work item's page, in the organization and the project as its repository's name encodes it. */
+export const workItemUrl = (organization: string, encodedProject: string, id: number) => `https://dev.azure.com/${organization}/${encodedProject}/_workitems/edit/${id}`;
 /** The ids a work item's links of `rel` point at: the last part of each link's URL. */
-const linked = (raw: RawWorkItem, rel: string) => (raw.relations ?? []).filter((r) => r.rel === rel).map((r) => Number(r.url.split('/').at(-1)));
+export const linked = (raw: RawWorkItem, rel: string) => (raw.relations ?? []).filter((r) => r.rel === rel).map((r) => Number(r.url.split('/').at(-1)));
 /** The work item's tags, from System.Tags's "a; b". */
 export const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';').map((t) => t.trim()).filter(Boolean);
 const STATUS_TAGS = new Set(STATUSES.flatMap((s) => (s === 'Done' ? [] : [statusLabel(s)])));
@@ -172,7 +174,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     if (!typeStates.has(type)) typeStates.set(type, kept(() => invoke<{ value: { name: string; category: Category }[] }>('wit', 'workitemtypestates', [`type=${type}`]), now));
     return typeStates.get(type)!();
   };
-  const url = (id: number) => `https://dev.azure.com/${organization}/${encoded}/_workitems/edit/${id}`;
+  const url = (id: number) => workItemUrl(organization, encoded, id);
   const itemId = (id: number) => `azure:${organization.toLowerCase()}/${id}`;
   const labelsOf = (raw: RawWorkItem) => tagsOf(raw).filter((t) => !STATUS_TAGS.has(t) && !isRepoTag(t));
 

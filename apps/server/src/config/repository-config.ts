@@ -5,8 +5,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigProblem, type RepositoryItemSource,
-  type SetupAnswers, type ShowSetting,
+  PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigAnswers,
+  type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
 import { readDefaultBranchFile } from '../github/github.ts';
 import { boardDataDir } from '../port/board-record.ts';
@@ -47,6 +47,11 @@ export function isItemSource(value: unknown): value is RepositoryItemSource {
   return value.kind === 'github-project' && typeof value.owner === 'string' && GITHUB_LOGIN.test(value.owner)
     && Number.isInteger(value.number) && (value.number as number) > 0;
 }
+
+/** Whether a value is the Repository config's values as onboarding and Edit send them: an item source, a show setting, a role and custom labels. */
+export const isConfigAnswers = (value: unknown): value is RepositoryConfigAnswers => isRecord(value) && isItemSource(value.itemSource)
+  && SHOW_SETTINGS.includes(value.show as ShowSetting) && typeof value.role === 'string' && value.role.trim() !== ''
+  && Array.isArray(value.labels) && value.labels.every((l) => typeof l === 'string');
 
 function readJson(file: string): unknown {
   try { return JSON.parse(readFileSync(file, 'utf8')); }

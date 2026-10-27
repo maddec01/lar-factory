@@ -375,6 +375,11 @@ test('.lar-factory.json as onboarding writes it has the answers, version 1 and t
     '{\n  "version": 1,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "show": "opted-in",\n  "labels": [\n    "app: music",\n    "web"\n  ]\n}\n');
 });
 
+test('.lar-factory.json as Edit writes it keeps the version the file had', () => {
+  const file = onboardingConfigFile({ itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'API server', labels: [] }, 2);
+  assert.deepEqual(JSON.parse(file), { version: 2, role: 'API server', itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', labels: [] });
+});
+
 test('a skill Clash renames only to a valid name no bundled skill, no other project skill and no rename beside it has', () => {
   const bundled = ['code-review', 'tdd'];
   assert.equal(skillRenameProblem('web-review', bundled, ['code-review', 'ours'], ['web-tdd']), null);

@@ -641,9 +641,9 @@ export interface RepositoryConfigAnswers {
   labels: string[];
 }
 
-/** The .lar-factory.json onboarding's PR adds. */
-export const onboardingConfigFile = ({ role, itemSource, show, labels }: RepositoryConfigAnswers): string =>
-  `${JSON.stringify({ version: 1, role, itemSource, show, labels }, null, 2)}\n`;
+/** The .lar-factory.json onboarding's PR adds, at `version` 1; Edit's PR writes it at the version the file had. */
+export const onboardingConfigFile = ({ role, itemSource, show, labels }: RepositoryConfigAnswers, version = 1): string =>
+  `${JSON.stringify({ version, role, itemSource, show, labels }, null, 2)}\n`;
 
 /** What the Provider and item source step has answered so far, as typed; the GitHub Project's fields count only for a Project. */
 export interface SetupAnswers {

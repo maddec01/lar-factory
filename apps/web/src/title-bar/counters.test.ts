@@ -6,12 +6,11 @@ import { $, $$, moved, mountPage, sample, settle, text } from '../../test/suppor
 
 const counters = () => $$<HTMLButtonElement>('.counters button[aria-haspopup]');
 const counter = (label: string) => counters().find((b) => b.getAttribute('aria-label')!.startsWith(`${label}: `))!;
-const popup = () => $('[data-slot="popover-popup"][data-open]');
+const popup = () => $('[data-state="open"] .counter-popup');
 const rows = () => [...popup()!.querySelectorAll('li')].map(text);
 /** The popover's head, its title and count, and its foot. */
 const head = (pop: HTMLElement) => text(pop.querySelector('.h-10'));
 const foot = (pop: HTMLElement) => text(pop.querySelector('.border-t'));
-const scopeButton = (repo: string) => $<HTMLButtonElement>(`.list-group[data-repo="${repo}"] button.scope`)!;
 
 async function openCounter(label: string): Promise<HTMLElement> {
   await settle(() => counter(label).click());
@@ -36,7 +35,8 @@ test('the counts are the whole factory\'s with a repository scoped', async () =>
   await openCounter('need you');
   const items = rows();
   await settle(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  await settle(() => scopeButton('maddec01/lar-apple').click());
+  const { useScopeStore } = await import('../board/scope-store.ts');
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect(text($('.title-bar .scope'))).toBe('lar-apple');
   expect(counters().map(text)).toEqual(before);
   await openCounter('need you');
@@ -116,7 +116,7 @@ test('the spend tooltip says the figure is an API estimate', async () => {
   await mountPage();
   await settle(() => counter('spend').focus());
   await settle(() => vi.advanceTimersByTime(1000));
-  expect(text($('[data-slot="tooltip-popup"]'))).toBe('Agent cost on open and recent items, an API estimate');
+  expect(text($('[role="tooltip"]'))).toBe('Agent cost on open and recent items, an API estimate');
 });
 
 test('with nothing on the board each popover says so', async () => {

@@ -45,8 +45,8 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · improvement');
   expect(text(row('I_sample21').querySelector('.queue-meta'))).toBe('Draft · queued 24h ago');
 
-  const { useSidebarStore } = await import('../sidebar/sidebar-store.ts');
-  await settle(() => useSidebarStore.getState().setScope('maddec01/lar-apple'));
+  const { useScopeStore } = await import('../board/scope-store.ts');
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect(rows().map((r) => r.dataset.item), 'only the scoped repository').toEqual(['I_sample06']);
 });
 
@@ -73,7 +73,7 @@ test("a dossier's parts are left out and show in the dossier; a Queued parent st
 
 test('an empty Queue says where items come from, and has no Start next', async () => {
   await mountPage({ ...sample, items: sample.items.filter((i) => i.status !== 'Queued') });
-  expect(text(queue().querySelector('p'))).toBe('Queue empty. Queue items from List in the sidebar.');
+  expect(text(queue().querySelector('p'))).toBe('Queue empty. Queue items from the List.');
   expect(queue().querySelector('[data-start]')).toBeNull();
 });
 

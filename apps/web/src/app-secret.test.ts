@@ -11,7 +11,8 @@ const secretOfLastPost = () => {
 
 async function queueFirstItem(): Promise<void> {
   await mountPage();
-  await settle(() => $<HTMLButtonElement>('.sidebar [data-item="I_sample01"]')!.click());
+  const { useItemDialogStore } = await import('./item-dialog/item-dialog-store.ts');
+  await settle(() => useItemDialogStore.getState().open('I_sample01'));
   await settle(() => $<HTMLButtonElement>('[data-item-dialog] [data-queue="I_sample01"]')!.click());
 }
 

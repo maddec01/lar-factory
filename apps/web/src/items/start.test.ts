@@ -263,12 +263,12 @@ test("Start on an untagged item that only one repository reads asks nothing", as
 });
 
 test('with the Scope on a repository that reads an untagged item, Start starts it there without asking', async () => {
-  const { useSidebarStore } = await import('../sidebar/sidebar-store.ts');
+  const { useScopeStore } = await import('../board/scope-store.ts');
   await mountItem(untagged([WEB, API]));
-  await settle(() => useSidebarStore.getState().setScope(API));
+  await settle(() => useScopeStore.getState().setScope(API));
   await open();
   expect(repoEntries()).toEqual([]);
   await press(entries()[0]!);
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', repo: API }]]);
-  await settle(() => useSidebarStore.getState().setScope(null));
+  await settle(() => useScopeStore.getState().setScope(null));
 });

@@ -28,7 +28,7 @@ test('the board page opens on the loading screen, over the board, with the mark 
   expect(text($('.loading-wordmark'))).toBe('larFactory');
   expect(screen()!.classList.contains('is-drawn')).toBe(false);
   expect(line()).toBe('Checking repositories');
-  expect($('.sidebar'), 'the board is under the screen').not.toBeNull();
+  expect($('.title-bar'), 'the board is under the screen').not.toBeNull();
 });
 
 test('the line names the running reads, drops each as it finishes, and the screen waits while the read is unsettled', async () => {
@@ -185,7 +185,7 @@ test('the board behind is inert while the screen is up, through the fade, and se
   await mountPage(unsettled());
   expect(covered()).toBe(true);
   expect($('#app .loading-screen'), 'the screen is not inside the inert board').toBeNull();
-  expect($('#app .sidebar'), 'the board is').not.toBeNull();
+  expect($('#app .title-bar'), 'the board is').not.toBeNull();
 
   await advance(DRAW_MS);
   await push(settled());

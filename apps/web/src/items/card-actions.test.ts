@@ -29,7 +29,7 @@ test('Queue shows the action in flight and holds Abandon without relabelling it,
   expect(text(button('abandon', 'I_sample01')), 'Abandon is not relabelled').toBe('Abandon');
 
   await answer({ error: null, board: moved('I_sample01', 'Queued') });
-  expect($('.sidebar [data-item="I_sample01"]'), 'it leaves the List').toBeNull();
+  expect(text($('.title-bar .list-button')), 'it leaves the List').toBe('List3');
   expect([toast()!.getAttribute('role'), text(toast())]).toEqual(['status', `Moved #61 ${sample.items[0]!.title} to Queued. View item`]);
   expect(toast()!.querySelector('button.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Moved #61');
 });
@@ -132,7 +132,7 @@ test('confirming Abandon holds Queue without relabelling it, and announces the d
   expect(text(button('queue', 'I_sample01')), 'Queue is not relabelled').toBe('Queue');
 
   await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample01') } });
-  expect($('.sidebar [data-item="I_sample01"]')).toBeNull();
+  expect(text($('.title-bar .list-button')), 'it leaves the List').toBe('List3');
   expect(toast()!.querySelector('a, .view-item'), 'nothing to link to').toBeNull();
   expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
 });

@@ -4,9 +4,7 @@
 .banner code { overflow-wrap: anywhere; }
 /* Fills the main area below the title bar. */
 .tool-missing { flex: 1; display: grid; place-items: center; padding: --spacing(5); }
-.tool-missing-box h1 { font-size: var(--text-base); font-weight: 600; margin: 0; letter-spacing: -0.01em; display: inline-flex; align-items: baseline; gap: --spacing(2); }
-/* Baseline alignment puts the mark's bottom edge on the text's baseline; at 0.705em its top meets the l's. */
-.brand-mark { width: 0.705em; height: 0.705em; flex: none; }
+.tool-missing-box h1 { font-size: var(--text-base); font-weight: 600; margin: --spacing(3) 0 0; letter-spacing: -0.01em; }
 .tool-missing-box { max-width: --spacing(130); @apply border; background: var(--card); border-radius: var(--radius); padding: --spacing(5) --spacing(6); }
 .tool-missing-box p { margin: --spacing(3) 0 0; color: var(--muted-foreground); }
 .tool-missing-box code { color: var(--foreground); overflow-wrap: anywhere; }

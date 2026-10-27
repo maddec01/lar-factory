@@ -19,7 +19,7 @@ import { startItem } from './start-item.ts';
 import { useStart, useStartStore } from './start-store.ts';
 import type { StartKind, StartState } from './start-store.ts';
 import { DismissButton, closeKeepingFocus } from '../notices/toasts.tsx';
-import { useSidebarStore } from '../sidebar/sidebar-store.ts';
+import { useScopeStore } from '../board/scope-store.ts';
 
 /**
  * The T3 thread Start opened for the item, from this page, another one or the board server's Start after. The
@@ -43,7 +43,7 @@ export function useStartHolds(item: Item, data: BoardData): boolean {
  */
 export function StartEntries({ item, data, onPick }: { item: Item; data: BoardData; onPick: (choice: ModelChoice | undefined, repo?: string) => void }) {
   const lastChoice = useStartStore((state) => state.lastChoice);
-  const scope = useSidebarStore((state) => state.scope);
+  const scope = useScopeStore((state) => state.scope);
   const [picked, setPicked] = useState<string>();
   const sample = data.capture?.enabled === false;
   const scoped = startRepo(item, scope ?? undefined);

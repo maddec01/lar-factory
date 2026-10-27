@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 import { GH_FLOOR, type AzCheck, type CommandCheck, type FailedCheck, type GhCheck, type T3Check } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
-import { BrandMark } from '../brand/brand-mark.tsx';
+import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { Banner } from './banner.tsx';
 import { useRecheckStore } from './recheck-store.ts';
@@ -46,7 +46,8 @@ export function T3Missing({ check }: { check: FailedCheck<T3Check> }) {
   return (
     <div className="tool-missing">
       <div className="tool-missing-box" role="alert">
-        <h1><BrandMark className="brand-mark" label="lar" /><span>T3 Code not found</span></h1>
+        <BrandMark label="lar" />
+        <h1>T3 Code not found</h1>
         <p>
           <Fix check={check} tool="t3" what="the T3 Code CLI">
             The board starts threads through T3 Code's <code>t3</code> command and didn't find it on the login shell's PATH, in /opt/homebrew/bin or in /usr/local/bin. Install T3 Code, then press Recheck.

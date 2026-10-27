@@ -42,6 +42,7 @@
     "./design-system/Switch": "./src/design-system/forms/Switch.tsx",
     "./design-system/Textarea": "./src/design-system/forms/Textarea.tsx",
     "./design-system/DesignSystemProvider": "./src/design-system/foundations/DesignSystemProvider.tsx",
+    "./design-system/NavigationIcons": "./src/design-system/icons/NavigationIcons.tsx",
     "./design-system/ScrollArea": "./src/design-system/layout/ScrollArea.tsx",
     "./design-system/SidebarNavigationItem": "./src/design-system/layout/sidebar/SidebarNavigationItem.tsx",
     "./design-system/SidebarPane": "./src/design-system/layout/sidebar/SidebarPane.tsx",

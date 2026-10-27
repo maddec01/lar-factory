@@ -121,7 +121,7 @@ export function Queue({ items }: { items: Item[] }) {
           {/* The row Start next starts is the one that waits for a slot. */}
           {queued.map((i, n) => <Row key={i.id} item={i} n={n} data={data} now={now} first={i === next} waits={i === next && building >= BUILD_LIMIT} />)}
         </ol>
-      ) : <p className="m-0 p-6 text-center text-(--muted-foreground)">Queue empty. Queue items from List in the sidebar.</p>}
+      ) : <p className="m-0 p-6 text-center text-(--muted-foreground)">Queue empty. Queue items from the List.</p>}
     </section>
   );
 }

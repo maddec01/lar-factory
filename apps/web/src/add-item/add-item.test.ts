@@ -1,7 +1,7 @@
 // The Add item dialog: the form, its repo-dependent fields, and each phase of a submission.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle } from '../../test/support.ts';
+import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
 import type { BoardData } from '@lar-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [
@@ -141,7 +141,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   const toast = $('[data-toast][role="status"]')!;
   expect(toast.textContent).toBe('Added #501 Playback stalls to List. View item');
   expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added #501');
-  expect($('.sidebar [data-item="I_created501"]'), 'the board shows the new data').not.toBeNull();
+  expect(text($('.title-bar .list-button')), 'the board shows the new data').toBe('List5');
 });
 
 test('a created issue the server could not add offers a retry of the same request', async () => {

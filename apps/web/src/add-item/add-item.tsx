@@ -1,4 +1,4 @@
-// The sidebar's Add item button and its dialog: a form that creates an issue in a configured repo
+// The title bar's Add item button and its dialog: a form that creates an issue in a configured repo
 // and adds it to List. ⌘N opens it too. The dialog stays mounted while closed, so a half-written draft survives. On an
 // Azure repository, Only for <repo> tags the new work item for it.
 
@@ -10,6 +10,7 @@ import type { RepoConfig } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/button';
 import { Checkbox } from '@lar-factory/ui/checkbox';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle, DialogTrigger } from '@lar-factory/ui/dialog';
+import { Button as LarButton } from '@lar-factory/ui/design-system/Button';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { Input } from '@lar-factory/ui/input';
 import { KeptMountedDialogPopup } from '@lar-factory/ui/kept-mounted-dialog-popup';
@@ -21,7 +22,6 @@ import { itemNoun, useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
-import { SidebarIconButton } from '../sidebar/sidebar-icon-button.tsx';
 
 /** The repo's custom labels, or tags on Azure DevOps, as toggles, none when it has none. Base UI's checkboxes don't follow a native
  * fieldset's disabled, so they take it themselves. */
@@ -141,7 +141,8 @@ export function AddItem() {
   }, []);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <SidebarIconButton label="Add item" tooltip="Add item (⌘N)" className="add-item" render={<DialogTrigger aria-keyshortcuts="Meta+N" />}><SquarePen /></SidebarIconButton>
+      {/* The dialog's trigger, so closing it returns focus here. */}
+      <DialogTrigger render={<LarButton variant="primary" className="add-item" leftIcon={<SquarePen />} title="Add item (⌘N)" aria-keyshortcuts="Meta+N" />}><span className="@max-[70rem]:sr-only [.title-bar:has(.update-button)_&]:@max-[74rem]:sr-only">Add item</span></DialogTrigger>
       <KeptMountedDialogPopup id="add-item-dialog" initialFocus={() => document.getElementById('item-repo')}>
         {/* A new draft remounts the form, which clears its fields. */}
         <AddItemForm key={draft} />

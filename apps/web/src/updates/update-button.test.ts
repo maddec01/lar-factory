@@ -1,4 +1,4 @@
-// The sidebar's update button, T3 Code's update pill: in the board app it always shows, as an icon, in
+// The title bar's update button, T3 Code's update pill: in the board app it always shows, as an icon, in
 // every update state. The bridge stands in for the app's preload and pushes each new update state, as the app does.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
@@ -47,11 +47,12 @@ test('a browser without the app has no update button', async () => {
   expect(button()).toBeNull();
 });
 
-test('the button is a round icon at the sidebar\'s foot, after Settings, with no text', async () => {
+test('the button is a round icon in the title bar, just before Settings, with no text', async () => {
   stubBridge(idle);
   await mountPage();
-  expect([...$('.sidebar-foot')!.querySelectorAll('li')].map((li) => li.firstElementChild!.getAttribute('aria-label') ?? text(li))).toEqual(['Settings', '']);
-  expect(button()!.closest('.sidebar-foot')).not.toBeNull();
+  expect(button()!.closest('.title-bar')).not.toBeNull();
+  const buttons = [...button()!.closest('.title-bar')!.querySelectorAll('button')];
+  expect(buttons[buttons.indexOf(button()!) + 1]!.classList, 'Settings comes right after it').toContain('open-settings');
   expect(button()!.classList).toContain('rounded-full');
   expect(button()!.textContent).toBe('');
 });

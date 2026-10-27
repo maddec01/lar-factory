@@ -1,12 +1,15 @@
-// The main area's title bar, in the Mac app and in a browser: the scope menu, the Refreshed time, the counters and
-// This week, T3's gap past the toggle while the sidebar is hidden.
+// The board's title bar, in the board app and in a browser: the brand, the scope menu, the Refreshed time, the
+// counters, the List button, Add item, the "for T3 Code" tag, the update button and Settings, past the traffic lights;
+// above the missing-t3 notice only the brand and Settings.
 
-import { expect, test, vi } from 'vite-plus/test';
+import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { clock } from '@lar-factory/shared';
-import { $, $$, NOW, mountPage, push, sample, settle, stubApp, text, toolChecks } from '../../test/support.ts';
+import { $, $$, NOW, fullScreen, mountPage, pressMenu, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
+
+// jsdom has no ResizeObserver, which the copied Modal's scroll fade observes with.
+beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
 
 const titleBar = () => $<HTMLElement>('.title-bar')!;
-const scopeButton = (repo: string) => $<HTMLButtonElement>(`.list-group[data-repo="${repo}"] button.scope`)!;
 const trigger = () => titleBar().querySelector<HTMLButtonElement>('button.scope')!;
 const refreshed = () => titleBar().querySelector<HTMLElement>('.refreshed')!;
 const dot = () => refreshed().querySelector<HTMLElement>('[data-dot]')!;
@@ -19,34 +22,129 @@ const isGreen = (el: Element) => el.classList.contains('bg-success');
 const tooltip = async () => {
   await settle(() => refreshed().focus());
   await settle(() => vi.advanceTimersByTime(1000));
-  return $$('[data-slot="tooltip-popup"] [data-line]').map(text);
+  // Radix repeats the tooltip, hidden, as the trigger's description; this reads the one shown.
+  return $$('[data-radix-popper-content-wrapper] [data-line]').filter((line) => !line.closest('[role="tooltip"]')).map(text);
 };
 
-test('the title bar shows All repositories, when the data was last read, and This week, not built yet', async () => {
+/** The title bar's controls, left to right, by name. */
+const CONTROLS = {
+  brand: '.brand', scope: 'button.scope', refreshed: '.refreshed', counters: '.counters', list: '.list-button',
+  'add item': '.add-item', 't3 tag': '.t3-tag', update: '.update-button, .update-stand-in', settings: '.open-settings',
+} as const;
+const controls = () => [...titleBar().querySelectorAll(Object.values(CONTROLS).join(', '))]
+  .map((el) => Object.entries(CONTROLS).find(([, selector]) => el.matches(selector))![0]);
+const inset = () => titleBar().className.split(' ').includes('pl-[74px]');
+
+test('the title bar holds the brand, Scope, Refreshed, the counters, List, Add item, the T3 tag, the update button and Settings, in that order', async () => {
+  stubApp({});
+  await mountPage();
+  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 't3 tag', 'update', 'settings']);
+  expect(text(titleBar().querySelector('.t3-tag'))).toBe('for T3 Code');
+  expect(titleBar().querySelector('header')!.className.split(' ')).toContain('h-13');
+});
+
+test('in a browser the update button is a still stand-in, in the same place', async () => {
+  await mountPage();
+  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 't3 tag', 'update', 'settings']);
+  const standIn = titleBar().querySelector('.update-stand-in')!;
+  expect([standIn.getAttribute('aria-label'), standIn.getAttribute('aria-disabled')]).toEqual(['Check for updates', 'true']);
+});
+
+test('the brand reads "lar Factory": the copied BrandMark, then Factory on its baseline', async () => {
+  await mountPage();
+  const brand = $('.title-bar .brand')!;
+  expect(text(brand)).toBe('larFactory');
+  expect(brand.className.split(' ')).toEqual(expect.arrayContaining(['inline-flex', 'items-baseline']));
+  const [mark, factory] = [...brand.children];
+  expect(mark!.className.split(' ')).toContain('lar-brand-mark');
+  expect(mark!.querySelector('svg')).not.toBeNull();
+  expect(text(factory)).toBe('Factory');
+});
+
+test('above the missing-t3 notice the bar holds only the brand and Settings, which opens', async () => {
+  stubApp({ listProfiles: vi.fn(async () => ({ profiles: [{ name: '.claude', ticked: true }], installed: true, conflicts: [] })) });
+  await mountPage({ ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
+  expect(controls()).toEqual(['brand', 'settings']);
+  await settle(() => $<HTMLButtonElement>('.title-bar .open-settings')!.click());
+  await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Skills')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect($('[role="dialog"] .settings-body')!.textContent, 'Settings opens over the notice').toContain('~/.claude');
+  expect($('.tool-missing')).not.toBeNull();
+});
+
+test('in a browser too, the missing-t3 notice\'s bar holds only the brand and Settings', async () => {
+  await mountPage({ ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
+  expect(controls()).toEqual(['brand', 'settings']);
+});
+
+test('Add item opens the Add item flow, and ⌘N does too', async () => {
+  await mountPage();
+  const add = titleBar().querySelector<HTMLButtonElement>('.add-item')!;
+  expect([text(add), add.getAttribute('aria-keyshortcuts')]).toEqual(['Add item', 'Meta+N']);
+  await settle(() => add.click());
+  expect($('#add-item-dialog')!.hidden).toBe(false);
+});
+
+test('in a browser, grey stand-ins hold the traffic lights\' place, with the bar starting past them as in the Mac app', async () => {
+  await mountPage();
+  const lights = $$('.traffic-lights > span');
+  expect(lights).toHaveLength(3);
+  expect(lights.every((s) => s.className.split(' ').includes('bg-(--traffic-stand-in)') && !s.style.background), 'one grey token, no colours').toBe(true);
+  expect(inset()).toBe(true);
+});
+
+test('in the Mac app, macOS draws the traffic lights and the bar starts past them', async () => {
+  stubApp({});
+  await mountPage();
+  expect($('.traffic-lights')).toBeNull();
+  expect(inset()).toBe(true);
+});
+
+test('in the Mac app\'s full screen, where macOS hides the traffic lights, the bar keeps only its own padding', async () => {
+  const window = fullScreen(true);
+  stubApp(window.bridge);
+  await mountPage();
+  expect(inset()).toBe(false);
+  await window.set(false);
+  expect(inset()).toBe(true);
+  await window.set(true);
+  expect(inset()).toBe(false);
+});
+
+test('outside the Mac app, full screen leaves the bar where it is', async () => {
+  stubApp({ ...fullScreen(true).bridge, platform: 'linux' });
+  await mountPage();
+  expect(inset()).toBe(true);
+});
+
+test('the bar drags the window, but none of its controls do', async () => {
+  await mountPage();
+  expect(titleBar().className.split(' ')).toEqual(expect.arrayContaining([
+    '[-webkit-app-region:drag]', '[&_:is(button,a,[tabindex])]:[-webkit-app-region:no-drag]',
+  ]));
+  expect(refreshed().tabIndex, 'the time is a tab stop, so it is no-drag too').toBe(0);
+});
+
+test('screen readers skip the brand; the page keeps one h1, for screen readers only', async () => {
+  await mountPage();
+  expect($('.brand')!.getAttribute('aria-hidden')).toBe('true');
+  expect(titleBar().closest('[aria-hidden="true"]')).toBeNull();
+  expect($$('h1').map((h) => [h.className, text(h)])).toEqual([['sr-only', 'Lar Factory']]);
+});
+
+test('the title bar shows All repositories and when the data was last read', async () => {
   await mountPage();
   expect(text(trigger())).toBe('All repositories');
   expect(trigger().querySelector('svg')).not.toBeNull();
   expect(trigger().getAttribute('aria-label')).toBe('Scope: All repositories');
   expect(text(refreshed())).toBe('Stale · 20m ago');
-  const week = [...titleBar().querySelectorAll('button')].find((b) => text(b) === 'This week')!;
-  expect([week.disabled, week.title]).toEqual([true, "This week isn't built yet"]);
-  expect(titleBar().className.split(' ')).toContain('h-13');
 });
 
-test('a group\'s name scopes the title bar to its repository, and its name again clears it', async () => {
-  await mountPage();
-  await settle(() => scopeButton('maddec01/lar-apple').click());
-  expect(text(trigger())).toBe('lar-apple');
-  await settle(() => scopeButton('maddec01/lar-apple').click());
-  expect(text(trigger())).toBe('All repositories');
-  expect(titleBar().querySelector('button[aria-label="Show the whole factory"]'), 'the × is gone').toBeNull();
-});
-
-test('the scope menu is headed Show, then All repositories, a separator and a repository per sidebar group, checked at the scope', async () => {
+test('the scope menu is headed Show, then All repositories, a separator and a repository per List group, checked at the scope', async () => {
   await mountPage();
   expect(menu()).toBeNull();
-  await settle(() => trigger().click());
-  expect(text($('[role="menu"] [data-slot="menu-label"]'))).toBe('Show');
+  await pressMenu(trigger());
+  expect(text($('[role="menu"] [role="menuitemradio"]')!.parentElement!.previousElementSibling)).toBe('Show');
   expect(entries().map(text)).toEqual(['All repositories', 'lar-server', 'lar-apple', 'Draft']);
   expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false', 'false']);
   expect($('[role="menu"] [role="separator"]')).not.toBeNull();
@@ -56,19 +154,25 @@ test('the scope menu is headed Show, then All repositories, a separator and a re
   expect(entries()[0]!.querySelector('[class*="repo-tone-"]'), 'All repositories has no dot').toBeNull();
 });
 
-test('picking a repository sets the scope, closes the menu and marks the sidebar group; All repositories clears it', async () => {
+test('picking a repository sets the scope and closes the menu; All repositories clears it', async () => {
   await mountPage();
-  await settle(() => trigger().click());
+  await pressMenu(trigger());
   await settle(() => entries()[2]!.click());
   expect(text(trigger())).toBe('lar-apple');
   expect(menu()).toBeNull();
-  expect(scopeButton('maddec01/lar-apple').getAttribute('aria-pressed')).toBe('true');
-  await settle(() => trigger().click());
+  await pressMenu(trigger());
   expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true', 'false']);
   await settle(() => entries()[0]!.click());
   expect(text(trigger())).toBe('All repositories');
   expect(menu()).toBeNull();
-  expect(scopeButton('maddec01/lar-apple').getAttribute('aria-pressed')).toBe('false');
+});
+
+test('the List modal\'s Scope board scopes the title bar too', async () => {
+  await mountPage();
+  await settle(() => $<HTMLButtonElement>('.title-bar .list-button')!.click());
+  await settle(() => $$<HTMLButtonElement>('[data-list-modal] nav button').find((b) => b.querySelector('.name')?.textContent === 'lar-apple')!.click());
+  await settle(() => $<HTMLButtonElement>('[data-list-modal] .scope-board')!.click());
+  expect(text(trigger())).toBe('lar-apple');
 });
 
 test('the menu works from the keyboard', async () => {
@@ -80,41 +184,10 @@ test('the menu works from the keyboard', async () => {
   expect(text(trigger())).toBe('lar-server');
 });
 
-test('the bar drags the window, but its buttons and the time never do', async () => {
+test('the time shows a focus ring on keyboard focus', async () => {
   await mountPage();
-  expect(titleBar().className.split(' ')).toContain('[-webkit-app-region:drag]');
-  expect(trigger().className.split(' ')).toContain('[-webkit-app-region:no-drag]');
-  expect(refreshed().className.split(' ')).toContain('[-webkit-app-region:no-drag]');
-  const week = [...titleBar().querySelectorAll('button')].find((b) => text(b) === 'This week')!;
-  expect(week.closest('.\\[-webkit-app-region\\:no-drag\\]')).not.toBeNull();
-});
-
-test('the scope trigger and the time show a focus ring on keyboard focus', async () => {
-  await mountPage();
-  expect(trigger().className.split(' ')).toContain('focus-visible:ring-2');
   expect(refreshed().className.split(' ')).toContain('focus-visible:ring-2');
   expect(refreshed().tabIndex).toBe(0);
-});
-
-test('the bar starts T3\'s gap past the toggle while the sidebar is hidden', async () => {
-  await mountPage();
-  expect(titleBar().className.split(' ')).toContain('pl-4');
-  await settle(() => $<HTMLButtonElement>('.sidebar-toggle')!.click());
-  expect($('[data-slot="sidebar"]')!.dataset.state).toBe('collapsed');
-  expect(titleBar().className.split(' ')).toContain('pl-[var(--workspace-titlebar-content-left)]');
-});
-
-test('below 768 px wide, the bar starts past the toggle while the sheet is closed', async () => {
-  vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 767px)', addEventListener: () => {}, removeEventListener: () => {} }));
-  await mountPage();
-  expect(titleBar().className.split(' ')).toContain('pl-[var(--workspace-titlebar-content-left)]');
-});
-
-test('screen readers skip the brand; the page keeps one h1, for screen readers only', async () => {
-  await mountPage();
-  expect($('.brand')!.getAttribute('aria-hidden')).toBe('true');
-  expect(titleBar().closest('[aria-hidden="true"]')).toBeNull();
-  expect($$('h1').map((h) => [h.className, text(h)])).toEqual([['sr-only', 'Lar Factory']]);
 });
 
 test('the time counts up each second, between the board\'s 15 s ticks, in muted 12 px digits of fixed width', async () => {
@@ -123,7 +196,7 @@ test('the time counts up each second, between the board\'s 15 s ticks, in muted 
   expect(text(refreshed())).toBe('12s ago');
   await settle(() => vi.advanceTimersByTime(1_000));
   expect(text(refreshed())).toBe('13s ago');
-  expect(refreshed().className.split(' ')).toEqual(expect.arrayContaining(['text-xs', 'tabular-nums', 'text-(--muted-foreground)']));
+  expect(refreshed().className.split(' ')).toEqual(expect.arrayContaining(['text-xs', 'tabular-nums', 'text-base-700']));
 });
 
 test('a fresh board has a green dot; stale turns the dot amber and says Stale, with the text still muted', async () => {
@@ -133,7 +206,7 @@ test('a fresh board has a green dot; stale turns the dot amber and says Stale, w
   await push({ ...fresh(4 * 86_400_000), error: null });
   expect(text(refreshed())).toBe('Stale · 4d ago');
   expect(isAmber(dot())).toBe(true);
-  expect(refreshed().className.split(' ')).toContain('text-(--muted-foreground)');
+  expect(refreshed().className.split(' ')).toContain('text-base-700');
   await push(fresh(20 * 60_000 + 1));
   expect(text(refreshed()), 'no error, but not read for 3 intervals').toBe('Stale · 20m ago');
 });
@@ -201,22 +274,27 @@ test('the first read of a page that had none pings, a failed read does not', asy
   expect(ping()).toBeNull();
 });
 
-test('above the missing-t3 notice the bar is empty, and the sidebar keeps the brand and Settings, which opens', async () => {
-  stubApp({ listProfiles: vi.fn(async () => ({ profiles: [{ name: '.claude', ticked: true }], installed: true, conflicts: [] })) });
-  await mountPage({ ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
-  expect(titleBar().children).toHaveLength(0);
-  expect($('.sidebar .brand')).not.toBeNull();
-  expect($('.sidebar input[type="search"]'), 'no List to search').toBeNull();
-  expect($('.sidebar .add-item')).toBeNull();
-  expect($$('.sidebar-foot button').map((b) => b.getAttribute('aria-label'))).toEqual(['Settings']);
-  await settle(() => $<HTMLButtonElement>('.sidebar .open-settings')!.click());
-  await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((b) => text(b) === 'Skills')!.click());
-  await settle(() => vi.advanceTimersByTime(50));
-  expect($('[role="dialog"] .settings-body')!.textContent, 'Settings opens over the notice').toContain('~/.claude');
-  expect($('.tool-missing')).not.toBeNull();
-});
-
-test('in a browser, the missing-t3 notice\'s sidebar foot holds only Settings', async () => {
-  await mountPage({ ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
-  expect($$('.sidebar-foot button').map((b) => b.getAttribute('aria-label'))).toEqual(['Settings']);
+// jsdom lays nothing out, so this checks the classes behind the fold. Beside the update pill the List and Add item
+// labels and the T3 tag come back at 74rem instead of 70rem, since the pill takes the room Scope needs.
+test('the bar folds by its own width instead of squeezing: the counters keep theirs, and labels go before controls', async () => {
+  stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'downloaded' as const, availableVersion: '1.1.0', downloadedVersion: '1.1.0', message: null })) });
+  await mountPage();
+  const classes = (el: Element | null) => el!.className.split(' ');
+  expect(classes(titleBar().querySelector('header')), 'the copied TitleBar is the container the fold reads').toContain('@container');
+  const counters = titleBar().querySelector('.counters')!;
+  expect(classes(counters)).toContain('shrink-0');
+  expect(classes(counters), 'a size container would have no width of its own').not.toContain('@container');
+  expect(classes(counters.parentElement), 'its slot never shrinks below it').not.toContain('min-w-0');
+  expect(classes(titleBar().querySelector('.t3-tag'))).toContain('@max-[70rem]:hidden');
+  expect(classes(titleBar().querySelector('.t3-tag'))).toContain('[.title-bar:has(.update-button)_&]:@max-[74rem]:hidden');
+  for (const [button, label] of [['.list-button', 'List'], ['.add-item', 'Add item']] as const) {
+    const span = [...titleBar().querySelectorAll(`${button} span`)].find((s) => text(s) === label);
+    expect(classes(span ?? null), `${label}'s label stays for screen readers`).toContain('@max-[70rem]:sr-only');
+    expect(classes(span ?? null), `beside the update pill ${label}'s label folds sooner`).toContain('[.title-bar:has(.update-button)_&]:@max-[74rem]:sr-only');
+  }
+  const label = [...counters.querySelectorAll('button span')].find((s) => text(s) === 'need you')!;
+  expect(classes(label), 'beside the update pill the counters\' labels wait for more room').toContain('[.title-bar:has(.update-button)_&]:@max-[94rem]:hidden');
+  expect(classes(trigger())).toContain('min-w-0');
+  expect(classes(trigger().querySelector('.truncate')), 'Scope truncates').toContain('min-w-0');
+  expect(classes(refreshed().querySelector('time')!.parentElement)).toContain('@max-[48rem]:sr-only');
 });

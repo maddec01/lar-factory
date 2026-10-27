@@ -33,7 +33,9 @@ export interface BoardSections {
   concepts: Item[];
   queued: Item[];
   list: Item[];
-  /** One per configured repository, then any other repository a List item has, then Draft; each group's items in board order. */
+  /** One per configured repository and any other repository a List item has, the most items in List first (ties in
+   *  configured order), then Draft; each group's items in board order. The List modal and the title bar's Scope menu
+   *  both show them in this order. */
   listGroups: ListGroup[];
   /** Closed in the last 7 days, most recently closed first. */
   done: Item[];
@@ -51,6 +53,10 @@ export function boardSections(data: BoardData, now: number): BoardSections {
   const list = inStatus('List');
   const repos = data.repos.map((r) => r.repo);
   for (const i of list) if (!repos.some((r) => sameRepo(r, repoKey(i)))) repos.push(repoKey(i));
+  const draft = repoKey({ repo: null });
+  const listGroups = repos
+    .map((repo) => ({ repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)) }))
+    .sort((a, b) => Number(a.repo === draft) - Number(b.repo === draft) || b.items.length - a.items.length);
   const notConcept = (i: Item) => kindOf(i) !== 'concept';
   return {
     needsYou: inStatus('Ready', 'Needs you', 'Verify', 'Ready to merge').filter(notConcept),
@@ -58,9 +64,7 @@ export function boardSections(data: BoardData, now: number): BoardSections {
     concepts: items.filter((i) => kindOf(i) === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),
     list,
-    listGroups: repos.map((repo) => ({
-      repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)),
-    })),
+    listGroups,
     done: items
       .filter((i) => isRecentlyDone(i, now))
       .sort((a, b) => (b.closedAt ?? b.updatedAt).localeCompare(a.closedAt ?? a.updatedAt)),

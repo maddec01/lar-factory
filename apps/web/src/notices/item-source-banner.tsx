@@ -5,7 +5,7 @@ import { repoName, type ItemSourceProblem, type RepoConfig } from '@lar-factory/
 import { Banner } from './banner.tsx';
 import { CopyableCommand } from './tool-notices.tsx';
 
-/** The banner names the repository as the sidebar does, among `repos`. */
+/** The banner names the repository as the title bar and the List modal do, among `repos`. */
 export function ItemSourceBanner({ repo, problem, fix, repos }: ItemSourceProblem & { repos: readonly RepoConfig[] }) {
   return (
     <Banner title={`${repoName(repo, repos)}'s items are off the board.`}>

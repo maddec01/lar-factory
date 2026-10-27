@@ -20,7 +20,7 @@ import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
-import { useSidebarStore } from '../sidebar/sidebar-store.ts';
+import { useScopeStore } from '../board/scope-store.ts';
 import { matchesSearch } from './list-search.ts';
 
 const DRAFT = repoKey({ repo: null });
@@ -103,7 +103,7 @@ function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElem
 function ListModal({ onClose }: { onClose: () => void }) {
   const data = useBoardStore((state) => state.data);
   const now = useBoardStore((state) => state.now);
-  const { scope, setScope } = useSidebarStore();
+  const { scope, setScope } = useScopeStore();
   const [query, setQuery] = useState('');
   // The chosen group's repository, or `null` for All repositories.
   const [pick, setPick] = useState<string | null>(scope);
@@ -111,10 +111,8 @@ function ListModal({ onClose }: { onClose: () => void }) {
   const searchField = useRef<HTMLInputElement>(null);
   useFocusSearchWhenOpenerGoes(searchField);
   const q = query.trim().toLowerCase();
-  // Repositories by their items in List, most first, counted before the search so the rows stay put while typing.
-  const groups = boardSections(data, now).listGroups
-    .sort((a, b) => b.items.length - a.items.length)
-    .map((group): ListGroup => ({ ...group, items: group.items.filter((i) => matchesSearch(i, q)) }));
+  // In boardSections' order, which counts items before the search so the rows stay put while typing.
+  const groups = boardSections(data, now).listGroups.map((group): ListGroup => ({ ...group, items: group.items.filter((i) => matchesSearch(i, q)) }));
   // A picked group that's gone, such as Draft once its last item leaves List, shows All repositories.
   const picked = groups.find((group) => group.repo === pick);
   const active = picked?.repo ?? null;
@@ -168,7 +166,7 @@ export function ListButton() {
   return (
     <>
       <Button variant="quiet" className="list-button" leftIcon={<Inbox />} title="List" onClick={() => setOpen(true)}>
-        List<Badge>{count}</Badge>
+        <span className="@max-[70rem]:sr-only [.title-bar:has(.update-button)_&]:@max-[74rem]:sr-only">List</span><Badge>{count}</Badge>
       </Button>
       {open && <ListModal onClose={() => setOpen(false)} />}
     </>

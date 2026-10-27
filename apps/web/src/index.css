@@ -4,7 +4,6 @@
 @import "@lar-factory/ui/styles.css";
 @import "./items/items.css";
 @import "./loading/loading-screen.css";
-@import "./sidebar/sidebar.css";
 @import "./notices/notices.css";
 @import "./add-item/add-item.css";
 @import "./settings/settings.css";
@@ -30,7 +29,6 @@
 @source "./notices/form-result.tsx";
 @source "./notices/toasts.tsx";
 @source "./settings";
-@source "./sidebar";
 @source "./title-bar";
 @source "./updates/UpdateButton.tsx";
 @source "./updates/UpdateStatusIcon.tsx";

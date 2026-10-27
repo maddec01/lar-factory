@@ -52,7 +52,7 @@ async function open(label = 'Skills', data: BoardData = sample): Promise<void> {
   await settle(() => vi.advanceTimersByTime(50));
 }
 
-test('Settings opens from the sidebar\'s foot, in a browser too, as a modal over the board with the sections in groups on the left', async () => {
+test('Settings opens from the title bar, in a browser too, as a modal over the board with the sections in groups on the left', async () => {
   await mountPage();
   expect(settingsButton()!.getAttribute('aria-label')).toBe('Settings');
   await settle(() => settingsButton()!.click());
@@ -66,8 +66,8 @@ test('Settings opens from the sidebar\'s foot, in a browser too, as a modal over
   expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('General');
   expect(text(modal())).toContain('How the board refreshes, what Start may do on its own, and how the app sits on your Mac.');
   expect($$('.settings-group h3').map(text)).toEqual(['Board', 'Flow limits', 'App']);
-  expect($('.list-group')!.closest('[hidden]'), 'the board stays under it').toBeNull();
-  expect($('.title-bar')).not.toBeNull();
+  expect($('.title-bar')!.closest('[hidden]'), 'the board stays under it').toBeNull();
+  expect($('.desk')).not.toBeNull();
 });
 
 test('choosing a section shows its title, description and controls on the right', async () => {
@@ -116,18 +116,16 @@ test('a search that matches nothing says so in the section list and keeps the op
   expect($('.settings-nav .no-match')).toBeNull();
 });
 
-test('Close returns to the board with the sidebar as it was, and Settings opens again on the same section', async () => {
+test('Close returns to the board as it was, and Settings opens again on the same section', async () => {
   await mountPage();
-  const collapse = $<HTMLButtonElement>('.list-group[data-repo="maddec01/lar-server"] button[aria-expanded]')!;
-  await settle(() => collapse.click());
-  await settle(() => $<HTMLButtonElement>('.list-group[data-repo="maddec01/lar-apple"] .scope')!.click());
+  const { useScopeStore } = await import('../board/scope-store.ts');
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   await settle(() => settingsButton()!.click());
   await settle(() => section('Diagnostics').click());
   await settle(() => close().click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(modal()).toBeNull();
   expect($('.settings-body')).toBeNull();
-  expect($('.list-group[data-repo="maddec01/lar-server"] button[aria-expanded]')!.getAttribute('aria-expanded')).toBe('false');
   expect(text($('.title-bar .scope'))).toBe('lar-apple');
   await settle(() => settingsButton()!.click());
   expect(section('Diagnostics').getAttribute('aria-current')).toBe('page');

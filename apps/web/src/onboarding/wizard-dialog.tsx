@@ -8,19 +8,18 @@ import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, Dia
 import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
 import { useBoardStore } from '../board/board-store.ts';
-import { sameRepo, shownRepo } from '@lar-factory/shared';
+import { shownRepo } from '@lar-factory/shared';
 import { type Run, type StepId, STEPS, onboarded, pickedProject, prClosed, stepReady, stepTitle, useWizardStore } from './wizard-store.ts';
 
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
 /**
  * Where focus goes when the dialog closes: the button that opened it; once that's gone, as the Resume of a repository
- * the dialog finished, the repository's entry in the sidebar, else the page's main heading.
+ * the dialog finished, the page's main heading.
  */
-function closedFocus(opener: HTMLElement | null, repo: string | null): HTMLElement | true {
+function closedFocus(opener: HTMLElement | null): HTMLElement | true {
   if (opener?.isConnected) return opener;
-  const entry = repo ? [...document.querySelectorAll<HTMLElement>('.list-group[data-repo]')].find((g) => sameRepo(g.dataset.repo!, repo)) : undefined;
-  return entry?.querySelector<HTMLElement>('.scope') ?? document.querySelector<HTMLElement>('.title-bar h1') ?? true;
+  return document.querySelector<HTMLElement>('.title-bar h1') ?? true;
 }
 
 /**
@@ -48,9 +47,6 @@ export function WizardDialog() {
   const { run, projects, opener, close } = useWizardStore();
   const title = useRef<HTMLHeadingElement>(null);
   const shown = useRef<StepId | null>(null);
-  /** The run's repository, which closedFocus reads once the run is gone. */
-  const lastRepo = useRef<string | null>(null);
-  if (run) lastRepo.current = run.repo;
   useEffect(() => {
     const now = run?.step ?? null;
     const moved = shown.current !== null && now !== null && now !== shown.current;
@@ -67,7 +63,7 @@ export function WizardDialog() {
   const done = finished ? 'Onboarded' : `${doneCount} of ${steps} done`;
   return (
     <Dialog open={!!run} onOpenChange={(open) => !open && close()}>
-      <DialogPopup className="max-w-3xl" data-onboarding-dialog finalFocus={() => closedFocus(opener, lastRepo.current)}>
+      <DialogPopup className="max-w-3xl" data-onboarding-dialog finalFocus={() => closedFocus(opener)}>
         {run && step && (<>
           <DialogHeader>
             <DialogDescription>Onboard {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'} · step {indexOf(run) + 1} of {steps}</DialogDescription>

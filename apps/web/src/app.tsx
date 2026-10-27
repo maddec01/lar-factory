@@ -1,12 +1,14 @@
-// The page, the control room: the window controls, the sidebar with the List, and the main area with the title bar,
-// a card for each repository still onboarding, the offers to onboard T3 projects that have a Repository config, the banners, Your desk and the line, scoped to the repository the
-// sidebar picked. While no t3 is found, the notice replaces the main area's content and the sidebar shows only its
-// brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces it. Settings opens as a modal
-// over it all. The loading screen covers all of it
-// until the server's first read has settled.
+// The page, the control room: the title bar, then a card for each repository still onboarding, the offers to onboard
+// T3 projects that have a Repository config, the banners, Your desk and the line, scoped to the repository the title
+// bar or the List modal picked. While no t3 is found, the notice replaces the content and the title bar shows only its
+// brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
+// it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
+// settled.
 
 import { boardSections, failedCheck, inRepo, noneOnboarded } from '@lar-factory/shared';
+import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
+import { useScopeStore } from './board/scope-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
@@ -23,13 +25,11 @@ import { WizardDialog } from './onboarding/wizard-dialog.tsx';
 import { EditDialog } from './repositories/edit-dialog.tsx';
 import { ResetDialog } from './repositories/reset-dialog.tsx';
 import { SettingsDialog } from './settings/settings.tsx';
-import { SidebarLayout } from './sidebar/sidebar.tsx';
-import { useSidebarStore } from './sidebar/sidebar-store.ts';
 import { TitleBar } from './title-bar/title-bar.tsx';
 
 function Content() {
   const { data, now } = useBoardStore();
-  const scope = useSidebarStore((state) => state.scope);
+  const scope = useScopeStore((state) => state.scope);
   const items = scope ? data.items.filter((i) => inRepo(i, scope)) : data.items;
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -50,21 +50,24 @@ export function App() {
   const missing = t3?.result === 'missing' ? t3 : undefined;
   const empty = useBoardStore((state) => noneOnboarded(state.data));
   return (
-    <SidebarLayout className="fixed inset-0 bg-(--background) text-(--foreground)" board={!missing}>
-      <main className="flex min-w-0 flex-1 flex-col">
-        <TitleBar />
-        {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
-      </main>
-      {/* Outside main, so the announcement sits apart from the page. */}
-      <CopyStatus />
-      <Toasts />
-      <ItemDialog />
-      <SettingsDialog />
-      <AbandonDialog />
-      <WizardDialog />
-      <EditDialog />
-      <ResetDialog />
-      <LoadingScreen />
-    </SidebarLayout>
+    // The copied Tooltip needs a provider above it.
+    <TooltipProvider>
+      <div className="fixed inset-0 flex flex-col bg-(--background) text-(--foreground)">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <TitleBar />
+          {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
+        </main>
+        {/* Outside main, so the announcement sits apart from the page. */}
+        <CopyStatus />
+        <Toasts />
+        <ItemDialog />
+        <SettingsDialog />
+        <AbandonDialog />
+        <WizardDialog />
+        <EditDialog />
+        <ResetDialog />
+        <LoadingScreen />
+      </div>
+    </TooltipProvider>
   );
 }

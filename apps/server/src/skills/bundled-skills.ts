@@ -58,6 +58,11 @@ export function readBundledSkills(bundle: string): BundledSkill[] {
   });
 }
 
+/** The names of the bundle's skills, which are its folders in skills/. */
+export function bundledSkillNames(url: URL = bundleUrl()): string[] {
+  return readdirSync(join(fileURLToPath(url), 'skills'), { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+}
+
 /** The home the board app installs skills into: LAR_FACTORY_INSTALL_ROOT when set, else the user's home. */
 export function installHome(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return env.LAR_FACTORY_INSTALL_ROOT || home;

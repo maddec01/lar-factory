@@ -398,6 +398,15 @@ export async function defaultBranchHead(repo: string, run: (args: string[]) => P
   return { branch, sha };
 }
 
+/** Every file's path on the repository's default branch at its head; throws when GitHub lists only part of them. */
+export async function defaultBranchFiles(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<string[]> {
+  const { sha } = await defaultBranchHead(repo, run);
+  const { truncated, tree } = JSON.parse(await run(['api', `repos/${repo}/git/trees/${sha}?recursive=1`])) as
+    { truncated: boolean; tree: { path: string; type: string }[] };
+  if (truncated) throw new Error('GitHub listed only part of its files, since it has too many.');
+  return tree.filter((entry) => entry.type === 'blob').map((entry) => entry.path);
+}
+
 /** Makes a branch on GitHub at the commit, leaving every checkout alone. */
 export async function createBranch(repo: string, branch: string, sha: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
   await run(['api', `repos/${repo}/git/refs`, '--method', 'POST', '-f', `ref=refs/heads/${branch}`, '-f', `sha=${sha}`]);

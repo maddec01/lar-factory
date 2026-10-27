@@ -4,7 +4,7 @@
 
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BRAND_BLOCK_COLOR, BRAND_MARK_BLOCK, BRAND_MARK_L, BRAND_MARK_VIEWBOX } from '@lar-factory/shared';
+import { BRAND_BLOCK_COLOR, BRAND_MARK_BAR, BRAND_MARK_BLOCK, BRAND_MARK_CENTRE_LINE, BRAND_MARK_L, BRAND_MARK_VIEWBOX } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { stepText } from './step-text.ts';
 
@@ -12,10 +12,6 @@ import { stepText } from './step-text.ts';
 const DRAW_MS = 1300;
 const EXIT_MS = 600;
 const ROLL_MS = 380;
-
-/** The L's centre line: a bar stroked with round caps and joins from the top of the stem to the end of the foot covers BRAND_MARK_L. */
-const BAR = 27.52;
-const CENTRE_LINE = `M${BAR / 2} ${BAR / 2}V${100 - BAR / 2}H${100 - BAR / 2}`;
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** The desktop's first page already drew the mark, so the board page opens on it finished. */
@@ -75,7 +71,7 @@ function Mark() {
   return (
     <svg className="loading-mark" viewBox={BRAND_MARK_VIEWBOX} aria-hidden>
       <path className="loading-mark-block" d={BRAND_MARK_BLOCK} fill={BRAND_BLOCK_COLOR} />
-      <path className="loading-mark-trace" d={CENTRE_LINE} pathLength={1} fill="none" stroke="currentColor" strokeWidth={BAR} strokeLinecap="round" strokeLinejoin="round" />
+      <path className="loading-mark-trace" d={BRAND_MARK_CENTRE_LINE} pathLength={1} fill="none" stroke="currentColor" strokeWidth={BRAND_MARK_BAR} strokeLinecap="round" strokeLinejoin="round" />
       <path className="loading-mark-fill" d={BRAND_MARK_L} fill="currentColor" />
     </svg>
   );

@@ -18,7 +18,7 @@ type Answer = { status?: number; body: object };
 function serve(data: BoardData, reset: Answer = { body: { error: null, board: { ...data, onboarding: [] } } }) {
   const sent: object[] = [];
   fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
-    if (url !== '/api/onboarding/reset') return new Response(JSON.stringify(data));
+    if (url !== '/api/repositories/reset') return new Response(JSON.stringify(data));
     sent.push(JSON.parse(String(init?.body)));
     return new Response(JSON.stringify(reset.body), { status: reset.status ?? 200 });
   }) as typeof fetchMock);
@@ -123,4 +123,17 @@ test("a Reset of an onboarded repository whose PR gh can't open keeps the confir
   await settle(() => vi.advanceTimersByTime(50));
   expect(text(dialog()!.querySelector('[data-slot="alert"]'))).toBe(`Can’t resetCan't open ${ONBOARDED}'s reset PR: HTTP 403`);
   expect(row(ONBOARDED)).not.toBeNull();
+});
+
+test("a Reset that closed the Edit PR but can't open the reset PR drops that Edit PR from the confirmation and the row", async () => {
+  const edit = `https://github.com/${ONBOARDED}/pull/9`;
+  const data: BoardData = { ...sample, repos: [{ ...sample.repos[0]!, editPr: edit }, ...sample.repos.slice(1)] };
+  const error = `Can't open ${ONBOARDED}'s reset PR: HTTP 403. Its Edit PR, ${edit}, is closed now.`;
+  serve(data, { status: 502, body: { error, board: sample } });
+  await openReset(data, ONBOARDED);
+  await settle(() => button(dialog()!, 'Reset').click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(text(dialog()!.querySelector('[data-slot="alert"]'))).toBe(`Can’t reset${error}`);
+  expect(dialog()!.querySelector('[data-closes-edit-pr]')).toBeNull();
+  expect(row(ONBOARDED)!.querySelector('[data-edit-pr]')).toBeNull();
 });

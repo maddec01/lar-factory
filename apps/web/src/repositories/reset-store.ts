@@ -31,7 +31,7 @@ export const useResetStore = create<ResetState>()((set, get) => ({
     const { reset } = get();
     if (!reset || reset.resetting) return;
     set({ reset: { ...reset, resetting: true, error: null } });
-    const result = await postAction<{ prUrl: string }>('/api/onboarding/reset', { repo: reset.repo });
+    const result = await postAction<{ prUrl: string }>('/api/repositories/reset', { repo: reset.repo });
     receive(result);
     set({ reset: result.error ? { ...reset, resetting: false, error: result.error } : null });
     if (result.error || !result.prUrl) return;

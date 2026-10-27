@@ -1,6 +1,6 @@
 // Settings: the modal with its section list in groups, each section's title and description over its rows, the
 // Claude profiles with their switches and what a change did, the bundled skills with their last updates and install
-// states, the update channel, version and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
+// states, the update channel, version, the update pill's state and step, and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
 // the profiles and updates show disabled.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
@@ -635,6 +635,9 @@ describe('updates', () => {
       onUpdateState: vi.fn((listener: (state: UpdateState) => void) => { push = listener; return () => {}; }),
       setUpdateChannel: vi.fn(async (channel: UpdateChannel) => ({ ...start, channel })),
       checkForUpdate: vi.fn(async () => ({ checked: true, state: start })),
+      downloadUpdate: vi.fn(async () => ({ accepted: true, completed: false, state: start })),
+      installUpdate: vi.fn(async () => ({ accepted: true, completed: false, state: start })),
+      confirmRestart: answerRestart(true),
     });
     return { bridge, push: (state: UpdateState) => settle(() => push(state)) };
   }
@@ -717,6 +720,47 @@ describe('updates', () => {
     expect(result().dataset.variant).toBe('error');
   });
 
+  describe('shows the update pill\'s state', () => {
+    const next = '0.2.0-nightly.20261024.42';
+    const available: UpdateState = { ...nightly, status: 'available', availableVersion: next };
+    const action = () => $<HTMLButtonElement>('.settings-body .update-action');
+    const pill = () => $('.title-bar .update-button')!;
+
+    test('an available update says so, and Download downloads it', async () => {
+      const { bridge } = stubChannel(available);
+      await open('Updates');
+      expect([status(), text(pill())]).toEqual([`${next} is available.`, 'Update available']);
+      expect($('.settings-body .check-now')).toBeNull();
+      await settle(() => action()!.click());
+      expect(bridge.downloadUpdate).toHaveBeenCalledOnce();
+    });
+
+    test('a download gives its percentage, as the pill does, and Check now waits for it', async () => {
+      stubChannel({ ...available, status: 'downloading', downloadPercent: 42.4 });
+      await open('Updates');
+      expect([status(), text(pill())]).toEqual([`Downloading ${next}… 42%`, 'Downloading 42%']);
+      expect([checkNow().disabled, checkNow().title]).toEqual([true, `Downloading ${next}… 42%`]);
+    });
+
+    test('a downloaded update says so, and Restart to update asks, then installs', async () => {
+      const { bridge } = stubChannel({ ...available, status: 'downloaded', downloadedVersion: next, downloadPercent: 100 });
+      await open('Updates');
+      expect([status(), text(pill())]).toEqual([`${next} is ready to install.`, 'Restart to update']);
+      expect(text(action())).toBe('Restart to update');
+      await settle(() => action()!.click());
+      expect(bridge.confirmRestart).toHaveBeenCalledOnce();
+      expect(bridge.installUpdate).toHaveBeenCalledOnce();
+    });
+
+    test('while it installs, both read Installing…, disabled', async () => {
+      const { bridge } = stubChannel({ ...available, status: 'downloaded', downloadedVersion: next, downloadPercent: 100 });
+      bridge.installUpdate.mockImplementation(() => new Promise<never>(() => {}));
+      await open('Updates');
+      await settle(() => action()!.click());
+      expect([text(action()), action()!.disabled, text(pill())]).toEqual(['Installing…', true, 'Installing…']);
+    });
+  });
+
   test('a failed download or install says why under the version', async () => {
     // The states the app's reducers give them: the update stays available or downloaded.
     const available: UpdateState = { ...nightly, status: 'available', availableVersion: '0.2.0-nightly.20261024.42', canRetry: true };
@@ -734,7 +778,7 @@ describe('updates', () => {
     expect([checkNow().disabled, checkNow().title]).toEqual([true, 'Updates work only in the packaged app.']);
   });
 
-  test('above the missing-t3 notice, where the sidebar has no update button, the page still reads the updater', async () => {
+  test('above the missing-t3 notice, where the title bar has no update pill, the page still reads the updater', async () => {
     stubChannel();
     await open('Updates', { ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
     expect($('.update-button')).toBeNull();

@@ -1,8 +1,8 @@
 // The board's title bar, laid out as lar-server's AppTitleBar on the copied TitleBar: the brand, then the scope menu
 // ("All repositories", or the repository the menu or the List modal scoped it to), the Refreshed time and the
-// counters, then the List button, Add item, the "for T3 Code" tag, the update button and Settings. It starts past the
-// traffic lights and drags the window, except on its controls. Above the missing-t3 notice there's no board to scope,
-// count or add to, so it holds only the brand and Settings.
+// counters, then the List button, Add item, the "for T3 Code" tag, the update pill while there's an update, and
+// Settings. It starts past the traffic lights and drags the window, except on its controls. Above the missing-t3 notice
+// there's no board to scope, count or add to, so it holds only the brand and Settings.
 // Every control keeps its own width, and the bar folds by its own width (the copied TitleBar is the container
 // queried) instead: the counters' labels go first, then the "for T3 Code" tag and the List and Add item labels (kept
 // for screen readers), then Spend, Queued and Shipped, then the Refreshed text, and on a narrow page Building and the
@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { boardApp, boardSections, clock, failedCheck, isStale, repoName, shortAgo } from '@lar-factory/shared';
+import { boardSections, clock, failedCheck, isStale, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
@@ -25,7 +25,6 @@ import { repoTone } from '../items/item-parts.tsx';
 import { ListButton } from '../list/list-modal.tsx';
 import { SettingsButton } from '../settings/settings.tsx';
 import { UpdateButton } from '../updates/UpdateButton.tsx';
-import { UpdateStatusIcon } from '../updates/UpdateStatusIcon.tsx';
 import { Counters } from './counters.tsx';
 import { TrafficLights, useWindowControlsInset } from './window-controls.tsx';
 
@@ -131,22 +130,6 @@ function Refreshed({ data }: { data: BoardData }) {
   );
 }
 
-/** The board app's update button; in a browser, where the app can't update, a still stand-in. */
-function Update() {
-  if (boardApp()) return <UpdateButton />;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button type="button" aria-label="Check for updates" aria-disabled="true"
-          className="update-stand-in inline-flex size-8 items-center justify-center rounded-full text-base-700 hover:bg-base-200 hover:text-base-content">
-          <UpdateStatusIcon status="idle" />
-        </button>
-      </TooltipTrigger>
-      <TooltipPopup side="bottom">Check for updates</TooltipPopup>
-    </Tooltip>
-  );
-}
-
 /** The window drags from the bar, but never from a control in it. */
 const DRAG = '[-webkit-app-region:drag] [&_:is(button,a,[tabindex])]:[-webkit-app-region:no-drag]';
 
@@ -176,7 +159,7 @@ export function TitleBar() {
                 <ListButton />
                 <AddItem />
                 <Badge className="t3-tag @max-[70rem]:hidden [.title-bar:has(.update-button)_&]:@max-[74rem]:hidden .idden">for T3 Code</Badge>
-                <Update />
+                <UpdateButton />
               </>
             )}
             <SettingsButton />

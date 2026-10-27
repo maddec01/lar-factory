@@ -1,6 +1,6 @@
 // The Settings sections and their grouped rows, from the control room prototype. Most rows aren't built yet: they
 // show the prototype's value, disabled. The working rows are the Claude profiles, the update channel, version and
-// Check now, the command check rows, the gh and az logins, each repository with Edit, which opens Edit's dialog, Resume and Add repository, which open the onboarding dialog, Reset on one still onboarding, and the
+// the update's next step or Check now, the command check rows, the gh and az logins, each repository with Edit, which opens Edit's dialog, Resume and Add repository, which open the onboarding dialog, Reset on one still onboarding, and the
 // bundled skills with their authors, licences, last updates, install states and sources. In a browser the profiles
 // and updates, which only the board app has, show the prototype's values, disabled with that reason.
 
@@ -14,7 +14,7 @@ import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { useResetStore } from '../repositories/reset-store.ts';
-import { CheckNow, ChannelChoice, ProfileSwitch, ProfilesNote, UpdateStatus, UpdatesNote } from './app-rows.tsx';
+import { ChannelChoice, ProfileSwitch, ProfilesNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, ToolState, notBuilt } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
 
@@ -216,7 +216,7 @@ function updateRows({ app, version }: PagesInput): Row[] {
   }
   return [
     { ...channel, control: custom(() => <ChannelChoice />) },
-    { id: 'version', title: version ? `Lar Factory ${version}` : 'Lar Factory', description: <UpdateStatus />, control: custom(() => <CheckNow />) },
+    { id: 'version', title: version ? `Lar Factory ${version}` : 'Lar Factory', description: <UpdateStatus />, control: custom(() => <UpdateAction />) },
     install,
   ];
 }

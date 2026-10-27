@@ -1,11 +1,13 @@
 // The settings rows the board app's bridge answers: a switch per Claude profile, which links the app's skills and
 // checklists into it or removes them at once, the update channel, and the version with what the updater last found
-// and Check now. Each group's note says what the last call did.
+// and the update pill's step, Download or Restart to update, or else Check now. Each group's note says what the last
+// call did.
 
-import type { UpdateChannel, UpdateState } from '@lar-factory/shared';
+import type { UpdateChannel } from '@lar-factory/shared';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { FormResult } from '../notices/form-result.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
-import { canCheckForUpdate, getUpdateDisabledReason } from '../updates/update-button-logic.ts';
+import { canCheckForUpdate, getUpdateDisabledReason, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from '../updates/update-button-logic.ts';
 import { SmallButton, Choice, Switch } from './controls.tsx';
 import { type SettingsResult, profilePath, useSettingsStore } from './settings-store.ts';
 
@@ -13,24 +15,6 @@ const CHANNELS: { value: UpdateChannel; label: string }[] = [
   { value: 'nightly', label: 'Nightly' },
   { value: 'latest', label: 'Latest' },
 ];
-
-/** What the updater last found, in words. */
-function updateStatusText(state: UpdateState): string {
-  // A failed download or install keeps its update available or downloaded, with the error.
-  if ((state.errorContext === 'download' || state.errorContext === 'install') && state.message !== null) {
-    const verb = state.errorContext === 'install' ? 'install' : 'download';
-    return `Couldn't ${verb} ${state.downloadedVersion ?? state.availableVersion}: ${state.message}`;
-  }
-  switch (state.status) {
-    case 'disabled': case 'error': return state.message ?? '';
-    case 'idle': return '';
-    case 'checking': return 'Checking for updates…';
-    case 'up-to-date': return `Up to date on ${state.currentVersion}.`;
-    case 'available': return `${state.availableVersion} is available.`;
-    case 'downloading': return `Downloading ${state.availableVersion}…`;
-    case 'downloaded': return `${state.downloadedVersion} is ready to install.`;
-  }
-}
 
 export function ProfileSwitch({ name }: { name: string }) {
   const { profiles, installed, pending, setTick } = useSettingsStore();
@@ -83,9 +67,22 @@ export function UpdateStatus() {
   return <span id="update-status" role="status" aria-live="polite">{state ? updateStatusText(state) : ''}</span>;
 }
 
-export function CheckNow() {
+function CheckNow() {
   const { state, check } = useUpdateStore();
   // While it checks or downloads, the reason is what it's doing.
   const reason = canCheckForUpdate(state) ? undefined : getUpdateDisabledReason(state) ?? (state ? updateStatusText(state) : 'Reading the updater…');
   return <SmallButton className="check-now" reason={reason} onClick={() => void check()}>Check now</SmallButton>;
+}
+
+/** The update pill's step while it has one, run as the pill runs it; otherwise Check now. */
+export function UpdateAction() {
+  const { state, installing, pending, run } = useUpdateStore();
+  const pill = resolveUpdatePill(state);
+  if (!state || (pill !== 'available' && pill !== 'ready')) return <CheckNow />;
+  const busy = installing || pending || resolveUpdateButtonAction(state) === 'none';
+  return (
+    <Button className="update-action" disabled={busy} onClick={() => void run()}>
+      {installing ? 'Installing…' : pill === 'ready' ? 'Restart to update' : 'Download'}
+    </Button>
+  );
 }

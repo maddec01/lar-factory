@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, type ClashRun, type FixedClashes, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, type ClashRun, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { isRepo } from '../config/repository-config.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
@@ -46,6 +46,8 @@ export interface HttpDeps {
   finishOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
   openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | { status: number; error: string }>;
+  /** What an onboarding's PR would change against its default branch with the body's answers and picks, or why it can't say. */
+  previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | { status: number; error: string }>;
   /** Reopens an onboarding's PR that closed without merging, returning the repositories still onboarding, or gh's problem. */
   reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
 }
@@ -123,7 +125,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  runSetupCheck, findFixedClashes, startClashRun, clashRuns, finishOnboarding, openOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
+  runSetupCheck, findFixedClashes, startClashRun, clashRuns, finishOnboarding, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -235,6 +237,13 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         board.update({ onboarding: opened.onboarding });
         board.push();
         return { status: 200, body: withBoard({ prUrl: opened.prUrl, error: null }) };
+      },
+    },
+    '/api/onboarding/pr/changes': {
+      what: 'the onboarding PR to preview', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const previewed = await previewOnboardingPr(input);
+        return 'error' in previewed ? { status: previewed.status, body: { error: previewed.error } } : { status: 200, body: { ...previewed, error: null } };
       },
     },
     '/api/onboarding/pr/reopen': {

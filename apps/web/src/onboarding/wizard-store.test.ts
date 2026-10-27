@@ -512,7 +512,7 @@ test("passing Cleanup with a new file moves to the Pull request step, and Open t
   await settle(() => wizard.getState().openPr());
   expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks', 'cleanup'],
     answers: { projectId: 'lar-web', provider: 'GitHub', setup: SETUP_DONE, cleanup: { ticks: {}, skills: {} } } },
-    config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' } }]);
+    config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' }, picks: { clashes: [], skills: {} } }]);
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR, savedAs: 'maddec01/lar-web' });
   expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error: null });
 });

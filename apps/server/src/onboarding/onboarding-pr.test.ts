@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRepositoryList, saveOnboarding, savePrClosed } from '../config/repository-config.ts';
-import { createPrOpener, followOnboardingPrs, reopenOnboardingPr } from './onboarding-pr.ts';
+import { createPrOpener, followOnboardingPrs, previewOnboardingPr, reopenOnboardingPr } from './onboarding-pr.ts';
 
 const progress = { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-web' } };
 const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client' };
@@ -17,18 +17,37 @@ async function dataDir(t: TestContext, entries: object[] = []): Promise<string> 
   return dir;
 }
 
+/** A call's value for a gh api field, such as `ref` for `-f ref=...`; the values of `tree[][path]` for an array's. */
+const field = (args: string[], name: string) => args.filter((a, i) => /^-[fF]$/.test(args[i - 1] ?? '') && a.startsWith(`${name}=`))
+  .map((a) => a.slice(name.length + 1));
+
+const RULES = '# lar-web\n\n- Push to main when done.\n';
+const LAR_CONFIG = JSON.stringify({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: [] });
+
 /**
- * A gh that records each call and answers it like GitHub, failing the calls `fails` names, by their first two args, with
- * its message. `branches` are the lar-factory/ branches the repository has, each with its open PR's URL or null.
+ * A gh that records each call and answers it like GitHub, failing the calls `fails` names, by their first two args or
+ * their path, with its message. The default branch holds `files`; `branches` are the lar-factory/ branches the
+ * repository has, each with its open PR's URL or null.
  */
-function gh(fails: Record<string, string> = {}, branches: Record<string, string | null> = {}) {
+function gh(fails: Record<string, string> = {}, branches: Record<string, string | null> = {}, files: Record<string, string> = { 'AGENTS.md': RULES }) {
   const calls: string[][] = [];
   const run = async (args: string[]) => {
     calls.push(args);
-    const failure = fails[args.slice(0, 2).join(' ')];
+    const failure = fails[args.slice(0, 2).join(' ')] ?? fails[args[1]!];
     if (failure) throw new Error(failure);
     if (args[1] === 'repos/maddec01/lar-web') return 'main\n';
     if (args[1] === 'repos/maddec01/lar-web/git/ref/heads/main') return 'abc123\n';
+    if (args[1] === 'repos/maddec01/lar-web/git/trees/abc123?recursive=1') {
+      return JSON.stringify({ sha: 'tree0', truncated: false, tree: Object.keys(files).map((path) => ({ path, mode: '100644', type: 'blob', sha: `blob:${path}` })) });
+    }
+    const blob = /\/git\/blobs\/blob:(.+)$/.exec(args[1]!)?.[1];
+    if (blob) return files[blob]!;
+    if (args[1] === 'repos/maddec01/lar-web/contents/.lar-factory.json') {
+      if (!files['.lar-factory.json']) throw new Error('gh: Not Found (HTTP 404)');
+      return files['.lar-factory.json'];
+    }
+    if (args[1] === 'repos/maddec01/lar-web/git/trees') return 'tree1\n';
+    if (args[1] === 'repos/maddec01/lar-web/git/commits') return 'commit1\n';
     const ref = /\/git\/ref\/heads\/(lar-factory\/.+)$/.exec(args[1]!)?.[1];
     if (ref) {
       if (!(ref in branches)) throw new Error('gh: Not Found (HTTP 404)');
@@ -41,93 +60,174 @@ function gh(fails: Record<string, string> = {}, branches: Record<string, string 
   return { calls, run };
 }
 
-test('opening the PR makes lar-factory/onboarding from the default branch, adds .lar-factory.json, opens the PR and keeps its URL', async (t) => {
+const picks = { clashes: [], skills: {} };
+const pushRule = { id: 'push', file: 'AGENTS.md', line: 3, ticked: true, reason: 'It pushes to main, and the factory opens PRs.',
+  edit: { kind: 'lines', remove: ['- Push to main when done.'], add: ['- Open a PR when done.'] } };
+const writes = (calls: string[][]) => calls.filter((args) => args.includes('POST') || args.includes('PATCH') || args[1] === 'create');
+
+test('opening the PR makes one commit on the default branch\'s head with every change, puts lar-factory/onboarding on it and opens the PR', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
-  const { calls, run } = gh();
-  const opened = await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config });
+  const { calls, run } = gh({}, {}, { 'AGENTS.md': RULES, 'CONTEXT.md': '# Terms\n', '.scratch/todo.md': 'x' });
+  const opened = await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config, picks: { skills: {}, clashes: [pushRule,
+    { id: 'context', file: 'CONTEXT.md', ticked: true, reason: 'Old name.', edit: { kind: 'rename', to: 'GLOSSARY.md' } },
+    { id: 'scratch', file: '.scratch/', ticked: true, reason: 'Local tracker.', edit: { kind: 'delete' } }] } });
   const kept = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' }, prUrl: PR };
   assert.deepEqual(opened, { prUrl: PR, onboarding: [{ repo: 'maddec01/lar-web', progress: kept }] });
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: kept }]);
-  assert.deepEqual(calls.map((args) => args.slice(0, 2)), [
-    ['api', 'repos/maddec01/lar-web'], ['api', 'repos/maddec01/lar-web/git/ref/heads/main'],
-    ['api', 'repos/maddec01/lar-web/git/ref/heads/lar-factory/onboarding'], ['api', 'repos/maddec01/lar-web/git/refs'],
-    ['api', 'repos/maddec01/lar-web/contents/.lar-factory.json'], ['pr', 'create'],
-  ]);
-  calls.splice(2, 1);
-  assert.deepEqual(calls[2]!.slice(2), ['--method', 'POST', '-f', 'ref=refs/heads/lar-factory/onboarding', '-f', 'sha=abc123']);
-  const content = calls[3]!.find((a) => a.startsWith('content='))!.slice('content='.length);
-  assert.deepEqual(JSON.parse(Buffer.from(content, 'base64').toString()),
+  const [tree, commit, branch, create] = writes(calls);
+  assert.deepEqual(field(tree!, 'base_tree'), ['tree0']);
+  assert.deepEqual(field(tree!, 'tree[][path]').sort(), ['.lar-factory.json', '.scratch/todo.md', 'AGENTS.md', 'CONTEXT.md', 'GLOSSARY.md',
+    'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md']);
+  assert.ok(field(tree!, 'tree[][content]').some((text) => text.startsWith('# lar-web\n\n- Open a PR when done.\n\n## Agent skills')));
+  assert.deepEqual(JSON.parse(field(tree!, 'tree[][content]').find((text) => text.includes('"version"'))!),
     { version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: [] });
-  assert.ok(calls[3]!.includes('branch=lar-factory/onboarding'));
-  const create = calls[4]!;
-  assert.deepEqual([create[create.indexOf('--base') + 1], create[create.indexOf('--head') + 1]], ['main', 'lar-factory/onboarding']);
+  assert.deepEqual([field(commit!, 'tree'), field(commit!, 'parents[]')], [['tree1'], ['abc123']]);
+  assert.deepEqual([field(branch!, 'ref'), field(branch!, 'sha')], [['refs/heads/lar-factory/onboarding'], ['commit1']]);
+  assert.deepEqual([create![create!.indexOf('--base') + 1], create![create!.indexOf('--head') + 1]], ['main', 'lar-factory/onboarding']);
+  const body = create![create!.indexOf('--body') + 1]!;
+  for (const line of ["- Writes lar Factory's `## Agent skills` block in `AGENTS.md`.", '- Adds `docs/agents/domain.md`.',
+    '- Adds `.lar-factory.json`, the Repository config lar Factory reads for this repository.',
+    '- Edits `AGENTS.md` at line 3: It pushes to main, and the factory opens PRs.', '- Renames `CONTEXT.md` to `GLOSSARY.md`.', '- Deletes `.scratch/`.']) {
+    assert.ok(body.includes(line), line);
+  }
+  assert.ok(!calls.some((args) => args[0] === 'label' || /\/labels\b/.test(args[1]!) || args.includes('--add-label')), 'onboarding touches no label');
 });
 
-test('a taken lar-factory/onboarding with an open PR is reused, opening nothing', async (t) => {
+test('a reused .lar-factory.json goes in no commit, and its PR is marked so only its merge finishes the onboarding', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+  const { calls, run } = gh({}, {}, { 'AGENTS.md': RULES, '.lar-factory.json': LAR_CONFIG });
+  await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config: null, picks });
+  assert.equal(readRepositoryList(dir)[0]!.onboarding?.reusesConfig, true);
+  assert.ok(!field(writes(calls)[0]!, 'tree[][path]').includes('.lar-factory.json'));
+  const create = writes(calls).at(-1)!;
+  assert.ok(!create[create.indexOf('--body') + 1]!.includes('.lar-factory.json'));
+});
+
+test('reusing a .lar-factory.json the default branch lacks is refused, writing nothing', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+  const { calls, run } = gh();
+  assert.deepEqual(await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config: null, picks }),
+    { status: 409, error: 'maddec01/lar-web has no .lar-factory.json on its default branch to reuse.' });
+  assert.deepEqual(writes(calls), []);
+});
+
+test('an edit whose lines moved on the default branch fails with its file and line, and writes nothing', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+  const { calls, run } = gh({}, {}, { 'AGENTS.md': '# lar-web\n\nRead the README.\n\n- Push to main when done.\n' });
+  assert.deepEqual(await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [pushRule], skills: {} } }),
+    { status: 409, error: "AGENTS.md line 3 doesn't have the lines its edit removes. Untick it on Cleanup, or Look again there." });
+  assert.deepEqual(writes(calls), []);
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+});
+
+test('a skill renamed in the PR moves its folder and names itself anew in its SKILL.md', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+  const { calls, run } = gh({}, {}, { '.claude/skills/code-review/SKILL.md': '---\nname: code-review\n---\n' });
+  await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config,
+    picks: { clashes: [], skills: { '.claude/skills/code-review/': { kind: 'rename', name: 'web-review' } } } });
+  const tree = writes(calls)[0]!;
+  assert.ok(field(tree, 'tree[][path]').includes('.claude/skills/web-review/SKILL.md'));
+  assert.ok(field(tree, 'tree[][content]').includes('---\nname: web-review\n---\n'));
+  const create = writes(calls).at(-1)!;
+  assert.ok(create[create.indexOf('--body') + 1]!.includes('- Renames `.claude/skills/code-review/` to `.claude/skills/web-review/`.'));
+});
+
+test('a taken lar-factory/onboarding with an open PR is moved to the new commit and its PR reused with the new body, opening nothing', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
   const reused = 'https://github.com/maddec01/lar-web/pull/9';
   const { calls, run } = gh({}, { 'lar-factory/onboarding': reused });
-  assert.equal((await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config }) as { prUrl: string }).prUrl, reused);
+  assert.equal((await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config, picks }) as { prUrl: string }).prUrl, reused);
   assert.equal(readRepositoryList(dir)[0]!.onboarding?.prUrl, reused);
-  assert.deepEqual(calls.slice(2).map((args) => args.slice(0, 2)), [['api', 'repos/maddec01/lar-web/git/ref/heads/lar-factory/onboarding'], ['pr', 'list']]);
-  assert.deepEqual(calls[3]!.slice(2, 8), ['-R', 'maddec01/lar-web', '--head', 'lar-factory/onboarding', '--state', 'open']);
+  const [, , move, edit, ...rest] = writes(calls);
+  assert.deepEqual(move!.slice(0, 4), ['api', 'repos/maddec01/lar-web/git/refs/heads/lar-factory/onboarding', '--method', 'PATCH']);
+  assert.deepEqual([field(move!, 'sha'), field(move!, 'force')], [['commit1'], ['true']]);
+  assert.equal(edit![3], 'repos/maddec01/lar-web/pulls/9');
+  assert.match(field(edit!, 'body')[0]!, /^This PR:/);
+  assert.deepEqual(rest, []);
 });
 
 test('a taken branch with no open PR moves on to the first free lar-factory/onboarding-N', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
   const { calls, run } = gh({}, { 'lar-factory/onboarding': null, 'lar-factory/onboarding-2': null });
-  assert.equal((await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config }) as { prUrl: string }).prUrl, PR);
+  assert.equal((await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config, picks }) as { prUrl: string }).prUrl, PR);
   const refs = calls.filter((args) => args[1]!.includes('/git/ref/heads/lar-factory/')).map((args) => args[1]!.split('heads/')[1]);
   assert.deepEqual(refs, ['lar-factory/onboarding', 'lar-factory/onboarding-2', 'lar-factory/onboarding-3']);
   assert.ok(calls.find((args) => args[1]!.endsWith('/git/refs'))!.includes('ref=refs/heads/lar-factory/onboarding-3'));
-  assert.ok(calls.find((args) => args[1]!.endsWith('/contents/.lar-factory.json'))!.includes('branch=lar-factory/onboarding-3'));
   const create = calls.find((args) => args[1] === 'create')!;
   assert.equal(create[create.indexOf('--head') + 1], 'lar-factory/onboarding-3');
 });
 
 test('a run never kept is kept with its PR, in place of the one it was kept under before', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-apple', onboarding: progress }]);
-  await createPrOpener(dir, gh().run)({ repo: 'maddec01/lar-web', progress, config, replaces: 'maddec01/lar-apple' });
+  await createPrOpener(dir, gh().run)({ repo: 'maddec01/lar-web', progress, config, picks, replaces: 'maddec01/lar-apple' });
   assert.deepEqual(readRepositoryList(dir).map((e) => [e.repo, e.onboarding?.prUrl]), [['maddec01/lar-web', PR]]);
 });
 
 test("a failing gh call answers with gh's message and keeps no PR; Retry goes on from the call that failed", async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
-  const fails: Record<string, string> = { 'pr create': 'gh pr create failed: GraphQL: No commits between main and lar-factory/onboarding' };
-  const { calls, run } = gh(fails);
-  const open = createPrOpener(dir, run);
-  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config }), { status: 502,
-    error: "Can't open maddec01/lar-web's onboarding PR: gh pr create failed: GraphQL: No commits between main and lar-factory/onboarding" });
-  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: progress }]);
-  delete fails['pr create'];
-  calls.length = 0;
-  assert.equal((await open({ repo: 'maddec01/lar-web', progress, config }) as { prUrl: string }).prUrl, PR);
-  assert.deepEqual(calls.map((args) => args.slice(0, 2)), [['pr', 'create']]);
+  for (const [call, after] of [['repos/maddec01/lar-web/git/commits', ['repos/maddec01/lar-web/git/commits', 'repos/maddec01/lar-web/git/ref/heads/lar-factory/onboarding',
+    'repos/maddec01/lar-web/git/refs', 'create']], ['pr create', ['create']]] as const) {
+    const fails: Record<string, string> = { [call]: `gh ${call} failed: HTTP 502` };
+    const { calls, run } = gh(fails);
+    const open = createPrOpener(dir, run);
+    assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config, picks }), { status: 502,
+      error: `Can't open maddec01/lar-web's onboarding PR: gh ${call} failed: HTTP 502` });
+    assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: progress }]);
+    delete fails[call];
+    calls.length = 0;
+    assert.equal((await open({ repo: 'maddec01/lar-web', progress, config, picks }) as { prUrl: string }).prUrl, PR);
+    assert.deepEqual(calls.map((args) => args[1]), after);
+    await writeFile(join(dir, 'repositories.json'), JSON.stringify({ repositories: [{ repo: 'maddec01/lar-web', onboarding: progress }] }));
+  }
 });
 
-test('Retry with changed answers after the file went on the branch starts again, adding the new file on a new branch', async (t) => {
+test('Retry with other picks after the commit was made starts again from the default branch, with only the new picks', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
   const fails: Record<string, string> = { 'pr create': 'gh pr create failed: HTTP 502' };
   const { calls, run } = gh(fails);
   const open = createPrOpener(dir, run);
-  await open({ repo: 'maddec01/lar-web', progress, config });
+  await open({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [pushRule], skills: {} } });
   delete fails['pr create'];
   calls.length = 0;
-  assert.equal((await open({ repo: 'maddec01/lar-web', progress, config: { ...config, role: 'Web app' } }) as { prUrl: string }).prUrl, PR);
-  const add = calls.find((args) => args[1]!.endsWith('/contents/.lar-factory.json'));
-  const content = add!.find((a) => a.startsWith('content='))!.slice('content='.length);
-  assert.equal(JSON.parse(Buffer.from(content, 'base64').toString()).role, 'Web app');
-  assert.ok(calls.some((args) => args[1]!.endsWith('/git/refs')));
+  assert.equal((await open({ repo: 'maddec01/lar-web', progress, config, picks }) as { prUrl: string }).prUrl, PR);
+  assert.ok(calls.some((args) => args[1] === 'repos/maddec01/lar-web/git/ref/heads/main'));
+  assert.ok(!field(writes(calls)[0]!, 'tree[][content]').some((text) => text.includes('Open a PR when done')));
+  const create = writes(calls).at(-1)!;
+  assert.ok(!create[create.indexOf('--body') + 1]!.includes('Edits'));
 });
 
-test('a body without the repository, its progress and a whole Repository config is refused', async (t) => {
+test('the preview lists the changes the PR would make against the default branch, writing nothing', async () => {
+  const { calls, run } = gh();
+  assert.deepEqual(await previewOnboardingPr({ repo: 'maddec01/lar-web', config, picks: { clashes: [pushRule], skills: {} } }, run), { changes: [
+    { kind: 'agent-skills', path: 'AGENTS.md' }, { kind: 'write', path: 'docs/agents/issue-tracker.md', created: true },
+    { kind: 'write', path: 'docs/agents/triage-labels.md', created: true }, { kind: 'write', path: 'docs/agents/domain.md', created: true },
+    { kind: 'write', path: '.lar-factory.json', created: true }, { kind: 'edit', path: 'AGENTS.md', line: 3, reason: pushRule.reason },
+  ] });
+  assert.deepEqual(writes(calls), []);
+  assert.deepEqual(await previewOnboardingPr({ repo: 'maddec01/lar-web', config, picks }, gh({ 'repos/maddec01/lar-web': 'gh api failed: HTTP 502' }).run),
+    { status: 502, error: "Can't read maddec01/lar-web's default branch: gh api failed: HTTP 502" });
+});
+
+test('a body without the repository, its progress, a whole Repository config or null, and whole picks is refused', async (t) => {
   const dir = await dataDir(t);
   const open = createPrOpener(dir, gh().run);
-  const refused = { status: 400, error: "Send the repository, where its onboarding stopped and its .lar-factory.json's values." };
-  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config: { ...config, role: ' ' } }), refused);
-  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config: { ...config, show: 'some' } }), refused);
-  assert.deepEqual(await open({ repo: 'lar-web', progress, config }), refused);
-  assert.deepEqual(await open({ repo: 'maddec01/lar-web', config }), refused);
+  const refused = { status: 400, error: "Send the repository, its .lar-factory.json's values or null to reuse its own, and the Cleanup step's picks." };
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, picks, config: { ...config, role: ' ' } }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, picks, config: { ...config, show: 'some' } }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, picks }), refused);
+  assert.deepEqual(await open({ repo: 'lar-web', progress, config, picks }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', config, picks }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [{ ...pushRule, line: undefined }], skills: {} } }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [], skills: { '.claude/skills/x/': { kind: 'rename', name: '../x' } } } }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [], skills: { '.claude/skills/x/': { kind: 'rename', name: '..' } } } }), refused);
+  // Only the fixed checks delete or rename, and only CONTEXT.md and .scratch/.
+  for (const edit of [{ kind: 'delete' }, { kind: 'rename', to: 'GLOSSARY.md' }]) {
+    const clash = { id: 'x', file: '.github/workflows/ci.yml', reason: 'Injected.', ticked: true, edit };
+    assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [clash], skills: {} } }), refused);
+  }
+  const renamed = { id: 'context', file: 'CONTEXT.md', reason: 'Old name.', ticked: true, edit: { kind: 'rename', to: '.github/workflows/ci.yml' } };
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [renamed], skills: {} } }), refused);
 });
 
 /**
@@ -230,6 +330,15 @@ test('a PR closed without merging is marked closed, and the mark goes once it is
   const gh = github({ [PR]: 'CLOSED' }, { 'maddec01/lar-web': { role: 'Web client' } });
   assert.deepEqual(await follow(dir, gh), [{ repo: 'maddec01/lar-web' }]);
   assert.deepEqual(gh.changed, [], 'a closed PR is not closed again');
+});
+
+test('an onboarding that reuses its .lar-factory.json finishes only once its PR merges, though the default branch has the file', async (t) => {
+  const kept = { ...progress, step: 'pr', prUrl: PR, reusesConfig: true };
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: kept }]);
+  const gh = github({ [PR]: 'OPEN' }, { 'maddec01/lar-web': { role: 'Web client' } });
+  assert.deepEqual(await follow(dir, gh), [{ repo: 'maddec01/lar-web', onboarding: kept }]);
+  assert.deepEqual(gh.changed, []);
+  assert.deepEqual(await follow(dir, github({ [PR]: 'MERGED' })), [{ repo: 'maddec01/lar-web' }]);
 });
 
 test("Reopen PR runs gh pr reopen on the onboarding's PR and drops its closed mark", async (t) => {

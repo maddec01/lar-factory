@@ -28,7 +28,7 @@ function scratchClash(files: string[]): Clash | null {
 }
 
 /** Each project skill, a folder with a SKILL.md in an agent's project skill folder, by its path. */
-function projectSkills(files: string[]): SkillClash[] {
+export function projectSkills(files: string[]): SkillClash[] {
   return files.flatMap((file) => {
     const dir = PROJECT_SKILL_DIRS.find((d) => file.startsWith(`${d}/`));
     const name = dir && /^([^/]+)\/SKILL\.md$/.exec(file.slice(dir.length + 1))?.[1];

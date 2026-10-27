@@ -704,6 +704,8 @@ export interface OnboardingProgress {
   prUrl?: string;
   /** Set by the board once it finds the PR closed without merging; a save with the same PR keeps it. */
   prClosed?: true;
+  /** Set by the board when the PR keeps the repository's .lar-factory.json, so only its merge finishes the onboarding; a save with the same PR keeps it. */
+  reusesConfig?: true;
 }
 
 /** A repository on this Mac's list that is still onboarding, with where it stopped. */
@@ -785,6 +787,23 @@ export interface FixedClashes {
   skillClashes: SkillClash[];
   projectSkills: string[];
 }
+
+/** The fixes onboarding's PR holds, as the Cleanup step leaves them: the ticked Clashes and each skill Clash's pick, by its folder's path. */
+export interface OnboardingPicks {
+  clashes: Clash[];
+  skills: Record<string, SkillPick>;
+}
+
+/**
+ * One change onboarding's PR makes against the default branch: the `## Agent skills` block in its file, a file written
+ * whole, a Clash's lines swapped at its line, or a file or folder (its path ending in `/`) deleted or renamed.
+ */
+export type OnboardingPrChange =
+  | { kind: 'agent-skills'; path: string }
+  | { kind: 'write'; path: string; created: boolean }
+  | { kind: 'edit'; path: string; line: number; reason: string }
+  | { kind: 'delete'; path: string }
+  | { kind: 'rename'; path: string; to: string };
 
 /** Where a run of onboarding's Clash agent stands: running with the agent's latest message, done with its Clashes, or ended without them and why. */
 export type ClashRunState =

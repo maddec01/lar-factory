@@ -5,7 +5,8 @@
 # (version 1, itemSource {"kind": "issues"}, show "all", labels []). role has no default.
 # --list prints the onboarded repositories, the repositories array of
 # ~/Library/Application Support/Lar Factory/repositories.json, the file the board
-# server reads. A missing file means none: [].
+# server reads. A missing file means none: []. It leaves out each entry still
+# resetting, so lar-work never reads a repository being reset as onboarded.
 # Each error exits nonzero with its reason on stderr.
 set -euo pipefail
 
@@ -37,7 +38,7 @@ if [[ $arg == --list ]]; then
         echo "$list_file: $problem." >&2
         exit 1
     fi
-    jq '.repositories' "$list_file"
+    jq '[.repositories[] | select(has("resetting") | not)]' "$list_file"
     exit 0
 fi
 

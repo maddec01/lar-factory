@@ -88,6 +88,10 @@ _Avoid_: onboarding config, project config, board config
 Setting up one repository for the factory: its T3 project, provider, item source, labels, domain docs and cleanup.
 _Avoid_: initialization, setup
 
+**Clash**:
+Something in a repository that makes agents work against the factory, such as a rule to push to main, another tracker's setup, or a project skill named like a bundled one.
+_Avoid_: conflict
+
 **Overlay**:
 The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.

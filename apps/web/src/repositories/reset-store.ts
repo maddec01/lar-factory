@@ -4,6 +4,7 @@
 // opened, and stays open with gh's message when Reset fails.
 
 import { create } from 'zustand';
+import { shownRepo } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showPrToast } from '../notices/toasts.tsx';
 
@@ -35,6 +36,6 @@ export const useResetStore = create<ResetState>()((set, get) => ({
     receive(result);
     set({ reset: result.error ? { ...reset, resetting: false, error: result.error } : null });
     if (result.error || !result.prUrl) return;
-    showPrToast({ slot: 'reset', what: ` reset PR for ${reset.repo}`, prUrl: result.prUrl, label: `${reset.repo}’s reset PR` });
+    showPrToast({ slot: 'reset', what: ` reset PR for ${shownRepo(reset.repo)}`, prUrl: result.prUrl, label: `${shownRepo(reset.repo)}’s reset PR` });
   },
 }));

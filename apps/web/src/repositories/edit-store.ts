@@ -5,7 +5,7 @@
 // and its answers open with gh's message when that fails.
 
 import { create } from 'zustand';
-import { customLabelChoices, labelPlan, type RepositoryConfigAnswers, type SetupAnswers } from '@lar-factory/shared';
+import { customLabelChoices, labelPlan, shownRepo, type RepositoryConfigAnswers, type SetupAnswers } from '@lar-factory/shared';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showPrToast } from '../notices/toasts.tsx';
 import { answerSetup, setupItemSource, setupProblems, type SetupChange } from '../onboarding/setup-answers.ts';
@@ -14,7 +14,7 @@ import { answerSetup, setupItemSource, setupProblems, type SetupChange } from '.
 function setupOf(repo: string, { itemSource, show, role }: RepositoryConfigAnswers): SetupAnswers {
   const project = itemSource.kind === 'github-project' ? { projectOwner: itemSource.owner, projectNumber: String(itemSource.number) }
     : { projectOwner: repo.split('/')[0] ?? '', projectNumber: '' };
-  return { itemSource: itemSource.kind, ...project, show, showPicked: true, role };
+  return { itemSource: itemSource.kind, ...project, ...'team' in itemSource && { team: itemSource.team }, show, showPicked: true, role };
 }
 
 /** The editing form, once the repository's values loaded. */
@@ -122,7 +122,7 @@ export const useEditStore = create<EditState>()((set, get) => {
       // The board sent back shows the Edit PR on the repository's row.
       receive(opened);
       set({ edit: null });
-      showPrToast({ slot: 'edit', what: ` Edit PR for ${repo}`, prUrl: opened.prUrl, label: `${repo}’s Edit PR`,
+      showPrToast({ slot: 'edit', what: ` Edit PR for ${shownRepo(repo)}`, prUrl: opened.prUrl, label: `${shownRepo(repo)}’s Edit PR`,
         ...editPr ? { before: 'Added the new values to ' } : { after: '. The board keeps the current values until it merges.' } });
     },
   };

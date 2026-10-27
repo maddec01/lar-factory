@@ -325,6 +325,9 @@ test('a repository goes by its name, or by owner/name when another board reposit
   assert.equal(repoName('maddec01/lar', repos), 'maddec01/lar');
   assert.equal(repoName('fabrikam/lar', repos), 'fabrikam/lar');
   assert.equal(repoName('someone/elsewhere', repos), 'elsewhere', 'a repository off the board still goes by its name');
+  const azure = [...repos, { repo: 'contoso/Fabrikam/lar-api', role: 'api', labels: [] }, { repo: 'contoso/Fabrikam/lar', role: 'app', labels: [] }];
+  assert.equal(repoName('contoso/Fabrikam/lar-api', azure), 'lar-api', 'an Azure DevOps repository goes by its last part');
+  assert.equal(repoName('contoso/Fabrikam/lar', azure), 'contoso/Fabrikam/lar');
   assert.equal(repoName(repoKey(item('List', [], { repo: null })), repos), 'Draft');
   assert.equal(repoKey(item('List')), 'maddec01/lar-server');
 });

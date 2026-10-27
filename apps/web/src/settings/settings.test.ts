@@ -140,7 +140,8 @@ test('the header drags the window, but not Restore defaults', async () => {
 const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
 
 test('Repositories shows the command line tools\' logins and each repository with its provider, item source and show setting', async () => {
-  const repos = [{ ...sample.repos[0]!, project: { owner: 'maddec01', number: 3 } }, { ...sample.repos[1]!, items: 'issues' as const, show: 'opted-in' as const }];
+  const repos = [{ ...sample.repos[0]!, project: { owner: 'maddec01', number: 3 } }, { ...sample.repos[1]!, items: 'issues' as const, show: 'opted-in' as const },
+    { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'sprint' as const, team: 'Fabrikam Team', labels: [] }];
   await open('Repositories', { ...sample, repos });
   expect(groups()).toEqual([['Command line tools', ['gh', 'az']], ['Repositories', repos.map((r) => `repo-${r.repo}`)]]);
   expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
@@ -153,6 +154,7 @@ test('Repositories shows the command line tools\' logins and each repository wit
   expect(repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual([
     `${repos[0]!.repo}GitHub · GitHub Project maddec01 #3 · All itemsEditReset`,
     `${repos[1]!.repo}GitHub · Issues · Opted-in itemsEditReset`,
+    'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team’s current sprint · All itemsEditReset',
   ]);
 });
 

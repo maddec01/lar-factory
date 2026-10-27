@@ -97,8 +97,9 @@ adding, queuing and starting are disabled in sample mode.
 Until the board can onboard a repository itself, you add one by hand. The board
 reads two files in the board app's data folder, `~/Library/Application Support/Lar Factory/`:
 
-- `repositories.json` lists the onboarded repositories. Without it, the board
-  shows no repository.
+- `repositories.json` lists the onboarded repositories, each GitHub one as
+  `owner/name` and each Azure DevOps one as `organization/project/repository`, as
+  its origin URL names them. Without it, the board shows no repository.
 - `settings.json` holds the board-wide settings. Today that is `refreshSeconds`,
   how often the board reads GitHub, 45 when the file or the field is missing.
 
@@ -109,9 +110,11 @@ branch. Its fields:
 
 - `version`: the file's shape, `1`. A missing `version` counts as `1`.
 - `role`: what the repository is for, which lar-work reads. Required.
-- `itemSource`: where the repository's items come from, either
+- `itemSource`: where the repository's items come from:
   `{ "kind": "github-project", "owner": "<owner>", "number": <n> }` for a GitHub
-  Project or `{ "kind": "issues" }` for the repository's own issues, the default.
+  Project, `{ "kind": "issues" }` for the repository's own issues, the default, or
+  `{ "kind": "azure-sprint", "team": "<team>" }` for an Azure DevOps team's current
+  sprint, read with `az`.
 - `show`: `"all"`, the default, or `"opted-in"`.
 - `labels`: an array of strings, empty by default.
 

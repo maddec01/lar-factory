@@ -307,10 +307,12 @@ export interface RepoConfig {
   repo: string;
   /** Repository role: what this repository is to the others. */
   role: string;
-  /** Its item source: the GitHub Project its .lar-factory.json names, or the repository's issues. */
+  /** Its item source: the GitHub Project its .lar-factory.json names, the repository's issues, or an Azure DevOps team's current sprint. */
   items?: ItemSourceKind;
-  /** The GitHub Project its item source names, by owner and number; absent for the repository's issues. */
+  /** The GitHub Project its item source names, by owner and number; absent for the other item sources. */
   project?: { owner: string; number: number };
+  /** The Azure DevOps team whose current sprint its item source is; absent for the other item sources. */
+  team?: string;
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
   /** Its custom labels, the `labels` in its .lar-factory.json, which Add item offers and the queue shows. */
@@ -326,7 +328,7 @@ export interface RepoConfig {
   configUpdate?: number;
 }
 
-export const ITEM_SOURCE_KINDS = ['project', 'issues'] as const;
+export const ITEM_SOURCE_KINDS = ['project', 'issues', 'sprint'] as const;
 
 export type ItemSourceKind = (typeof ITEM_SOURCE_KINDS)[number];
 
@@ -354,6 +356,13 @@ export interface RepositoryConfigProblem {
   problem: string;
 }
 
+/** Why the latest read left a repository's items off the board, and the command that fixes it, when one does. */
+export interface ItemSourceProblem {
+  repo: string;
+  problem: string;
+  fix?: string;
+}
+
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
@@ -362,6 +371,8 @@ export interface BoardData {
   repos: RepoConfig[];
   /** Each onboarded repository the latest read left off the board because its .lar-factory.json couldn't be read, and why. */
   repositoryConfigProblems?: RepositoryConfigProblem[];
+  /** Each onboarded repository whose items the latest read left off, such as one reading through a logged-out az, and why. */
+  itemSourceProblems?: ItemSourceProblem[];
   /** The repositories on this Mac's list that are still onboarding, in the list's order. Absent in sample mode. */
   onboarding?: OnboardingRepository[];
   /** A T3 project the board offers to onboard, as its repository has .lar-factory.json and isn't on the list. Absent in sample mode. */
@@ -469,8 +480,8 @@ export function failedCheck<N extends CheckedTool>(tools: ToolChecks | undefined
   return check && check.result !== 'ok' ? check as FailedCheck<NonNullable<ToolChecks[N]>> : undefined;
 }
 
-/** Where a repository's items come from: its GitHub Project, or its issues. */
-export type ItemSource = 'project' | 'issues';
+/** Where a repository's items come from: its GitHub Project, its issues, or an Azure DevOps team's current sprint. */
+export type ItemSource = ItemSourceKind;
 
 /** Where a repository's items come from: the GitHub Project, unless its config says its issues. */
 export function itemSource(repo: RepoConfig): ItemSource {
@@ -573,11 +584,15 @@ export const repoKey = (item: Pick<Item, 'repo'>): string => item.repo ?? 'Draft
 /** Whether two `owner/name`s, or repository keys, are the same repository: GitHub ignores case, so the board does too. */
 export const sameRepo = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
-/** A repository's shown name: the part after `owner/`, or all of `owner/name` when another of `repos` has the same name. */
+/**
+ * A repository's shown name: the part after the last `/` of `owner/name` or `organization/project/repository`, or all
+ * of it when another of `repos` has the same name.
+ */
 export function repoName(key: string, repos: readonly RepoConfig[]): string {
-  const name = key.split('/')[1];
-  if (!name) return key;
-  return repos.some((r) => !sameRepo(r.repo, key) && r.repo.split('/')[1] === name) ? key : name;
+  if (!key.includes('/')) return key;
+  const nameOf = (repo: string) => repo.split('/').at(-1);
+  const name = nameOf(key)!;
+  return repos.some((r) => !sameRepo(r.repo, key) && nameOf(r.repo) === name) ? key : name;
 }
 
 /** A ticket with no repository yet, such as a Project draft. */
@@ -638,8 +653,11 @@ export const PROVIDERS = ['GitHub', 'Azure DevOps'] as const;
 
 export type Provider = (typeof PROVIDERS)[number];
 
-/** Where a repository's items come from: a GitHub Project, which other repositories may name too, or its own issues. */
-export type RepositoryItemSource = { kind: 'github-project'; owner: string; number: number } | { kind: 'issues' };
+/**
+ * Where a repository's items come from: a GitHub Project, which other repositories may name too, its own issues, or an
+ * Azure DevOps team's current sprint in the repository's project.
+ */
+export type RepositoryItemSource = { kind: 'github-project'; owner: string; number: number } | { kind: 'issues' } | { kind: 'azure-sprint'; team: string };
 
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
 export interface RepositoryConfigAnswers {

@@ -43,7 +43,7 @@ test('every Azure DevOps origin form names its organization, project and reposit
   for (const url of AZURE) assert.equal(azureRepo(url), 'contoso/Fabrikam/lar-api', url);
   assert.equal(azureRepo('https://dev.azure.com/contoso/Fabrikam/_git/lar-api'), 'contoso/Fabrikam/lar-api');
   assert.equal(azureRepo('https://contoso.visualstudio.com/DefaultCollection/Fabrikam/_git/lar-api'), 'contoso/Fabrikam/lar-api');
-  assert.equal(azureRepo('https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar%20api'), 'contoso/Fabrikam Fiber/lar api');
+  assert.equal(azureRepo('https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar%20api'), 'contoso/Fabrikam%20Fiber/lar%20api');
   // A repository named after its project may leave the project out.
   assert.equal(azureRepo('https://dev.azure.com/contoso/_git/Fabrikam'), 'contoso/Fabrikam/Fabrikam');
   for (const url of [...GITHUB, 'https://dev.azure.com/contoso', 'https://dev.azure.com/contoso/Fabrikam/_wiki/x']) assert.equal(azureRepo(url), null, url);

@@ -162,7 +162,7 @@ test('a listed repository on Azure DevOps gets an az check, which Recheck reruns
     chmodSync(az, 0o755);
   };
   fakeAz(1);
-  const board = await startBoard(t, { repositories: ['maddec01/lar-factory', 'Fabrikam/lar-api'] }, false, false, { HOME: home, AZ_PATH: az,
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory', 'contoso/Fabrikam/lar-api'] }, false, false, { HOME: home, AZ_PATH: az,
     T3_STATE_DB: projectsDb(t, [{ id: 'project-api', root: join(home, 'Developer/lar/lar-api') }]) });
   const data = await afterRead(board);
   assert.ok(data.fetchedAt, 'the board reads GitHub');

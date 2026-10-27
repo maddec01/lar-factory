@@ -37,17 +37,30 @@ export interface OnboardedRepository {
   resetting?: { prUrl: string };
 }
 
-/** owner/name, each part of letters, digits, ".", "_" or "-", and neither "." nor ".."; repo-config.sh's repo_form. */
-const REPO = /^(?!\.\.?\/)[A-Za-z0-9._-]+\/(?!\.\.?$)[A-Za-z0-9._-]+$/;
+/**
+ * GitHub's owner/name, each part of letters, digits, ".", "_" or "-", or Azure DevOps's organization/project/repository
+ * as its origin URL has them, which may hold "%" and "~" too; no part is "." or "..". repo-config.sh's repo_form and
+ * azure_form.
+ */
+const REPO = /^(?:(?!\.\.?\/)[A-Za-z0-9._-]+\/(?!\.\.?$)[A-Za-z0-9._-]+|(?!\.\.?\/)[A-Za-z0-9._%~-]+\/(?!\.\.?\/)[A-Za-z0-9._%~-]+\/(?!\.\.?$)[A-Za-z0-9._%~-]+)$/;
 const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 
-/** Whether a value is a repository of the form owner/name. */
+/** Whether a value is a repository of the form owner/name or organization/project/repository. */
 export const isRepo = (value: unknown): value is string => typeof value === 'string' && REPO.test(value);
 
-/** Whether a value is an item source as .lar-factory.json holds it: a GitHub Project by owner and positive number, or the issues. */
+/** Whether a repository is on Azure DevOps: organization/project/repository, not GitHub's owner/name. */
+const onAzure = (repo: string): boolean => repo.split('/').length === 3;
+
+const isTeam = (value: unknown): value is string => typeof value === 'string' && value !== '';
+
+/**
+ * Whether a value is an item source as .lar-factory.json holds it: a GitHub Project by owner and positive number, the
+ * issues, or an Azure DevOps team's current sprint by team.
+ */
 export function isItemSource(value: unknown): value is RepositoryItemSource {
   if (!isRecord(value)) return false;
   if (value.kind === 'issues') return true;
+  if (value.kind === 'azure-sprint') return isTeam(value.team);
   return value.kind === 'github-project' && typeof value.owner === 'string' && GITHUB_LOGIN.test(value.owner)
     && Number.isInteger(value.number) && (value.number as number) > 0;
 }
@@ -231,13 +244,18 @@ export function readBoardSettings(dir = boardDataDir()): BoardSettings {
   return { refreshSeconds: seconds ?? defaults.refreshSeconds };
 }
 
-/** What is wrong with a parsed .lar-factory.json, in repo-config.sh's words, or null when nothing is. */
-function problem(raw: Record<string, unknown>): string | null {
+/**
+ * What is wrong with a parsed .lar-factory.json, in repo-config.sh's words, or null when nothing is. A GitHub repository
+ * reads a GitHub Project or its issues, and an Azure DevOps one names its team's sprint, with no default.
+ */
+function problem(raw: Record<string, unknown>, azure: boolean): string | null {
   const source = raw.itemSource as Record<string, unknown> | undefined;
   if ('version' in raw && typeof raw.version !== 'number') return 'field version must be a number';
   if (typeof raw.role !== 'string' || !raw.role) return 'field role is missing or not a string';
   if ('itemSource' in raw && (typeof source !== 'object' || source === null || Array.isArray(source))) return 'field itemSource must be an object';
-  if (source && source.kind !== 'issues' && source.kind !== 'github-project') return 'field itemSource.kind must be "issues" or "github-project"';
+  if (!azure && source && source.kind !== 'issues' && source.kind !== 'github-project') return 'field itemSource.kind must be "issues" or "github-project"';
+  if (azure && source?.kind !== 'azure-sprint') return 'field itemSource.kind must be "azure-sprint"';
+  if (azure && !isTeam(source?.team)) return 'field itemSource.team must name the team for an azure-sprint';
   if (source?.kind === 'github-project' && (typeof source.owner !== 'string' || !GITHUB_LOGIN.test(source.owner))) {
     return 'field itemSource.owner must be a GitHub login for a github-project';
   }
@@ -271,12 +289,12 @@ export async function findRepositoryConfig(repo: string, run?: (args: string[]) 
   try { raw = JSON.parse(text); }
   catch { return { problem: ".lar-factory.json isn't valid JSON." }; }
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { problem: ".lar-factory.json isn't a JSON object." };
-  const wrong = problem(raw as Record<string, unknown>);
+  const wrong = problem(raw as Record<string, unknown>, onAzure(repo));
   if (wrong) return { problem: `.lar-factory.json ${wrong}.` };
   const file = raw as Partial<RepositoryConfig> & { role: string };
-  const itemSource: RepositoryItemSource = file.itemSource?.kind === 'github-project'
-    ? { kind: 'github-project', owner: file.itemSource.owner, number: file.itemSource.number }
-    : { kind: 'issues' };
+  const source = file.itemSource;
+  const itemSource: RepositoryItemSource = source?.kind === 'github-project' ? { kind: 'github-project', owner: source.owner, number: source.number }
+    : source?.kind === 'azure-sprint' ? { kind: 'azure-sprint', team: source.team } : { kind: 'issues' };
   return { repo, version: file.version ?? 1, role: file.role, itemSource, show: file.show ?? 'all', labels: file.labels ?? [] };
 }
 

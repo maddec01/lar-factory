@@ -92,7 +92,7 @@ export function githubRepo(url: string | null): string | null {
 /**
  * `organization/project/repository` from an Azure DevOps origin: `https://dev.azure.com/<org>/<project>/_git/<repo>`,
  * `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` or `https://<org>.visualstudio.com/<project>/_git/<repo>`, each
- * name decoded; null for any other URL. The organization keeps two organizations' projects apart. A URL without the
+ * name as the URL has it, percent-encoded or not, as lar-work's azure.sh names it; null for any other URL. The organization keeps two organizations' projects apart. A URL without the
  * project names a repository named after its project.
  */
 export function azureRepo(url: string): string | null {
@@ -107,9 +107,7 @@ export function azureRepo(url: string): string | null {
     const project = https[2] ?? (https[1]?.toLowerCase() === 'defaultcollection' ? undefined : https[1]);
     parts = [host.split('.')[0], project ?? https[3], https[3]];
   } else if (https?.[1]) parts = [https[1], https[2] ?? https[3], https[3]];
-  if (!parts?.every(Boolean)) return null;
-  try { return parts.map((part) => decodeURIComponent(part!)).join('/'); }
-  catch { return null; }
+  return parts?.every(Boolean) ? parts.join('/') : null;
 }
 
 /** The repository an origin URL names: GitHub's `owner/repo`, or Azure DevOps's `organization/project/repository`. */

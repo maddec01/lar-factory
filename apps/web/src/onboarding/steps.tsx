@@ -106,7 +106,8 @@ function ProjectStep({ run }: { run: Run }) {
 }
 
 /** An item source as a line, like `GitHub Project maddec01 #3`. */
-const sourceLine = (source: RepositoryItemSource, repo: string) => source.kind === 'github-project' ? `GitHub Project ${source.owner} #${source.number}` : `${repo}’s issues`;
+const sourceLine = (source: RepositoryItemSource, repo: string) => source.kind === 'github-project' ? `GitHub Project ${source.owner} #${source.number}`
+  : source.kind === 'azure-sprint' ? `${source.team}’s current sprint` : `${repo}’s issues`;
 
 /** The provider, from the origin's host, which onboarding can't change. */
 function ProviderRow({ project }: { project: ProjectChoice }) {

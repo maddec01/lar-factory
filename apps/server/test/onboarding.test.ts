@@ -293,7 +293,7 @@ test("a Reopen PR that gh refuses answers with gh's message and keeps the PR clo
 test("Reset closes an onboarding's open PR and drops it from the board and the list", async (t) => {
   const { home, board } = await onPr(t, { repoConfigs: { 'maddec01/lar-web': null }, prs: { [PR]: 'OPEN' } });
   await until(board, (d) => d.onboarding?.length === 1);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/reset');
+  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json() as { board: BoardData }).board.onboarding, []);
   assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'close').map((args) => args.slice(0, 3)), [['pr', 'close', PR]]);
@@ -304,7 +304,7 @@ test("Reset closes an onboarding's open PR and drops it from the board and the l
 test("a Reset whose PR gh can't close answers with gh's message and keeps the onboarding", async (t) => {
   const { home, board } = await onPr(t, { repoConfigs: { 'maddec01/lar-web': null }, prs: { [PR]: 'OPEN' }, fail: 'pr-close' });
   await until(board, (d) => d.onboarding?.length === 1);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/reset');
+  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
   assert.deepEqual([response.status, await response.json()], [502, { error: "Can't close maddec01/lar-web's onboarding PR: gh pr close failed: HTTP 403: Resource not accessible by integration" }]);
   assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories,
     [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } }]);
@@ -317,7 +317,7 @@ test('Reset of an onboarded repository opens its reset PR and takes it off the b
   const options = { files: ['.lar-factory.json', 'AGENTS.md'], items: [rawIssue('PVTI_1', 1, 'List', []), rawIssue('PVTI_2', 2, 'List', [], { repository: { nameWithOwner: 'maddec01/lar-web' } })] };
   const board = await startBoard(t, options, false, false, { HOME: home });
   await until(board, (d) => d.items.length === 2);
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/reset');
+  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
   assert.equal(response.status, 200);
   const { board: data, prUrl } = await response.json() as { board: BoardData; prUrl: string };
   assert.equal(prUrl, PR);
@@ -338,7 +338,7 @@ test("a Reset whose reset PR can't be opened answers with gh's message and keeps
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
   writeList(home, [{ repo: 'maddec01/lar-web' }]);
   const board = await startBoard(t, { files: ['.lar-factory.json'], fail: 'pr-create' }, false, false, { HOME: home });
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/reset');
+  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');
   assert.equal(response.status, 502);
   assert.match((await response.json() as { error: string }).error, /^Can't open maddec01\/lar-web's reset PR: gh pr create failed: /);
   assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories, [{ repo: 'maddec01/lar-web' }]);
@@ -356,7 +356,7 @@ test('a .lar-factory.json that lands another way finishes onboarding and closes 
 
 test('the sample board opens, reopens and resets no onboarding PR', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/pr', '/api/onboarding/pr/changes', '/api/onboarding/pr/reopen', '/api/onboarding/reset']) {
+  for (const path of ['/api/onboarding/pr', '/api/onboarding/pr/changes', '/api/onboarding/pr/reopen', '/api/repositories/reset']) {
     const response = await board.post({ repo: 'maddec01/lar-web', progress, config }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }

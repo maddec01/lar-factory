@@ -141,7 +141,7 @@ test("a part whose repository is still onboarding can't be armed, and one armed 
 test('an armed start whose repository Reset takes off the board drops on the next read and never starts, also after a restart', async (t) => {
   const { board, env } = await armableBoard(t, [blockedBuild()], { files: ['.lar-factory.json'] });
   assert.equal((await arm(board, 'I_12', OPUS)).status, 200);
-  assert.equal((await board.post({ repo: 'maddec01/lar-factory' }, board.url, '/api/onboarding/reset')).status, 200);
+  assert.equal((await board.post({ repo: 'maddec01/lar-factory' }, board.url, '/api/repositories/reset')).status, 200);
   await board.update({ items: [blockedBuild(['CLOSED', 'CLOSED'])] });
   const data = await read(board);
   assert.deepEqual([data.items, data.armed], [[], {}]);

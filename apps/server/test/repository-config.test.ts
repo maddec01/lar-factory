@@ -29,8 +29,8 @@ test('each onboarded repository reads its items from the item source its .lar-fa
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(data.error, null);
   assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]), [[FACTORY, 1, 'Queued'], [FACTORY, 2, 'List'], [APPLE, 7, 'Queued']]);
-  assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all', labels: [] },
-    { repo: APPLE, role: 'Apple client', items: 'issues', show: 'opted-in', labels: ['app: music'] }]);
+  assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all', labels: [], version: 1 },
+    { repo: APPLE, role: 'Apple client', items: 'issues', show: 'opted-in', labels: ['app: music'], version: 1 }]);
   assert.equal(data.project.title, 'lar');
 });
 
@@ -39,7 +39,7 @@ test('repositories naming the same Project share one read of it, and a missing f
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(await projectReads(board), 1);
   assert.equal(await configReads(board), 3);
-  assert.deepEqual(data.repos[0], { repo: 'maddec01/lar-server', role: 'Server', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all', labels: [] });
+  assert.deepEqual(data.repos[0], { repo: 'maddec01/lar-server', role: 'Server', items: 'project', project: { owner: LAR.owner, number: LAR.number }, show: 'all', labels: [], version: 1 });
 });
 
 test('without a list of onboarded repositories the board is empty', async (t) => {
@@ -94,7 +94,7 @@ test('a change to a .lar-factory.json shows on the next refresh', async (t) => {
   await until(board, (d) => d.items.map((i) => i.number).join() === '1');
   await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } } });
   const data: BoardData = await until(board, (d) => d.items.map((i) => i.number).join() === '7');
-  assert.deepEqual(data.repos, [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all', labels: [] }]);
+  assert.deepEqual(data.repos, [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all', labels: [], version: 1 }]);
 });
 
 test("a repository whose .lar-factory.json is missing, doesn't parse or has a wrong field stays off the board with a notice, the others still show", async (t) => {
@@ -119,4 +119,22 @@ test('the notice clears on the first refresh that reads the file', async (t) => 
   await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: LAR } } });
   const data = await until(board, (d) => d.items.length === 1);
   assert.deepEqual([data.repositoryConfigProblems, data.repos.map((r) => r.repo)], [[], [APPLE]]);
+});
+
+test("the config update notice's Dismiss refuses a repository off this Mac's list", async (t) => {
+  const board = await startBoard(t, { repositories: [FACTORY], items: [projectIssue(1, 'Queued', FACTORY)] });
+  await until(board, (d) => d.fetchedAt !== null);
+  const response = await board.post({ repo: APPLE }, board.url, '/api/repositories/config-update/dismiss');
+  assert.deepEqual([response.status, await response.json()], [409, { error: `${APPLE} is not on this Mac's list.` }]);
+});
+
+test("Edit's Save shows the Edit PR on the repository's row at once", async (t) => {
+  const board = await startBoard(t, { repositories: [FACTORY], items: [projectIssue(1, 'Queued', FACTORY)], files: ['.lar-factory.json'] });
+  await until(board, (d) => d.fetchedAt !== null);
+  const config = { itemSource: { kind: 'issues' }, show: 'all', role: 'The factory', labels: [] };
+  const response = await board.post({ repo: FACTORY, config }, board.url, '/api/repositories/config/pr');
+  const { prUrl, board: data } = await response.json() as { prUrl: string; board: BoardData };
+  assert.equal(response.status, 200);
+  assert.match(prUrl, /\/pull\/\d+$/);
+  assert.equal(data.repos.find((r) => r.repo === FACTORY)?.editPr, prUrl);
 });

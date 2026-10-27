@@ -1,6 +1,10 @@
-import { test } from 'vite-plus/test';
+import { afterAll, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { openEditPr, readEditConfig, readEditPrs } from './edit-config.ts';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { CONFIG_VERSION } from '@lar-factory/shared';
+import { notEditable, openConfigUpdatePr as openUpdate, openEditPr as openEdit, readEditConfig as readEdit, readEditPrs } from './edit-config.ts';
 
 const REPO = 'maddec01/lar-web';
 const PR = 'https://github.com/maddec01/lar-web/pull/21';
@@ -48,6 +52,21 @@ function gh({ file = FILE as string | null, labels = ['bug', 'app: music'], fail
   return { calls, run };
 }
 
+/** A board data folder whose list has `entries`. */
+function listDir(entries: object[]): string {
+  const dir = mkdtempSync(join(tmpdir(), 'lar edit config test '));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'repositories.json'), JSON.stringify({ repositories: entries }));
+  return dir;
+}
+
+/** The list the tests edit REPO from, where it is onboarded. */
+const ONBOARDED = listDir([{ repo: REPO }]);
+type Run = (args: string[]) => Promise<string>;
+const readEditConfig = (input: Record<string, unknown>, run: Run) => readEdit(input, run, ONBOARDED);
+const openEditPr = (input: Record<string, unknown>, run: Run) => openEdit(input, run, ONBOARDED);
+const openConfigUpdatePr = (input: Record<string, unknown>, run: Run, version?: number) => openUpdate(input, run, version, ONBOARDED);
+
 const writes = (calls: string[][]) => calls.filter((args) => args.includes('POST') || args.includes('PATCH') || args[1] === 'create');
 
 test("Edit loads the default branch's .lar-factory.json and the repository's labels", async () => {
@@ -80,7 +99,7 @@ test('Save creates the custom labels the repository lacks, then opens a PR from 
   assert.deepEqual(field(tree!, 'base_tree'), ['tree0']);
   assert.deepEqual(field(tree!, 'tree[][path]'), ['.lar-factory.json']);
   assert.deepEqual(JSON.parse(field(tree!, 'tree[][content]')[0]!),
-    { version: 2, role: 'Web client for the API', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: music', 'app: video'] });
+    { version: CONFIG_VERSION, role: 'Web client for the API', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: music', 'app: video'] });
   assert.deepEqual([field(commit!, 'tree'), field(commit!, 'parents[]')], [['tree1'], ['abc123']]);
   assert.deepEqual([field(branch!, 'ref'), field(branch!, 'sha')], [['refs/heads/lar-factory/edit-config'], ['commit1']]);
   assert.deepEqual(pr!.slice(0, 8), ['pr', 'create', '-R', REPO, '--base', 'main', '--head', 'lar-factory/edit-config']);
@@ -95,13 +114,13 @@ test('Save moves a lar-factory/edit-config branch left without an open PR to its
   assert.deepEqual(field(moved, 'sha'), ['commit1']);
 });
 
-test("Save with an Edit PR open adds a commit to its branch, at the version the branch's .lar-factory.json has, and opens no second PR", async () => {
+test("Save with an Edit PR open adds a commit to its branch, at the app's version, and opens no second PR", async () => {
   const { calls, run } = gh({ branch: true, openPr: PR });
   assert.deepEqual(await openEditPr({ repo: REPO, config }, run), { prUrl: PR });
   const [create, tree, commit, moved, ...rest] = writes(calls);
   assert.deepEqual(create, ['label', 'create', '-R', REPO, '--', 'app: video']);
   assert.deepEqual(field(tree!, 'base_tree'), ['treeOld']);
-  assert.equal(JSON.parse(field(tree!, 'tree[][content]')[0]!).version, 3);
+  assert.equal(JSON.parse(field(tree!, 'tree[][content]')[0]!).version, CONFIG_VERSION);
   assert.deepEqual(field(commit!, 'parents[]'), ['old']);
   assert.equal(moved![1], `repos/${REPO}/git/refs/heads/lar-factory/edit-config`);
   assert.deepEqual(field(moved!, 'sha'), ['commit1']);
@@ -134,4 +153,53 @@ test("Save refuses answers that don't fit and a .lar-factory.json gone from the 
   assert.deepEqual(await openEditPr({ repo: REPO, config: { ...config, role: ' ' } }, gh().run),
     { status: 400, error: "Send the repository and its .lar-factory.json's values." });
   assert.deepEqual(await openEditPr({ repo: REPO, config }, gh({ file: null }).run), { status: 409, error: `${REPO} has no .lar-factory.json on its default branch.` });
+});
+
+test("the config update PR rewrites only .lar-factory.json with the default branch's values at the app's version, from lar-factory/edit-config", async () => {
+  const { calls, run } = gh({ file: JSON.stringify({ role: 'Web client', labels: ['app: music'] }) });
+  assert.deepEqual(await openConfigUpdatePr({ repo: REPO }, run, 2), { prUrl: PR });
+  const [tree, commit, branch, pr, ...rest] = writes(calls);
+  assert.deepEqual(field(tree!, 'tree[][path]'), ['.lar-factory.json']);
+  assert.equal(field(tree!, 'tree[][content]')[0], `${JSON.stringify({ version: 2, role: 'Web client', itemSource: { kind: 'issues' }, show: 'all', labels: ['app: music'] }, null, 2)}\n`);
+  assert.deepEqual(field(commit!, 'parents[]'), ['abc123']);
+  assert.deepEqual(field(branch!, 'ref'), ['refs/heads/lar-factory/edit-config']);
+  assert.deepEqual(pr!.slice(0, 8), ['pr', 'create', '-R', REPO, '--base', 'main', '--head', 'lar-factory/edit-config']);
+  assert.match(pr!.join(' '), /update lar Factory's Repository config to version 2/);
+  assert.deepEqual(rest, []);
+});
+
+test("the config update PR joins an open Edit PR, rewriting its branch's values, and creates no label", async () => {
+  const { calls, run } = gh({ branch: true, openPr: PR });
+  assert.deepEqual(await openConfigUpdatePr({ repo: REPO }, run, 4), { prUrl: PR });
+  const [tree, commit, moved, ...rest] = writes(calls);
+  assert.deepEqual(JSON.parse(field(tree!, 'tree[][content]')[0]!),
+    { version: 4, role: 'Web client on the PR', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: video'] });
+  assert.deepEqual(field(commit!, 'parents[]'), ['old']);
+  assert.equal(moved![1], `repos/${REPO}/git/refs/heads/lar-factory/edit-config`);
+  assert.deepEqual(rest, []);
+});
+
+test("the config update PR refuses a body without a repository and shows a missing file or gh's message", async () => {
+  assert.deepEqual(await openConfigUpdatePr({ repo: 'nope' }, gh().run), { status: 400, error: 'Send the repository to update.' });
+  assert.deepEqual(await openConfigUpdatePr({ repo: REPO }, gh({ file: null }).run), { status: 409, error: `${REPO} has no .lar-factory.json on its default branch.` });
+  assert.deepEqual(await openConfigUpdatePr({ repo: REPO }, gh({ fails: { 'pr create': 'HTTP 403' } }).run, 2), { status: 502, error: `Can't open ${REPO}'s Edit PR: HTTP 403` });
+});
+
+test('Edit, its Save and the config update PR refuse a repository off the list, still onboarding or resetting, and call no gh', async () => {
+  const progress = { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-web' } };
+  const lists: [object[], string][] = [
+    [[{ repo: 'maddec01/lar-cli' }], `${REPO} is not on this Mac's list.`],
+    [[{ repo: REPO, onboarding: progress }], `${REPO} is still onboarding.`],
+    [[{ repo: REPO, resetting: { prUrl: PR } }], `${REPO} is resetting.`],
+  ];
+  for (const [entries, error] of lists) {
+    const dir = listDir(entries);
+    const { calls, run } = gh();
+    assert.deepEqual(notEditable(REPO, dir), { status: 409, error });
+    assert.deepEqual(await readEdit({ repo: REPO }, run, dir), { status: 409, error });
+    assert.deepEqual(await openEdit({ repo: REPO, config }, run, dir), { status: 409, error });
+    assert.deepEqual(await openUpdate({ repo: REPO }, run, 2, dir), { status: 409, error });
+    assert.deepEqual(calls, []);
+  }
+  assert.equal(notEditable('MADDEC01/lar-web', ONBOARDED), null);
 });

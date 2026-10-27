@@ -314,8 +314,16 @@ export interface RepoConfig {
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
   /** Its custom labels, the `labels` in its .lar-factory.json, which Add item offers and the queue shows. */
-  labels: string[];  /** The URL of its open Edit PR, the open PR from lar-factory/edit-config, as the latest read found it; absent when it has none. */
+  labels: string[];
+  /** The URL of its open Edit PR, the open PR from lar-factory/edit-config, as the latest read found it; absent when it has none. */
   editPr?: string;
+  /** Its .lar-factory.json's `version`, 1 when the file has none; absent in sample mode. */
+  version?: number;
+  /**
+   * CONFIG_VERSION, while its .lar-factory.json's version is lower and the notice offering the PR that brings the file
+   * up to date hasn't been dismissed at that version; absent otherwise.
+   */
+  configUpdate?: number;
 }
 
 export const ITEM_SOURCE_KINDS = ['project', 'issues'] as const;
@@ -642,8 +650,14 @@ export interface RepositoryConfigAnswers {
   labels: string[];
 }
 
-/** The .lar-factory.json onboarding's PR adds, at `version` 1; Edit's PR writes it at the version the file had. */
-export const onboardingConfigFile = ({ role, itemSource, show, labels }: RepositoryConfigAnswers, version = 1): string =>
+/**
+ * The Repository config `version` the app writes. Raise it only when .lar-factory.json's shape changes: a file at a
+ * lower version then gets a notice offering a PR that rewrites it in the new shape.
+ */
+export const CONFIG_VERSION = 1;
+
+/** The .lar-factory.json that onboarding's PR adds and Edit's PR writes, at CONFIG_VERSION unless a test names another. */
+export const onboardingConfigFile = ({ role, itemSource, show, labels }: RepositoryConfigAnswers, version = CONFIG_VERSION): string =>
   `${JSON.stringify({ version, role, itemSource, show, labels }, null, 2)}\n`;
 
 /** What the Provider and item source step has answered so far, as typed; the GitHub Project's fields count only for a Project. */

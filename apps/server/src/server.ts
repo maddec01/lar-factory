@@ -8,7 +8,8 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
-import { openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
+import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
+import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
 import { onTheBoard, readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
@@ -21,7 +22,7 @@ import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import {
-  createPrOpener, followOnboardingPrs, followResetPrs, previewOnboardingPr, reopenOnboardingPr, resetOnboarding,
+  createPrOpener, followOnboardingPrs, followResetPrs, previewOnboardingPr, reopenOnboardingPr, resetRepository,
 } from './onboarding/onboarding-pr.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { findFixedClashes } from './onboarding/fixed-clashes.ts';
@@ -99,12 +100,18 @@ const items = onboardedSources(async () => {
   resetFollowProblems = resetProblems;
   // A repository still onboarding has no Repository config on its default branch until its PR merges, and one
   // resetting is off the board though its default branch still has one. Each refresh asks gh for every open Edit PR, so
-  // its row's mark survives a restart and goes once the PR merges or closes.
+  // its row's mark survives a restart and goes once the PR merges or closes. A file below the app's Repository config
+  // version gets the notice offering its update PR, unless this Mac dismissed it at that version.
   const onboarded = onTheBoard(list);
   const [read, editPrs] = await Promise.all([readOnboardedConfigs(list),
     readEditPrs(onboarded.map((e) => e.repo), undefined, (repo, problem) => log(`can't read ${repo}'s Edit PR: ${problem}`))]);
+  const dismissed = readDismissedUpdates();
   board.update({
-    repos: read.configs.map((config) => ({ ...repoView(config), ...editPrs.has(config.repo) && { editPr: editPrs.get(config.repo) } })),
+    repos: read.configs.map((config) => {
+      const configUpdate = configUpdateOf(config, dismissed);
+      return { ...repoView(config), version: config.version, ...editPrs.has(config.repo) && { editPr: editPrs.get(config.repo) },
+        ...configUpdate !== undefined && { configUpdate } };
+    }),
     repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list, followProblems),
   });
   return read;
@@ -343,8 +350,9 @@ const { server, endStreams } = createBoardServer({
   findFixedClashes: (input) => findFixedClashes(input),
   startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo),
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input), reopenOnboardingPr: (input) => reopenOnboardingPr(input),
-  resetOnboarding: (input) => resetOnboarding(input),
+  resetRepository: (input) => resetRepository(input),
   readEditConfig: (input) => readEditConfig(input), openEditPr: (input) => openEditPr(input),
+  openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),
 });
 
 /** Logs why the board can't start and exits. */

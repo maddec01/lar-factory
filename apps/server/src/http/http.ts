@@ -5,8 +5,9 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type ClashRun, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type ClashRun, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
+import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { BuiltPage } from '../page/page.ts';
@@ -31,37 +32,42 @@ export interface HttpDeps {
   /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
   projectChoices(): Promise<ProjectChoice[]>;
   /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
-  keepOnboarding(input: Record<string, unknown>): { onboarding: OnboardingRepository[] } | { status: number; error: string };
+  keepOnboarding(input: Record<string, unknown>): { onboarding: OnboardingRepository[] } | Refused;
   /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
-  createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | { status: number; error: string }>;
+  createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | Refused>;
   /** Runs one of onboarding's setup checks on the body's repository, T3 project and item source, or says why it can't. */
-  runSetupCheck(input: Record<string, unknown>): Promise<{ result: SetupCheckResult } | { status: number; error: string }>;
+  runSetupCheck(input: Record<string, unknown>): Promise<{ result: SetupCheckResult } | Refused>;
   /** Runs onboarding's fixed checks for known Clashes on the body's repository's default branch, or says why it can't. */
-  findFixedClashes(input: Record<string, unknown>): Promise<FixedClashes | { status: number; error: string }>;
+  findFixedClashes(input: Record<string, unknown>): Promise<FixedClashes | Refused>;
   /** Starts onboarding's Clash agent on the body's repository, T3 project and model, or returns its running run; answers the repository's runs. */
-  startClashRun(input: Record<string, unknown>): Promise<{ runs: ClashRun[] } | { status: number; error: string }>;
+  startClashRun(input: Record<string, unknown>): Promise<{ runs: ClashRun[] } | Refused>;
   /** The repository's Clash agent runs, oldest first. */
   clashRuns(repo: string): ClashRun[];
   /** Reads, creates or renames the labels of onboarding's Labels step, or creates a custom label, answering with the repository's labels, or gh's problem. */
-  repositoryLabels: Record<'read' | 'create' | 'rename' | 'custom', (input: Record<string, unknown>) => Promise<{ labels: string[] } | { status: number; error: string }>>;
+  repositoryLabels: Record<'read' | 'create' | 'rename' | 'custom', (input: Record<string, unknown>) => Promise<{ labels: string[] } | Refused>>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
-  openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | { status: number; error: string }>;
+  openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | Refused>;
   /** What an onboarding's PR would change against its default branch with the body's answers and picks, or why it can't say. */
-  previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | { status: number; error: string }>;
+  previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | Refused>;
   /** Reopens an onboarding's PR that closed without merging, returning the repositories still onboarding, or gh's problem. */
-  reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
+  reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
   /**
    * Reset: closes a repository's open onboarding PR and drops its entry while it is still onboarding, or opens its reset
-   * PR, returning its URL, and marks it resetting once onboarded; returns the repositories still onboarding, or gh's problem.
+   * PR, returning its URL, and marks it resetting once onboarded; returns the repositories still onboarding, or gh's problem,
+   * with `editPrClosed` when it closed the Edit PR before it failed.
    */
-  resetOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[]; prUrl?: string } | { status: number; error: string }>;
+  resetRepository(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[]; prUrl?: string } | (Refused & { editPrClosed?: true })>;
   /**
    * Edit's load: an onboarded repository's .lar-factory.json values and its labels, or why it can't. The values come
    * from its open Edit PR's branch, which `editPr` names, while there is one, else from its default branch.
    */
-  readEditConfig(input: Record<string, unknown>): Promise<{ config: RepositoryConfigAnswers; labels: string[]; editPr?: string } | { status: number; error: string }>;
+  readEditConfig(input: Record<string, unknown>): Promise<{ config: RepositoryConfigAnswers; labels: string[]; editPr?: string } | Refused>;
   /** Edit's Save: creates the custom labels the repository lacks and opens the PR on its .lar-factory.json, or adds to the open one, returning its URL, or gh's problem. */
-  openEditPr(input: Record<string, unknown>): Promise<{ prUrl: string } | { status: number; error: string }>;
+  openEditPr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
+  /** The config update notice's PR: rewrites the body's repository's .lar-factory.json at the app's version through Edit's PR, returning its URL, or gh's problem. */
+  openConfigUpdatePr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
+  /** Records the repository's config update notice dismissed at the app's version, on this Mac, or says why it can't for a repository that isn't onboarded. */
+  dismissConfigUpdate(repo: string): Refused | null;
 }
 
 export interface BoardServer {
@@ -138,7 +144,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
   runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
-  resetOnboarding, readEditConfig, openEditPr }: HttpDeps): BoardServer {
+  resetRepository, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -148,6 +154,23 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
   const drained: Array<() => void> = [];
 
   const withBoard = (body: object) => ({ ...body, board: board.snapshot() });
+
+  /** Changes the repository's row on the board at once, before the next read sees it. */
+  function changeRow(repo: string, change: (row: RepoConfig) => RepoConfig): void {
+    board.update({ repos: board.snapshot().repos.map((r) => sameRepo(r.repo, repo) ? change(r) : r) });
+    board.push();
+  }
+
+  /**
+   * Records the repository's config update notice dismissed and takes it off its row at once, with `changes` to the row;
+   * or answers why it can't.
+   */
+  function dismissNotice(repo: string, changes: object = {}): Refused | null {
+    const refused = dismissConfigUpdate(repo);
+    if (refused) return refused;
+    changeRow(repo, ({ configUpdate: _, ...r }) => ({ ...r, ...changes }));
+    return null;
+  }
 
   /** A write of onboarding's Labels step, which answers with the repository's labels. */
   const labelsWrite = (action: keyof HttpDeps['repositoryLabels']): Write => ({
@@ -270,11 +293,16 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         return { status: 200, body: withBoard({ error: null }) };
       },
     },
-    '/api/onboarding/reset': {
-      what: 'the onboarding to reset', disabled: 'Sample mode onboards no repository.',
+    '/api/repositories/reset': {
+      what: 'the repository to reset', disabled: 'Sample mode onboards no repository.',
       async run(input) {
-        const reset = await resetOnboarding(input);
-        if ('error' in reset) return { status: reset.status, body: { error: reset.error } };
+        const reset = await resetRepository(input);
+        if ('error' in reset) {
+          if (!reset.editPrClosed) return { status: reset.status, body: { error: reset.error } };
+          // The Edit PR Reset closed leaves the row at once, though the reset PR didn't open.
+          changeRow(input.repo as string, ({ editPr: _, ...r }) => r);
+          return { status: reset.status, body: withBoard({ error: reset.error }) };
+        }
         // A reset repository leaves the board at once, with its items; the read then sees it resetting.
         const gone = (repo: string | null) => repo !== null && sameRepo(repo, input.repo as string);
         const { repos, items } = board.snapshot();
@@ -295,7 +323,29 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       what: 'the repository and its new values', disabled: 'Sample mode edits no repository.',
       async run(input) {
         const opened = await openEditPr(input);
-        return 'error' in opened ? { status: opened.status, body: { error: opened.error } } : { status: 200, body: { ...opened, error: null } };
+        if ('error' in opened) return { status: opened.status, body: { error: opened.error } };
+        // The row shows its Edit PR at once.
+        changeRow(input.repo as string, (r) => ({ ...r, editPr: opened.prUrl }));
+        return { status: 200, body: withBoard({ ...opened, error: null }) };
+      },
+    },
+    // A config update PR the notice opened takes the notice's place, as the row's open Edit PR.
+    '/api/repositories/config-update/pr': {
+      what: 'the repository to update', disabled: 'Sample mode edits no repository.',
+      async run(input) {
+        const opened = await openConfigUpdatePr(input);
+        if ('error' in opened) return { status: opened.status, body: { error: opened.error } };
+        dismissNotice(input.repo as string, { editPr: opened.prUrl });
+        return { status: 200, body: withBoard({ ...opened, error: null }) };
+      },
+    },
+    '/api/repositories/config-update/dismiss': {
+      what: 'the repository whose notice to dismiss', disabled: 'Sample mode edits no repository.',
+      async run({ repo }) {
+        if (!isRepo(repo)) return { status: 400, body: { error: 'Send the repository whose notice to dismiss.' } };
+        const refused = dismissNotice(repo);
+        if (refused) return { status: refused.status, body: { error: refused.error } };
+        return { status: 200, body: withBoard({ error: null }) };
       },
     },
     // Looks the tools up again for the notices' Recheck button.

@@ -19,7 +19,7 @@ import {
   branchExists, closePr, commitTree, createBranch, createCommit, createPr, createTree, defaultBranchHead, editPrBody, message, moveBranch, openPrFrom,
   prState, readBlob, reopenPr,
 } from '../github/github.ts';
-import { editPrOf } from '../config/edit-config.ts';
+import { editPrOf, type Refused } from '../config/edit-config.ts';
 import { boardDataDir } from '../port/board-record.ts';
 import { bundledSkillNames } from '../skills/bundled-skills.ts';
 import { planPrChanges, type PrPlan } from './pr-changes.ts';
@@ -34,7 +34,6 @@ const LANDED = '`.lar-factory.json` reached the default branch without this PR, 
   + 'and closed this PR.';
 
 type Run = (args: string[]) => Promise<string>;
-type Refused = { status: number; error: string };
 
 /** A line of the PR body that says what one change does. */
 function describe(change: OnboardingPrChange): string {
@@ -197,7 +196,7 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
  * onboarding; or the status and problem, with gh's message, when the body, the list or gh refuses it.
  */
 export async function reopenOnboardingPr(input: Record<string, unknown>, dir = boardDataDir(), run?: Run):
-  Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }> {
+  Promise<{ onboarding: OnboardingRepository[] } | Refused> {
   const { repo } = input;
   if (!isRepo(repo)) return { status: 400, error: 'Send the repository whose onboarding PR to reopen.' };
   let prUrl;
@@ -216,12 +215,12 @@ export async function reopenOnboardingPr(input: Record<string, unknown>, dir = b
  * entry, opening no PR. Once it is onboarded, Reset closes its open Edit PR with a comment, so that PR can't bring .lar-factory.json back, then opens the reset PR
  * and marks its entry resetting with the PR's URL. Refuses a repository off the list or resetting already, and one
  * whose onboarding PR merged, and keeps the entry, with gh's message, when gh can't read or close the onboarding PR or
- * the Edit PR, or open the reset PR, then saying that the Edit PR it closed is closed now.
+ * the Edit PR, or open the reset PR, then saying that the Edit PR it closed is closed now, with `editPrClosed`.
  */
-export async function resetOnboarding(input: Record<string, unknown>, dir = boardDataDir(), run?: Run):
-  Promise<{ onboarding: OnboardingRepository[]; prUrl?: string } | Refused> {
+export async function resetRepository(input: Record<string, unknown>, dir = boardDataDir(), run?: Run):
+  Promise<{ onboarding: OnboardingRepository[]; prUrl?: string } | (Refused & { editPrClosed?: true })> {
   const { repo } = input;
-  if (!isRepo(repo)) return { status: 400, error: 'Send the repository whose onboarding to reset.' };
+  if (!isRepo(repo)) return { status: 400, error: 'Send the repository to reset.' };
   let entry;
   try { entry = readRepositoryList(dir).find((e) => sameRepo(e.repo, repo)); }
   catch (err) { return { status: 409, error: message(err) }; }
@@ -238,8 +237,9 @@ export async function resetOnboarding(input: Record<string, unknown>, dir = boar
     let prUrl;
     try { prUrl = await openResetPr(entry.repo, run); }
     catch (err) {
-      const problem = editPr ? `${message(err).replace(/\.$/, '')}. Its Edit PR, ${editPr}, is closed now.` : message(err);
-      return { status: 502, error: `Can't open ${repo}'s reset PR: ${problem}` };
+      const problem = `Can't open ${repo}'s reset PR: ${message(err)}`;
+      if (!editPr) return { status: 502, error: problem };
+      return { status: 502, error: `${problem.replace(/\.$/, '')}. Its Edit PR, ${editPr}, is closed now.`, editPrClosed: true };
     }
     try { return { onboarding: stillOnboarding(saveResetting(repo, prUrl, dir)), prUrl }; }
     catch (err) { return { status: 409, error: `Opened ${repo}'s reset PR, ${prUrl}, but can't mark it resetting: ${message(err)}` }; }

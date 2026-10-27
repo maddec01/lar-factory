@@ -130,7 +130,7 @@ function ReusedConfig({ project, config }: { project: ProjectChoice; config: Non
         <dt className="text-muted-foreground">Show</dt><dd className="m-0">{SHOW_TITLES[config.show]}</dd>
         <dt className="text-muted-foreground">Repository role</dt><dd className="m-0">{config.role}</dd>
       </dl>
-      <p className="m-0 text-xs text-muted-foreground">Changing these waits for Edit in build #385.</p>
+      <p className="m-0 text-xs text-muted-foreground">To change these once onboarding finishes, use Edit in Settings › Repositories.</p>
     </div>
   );
 }
@@ -216,7 +216,7 @@ function CustomLabels({ run, project, plan, labels }: { run: Run; project: Proje
     return (
       <div data-custom-labels className="grid gap-1">
         <CustomLabelsTitle />
-        <p className="m-0 text-xs text-muted-foreground">{CUSTOM_LABELS_HELP} These are the ones {project.repo}’s .lar-factory.json lists; change them in that file. Create makes the missing ones, with GitHub’s colour, but none that can’t be a custom label.</p>
+        <p className="m-0 text-xs text-muted-foreground">{CUSTOM_LABELS_HELP} These are the ones {project.repo}’s .lar-factory.json lists; change them with Edit in Settings › Repositories once onboarding finishes. Create makes the missing ones, with GitHub’s colour, but none that can’t be a custom label.</p>
         {names.length ? (
           <ul className="m-0 grid list-none divide-y rounded-lg border p-0">
             {names.map((name) => {

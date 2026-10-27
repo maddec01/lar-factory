@@ -18,6 +18,7 @@ import { EmptyState } from './onboarding/empty-state.tsx';
 import { OnboardingCards } from './onboarding/onboarding-cards.tsx';
 import { OnboardingOffers } from './onboarding/onboarding-offers.tsx';
 import { WizardDialog } from './onboarding/wizard-dialog.tsx';
+import { EditDialog } from './repositories/edit-dialog.tsx';
 import { SettingsMain } from './settings/settings.tsx';
 import { useSettingsStore } from './settings/settings-store.ts';
 import { SidebarLayout } from './sidebar/sidebar.tsx';
@@ -62,6 +63,7 @@ export function App() {
       <ItemDialog />
       <AbandonDialog />
       <WizardDialog />
+      <EditDialog />
     </SidebarLayout>
   );
 }

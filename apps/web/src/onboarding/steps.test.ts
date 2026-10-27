@@ -214,7 +214,8 @@ test('a reused .lar-factory.json shows its values and asks nothing', async () =>
     config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'opted-in', role: 'Web client', labels: [] } }));
   const values = text(dialog()!.querySelector('[data-reused-config]'));
   for (const value of ['GitHub', 'GitHub Project maddec01 #3', 'Opted-in items', 'Web client']) expect(values).toContain(value);
-  expect(text(dialog()!.querySelector('[data-slot="dialog-panel"]'))).toContain('build #385');
+  expect(text(dialog()!.querySelector('[data-slot="dialog-panel"]'))).toContain('use Edit in Settings › Repositories');
+  expect([...dialog()!.querySelectorAll('button')].some((b) => text(b) === 'Edit'), 'the onboarding dialog has no Edit').toBe(false);
   expect(dialog()!.querySelector('[data-slot="dialog-panel"] input, [data-slot="dialog-panel"] [role="radio"]')).toBeNull();
   expect(nextButton().disabled).toBe(false);
 });

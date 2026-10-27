@@ -3,7 +3,7 @@
 
 import { expect, test } from 'vite-plus/test';
 import type { SetupAnswers } from '@lar-factory/shared';
-import { answerSetup, setupProblems } from './setup-answers.ts';
+import { answerSetup, setupItemSource, setupProblems } from './setup-answers.ts';
 
 const SETUP: SetupAnswers = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '3', show: 'all', showPicked: false, role: 'Web client' };
 
@@ -22,4 +22,9 @@ test("Save's problems name Save, and whole answers have none", () => {
     role: 'Save needs the repository’s role.',
   });
   expect(setupProblems({ ...SETUP, role: '' }).role).toBe('Next needs the repository’s role.');
+});
+
+test('the answers name a GitHub Project by its owner and number, or the issues', () => {
+  expect(setupItemSource(SETUP)).toEqual({ kind: 'github-project', owner: 'maddec01', number: 3 });
+  expect(setupItemSource({ ...SETUP, itemSource: 'issues' })).toEqual({ kind: 'issues' });
 });

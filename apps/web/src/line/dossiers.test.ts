@@ -2,7 +2,7 @@
 // its map, its parts as a checklist or a map, and their rows. Ports the old Board view's concept block tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, posted, sample, settle, text } from '../../test/support.ts';
+import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -17,9 +17,13 @@ const phases = (d = C200) => [...dossier(d).querySelectorAll('[data-checklist] [
 const progress = (d = C200) => [...dossier(d).querySelectorAll('[data-item]')].slice(1) as HTMLElement[];
 const row = (id: string, d = C200) => dossier(d).querySelector<HTMLElement>(`[data-item="${id}"]`)!;
 const startIn = (el: Element) => el.querySelector<HTMLButtonElement>('[data-start]');
-const press = (el: Element) => settle(() => (el as HTMLElement).click());
+/** Clicks `el`; a menu it closes hands focus back on the next tick. */
+const press = (el: Element) => settle(() => {
+  (el as HTMLElement).click();
+  vi.advanceTimersByTime(0);
+});
 const entries = () => $$('[role="menu"] [role="menuitemradio"]');
-const dialogTitle = () => text($('[data-item-dialog] [data-slot="dialog-title"]'));
+const dialogTitle = () => text($('[data-item-dialog] [data-slot="modal-header"] h2'));
 const button = (within: Element, label: string) => [...within.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === label)!;
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData =>
   ({ ...data, items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)) });
@@ -144,7 +148,7 @@ test('once its blockers close, Start build sends the build, and the header offer
   holdPosts(unblocked());
   await mountPage(withItem('I_sample12', { status: 'Shaping' }, unblocked()));
   expect(text(startIn(header()[3]!))).toBe('Start #140 ▾');
-  await press(startIn(step('I_sample13'))!);
+  await pressMenu(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
   await press(entries()[1]!);
   expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
@@ -173,7 +177,7 @@ test("Start on a Queued decision is today's Start", async () => {
   holdPosts(withDecision());
   await mountPage(withDecision());
   expect(text(step('I_d204'))).toMatch(/^#204 Pick the relay hostgrillStart ▾/);
-  await press(startIn(step('I_d204'))!);
+  await pressMenu(startIn(step('I_d204'))!);
   await press(entries()[0]!);
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_d204' }]]);
 });
@@ -187,7 +191,7 @@ test('Start on a Queued decision is disabled while a blocker is open, its title 
   expect([text(start), start.disabled, start.title]).toEqual(['Start', true, 'Blocked by #201, #140 until they close']);
   const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Starts by itself once #201, #140 close']);
-  await press(after);
+  await pressMenu(after);
   await press(entries()[0]!);
   expect(posted(), 'T3 default arms it with no model').toEqual([['/api/arm', { session: 's1', itemId: 'I_d204' }]]);
   await answer({ error: null, board: { ...data, armed: { I_d204: {} } } });

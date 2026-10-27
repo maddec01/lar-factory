@@ -20,8 +20,9 @@
 .title:hover { text-decoration: underline; }
 .ref { color: var(--muted-foreground); font-weight: 500; font-variant-numeric: tabular-nums; }
 
-/* The dot T3's Badge doesn't draw, coloured by repository; the sidebar's group avatars take the same colour. Each
-   repository takes the next colour in the board's list order (repoTone); Draft and others keep the muted colour. */
+/* The dot the design system's Badge doesn't draw, coloured by repository; the List modal's group avatars take the same
+   colour. Each repository takes the next colour in the board's list order (repoTone); Draft and others keep the muted
+   colour. */
 .repo-tag::before { content: ""; width: --spacing(1.75); height: --spacing(1.75); border-radius: 50%; background: var(--k, var(--muted-foreground)); }
 .repo-tone-0 { --k: var(--color-sky-500); }
 .repo-tone-1 { --k: var(--color-pink-500); }
@@ -37,8 +38,5 @@
 .start { margin: 0; font-size: var(--text-xs); }
 p[data-start-result] { padding: --spacing(1) --spacing(1.5); margin-inline: --spacing(-1.5); border-radius: var(--radius-sm); }
 .start-group { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: --spacing(1.25); position: relative; }
-/* The padding gives a size-6 target (WCAG 2.5.8); the matching negative margin keeps the row's height. */
-.link-action { padding: --spacing(1.25) 0; margin-block: --spacing(-1.25); }
-.link-action.danger { margin-left: auto; }
 .link-action[aria-disabled="true"] { cursor: progress; opacity: 0.7; }
 .action-error { order: 1; flex: 1 1 100%; min-width: 0; color: var(--danger-text); font-weight: 600; overflow-wrap: anywhere; }

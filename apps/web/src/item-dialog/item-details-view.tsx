@@ -4,11 +4,11 @@
 // description's place; the board's own fields never wait.
 
 import type { ReactNode } from 'react';
-import { CircleCheck, CircleDot, LoaderCircle } from 'lucide-react';
+import { CircleCheck, CircleDot } from 'lucide-react';
 import { onAzure, shortAgo } from '@lar-factory/shared';
 import type { Item, ItemComment, ItemDetails } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/badge';
-import { Button } from '@lar-factory/ui/button';
+import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { RichText } from '@lar-factory/ui/rich-text';
 import { AgentWork, AgentWorkNote, ChecksBadge } from '../items/item-parts.tsx';
 import type { ItemDetailsRead } from './use-item-details.ts';
@@ -62,7 +62,7 @@ function Comments({ itemId, entry, now, className }: { itemId: string; entry: De
         : <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>}
       {older.hasMore && (
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" size="sm" disabled={older.loading} onClick={older.loadMore}>{older.loading && <LoaderCircle className="animate-spin" />}Load 10 more</Button>
+          <Button variant="secondary" loading={older.loading} onClick={older.loadMore}>Load 10 more</Button>
           {older.error && <p className="m-0 text-xs text-(--error-foreground)" role="alert">Could not load older comments: {older.error}</p>}
         </div>
       )}
@@ -115,7 +115,7 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
       <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
       <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
       {item.labels.length > 0 && (
-        <Fact label="Labels"><span className="flex flex-wrap gap-1" data-labels>{item.labels.map((l) => <Badge key={l} variant="outline" className="h-auto max-w-full whitespace-normal py-px text-start wrap-anywhere sm:h-auto">{l}</Badge>)}</span></Fact>
+        <Fact label="Labels"><span className="flex flex-wrap gap-1" data-labels>{item.labels.map((l) => <Badge key={l} className="h-auto max-w-full whitespace-normal py-px text-start wrap-anywhere">{l}</Badge>)}</span></Fact>
       )}
       {azure
         ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>

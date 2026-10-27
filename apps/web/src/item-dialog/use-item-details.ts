@@ -1,6 +1,5 @@
-// Reads an item's details from the board when the item dialog opens on it, once per open. Closing keeps what the
-// dialog still shows while it animates away; the next open reuses the details cached for the item's updatedAt, else
-// reads again. A reply for a dialog that has since closed or moved to another item is ignored.
+// Reads an item's details from the board when the item dialog opens on it, once per open. The next open reuses the
+// details cached for the item's updatedAt, else reads again. A reply for a dialog that has since closed or moved to another item is ignored.
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { ItemDetails } from '@lar-factory/shared';
@@ -26,16 +25,15 @@ async function readDetails(itemId: string, updatedAt: string, signal: AbortSigna
 }
 
 /**
- * The details of the item the dialog shows, loading until they arrive; `open` is false while the dialog animates closed.
+ * The details of the item the dialog shows, loading until they arrive.
  * The cache is keyed by the `updatedAt` the item has when the dialog opens, which later board updates don't move.
  */
-export function useItemDetails(itemId: string | undefined, updatedAt: string, open: boolean): ItemDetailsRead {
+export function useItemDetails(itemId: string, updatedAt: string): ItemDetailsRead {
   const board = useRef(updatedAt);
   board.current = updatedAt;
   const [read, setRead] = useState<{ itemId: string; result: ItemDetailsRead } | null>(null);
   // A layout effect starts the read before paint, so a reopened item never flashes its earlier details.
   useLayoutEffect(() => {
-    if (!itemId || !open) return;
     const cached = detailsCache.get(itemId, board.current);
     if (cached) {
       setRead({ itemId, result: { state: 'loaded', details: cached.details, entry: cached } });
@@ -45,6 +43,6 @@ export function useItemDetails(itemId: string | undefined, updatedAt: string, op
     setRead({ itemId, result: LOADING });
     void readDetails(itemId, board.current, reading.signal).then((result) => !reading.signal.aborted && setRead({ itemId, result }));
     return () => reading.abort();
-  }, [itemId, open]);
+  }, [itemId]);
   return read && read.itemId === itemId ? read.result : LOADING;
 }

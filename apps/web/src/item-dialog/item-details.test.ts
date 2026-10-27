@@ -48,7 +48,7 @@ test('while the details load the dialog shows the board data and a loading state
   const held = holdReads();
   await mountPage();
   await openItem('I_sample13');
-  expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('#140 Owner accounts');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
   expect(inDialog('[data-labels]')!.textContent).toBe('build');
   expect(inDialog('[aria-busy="true"]'), 'the loading state').not.toBeNull();
   expect(description()).toBeNull();
@@ -120,7 +120,7 @@ test('a failed read shows its error in the modal and the board data stays visibl
   await openItem('I_sample13');
   await reply(held, 'I_sample13', new Response(JSON.stringify({ error: 'Item details are not available yet.' }), { status: 501 }));
   expect(text(inDialog('[role="alert"]'))).toBe('Could not load the details: Item details are not available yet.');
-  expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('#140 Owner accounts');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
   expect(inDialog('[data-labels]')!.textContent).toBe('build');
   expect(text(inDialog('[data-slices] p'))).toBe('Slices · 1/3 done');
   expect(inDialog('[aria-busy="true"]')).toBeNull();
@@ -200,7 +200,7 @@ test('a reply for an item that is no longer open is ignored', async () => {
   expect(text(description())).toContain('Bumps FFmpeg');
   // The first item's late reply lands on a dialog that moved on.
   await reply(held, 'I_sample13');
-  expect(text(inDialog('[data-slot="dialog-title"]'))).toContain('Bump FFmpeg');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toContain('Bump FFmpeg');
   expect(text(description())).toContain('Bumps FFmpeg');
   expect(text(description())).not.toContain('Owner accounts');
 });

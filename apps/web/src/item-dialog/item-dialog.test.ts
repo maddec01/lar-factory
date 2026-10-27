@@ -3,12 +3,12 @@
 // requests in a sidebar, and its footer carries GitHub and the action the item's status asks for.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, moved, posted, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, answer, holdPosts, mountPage, moved, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
 import type { BoardData, Item, ItemThread } from '@lar-factory/shared';
 
 const dialog = () => $('[data-item-dialog]');
 const inDialog = <T extends Element = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
-const footer = () => inDialog('[data-slot="dialog-footer"]')!;
+const footer = () => inDialog('[data-slot="modal-footer"]')!;
 /** The item dialog's `attr` button, not the board's behind it. */
 const button = (attr: string, id: string) => inDialog<HTMLButtonElement>(`[data-${attr}="${id}"]`)!;
 /** A sidebar section by the start of its heading. */
@@ -29,10 +29,10 @@ test('the dialog shows the repository, status, update time, blockers, numbered t
   await mountPage();
   await openItem('I_sample13');
   expect(dialog()!.getAttribute('role')).toBe('dialog');
-  const meta = inDialog('header')!;
-  expect(text(meta)).toBe('lar-server Ready· updated 1h agoblocked by 1');
-  expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('#140 Owner accounts');
-  const parent = inDialog<HTMLAnchorElement>('[data-slot="dialog-description"] a')!;
+  const summary = inDialog('[data-item-summary] > div')!;
+  expect(text(summary)).toBe('lar-server Ready· updated 1h agoblocked by 1');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('#140 Owner accounts');
+  const parent = inDialog<HTMLAnchorElement>('[data-item-parent] a')!;
   expect([text(parent), parent.href]).toEqual(['#200 lar cloud: website sign-in and relay', 'https://github.com/maddec01/lar-server/issues/200']);
   expect(steps()).toHaveLength(10);
   expect(text(inDialog('[data-meta]'))).toContain('No T3 thread has worked on this yet.');
@@ -101,8 +101,8 @@ test('the header bar holds the agent work figures and the close button', async (
 test('the dialog lays out by its own width and never hides an overflow', async () => {
   await mountPage();
   await openItem('I_sample13');
-  expect(dialog()!.classList.contains('@container')).toBe(true);
-  expect(inDialog('[data-slot="dialog-panel"]')!.className).not.toMatch(/overflow/);
+  expect(inDialog('[data-item-body]')!.classList.contains('@container')).toBe(true);
+  expect(inDialog('[data-item-body]')!.className).not.toMatch(/overflow/);
 });
 
 test('the dialog of an untagged item two repositories read tags it with both', async () => {
@@ -110,14 +110,15 @@ test('the dialog of an untagged item two repositories read tags it with both', a
   await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'sprint', team: 'Web', show: 'all', labels: [] }],
     items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, repo: web, untaggedFor: [web, api] } : i)) });
   await openItem('I_sample05');
-  expect([...inDialog('header')!.querySelectorAll('.repo-tag')].map(text)).toEqual(['web', 'api']);
+  expect([...inDialog('[data-item-summary]')!.querySelectorAll('.repo-tag')].map(text)).toEqual(['web', 'api']);
 });
 
 test('the dialog shows the hint, each pull request with its checks, and the agent work figures', async () => {
   await mountPage();
   await openItem('I_sample14');
   const work = inDialog('header [data-agent-work]')!;
-  expect(text(inDialog('header'))).toBe('lar-apple In progress· updated 25m ago$24.18 · 2h 14m · 16.6M tokens · 1h 20m wall');
+  expect(text(inDialog('[data-item-summary]'))).toBe('lar-apple In progress· updated 25m ago');
+  expect(text(inDialog('header'))).toBe('#30 Chapter markers in the scrubber$24.18 · 2h 14m · 16.6M tokens · 1h 20m wall');
   expect(work.title).toBe('Cost $24.18 · Agent time 2h 14m · Tokens 16.6M · Wall time 1h 20m');
   expect(inDialog('[data-meta] [data-agent-work]')!.className, 'a narrow dialog shows them in the meta area instead').toContain('@min-[40rem]:hidden');
   expect(work.className, 'a wide one in the header').toContain('@max-[40rem]:hidden');
@@ -125,7 +126,7 @@ test('the dialog shows the hint, each pull request with its checks, and the agen
   expect([text(pr), pr.querySelector('a')!.getAttribute('href')]).toEqual(['PR #33 (draft)checks running', 'https://github.com/maddec01/lar-apple/pull/33']);
 
   await openItem('I_sample16');
-  expect(text(inDialog('[data-slot="dialog-panel"] > div:nth-child(2)')), 'the hint').toBe('Test it with the steps in the PR, then merge');
+  expect(text(inDialog('[data-item-body] > div:nth-child(2)')), 'the hint').toBe('Test it with the steps in the PR, then merge');
   expect(inDialog('[data-agent-work]'), 'no figures').toBeNull();
   expect(text(inDialog('[data-meta]')), 'unreadable stats say so').toContain('The T3 Code database could not be read');
 });
@@ -189,7 +190,7 @@ const withThreads = (itemId: string, threads: Item['threads'], data: BoardData =
   ({ ...data, items: data.items.map((i) => (i.id === itemId ? { ...i, threads } : i)) });
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 /** The footer's last control: the item's status action. */
-const statusAction = () => footer().querySelector<HTMLElement>('span:last-child > :last-child')!;
+const statusAction = () => footer().querySelector<HTMLElement>(':scope > span:last-child > :last-child')!;
 
 test('Open thread and Answer in T3 link to the latest thread in T3 Code, in the same tab', async () => {
   await mountPage(withThreads('I_sample10', [thread('new', 'running'), thread('old', 'done')]));
@@ -239,7 +240,7 @@ test('Queue in the dialog shows it in flight, then shows the item Queued, says s
   expect(posted()).toEqual([['/api/queue', { itemId: 'I_sample01' }]]);
 
   await answer({ error: null, board: moved('I_sample01', 'Queued') });
-  expect(text(inDialog('header'))).toMatch(/ Queued· /);
+  expect(text(inDialog('[data-item-summary]'))).toMatch(/ Queued· /);
   expect(text(toast())).toBe(`Moved #61 ${sample.items[0]!.title} to Queued. View item`);
   expect(document.activeElement).toBe(button('start', 'I_sample01'));
 });
@@ -265,9 +266,9 @@ test('an issue with two statuses shows in the first with a warning mark, and its
   expect($('[data-item="I_sample07"] [data-two-statuses]')!.getAttribute('aria-label')).toBe('Carries Shaping and Review; keep one');
   expect($('[data-item="I_sample06"] [data-two-statuses]'), 'one status, no mark').toBeNull();
   await openItem('I_sample07');
-  expect(text(inDialog('header'))).toMatch(/^[\w-]+ Shaping· /);
-  expect(inDialog('header [data-two-statuses]')).not.toBeNull();
-  expect(text(inDialog('[data-slot="dialog-panel"] > div:nth-child(2)'))).toBe('This issue carries Shaping and Review. Keep one to move it again.');
+  expect(text(inDialog('[data-item-summary]'))).toMatch(/^[\w-]+ Shaping· /);
+  expect(inDialog('[data-item-summary] [data-two-statuses]')).not.toBeNull();
+  expect(text(inDialog('[data-item-body] > div:nth-child(2)'))).toBe('This issue carries Shaping and Review. Keep one to move it again.');
   expect(footerControls()).toEqual(['GitHub', 'Keep Shaping', 'Keep Review']);
 });
 
@@ -298,7 +299,7 @@ test('Keep posts the status picked, shows it in flight, then shows the item with
   expect(posted()).toEqual([['/api/pick-status', { itemId: 'I_sample07', status: 'Review' }]]);
 
   await answer({ error: null, board: { ...twice, items: twice.items.map((i) => (i.id === 'I_sample07' ? { ...i, status: 'Review', statuses: ['Review'] } : i)) } });
-  expect(text(inDialog('header'))).toMatch(/ Review· /);
+  expect(text(inDialog('[data-item-summary]'))).toMatch(/ Review· /);
   expect(inDialog('[data-two-statuses], [data-pick-status]')).toBeNull();
   expect(text(toast())).toMatch(/^Kept Review on #\d+ .*\./);
 });
@@ -318,7 +319,7 @@ test('Start refining opens the model menu, and picking a model starts the item a
   holdPosts(withChoices);
   await mountPage(withChoices);
   await openItem('I_sample05');
-  await press(button('start', 'I_sample05'));
+  await pressMenu(button('start', 'I_sample05'));
   await settle(() => vi.advanceTimersByTime(20));
   expect($$('[role="menu"] [role="menuitemradio"]').map(text)).toEqual(['T3 default', 'GPT-5.5']);
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[1]!.click());
@@ -337,7 +338,7 @@ test('a failed Start shows in the dialog and offers Retry start', async () => {
   holdPosts();
   await mountPage({ ...sample, capture: { session: 's1', enabled: true } });
   await openItem('I_sample05');
-  await press(button('start', 'I_sample05'));
+  await pressMenu(button('start', 'I_sample05'));
   await settle(() => vi.advanceTimersByTime(20));
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
   await answer({ error: 'T3 is not running.' }, 502);
@@ -356,7 +357,7 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
   await mountPage(readyBuild);
   await openItem('I_sample13');
   expect(footerControls()).toEqual(['GitHub', 'Start build ▾']);
-  await press(button('start', 'I_sample13'));
+  await pressMenu(button('start', 'I_sample13'));
   await settle(() => vi.advanceTimersByTime(20));
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
   expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13' }]]);
@@ -376,7 +377,7 @@ test('a failed Start build shows in the dialog and offers Retry start', async ()
   holdPosts(readyBuild);
   await mountPage(readyBuild);
   await openItem('I_sample13');
-  await press(button('start', 'I_sample13'));
+  await pressMenu(button('start', 'I_sample13'));
   await settle(() => vi.advanceTimersByTime(20));
   await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
   await answer({ thread: null, error: 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code' }, 409);
@@ -431,13 +432,13 @@ test('Abandon in the dialog asks first, then deletes the item, closes the dialog
   await mountPage(data);
   await openItem('I_sample01');
   await press(button('abandon', 'I_sample01'));
-  expect(text($('#abandon-heading'))).toMatch(/#61/);
-  await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
+  expect(text($('#abandon-dialog h2'))).toMatch(/#61/);
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
   expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
   expect(text(button('abandon', 'I_sample01'))).toBe('Abandoning…');
   await answer({ error: null, board: without('I_sample01') });
   expect(text(toast())).toBe(`Deleted #61 ${sample.items[0]!.title}.`);
-  expect($('[data-item-dialog][data-open]'), 'the dialog closes').toBeNull();
+  expect($('[data-item-dialog]'), 'the dialog closes').toBeNull();
 });
 
 test('a failed Abandon in the dialog is a toast, and focus goes back to Abandon', async () => {
@@ -445,7 +446,7 @@ test('a failed Abandon in the dialog is a toast, and focus goes back to Abandon'
   await mountPage();
   await openItem('I_sample01');
   await press(button('abandon', 'I_sample01'));
-  await settle(() => $$<HTMLButtonElement>('#abandon-dialog button')[1]!.click());
+  await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
   await answer({ error: 'Could not delete #61.' }, 502);
   expect(text(toast())).toMatch(/^Couldn't abandon #61 .*\. Could not delete #61\.$/);
   expect(inDialog('.action-error'), 'no inline error').toBeNull();

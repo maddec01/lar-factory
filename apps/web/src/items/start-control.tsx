@@ -4,14 +4,15 @@
 // the menu first asks which repository it's for.
 // Once a thread starts or may have started, a tag takes Start's place.
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
+import type { SyntheticEvent } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { ref, highlightedChoice, repoName, startRepo, storedChoice } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/badge';
-import { Button } from '@lar-factory/ui/button';
-import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRadioItemIndicator, MenuTrigger } from '@lar-factory/ui/menu';
+import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './item-actions.tsx';
 import { startItem } from './start-item.ts';
@@ -44,9 +45,6 @@ export function StartEntries({ item, data, onPick }: { item: Item; data: BoardDa
   const lastChoice = useStartStore((state) => state.lastChoice);
   const scope = useSidebarStore((state) => state.scope);
   const [picked, setPicked] = useState<string>();
-  const checkedEntry = useRef<HTMLDivElement>(null);
-  // The menu opens on its checked entry. After Base UI has registered the entries, so arrow keys move on from it.
-  useEffect(() => checkedEntry.current?.focus({ preventScroll: true }), []);
   const sample = data.capture?.enabled === false;
   const scoped = startRepo(item, scope ?? undefined);
   const asks = Boolean(item.untaggedFor) && scoped === undefined;
@@ -56,61 +54,69 @@ export function StartEntries({ item, data, onPick }: { item: Item; data: BoardDa
   const held = sample ? 'Disabled in sample mode' : unpicked ? 'Pick a repository first' : undefined;
   // Until a repository is picked, a line under the repositories says so, and each model entry points at it.
   const pickHint = useId();
+  const headings = useId();
+  const keepOpen = (event: SyntheticEvent | Event) => event.preventDefault();
   const entry = (label: string, choice?: ModelChoice) => (
-    // Pointer events stay on while disabled, so the entry's title says why.
-    <MenuRadioItem className="data-disabled:pointer-events-auto" value={storedChoice(choice)} ref={!asks && storedChoice(choice) === checked ? checkedEntry : undefined}
-      closeOnClick disabled={held !== undefined} title={held} aria-describedby={unpicked ? pickHint : undefined}
+    // A held entry stays hoverable and focusable rather than disabled, so its title says why; picking it does nothing.
+    <DropdownMenu.RadioItem value={storedChoice(choice)} data-opens-here={(!asks && storedChoice(choice) === checked) || undefined}
+      aria-disabled={held !== undefined || undefined} title={held} aria-describedby={unpicked ? pickHint : undefined}
       data-start-pick={item.id} data-instance-id={choice?.instanceId} data-model={choice?.model}
-      onClick={() => held === undefined && onPick(choice, repo)} key={label}>
-      <span className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        <MenuRadioItemIndicator />
-      </span>
-    </MenuRadioItem>
+      onSelect={(event) => (held === undefined ? onPick(choice, repo) : keepOpen(event))} key={label}>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+    </DropdownMenu.RadioItem>
   );
   return (
     <>
       {asks && (
-        <MenuRadioGroup value={picked ?? ''} onValueChange={(value: string) => setPicked(value)}>
-          <MenuGroupLabel>For repository</MenuGroupLabel>
+        <DropdownMenu.RadioGroup value={picked ?? ''} onValueChange={(value: string) => setPicked(value)} aria-labelledby={`${headings}-repo`}>
+          <DropdownMenu.Label id={`${headings}-repo`}>For repository</DropdownMenu.Label>
           {item.untaggedFor!.map((r, i) => (
-            <MenuRadioItem value={r} key={r} ref={i === 0 ? checkedEntry : undefined} closeOnClick={false} data-start-repo={r}>
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="min-w-0 flex-1 truncate">{repoName(r, data.repos)}</span>
-                <MenuRadioItemIndicator />
-              </span>
-            </MenuRadioItem>
+            <DropdownMenu.RadioItem value={r} key={r} data-opens-here={i === 0 || undefined} onSelect={keepOpen} data-start-repo={r}>
+              <span className="min-w-0 flex-1 truncate">{repoName(r, data.repos)}</span>
+            </DropdownMenu.RadioItem>
           ))}
-          {unpicked && <p id={pickHint} className="px-2 py-1 text-muted-foreground text-xs" data-start-pick-hint>Pick a repository first.</p>}
-        </MenuRadioGroup>
+          {unpicked && <p id={pickHint} className="px-2 py-1 text-base-700 text-xs" data-start-pick-hint>Pick a repository first.</p>}
+        </DropdownMenu.RadioGroup>
       )}
-      <MenuRadioGroup value={checked}>
-        <MenuGroupLabel>Start with</MenuGroupLabel>
+      <DropdownMenu.RadioGroup value={checked} aria-labelledby={`${headings}-with`}>
+        <DropdownMenu.Label id={`${headings}-with`}>Start with</DropdownMenu.Label>
         {entry('T3 default')}
-        {data.modelChoices.map((g) => (
-          <MenuGroup key={g.instanceId}>
-            <MenuGroupLabel>{g.name}</MenuGroupLabel>
+        {data.modelChoices.map((g, i) => (
+          <DropdownMenu.Group key={g.instanceId} aria-labelledby={`${headings}-${i}`}>
+            <DropdownMenu.Label id={`${headings}-${i}`}>{g.name}</DropdownMenu.Label>
             {g.models.map((m) => entry(m.label, { instanceId: g.instanceId, model: m.slug }))}
-          </MenuGroup>
+          </DropdownMenu.Group>
         ))}
-      </MenuRadioGroup>
+      </DropdownMenu.RadioGroup>
     </>
   );
 }
 
-/** Start, or the tag that took its place; the item dialog names it `label` and sizes it up, and the Queue outlines its later rows'. */
-export function StartControl({ item, data, label = 'Start', size = 'xs', variant, icon, kind = 'refine' }: {
-  item: Item; data: BoardData; label?: string; size?: 'xs' | 'sm'; variant?: 'default' | 'outline'; icon?: ReactNode; kind?: StartKind;
+/**
+ * Spread on a Start menu's content, it opens the menu on its checked entry, or on the first repository while it asks
+ * for one, not on the menu itself. ninna-ui passes Radix's onOpenAutoFocus through to the menu but leaves it out of its
+ * props type, which a spread doesn't check.
+ */
+export const opensOnChecked = {
+  onOpenAutoFocus: (event: Event): void => {
+    event.preventDefault();
+    (event.target as HTMLElement).querySelector<HTMLElement>('[data-opens-here]')?.focus({ preventScroll: true });
+  },
+};
+
+/** Start, or the tag that took its place; the item dialog names it `label`, and the Queue outlines its later rows'. */
+export function StartControl({ item, data, label = 'Start', variant = 'primary', icon, kind = 'refine' }: {
+  item: Item; data: BoardData; label?: string; variant?: 'primary' | 'secondary'; icon?: ReactNode; kind?: StartKind;
 }) {
   const start = useStart(item.id, kind);
   const action = useItemAction(item.id);
   const [open, setOpen] = useState(false);
   const thread = startedThread(item, data, start, kind);
   // The toast announces a start; the tag only keeps Start from running twice.
-  if (thread) return <span className="start-group"><Badge variant="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
+  if (thread) return <span className="start-group"><Badge tone="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
   if (start?.phase === 'uncertain') {
     // Once its message is closed, a tag still says why Start is gone.
-    return <span className="start-group">{!start.message && <Badge variant="warning" className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</Badge>}</span>;
+    return <span className="start-group">{!start.message && <Badge tone="warning" className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</Badge>}</span>;
   }
   const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : label;
   // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
@@ -123,14 +129,16 @@ export function StartControl({ item, data, label = 'Start', size = 'xs', variant
   };
   return (
     <span className="start-group">
-      <Menu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
-        <MenuTrigger render={<Button size={size} variant={variant} />} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
-          {start?.phase !== 'pending' && icon}{verb}{start?.phase !== 'pending' && ' ▾'}
-        </MenuTrigger>
-        <MenuPopup align="end" aria-label={`Start ${ref(item)} with`}>
+      <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
+        <DropdownMenu.Trigger asChild>
+          <Button variant={variant} leftIcon={start?.phase !== 'pending' && icon} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
+            {verb}{start?.phase !== 'pending' && ' ▾'}
+          </Button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} with`} {...opensOnChecked}>
           <StartEntries item={item} data={data} onPick={pick} />
-        </MenuPopup>
-      </Menu>
+        </DropdownMenu.Content>
+      </DropdownMenu>
     </span>
   );
 }

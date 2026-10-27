@@ -74,6 +74,10 @@ check "--list prints the repositories array, an entry still onboarding with its 
 FAKE_LOGGED_OUT=1 run --list
 check "--list doesn't need gh" '[{"repo":"maddec01/lar-factory"},{"repo":"maddec01/lar-server","onboarding":{"step":"setup","done":["project"],"answers":{"projectId":"lar-server"}}}]'
 
+echo '{"repositories":[{"repo":"maddec01/lar-web","resetting":{"prUrl":"https://github.com/maddec01/lar-web/pull/14"}},{"repo":"maddec01/lar-factory"}]}' >"$list_file"
+run --list
+check "--list leaves out an entry resetting" '[{"repo":"maddec01/lar-factory"}]'
+
 echo '{"repositories": [' >"$list_file"
 run --list
 refuses "a repositories.json that isn't JSON names the file" "$list_file isn't valid JSON"

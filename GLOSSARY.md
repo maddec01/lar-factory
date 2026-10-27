@@ -260,6 +260,14 @@ _Avoid_: test board, dev board
 The installable desktop app that runs the board and updates itself from Releases.
 _Avoid_: Electron app, desktop board, dashboard
 
+**Loading screen**:
+The screen the board app and the board page show until the first read settles, at launch and after a board server restart. It shows the lar Factory lockup, whose L draws itself, over one line naming the current step, then fades into the board.
+_Avoid_: splash, spinner, starting page
+
+**First read**:
+The board server's first read of every repository after it starts. It settles when the read finishes, fails, or gh blocks it.
+_Avoid_: initial load, first sync
+
 **Title bar**:
 The bar at the top of the main area, in the board app and in a browser. It holds the scope, the Refreshed time and the counters. The brand sits in the sidebar's top row.
 _Avoid_: toolbar, top bar
@@ -312,7 +320,7 @@ Arming a blocked part's start, so the board starts it once every issue it's bloc
 _Avoid_: auto-start (for this)
 
 **Design system**:
-The package that holds every token, style and base component of the board page and the board app's starting page; nothing outside it sets its own colours or spacing.
+The package that holds every token, style and base component of the board page and the board app's loading screen; nothing outside it sets its own colours or spacing.
 _Avoid_: UI kit, component library, theme
 
 ### Upstream files

@@ -1,5 +1,5 @@
 // The main area's title bar: a 52 px drag bar with the scope menu ("All repositories", or the repository the menu or
-// the sidebar scoped it to), the Refreshed time, the counters and This week. While the sidebar is hidden it starts
+// the sidebar scoped it to), the Refreshed time, the counters, the List button and This week. While the sidebar is hidden it starts
 // T3's gap past the toggle. Clicks on its buttons and on the time never drag the window; the rest of the bar does.
 // Above the missing-t3 notice there's no board to scope or count, so the bar is empty.
 
@@ -12,6 +12,7 @@ import { Menu, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuRad
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/tooltip';
 import { useBoardStore } from '../board/board-store.ts';
 import { repoTone } from '../items/item-parts.tsx';
+import { ListButton } from '../list/list-modal.tsx';
 import { useSidebarStore } from '../sidebar/sidebar-store.ts';
 import { useTitlebarInset } from '../sidebar/window-controls.tsx';
 import { Counters } from './counters.tsx';
@@ -125,6 +126,7 @@ export function TitleBar() {
           <Refreshed data={data} />
           <div className="flex min-w-0 flex-1 items-center justify-center"><Counters /></div>
           <span className="flex items-center gap-1.5 [-webkit-app-region:no-drag]">
+            <ListButton />
             <Button variant="outline" size="xs" disabled title="This week isn't built yet">This week</Button>
           </span>
         </>

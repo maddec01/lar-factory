@@ -12,10 +12,10 @@ import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
+import { matchesSearch } from '../list/list-search.ts';
 import { useSidebarStore } from './sidebar-store.ts';
 
 const PREVIEW = 6;
-const matches = (item: Item, q: string) => !q || `${item.title} ${ref(item)}`.toLowerCase().includes(q);
 
 function Row({ item, now }: { item: Item; now: number }) {
   const on = useItemDialogStore((state) => state.itemId === item.id);
@@ -71,7 +71,7 @@ function Group({ repo, name, items, tone, now, q }: ListGroup & { tone: string; 
 export function ListGroups({ query: q }: { query: string }) {
   const { data, now } = useBoardStore();
   const groups = boardSections(data, now).listGroups
-    .map((group) => ({ ...group, items: group.items.filter((i) => matches(i, q)) }))
+    .map((group) => ({ ...group, items: group.items.filter((i) => matchesSearch(i, q)) }))
     .filter((group) => !q || group.items.length);
   return (
     <nav className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-2 pb-3 pt-1" aria-label="List">

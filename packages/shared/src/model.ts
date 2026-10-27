@@ -307,11 +307,11 @@ export interface RepoConfig {
   repo: string;
   /** Repository role: what this repository is to the others. */
   role: string;
-  /** Its item source: the GitHub Project its .lar-factory.json names, the repository's issues, or an Azure DevOps team's current sprint. */
+  /** Its item source: the GitHub Project its .lar-factory.json names, the repository's issues, or an Azure DevOps team's current sprint or backlog. */
   items?: ItemSourceKind;
   /** The GitHub Project its item source names, by owner and number; absent for the other item sources. */
   project?: { owner: string; number: number };
-  /** The Azure DevOps team whose current sprint its item source is; absent for the other item sources. */
+  /** The Azure DevOps team whose current sprint or backlog its item source is; absent for the other item sources. */
   team?: string;
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
@@ -328,7 +328,7 @@ export interface RepoConfig {
   configUpdate?: number;
 }
 
-export const ITEM_SOURCE_KINDS = ['project', 'issues', 'sprint'] as const;
+export const ITEM_SOURCE_KINDS = ['project', 'issues', 'sprint', 'backlog'] as const;
 
 export type ItemSourceKind = (typeof ITEM_SOURCE_KINDS)[number];
 
@@ -480,7 +480,7 @@ export function failedCheck<N extends CheckedTool>(tools: ToolChecks | undefined
   return check && check.result !== 'ok' ? check as FailedCheck<NonNullable<ToolChecks[N]>> : undefined;
 }
 
-/** Where a repository's items come from: its GitHub Project, its issues, or an Azure DevOps team's current sprint. */
+/** Where a repository's items come from: its GitHub Project, its issues, or an Azure DevOps team's current sprint or backlog. */
 export type ItemSource = ItemSourceKind;
 
 /** Where a repository's items come from: the GitHub Project, unless its config says its issues. */
@@ -655,9 +655,10 @@ export type Provider = (typeof PROVIDERS)[number];
 
 /**
  * Where a repository's items come from: a GitHub Project, which other repositories may name too, its own issues, or an
- * Azure DevOps team's current sprint in the repository's project.
+ * Azure DevOps team's current sprint or backlog in the repository's project.
  */
-export type RepositoryItemSource = { kind: 'github-project'; owner: string; number: number } | { kind: 'issues' } | { kind: 'azure-sprint'; team: string };
+export type RepositoryItemSource = { kind: 'github-project'; owner: string; number: number } | { kind: 'issues' }
+  | { kind: 'azure-sprint'; team: string } | { kind: 'azure-backlog'; team: string };
 
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
 export interface RepositoryConfigAnswers {

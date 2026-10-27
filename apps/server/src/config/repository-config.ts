@@ -55,12 +55,12 @@ const isTeam = (value: unknown): value is string => typeof value === 'string' &&
 
 /**
  * Whether a value is an item source as .lar-factory.json holds it: a GitHub Project by owner and positive number, the
- * issues, or an Azure DevOps team's current sprint by team.
+ * issues, or an Azure DevOps team's current sprint or backlog by team.
  */
 export function isItemSource(value: unknown): value is RepositoryItemSource {
   if (!isRecord(value)) return false;
   if (value.kind === 'issues') return true;
-  if (value.kind === 'azure-sprint') return isTeam(value.team);
+  if (value.kind === 'azure-sprint' || value.kind === 'azure-backlog') return isTeam(value.team);
   return value.kind === 'github-project' && typeof value.owner === 'string' && GITHUB_LOGIN.test(value.owner)
     && Number.isInteger(value.number) && (value.number as number) > 0;
 }
@@ -246,7 +246,7 @@ export function readBoardSettings(dir = boardDataDir()): BoardSettings {
 
 /**
  * What is wrong with a parsed .lar-factory.json, in repo-config.sh's words, or null when nothing is. A GitHub repository
- * reads a GitHub Project or its issues, and an Azure DevOps one names its team's sprint, with no default.
+ * reads a GitHub Project or its issues, and an Azure DevOps one names its team's sprint or backlog, with no default.
  */
 function problem(raw: Record<string, unknown>, azure: boolean): string | null {
   const source = raw.itemSource as Record<string, unknown> | undefined;
@@ -254,8 +254,8 @@ function problem(raw: Record<string, unknown>, azure: boolean): string | null {
   if (typeof raw.role !== 'string' || !raw.role) return 'field role is missing or not a string';
   if ('itemSource' in raw && (typeof source !== 'object' || source === null || Array.isArray(source))) return 'field itemSource must be an object';
   if (!azure && source && source.kind !== 'issues' && source.kind !== 'github-project') return 'field itemSource.kind must be "issues" or "github-project"';
-  if (azure && source?.kind !== 'azure-sprint') return 'field itemSource.kind must be "azure-sprint"';
-  if (azure && !isTeam(source?.team)) return 'field itemSource.team must name the team for an azure-sprint';
+  if (azure && source?.kind !== 'azure-sprint' && source?.kind !== 'azure-backlog') return 'field itemSource.kind must be "azure-sprint" or "azure-backlog"';
+  if (azure && !isTeam(source?.team)) return `field itemSource.team must name the team for an ${source?.kind}`;
   if (source?.kind === 'github-project' && (typeof source.owner !== 'string' || !GITHUB_LOGIN.test(source.owner))) {
     return 'field itemSource.owner must be a GitHub login for a github-project';
   }
@@ -294,7 +294,7 @@ export async function findRepositoryConfig(repo: string, run?: (args: string[]) 
   const file = raw as Partial<RepositoryConfig> & { role: string };
   const source = file.itemSource;
   const itemSource: RepositoryItemSource = source?.kind === 'github-project' ? { kind: 'github-project', owner: source.owner, number: source.number }
-    : source?.kind === 'azure-sprint' ? { kind: 'azure-sprint', team: source.team } : { kind: 'issues' };
+    : source?.kind === 'azure-sprint' || source?.kind === 'azure-backlog' ? { kind: source.kind, team: source.team } : { kind: 'issues' };
   return { repo, version: file.version ?? 1, role: file.role, itemSource, show: file.show ?? 'all', labels: file.labels ?? [] };
 }
 

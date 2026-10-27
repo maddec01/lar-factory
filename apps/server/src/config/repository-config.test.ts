@@ -183,11 +183,12 @@ test('a repository is owner/name on GitHub or organization/project/repository on
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'contoso/Fabrikam%20Fiber/lar-api' }]);
 });
 
-test("an item source is a GitHub Project, the repository's issues or an Azure DevOps team's current sprint, named by team", () => {
-  for (const source of [{ kind: 'issues' }, { kind: 'github-project', owner: 'maddec01', number: 3 }, { kind: 'azure-sprint', team: 'Fabrikam Team' }]) {
+test("an item source is a GitHub Project, the repository's issues or an Azure DevOps team's current sprint or backlog, named by team", () => {
+  for (const source of [{ kind: 'issues' }, { kind: 'github-project', owner: 'maddec01', number: 3 }, { kind: 'azure-sprint', team: 'Fabrikam Team' },
+    { kind: 'azure-backlog', team: 'Fabrikam Team' }]) {
     assert.equal(isItemSource(source), true, JSON.stringify(source));
   }
-  for (const source of [{ kind: 'azure-sprint' }, { kind: 'azure-sprint', team: '' }, { kind: 'sprint', team: 'x' }]) {
+  for (const source of [{ kind: 'azure-sprint' }, { kind: 'azure-sprint', team: '' }, { kind: 'sprint', team: 'x' }, { kind: 'azure-backlog' }, { kind: 'backlog', team: 'x' }]) {
     assert.equal(isItemSource(source), false, JSON.stringify(source));
   }
 });
@@ -223,13 +224,15 @@ test("a repository without the file, or with a file that doesn't parse or has a 
     'maddec01/no-number': { role: 'x', itemSource: { kind: 'github-project', owner: 'maddec01' } }, 'maddec01/some': { role: 'x', show: 'some' },
     'maddec01/bad-owner': { role: 'x', itemSource: { kind: 'github-project', owner: 'lar" or true or "', number: 3 } },
     'maddec01/bad-number': { role: 'x', itemSource: { kind: 'github-project', owner: 'maddec01', number: 1.5 } },
-    'maddec01/azure-kind': { role: 'x', itemSource: { kind: 'azure-sprint', team: 'Web' } } });
+    'maddec01/azure-kind': { role: 'x', itemSource: { kind: 'azure-sprint', team: 'Web' } },
+    'maddec01/azure-backlog': { role: 'x', itemSource: { kind: 'azure-backlog', team: 'Web' } } });
   const refusals = {
     'maddec01/missing': 'maddec01/missing: no .lar-factory.json on its default branch.',
     'maddec01/broken': "maddec01/broken: .lar-factory.json isn't valid JSON.",
     'maddec01/no-role': 'maddec01/no-role: .lar-factory.json field role is missing or not a string.',
     'maddec01/sprint': 'maddec01/sprint: .lar-factory.json field itemSource.kind must be "issues" or "github-project".',
     'maddec01/azure-kind': 'maddec01/azure-kind: .lar-factory.json field itemSource.kind must be "issues" or "github-project".',
+    'maddec01/azure-backlog': 'maddec01/azure-backlog: .lar-factory.json field itemSource.kind must be "issues" or "github-project".',
     'maddec01/no-number': 'maddec01/no-number: .lar-factory.json field itemSource.number must be a positive whole number for a github-project.',
     'maddec01/bad-number': 'maddec01/bad-number: .lar-factory.json field itemSource.number must be a positive whole number for a github-project.',
     'maddec01/bad-owner': 'maddec01/bad-owner: .lar-factory.json field itemSource.owner must be a GitHub login for a github-project.',
@@ -238,16 +241,20 @@ test("a repository without the file, or with a file that doesn't parse or has a 
   for (const [repo, message] of Object.entries(refusals)) await assert.rejects(readRepositoryConfig(repo, gh), { message });
 });
 
-test("an Azure DevOps repository's config names its team's sprint, with no default item source", async () => {
+test("an Azure DevOps repository's config names its team's sprint or backlog, with no default item source", async () => {
   const files: Record<string, unknown> = { 'contoso/Fabrikam/api': { role: 'API', itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' } },
+    'contoso/Fabrikam/web': { role: 'Web', itemSource: { kind: 'azure-backlog', team: 'Web' } },
+    'contoso/Fabrikam/backlog-no-team': { role: 'x', itemSource: { kind: 'azure-backlog' } },
     'contoso/Fabrikam/none': { role: 'x' }, 'contoso/Fabrikam/issues': { role: 'x', itemSource: { kind: 'issues' } },
     'contoso/Fabrikam/no-team': { role: 'x', itemSource: { kind: 'azure-sprint' } }, 'contoso/Fabrikam/empty-team': { role: 'x', itemSource: { kind: 'azure-sprint', team: '' } } };
   // Reading the file with az waits for its own slice; this reader hands back each file as it is.
   const read = async (args: string[]) => JSON.stringify(files[/^repos\/(.+)\/contents\//.exec(args[1] ?? '')?.[1] ?? '']);
   assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/api', read)).itemSource, { kind: 'azure-sprint', team: 'Fabrikam Team' });
+  assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/web', read)).itemSource, { kind: 'azure-backlog', team: 'Web' });
   const refusals = {
-    'contoso/Fabrikam/none': 'field itemSource.kind must be "azure-sprint"',
-    'contoso/Fabrikam/issues': 'field itemSource.kind must be "azure-sprint"',
+    'contoso/Fabrikam/none': 'field itemSource.kind must be "azure-sprint" or "azure-backlog"',
+    'contoso/Fabrikam/issues': 'field itemSource.kind must be "azure-sprint" or "azure-backlog"',
+    'contoso/Fabrikam/backlog-no-team': 'field itemSource.team must name the team for an azure-backlog',
     'contoso/Fabrikam/no-team': 'field itemSource.team must name the team for an azure-sprint',
     'contoso/Fabrikam/empty-team': 'field itemSource.team must name the team for an azure-sprint',
   };

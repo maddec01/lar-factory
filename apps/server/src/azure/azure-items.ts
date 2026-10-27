@@ -37,7 +37,7 @@ function problemOf(err: unknown): unknown {
   return err;
 }
 
-interface RawWorkItem {
+export interface RawWorkItem {
   id: number;
   fields: Record<string, unknown>;
   relations?: { rel: string; url: string }[] | null;
@@ -46,9 +46,9 @@ interface RawWorkItem {
 type Category = 'Proposed' | 'InProgress' | 'Resolved' | 'Completed' | 'Removed';
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
-const field = (raw: RawWorkItem, name: string) => text(raw.fields[name]);
+export const field = (raw: RawWorkItem, name: string) => text(raw.fields[name]);
 /** The ids a work item's links of `rel` point at: the last part of each link's URL. */
-const linked = (raw: RawWorkItem, rel: string) => (raw.relations ?? []).filter((r) => r.rel === rel).map((r) => Number(r.url.split('/').at(-1)));
+export const linked = (raw: RawWorkItem, rel: string) => (raw.relations ?? []).filter((r) => r.rel === rel).map((r) => Number(r.url.split('/').at(-1)));
 const tagsOf = (raw: RawWorkItem) => field(raw, 'System.Tags').split(';').map((t) => t.trim()).filter(Boolean);
 const STATUS_TAGS = new Set(STATUSES.flatMap((s) => (s === 'Done' ? [] : [statusLabel(s)])));
 

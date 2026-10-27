@@ -1,98 +1,13 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import type { Item } from '@lar-factory/shared';
 import { mergeSources } from '../items/item-sources.ts';
 import type { ItemSource } from '../items/item-source.ts';
 import { azureSprint } from './azure-sprint.ts';
+import { STATES, fakeAz, type WorkItem } from './fake-az.ts';
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
 const TEAM = 'Fabrikam Team';
-
-interface WorkItem {
-  id: number;
-  type: string;
-  state: string;
-  title?: string;
-  tags?: string;
-  parent?: number;
-  predecessors?: number[];
-  closed?: string;
-}
-
-/** Each process's states with their categories, as the work item type states endpoint lists them. */
-const STATES: Record<string, [string, string][]> = {
-  'User Story': [['New', 'Proposed'], ['Active', 'InProgress'], ['Resolved', 'Resolved'], ['Closed', 'Completed'], ['Removed', 'Removed']],
-  'Product Backlog Item': [['New', 'Proposed'], ['Approved', 'Proposed'], ['Committed', 'InProgress'], ['Done', 'Completed'], ['Removed', 'Removed']],
-  'Issue': [['To Do', 'Proposed'], ['Doing', 'InProgress'], ['Done', 'Completed']],
-  'Requirement': [['Proposed', 'Proposed'], ['Active', 'InProgress'], ['Resolved', 'Resolved'], ['Closed', 'Completed']],
-  'Task': [['New', 'Proposed'], ['Active', 'InProgress'], ['Closed', 'Completed'], ['Removed', 'Removed']],
-  'Epic': [['New', 'Proposed'], ['Active', 'InProgress'], ['Closed', 'Completed'], ['Removed', 'Removed']],
-};
-
-/**
- * A fake az for one team whose current sprint holds `sprint`'s ids, reading `items` (in the sprint or not), with
- * `requirement` its requirement backlog level's type. It records each call, and `fail` throws for a call it matches.
- */
-function fakeAz({ items, sprint = items.map((i) => i.id), requirement = 'User Story', iterations = [{ id: 'it-12', name: 'Sprint 12' }], fail }: {
-  items: WorkItem[];
-  sprint?: number[];
-  requirement?: string;
-  iterations?: { id: string; name: string }[];
-  fail?: (args: string[]) => Error | undefined;
-}) {
-  const calls: string[][] = [];
-  /** Each workitemsbatch call's ids, read from its --in-file while the file exists. */
-  const batches: number[][] = [];
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
-  const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
-  const raw = (i: WorkItem) => ({
-    id: i.id, rev: 1, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
-    fields: {
-      'System.WorkItemType': i.type, 'System.State': i.state, 'System.Title': i.title ?? `Item ${i.id}`, 'System.ChangedDate': '2026-10-21T08:00:00Z',
-      ...i.tags && { 'System.Tags': i.tags }, ...i.parent && { 'System.Parent': i.parent }, ...i.closed && { 'Microsoft.VSTS.Common.ClosedDate': i.closed },
-    },
-    relations: [
-      ...i.parent ? [{ rel: 'System.LinkTypes.Hierarchy-Reverse', url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.parent}`, attributes: {} }] : [],
-      ...(i.predecessors ?? []).map((p) => ({ rel: 'System.LinkTypes.Dependency-Reverse', url: `https://dev.azure.com/contoso/_apis/wit/workItems/${p}`, attributes: {} })),
-      { rel: 'ArtifactLink', url: 'vstfs:///Git/Commit/x', attributes: {} },
-    ],
-  });
-  const run = async (args: string[]) => {
-    calls.push(args);
-    const failure = fail?.(args);
-    if (failure) throw failure;
-    const command = args.slice(0, 4).join(' ');
-    if (command === 'boards iteration team list') return JSON.stringify(iterations.map((it) => ({ ...it, path: `Fabrikam Fiber\\${it.name}` })));
-    if (command === 'boards iteration team list-work-items') {
-      return JSON.stringify({ workItemRelations: sprint.map((id) => {
-        const parent = byId.get(id)?.parent;
-        return parent && sprint.includes(parent)
-          ? { rel: 'System.LinkTypes.Hierarchy-Forward', source: { id: parent }, target: { id } }
-          : { rel: null, source: null, target: { id } };
-      }) });
-    }
-    if (args[0] === 'devops' && args[1] === 'invoke') {
-      const resource = `${flag(args, '--area')}/${flag(args, '--resource')}`;
-      if (resource === 'work/backlogconfiguration') {
-        return JSON.stringify({ requirementBacklog: { workItemTypes: [{ name: requirement }] }, taskBacklog: { workItemTypes: [{ name: 'Task' }] } });
-      }
-      if (resource === 'wit/workitemsbatch') {
-        const { ids } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { ids: number[] };
-        batches.push(ids);
-        const found = ids.flatMap((id) => byId.has(id) ? [raw(byId.get(id)!)] : []);
-        return JSON.stringify({ count: found.length, value: found });
-      }
-      if (resource === 'wit/workitemtypestates') {
-        const states = STATES[route(args, 'type')!]!;
-        return JSON.stringify({ count: states.length, value: states.map(([name, category]) => ({ name, color: '000000', category })) });
-      }
-    }
-    throw new Error(`fake az: unexpected ${args.join(' ')}`);
-  };
-  return { calls, batches, run };
-}
 
 const invokes = (calls: string[][], resource: string) => calls.filter((c) => c[0] === 'devops' && c[c.indexOf('--resource') + 1] === resource);
 const shown = (items: Item[]) => items.map((i) => [i.number, i.status, i.parent?.number ?? null]);

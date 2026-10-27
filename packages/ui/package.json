@@ -45,6 +45,7 @@
     "./design-system/ScrollArea": "./src/design-system/layout/ScrollArea.tsx",
     "./design-system/SidebarNavigationItem": "./src/design-system/layout/sidebar/SidebarNavigationItem.tsx",
     "./design-system/SidebarPane": "./src/design-system/layout/sidebar/SidebarPane.tsx",
+    "./design-system/TitleBar": "./src/design-system/layout/TitleBar.tsx",
     "./design-system/ActionModal": "./src/design-system/overlays/ActionModal.tsx",
     "./design-system/DropdownMenu": "./src/design-system/overlays/DropdownMenu.tsx",
     "./design-system/Modal": "./src/design-system/overlays/Modal.tsx",

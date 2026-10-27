@@ -39,10 +39,10 @@ bug|D73A4A|Something broken
 feature|A2EEEF|New behaviour
 improvement|1D76DB|Better existing behaviour
 concept|5319E7|A map of work needing decisions and builds
-decision: grill|D4C5F9|Concept decision settled by questions
-decision: prototype|D4C5F9|Concept decision settled by a prototype
-decision: research|D4C5F9|Concept decision settled by research
-decision: task|D4C5F9|Concept decision settled by a small task
+decision-grill|D4C5F9|Concept decision settled by questions
+decision-prototype|D4C5F9|Concept decision settled by a prototype
+decision-research|D4C5F9|Concept decision settled by research
+decision-task|D4C5F9|Concept decision settled by a small task
 build|0E8A16|Issue that becomes one PR
 active|FBCA04|Slice an implementer is working on now
 blocked|BFD4F2|Slice an implementer couldn't finish, waiting for a re-slice
@@ -96,7 +96,7 @@ child_repo=$repo
 # Create a decision as a native sub-issue; retain the returned URL immediately.
 # Slices are created with slice.sh instead (see Slices).
 gh issue create --repo "$repo" --title "Decide the approach" \
-  --body-file /path/to/decision.md --label "decision: grill" --parent "$parent"
+  --body-file /path/to/decision.md --label "decision-grill" --parent "$parent"
 
 # Or attach an existing child to the map.
 gh issue edit "$parent" --repo "$repo" --add-sub-issue "$child"

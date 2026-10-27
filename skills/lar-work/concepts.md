@@ -44,11 +44,11 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
    and go back to [2. Size up](SKILL.md#2-size-up).
 
 2. Create a sub-issue for each decision you can phrase now, labelled
-   `decision: grill`, `decision: prototype`, `decision: research` or
-   `decision: task`, with blocked-by links where one needs another
+   `decision-grill`, `decision-prototype`, `decision-research` or
+   `decision-task`, with blocked-by links where one needs another
    ([native relationship commands](issue-tracker.md#native-relationships)).
    Put them in Queued; the rest stays in Fog.
-3. Start each `decision: research` now, in the background, with the `research`
+3. Start each `decision-research` now, in the background, with the `research`
    skill. Findings go on a `research/<n>-<slug>` branch linked from the
    sub-issue.
 4. Keep the map in Shaping while decisions are open. Each `grill`,
@@ -70,7 +70,7 @@ turn fog that cleared into new decision sub-issues. When part of the
 destination is fully decided, create a `build` sub-issue for it with a brief
 ([3. Brief](SKILL.md#3-brief)) whose Domain docs copies the map entries that
 build needs, run the [gate](SKILL.md#4-gate) and set it Ready. Start each new
-`decision: research` at once, as in step 3; every other new decision waits in
+`decision-research` at once, as in step 3; every other new decision waits in
 Queued as in step 4, and each build in Ready for the board's Start build
 ([5. Start the build](SKILL.md#5-start-the-build)). Then close this sub-issue
 and redraw the map. Map builds follow the

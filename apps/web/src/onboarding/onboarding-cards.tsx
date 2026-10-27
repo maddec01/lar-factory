@@ -2,6 +2,7 @@
 // the merge, and Resume, which reopens the onboarding dialog there.
 
 import { FolderGit2 } from 'lucide-react';
+import { shownRepo } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { Card } from '@lar-factory/ui/card';
@@ -20,7 +21,7 @@ export function OnboardingCards() {
           <Card key={repo} accent className="flex-row flex-wrap items-center gap-3" data-onboarding-card={repo}>
             <FolderGit2 className="size-4 text-muted-foreground" />
             <div className="grid min-w-0 flex-1 gap-0.5">
-              <span className="flex items-center gap-2 text-sm font-medium"><span data-repo>{repo}</span><Badge variant="warning" size="sm">Onboarding</Badge></span>
+              <span className="flex items-center gap-2 text-sm font-medium"><span data-repo>{shownRepo(repo)}</span><Badge variant="warning" size="sm">Onboarding</Badge></span>
               <span className="text-xs text-muted-foreground">{where[0]!.toUpperCase()}{where.slice(1)}</span>
             </div>
             <Button size="xs" onClick={() => resume(repo)} data-resume>Resume</Button>

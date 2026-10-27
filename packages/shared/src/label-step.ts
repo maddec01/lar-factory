@@ -60,9 +60,12 @@ export const labelsToCreate = (plan: LabelPlan, renaming: readonly string[]): Wo
   .filter((r) => r.state === 'missing' || r.state === 'rename' && !renaming.includes(r.oldName)).map((r) => r.label);
 
 
-/** The labels the step offers as custom labels: those it leaves alone, less any status label and any old name kept beside its new label. */
+/**
+ * The labels the step offers as custom labels: those it leaves alone, less any status label, any repo- tag that routes an
+ * Azure work item to its repository, and any old name kept beside its new label.
+ */
 export const customLabelChoices = (plan: LabelPlan): string[] =>
-  plan.leftAlone.filter((l) => !l.keptBeside && !key(l.name).startsWith('status-')).map((l) => l.name);
+  plan.leftAlone.filter((l) => !l.keptBeside && !/^(status|repo)-/.test(key(l.name))).map((l) => l.name);
 
 /** The longest label name GitHub takes. */
 const LONGEST_LABEL = 50;

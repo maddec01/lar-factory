@@ -35,6 +35,16 @@ test('a card with an open PR says it waits for the merge, and one whose PR close
   expect(text($('[data-onboarding-card="maddec01/lar-cli"]'))).toContain('Its PR closed without merging');
 });
 
+test("an Azure DevOps repository's card shows its name decoded, and its Labels step as Tags", async () => {
+  const repo = 'contoso/Fabrikam%20Fiber/lar-api';
+  const data: BoardData = { ...empty, onboarding: [{ repo, progress: { step: 'labels', done: ['project', 'setup'], answers: { projectId: 'lar-api', provider: 'Azure DevOps' } } }] };
+  serve(data, []);
+  await mountPage(data);
+  const azure = $(`[data-onboarding-card="${repo}"]`)!;
+  expect(text(azure.querySelector('[data-repo]'))).toBe('contoso/Fabrikam Fiber/lar-api');
+  expect(text(azure)).toContain('Stopped at Tags');
+});
+
 test('the card sits above the board of the repositories onboarded already', async () => {
   serve(waiting(sample), []);
   await mountPage(waiting(sample));

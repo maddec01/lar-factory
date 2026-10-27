@@ -394,6 +394,7 @@ test("an Azure DevOps run asks the board for az's check, which holds Next in pla
   wizard.getState().next();
   wizard.getState().answer({ team: 'Fabrikam Team', role: 'API server' });
   wizard.getState().next();
+  await settle();
   wizard.getState().next();
   await vi.waitFor(() => expect(wizard.getState().checks?.setup.push.state).toBe('done'));
   const posts = (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/recheck' || url === '/api/onboarding/checks')
@@ -921,12 +922,28 @@ test("Create runs for a reused file's missing custom labels alone, and sends non
   expect(labelPosts().length, 'nothing left to create').toBe(2);
 });
 
-test('on Azure DevOps the Labels step reads no label and lets Next through', async () => {
-  const azure = project('lar-api', { repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true, config: REUSED.config });
-  const wizard = await labelsStore([azure], []);
-  await toLabels(wizard, 'lar-api');
+test("on Azure DevOps the Labels step reads the project's tags, goes on with tags not yet used, and picks a typed custom tag without creating it", async () => {
+  const azure = project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps' });
+  const wizard = await labelsStore([azure], ['bug']);
+  await settle(() => wizard.getState().start());
+  wizard.getState().pick('lar-api');
+  wizard.getState().next();
+  wizard.getState().answer({ itemSource: 'azure-sprint', team: 'Fabrikam Team', role: 'API' });
+  wizard.getState().next();
+  await settle();
   expect(wizard.getState().run!.step).toBe('labels');
-  expect(labelPosts()).toEqual([]);
+  expect(labelPosts()).toEqual([['/api/onboarding/labels', { repo: 'contoso/Fabrikam/lar-api' }]]);
+  await settle(() => wizard.getState().createLabels());
+  for (const typed of ['app, music', 'app; music']) {
+    wizard.getState().typeCustomLabel(typed);
+    await settle(() => wizard.getState().addCustomLabel());
+    expect(wizard.getState().run!.customLabels).toEqual([]);
+  }
+  wizard.getState().typeCustomLabel(' app: music ');
+  await settle(() => wizard.getState().addCustomLabel());
+  expect(wizard.getState().run!.customLabels).toEqual(['app: music']);
+  expect(wizard.getState().labels!.typed).toBe('');
+  expect(labelPosts().length, 'no Create and no custom tag post').toBe(1);
   wizard.getState().next();
   expect(wizard.getState().run!.step).toBe('checks');
 });

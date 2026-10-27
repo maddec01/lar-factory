@@ -8,8 +8,8 @@ import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, Dia
 import { Progress } from '@lar-factory/ui/progress';
 import { StepBody } from './steps.tsx';
 import { useBoardStore } from '../board/board-store.ts';
-import { sameRepo } from '@lar-factory/shared';
-import { type Run, type StepId, STEPS, onboarded, pickedProject, prClosed, stepReady, useWizardStore } from './wizard-store.ts';
+import { sameRepo, shownRepo } from '@lar-factory/shared';
+import { type Run, type StepId, STEPS, onboarded, pickedProject, prClosed, stepReady, stepTitle, useWizardStore } from './wizard-store.ts';
 
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
@@ -70,8 +70,8 @@ export function WizardDialog() {
       <DialogPopup className="max-w-3xl" data-onboarding-dialog finalFocus={() => closedFocus(opener, lastRepo.current)}>
         {run && step && (<>
           <DialogHeader>
-            <DialogDescription>Onboard {pickedProject(run, projects)?.name ?? run.repo?.split('/')[1] ?? 'a repository'} · step {indexOf(run) + 1} of {steps}</DialogDescription>
-            <DialogTitle ref={title} tabIndex={-1} className="outline-none">{step.label}</DialogTitle>
+            <DialogDescription>Onboard {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'} · step {indexOf(run) + 1} of {steps}</DialogDescription>
+            <DialogTitle ref={title} tabIndex={-1} className="outline-none">{stepTitle(step.id, run.provider)}</DialogTitle>
             <Progress value={doneCount} max={steps} caption={done} aria-label={done} />
           </DialogHeader>
           <DialogPanel className="py-6"><StepBody run={run} step={run.step} /></DialogPanel>

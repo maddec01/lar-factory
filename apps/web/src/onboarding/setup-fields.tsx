@@ -4,7 +4,7 @@
 
 import { useId, useState, type ReactNode } from 'react';
 import { CircleAlert, LoaderCircle } from 'lucide-react';
-import { customLabelProblem, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
+import { customLabelProblem, customTagProblem, shownRepo, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
 import { Alert, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
@@ -64,10 +64,7 @@ export const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opt
 type TextAnswer = keyof ReturnType<typeof setupProblems>;
 
 /** An Azure DevOps repository's project, as people read it: organization/project/repository's middle part, decoded. */
-export function azureProject(repo: string): string {
-  const project = repo.split('/')[1] ?? '';
-  try { return decodeURIComponent(project); } catch { return project; }
-}
+const azureProject = (repo: string): string => shownRepo(repo).split('/')[1] ?? '';
 
 /**
  * The setup fields for `repo`: item source, with a Team field for an Azure DevOps one when `azure`, show setting with
@@ -98,7 +95,7 @@ export function SetupFields({ repo, azure = false, setup, action = 'Next', disab
           <Choice value="azure-backlog" title="The team’s backlog" disabled={disabled}>The open requirement-level work items under the team’s area paths, in any sprint.</Choice>
         </>) : (<>
           <Choice value="github-project" title="A GitHub Project" disabled={disabled}>A Project named by its owner and number, which other repositories may name too.</Choice>
-          <Choice value="issues" title="The repository’s issues" disabled={disabled}>{repo}’s own issues, with no extra fields.</Choice>
+          <Choice value="issues" title="The repository’s issues" disabled={disabled}>{shownRepo(repo)}’s own issues, with no extra fields.</Choice>
         </>)}
       </RadioGroup>
     </Group>
@@ -153,24 +150,29 @@ export interface CustomLabelHandlers {
   onAdd: () => void;
 }
 
-export const CUSTOM_LABELS_HELP = 'Custom labels mark which part of the product an item touches, such as app: music. Add item offers them, and the queue shows them on each item.';
+/** What custom labels, or on Azure DevOps custom tags, are for. */
+export const customLabelsHelp = (noun: 'label' | 'tag') =>
+  `Custom ${noun}s mark which part of the product an item touches, such as app: music. Add item offers them, and the queue shows them on each item.`;
 
-export function CustomLabelsTitle() {
-  return <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Custom labels</h4>;
+export function CustomLabelsTitle({ noun = 'label' }: { noun?: 'label' | 'tag' }) {
+  return <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Custom {noun}s</h4>;
 }
 
 /**
  * The custom label picker for `repo`: a toggle for each label it offers and each pick, then a field whose Add takes a
- * new label, which shows why it can't be one as it's typed.
+ * new label, which shows why it can't be one as it's typed. When `azure` they are tags, which can't hold a comma or
+ * semicolon either, and the board writes a new one the first time a work item needs it.
  */
-export function CustomLabelPicker({ repo, offered, picked, typed, adding, busy, error, disabled: locked, onToggle, onType, onAdd }: { repo: string } & CustomLabelPicks & CustomLabelHandlers) {
+export function CustomLabelPicker({ repo, azure = false, offered, picked, typed, adding, busy, error, disabled: locked, onToggle, onType, onAdd }: { repo: string; azure?: boolean } & CustomLabelPicks & CustomLabelHandlers) {
+  const noun = azure ? 'tag' : 'label';
   const choices = [...offered, ...picked.filter((name) => !offered.some((o) => o.toLowerCase() === name.toLowerCase()))];
-  const problem = typed.trim() ? customLabelProblem(typed) : null;
+  const problem = typed.trim() ? (azure ? customTagProblem : customLabelProblem)(typed) : null;
   const disabled = !typed.trim() || !!problem || adding || busy;
   const add = () => { if (!disabled) onAdd(); };
   return (
     <div data-custom-labels className="grid gap-2">
-      <div className="grid gap-1"><CustomLabelsTitle /><p className="m-0 text-xs text-muted-foreground">{CUSTOM_LABELS_HELP} Pick the ones {repo} uses, or add a new one.</p></div>
+      <div className="grid gap-1"><CustomLabelsTitle noun={noun} /><p className="m-0 text-xs text-muted-foreground">{customLabelsHelp(noun)} Pick the ones {shownRepo(repo)} uses, or add a new one.{azure
+        && ' The board writes a new one the first time a work item needs it.'}</p></div>
       {choices.length > 0 && (
         <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0">
           {choices.map((name) => (
@@ -184,7 +186,7 @@ export function CustomLabelPicker({ repo, offered, picked, typed, adding, busy, 
         </ul>
       )}
       <span className="flex gap-2">
-        <Input data-new-custom font="mono" placeholder="app: music" aria-label="New custom label" value={typed} disabled={adding}
+        <Input data-new-custom font="mono" placeholder="app: music" aria-label={`New custom ${noun}`} value={typed} disabled={adding}
           onChange={(e) => onType(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
         <Button data-add-custom variant="outline" disabled={disabled} onClick={add}>
           {adding ? <><LoaderCircle className="animate-spin" /> Adding…</> : 'Add'}</Button>

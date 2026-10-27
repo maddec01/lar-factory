@@ -1,7 +1,7 @@
 // The T3 project step: T3's projects, each with its provider and whether its repository has .lar-factory.json, and
 // the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
 // and role, or the values of a .lar-factory.json it reuses. The Labels step: each label's state, Create and Rename, gh's
-// message with Retry, the custom labels to pick or type, a reused file's custom labels, and the Azure DevOps note. The
+// message with Retry, the custom labels to pick or type, a reused file's custom labels, and an Azure DevOps project's tags. The
 // Checks step: each check with its state and a failure's fix with Retry. The Cleanup step: each fixed Clash with its
 // tick, Delete or Rename for a project skill named like a bundled skill, the Clash agent's run with its thread, Clashes or
 // why it ended with Retry, and what the PR always writes. The Pull request step: the PR's changes for a new or a reused
@@ -31,6 +31,12 @@ test('each project shows its folder, repository, provider and whether it has .la
   expect(badges('lar-cli')).toEqual(['GitHub', 'no .lar-factory.json']);
   expect(badges('lar-ios')).toEqual(['GitHub', 'couldn’t check .lar-factory.json']);
   expect(badges('lar-api')).toEqual(['Azure DevOps', 'couldn’t check .lar-factory.json']);
+});
+
+test("an Azure DevOps repository whose project's name has a space shows it decoded", async () => {
+  await openOnboarding([project('lar-api', { repo: 'contoso/Fabrikam%20Fiber/lar-api', provider: 'Azure DevOps', hasConfig: false })]);
+  expect(text(row('lar-api'))).toContain('/Users/me/Developer/lar-api · contoso/Fabrikam Fiber/lar-api');
+  expect(text(dialog())).not.toContain('%20');
 });
 
 test("a repository already on the board, or a folder with no provider's origin, shows but can't be picked", async () => {
@@ -234,6 +240,7 @@ const choices = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-choice]
 test("an Azure DevOps origin offers the team's current sprint and backlog with a Team field, and Next waits for a team", async () => {
   await openSetup(AZURE);
   expect(text(field('provider'))).toContain('Azure DevOps');
+  expect(text(field('provider'))).toContain('From the host of contoso/Fabrikam Fiber/lar-api’s origin');
   expect(choices()).toEqual(['azure-sprint', 'azure-backlog', 'all', 'opted-in']);
   expect(choice('azure-sprint').querySelector('[role="radio"]')!.getAttribute('aria-checked')).toBe('true');
   expect(suggested()).toEqual(['all']);
@@ -817,13 +824,25 @@ test("a reused .lar-factory.json's custom label that can't be one shows why on i
   expect(nextButton().disabled).toBe(false);
 });
 
-test('on Azure DevOps the Labels step says tags arrive in build #386, reads no label and lets Next through', async () => {
-  await openSetup(project('lar-api', { repo: 'Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true,
-    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'API', labels: [] } }));
+test("on Azure DevOps the Labels step lists the project's tags with the status tags, offers Rename but no Create, and Next goes on", async () => {
+  await openSetup(project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true,
+    config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['web'] } }));
+  answerLabels(['decision: grill', 'status-list'], ['decision-grill', 'status-list']);
   await settle(() => nextButton().click());
-  expect(text(dialog()!.querySelector('[data-labels-azure]'))).toContain('build #386');
-  expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith('/api/onboarding/labels'))).toBe(false);
+  await settle();
+  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Tags');
+  expect(text(dialog())).toContain('tags on contoso/Fabrikam');
+  expect(text(dialog())).not.toContain('build #386');
+  expect(text(dialog())).not.toMatch(/\blabels?\b/);
+  expect(labelRow('feature')!.dataset.state).toBe('missing');
+  expect(text(labelRow('feature'))).toContain('not used yet');
+  expect(labelRow('status-list')!.dataset.state).toBe('present');
+  expect(text(customRow('web'))).toContain('not used yet');
+  expect(dialog()!.querySelector('[data-create-labels]')).toBeNull();
   expect(nextButton().disabled).toBe(false);
+  await settle(() => panelButton('[data-rename-labels]').click());
+  await settle();
+  expect(labelRow('decision-grill')!.dataset.state).toBe('present');
 });
 
 const PR = 'https://github.com/maddec01/lar-web/pull/14';
@@ -954,7 +973,7 @@ test("an Azure DevOps repository's PR adds the team's item source, made on Azure
   await settle(() => choice('azure-backlog').querySelector<HTMLElement>('[role="radio"]')!.click());
   await type(input('team')!, 'Fabrikam Team');
   await type(input('role')!, 'API server');
-  answerChecks({}, toolChecks({ az: { result: 'ok' } }));
+  answerChecks();
   await openChecks();
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED, modelChoices: MODELS }));

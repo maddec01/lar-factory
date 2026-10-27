@@ -5,8 +5,9 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, type FixedClashes, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, type ClashRun, type FixedClashes, type OnboardingRepository, type ProjectChoice, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
+import { isRepo } from '../config/repository-config.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
 import type { BuiltPage } from '../page/page.ts';
 import type { StartAfter } from '../start-after/start-after.ts';
@@ -37,6 +38,10 @@ export interface HttpDeps {
   runSetupCheck(input: Record<string, unknown>): Promise<{ result: SetupCheckResult } | { status: number; error: string }>;
   /** Runs onboarding's fixed checks for known Clashes on the body's repository's default branch, or says why it can't. */
   findFixedClashes(input: Record<string, unknown>): Promise<FixedClashes | { status: number; error: string }>;
+  /** Starts onboarding's Clash agent on the body's repository, T3 project and model, or returns its running run; answers the repository's runs. */
+  startClashRun(input: Record<string, unknown>): Promise<{ runs: ClashRun[] } | { status: number; error: string }>;
+  /** The repository's Clash agent runs, oldest first. */
+  clashRuns(repo: string): ClashRun[];
   /** Finishes an onboarding that reuses its .lar-factory.json, returning the repositories still onboarding, or why it can't. */
   finishOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
@@ -118,7 +123,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  runSetupCheck, findFixedClashes, finishOnboarding, openOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
+  runSetupCheck, findFixedClashes, startClashRun, clashRuns, finishOnboarding, openOnboardingPr, reopenOnboardingPr }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -201,6 +206,13 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       async run(input) {
         const found = await findFixedClashes(input);
         return 'error' in found ? { status: found.status, body: { error: found.error } } : { status: 200, body: { ...found, error: null } };
+      },
+    },
+    '/api/onboarding/clash-runs': {
+      what: 'the Clash run to start', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const started = await startClashRun(input);
+        return 'error' in started ? { status: started.status, body: { error: started.error } } : { status: 200, body: { ...started, error: null } };
       },
     },
     '/api/onboarding/finish': {
@@ -296,6 +308,14 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
   }
 
+  /** Answers a repository's Clash agent runs, which the Cleanup step reads while one runs. */
+  function clashRunsRequest(url: URL, res: ServerResponse): void {
+    if (sample) return json(res, 403, { error: 'Sample mode onboards no repository.' });
+    const repo = url.searchParams.get('repo');
+    if (!isRepo(repo)) return json(res, 400, { error: 'Name the repository whose Clash runs to read.' });
+    json(res, 200, { runs: clashRuns(repo) });
+  }
+
   /** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
   function openStream(req: IncomingMessage, res: ServerResponse): void {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
@@ -319,7 +339,8 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (!allowedHost(req)) return send(res, 421, 'text/plain; charset=utf-8', 'Misdirected request\n');
-    const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const { pathname: path } = url;
     // The health check must answer at once; everything else runs tools or shows what the lookup found.
     if (path !== '/healthz' && !path.startsWith('/assets/')) await ready();
     if (req.method === 'POST' && req.headers.origin !== `http://${req.headers.host}`) {
@@ -346,6 +367,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     }
     if (path === '/api/events') return openStream(req, res);
     if (path === '/api/onboarding/projects') return projectsRequest(res);
+    if (path === '/api/onboarding/clash-runs') return clashRunsRequest(url, res);
     if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));
     if (path === '/healthz') return json(res, 200, {});
     const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;

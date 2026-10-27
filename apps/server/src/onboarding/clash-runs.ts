@@ -69,7 +69,7 @@ const INSTRUCTION_FILES = `- \`AGENTS.md\`, \`AGENTS.override.md\`, \`Agents.md\
 - \`opencode.json\`'s \`instructions\` key and each file it names`;
 
 /** The message that starts a run on the repository's freshly fetched default branch. */
-export function clashMessage(repo: string, branch: string): string {
+function clashMessage(repo: string, branch: string): string {
   const ref = `origin/${branch}`;
   return `Look for Clashes in ${repo}
 

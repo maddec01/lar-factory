@@ -111,6 +111,11 @@ const main = async () => {
         .map((issue) => ({ ...issue, body: undefined }));
       return output({ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } } });
     }
+    // One item's details by node id: options.details holds each item's node, by id; an item it doesn't name is not found.
+    if (args.some((a) => a.includes('node(id:'))) {
+      const id = args.find((a) => a.startsWith('id='))?.slice('id='.length);
+      return output({ data: { node: options.details?.[id] ?? null } });
+    }
     // Dossier bodies by node id; the project read below leaves bodies out, as the real query does.
     if (args.some((a) => a.includes('nodes(ids:'))) {
       const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));

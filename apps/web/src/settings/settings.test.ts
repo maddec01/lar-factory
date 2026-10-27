@@ -467,7 +467,7 @@ test('ticking a profile installs it and shows the new ticks', async () => {
   expect(bridge.setProfileTick).toHaveBeenCalledWith('.claude-work', true);
   expect(switches().slice(0, 2).map(ticked)).toEqual([true, true]);
   expect(result().textContent).toBe('Linked the skills and checklists into ~/.claude-work.');
-  expect(result().dataset.variant).toBe('success');
+  expect(result().dataset.tone).toBe('success');
 });
 
 test('focus stays on a switch while its change runs and after', async () => {
@@ -521,7 +521,7 @@ test('a tick that left paths alone names each one', async () => {
   await settle(() => switches()[1]!.click());
   expect(result().textContent).toContain('left these alone because Lar Factory didn\'t make them');
   expect($$('#settings-result li').map((li) => li.textContent)).toEqual(['~/.claude-work/skills/lar-work']);
-  expect(result().dataset.variant).toBe('warning');
+  expect(result().dataset.tone).toBe('warning');
 });
 
 test('a failed tick shows its error and keeps the old ticks', async () => {
@@ -530,7 +530,7 @@ test('a failed tick shows its error and keeps the old ticks', async () => {
   await settle(() => switches()[1]!.click());
   expect(switches().slice(0, 2).map(ticked)).toEqual([true, false]);
   expect(result().textContent).toBe('Couldn\'t change ~/.claude-work: No skills are installed in /Users/me/.agents yet');
-  expect(result().dataset.variant).toBe('error');
+  expect(result().dataset.tone).toBe('error');
 });
 
 test('a profile\'s result shows under the profiles only', async () => {
@@ -717,7 +717,7 @@ describe('updates', () => {
     await settle(() => radio('latest').click());
     expect(checked()).toBe('nightly');
     expect(result().textContent).toBe('Couldn\'t switch to latest: Cannot change the update channel to latest while an update download is in progress.');
-    expect(result().dataset.variant).toBe('error');
+    expect(result().dataset.tone).toBe('error');
   });
 
   describe('shows the update pill\'s state', () => {

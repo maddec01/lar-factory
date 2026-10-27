@@ -1,9 +1,9 @@
 // A dialog form's result. It stays mounted, as a live region, so screen readers hear each new message.
 
 import type { ReactNode } from 'react';
-import { Alert, AlertDescription } from '@lar-factory/ui/alert';
+import { Alert } from '@lar-factory/ui/design-system/Alert';
 
-/** Empty, it has no border or padding. With no tone it's a warning, as a validation message is. */
+/** Empty, it has no border, padding or icon. With no tone it's a warning, as a validation message is. */
 export function FormResult({ id, text, tone = 'warning', children }: {
   id: string;
   text: string;
@@ -12,9 +12,9 @@ export function FormResult({ id, text, tone = 'warning', children }: {
   children?: ReactNode;
 }) {
   return (
-    <Alert id={id} variant={tone} role="status" aria-live="polite" aria-atomic="true"
+    <Alert id={id} tone={tone === 'error' ? 'danger' : tone} data-tone={tone} role="status" aria-atomic="true" showIcon={Boolean(text)}
       className={text ? 'wrap-anywhere whitespace-pre-line' : 'border-0 p-0'}>
-      {text && <AlertDescription>{text}{children}</AlertDescription>}
+      {text && <>{text}{children}</>}
     </Alert>
   );
 }

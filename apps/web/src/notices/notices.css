@@ -12,19 +12,5 @@
 /* a close button on every failure, and successes as toasts that clear themselves */
 .dismiss { float: right; margin: --spacing(-0.75) --spacing(-1.5) 0 --spacing(2); }
 .action-error .dismiss { float: none; margin: --spacing(-1) 0 --spacing(-1) --spacing(0.5); vertical-align: middle; }
-/* notices/toasts.tsx keeps --toast-anchor at the bottom of the banners while they're on screen, or of the title bar.
-   A toast never drags the app's window, even where it overlaps the title bar. */
-[data-slot="toast-viewport"] {
-  top: max(--spacing(3), calc(var(--toast-anchor, --spacing(0)) + --spacing(2)));
-  -webkit-app-region: no-drag;
-}
-/* Each toast keeps its own row, as coss's toast spreads its pile on hover, so a failure is never half hidden
-   behind a later success. Toasts coming in or going out keep coss's animations. */
-[data-slot="toast-viewport"] > [data-toast]:not([data-starting-style], [data-ending-style]) {
-  height: var(--toast-height);
-  background: var(--popover);
-  transform: translateX(var(--toast-swipe-movement-x)) translateY(var(--toast-calc-offset-y));
-}
-[data-slot="toast-viewport"] [data-behind] { opacity: 1; pointer-events: auto; }
 .view-item { margin-left: --spacing(1); }
 .thread-id { font-size: var(--text-2xs); color: var(--muted-foreground); overflow-wrap: anywhere; }

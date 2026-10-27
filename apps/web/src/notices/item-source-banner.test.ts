@@ -16,7 +16,7 @@ test("each repository whose items can't be read gets a banner naming it as the L
     ["lar-web's items are off the board.", 'Team Web has no current iteration in contoso/Fabrikam. Give the team a sprint whose dates cover today in its project settings. '
       + 'The board reads it again on each refresh.'],
   ]);
-  expect(banners()[0]!.dataset.variant).toBe('warning');
+  expect(banners()[0]!.dataset.tone).toBe('warning');
 
   await push({ ...sample, itemSourceProblems: [] });
   expect(banners()).toEqual([]);

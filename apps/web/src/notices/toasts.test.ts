@@ -1,5 +1,5 @@
 // Toasts: a success clears itself after 5 s, later while it's in use; the close button; View item;
-// and their place below the banners. Ported from the toast cases of test/render.test.ts.
+// shown through the copied Notifications. Ported from the toast cases of test/render.test.ts.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, fetchMock, mountPage, moved, sample, settle, text, toast } from '../../test/support.ts';
@@ -48,25 +48,22 @@ test('a new notice replaces the last, and its close button closes it', async () 
   expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
 });
 
-test("a toast swiped away runs the board's close, so focus moves on", async () => {
-  await mountPage();
-  await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
-  toast()!.querySelector<HTMLButtonElement>('button.dismiss')!.focus();
-  // A swipe closes the toast through coss's toast manager, not through the board's close button.
-  const { toastManager } = await import('@lar-factory/ui/toast');
-  await settle(() => toastManager.close(toast()!.getAttribute('data-toast-id')!));
-  expect(toast()).toBeNull();
-  expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
-});
-
-test('toasts in different slots each keep their own row, not a pile that spreads only on hover', async () => {
+test('toasts in different slots each show, a failure as an alert', async () => {
   await mountPage();
   const { showToast } = await import('./toasts.tsx');
   await settle(() => showToast({ slot: 'update', failed: true, what: 'Update failed', body: 'Update failed' }));
   await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
   expect(document.querySelectorAll('[data-toast]').length).toBe(2);
-  // coss's toast marks every toast but the newest as behind and piles them up until hovered.
-  expect(document.querySelector('[data-toast="update"] [data-behind]')).not.toBeNull();
+  expect(document.querySelector('[data-toast="update"]')!.closest('[data-slot="toast"]')!.getAttribute('role')).toBe('alert');
+  expect(document.querySelector('[data-toast="notice"]')!.closest('[data-slot="toast"]')!.getAttribute('role')).toBe('status');
+});
+
+test('a failure stays until it is closed', async () => {
+  await mountPage();
+  const { showToast } = await import('./toasts.tsx');
+  await settle(() => showToast({ slot: 'update', failed: true, what: 'Update failed', body: 'Update failed' }));
+  await settle(() => vi.advanceTimersByTime(60_000));
+  expect(toast()).not.toBeNull();
 });
 
 test('View item opens the item in the item dialog and closes the toast', async () => {
@@ -85,23 +82,6 @@ test('View item does nothing once the item has left the board', async () => {
   await settle(() => toast()!.querySelector<HTMLButtonElement>('.view-item')!.click());
   expect($('[data-item-dialog]')).toBeNull();
   expect(toast(), 'the toast stays').not.toBeNull();
-});
-
-test('toasts sit below the banners while they are on screen, and below the title bar once they scroll away', async () => {
-  await mountPage();
-  let bottom = 140;
-  $('.banners')!.getBoundingClientRect = () => ({ bottom }) as DOMRect;
-  $('.title-bar')!.getBoundingClientRect = () => ({ bottom: 52 }) as DOMRect;
-  await notify({ verb: 'Added', item: sample.items[0]!, to: 'List' });
-  const anchor = () => document.documentElement.style.getPropertyValue('--toast-anchor');
-  expect(anchor()).toBe('140px');
-  bottom = -40;
-  // The main area scrolls, not the window.
-  $('main .overflow-y-auto')!.dispatchEvent(new Event('scroll'));
-  expect(anchor()).toBe('52px');
-  bottom = 90;
-  dispatchEvent(new Event('resize'));
-  expect(anchor()).toBe('90px');
 });
 
 test("a poll that started before the page's own write doesn't bring back older data", async () => {

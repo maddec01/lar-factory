@@ -3,7 +3,7 @@
 
 import { ref, workTitle, abandonPrompt } from '@lar-factory/shared';
 import type { Item, StartedThread, Status } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { TitleLink } from '../items/item-parts.tsx';
@@ -30,7 +30,7 @@ function viewItem(itemId: string): void {
   useItemDialogStore.getState().open(itemId);
 }
 
-const viewButton = (item: Item) => <Button variant="outline" size="xs" className="view-item" onClick={() => viewItem(item.id)}>View item</Button>;
+const viewButton = (item: Item) => <Button variant="secondary" className="view-item" onClick={() => viewItem(item.id)}>View item</Button>;
 
 function toastOf(notice: Notice): Toast {
   const { item } = notice;

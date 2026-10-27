@@ -131,9 +131,9 @@ export const $ = <T extends Element = HTMLElement>(selector: string) => document
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';
 /** A banner's title and description. */
-export const bannerText = (el: Element) => ['title', 'description'].map((slot) => text(el.querySelector(`[data-slot="alert-${slot}"]`)));
+export const bannerText = (el: Element) => ['title', 'description'].map((slot) => text(el.querySelector(`[data-slot="${slot}"]`)));
 /** The toast on screen. */
-export const toast = () => $('[data-slot="toast-viewport"] [data-toast]');
+export const toast = () => $('[data-slot="toaster"] [data-toast]');
 
 /** Sends `data` down the page's event stream. */
 export const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));

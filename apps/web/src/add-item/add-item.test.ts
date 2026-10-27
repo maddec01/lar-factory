@@ -54,7 +54,7 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
   expect($('label[for="item-title"]')!.textContent).toBe('Title (required)');
   expect(field('item-title').required).toBe(true);
   expect($('label[for="item-description"]')!.textContent).toBe('Description (optional)');
-  expect([result().getAttribute('role'), result().dataset.slot, result().dataset.variant]).toEqual(['status', 'alert', 'warning']);
+  expect([result().getAttribute('role'), result().dataset.slot, result().dataset.tone]).toEqual(['status', 'alert', 'warning']);
   expect(popup.textContent).toContain('Create an issue in lar-server and add it to List.');
 
   expect(labels()).toEqual(['area: server', 'area: web']);

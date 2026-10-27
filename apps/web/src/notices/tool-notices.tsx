@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 import { GH_FLOOR, type AzCheck, type CommandCheck, type FailedCheck, type GhCheck, type T3Check } from '@lar-factory/shared';
-import { Button } from '@lar-factory/ui/button';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { Banner } from './banner.tsx';
@@ -24,7 +24,7 @@ function Recheck({ check }: { check: FailedCheck }) {
   const note = answer && !checking ? answer.error ?? STILL[check.result] : null;
   return (
     <>
-      <Button variant="outline" size="xs" className="recheck" data-recheck disabled={checking} onClick={() => void recheck()}>{checking ? 'Checking…' : 'Recheck'}</Button>
+      <Button variant="secondary" className="recheck" data-recheck disabled={checking} onClick={() => void recheck()}>{checking ? 'Checking…' : 'Recheck'}</Button>
       {note && <> <span className="recheck-note" role="status">{note}</span></>}
     </>
   );

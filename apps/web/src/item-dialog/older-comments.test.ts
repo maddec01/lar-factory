@@ -1,10 +1,10 @@
 // The item dialog's "Load 10 more": it shows when older comments exist, appends the next page in the details' order,
-// hides at the end, keeps the comments already shown when a load fails and lets the button retry, and starts over
-// at the latest comments when the dialog reopens.
+// hides at the end, keeps the comments already shown when a load fails and lets the button retry, keeps the pages
+// loaded while the dialog reopens on an unchanged item, and starts over at the latest comments once it changed.
 
 import { expect, test } from 'vite-plus/test';
 import sampleDetailsJson from '@lar-factory/shared/test/sample-details.json' with { type: 'json' };
-import { $, $$, fetchMock, mountPage, settle, text } from '../../test/support.ts';
+import { $, $$, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
 import type { ItemComment } from '@lar-factory/shared';
 
 /** The sample's older comments of Owner accounts, newest first: 14, so a page of 10 and a page of 4. */
@@ -112,13 +112,28 @@ test('a read that cannot reach the board fails the same way', async () => {
   expect(authors()).toHaveLength(3);
 });
 
-test('reopening the dialog starts again at the latest comments', async () => {
+test('reopening an unchanged item shows the older comments already loaded and goes on from the next page', async () => {
   serveOlder();
   await mountPage();
   await openItem('I_sample13');
   await settle(() => loadMore()!.click());
   expect(authors()).toHaveLength(13);
   await closeItem();
+  await openItem('I_sample13');
+  expect(authors()).toHaveLength(13);
+  await settle(() => loadMore()!.click());
+  expect(pageReads().map((r) => r.before), 'the second older page, not the first again').toEqual(['0', '10']);
+  expect(authors()).toHaveLength(17);
+});
+
+test('reopening an item whose updatedAt changed starts again at the latest comments', async () => {
+  serveOlder();
+  await mountPage();
+  await openItem('I_sample13');
+  await settle(() => loadMore()!.click());
+  expect(authors()).toHaveLength(13);
+  await closeItem();
+  await push({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, updatedAt: '2026-10-21T09:45:00Z' } : i)) });
   await openItem('I_sample13');
   expect(authors()).toHaveLength(3);
   await settle(() => loadMore()!.click());

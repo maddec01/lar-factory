@@ -142,7 +142,24 @@ test('one read per open: live board data updates the board fields and leaves the
   expect(reads()).toEqual(['I_sample13']);
 });
 
-test('closing and reopening the dialog reads the details again', async () => {
+/** The sample with Owner accounts updated at `updatedAt`, as the board pushes it after a comment. */
+const updatedAt = (iso: string): BoardData => ({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample13' ? { ...i, updatedAt: iso } : i)) });
+
+test('reopening the dialog on an item whose updatedAt is unchanged shows its details at once, with no read', async () => {
+  const held = holdReads();
+  await mountPage();
+  await openItem('I_sample13');
+  await reply(held, 'I_sample13');
+  const before = text(description());
+  const earlier = fetchMock.mock.calls.length;
+  await closeItem();
+  await openItem('I_sample13');
+  expect(fetchMock.mock.calls.length, 'no read of its own').toBe(earlier);
+  expect(inDialog('[aria-busy="true"]'), 'no loading state').toBeNull();
+  expect(text(description())).toBe(before);
+});
+
+test('reopening the dialog once the item\'s updatedAt has changed reads the details again', async () => {
   const held = holdReads();
   await mountPage();
   await openItem('I_sample13');
@@ -150,6 +167,7 @@ test('closing and reopening the dialog reads the details again', async () => {
   expect(description()).not.toBeNull();
   const earlier = fetchMock.mock.calls.length;
   await closeItem();
+  await push(updatedAt('2026-10-21T09:45:00Z'));
   await openItem('I_sample13');
   expect(fetchMock.mock.calls.length, 'a read of its own').toBeGreaterThan(earlier);
   expect(reads(), 'the earlier read ended with the dialog').toEqual(['I_sample13']);
@@ -157,6 +175,17 @@ test('closing and reopening the dialog reads the details again', async () => {
   expect(description()).toBeNull();
   await reply(held, 'I_sample13');
   expect(description()).not.toBeNull();
+});
+
+test('a comment that moves updatedAt while the dialog is open does not read again until it reopens', async () => {
+  const held = holdReads();
+  await mountPage();
+  await openItem('I_sample13');
+  await reply(held, 'I_sample13');
+  await push(updatedAt('2026-10-21T09:45:00Z'));
+  await closeItem();
+  await openItem('I_sample13');
+  expect(inDialog('[aria-busy="true"]'), 'the details were read at the earlier updatedAt').not.toBeNull();
 });
 
 test('a reply for an item that is no longer open is ignored', async () => {

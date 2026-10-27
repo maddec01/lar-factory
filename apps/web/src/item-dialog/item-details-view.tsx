@@ -11,6 +11,7 @@ import { Button } from '@lar-factory/ui/button';
 import { RichText } from '@lar-factory/ui/rich-text';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
+import type { DetailsEntry } from './details-cache.ts';
 
 const Heading = ({ children }: { children: ReactNode }) => <h2 className="m-0 text-[13px] font-medium text-(--muted-foreground)">{children}</h2>;
 
@@ -47,10 +48,10 @@ function Comment({ comment, now }: { comment: ItemComment; now: number }) {
   );
 }
 
-/** The comments, newest first: the latest the details hold, then each page "Load 10 more" fetched. Remounts with each load of the details. */
-function Comments({ itemId, details, now }: { itemId: string; details: ItemDetails; now: number }) {
-  const older = useOlderComments(itemId, details.olderCursor);
-  const comments = [...details.comments, ...older.comments];
+/** The comments, newest first: the latest the details hold, then each page "Load 10 more" fetched. Remounts with each open of the dialog. */
+function Comments({ itemId, entry, now }: { itemId: string; entry: DetailsEntry; now: number }) {
+  const older = useOlderComments(itemId, entry);
+  const comments = [...entry.details.comments, ...older.comments];
   return (
     <div className="grid min-w-0 gap-2" data-comments>
       <Heading>Comments{comments.length > 0 && ` · ${comments.length}`}</Heading>
@@ -78,7 +79,7 @@ export function ItemText({ itemId, read, now }: { itemId: string; read: ItemDeta
         <Heading>Description</Heading>
         {body ? <RichText text={body} format={format} /> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
       </div>
-      <Comments itemId={itemId} details={read.details} now={now} />
+      <Comments itemId={itemId} entry={read.entry} now={now} />
     </>
   );
 }

@@ -1,5 +1,5 @@
-// The item dialog's details: the description and comments in its main column and the people, dates and sub-tickets in
-// its sidebar, with the loading, failed and empty states, one read per open, and a reply for an item no longer open
+// The item dialog's details: the description and comments in its main column, the people, dates, milestone or iteration
+// and area in the meta area under its title, and the sub-tickets in its sidebar, with the loading, failed and empty states, one read per open, and a reply for an item no longer open
 // ignored.
 
 import { expect, test } from 'vite-plus/test';
@@ -10,6 +10,7 @@ const dialog = () => $('[data-item-dialog]');
 const inDialog = <T extends Element = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
 const description = () => inDialog('[data-description]');
 const comments = () => inDialog('[data-comments]');
+const meta = () => text(inDialog('[data-meta]'));
 const sidebar = () => text(inDialog('aside'));
 /** The details reads still wanted: StrictMode starts each effect twice in the page and aborts the first read. */
 const reads = () => (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([, init]) => !init.signal?.aborted).map(([url]) => detailsRead(url)).filter(Boolean);
@@ -65,22 +66,23 @@ test('while the details load the dialog shows the board data and a loading state
 
   expect($$('[data-comments] li').map((li) => text(li.querySelector('.font-medium')))).toEqual(['maddec01', 'claude-bot', 'reviewer-anne']);
   expect(text(comments()!.querySelector('h2'))).toBe('Comments · 3');
-  expect(sidebar()).toMatch(/Author.maddec01/);
-  expect(sidebar()).toMatch(/Assignees.maddec01.claude-bot/);
-  expect(sidebar()).toMatch(/MilestoneCloud v0\.1/);
-  expect(sidebar()).toMatch(/Created9d ago/);
-  expect(sidebar()).not.toMatch(/Iteration|Area/);
+  expect(meta()).toMatch(/Author.maddec01/);
+  expect(meta()).toMatch(/Assignees.maddec01.claude-bot/);
+  expect(meta()).toMatch(/MilestoneCloud v0\.1/);
+  expect(meta()).toMatch(/Created9d ago/);
+  expect(meta()).not.toMatch(/Iteration|Area/);
   expect(sidebar()).toMatch(/Sub-tickets.*#144 Owner table and sign-up.*#145 Sign-in sessions.*#146 Owner settings page/);
   expect($$('[data-item-dialog] aside li a').map((a) => a.getAttribute('href'))).toContain('https://github.com/maddec01/lar-server/issues/145');
 });
 
-test('a pull request item shows its description, comments and people beside its checks', async () => {
+test('a pull request item shows its description, comments and people with its checks in the meta area', async () => {
   await mountPage();
   await openItem('I_sample26');
+  expect(meta()).toMatch(/checks running.*4\/6 passed/);
   expect(text(description())).toContain('Bumps FFmpeg from 7.0 to 7.1.');
   expect($$('[data-comments] li')).toHaveLength(1);
-  expect(sidebar()).toMatch(/Author.claude-bot/);
-  expect(sidebar()).toMatch(/Assignees.maddec01/);
+  expect(meta()).toMatch(/Author.claude-bot/);
+  expect(meta()).toMatch(/Assignees.maddec01/);
 });
 
 test('a draft shows its body', async () => {
@@ -94,9 +96,9 @@ test('an Azure DevOps work item shows its iteration and area in place of a miles
   const [data, id] = azureItem();
   await mountPage(data);
   await openItem(id);
-  expect(sidebar()).toMatch(/IterationFabrikam\\Sprint 42/);
-  expect(sidebar()).toMatch(/AreaFabrikam\\Web/);
-  expect(sidebar()).not.toMatch(/Milestone/);
+  expect(meta()).toMatch(/IterationFabrikam\\Sprint 42/);
+  expect(meta()).toMatch(/AreaFabrikam\\Web/);
+  expect(meta()).not.toMatch(/Milestone/);
   expect(description()!.querySelector('b')!.textContent).toBe('sign-in');
   expect(description()!.querySelector('img'), 'an image is a link').toBeNull();
   const [markdown, html] = $$('[data-comments] li').map((li) => li.querySelector('[data-slot="rich-text"]')!);

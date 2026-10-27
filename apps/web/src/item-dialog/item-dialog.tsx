@@ -1,25 +1,27 @@
 // The item dialog: every item, wherever it's listed, opens here over the page, as a wide modal. It shows the item's
-// repository, status, track and hint, then its description and comments beside a sidebar of people, labels, dates,
-// milestone or iteration and area, sub-tickets, slices, pull requests and agent work. The board's fields show at once;
-// the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work item,
-// and the one action the item's status asks for, with Back to List and Abandon at its left.
+// repository, status, track and hint, a meta area of people, labels, dates, milestone or iteration and area, checks
+// and agent work, then its description and comments. Sub-tickets, slices and pull requests sit in a sidebar beside
+// them when the dialog is 45rem wide, else between the description and the comments. The board's fields show at
+// once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
+// item, and the one action the item's status asks for, with Back to List and Abandon at its left.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { ExternalLink, Play } from 'lucide-react';
 import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
+import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/button';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '@lar-factory/ui/dialog';
 import { useBoardStore } from '../board/board-store.ts';
 import { AbandonButton, ActionError, BackToListButton, PickStatusButtons, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
-import { ItemTitle, PrList, RepoTag, SliceList, StatsGrid, StepTrack } from '../items/item-parts.tsx';
+import { ItemTitle, PrList, RepoTag, SliceList, StepTrack } from '../items/item-parts.tsx';
 import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
-import { ItemFields, ItemText } from './item-details-view.tsx';
+import { ItemComments, ItemDescription, ItemMeta, SubTickets } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
 import { useItemDetails } from './use-item-details.ts';
 
@@ -52,8 +54,18 @@ function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   return <>{!carriesTwoStatuses(item) && <BackToListButton item={item} data={data} />}<AbandonButton item={item} data={data} /></>;
 }
 
+/** Whether the sidebar has anything: slices, pull requests, or sub-tickets (as many as the board counts while the details load). */
+const hasRelations = (item: Item, read: ItemDetailsRead): boolean =>
+  item.slices.length > 0 || item.linkedPrs.length > 0
+  || (read.state === 'loaded' ? read.details.subTickets.length > 0 : read.state === 'loading' && item.subIssues.total > 0);
+
+const Section = ({ heading, children }: { heading: ReactNode; children: ReactNode }) => (
+  <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2"><h2 className="m-0 text-[13px] font-medium">{heading}</h2>{children}</section>
+);
+
 function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData; now: number; open: boolean }) {
   const read = useItemDetails(item.id, item.updatedAt, open);
+  const aside = hasRelations(item, read);
   const hint = carriesTwoStatuses(item) ? keepOneText(item.statuses) : HINTS[item.status];
   return (
     <>
@@ -66,27 +78,25 @@ function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData
         <DialogTitle className="text-lg leading-snug tracking-tight"><ItemTitle item={item} /></DialogTitle>
         {item.parent && <DialogDescription>Part of <a href={item.parent.url} target="_blank" rel="noopener" className="underline">#{item.parent.number} {item.parent.title}</a></DialogDescription>}
       </DialogHeader>
-      <DialogPanel className="grid grid-cols-[minmax(0,1fr)] gap-5 space-y-0 overflow-x-hidden">
+      <DialogPanel className="grid grid-cols-[minmax(0,1fr)] gap-5 space-y-0">
         <StepTrack status={item.status} labels />
         {hint && (
           <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
             <StatusGlyph status={item.status} className="size-4" />
-            <span className="flex-1 font-medium text-(--warning-foreground)">{hint}</span>
+            <span className="min-w-0 flex-1 font-medium text-(--warning-foreground)">{hint}</span>
           </div>
         )}
-        <div className="grid min-w-0 gap-8 md:grid-cols-[minmax(0,1fr)_15rem]">
-          <article className="grid min-w-0 content-start gap-6"><ItemText itemId={item.id} read={read} now={now} /></article>
-          <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5 md:border-l md:border-(--border) md:pl-6">
-            <ItemFields item={item} read={read} now={now} />
-            {item.slices.length > 0 && (
-              <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
-                <h2 className="m-0 text-[13px] font-medium">Slices <span className="text-(--muted-foreground)">{item.slices.filter((s) => s.progress === 'done').length}/{item.slices.length} done</span></h2>
-                <SliceList item={item} />
-              </section>
-            )}
-            {item.linkedPrs.length > 0 && <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2"><h2 className="m-0 text-[13px] font-medium">Pull requests</h2><PrList item={item} /></section>}
-            <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2"><h2 className="m-0 text-[13px] font-medium">Agent work</h2><StatsGrid item={item} /></section>
-          </aside>
+        <ItemMeta item={item} read={read} now={now} />
+        <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-6 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem] @min-[45rem]:grid-rows-[auto_1fr]' : ''}`}>
+          <ItemDescription read={read} className="@min-[45rem]:col-start-1" />
+          {aside && (
+            <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-5 @min-[45rem]:col-start-2 @min-[45rem]:row-span-2 @min-[45rem]:row-start-1 @min-[45rem]:border-l @min-[45rem]:border-(--border) @min-[45rem]:pl-6">
+              <SubTickets read={read} />
+              {item.slices.length > 0 && <Section heading={<>Slices <span className="text-(--muted-foreground)">{item.slices.filter((s) => s.progress === 'done').length}/{item.slices.length} done</span></>}><SliceList item={item} /></Section>}
+              {item.linkedPrs.length > 0 && <Section heading="Pull requests"><PrList item={item} /></Section>}
+            </aside>
+          )}
+          <ItemComments itemId={item.id} read={read} now={now} className="@min-[45rem]:col-start-1" />
         </div>
         <ActionError item={item} />
         <StartMessage item={item} kind={item.status === 'Ready' ? 'build' : 'refine'} />
@@ -117,7 +127,7 @@ export function ItemDialog() {
   const item = kept.current;
   return (
     <Dialog open={Boolean(opened)} onOpenChange={(open) => !open && close()}>
-      <DialogPopup className="h-[88vh] max-w-5xl" data-item-dialog>
+      <DialogPopup className="@container h-[88vh] max-w-5xl" data-item-dialog>
         {item && <ItemDialogBody item={item} data={data} now={now} open={Boolean(opened)} />}
       </DialogPopup>
     </Dialog>

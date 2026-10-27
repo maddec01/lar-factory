@@ -1,6 +1,7 @@
-// What the item dialog shows from an item's details: the description and comments in its main column, and the people,
-// dates, milestone or iteration and area, and sub-tickets in its sidebar. While the details load each shows a
-// placeholder, and a failed read shows its error in the description's place; the board's own fields never wait.
+// What the item dialog shows from an item's details: the description and comments in its main column, the people,
+// labels, dates, milestone or iteration and area, agent work and a pull request's checks in the meta area under its
+// title, and the sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows
+// its error in the description's place; the board's own fields never wait.
 
 import type { ReactNode } from 'react';
 import { CircleCheck, CircleDot, LoaderCircle } from 'lucide-react';
@@ -9,6 +10,7 @@ import type { Item, ItemComment, ItemDetails } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/badge';
 import { Button } from '@lar-factory/ui/button';
 import { RichText } from '@lar-factory/ui/rich-text';
+import { ChecksBadge, StatChips } from '../items/item-parts.tsx';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
 import type { DetailsEntry } from './details-cache.ts';
@@ -19,7 +21,7 @@ const Avatar = ({ name }: { name: string }) => (
   <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-(--secondary) text-[11px] font-semibold uppercase text-(--secondary-foreground)">{name[0]}</span>
 );
 
-const Person = ({ name }: { name: string }) => <span className="inline-flex min-w-0 items-center gap-1.5"><Avatar name={name} /><span className="min-w-0 truncate">{name}</span></span>;
+const Person = ({ name }: { name: string }) => <span className="inline-flex min-w-0 max-w-full items-center gap-1.5"><Avatar name={name} /><span className="min-w-0 wrap-anywhere">{name}</span></span>;
 
 const Placeholder = ({ className }: { className: string }) => <div className={`animate-pulse rounded bg-(--muted) ${className}`} />;
 
@@ -49,11 +51,11 @@ function Comment({ comment, now }: { comment: ItemComment; now: number }) {
 }
 
 /** The comments, newest first: the latest the details hold, then each page "Load 10 more" fetched. Remounts with each open of the dialog. */
-function Comments({ itemId, entry, now }: { itemId: string; entry: DetailsEntry; now: number }) {
+function Comments({ itemId, entry, now, className }: { itemId: string; entry: DetailsEntry; now: number; className: string }) {
   const older = useOlderComments(itemId, entry);
   const comments = [...entry.details.comments, ...older.comments];
   return (
-    <div className="grid min-w-0 gap-2" data-comments>
+    <div className={`grid min-w-0 gap-2 ${className}`} data-comments>
       <Heading>Comments{comments.length > 0 && ` · ${comments.length}`}</Heading>
       {comments.length > 0
         ? <ol className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-3 p-0">{comments.map((c) => <Comment key={c.id} comment={c} now={now} />)}</ol>
@@ -68,59 +70,84 @@ function Comments({ itemId, entry, now }: { itemId: string; entry: DetailsEntry;
   );
 }
 
-/** The description and the comments, newest first. */
-export function ItemText({ itemId, read, now }: { itemId: string; read: ItemDetailsRead; now: number }) {
-  if (read.state === 'loading') return <Loading />;
-  if (read.state === 'failed') return <p className="m-0 text-sm text-(--error-foreground)" role="alert">Could not load the details: {read.error}</p>;
+/** The description, or the loading state or the error that stands in for it. */
+export function ItemDescription({ read, className }: { read: ItemDetailsRead; className: string }) {
+  if (read.state === 'loading') return <div className={className}><Loading /></div>;
+  if (read.state === 'failed') return <p className={`m-0 text-sm text-(--error-foreground) ${className}`} role="alert">Could not load the details: {read.error}</p>;
   const { body, format } = read.details;
   return (
-    <>
-      <div className="grid min-w-0 gap-2" data-description>
-        <Heading>Description</Heading>
-        {body ? <RichText text={body} format={format} /> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
-      </div>
-      <Comments itemId={itemId} entry={read.entry} now={now} />
-    </>
+    <div className={`grid min-w-0 gap-2 ${className}`} data-description>
+      <Heading>Description</Heading>
+      {body ? <RichText text={body} format={format} /> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
+    </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="grid min-w-0 gap-1 text-sm"><div className="text-xs text-(--muted-foreground)">{label}</div><div className="min-w-0 break-words">{children}</div></div>;
+/** The comments, newest first; none while the details load or when the read failed. */
+export function ItemComments({ itemId, read, now, className }: { itemId: string; read: ItemDetailsRead; now: number; className: string }) {
+  return read.state === 'loaded' ? <Comments itemId={itemId} entry={read.entry} now={now} className={className} /> : null;
+}
+
+/** A labelled fact for the meta area; its value wraps rather than runs past the dialog. */
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return <div className="flex min-w-0 max-w-full items-baseline gap-1.5 text-sm"><span className="shrink-0 text-xs text-(--muted-foreground)">{label}</span><span className="min-w-0 wrap-anywhere">{children}</span></div>;
 }
 
 const When = ({ iso, now }: { iso: string; now: number }) => <time dateTime={iso} title={new Date(iso).toLocaleString()}>{shortAgo(iso, now)}</time>;
 
-/** A field from the details: a placeholder while they load, nothing once they failed or hold none. */
+/** A fact from the details: a placeholder while they load, nothing once they failed or hold none. */
 function FromDetails({ read, label, show }: { read: ItemDetailsRead; label: string; show: (d: ItemDetails) => ReactNode }) {
-  if (read.state === 'loading') return <Field label={label}><Placeholder className="h-4 w-24" /></Field>;
+  if (read.state === 'loading') return <Fact label={label}><Placeholder className="h-4 w-20" /></Fact>;
   if (read.state === 'failed') return null;
   const shown = show(read.details);
-  return shown ? <Field label={label}>{shown}</Field> : null;
+  return shown ? <Fact label={label}>{shown}</Fact> : null;
 }
 
-/** Author, assignees, labels, dates, milestone or iteration and area, and sub-tickets. Labels and the update time come from the board. */
-export function ItemFields({ item, read, now }: { item: Item; read: ItemDetailsRead; now: number }) {
+/**
+ * The meta area under the title: author, assignees, labels, milestone or iteration and area, dates, a pull request item's
+ * checks, and the agent work figures. They wrap onto as many lines as the width needs. Labels, update time, checks and
+ * agent work come from the board.
+ */
+export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRead; now: number }) {
   const azure = Boolean(item.repo && onAzure(item.repo));
   return (
-    <div className="grid min-w-0 gap-4">
-      <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
-      <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="grid gap-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
-      {item.labels.length > 0 && <Field label="Labels"><span className="flex flex-wrap gap-1" data-labels>{item.labels.map((l) => <Badge key={l} variant="outline">{l}</Badge>)}</span></Field>}
-      {azure
-        ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>
-        : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}
-      <FromDetails read={read} label="Created" show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />} />
-      <Field label="Updated"><When iso={item.updatedAt} now={now} /></Field>
-      <FromDetails read={read} label="Sub-tickets" show={(d) => d.subTickets.length > 0 && (
+    <div className="grid min-w-0 gap-2.5" data-meta>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
+        <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
+        <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
+        {item.labels.length > 0 && (
+          <Fact label="Labels"><span className="flex flex-wrap gap-1" data-labels>{item.labels.map((l) => <Badge key={l} variant="outline" className="h-auto max-w-full whitespace-normal py-px text-start wrap-anywhere sm:h-auto">{l}</Badge>)}</span></Fact>
+        )}
+        {azure
+          ? <><FromDetails read={read} label="Iteration" show={(d) => d.iteration} /><FromDetails read={read} label="Area" show={(d) => d.area} /></>
+          : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}
+        <FromDetails read={read} label="Created" show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />} />
+        <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+        {item.pipeline && <ChecksBadge checks={item.pipeline.checks} counts />}
+        <StatChips item={item} />
+      </div>
+    </div>
+  );
+}
+
+/** The item's sub-tickets, each a link with its open or closed mark, in a sidebar section; a placeholder while the details load, nothing once they failed or hold none. */
+export function SubTickets({ read }: { read: ItemDetailsRead }) {
+  if (read.state === 'failed' || (read.state === 'loaded' && read.details.subTickets.length === 0)) return null;
+  return (
+    <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
+      <h2 className="m-0 text-[13px] font-medium">Sub-tickets</h2>
+      {read.state === 'loading' ? <Placeholder className="h-4 w-24" /> : (
         <ul className="m-0 grid list-none gap-1.5 p-0">
-          {d.subTickets.map((s) => (
-            <li key={s.url} className="flex items-start gap-2">
+          {read.details.subTickets.map((s) => (
+            <li key={s.url} className="flex items-start gap-2 text-sm">
               {s.state === 'closed' ? <CircleCheck className="mt-0.5 size-3.5 shrink-0 text-(--success)" /> : <CircleDot className="mt-0.5 size-3.5 shrink-0 text-(--muted-foreground)" />}
-              <a href={s.url} target="_blank" rel="noopener" className="min-w-0 hover:underline"><span className="text-(--muted-foreground)">#{s.number}</span> {s.title}</a>
+              <a href={s.url} target="_blank" rel="noopener" className="min-w-0 wrap-anywhere hover:underline"><span className="text-(--muted-foreground)">#{s.number}</span> {s.title}</a>
             </li>
           ))}
         </ul>
-      )} />
-    </div>
+      )}
+    </section>
   );
 }

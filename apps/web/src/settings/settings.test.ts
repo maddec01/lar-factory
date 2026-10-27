@@ -156,6 +156,16 @@ test('Repositories shows the command line tools\' logins and each repository wit
   ]);
 });
 
+test('a repository with an open Edit PR shows it on its row, with its link, until a read finds it gone', async () => {
+  const editPr = 'https://github.com/maddec01/lar-server/pull/21';
+  await open('Repositories', { ...sample, repos: [{ ...sample.repos[0]!, editPr }, sample.repos[1]!] });
+  const link = row(`repo-${sample.repos[0]!.repo}`).querySelector('a[data-edit-pr]')!;
+  expect([text(link), link.getAttribute('href')]).toEqual(['Edit PR open', editPr]);
+  expect(row(`repo-${sample.repos[1]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
+  await push(sample);
+  expect(row(`repo-${sample.repos[0]!.repo}`).querySelector('[data-edit-pr]')).toBeNull();
+});
+
 test('Reset waits for build #385, and Add repository opens the onboarding dialog over Settings', async () => {
   serve(sample, [project('lar-web')]);
   await open('Repositories', sample);

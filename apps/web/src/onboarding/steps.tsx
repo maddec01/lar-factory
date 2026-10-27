@@ -648,7 +648,7 @@ function CleanupStep({ run }: { run: Run }) {
 }
 
 /** The PR's place, `owner/name#n`, from its URL. */
-const prName = (url: string) => url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
+export const prName = (url: string) => url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
 
 /** A change of the PR as its list shows it: the path, then what the PR does to it. */
 function changeRow(change: OnboardingPrChange): { path: string; what: string } {

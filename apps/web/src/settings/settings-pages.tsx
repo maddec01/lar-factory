@@ -113,7 +113,8 @@ function onboardingDescription(progress: OnboardingProgress): string {
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: r.repo, description: `GitHub · ${sourceName(itemSource(r), r.project)} · ${SHOWN[r.show ?? 'all']}`,
+    id: `repo-${r.repo}`, title: r.repo, description: <>GitHub · {sourceName(itemSource(r), r.project)} · {SHOWN[r.show ?? 'all']}
+      {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     control: custom(() => <span className="flex items-center gap-2">
       <Button variant="outline" size="xs" onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>{reset}
     </span>),

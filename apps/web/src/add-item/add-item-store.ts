@@ -1,5 +1,5 @@
-// The Add item dialog: whether it's open, the submission's phase, the attempt it sends to /api/items,
-// and what the dialog says about it. A retry resends the same attempt, so the server finishes one
+// The Add item dialog: whether it's open, the draft's values, the submission's phase, the attempt it sends to
+// /api/items, and what the dialog says about it. A retry resends the same attempt, so the server finishes one
 // issue rather than making two. A created item closes the dialog and shows the Added toast.
 
 import { create } from 'zustand';
@@ -16,6 +16,9 @@ type Submission =
 
 export interface ResultMessage { text: string; url?: string; label?: string }
 
+/** The form's values as last edited, which a closed dialog keeps for the next opening. */
+export interface DraftValues { repo: string; kind: string; title: string; description: string; labels: string[]; onlyFor: boolean }
+
 interface AddItemState {
   open: boolean;
   /** Opens or closes the dialog; opening after a created item starts a new draft. */
@@ -24,6 +27,10 @@ interface AddItemState {
   message: ResultMessage;
   /** Counts the drafts started, so the form clears its fields for a new one. */
   draft: number;
+  /** The draft's values once edited; null for a new draft. The form starts from them, so a draft survives a close. */
+  values: DraftValues | null;
+  /** Keeps the form's values as edited. */
+  keep: (values: DraftValues) => void;
   /** Validates and sends the form's values, or resends the attempt that needs a retry. */
   submit: (values: unknown) => Promise<void>;
   /** Clears what the dialog says while the draft is being edited. */
@@ -51,6 +58,8 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
   submission: { phase: 'editing' },
   message: idle(),
   draft: 0,
+  values: null,
+  keep: (values) => set({ values }),
   setOpen: (open) => {
     // A finished item is done with; the next opening starts a new one.
     if (open && get().submission.phase === 'complete') get().reset();
@@ -59,7 +68,7 @@ export const useAddItemStore = create<AddItemState>()((set, get) => ({
   edit: () => {
     if (get().submission.phase === 'editing') set({ message: { text: '' } });
   },
-  reset: () => set((state) => ({ submission: { phase: 'editing' }, message: idle(), draft: state.draft + 1 })),
+  reset: () => set((state) => ({ submission: { phase: 'editing' }, message: idle(), draft: state.draft + 1, values: null })),
   submit: async (values) => {
     const { submission } = get();
     if (submission.phase !== 'editing' && submission.phase !== 'retry') return;

@@ -814,6 +814,7 @@ export interface OnboardingOffer {
   /** The T3 project's title. */
   name: string;
   repo: string;
+  provider: Provider;
 }
 
 /** A T3 project onboarding can offer, with what the T3 project step shows about its repository. */

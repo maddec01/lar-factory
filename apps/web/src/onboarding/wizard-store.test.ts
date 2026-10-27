@@ -36,14 +36,20 @@ test("starting a run opens it on the T3 project step and reads T3's projects", a
 test('starting a run from an offer opens it with the offered project picked', async () => {
   const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-web', { hasConfig: true })] })));
   const { stepReady } = await import('./wizard-store.ts');
-  await settle(() => wizard.getState().start({ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }));
+  await settle(() => wizard.getState().start({ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub' as const }));
   expect(wizard.getState().run).toEqual({ step: 'project', done: [], projectId: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub', savedAs: null, setup: null, customLabels: [], cleanup: null, prUrl: null });
   expect(stepReady(wizard.getState().run!, wizard.getState().projects)).toBe(true);
 });
 
+test("an offered Azure DevOps project's run keeps its provider", async () => {
+  const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true })] })));
+  await settle(() => wizard.getState().start({ projectId: 'lar-api', name: 'lar-api', repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps' }));
+  expect(wizard.getState().run).toMatchObject({ projectId: 'lar-api', repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps' });
+});
+
 test('closing an offered run untouched keeps nothing; once Next moves it or a change, closing keeps it', async () => {
   const wizard = await store(() => new Response(JSON.stringify({ projects: [project('lar-web', { hasConfig: true }), project('lar-cli')] })));
-  const offer = { projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' };
+  const offer = { projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub' as const };
   await settle(() => wizard.getState().start(offer));
   await settle(() => wizard.getState().close());
   expect(kept(), 'nothing kept').toEqual([]);

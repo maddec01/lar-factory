@@ -30,7 +30,7 @@ export function Banners() {
       })}
       {az && <AzBanner check={az} />}
       {data.repositoryConfigProblems?.map((p) => <RepositoryConfigBanner key={p.repo} {...p} />)}
-      {data.itemSourceProblems?.map((p) => <ItemSourceBanner key={p.repo} {...p} />)}
+      {data.itemSourceProblems?.map((p) => <ItemSourceBanner key={p.repo} {...p} repos={data.repos} />)}
     </div>
   );
 }

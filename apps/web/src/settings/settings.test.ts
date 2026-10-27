@@ -108,7 +108,8 @@ test('a repository colour named owner/name shows it once; one named by its name 
 
 test('Refresh every says the board reads each repository\'s items and .lar-factory.json', async () => {
   await open('General');
-  expect(text(row('refresh'))).toContain("How often the board reads each repository's items and .lar-factory.json through gh.");
+  expect(text(row('refresh'))).toContain("How often the board reads each repository's items and .lar-factory.json, through gh on GitHub and az on Azure DevOps.");
+  expect(text(row('confirm-abandon'))).toContain('Abandon closes a GitHub issue as not planned, or moves an Azure DevOps work item to Removed.');
 });
 
 test('a row that isn\'t built yet shows the prototype\'s value, disabled, and says so', async () => {

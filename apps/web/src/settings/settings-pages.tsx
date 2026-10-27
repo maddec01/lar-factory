@@ -6,7 +6,7 @@
 
 import type { ComponentProps, ReactNode } from 'react';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, Plus, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
+import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/button';
 import { RepoTag } from '../items/item-parts.tsx';
@@ -119,7 +119,7 @@ function onboardingDescription(progress: OnboardingProgress): string {
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: r.repo, description: <>{itemSource(r) === 'sprint' || itemSource(r) === 'backlog' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.project, r.team)} · {SHOWN[r.show ?? 'all']}
+    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'sprint' || itemSource(r) === 'backlog' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.project, r.team)} · {SHOWN[r.show ?? 'all']}
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     below: <ConfigUpdateNotice repo={r} />,
     control: custom(() => <span className="flex items-center gap-2">
@@ -128,7 +128,7 @@ function repositoryGroup(data: BoardData): Group {
     </span>),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
-    id: `repo-${repo}`, title: repo, description: onboardingDescription(progress),
+    id: `repo-${repo}`, title: shownRepo(repo), description: onboardingDescription(progress),
     control: custom(() => <span className="flex items-center gap-2">
       <Button size="xs" onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>
       <Button variant="outline" size="xs" onClick={() => useResetStore.getState().open(repo)}>Reset</Button>
@@ -225,10 +225,10 @@ export function pages(input: PagesInput): Page[] {
   return [
     { id: 'general', label: 'General', icon: <Settings2 />, groups: [
       { title: 'Board', rows: [
-        { id: 'refresh', title: 'Refresh every', description: "How often the board reads each repository's items and .lar-factory.json through gh.", control: refreshEvery(data.refreshSeconds) },
+        { id: 'refresh', title: 'Refresh every', description: "How often the board reads each repository's items and .lar-factory.json, through gh on GitHub and az on Azure DevOps.", control: refreshEvery(data.refreshSeconds) },
         { id: 'done-window', title: 'Done shows', description: 'Items closed within this window stay on the board.', control: { type: 'select', options: ['3 days', '7 days', '14 days', '30 days'], value: '7 days' } },
         { id: 'open-in', title: 'Open an item in', control: { type: 'segmented', options: ['GitHub', 'T3 thread', 'Ask'], value: 'T3 thread' } },
-        { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon closes the issue as not planned.', control: { type: 'switch', value: true } },
+        { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon closes a GitHub issue as not planned, or moves an Azure DevOps work item to Removed.', control: { type: 'switch', value: true } },
       ] },
       { title: 'Flow limits', description: 'Start holds back when the factory is full, so work lands before more starts.', rows: [
         { id: 'in-flight', title: 'In-flight limit', description: 'Builds in progress at once.', control: { type: 'number', value: 2 } },

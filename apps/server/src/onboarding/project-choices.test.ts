@@ -19,8 +19,16 @@ function t3Home(t: TestContext, origins: Record<string, string | null>): { home:
   return { home, env: { ...process.env, HOME: home, T3_STATE_DB: db } };
 }
 
-/** A gh that answers each repository's .lar-factory.json read: a file, a wrong file, a 404, or a failure. */
+/**
+ * A gh, or for an Azure DevOps repository an az, that answers each repository's .lar-factory.json read: a file, a wrong
+ * file, a 404, or a failure.
+ */
 const gh = (files: Record<string, 'file' | 'wrong' | 'none' | 'fails'>) => createConfigChecks(async (args: string[]) => {
+  if (args[0] === 'devops') {
+    const repo = `${args[args.indexOf('--org') + 1]!.split('/').at(-1)}/${args.find((a) => a.startsWith('project='))!.slice(8)}/${args.find((a) => a.startsWith('repositoryId='))!.slice(13)}`;
+    if (files[repo] === 'file') return JSON.stringify({ content: '{"role":"API server","itemSource":{"kind":"azure-sprint","team":"Fabrikam Team"}}' });
+    throw new Error(files[repo] === 'none' ? 'az devops invoke failed: TF401174: The item /.lar-factory.json could not be found' : 'az devops invoke failed: HTTP 502');
+  }
   const repo = args[1]!.match(/^repos\/(.+)\/contents\/\.lar-factory\.json$/)![1]!;
   if (files[repo] === 'file') return '{"role":"Web client","itemSource":{"kind":"github-project","owner":"maddec01","number":3}}';
   if (files[repo] === 'wrong') return '{"itemSource":{"kind":"issues"}}';
@@ -35,14 +43,14 @@ test('each T3 project shows its provider, whether its repository has .lar-factor
     'lar-cli': 'https://github.com/maddec01/lar-cli',
   });
   const choices = await projectChoices([{ repo: 'Maddec01/lar-server' }],
-    gh({ 'maddec01/lar-web': 'file', 'maddec01/lar-server': 'none', 'maddec01/lar-cli': 'fails' }), env);
+    gh({ 'maddec01/lar-web': 'file', 'maddec01/lar-server': 'none', 'contoso/Fabrikam/lar-api': 'file', 'maddec01/lar-cli': 'fails' }), env);
   const folder = (name: string) => join(home, 'Developer/lar', name);
   assert.deepEqual(choices, [
     { id: 'lar-web', name: 'lar-web', folder: folder('lar-web'), repo: 'maddec01/lar-web', provider: 'GitHub', hasConfig: true, onBoard: false,
       config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client', labels: [] } },
     { id: 'lar-server', name: 'lar-server', folder: folder('lar-server'), repo: 'maddec01/lar-server', provider: 'GitHub', hasConfig: false, onBoard: true },
-    // Reading an Azure DevOps repository's file waits for build #386.
-    { id: 'lar-api', name: 'lar-api', folder: folder('lar-api'), repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: null, onBoard: false },
+    { id: 'lar-api', name: 'lar-api', folder: folder('lar-api'), repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true, onBoard: false,
+      config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API server', labels: [] } },
     { id: 'lar-cli', name: 'lar-cli', folder: folder('lar-cli'), repo: 'maddec01/lar-cli', provider: 'GitHub', hasConfig: null, onBoard: false },
   ]);
 });
@@ -76,7 +84,7 @@ test("T3's projects that can't be read are an error that names the database", as
   await assert.rejects(projectChoices([], gh({}), { ...process.env, T3_STATE_DB: '/nowhere/state.sqlite' }), /Can't read T3 Code's projects at \/nowhere\/state\.sqlite/);
 });
 
-test('the board offers each T3 project whose GitHub repository has .lar-factory.json and is off the list', () => {
+test('the board offers each T3 project whose GitHub or Azure DevOps repository has .lar-factory.json and is off the list', () => {
   const choice = (name: string, parts: object) => ({ id: name, name, folder: `/f/${name}`, repo: `maddec01/${name}`,
     provider: 'GitHub' as const, hasConfig: true, onBoard: false, ...parts });
   const offers = onboardingOffers([
@@ -88,5 +96,6 @@ test('the board offers each T3 project whose GitHub repository has .lar-factory.
     choice('lar-api', { provider: 'Azure DevOps', repo: 'contoso/Fabrikam/lar-api' }),
     choice('plain', { provider: null, repo: null }),
   ]);
-  assert.deepEqual(offers, [{ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }]);
+  assert.deepEqual(offers, [{ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub' },
+    { projectId: 'lar-api', name: 'lar-api', repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps' }]);
 });

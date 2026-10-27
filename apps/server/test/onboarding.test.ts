@@ -41,7 +41,7 @@ test('the board offers each T3 project whose repository has .lar-factory.json, r
   const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], repoConfigs: { 'maddec01/lar-docs': false, 'maddec01/lar-cli': null } },
     false, true, { HOME: home, T3_STATE_DB: db });
   const data = await until(board, (d) => !!d.onboardingOffers);
-  assert.deepEqual(data.onboardingOffers, [{ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web' }]);
+  assert.deepEqual(data.onboardingOffers, [{ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub' }]);
   const reads = async (repo: string) => (await board.calls()).filter((args) => readsRepositoryConfig(args) && args[1] === `repos/${repo}/contents/.lar-factory.json`).length;
   // More refreshes read lar-factory's items, but no answer they have already.
   const refreshed = await reads('maddec01/lar-factory');

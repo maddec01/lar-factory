@@ -24,7 +24,7 @@ import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
 import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
-import { CUSTOM_LABELS_HELP, Choice, CustomLabelPicker, CustomLabelsTitle, Field, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
+import { CUSTOM_LABELS_HELP, Choice, azureProject, CustomLabelPicker, CustomLabelsTitle, Field, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
 import {
   commandChecks, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, customLabelsToCreate, itemSourceOf, labelsPlan, latestRun,
   nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, skillProblem, skillsDir, ticked, unpickable, useWizardStore,
@@ -648,8 +648,13 @@ function CleanupStep({ run }: { run: Run }) {
   );
 }
 
-/** The PR's place, `owner/name#n`, from its URL. */
-export const prName = (url: string) => url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
+/** The PR's place from its URL: `owner/name#n` on GitHub, `organization/project/repository!n` on Azure Repos. */
+export function prName(url: string): string {
+  const azure = /^https:\/\/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+)\/pullrequest\/(\d+)$/.exec(url);
+  if (!azure) return url.replace(/^https:\/\/github\.com\//, '').replace('/pull/', '#');
+  const [, organization, project, repository, id] = azure;
+  return `${organization}/${azureProject(`/${project}`)}/${repository}!${id}`;
+}
 
 /** A change of the PR as its list shows it: the path, then what the PR does to it. */
 function changeRow(change: OnboardingPrChange): { path: string; what: string } {
@@ -712,7 +717,7 @@ function PrStep({ run }: { run: Run }) {
     <div data-pr-step className="grid gap-4">
       <div className="grid gap-1">
         <h4 className="m-0 text-xs font-medium text-muted-foreground">One PR on {repo}, branch lar-factory/onboarding</h4>
-        <p className="m-0 text-xs text-muted-foreground">Its one commit is made on GitHub from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
+        <p className="m-0 text-xs text-muted-foreground">Its one commit is made on {project.provider} from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
         {listed && (<>
           <PrChangeList />
           {!project.config && <pre className="m-0 overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>}

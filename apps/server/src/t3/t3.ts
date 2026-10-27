@@ -1,7 +1,7 @@
 // Starts T3 Code threads, and adds onboarding's new T3 projects, through the local `t3` CLI.
 
-import type { ModelChoice, StartResult } from '@lar-factory/shared';
-import { runTool } from '../tools/run-tool.ts';
+import { isRecord, type ModelChoice, type StartResult } from '@lar-factory/shared';
+import { runTool, type RunResult } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 
 const UNCERTAIN: StartResult = { thread: null, uncertain: true,
@@ -38,6 +38,58 @@ export async function startThread(project: string, message: string, choice?: Mod
     return { thread: { threadId: launched.threadId, title }, error: null };
   } catch {
     return UNCERTAIN;
+  }
+}
+
+/** Runs `t3` with these arguments and timeout; tests pass a stub. */
+export type T3Run = (args: string[], timeout: number) => Promise<RunResult>;
+
+const runT3: T3Run = (args, timeout) => {
+  const command = toolCommand('t3');
+  if (!command) return Promise.resolve({ code: 'ENOENT', stdout: '', stderr: '', detail: '' });
+  return runTool(command.file, args, { env: command.env, timeout });
+};
+
+/** How long a waiting start waits for its run. */
+const WAIT_TIMEOUT = 15 * 60_000;
+
+/**
+ * How a waited run ended: completed with its reply, failed or stopped with why, waiting on the user, or past the
+ * timeout. The thread id comes from t3's answer at the end, so a timeout or a start that failed has none.
+ */
+export type WaitedRun =
+  | { ended: 'completed'; threadId: string; reply: string }
+  | { ended: 'failed'; threadId: string | null; why: string }
+  | { ended: 'waiting'; threadId: string }
+  | { ended: 'timed-out'; threadId: null };
+
+/**
+ * Runs `t3 thread start <project id> <message> --title <title> --provider <instance id> --model <slug> --wait --json`
+ * and waits up to 15 minutes for the run. t3 exits 0 for a completed run, 1 for a failed or stopped one and 2 for an
+ * agent waiting on the user. T3 starts the thread in the project's default runtime mode, which t3 has no flag for.
+ */
+export async function startThreadAndWait(project: string, message: string, choice: ModelChoice, title: string,
+  run: T3Run = runT3): Promise<WaitedRun> {
+  const { code, stdout, detail } = await run(['thread', 'start', project, message, '--title', title,
+    '--provider', choice.instanceId, '--model', choice.model, '--wait', '--json'], WAIT_TIMEOUT);
+  if (code === 'ENOENT') return { ended: 'failed', threadId: null, why: `${missingTool('t3')}. Install the T3 Code CLI or set T3_PATH.` };
+  // A signal is our timeout; the thread may still be running in T3.
+  if (code === null) return { ended: 'timed-out', threadId: null };
+  const answer = waitAnswer(stdout);
+  if (!answer) return { ended: 'failed', threadId: null, why: `t3 could not start the thread: ${detail || 'its answer was not JSON.'}` };
+  if (code === 0 && typeof answer.reply === 'string') return { ended: 'completed', threadId: answer.threadId, reply: answer.reply };
+  if (code === 2) return { ended: 'waiting', threadId: answer.threadId };
+  const error = typeof answer.error === 'string' && answer.error.trim() ? answer.error.trim() : detail;
+  return { ended: 'failed', threadId: answer.threadId, why: `The run ended ${String(answer.status ?? 'without a reply')}${error ? `: ${error}` : '.'}` };
+}
+
+/** t3's `--wait --json` answer, or null when it printed none. */
+function waitAnswer(stdout: string): { threadId: string; status?: unknown; reply?: unknown; error?: unknown } | null {
+  try {
+    const answer = JSON.parse(stdout) as unknown;
+    return isRecord(answer) && typeof answer.threadId === 'string' && answer.threadId ? { ...answer, threadId: answer.threadId } : null;
+  } catch {
+    return null;
   }
 }
 

@@ -88,6 +88,10 @@ _Avoid_: onboarding config, project config, board config
 Setting up one repository for the factory: its T3 project, provider, item source, labels, domain docs and cleanup.
 _Avoid_: initialization, setup
 
+**Reset**:
+Taking a repository off the board: it leaves this Mac's list, and a PR removes its Repository config and the factory's agent setup.
+_Avoid_: offboarding, uninstall
+
 **Clash**:
 Something in a repository that makes agents work against the factory, such as a rule to push to main, another tracker's setup, or a project skill named like a bundled one.
 _Avoid_: conflict

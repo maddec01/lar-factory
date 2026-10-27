@@ -3,6 +3,8 @@ export interface WorkflowLabel {
   name: string;
   color: string;
   description: string;
+  /** The name the label had before build #383, which onboarding's Labels step offers to rename. */
+  oldName?: string;
 }
 
 /** Every workflow label, in the label setup's order. */
@@ -11,10 +13,10 @@ export const WORKFLOW_LABELS: readonly WorkflowLabel[] = [
   { name: 'feature', color: 'A2EEEF', description: 'New behaviour' },
   { name: 'improvement', color: '1D76DB', description: 'Better existing behaviour' },
   { name: 'concept', color: '5319E7', description: 'A map of work needing decisions and builds' },
-  { name: 'decision-grill', color: 'D4C5F9', description: 'Concept decision settled by questions' },
-  { name: 'decision-prototype', color: 'D4C5F9', description: 'Concept decision settled by a prototype' },
-  { name: 'decision-research', color: 'D4C5F9', description: 'Concept decision settled by research' },
-  { name: 'decision-task', color: 'D4C5F9', description: 'Concept decision settled by a small task' },
+  { name: 'decision-grill', color: 'D4C5F9', description: 'Concept decision settled by questions', oldName: 'decision: grill' },
+  { name: 'decision-prototype', color: 'D4C5F9', description: 'Concept decision settled by a prototype', oldName: 'decision: prototype' },
+  { name: 'decision-research', color: 'D4C5F9', description: 'Concept decision settled by research', oldName: 'decision: research' },
+  { name: 'decision-task', color: 'D4C5F9', description: 'Concept decision settled by a small task', oldName: 'decision: task' },
   { name: 'build', color: '0E8A16', description: 'Issue that becomes one PR' },
   { name: 'active', color: 'FBCA04', description: 'Slice an implementer is working on now' },
   { name: 'blocked', color: 'BFD4F2', description: "Slice an implementer couldn't finish, waiting for a re-slice" },

@@ -17,8 +17,10 @@ const box = (label: string) => $$('input[type="checkbox"]').find((each) => each.
 
 async function open(data: BoardData = withFactory): Promise<void> {
   await mountPage(data);
+  // A click focuses the button it presses.
+  addButton().focus();
   await settle(() => addButton().click());
-  // Base UI moves focus on the next frame.
+  // The Modal moves focus on the next frame.
   await settle(() => vi.advanceTimersByTime(50));
 }
 
@@ -59,6 +61,16 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
 
   expect(labels()).toEqual(['area: server', 'area: web']);
   expect($('.custom-labels')!.textContent).toBe('Labelsarea: serverarea: web');
+});
+
+test('Repository, Kind, Title and Description each take their label from the copied Field, so the labels match', async () => {
+  await open();
+  const labels = $$<HTMLLabelElement>('#item-fields [data-slot="field"] label');
+  expect(labels.map((l) => [l.htmlFor, l.textContent])).toEqual([
+    ['item-repo', 'Repository'], ['item-kind', 'Kind'], ['item-title', 'Title (required)'], ['item-description', 'Description (optional)']]);
+  expect(new Set(labels.map((l) => l.className)).size, 'one look for every label').toBe(1);
+  expect(field('item-repo').tagName).toBe('SELECT');
+  expect(field('item-kind').tagName).toBe('SELECT');
 });
 
 test('changing the repo shows its custom labels, unchecked, and a repo with none or an empty list shows no toggles', async () => {
@@ -126,7 +138,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   expect(submit().textContent).toBe('Adding…');
   expect(submit().disabled).toBe(true);
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
-  expect(box('area: server').hasAttribute('data-disabled'), 'the boxes lock with the fields').toBe(true);
+  expect(box('area: server').matches(':disabled'), 'the boxes lock with the fields').toBe(true);
   await settle(() => box('area: server').click());
   expect(checkedOf(box('area: server'))).toBe('false');
   expect($('#add-item-form')!.getAttribute('aria-busy')).toBe('true');
@@ -136,9 +148,9 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   const board = { ...sample, items: [...sample.items, item] };
   await settle(() => finish(new Response(JSON.stringify({ item, issueUrl: created.html_url, error: null, board }))));
   await settle(() => vi.advanceTimersByTime(50));
-  expect(dialog()!.hidden, 'the dialog closes').toBe(true);
+  expect(dialog(), 'the dialog closes').toBeNull();
   expect(document.activeElement, 'focus goes back to Add item').toBe(addButton());
-  const toast = $('[data-toast][role="status"]')!;
+  const toast = $('[data-slot="toast"][role="status"] [data-toast]')!;
   expect(toast.textContent).toBe('Added #501 Playback stalls to List. View item');
   expect(toast.querySelector('.dismiss')!.getAttribute('aria-label')).toBe('Dismiss: Added #501');
   expect(text($('.title-bar .list-button')), 'the board shows the new data').toBe('List5');
@@ -153,7 +165,7 @@ test('a created issue the server could not add offers a retry of the same reques
   expect(result().textContent).toBe('Issue created. Could not add it to List. Retry to finish this issue.View created issue');
   expect(submit().textContent).toBe('Retry this submission');
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
-  expect(box('area: server').hasAttribute('data-disabled'), 'the boxes lock with the fields').toBe(true);
+  expect(box('area: server').matches(':disabled'), 'the boxes lock with the fields').toBe(true);
   await settle(() => box('area: server').click());
   expect(checkedOf(box('area: server'))).toBe('false');
 
@@ -232,17 +244,13 @@ test('opened before the repositories arrive, the dialog picks the first one once
   expect(submit().disabled).toBe(false);
 });
 
-test('the dialog opens centred on T3\'s backdrop and glass panel, and nothing over the title bar drags', async () => {
+test('the dialog opens as the copied Modal, and nothing over the title bar drags', async () => {
   await open();
   const { noDrag } = addStylesheet();
   const popup = dialog()!;
-  const viewport = popup.closest('[data-slot="dialog-viewport"]')!;
-  const backdrop = $('[data-slot="dialog-backdrop"]')!;
-  expect(viewport.className).toContain('grid-rows-[1fr_auto_1fr]');
-  expect(popup.classList).toContain('row-start-2');
-  expect(popup.classList).toContain('dialog-glass');
-  expect(backdrop.classList).toContain('dialog-backdrop');
-  expect([popup, viewport, backdrop].map(noDrag)).toEqual([true, true, true]);
+  expect(popup.dataset.slot).toBe('modal-content');
+  expect(popup.getAttribute('aria-describedby'), 'its description names it').toBe('add-item-description');
+  expect([popup, $('[data-slot="modal-overlay"]')!].map(noDrag)).toEqual([true, true]);
 });
 
 test('Close returns focus to Add item, and reopening keeps a draft but not a finished item', async () => {
@@ -250,11 +258,11 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
   await enter(field('item-title'), 'Half written');
   await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(dialog()!.hidden).toBe(true);
+  expect(dialog()).toBeNull();
   expect(document.activeElement).toBe(addButton());
 
   await settle(() => addButton().click());
-  expect(dialog()!.hidden).toBe(false);
+  expect(dialog()).not.toBeNull();
   expect(field('item-title').value).toBe('Half written');
 
   await fillDraft();
@@ -262,7 +270,7 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
   respond({ item, issueUrl: created.html_url, error: null, board: withFactory });
   await settle(() => submit().click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(dialog()!.hidden).toBe(true);
+  expect(dialog()).toBeNull();
   await settle(() => addButton().click());
   expect(field('item-title').value).toBe('');
   expect(result().textContent).toBe('');

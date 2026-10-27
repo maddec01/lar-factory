@@ -75,7 +75,7 @@ function ItemDialogBody({ item, data, now, open }: { item: Item; data: BoardData
           </div>
         )}
         <div className="grid min-w-0 gap-8 md:grid-cols-[minmax(0,1fr)_15rem]">
-          <article className="grid min-w-0 content-start gap-6"><ItemText read={read} now={now} /></article>
+          <article className="grid min-w-0 content-start gap-6"><ItemText itemId={item.id} read={read} now={now} /></article>
           <aside className="grid min-w-0 content-start gap-5 md:border-l md:border-(--border) md:pl-6">
             <ItemFields item={item} read={read} now={now} />
             {item.slices.length > 0 && (

@@ -150,13 +150,14 @@ export const REPO_URL = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar
 
 /**
  * A fake az for one Azure Repos repository whose default branch is main at abc123 and holds `files`, with `branches`
- * besides main, by name and head, and `prs`. Pushes, new branches and PRs change it, and it records each call; `fail`
- * throws for a call it matches.
+ * besides main, by name and head, and `prs`; `canPush` is whether az's login may push to it. Pushes, new branches and
+ * PRs change it, and it records each call; `fail` throws for a call it matches.
  */
-export function fakeAzRepos({ files = {}, branches = {}, prs = [], fail }: {
+export function fakeAzRepos({ files = {}, branches = {}, prs = [], canPush = true, fail }: {
   files?: Record<string, string>;
   branches?: Record<string, string>;
   prs?: FakePr[];
+  canPush?: boolean;
   fail?: (args: string[]) => Error | undefined;
 } = {}) {
   const calls: string[][] = [];
@@ -197,13 +198,21 @@ export function fakeAzRepos({ files = {}, branches = {}, prs = [], fail }: {
         heads.set(name.replace('refs/heads/', ''), `pushed${pushes.length}`);
         return JSON.stringify({ pushId: pushes.length });
       }
+      if (resource === 'security/permissions') {
+        // The Git Repositories namespace's GenericContribute bit, on the repository's token, for the caller.
+        const asked = [route(args, 'securityNamespaceId'), route(args, 'permissions'), route(args, 'tokens')];
+        if (asked.join(' ') !== '2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87 4 repoV2/project-1/repo-1') throw new Error(`fake az: unexpected permission ${asked.join(' ')}`);
+        return JSON.stringify({ count: 1, value: [canPush] });
+      }
       if (resource === 'git/pullRequestThreads') {
         const body = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { comments: { content: string }[] };
         comments.push({ id: Number(route(args, 'pullRequestId')), content: body.comments[0]!.content });
         return '{}';
       }
     }
-    if (command === 'repos show --repository') return JSON.stringify({ name: 'lar-api', defaultBranch: 'refs/heads/main', webUrl: REPO_URL });
+    if (command === 'repos show --repository') {
+      return JSON.stringify({ id: 'repo-1', name: 'lar-api', defaultBranch: 'refs/heads/main', webUrl: REPO_URL, project: { id: 'project-1', name: 'Fabrikam Fiber' } });
+    }
     if (command === 'repos ref list') {
       // --filter matches the start of each name after refs/.
       const filter = flag(args, '--filter');

@@ -9,7 +9,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Check, CircleAlert, ExternalLink, FileText, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
-  SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, threadLink, type Clash, type ClashRun, type LabelPlan, type LabelRow,
+  SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, threadLink, type Clash, type ClashRun, type CheckedTool, type LabelPlan, type LabelRow,
   type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupCheckId,
   type SkillClash,
 } from '@lar-factory/shared';
@@ -26,7 +26,7 @@ import { CopyButton } from '../copy/copy-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import { CUSTOM_LABELS_HELP, Choice, CustomLabelPicker, CustomLabelsTitle, Field, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
 import {
-  COMMAND_CHECKS, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, customLabelsToCreate, itemSourceOf, labelsPlan, latestRun,
+  commandChecks, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, customLabelsToCreate, itemSourceOf, labelsPlan, latestRun,
   nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, skillProblem, skillsDir, ticked, unpickable, useWizardStore,
 } from './wizard-store.ts';
 
@@ -346,8 +346,10 @@ function CheckList({ title, rows }: { title: string; rows: CheckRow[] }) {
   );
 }
 
-const COMMAND_TITLES: Record<(typeof COMMAND_CHECKS)[number], string> = { gh: 'gh login', t3: 't3 and T3 Code', git: 'git', jq: 'jq', curl: 'curl' };
-const SETUP_TITLES: Record<SetupCheckId, string> = { checkout: 'T3 project is the main checkout', source: 'Item source can be read', push: 'gh can push to the repository' };
+const COMMAND_TITLES: Record<CheckedTool, string> = { gh: 'gh login', az: 'az login', t3: 't3 and T3 Code', git: 'git', jq: 'jq', curl: 'curl' };
+/** Each setup check's title; the push check names the login, az's on Azure DevOps. */
+const setupTitle = (id: SetupCheckId, provider: ProjectChoice['provider']) => id === 'checkout' ? 'T3 project is the main checkout'
+  : id === 'source' ? 'Item source can be read' : `${provider === 'Azure DevOps' ? 'az' : 'gh'} can push to the repository`;
 
 function ChecksStep({ run }: { run: Run }) {
   const { projects, checks, runChecks, retryCheck } = useWizardStore();
@@ -358,18 +360,19 @@ function ChecksStep({ run }: { run: Run }) {
   if (!checks) return null;
   const source = itemSourceOf(run, project);
   const retryAll = () => void runChecks();
-  const commands = COMMAND_CHECKS.map((name): CheckRow => {
+  const commands = commandChecks(source).map((name): CheckRow => {
     const check = tools?.[name];
     if (checks.commands.state === 'running') return { id: name, title: COMMAND_TITLES[name], status: 'running' };
-    if (commandPasses(name, tools, source)) return { id: name, title: COMMAND_TITLES[name], status: 'passed', detail: toolState(check, name === 'gh').text };
+    if (commandPasses(name, tools, source)) return { id: name, title: COMMAND_TITLES[name], status: 'passed', detail: toolState(check, name === 'gh' || name === 'az').text };
     return { id: name, title: COMMAND_TITLES[name], status: 'failed', problem: `${name}: ${toolState(check).text}`, fix: toolDescription('', check), retry: retryAll };
   });
   const setup = SETUP_CHECKS.map((id): CheckRow => {
     const check = checks.setup[id];
-    if (check.state !== 'done') return { id, title: SETUP_TITLES[id], status: check.state };
+    const title = setupTitle(id, project.provider);
+    if (check.state !== 'done') return { id, title, status: check.state };
     const { result } = check;
-    return result.passed ? { id, title: SETUP_TITLES[id], status: 'passed', detail: result.detail }
-      : { id, title: SETUP_TITLES[id], status: 'failed', problem: result.problem, fix: result.fix, command: result.command, retry: () => void retryCheck(id) };
+    return result.passed ? { id, title, status: 'passed', detail: result.detail }
+      : { id, title, status: 'failed', problem: result.problem, fix: result.fix, command: result.command, retry: () => void retryCheck(id) };
   });
   const rows = [...commands, ...setup];
   const passed = rows.filter((r) => r.status === 'passed').length;

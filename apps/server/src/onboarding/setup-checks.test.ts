@@ -1,8 +1,9 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { RepositoryItemSource } from '@lar-factory/shared';
+import { fakeAz, fakeAzRepos, type WorkItem } from '../azure/fake-az.ts';
 import type { Checkout } from '../t3/repository-project.ts';
-import { type SetupCheckReads, runSetupCheck } from './setup-checks.ts';
+import { type SetupCheckReads, runSetupCheck, setupCheckReads } from './setup-checks.ts';
 
 const WEB: Checkout = { id: 'web', title: 'lar-web', folder: '/Users/me/Developer/lar-web', origin: 'git@github.com:maddec01/lar-web.git' };
 const PROJECT: RepositoryItemSource = { kind: 'github-project', owner: 'maddec01', number: 3 };
@@ -68,4 +69,56 @@ test('a body without a known check, its repository, its T3 project or its item s
     { check: 'push', repo: '../x' }]) {
     assert.deepEqual(await check(input), { status: 400, error: 'Send the check to run, the repository, its T3 project and its item source.' }, JSON.stringify(input));
   }
+});
+
+const API: Checkout = { id: 'api', title: 'lar-api', folder: '/Users/me/Developer/lar-api', origin: 'git@ssh.dev.azure.com:v3/contoso/Fabrikam%20Fiber/lar-api' };
+const AZURE_REPO = 'contoso/Fabrikam%20Fiber/lar-api';
+/** AZURE_REPO as the checks' text names it, decoded. */
+const SHOWN_REPO = 'contoso/Fabrikam Fiber/lar-api';
+const SPRINT: RepositoryItemSource = { kind: 'azure-sprint', team: 'Fabrikam Team' };
+const ITEMS: WorkItem[] = [
+  { id: 1, type: 'User Story', state: 'Active', title: 'Seek' },
+  { id: 11, type: 'Task', state: 'Active', parent: 1 },
+  { id: 2, type: 'User Story', state: 'New', title: 'Ship' },
+];
+
+/** Runs a check on lar-api through `run` as az, with lar-api as T3's only project. */
+const azureCheck = (input: Record<string, unknown>, run: (args: string[]) => Promise<string>) =>
+  runSetupCheck({ repo: AZURE_REPO, projectId: 'api', itemSource: SPRINT, ...input }, { ...setupCheckReads(run), checkouts: async () => [API] });
+
+test("the main checkout check reads an Azure DevOps origin as organization/project/repository", async () => {
+  assert.deepEqual(await azureCheck({ check: 'checkout' }, fakeAzRepos().run),
+    { result: { passed: true, detail: '/Users/me/Developer/lar-api · origin contoso/Fabrikam Fiber/lar-api' } });
+});
+
+test("the item source check counts an Azure DevOps team's sprint or backlog through az", async () => {
+  const az = fakeAz({ items: ITEMS });
+  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Fabrikam Team’s current sprint has 3 items to show' } });
+  assert.deepEqual(await azureCheck({ check: 'source', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' } }, az.run),
+    { result: { passed: true, detail: 'Fabrikam Team’s backlog has 3 items to show' } });
+});
+
+test("an Azure DevOps item source az can't read shows az's message, with az login for a logged-out az", async () => {
+  const failing = (message: string) => fakeAz({ items: ITEMS, fail: () => new Error(message) }).run;
+  assert.deepEqual(await azureCheck({ check: 'source' }, failing("az boards failed: TF400898: team 'Nobody' not found")), { result: { passed: false,
+    problem: "Can't read Fabrikam Team’s current sprint: az boards failed: TF400898: team 'Nobody' not found",
+    fix: "Check the team's name, and that az's login can read Fabrikam Fiber's boards." } });
+  assert.deepEqual(await azureCheck({ check: 'source' }, failing('Please run az login to setup account.')), { result: { passed: false,
+    problem: "Can't read Fabrikam Team’s current sprint: az is logged out.", fix: 'Run this, then Retry:', command: 'az login' } });
+});
+
+test('a team with no current iteration names its sprint fix, or going Back to name another team', async () => {
+  assert.deepEqual(await azureCheck({ check: 'source' }, fakeAz({ items: ITEMS, iterations: [] }).run), { result: { passed: false,
+    problem: "Can't read Fabrikam Team’s current sprint: Team Fabrikam Team has no current iteration in contoso/Fabrikam Fiber.",
+    fix: 'Give the team a sprint whose dates cover today in its project settings, then Retry, or go Back and name another team.' } });
+});
+
+test("the push check asks Azure DevOps whether az's login can contribute to the repository", async () => {
+  assert.deepEqual(await azureCheck({ check: 'push' }, fakeAzRepos().run), { result: { passed: true, detail: `az's login can push to ${SHOWN_REPO}` } });
+  assert.deepEqual(await azureCheck({ check: 'push' }, fakeAzRepos({ canPush: false }).run), { result: { passed: false,
+    problem: `az's login can't push to ${SHOWN_REPO}, so lar-work's agents can't push their branches.`,
+    fix: `Get Contribute on ${SHOWN_REPO}, or log az in as an account that has it:`, command: 'az login' } });
+  const { result } = await azureCheck({ check: 'push' }, fakeAzRepos({ fail: () => new Error('az repos show failed: TF401019: no repository') }).run) as { result: unknown };
+  assert.deepEqual(result, { passed: false, problem: `Can't read ${SHOWN_REPO}'s permissions: az repos show failed: TF401019: no repository`,
+    fix: `Check that az's login can read ${SHOWN_REPO}, then Retry.` });
 });

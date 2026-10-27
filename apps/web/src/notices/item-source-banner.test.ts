@@ -1,7 +1,7 @@
 // The banner for each onboarded repository whose items the latest read left off, such as one reading through a logged-out az.
 
 import { expect, test } from 'vite-plus/test';
-import { $$, bannerText, mountPage, push, sample } from '../../test/support.ts';
+import { $$, bannerText, mountPage, push, sample, toolChecks } from '../../test/support.ts';
 
 const problems = [
   { repo: 'contoso/Fabrikam/lar-api', problem: 'az is logged out.', fix: 'az login' },
@@ -20,4 +20,9 @@ test("each repository whose items can't be read gets a banner naming it as the s
 
   await push({ ...sample, itemSourceProblems: [] });
   expect(banners()).toEqual([]);
+});
+
+test("a repository whose problem the failed az check's fix covers shows no banner of its own beside the az banner", async () => {
+  await mountPage({ ...sample, tools: toolChecks({ az: { result: 'logged-out', fix: 'az login' } }), itemSourceProblems: problems });
+  expect($$('.banners .banner').map((b) => bannerText(b)[0])).toEqual(['Azure CLI is logged out.', "lar-web's items are off the board."]);
 });

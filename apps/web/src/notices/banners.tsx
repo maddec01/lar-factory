@@ -1,5 +1,6 @@
 // The banners above the desk: an unreachable server, which closes, then T3 Code not running, then a gh the board can't use,
-// then a missing git, jq or curl, then an az that fails its check, then each repository whose .lar-factory.json can't be read.
+// then a missing git, jq or curl, then an az that fails its check, then each repository whose .lar-factory.json can't be read,
+// then each repository whose items are off the board, less those the az banner's fix already covers.
 
 import { failedCheck, itemSource } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -30,7 +31,8 @@ export function Banners() {
       })}
       {az && <AzBanner check={az} />}
       {data.repositoryConfigProblems?.map((p) => <RepositoryConfigBanner key={p.repo} {...p} />)}
-      {data.itemSourceProblems?.map((p) => <ItemSourceBanner key={p.repo} {...p} repos={data.repos} />)}
+      {data.itemSourceProblems?.filter((p) => !(az && p.fix === az.fix))
+        .map((p) => <ItemSourceBanner key={p.repo} {...p} repos={data.repos} />)}
     </div>
   );
 }

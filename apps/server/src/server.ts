@@ -231,12 +231,12 @@ function showToolChecks(checks: ToolChecks): void {
 }
 
 /**
- * Looks every tool up again and checks each command, az only while a listed repository is on Azure DevOps,
- * then reads GitHub if gh works now and didn't before.
+ * Looks every tool up again and checks each command, az only while a listed repository is on Azure DevOps or `az`
+ * asks for it, then reads GitHub if gh works now and didn't before.
  * Startup and Recheck reread the login shell PATH; the timed retry passes false to keep the last one.
  * A check asked for during a running one waits for it, then runs.
  */
-async function recheckTools(rereadLoginPath = true): Promise<void> {
+async function recheckTools(rereadLoginPath = true, az = false): Promise<void> {
   while (checkingTools) await checkingTools;
   // Recheck asks each repository for its .lar-factory.json again; the timed retry keeps the answers.
   if (rereadLoginPath) configChecks.clear();
@@ -244,7 +244,7 @@ async function recheckTools(rereadLoginPath = true): Promise<void> {
   const ghBlocked = ghStopsRead(before?.gh);
   checkingTools = (async () => {
     const [, withAz] = await Promise.all([lookUpTools(process.env, rereadLoginPath), anyOnAzureDevOps(onboarded())]);
-    const { tools: checks, ghError } = await checkTools(withAz);
+    const { tools: checks, ghError } = await checkTools(withAz || az);
     showToolChecks(checks);
     if (ghError) log(`gh probe failed: ${ghError}`);
   })().finally(() => { checkingTools = null; });
@@ -341,7 +341,7 @@ const startAfter = createStartAfter({ board, commands, offerModelChoices, file: 
   renamedId: items.renamedId });
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
-  recheck: recheckTools, readSoon, ready: () => firstToolCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options?.az), readSoon, ready: () => firstToolCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input),

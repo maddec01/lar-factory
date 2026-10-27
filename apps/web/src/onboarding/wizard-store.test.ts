@@ -384,6 +384,28 @@ test('a failing command holds Next; gh without the project scope passes only for
   expect(checksPassed({ ...checks, commands: { state: 'running' } }, toolChecks(), { kind: 'issues' })).toBe(false);
 });
 
+test("an Azure DevOps run asks the board for az's check, which holds Next in place of gh's, and checks the team's sprint", async () => {
+  const azure = project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps' });
+  const loggedOut = toolChecks({ gh: { result: 'missing', fix: 'brew install gh' }, az: { result: 'logged-out', fix: 'az login' } });
+  const wizard = await checkingStore([azure], {}, loggedOut);
+  const { checksPassed, commandChecks } = await import('./wizard-store.ts');
+  await settle(() => wizard.getState().start());
+  wizard.getState().pick('lar-api');
+  wizard.getState().next();
+  wizard.getState().answer({ team: 'Fabrikam Team', role: 'API server' });
+  wizard.getState().next();
+  wizard.getState().next();
+  await vi.waitFor(() => expect(wizard.getState().checks?.setup.push.state).toBe('done'));
+  const posts = (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/recheck' || url === '/api/onboarding/checks')
+    .map(([, init]) => JSON.parse(String(init.body)) as object);
+  expect(posts[0]).toEqual({ az: true });
+  expect(posts[1]).toMatchObject({ check: 'checkout', repo: 'contoso/Fabrikam/lar-api', itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' } });
+  const sprint = { kind: 'azure-sprint' as const, team: 'Fabrikam Team' };
+  expect(commandChecks(sprint)).toEqual(['az', 't3', 'git', 'jq', 'curl']);
+  expect(checksPassed(wizard.getState().checks, loggedOut, sprint), 'az is logged out').toBe(false);
+  expect(checksPassed(wizard.getState().checks, toolChecks({ gh: { result: 'missing', fix: 'brew install gh' }, az: { result: 'ok' } }), sprint), 'gh isn’t needed').toBe(true);
+});
+
 const bundled = (name: string): BundledSkill => ({ name, author: 'Lar', licence: 'MIT', source: `https://github.com/maddec01/lar-factory/tree/main/skills/${name}` });
 const BUNDLED = ['code-review', 'tdd', 'references/review-checklist.md'].map(bundled);
 const CONTEXT: Clash = { id: 'context', file: 'CONTEXT.md', ticked: true, edit: { kind: 'rename', to: 'GLOSSARY.md' }, reason: 'CONTEXT.md is its old name.' };

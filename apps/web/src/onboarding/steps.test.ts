@@ -318,6 +318,22 @@ test('the Checks step lists the command checks, then the setup checks, each with
   expect(nextButton().disabled).toBe(false);
 });
 
+test("an Azure DevOps repository's Checks step lists az's check in place of gh's, and the az push check", async () => {
+  await openSetup(AZURE);
+  await type(input('team')!, 'Fabrikam Team');
+  await type(input('role')!, 'API server');
+  answerChecks({ push: { passed: false, problem: "az's login can't push to contoso/Fabrikam%20Fiber/lar-api.", fix: 'Get Contribute, or log az in as an account that has it:', command: 'az login' } },
+    toolChecks({ az: { result: 'no-extension', fix: 'az extension add --name azure-devops' } }));
+  await openChecks();
+  const ids = [...dialog()!.querySelectorAll<HTMLElement>('[data-check]')].map((r) => r.dataset.check);
+  expect(ids).toEqual(['az', 't3', 'git', 'jq', 'curl', 'checkout', 'source', 'push']);
+  expect(checkRow('az').dataset.status).toBe('failed');
+  expect(text(checkRow('az'))).toContain('az extension add --name azure-devops');
+  expect(text(checkRow('push'))).toContain('az can push to the repository');
+  expect(text(checkRow('push'))).toContain('az login');
+  expect(nextButton().disabled).toBe(true);
+});
+
 test('a failed check shows its problem, fix and Retry, and Next stays disabled until Retry passes', async () => {
   await openSetup(project('lar-web'));
   await settle(() => choice('issues').querySelector<HTMLElement>('[role="radio"]')!.click());

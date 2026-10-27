@@ -67,6 +67,19 @@ async function defaultBranchHead(repo: string, run: Az = az): Promise<{ branch: 
   return { branch, sha };
 }
 
+/** The Git Repositories security namespace, and its GenericContribute bit, which lets a user push. */
+const GIT_REPOSITORIES = '2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87';
+const GENERIC_CONTRIBUTE = 4;
+
+/** Whether az's login can push to the repository, as Azure DevOps evaluates GenericContribute on it for the caller. */
+export async function canPush(repo: string, run: Az = az): Promise<boolean> {
+  const { id, project } = await repos<{ id: string; project: { id: string } }>(run, repo, ['show']);
+  const { value } = await json<{ value: boolean[] }>(run, ['devops', 'invoke', '--area', 'security', '--resource', 'permissions', '--route-parameters',
+    `securityNamespaceId=${GIT_REPOSITORIES}`, `permissions=${GENERIC_CONTRIBUTE}`, '--query-parameters', `tokens=repoV2/${project.id}/${id}`,
+    '--api-version', API_VERSION], repo);
+  return value[0] === true;
+}
+
 /** Makes a branch on Azure Repos at the commit, leaving every checkout alone. */
 async function createBranch(repo: string, branch: string, sha: string, run: Az = az): Promise<void> {
   await repos(run, repo, ['ref', 'create', '--name', `heads/${branch}`, '--object-id', sha]);

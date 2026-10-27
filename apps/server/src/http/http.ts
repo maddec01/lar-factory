@@ -5,11 +5,12 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type ClashRun, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupCheckResult } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type ClashRun, type ItemDetails, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupCheckResult } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
 import type { ItemCommands, Reply } from '../items/item-commands.ts';
+import type { ReadItemDetails } from '../item-details/item-details.ts';
 import type { BuiltPage } from '../page/page.ts';
 import type { StartAfter } from '../start-after/start-after.ts';
 import { log } from '../log.ts';
@@ -25,6 +26,8 @@ export interface HttpDeps {
   sample: boolean;
   /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
   recheck(options?: { az?: boolean }): Promise<void>;
+  /** Reads one item's details for the item dialog, or says why it can't. */
+  itemDetails: ReadItemDetails;
   /** Reads GitHub now, or once more after the running read. */
   readSoon(): void;
   /** The startup tool check; requests other than /healthz and assets wait for it. */
@@ -142,7 +145,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, readSoon, ready, projectChoices, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
   runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
   resetRepository, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
@@ -417,6 +420,19 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     json(res, 200, { runs: clashRuns(repo) });
   }
 
+  /** Answers one item's details, which the item dialog reads when it opens. */
+  async function itemDetailsRequest(url: URL, res: ServerResponse): Promise<void> {
+    const itemId = url.searchParams.get('itemId');
+    if (!itemId) return json(res, 400, { error: 'Name the item whose details to read.' });
+    const item = board.snapshot().items.find((i) => i.id === itemId);
+    if (!item) return json(res, 404, { error: 'That item is not on the board.' });
+    try {
+      const read = await itemDetails(item);
+      if ('error' in read) json(res, read.status, { error: read.error });
+      else json(res, 200, { details: read satisfies ItemDetails });
+    } catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
+  }
+
   /** Opens a page's event stream and sends the board data at once, so a reconnecting page catches up. */
   function openStream(req: IncomingMessage, res: ServerResponse): void {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
@@ -469,6 +485,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     if (path === '/api/events') return openStream(req, res);
     if (path === '/api/onboarding/projects') return projectsRequest(res);
     if (path === '/api/onboarding/clash-runs') return clashRunsRequest(url, res);
+    if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/board') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(board.snapshot()));
     if (path === '/healthz') return json(res, 200, {});
     const asset = path.startsWith('/assets/') ? page.assets.get(path.slice('/assets/'.length)) : undefined;

@@ -18,6 +18,7 @@ import { createItemCommands } from './items/item-commands.ts';
 import { onboardedSources, repoView } from './items/item-sources.ts';
 import type { ReadProgress } from './items/item-source.ts';
 import { log } from './log.ts';
+import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
 import { createClashRuns } from './onboarding/clash-runs.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
@@ -377,7 +378,7 @@ const startAfter = createStartAfter({ board, commands, offerModelChoices, file: 
   renamedId: items.renamedId });
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
-  recheck: (options) => recheckTools(true, options?.az), readSoon, ready: () => firstToolCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options?.az), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null), readSoon, ready: () => firstToolCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input),

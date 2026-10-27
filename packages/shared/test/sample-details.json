@@ -1,0 +1,124 @@
+{
+  "I_sample13": {
+    "body": "## Owner accounts\n\nA household has one **owner**. This build adds the owner table, sign-in sessions and the settings page.\n\n- [x] Owner table and sign-up\n- [ ] Sign-in sessions\n- [ ] Owner settings page\n\n| Column | Type | Notes |\n| --- | --- | --- |\n| `id` | uuid | primary key |\n| `email` | text | unique, lower-cased before it is stored and compared by the database |\n| `created_at` | timestamptz | set by the server |\n\n```ts\nexport async function createOwner(email: string, passwordHash: string): Promise<Owner> {\n  return db.insert(owners).values({ email: email.toLowerCase(), passwordHash }).returning().then(([row]) => row!);\n}\n```\n\n<details><summary>Open questions</summary>\n\nShould an owner be able to invite a second owner? See [#200](https://github.com/maddec01/lar-server/issues/200).\n\n</details>\n\n![Sign-up flow](https://example.com/sign-up-flow.png)\n",
+    "format": "markdown",
+    "author": "maddec01",
+    "assignees": [
+      "maddec01",
+      "claude-bot"
+    ],
+    "createdAt": "2026-10-12T09:14:00Z",
+    "milestone": "Cloud v0.1",
+    "subTickets": [
+      {
+        "number": 144,
+        "title": "Owner table and sign-up",
+        "url": "https://github.com/maddec01/lar-server/issues/144",
+        "repo": "maddec01/lar-server",
+        "state": "closed"
+      },
+      {
+        "number": 145,
+        "title": "Sign-in sessions",
+        "url": "https://github.com/maddec01/lar-server/issues/145",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      {
+        "number": 146,
+        "title": "Owner settings page",
+        "url": "https://github.com/maddec01/lar-server/issues/146",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      }
+    ],
+    "comments": [
+      {
+        "id": "IC_sample13c",
+        "author": "maddec01",
+        "createdAt": "2026-10-21T08:30:00Z",
+        "body": "Moving this to **Ready**. The first slice is merged.",
+        "format": "markdown"
+      },
+      {
+        "id": "IC_sample13b",
+        "author": "claude-bot",
+        "createdAt": "2026-10-20T16:02:00Z",
+        "body": "Shaped into three slices. Run `pnpm test` in `apps/server` before opening the PR:\n\n```sh\npnpm --filter @lar-factory/server test --reporter=verbose --run --no-file-parallelism --testTimeout=30000 --some-very-long-flag-name-that-would-not-fit\n```",
+        "format": "markdown"
+      },
+      {
+        "id": "IC_sample13a",
+        "author": "reviewer-anne",
+        "createdAt": "2026-10-14T11:40:00Z",
+        "body": "Can a household have more than one owner?",
+        "format": "markdown"
+      }
+    ],
+    "hasOlderComments": true,
+    "olderCursor": "Y3Vyc29yOjM="
+  },
+  "I_sample26": {
+    "body": "Bumps FFmpeg from 7.0 to 7.1.\n\n- Updates the pinned build\n- Re-runs the transcoder probes\n",
+    "format": "markdown",
+    "author": "claude-bot",
+    "assignees": [
+      "maddec01"
+    ],
+    "createdAt": "2026-10-21T08:55:00Z",
+    "milestone": "Cloud v0.1",
+    "subTickets": [],
+    "comments": [
+      {
+        "id": "IC_sample26a",
+        "author": "maddec01",
+        "createdAt": "2026-10-21T09:05:00Z",
+        "body": "Waiting on the 4K HDR probe.",
+        "format": "markdown"
+      }
+    ],
+    "hasOlderComments": false,
+    "olderCursor": null
+  },
+  "I_sample04": {
+    "body": "Keep one watch history per household, so a show started on the TV resumes on the phone.",
+    "format": "markdown",
+    "author": "maddec01",
+    "assignees": [],
+    "createdAt": "2026-10-19T10:00:00Z",
+    "subTickets": [],
+    "comments": [],
+    "hasOlderComments": false,
+    "olderCursor": null
+  },
+  "azure:contoso/310": {
+    "body": "<p>The <b>sign-in</b> screen shows the wrong error for a locked account.</p><ul><li>Expected: <i>Your account is locked</i></li><li>Actual: <i>Wrong password</i></li></ul><p><a href=\"https://dev.azure.com/contoso/Fabrikam/_workitems/edit/310\">Related work item</a></p><img src=\"https://dev.azure.com/contoso/Fabrikam/_apis/wit/attachments/screenshot.png\" alt=\"Screenshot\">",
+    "format": "html",
+    "author": "Dana Whitfield",
+    "assignees": [
+      "Dana Whitfield"
+    ],
+    "createdAt": "2026-10-15T13:20:00Z",
+    "iteration": "Fabrikam\\Sprint 42",
+    "area": "Fabrikam\\Web",
+    "subTickets": [],
+    "comments": [
+      {
+        "id": "31",
+        "author": "Sam Ortiz",
+        "createdAt": "2026-10-20T09:00:00Z",
+        "body": "I can reproduce it with a locked test account.",
+        "format": "markdown"
+      },
+      {
+        "id": "30",
+        "author": "Dana Whitfield",
+        "createdAt": "2026-10-16T08:10:00Z",
+        "body": "<div>Seen on <b>iOS</b> too.</div>",
+        "format": "html"
+      }
+    ],
+    "hasOlderComments": false,
+    "olderCursor": null
+  }
+}

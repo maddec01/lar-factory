@@ -1,5 +1,6 @@
 // The sidebar's Add item button and its dialog: a form that creates an issue in a configured repo
-// and adds it to List. ⌘N opens it too. The dialog stays mounted while closed, so a half-written draft survives.
+// and adds it to List. ⌘N opens it too. The dialog stays mounted while closed, so a half-written draft survives. On an
+// Azure repository, Only for <repo> tags the new work item for it.
 
 import { useEffect, useState } from 'react';
 import { SquarePen } from 'lucide-react';
@@ -16,7 +17,7 @@ import { Label } from '@lar-factory/ui/label';
 import { NativeSelect } from '@lar-factory/ui/native-select';
 import { Textarea } from '@lar-factory/ui/textarea';
 import { FormResult } from '../notices/form-result.tsx';
-import { useAddItemStore } from './add-item-store.ts';
+import { itemNoun, useAddItemStore } from './add-item-store.ts';
 import type { ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
@@ -33,6 +34,17 @@ function CustomLabels({ repo, disabled }: { repo: RepoConfig; disabled: boolean 
         {repo.labels.map((label) => <Label key={label}><Checkbox name="labels" value={label} disabled={disabled} />{label}</Label>)}
       </div>
     </Fieldset>
+  );
+}
+
+/** Only for <repo> on an Azure repository: unticked, the new work item shows in every List that reads its item source. */
+function OnlyFor({ repo, name, disabled }: { repo: RepoConfig; name: string; disabled: boolean }) {
+  if (repo.items !== 'sprint' && repo.items !== 'backlog') return null;
+  return (
+    <div className="form-field">
+      <Label><Checkbox name="onlyFor" value="true" disabled={disabled} aria-describedby="item-only-for-hint" />Only for {name}</Label>
+      <p className="form-hint" id="item-only-for-hint">Unticked, it shows in the List of every repository that reads the team's {repo.items}.</p>
+    </div>
   );
 }
 
@@ -59,7 +71,7 @@ function AddItemForm() {
     const form = event.currentTarget;
     const values = new FormData(form);
     void submit({ repo: values.get('repo'), kind: values.get('kind'), title: values.get('title'),
-      description: values.get('description'), labels: values.getAll('labels') }).then(() => {
+      description: values.get('description'), labels: values.getAll('labels'), onlyFor: values.get('onlyFor') === 'true' }).then(() => {
       if (useAddItemStore.getState().submission.phase === 'editing' && form.isConnected) form.reportValidity();
     });
   };
@@ -67,7 +79,7 @@ function AddItemForm() {
     <form id="add-item-form" className="flex min-h-0 flex-col" noValidate aria-busy={phase === 'pending'} onSubmit={onSubmit} onInput={edit}>
       <DialogHeader>
         <DialogTitle id="add-item-heading">Add item</DialogTitle>
-        <DialogDescription>Create an issue{selected && ` in ${repoName(selected.repo, data.repos)}`} and add it to List.</DialogDescription>
+        <DialogDescription>Create {itemNoun(selected?.repo) === 'issue' ? 'an issue' : 'a work item'}{selected && ` in ${repoName(selected.repo, data.repos)}`} and add it to List.</DialogDescription>
       </DialogHeader>
       <DialogPanel>
         <Fieldset id="item-fields" unstyled disabled={locked}>
@@ -92,6 +104,7 @@ function AddItemForm() {
           </div>
           {/* Keyed by repo, so another repo's labels start unchecked. */}
           {selected && <CustomLabels repo={selected} disabled={locked} key={selected.repo} />}
+          {selected && <OnlyFor repo={selected} name={repoName(selected.repo, data.repos)} disabled={locked} key={`only-${selected.repo}`} />}
           <div className="form-field">
             <Label htmlFor="item-title">Title <span className="required-note">(required)</span></Label>
             <Input id="item-title" name="title" required maxLength={256} autoComplete="off" nativeInput />

@@ -5,6 +5,7 @@ import { failedCheck, itemSource } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { CLIENT_ERROR } from '../board/live-data.ts';
 import { ClosableBanner } from './banner.tsx';
+import { ItemSourceBanner } from './item-source-banner.tsx';
 import { RepositoryConfigBanner } from './repository-config-banner.tsx';
 import { AzBanner, CommandBanner, GhBanner, T3NotRunningBanner } from './tool-notices.tsx';
 
@@ -29,6 +30,7 @@ export function Banners() {
       })}
       {az && <AzBanner check={az} />}
       {data.repositoryConfigProblems?.map((p) => <RepositoryConfigBanner key={p.repo} {...p} />)}
+      {data.itemSourceProblems?.map((p) => <ItemSourceBanner key={p.repo} {...p} />)}
     </div>
   );
 }

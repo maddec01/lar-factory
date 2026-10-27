@@ -30,7 +30,7 @@ function Recheck({ check }: { check: FailedCheck }) {
   );
 }
 
-function CopyableCommand({ command }: { command: string }) {
+export function CopyableCommand({ command }: { command: string }) {
   return <><code>{command}</code> <CopyButton text={command} label={`Copy ${command}`} /></>;
 }
 

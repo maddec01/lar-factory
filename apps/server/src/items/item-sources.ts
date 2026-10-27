@@ -1,11 +1,12 @@
 // Every item source the onboarded repositories' configs name, as the one item source the board server reads and writes through.
-// The board knows only the GitHub provider in this build, so each source is a GitHub adapter.
+// A GitHub Project or a repository's issues read through gh, and an Azure DevOps team's sprint through az.
 
 import type { Item, RepoConfig } from '@lar-factory/shared';
 import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
-import type { ItemSource } from './item-source.ts';
+import { azureSprint } from '../azure/azure-sprint.ts';
+import { ReadProblem, type ItemSource, type ItemsRead } from './item-source.ts';
 
 /** Who writes for a repository no source names, on a board that reads no Project. */
 const NOT_ONBOARDED = "That item's repository isn't onboarded.";
@@ -21,8 +22,9 @@ const unlisted: ItemSource = {
 
 /** A repository's config as the page sees it: its role, item source, show setting and custom labels. */
 export function repoView({ repo, role, itemSource, show, labels }: RepositoryConfig): RepoConfig {
-  return itemSource.kind === 'issues' ? { repo, role, items: 'issues', show, labels }
-    : { repo, role, items: 'project', project: { owner: itemSource.owner, number: itemSource.number }, show, labels };
+  if (itemSource.kind === 'issues') return { repo, role, items: 'issues', show, labels };
+  if (itemSource.kind === 'azure-sprint') return { repo, role, items: 'sprint', team: itemSource.team, show, labels };
+  return { repo, role, items: 'project', project: { owner: itemSource.owner, number: itemSource.number }, show, labels };
 }
 
 /**
@@ -33,6 +35,7 @@ function configuredSources(configs: readonly RepositoryConfig[]): ItemSource {
   const projects = new Map<string, ItemSource>();
   const byRepo = new Map(configs.map(({ repo, itemSource }): [string, ItemSource] => {
     if (itemSource.kind === 'issues') return [repo, repoIssues(repo)];
+    if (itemSource.kind === 'azure-sprint') return [repo, azureSprint(repo, itemSource.team)];
     const key = `${itemSource.owner.toLowerCase()}/${itemSource.number}`;
     if (!projects.has(key)) projects.set(key, githubProject(itemSource));
     return [repo, projects.get(key)!];
@@ -47,7 +50,8 @@ function configuredSources(configs: readonly RepositoryConfig[]): ItemSource {
  * once, as the first lists it, Projects first. A write goes to the source that last listed the item, or, for an item
  * none has listed, to the source its repository names, else the first Project. A read fails whole when any source's
  * read fails, so items never vanish on a passing error; a source other than a Project starts its error with its
- * repository, so the user knows which repository to fix. A read leaves out each item from a repository in `optedIn`
+ * repository, so the user knows which repository to fix. A ReadProblem from a source other than a Project leaves out
+ * only that source's items instead, and the read names the problem under its repository. A read leaves out each item from a repository in `optedIn`
  * that carries no status, except a closed item a Project lists: being in a Project opts it in.
  */
 export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = []): ItemSource {
@@ -57,9 +61,10 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
     || (item.state === 'closed' && projects.includes(source));
   const sources = [...new Set([...projects, ...byRepo.values()])];
   const named = new Map([...byRepo].filter(([, source]) => !projects.includes(source)).map(([repo, source]) => [source, repo]));
-  const readOf = (source: ItemSource) => {
+  const readOf = (source: ItemSource): Promise<ItemsRead> => {
     const repo = named.get(source);
     return repo === undefined ? source.read() : source.read().catch((err: unknown) => {
+      if (err instanceof ReadProblem) return { title: '', items: [], problems: [{ repo, problem: err.message, ...err.fix !== undefined && { fix: err.fix } }] };
       throw new Error(`${repo}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
     });
   };
@@ -77,7 +82,8 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
         return true;
       }));
       listedBy = listed;
-      return { title: reads[0]?.title ?? '', items: items.filter((item) => shows(item, listed.get(item.id)!)) };
+      const problems = reads.flatMap((read) => read.problems ?? []);
+      return { title: reads[0]?.title ?? '', items: items.filter((item) => shows(item, listed.get(item.id)!)), ...problems.length > 0 && { problems } };
     },
     setStatus: (item, status) => sourceOf(item).setStatus(item, status),
     statusRefusal: (item) => ('id' in item ? sourceOf(item) : forRepo(item.repo)).statusRefusal(item),

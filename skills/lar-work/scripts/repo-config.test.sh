@@ -138,6 +138,16 @@ printf '%s' '{"repositories":[{"repo":"maddec01/lar-server\n"}]}' >"$list_file"
 run --list
 refuses "an entry ending in a newline names the file and the entry" "$list_file: repositories[0] needs a repo of the form owner/name"
 
+echo '{"repositories":[{"repo":"maddec01/lar-factory"},{"repo":"contoso/Fabrikam%20Fiber/lar-api"}]}' >"$list_file"
+run --list
+check "lists an Azure DevOps repository as organization/project/repository" '[{"repo":"maddec01/lar-factory"},{"repo":"contoso/Fabrikam%20Fiber/lar-api"}]'
+
+for bad in contoso/Fabrikam/lar-api/x contoso/../lar-api contoso/Fabrikam/.. 'contoso/Fabrikam Fiber/lar-api'; do
+    echo "{\"repositories\":[{\"repo\":\"$bad\"}]}" >"$list_file"
+    run --list
+    refuses "an Azure DevOps entry $bad names the file and the entry" "$list_file: repositories[0] needs a repo of the form owner/name"
+done
+
 # <owner/repo>
 
 file maddec01/lar-factory '{"role":"factory"}'

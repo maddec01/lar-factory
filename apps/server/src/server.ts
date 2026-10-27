@@ -288,7 +288,7 @@ async function refresh(): Promise<void> {
     const recovered = error !== null && error !== settings.problem || fetchedAt === null;
     board.applyRead(snapshot.items, readRevision, withT3Reads);
     const repos = items.repos();
-    board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: settings.problem ?? null,
+    board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: settings.problem ?? null, itemSourceProblems: snapshot.problems ?? [],
       t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;

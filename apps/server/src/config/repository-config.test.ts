@@ -4,8 +4,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  dropRepository, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding, savePrClosed, saveResetting,
-  stillOnboarding,
+  dropRepository, isItemSource, isRepo, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded, saveOnboarding,
+  savePrClosed, saveResetting, stillOnboarding,
 } from './repository-config.ts';
 
 async function dataDir(t: TestContext, files: Record<string, string> = {}): Promise<string> {
@@ -167,9 +167,28 @@ test("a list file that isn't JSON or has the wrong shape is refused, naming its 
   assert.throws(() => readRepositoryList(broken), { message: `${join(broken, 'repositories.json')} isn't valid JSON.` });
   for (const shape of [[], { repositories: {} }, { repositories: ['maddec01/lar-factory'] }, { repositories: [{ repo: 'lar-factory' }] },
     { repositories: [{ repo: 'maddec01/..' }] }, { repositories: [{ repo: '../lar-factory' }] }, { repositories: [{ repo: 'maddec01/lar?x' }] },
-    { repositories: [{ repo: 'maddec01/lar#x' }] }]) {
+    { repositories: [{ repo: 'maddec01/lar#x' }] }, { repositories: [{ repo: 'contoso/Fabrikam/lar-api/x' }] },
+    { repositories: [{ repo: 'contoso/../lar-api' }] }, { repositories: [{ repo: 'contoso/Fabrikam/..' }] }]) {
     const dir = await dataDir(t, { 'repositories.json': JSON.stringify(shape) });
     assert.throws(() => readRepositoryList(dir), (err: Error) => err.message.startsWith(`${join(dir, 'repositories.json')}: `), JSON.stringify(shape));
+  }
+});
+
+test('a repository is owner/name on GitHub or organization/project/repository on Azure DevOps, as its origin URL has them', async (t) => {
+  for (const repo of ['maddec01/lar-factory', 'contoso/Fabrikam/lar-api', 'contoso/Fabrikam%20Fiber/lar~api']) assert.equal(isRepo(repo), true, repo);
+  for (const repo of ['maddec01/lar factory', 'contoso/Fabrikam Fiber/lar-api', 'contoso/Fabrikam/lar-api/x', 'contoso/../lar-api', 'contoso/Fabrikam/.']) {
+    assert.equal(isRepo(repo), false, repo);
+  }
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'contoso/Fabrikam%20Fiber/lar-api' }] }) });
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'contoso/Fabrikam%20Fiber/lar-api' }]);
+});
+
+test("an item source is a GitHub Project, the repository's issues or an Azure DevOps team's current sprint, named by team", () => {
+  for (const source of [{ kind: 'issues' }, { kind: 'github-project', owner: 'maddec01', number: 3 }, { kind: 'azure-sprint', team: 'Fabrikam Team' }]) {
+    assert.equal(isItemSource(source), true, JSON.stringify(source));
+  }
+  for (const source of [{ kind: 'azure-sprint' }, { kind: 'azure-sprint', team: '' }, { kind: 'sprint', team: 'x' }]) {
+    assert.equal(isItemSource(source), false, JSON.stringify(source));
   }
 });
 
@@ -203,18 +222,36 @@ test("a repository without the file, or with a file that doesn't parse or has a 
   const gh = ghWith({ 'maddec01/broken': '{ broken', 'maddec01/no-role': {}, 'maddec01/sprint': { role: 'x', itemSource: { kind: 'sprint' } },
     'maddec01/no-number': { role: 'x', itemSource: { kind: 'github-project', owner: 'maddec01' } }, 'maddec01/some': { role: 'x', show: 'some' },
     'maddec01/bad-owner': { role: 'x', itemSource: { kind: 'github-project', owner: 'lar" or true or "', number: 3 } },
-    'maddec01/bad-number': { role: 'x', itemSource: { kind: 'github-project', owner: 'maddec01', number: 1.5 } } });
+    'maddec01/bad-number': { role: 'x', itemSource: { kind: 'github-project', owner: 'maddec01', number: 1.5 } },
+    'maddec01/azure-kind': { role: 'x', itemSource: { kind: 'azure-sprint', team: 'Web' } } });
   const refusals = {
     'maddec01/missing': 'maddec01/missing: no .lar-factory.json on its default branch.',
     'maddec01/broken': "maddec01/broken: .lar-factory.json isn't valid JSON.",
     'maddec01/no-role': 'maddec01/no-role: .lar-factory.json field role is missing or not a string.',
     'maddec01/sprint': 'maddec01/sprint: .lar-factory.json field itemSource.kind must be "issues" or "github-project".',
+    'maddec01/azure-kind': 'maddec01/azure-kind: .lar-factory.json field itemSource.kind must be "issues" or "github-project".',
     'maddec01/no-number': 'maddec01/no-number: .lar-factory.json field itemSource.number must be a positive whole number for a github-project.',
     'maddec01/bad-number': 'maddec01/bad-number: .lar-factory.json field itemSource.number must be a positive whole number for a github-project.',
     'maddec01/bad-owner': 'maddec01/bad-owner: .lar-factory.json field itemSource.owner must be a GitHub login for a github-project.',
     'maddec01/some': 'maddec01/some: .lar-factory.json field show must be "all" or "opted-in".',
   };
   for (const [repo, message] of Object.entries(refusals)) await assert.rejects(readRepositoryConfig(repo, gh), { message });
+});
+
+test("an Azure DevOps repository's config names its team's sprint, with no default item source", async () => {
+  const files: Record<string, unknown> = { 'contoso/Fabrikam/api': { role: 'API', itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' } },
+    'contoso/Fabrikam/none': { role: 'x' }, 'contoso/Fabrikam/issues': { role: 'x', itemSource: { kind: 'issues' } },
+    'contoso/Fabrikam/no-team': { role: 'x', itemSource: { kind: 'azure-sprint' } }, 'contoso/Fabrikam/empty-team': { role: 'x', itemSource: { kind: 'azure-sprint', team: '' } } };
+  // Reading the file with az waits for its own slice; this reader hands back each file as it is.
+  const read = async (args: string[]) => JSON.stringify(files[/^repos\/(.+)\/contents\//.exec(args[1] ?? '')?.[1] ?? '']);
+  assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/api', read)).itemSource, { kind: 'azure-sprint', team: 'Fabrikam Team' });
+  const refusals = {
+    'contoso/Fabrikam/none': 'field itemSource.kind must be "azure-sprint"',
+    'contoso/Fabrikam/issues': 'field itemSource.kind must be "azure-sprint"',
+    'contoso/Fabrikam/no-team': 'field itemSource.team must name the team for an azure-sprint',
+    'contoso/Fabrikam/empty-team': 'field itemSource.team must name the team for an azure-sprint',
+  };
+  for (const [repo, problem] of Object.entries(refusals)) await assert.rejects(readRepositoryConfig(repo, read), { message: `${repo}: .lar-factory.json ${problem}.` });
 });
 
 test('a gh failure other than a 404 passes through', async () => {

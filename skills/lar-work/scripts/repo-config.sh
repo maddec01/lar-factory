@@ -16,6 +16,9 @@ set -euo pipefail
 usage="usage: repo-config.sh <owner/repo> | <Azure repository> | --list"
 # owner/name, each part of letters, digits, ".", "_" or "-", and neither "." nor "..". A jq regex: bash's has no lookahead.
 repo_form='^(?!\.\.?/)[A-Za-z0-9._-]+/(?!\.\.?\z)[A-Za-z0-9._-]+\z'
+# An Azure repository on the list: <org>/<project>/<repo> as its origin URL has them, each part as azure.sh's azure_repo
+# takes it, and none "." nor "..".
+azure_form='^(?!\.\.?/)[A-Za-z0-9._%~-]+/(?!\.\.?/)[A-Za-z0-9._%~-]+/(?!\.\.?\z)[A-Za-z0-9._%~-]+\z'
 arg=${1:-}
 
 if [[ $arg == --list ]]; then
@@ -34,9 +37,9 @@ if [[ $arg == --list ]]; then
         else
             first(.repositories | to_entries[]
                 | select((.value | type) != "object" or (.value.repo | type) != "string"
-                    or (.value.repo | test($repo_form) | not))
+                    or (.value.repo | test($repo_form) or test($azure_form) | not))
                 | "repositories[\(.key)] needs a repo of the form owner/name") // empty
-        end' --arg repo_form "$repo_form" "$list_file")
+        end' --arg repo_form "$repo_form" --arg azure_form "$azure_form" "$list_file")
     if [[ -n $problem ]]; then
         echo "$list_file: $problem." >&2
         exit 1

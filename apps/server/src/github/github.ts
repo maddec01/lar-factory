@@ -155,10 +155,14 @@ export interface GithubProjectRef {
   number: number;
 }
 
-/** A file's text on the repository's default branch, read through the contents API without a ref; null when it has none there. */
-export async function readDefaultBranchFile(repo: string, path: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+/**
+ * A file's text on the branch, or on the repository's default branch when there is none, read through the contents
+ * API; null when the branch has no such file.
+ */
+export async function readBranchFile(repo: string, path: string, branch?: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+  const ref = branch === undefined ? '' : `?ref=${encodeURIComponent(branch)}`;
   try {
-    return await run(['api', `repos/${repo}/contents/${path}`, '-H', 'Accept: application/vnd.github.raw']);
+    return await run(['api', `repos/${repo}/contents/${path}${ref}`, '-H', 'Accept: application/vnd.github.raw']);
   } catch (err) {
     if (/HTTP 404/.test(message(err))) return null;
     throw err;
@@ -474,15 +478,19 @@ export async function createBranch(repo: string, branch: string, sha: string, ru
   await run(['api', `repos/${repo}/git/refs`, '--method', 'POST', '-f', `ref=refs/heads/${branch}`, '-f', `sha=${sha}`]);
 }
 
-/** Whether the repository has the branch on GitHub. */
-export async function branchExists(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<boolean> {
+/** The commit at the head of the repository's branch on GitHub, or null when it has no such branch. */
+export async function branchHead(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
   try {
-    await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha']);
-    return true;
+    return (await run(['api', `repos/${repo}/git/ref/heads/${branch}`, '--jq', '.object.sha'])).trim();
   } catch (err) {
-    if (/HTTP 404/.test(message(err))) return false;
+    if (/HTTP 404/.test(message(err))) return null;
     throw err;
   }
+}
+
+/** Whether the repository has the branch on GitHub. */
+export async function branchExists(repo: string, branch: string, run: (args: string[]) => Promise<string> = gh): Promise<boolean> {
+  return await branchHead(repo, branch, run) !== null;
 }
 
 /** The URL of the open PR from the branch, or null when it has none. */

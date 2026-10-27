@@ -8,7 +8,7 @@ import {
   PROVIDERS, SHOW_SETTINGS, isRecord, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider, type RepositoryConfigAnswers,
   type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
-import { readDefaultBranchFile } from '../github/github.ts';
+import { readBranchFile } from '../github/github.ts';
 import { boardDataDir } from '../port/board-record.ts';
 
 /** One repository's Repository config, with each field its file leaves out filled in. */
@@ -224,11 +224,11 @@ class RepositoryConfigError extends Error {
 }
 
 /**
- * The repository's .lar-factory.json from its default branch, never a checkout, with defaults filled in; null when it
- * has none, or why the one it has is wrong. Throws any other failure, such as a logged-out gh.
+ * The repository's .lar-factory.json from its default branch, or from `branch` when given, never a checkout, with
+ * defaults filled in; null when it has none, or why the one it has is wrong. Throws any other failure, such as a logged-out gh.
  */
-export async function findRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>): Promise<RepositoryConfig | { problem: string } | null> {
-  const text = await readDefaultBranchFile(repo, '.lar-factory.json', run);
+export async function findRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>, branch?: string): Promise<RepositoryConfig | { problem: string } | null> {
+  const text = await readBranchFile(repo, '.lar-factory.json', branch, run);
   if (text === null) return null;
   let raw: unknown;
   try { raw = JSON.parse(text); }

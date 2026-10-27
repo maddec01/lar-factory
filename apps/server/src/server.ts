@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { GH_FLOOR, ghBlocksRead, itemSource, type BoardData, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
-import { openEditPr, readEditConfig } from './config/edit-config.ts';
+import { openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
 import { readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { editPrBody, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
@@ -84,9 +84,15 @@ const items = onboardedSources(async () => {
     },
     // A finished onboarding has its .lar-factory.json now, which the kept answer may not say.
     finished: configChecks.forget });
-  // A repository still onboarding has no Repository config on its default branch until its PR merges.
-  const read = await readOnboardedConfigs(list.filter((e) => !e.onboarding));
-  board.update({ repos: read.configs.map(repoView), repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list, followProblems) });
+  // A repository still onboarding has no Repository config on its default branch until its PR merges. Each refresh
+  // asks gh for every open Edit PR, so its row's mark survives a restart and goes once the PR merges or closes.
+  const onboarded = list.filter((e) => !e.onboarding);
+  const [read, editPrs] = await Promise.all([readOnboardedConfigs(onboarded),
+    readEditPrs(onboarded.map((e) => e.repo), undefined, (repo, problem) => log(`can't read ${repo}'s Edit PR: ${problem}`))]);
+  board.update({
+    repos: read.configs.map((config) => ({ ...repoView(config), ...editPrs.has(config.repo) && { editPr: editPrs.get(config.repo) } })),
+    repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list, followProblems),
+  });
   return read;
 });
 /** Each repository's .lar-factory.json answer for onboarding, kept until Recheck. */

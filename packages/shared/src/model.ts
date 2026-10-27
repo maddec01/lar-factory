@@ -314,7 +314,8 @@ export interface RepoConfig {
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
   /** Its custom labels, the `labels` in its .lar-factory.json, which Add item offers and the queue shows. */
-  labels: string[];
+  labels: string[];  /** The URL of its open Edit PR, the open PR from lar-factory/edit-config, as the latest read found it; absent when it has none. */
+  editPr?: string;
 }
 
 export const ITEM_SOURCE_KINDS = ['project', 'issues'] as const;

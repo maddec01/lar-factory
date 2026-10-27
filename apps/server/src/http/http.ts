@@ -50,9 +50,12 @@ export interface HttpDeps {
   previewOnboardingPr(input: Record<string, unknown>): Promise<{ changes: OnboardingPrChange[] } | { status: number; error: string }>;
   /** Reopens an onboarding's PR that closed without merging, returning the repositories still onboarding, or gh's problem. */
   reopenOnboardingPr(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | { status: number; error: string }>;
-  /** Edit's load: an onboarded repository's .lar-factory.json values from its default branch and its labels, or why it can't. */
-  readEditConfig(input: Record<string, unknown>): Promise<{ config: RepositoryConfigAnswers; labels: string[] } | { status: number; error: string }>;
-  /** Edit's Save: creates the custom labels the repository lacks and opens the PR on its .lar-factory.json, returning its URL, or gh's problem. */
+  /**
+   * Edit's load: an onboarded repository's .lar-factory.json values and its labels, or why it can't. The values come
+   * from its open Edit PR's branch, which `editPr` names, while there is one, else from its default branch.
+   */
+  readEditConfig(input: Record<string, unknown>): Promise<{ config: RepositoryConfigAnswers; labels: string[]; editPr?: string } | { status: number; error: string }>;
+  /** Edit's Save: creates the custom labels the repository lacks and opens the PR on its .lar-factory.json, or adds to the open one, returning its URL, or gh's problem. */
   openEditPr(input: Record<string, unknown>): Promise<{ prUrl: string } | { status: number; error: string }>;
 }
 

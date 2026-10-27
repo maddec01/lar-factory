@@ -3,34 +3,33 @@
 // asks, one to a row with its label and one line of help.
 
 import { useId, useState, type ReactNode } from 'react';
-import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { customLabelProblem, customTagProblem, shownRepo, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
-import { Alert, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
-import { Badge } from '@lar-factory/ui/badge';
-import { Button } from '@lar-factory/ui/button';
-import { Checkbox } from '@lar-factory/ui/checkbox';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { Alert } from '@lar-factory/ui/design-system/Alert';
+import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
+import { Field as LabelledField } from '@lar-factory/ui/design-system/Field';
+import { Input } from '@lar-factory/ui/design-system/Input';
+import { RadioGroup, RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
-import { Input } from '@lar-factory/ui/input';
-import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
 import { byTeam, setupProblems, suggestedShow, type SetupAction, type SetupChange } from './setup-answers.ts';
 
 /** One choice of a radio group: its title, then a line of detail. */
 export function Choice({ value, title, children, disabled }: { value: string; title: ReactNode; children?: ReactNode; disabled?: boolean }) {
   return (
-    <label data-choice={value} className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 has-data-checked:border-ring has-data-checked:bg-accent/40 ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
-      <Radio value={value} disabled={disabled} className="mt-0.5" />
-      <span className="grid min-w-0 flex-1 gap-0.5"><span className="text-sm font-medium">{title}</span>{children && <span className="text-xs text-muted-foreground">{children}</span>}</span>
-    </label>
+    <div data-choice={value} className={`rounded-lg border border-base-300 px-3 py-2.5 has-data-[state=checked]:border-primary/60 has-data-[state=checked]:bg-primary/8 ${disabled ? 'opacity-60' : ''}`}>
+      <RadioGroupItem value={value} disabled={disabled} label={title} description={children} />
+    </div>
   );
 }
 
 /** The props that tie a field's control to its help and problem. */
-type Described = { 'aria-describedby'?: string; 'aria-invalid'?: true };
+type Described = { 'aria-describedby'?: string };
 
 /**
- * One field on its own row: its label and control, one line of help, then what Next waits for from it, if anything.
- * The help and problem sit outside the label and describe the control, so they aren't read as its name. The problem
- * is muted help until `invalid`, which marks it and the control.
+ * One field on its own row: the copied Field's label and control, one line of help, then what Next waits for from it,
+ * if anything. The help and problem sit outside the label and describe the control, so they aren't read as its name.
+ * The problem is muted help until `invalid`, which marks it and the control.
  */
 export function Field({ name, label, hint, problem, invalid = false, children }: {
   name?: string; label: string; hint?: ReactNode; problem?: string; invalid?: boolean; children: (described: Described) => ReactNode;
@@ -40,10 +39,10 @@ export function Field({ name, label, hint, problem, invalid = false, children }:
   const describedBy = [hint && `${id}-hint`, problem && `${id}-problem`].filter(Boolean).join(' ');
   return (
     <div data-field={name} className="grid gap-1.5">
-      <label className="grid gap-1.5"><span className="text-sm font-medium">{label}</span>
-        {children({ ...describedBy && { 'aria-describedby': describedBy }, ...marked && { 'aria-invalid': true } })}</label>
-      {hint && <span id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</span>}
-      {problem && <span id={`${id}-problem`} data-problem className={`text-xs ${marked ? 'text-destructive-foreground' : 'text-muted-foreground'}`}>{problem}</span>}
+      {/* The copied Field shows one helper line; the board shows the help and the problem below it instead. */}
+      <LabelledField label={label} invalid={marked}>{children(describedBy ? { 'aria-describedby': describedBy } : {})}</LabelledField>
+      {hint && <span id={`${id}-hint`} className="text-xs text-base-700">{hint}</span>}
+      {problem && <span id={`${id}-problem`} data-problem className={`text-xs ${marked ? 'text-(--lar-danger-text)' : 'text-base-700'}`}>{problem}</span>}
     </div>
   );
 }
@@ -53,7 +52,7 @@ export function Group({ legend, hint, children }: { legend: string; hint?: React
   return (
     <Fieldset unstyled className="grid gap-2">
       <FieldsetLegend className="mb-0 font-medium">{legend}</FieldsetLegend>
-      {hint && <p className="m-0 -mt-1 text-xs text-muted-foreground">{hint}</p>}
+      {hint && <p className="m-0 -mt-1 text-xs text-base-700">{hint}</p>}
       {children}
     </Fieldset>
   );
@@ -106,16 +105,16 @@ export function SetupFields({ repo, azure = false, setup, action = 'Next', disab
     )}
     {setup.itemSource === 'github-project' && (<>
       <Field name="project-owner" label="Project owner" hint="The GitHub user or organization that owns the Project." {...owner.field}>
-        {(described) => <Input font="mono" {...owner.control} {...described} />}
+        {(described) => <Input className="font-mono" {...owner.control} {...described} />}
       </Field>
       <Field name="project-number" label="Project number" hint="The number in the Project’s URL, after /projects/." {...number.field}>
-        {(described) => <Input font="mono" inputMode="numeric" placeholder="3" {...number.control} {...described} />}
+        {(described) => <Input className="font-mono" inputMode="numeric" placeholder="3" {...number.control} {...described} />}
       </Field>
     </>)}
     <Group legend="Show" hint="Which of the item source’s items show on the board.">
       <RadioGroup value={setup.show} onValueChange={(v) => onAnswer({ show: v as ShowSetting })} className="gap-2">
         {(['all', 'opted-in'] as const).map((show) => (
-          <Choice key={show} value={show} disabled={disabled} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge variant="secondary" size="sm">Suggested</Badge>}</span>}>
+          <Choice key={show} value={show} disabled={disabled} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge tone="accent">Suggested</Badge>}</span>}>
             {show === 'all' ? 'Every open item from the item source; an item with no status counts as List.'
               : `Only items that carry a status show; someone opts an item in by giving it ${setup.itemSource === 'github-project' ? 'the List Status' : azure ? 'the status-list tag' : 'the status-list label'}.`}
           </Choice>
@@ -155,7 +154,7 @@ export const customLabelsHelp = (noun: 'label' | 'tag') =>
   `Custom ${noun}s mark which part of the product an item touches, such as app: music. Add item offers them, and the queue shows them on each item.`;
 
 export function CustomLabelsTitle({ noun = 'label' }: { noun?: 'label' | 'tag' }) {
-  return <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Custom {noun}s</h4>;
+  return <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">Custom {noun}s</h4>;
 }
 
 /**
@@ -171,14 +170,14 @@ export function CustomLabelPicker({ repo, azure = false, offered, picked, typed,
   const add = () => { if (!disabled) onAdd(); };
   return (
     <div data-custom-labels className="grid gap-2">
-      <div className="grid gap-1"><CustomLabelsTitle noun={noun} /><p className="m-0 text-xs text-muted-foreground">{customLabelsHelp(noun)} Pick the ones {shownRepo(repo)} uses, or add a new one.{azure
+      <div className="grid gap-1"><CustomLabelsTitle noun={noun} /><p className="m-0 text-xs text-base-700">{customLabelsHelp(noun)} Pick the ones {shownRepo(repo)} uses, or add a new one.{azure
         && ' The board writes a new one the first time a work item needs it.'}</p></div>
       {choices.length > 0 && (
         <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0">
           {choices.map((name) => (
             <li key={name} data-custom={name}>
               <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={picked.includes(name)} disabled={locked} onCheckedChange={() => onToggle(name)} />
+                <Checkbox checked={picked.includes(name)} disabled={locked} onChange={() => onToggle(name)} />
                 <code className="min-w-0 break-all font-mono">{name}</code>
               </label>
             </li>
@@ -186,13 +185,12 @@ export function CustomLabelPicker({ repo, azure = false, offered, picked, typed,
         </ul>
       )}
       <span className="flex gap-2">
-        <Input data-new-custom font="mono" placeholder="app: music" aria-label={`New custom ${noun}`} value={typed} disabled={adding}
+        <Input data-new-custom className="font-mono" placeholder="app: music" aria-label={`New custom ${noun}`} value={typed} disabled={adding}
           onChange={(e) => onType(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-        <Button data-add-custom variant="outline" disabled={disabled} onClick={add}>
-          {adding ? <><LoaderCircle className="animate-spin" /> Adding…</> : 'Add'}</Button>
+        <Button data-add-custom variant="secondary" disabled={disabled} loading={adding} onClick={add}>{adding ? 'Adding…' : 'Add'}</Button>
       </span>
-      {problem && <p className="m-0 text-xs text-destructive-foreground">{problem}</p>}
-      {error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t create {error.name}</AlertTitle><AlertDescription>{error.message}</AlertDescription></Alert>}
+      {problem && <p className="m-0 text-xs text-(--lar-danger-text)">{problem}</p>}
+      {error && <Alert tone="danger" title={`Can’t create ${error.name}`}>{error.message}</Alert>}
     </div>
   );
 }

@@ -42,10 +42,10 @@ test('Reset of an onboarding waiting for its PR says it closes the PR, then clos
   const data: BoardData = { ...sample, onboarding: [{ repo: REPO, progress: waiting }] };
   const sent = serve(data);
   await openReset(data);
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-title"]'))).toBe(`Reset ${REPO}?`);
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toBe(
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Reset ${REPO}?`);
+  expect(text(dialog()!.querySelector('#reset-detail'))).toBe(
     `Reset closes ${REPO}’s onboarding PR, maddec01/lar-web#14, and drops its onboarding from this Mac’s list, with its Resume. It opens no PR, and leaves alone the T3 project and the repository’s labels.`);
-  expect(dialog()!.querySelector('[data-slot="alert-dialog-description"] a')!.getAttribute('href')).toBe(PR);
+  expect(dialog()!.querySelector('#reset-detail a')!.getAttribute('href')).toBe(PR);
   expect(document.activeElement, 'focus starts on Cancel, not the PR link').toBe(button(dialog()!, 'Cancel'));
   await settle(() => button(dialog()!, 'Reset').click());
   await settle(() => vi.advanceTimersByTime(50));
@@ -59,7 +59,7 @@ test.each([['no PR yet', progress], ['a closed PR', { ...waiting, prClosed: true
   const data: BoardData = { ...sample, onboarding: [{ repo: REPO, progress: onboarding }] };
   serve(data);
   await openReset(data);
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toBe(
+  expect(text(dialog()!.querySelector('#reset-detail'))).toBe(
     `Reset drops ${REPO}’s onboarding from this Mac’s list, with its Resume. It has no open PR to close, so it changes nothing on GitHub, and leaves alone the T3 project and the repository’s labels.`);
   await settle(() => button(dialog()!, 'Cancel').click());
   await settle(() => vi.advanceTimersByTime(50));
@@ -86,13 +86,13 @@ test('Reset of an onboarded repository says what its PR removes, what it drops a
   const resetPr = `https://github.com/${ONBOARDED}/pull/30`;
   const sent = serve(sample, { body: { error: null, prUrl: resetPr, board: { ...sample, repos: sample.repos.slice(1) } } });
   await openReset(sample, ONBOARDED);
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-title"]'))).toBe(`Reset ${ONBOARDED}?`);
-  expect([...dialog()!.querySelectorAll('[data-slot="alert-dialog-description"] li')].map(text)).toEqual([
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Reset ${ONBOARDED}?`);
+  expect([...dialog()!.querySelectorAll('#reset-detail li')].map(text)).toEqual([
     'opens a PR that removes .lar-factory.json, the ## Agent skills block and the docs/agents/ files;',
     `drops ${ONBOARDED} from this Mac’s list and hides its items;`,
     `makes others who onboarded ${ONBOARDED} lose its Repository config once the PR merges.`,
   ]);
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toMatch(/It leaves alone the T3 project and the labels and statuses on its items\.$/);
+  expect(text(dialog()!.querySelector('#reset-detail'))).toMatch(/It leaves alone the T3 project and the labels and statuses on its items\.$/);
   await settle(() => button(dialog()!, 'Reset').click());
   await settle(() => vi.advanceTimersByTime(50));
   expect(sent).toEqual([{ repo: ONBOARDED }]);
@@ -150,8 +150,8 @@ test('Reset of an Azure DevOps onboarding says it abandons the PR and leaves the
   const data: BoardData = { ...sample, onboarding: [{ repo: azure, progress: { ...waiting, prUrl } }] };
   serve(data);
   await openReset(data, azure);
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-title"]'))).toBe('Reset contoso/Fabrikam Fiber/lar-api?');
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toMatch(
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Reset contoso/Fabrikam Fiber/lar-api?');
+  expect(text(dialog()!.querySelector('#reset-detail'))).toMatch(
     /^Reset abandons contoso\/Fabrikam Fiber\/lar-api’s onboarding PR, .+ It opens no PR, and leaves alone the T3 project and the project’s tags\.$/);
 });
 
@@ -160,7 +160,7 @@ test('Reset of an Azure DevOps onboarding with no PR yet says it has none to aba
   const data: BoardData = { ...sample, onboarding: [{ repo: azure, progress }] };
   serve(data);
   await openReset(data, azure);
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-description"]'))).toBe(
+  expect(text(dialog()!.querySelector('#reset-detail'))).toBe(
     'Reset drops contoso/Fabrikam Fiber/lar-api’s onboarding from this Mac’s list, with its Resume. It has no open PR to abandon, so it changes nothing on Azure DevOps, and leaves alone the T3 project and the project’s tags.');
 });
 
@@ -170,8 +170,8 @@ test('Reset of an onboarded Azure DevOps repository names it as Azure shows it, 
   const data: BoardData = { ...sample, repos: [...sample.repos, { ...sample.repos[0]!, repo: azure }] };
   serve(data, { body: { error: null, prUrl: resetPr, board: sample } });
   await openReset(data, azure);
-  expect(text(dialog()!.querySelector('[data-slot="alert-dialog-title"]'))).toBe('Reset contoso/Fabrikam Fiber/lar-api?');
-  expect([...dialog()!.querySelectorAll('[data-slot="alert-dialog-description"] li')].map(text).slice(1)).toEqual([
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Reset contoso/Fabrikam Fiber/lar-api?');
+  expect([...dialog()!.querySelectorAll('#reset-detail li')].map(text).slice(1)).toEqual([
     'drops contoso/Fabrikam Fiber/lar-api from this Mac’s list and hides its items;',
     'makes others who onboarded contoso/Fabrikam Fiber/lar-api lose its Repository config once the PR merges.',
   ]);

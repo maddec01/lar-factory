@@ -1,7 +1,7 @@
 // The Add item dialog: the form, its repo-dependent fields, and each phase of a submission.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, addStylesheet, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
+import { $, $$, addStylesheet, checkedOf, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
 import type { BoardData } from '@lar-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [
@@ -13,7 +13,7 @@ const field = <T extends HTMLElement = HTMLInputElement>(id: string) => $<T>(`#$
 const submit = () => field<HTMLButtonElement>('item-submit');
 const result = () => field('item-result');
 const labels = () => $$<HTMLInputElement>('input[name="labels"]').map((input) => input.value);
-const box = (label: string) => $$('[role="checkbox"]').find((each) => each.closest('label')!.textContent === label)!;
+const box = (label: string) => $$('input[type="checkbox"]').find((each) => each.closest('label')!.textContent === label)!;
 
 async function open(data: BoardData = withFactory): Promise<void> {
   await mountPage(data);
@@ -95,7 +95,7 @@ test('ticking a box counts as editing and clears the message', async () => {
   await settle(() => submit().click());
   expect(result().textContent).toBe('Choose bug, feature or improvement.');
   await settle(() => box('area: web').click());
-  expect(box('area: web').getAttribute('aria-checked')).toBe('true');
+  expect(checkedOf(box('area: web'))).toBe('true');
   expect(result().textContent).toBe('');
 });
 
@@ -128,7 +128,7 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
   expect(box('area: server').hasAttribute('data-disabled'), 'the boxes lock with the fields').toBe(true);
   await settle(() => box('area: server').click());
-  expect(box('area: server').getAttribute('aria-checked')).toBe('false');
+  expect(checkedOf(box('area: server'))).toBe('false');
   expect($('#add-item-form')!.getAttribute('aria-busy')).toBe('true');
   expect(result().textContent).toBe('Creating the issue and adding it to List…');
 
@@ -155,7 +155,7 @@ test('a created issue the server could not add offers a retry of the same reques
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
   expect(box('area: server').hasAttribute('data-disabled'), 'the boxes lock with the fields').toBe(true);
   await settle(() => box('area: server').click());
-  expect(box('area: server').getAttribute('aria-checked')).toBe('false');
+  expect(checkedOf(box('area: server'))).toBe('false');
 
   respond({ item: null, issueUrl: null, error: 'Still failing.' }, 502);
   await settle(() => submit().click());
@@ -274,16 +274,16 @@ test('on an Azure repository, Only for <repo> starts unticked, and ticked, the d
   const azure: BoardData = { ...withFactory, capture: { session: 's1', enabled: true },
     repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }] };
   await open(azure);
-  expect($$('[role="checkbox"]').some((each) => each.closest('label')!.textContent!.startsWith('Only for')), 'a GitHub repository has no such box').toBe(false);
+  expect($$('input[type="checkbox"]').some((each) => each.closest('label')!.textContent!.startsWith('Only for')), 'a GitHub repository has no such box').toBe(false);
   await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam/web');
-  expect(box('Only for web').getAttribute('aria-checked')).toBe('false');
+  expect(checkedOf(box('Only for web'))).toBe('false');
   await fillDraft();
   respond({ error: 'Could not create the work item.', item: null, issueUrl: null }, 502);
   await settle(() => submit().click());
   expect(posted().draft).toMatchObject({ repo: 'contoso/Fabrikam/web' });
   expect(posted().draft, 'unticked, the draft is for every repository reading the source').not.toHaveProperty('onlyFor');
   await settle(() => box('Only for web').click());
-  expect(box('Only for web').getAttribute('aria-checked')).toBe('true');
+  expect(checkedOf(box('Only for web'))).toBe('true');
   respond({ error: 'Could not create the work item.', item: null, issueUrl: null }, 502);
   await settle(() => submit().click());
   expect(posted().draft).toMatchObject({ repo: 'contoso/Fabrikam/web', onlyFor: true });

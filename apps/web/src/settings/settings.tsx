@@ -12,9 +12,6 @@ import { SidebarNavigationItem } from '@lar-factory/ui/design-system/SidebarNavi
 import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-system/SidebarPane';
 import { SettingsIcon } from '@lar-factory/ui/design-system/NavigationIcons';
 import { useBoardStore } from '../board/board-store.ts';
-import { useWizardStore } from '../onboarding/wizard-store.ts';
-import { useEditStore } from '../repositories/edit-store.ts';
-import { useResetStore } from '../repositories/reset-store.ts';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { ShownControl, notBuilt } from './controls.tsx';
 import { type Group, type Page, pages } from './settings-pages.tsx';
@@ -129,14 +126,8 @@ function SettingsModal() {
   );
 }
 
-/**
- * Settings while it's open. It steps aside while a dialog its rows open is up (Edit, onboarding or Reset), since those
- * are T3 Copies whose focus trap the modal's would fight, and comes back on the same section when that one closes.
- */
+/** Settings while it's open. A dialog its rows open (Edit, onboarding or Reset) stacks over it. */
 export function SettingsDialog() {
   const open = useSettingsStore((state) => state.open);
-  const editing = useEditStore((state) => state.edit !== null);
-  const onboarding = useWizardStore((state) => state.run !== null);
-  const resetting = useResetStore((state) => state.reset !== null);
-  return open && !editing && !onboarding && !resetting ? <SettingsModal /> : null;
+  return open ? <SettingsModal /> : null;
 }

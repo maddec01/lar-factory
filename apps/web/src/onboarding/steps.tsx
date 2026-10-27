@@ -7,22 +7,23 @@
 // thread. The Pull request step lists what the PR changes, opens it, then waits for its merge.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { Check, CircleAlert, ExternalLink, FileText, FolderPlus, GitPullRequest, Info, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
+import { Check, ExternalLink, FileText, FolderPlus, GitPullRequest, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
   SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, shownRepo, threadLink, type Clash, type ClashRun, type CheckedTool, type LabelPlan, type LabelRow,
   type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupCheckId,
   type SkillClash,
 } from '@lar-factory/shared';
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@lar-factory/ui/alert';
-import { Badge } from '@lar-factory/ui/badge';
-import { Button } from '@lar-factory/ui/button';
-import { Checkbox } from '@lar-factory/ui/checkbox';
-import { Input } from '@lar-factory/ui/input';
+import { Button } from '@lar-factory/ui/design-system/Button';
+import { Alert } from '@lar-factory/ui/design-system/Alert';
+import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
+import { Input } from '@lar-factory/ui/design-system/Input';
+import { RadioGroup, RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
 import { NativeSelect } from '@lar-factory/ui/native-select';
 import { Progress } from '@lar-factory/ui/progress';
-import { Radio, RadioGroup } from '@lar-factory/ui/radio-group';
 import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
+import { LinkButton } from '../items/link-button.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import { Choice, CustomLabelPicker, CustomLabelsTitle, Field, customLabelsHelp, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
 import {
@@ -32,19 +33,16 @@ import {
 
 /** Whether the project's repository has .lar-factory.json. */
 function ConfigBadge({ project }: { project: ProjectChoice }) {
-  if (project.hasConfig) return <Badge variant="info" size="sm">has .lar-factory.json</Badge>;
-  if (project.hasConfig === false) return <Badge variant="outline" size="sm">no .lar-factory.json</Badge>;
-  return !!project.provider && <Badge variant="outline" size="sm">couldn’t check .lar-factory.json</Badge>;
+  if (project.hasConfig) return <Badge tone="info">has .lar-factory.json</Badge>;
+  if (project.hasConfig === false) return <Badge>no .lar-factory.json</Badge>;
+  return !!project.provider && <Badge>couldn’t check .lar-factory.json</Badge>;
 }
 
 /** A problem with Retry, which reads T3's projects and their Repository configs again. */
 function Problem({ title, children }: { title: string; children: ReactNode }) {
   const loadProjects = useWizardStore((s) => s.loadProjects);
   return (
-    <Alert variant="error"><CircleAlert /><AlertTitle>{title}</AlertTitle>
-      <AlertDescription>{children}</AlertDescription>
-      <AlertAction><Button size="xs" variant="outline" onClick={() => void loadProjects()}><RotateCw /> Retry</Button></AlertAction>
-    </Alert>
+    <Alert tone="danger" title={title} action={<Button variant="secondary" onClick={() => void loadProjects()} leftIcon={<RotateCw />}>Retry</Button>}>{children}</Alert>
   );
 }
 
@@ -52,7 +50,7 @@ function Problem({ title, children }: { title: string; children: ReactNode }) {
 function ProjectsPending() {
   const projects = useWizardStore((s) => s.projects);
   if (projects.state === 'loading') {
-    return <p data-reading-projects className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading T3 Code’s projects…</p>;
+    return <p data-reading-projects className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading T3 Code’s projects…</p>;
   }
   if (projects.state === 'failed') return <Problem title="Can’t list T3 Code’s projects">{projects.error}</Problem>;
   return null;
@@ -66,14 +64,13 @@ function NewProject({ creating }: { creating: Creating }) {
     <div className="grid gap-3 rounded-lg border p-4">
       <Field label="Folder" hint="The repository’s main checkout on this Mac, as a full path. T3 Code adds it as a project.">
         {(described) => <span className="flex gap-2">
-          <Input data-new-folder font="mono" placeholder="~/Developer/lar-web" value={creating.folder} disabled={creating.adding} {...described}
+          <Input data-new-folder className="font-mono" placeholder="~/Developer/lar-web" value={creating.folder} disabled={creating.adding} {...described}
             onChange={(e) => setFolder(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-          <Button data-add-project variant="outline" disabled={creating.adding || !creating.folder.trim()} onClick={add}>
-            {creating.adding ? <><LoaderCircle className="animate-spin" /> Adding…</> : <><FolderPlus /> Add to T3 Code</>}
-          </Button>
+          <Button data-add-project variant="secondary" disabled={!creating.folder.trim()} loading={creating.adding}
+            leftIcon={creating.adding ? undefined : <FolderPlus />} onClick={add}>{creating.adding ? 'Adding…' : 'Add to T3 Code'}</Button>
         </span>}
       </Field>
-      {creating.error && <Alert variant="error"><CircleAlert /><AlertTitle>Can’t create the T3 project</AlertTitle><AlertDescription>{creating.error}</AlertDescription></Alert>}
+      {creating.error && <Alert tone="danger" title="Can’t create the T3 project">{creating.error}</Alert>}
     </div>
   );
 }
@@ -84,16 +81,16 @@ function ProjectStep({ run }: { run: Run }) {
   if (projects.state !== 'loaded') return <ProjectsPending />;
   return (
     <Group legend="T3 project" hint="Its threads run in this T3 project, whose folder is the repository’s main checkout.">
-      {projects.projects.length === 0 && <p className="m-0 text-sm text-muted-foreground">T3 Code has no project yet.</p>}
+      {projects.projects.length === 0 && <p className="m-0 text-sm text-base-700">T3 Code has no project yet.</p>}
       <RadioGroup value={run.projectId ?? (creating ? 'new' : '')} onValueChange={(id) => (id === 'new' ? chooseNew() : pick(id as string))} className="gap-2">
         {projects.projects.map((p) => {
           const reason = unpickable(p, run, { onboarding });
           const kept = p.onBoard && isOnboarding({ onboarding }, p.repo);
           return (
             <Choice key={p.id} value={p.id} disabled={!!reason} title={<span className="flex flex-wrap items-center gap-2">{p.name}
-              {p.provider && <Badge variant="outline" size="sm">{p.provider}</Badge>}
+              {p.provider && <Badge>{p.provider}</Badge>}
               <ConfigBadge project={p} />
-              {p.onBoard && <Badge variant="secondary" size="sm">{kept ? 'onboarding' : 'on the board'}</Badge>}</span>}>
+              {p.onBoard && <Badge>{kept ? 'onboarding' : 'on the board'}</Badge>}</span>}>
               <span className="font-mono">{p.folder}</span>{p.repo ? ` · ${shownRepo(p.repo)}` : ` · ${reason}`}{p.repo && kept && reason && ` · ${reason}`}
             </Choice>
           );
@@ -114,8 +111,8 @@ function ProviderRow({ project }: { project: ProjectChoice }) {
   return (
     <div data-field="provider" className="grid gap-1.5">
       <span className="text-sm font-medium">Provider</span>
-      <Badge variant="outline" className="justify-self-start">{project.provider}</Badge>
-      <span className="text-xs text-muted-foreground">From the host of {shownRepo(project.repo!)}’s origin; it can’t be changed.</span>
+      <Badge className="justify-self-start">{project.provider}</Badge>
+      <span className="text-xs text-base-700">From the host of {shownRepo(project.repo!)}’s origin; it can’t be changed.</span>
     </div>
   );
 }
@@ -124,14 +121,14 @@ function ProviderRow({ project }: { project: ProjectChoice }) {
 function ReusedConfig({ project, config }: { project: ProjectChoice; config: NonNullable<ProjectChoice['config']> }) {
   return (
     <div className="grid gap-3">
-      <Badge variant="info" className="justify-self-start">From .lar-factory.json on the default branch</Badge>
+      <Badge tone="info" className="justify-self-start">From .lar-factory.json on the default branch</Badge>
       <dl data-reused-config className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 rounded-lg border p-3 text-sm">
-        <dt className="text-muted-foreground">Provider</dt><dd className="m-0">{project.provider}</dd>
-        <dt className="text-muted-foreground">Item source</dt><dd className="m-0">{sourceLine(config.itemSource, project.repo!)}</dd>
-        <dt className="text-muted-foreground">Show</dt><dd className="m-0">{SHOW_TITLES[config.show]}</dd>
-        <dt className="text-muted-foreground">Repository role</dt><dd className="m-0">{config.role}</dd>
+        <dt className="text-base-700">Provider</dt><dd className="m-0">{project.provider}</dd>
+        <dt className="text-base-700">Item source</dt><dd className="m-0">{sourceLine(config.itemSource, project.repo!)}</dd>
+        <dt className="text-base-700">Show</dt><dd className="m-0">{SHOW_TITLES[config.show]}</dd>
+        <dt className="text-base-700">Repository role</dt><dd className="m-0">{config.role}</dd>
       </dl>
-      <p className="m-0 text-xs text-muted-foreground">To change these once onboarding finishes, use Edit in Settings › Repositories.</p>
+      <p className="m-0 text-xs text-base-700">To change these once onboarding finishes, use Edit in Settings › Repositories.</p>
     </div>
   );
 }
@@ -140,7 +137,7 @@ function SetupStep({ run }: { run: Run }) {
   const { projects, answer } = useWizardStore();
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
-  if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  if (!project?.repo) return <p className="m-0 text-sm text-base-700">T3 Code no longer has the picked project. Go Back and pick one.</p>;
   if (project.config) return <ReusedConfig project={project} config={project.config} />;
   return (
     <div className="grid gap-6">
@@ -164,13 +161,13 @@ function LabelItem({ row, labels, azure }: { row: LabelRow; labels: Labels; azur
     <li data-label={row.label.name} data-state={row.state} className="flex items-center gap-2.5 px-3 py-2 text-sm">
       <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: `#${row.label.color}` }} />
       <span className="grid min-w-0 flex-1 gap-0.5"><span className="font-mono font-medium break-all">{row.label.name}</span>
-        <span className="text-xs text-muted-foreground">{row.label.description}</span></span>
+        <span className="text-xs text-base-700">{row.label.description}</span></span>
       {row.state === 'rename' ? (
         <label className="flex items-center gap-2 text-xs">
-          <Checkbox checked={!labels.kept.includes(row.oldName)} disabled={!!labels.busy} onCheckedChange={() => toggleRename(row.oldName)} />
+          <Checkbox checked={!labels.kept.includes(row.oldName)} disabled={!!labels.busy} onChange={() => toggleRename(row.oldName)} />
           Rename <code className="font-mono break-all">{row.oldName}</code>
         </label>
-      ) : <Badge variant={row.state === 'present' ? 'success' : 'warning'} size="sm">{azure && row.state === 'missing' ? 'not used yet' : row.state}</Badge>}
+      ) : <Badge tone={row.state === 'present' ? 'success' : 'warning'}>{azure && row.state === 'missing' ? 'not used yet' : row.state}</Badge>}
     </li>
   );
 }
@@ -178,8 +175,8 @@ function LabelItem({ row, labels, azure }: { row: LabelRow; labels: Labels; azur
 function LabelList({ title, note, rows, labels, azure }: { title: string; note?: string; rows: LabelRow[]; labels: Labels; azure: boolean }) {
   return (
     <div className="grid gap-1">
-      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
-      {note && <p className="m-0 text-xs text-muted-foreground">{note}</p>}
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">{title}</h4>
+      {note && <p className="m-0 text-xs text-base-700">{note}</p>}
       <ul className="m-0 grid list-none divide-y rounded-lg border p-0">{rows.map((row) => <LabelItem key={row.label.name} row={row} labels={labels} azure={azure} />)}</ul>
     </div>
   );
@@ -193,11 +190,11 @@ function LeftAlone({ labels, azure }: { labels: LeftAloneLabel[]; azure: boolean
   if (!labels.length) return null;
   return (
     <div data-left-alone className="grid gap-1">
-      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Left alone</h4>
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">Left alone</h4>
       <ul className="m-0 grid list-none gap-1 p-0 text-sm">
         {labels.map((l) => (
           <li key={l.name} data-left={l.name} className="min-w-0 break-all"><code className="font-mono">{l.name}</code>
-            {l.keptBeside && <span className="text-xs text-muted-foreground"> · The {azure ? 'project' : 'repository'} has {l.keptBeside} too, so it can’t be renamed. Its {azure ? 'work items' : 'issues'} keep {l.name} until you move them to {l.keptBeside}.</span>}
+            {l.keptBeside && <span className="text-xs text-base-700"> · The {azure ? 'project' : 'repository'} has {l.keptBeside} too, so it can’t be renamed. Its {azure ? 'work items' : 'issues'} keep {l.name} until you move them to {l.keptBeside}.</span>}
           </li>
         ))}
       </ul>
@@ -218,7 +215,7 @@ function CustomLabels({ run, project, plan, labels }: { run: Run; project: Proje
     return (
       <div data-custom-labels className="grid gap-1">
         <CustomLabelsTitle noun={azure ? 'tag' : 'label'} />
-        <p className="m-0 text-xs text-muted-foreground">{customLabelsHelp(azure ? 'tag' : 'label')} These are the ones {shownRepo(project.repo!)}’s .lar-factory.json lists; change them with Edit in Settings › Repositories once onboarding finishes. {azure
+        <p className="m-0 text-xs text-base-700">{customLabelsHelp(azure ? 'tag' : 'label')} These are the ones {shownRepo(project.repo!)}’s .lar-factory.json lists; change them with Edit in Settings › Repositories once onboarding finishes. {azure
           ? 'The board writes each the first time a work item needs it.' : 'Create makes the missing ones, with GitHub’s colour, but none that can’t be a custom label.'}</p>
         {names.length ? (
           <ul className="m-0 grid list-none divide-y rounded-lg border p-0">
@@ -229,15 +226,15 @@ function CustomLabels({ run, project, plan, labels }: { run: Run; project: Proje
                 <li key={name} data-custom={name} data-state={state} className="flex items-center gap-2.5 px-3 py-2 text-sm">
                   <span className="grid min-w-0 flex-1 gap-0.5">
                     <code className="break-all font-mono">{name}</code>
-                    {problem && <span data-problem className="text-xs text-destructive-foreground">{problem}</span>}
+                    {problem && <span data-problem className="text-xs text-(--lar-danger-text)">{problem}</span>}
                   </span>
-                  <Badge variant={state === 'present' ? 'success' : state === 'missing' ? 'warning' : 'error'} size="sm">
+                  <Badge tone={state === 'present' ? 'success' : state === 'missing' ? 'warning' : 'danger'}>
                     {problem ? azure ? 'can’t use' : 'can’t create' : azure && state === 'missing' ? 'not used yet' : state}</Badge>
                 </li>
               );
             })}
           </ul>
-        ) : <p className="m-0 text-sm text-muted-foreground">It lists none.</p>}
+        ) : <p className="m-0 text-sm text-base-700">It lists none.</p>}
       </div>
     );
   }
@@ -259,15 +256,14 @@ function LabelsStep({ run }: { run: Run }) {
   const { projects, labels, loadLabels, createLabels, renameLabels } = useWizardStore();
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
-  if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  if (!project?.repo) return <p className="m-0 text-sm text-base-700">T3 Code no longer has the picked project. Go Back and pick one.</p>;
   const azure = project.provider === 'Azure DevOps';
   const nouns = azure ? 'tags' : 'labels';
   if (!labels || labels.read.state === 'loading') {
-    return <p className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading {shownRepo(project.repo)}’s {nouns}…</p>;
+    return <p className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading {shownRepo(project.repo)}’s {nouns}…</p>;
   }
   if (labels.read.state === 'failed') {
-    return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t read {shownRepo(project.repo)}’s {nouns}</AlertTitle><AlertDescription>{labels.read.error}</AlertDescription>
-      <AlertAction><Button size="xs" variant="outline" onClick={() => void loadLabels()}><RotateCw /> Retry</Button></AlertAction></Alert>;
+    return <Alert tone="danger" title={<>Can’t read {shownRepo(project.repo)}’s {nouns}</>} action={<Button variant="secondary" onClick={() => void loadLabels()} leftIcon={<RotateCw />}>Retry</Button>}>{labels.read.error}</Alert>;
   }
   const plan = labelsPlan(run, project, labels)!;
   const creates = azure ? 0 : labelsToCreate(plan, renaming(plan, labels)).length + customLabelsToCreate(project, labels).length;
@@ -277,21 +273,19 @@ function LabelsStep({ run }: { run: Run }) {
   const retry = labels.error?.action === 'rename' ? renameLabels : createLabels;
   return (
     <div className="grid gap-4">
-      <p className="m-0 text-xs text-muted-foreground">{azure
+      <p className="m-0 text-xs text-base-700">{azure
         ? `lar-work and the board read these tags on ${shownRepo(project.repo)}’s project. The board writes a tag the first time a work item needs it, so Next doesn’t wait for one. A rename renames the tag in the project, and every work item that carries it keeps it.`
         : `lar-work and the board read these labels on ${shownRepo(project.repo)}. Next waits until it has every workflow label. A rename keeps the label on every issue that carries it.`}</p>
       <LabelList title={`Workflow ${nouns}`} rows={plan.workflow} labels={labels} azure={azure} />
       {plan.status.length > 0 && <LabelList title={`Status ${nouns}`} note={azure ? STATUS_TAGS_NOTE : STATUS_LABELS_NOTE} rows={plan.status} labels={labels} azure={azure} />}
       {(creates > 0 || renames > 0) && <div className="flex gap-2">
-        {creates > 0 && <Button data-create-labels size="sm" disabled={!!labels.busy} onClick={() => void createLabels()}>
-          {labels.busy === 'create' ? <><LoaderCircle className="animate-spin" /> Creating…</> : `Create ${creates} missing`}</Button>}
-        {renames > 0 && <Button data-rename-labels size="sm" variant="outline" disabled={!!labels.busy} onClick={() => void renameLabels()}>
-          {labels.busy === 'rename' ? <><LoaderCircle className="animate-spin" /> Renaming…</> : `Rename ${renames}`}</Button>}
+        {creates > 0 && <Button data-create-labels disabled={!!labels.busy} loading={labels.busy === 'create'} onClick={() => void createLabels()}>
+          {labels.busy === 'create' ? 'Creating…' : `Create ${creates} missing`}</Button>}
+        {renames > 0 && <Button data-rename-labels variant="secondary" disabled={!!labels.busy} loading={labels.busy === 'rename'} onClick={() => void renameLabels()}>
+          {labels.busy === 'rename' ? 'Renaming…' : `Rename ${renames}`}</Button>}
       </div>}
       {labels.error && labels.error.action !== 'custom' && (
-        <Alert variant="error"><CircleAlert /><AlertTitle>{labels.error.action === 'create' ? `Can’t create the ${nouns}` : `Can’t rename the ${nouns}`}</AlertTitle>
-          <AlertDescription>{labels.error.message}</AlertDescription>
-          <AlertAction><Button size="xs" variant="outline" disabled={!!labels.busy} onClick={() => void retry()}><RotateCw /> Retry</Button></AlertAction></Alert>
+        <Alert tone="danger" title={labels.error.action === 'create' ? `Can’t create the ${nouns}` : `Can’t rename the ${nouns}`} action={<Button variant="secondary" disabled={!!labels.busy} onClick={() => void retry()} leftIcon={<RotateCw />}>Retry</Button>}>{labels.error.message}</Alert>
       )}
       <CustomLabels run={run} project={project} plan={plan} labels={labels} />
       <LeftAlone labels={plan.leftAlone.filter((l) => !labels.created.includes(l.name) && !chosen.has(l.name.toLowerCase()))} azure={azure} />
@@ -327,23 +321,20 @@ const STATUS_TEXT: Record<CheckStatus, string> = { waiting: 'Waiting', running: 
 function CheckList({ title, rows }: { title: string; rows: CheckRow[] }) {
   return (
     <div className="grid gap-1">
-      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">{title}</h4>
       <ul className="m-0 grid list-none divide-y rounded-lg border p-0">
         {rows.map((row) => (
           <li key={row.id} data-check={row.id} data-status={row.status} className="grid gap-2 px-3 py-2">
             <div className="flex items-center gap-2.5 text-sm">
               <StatusIcon status={row.status} />
               <span className="font-medium">{row.title}</span>
-              <span className="ml-auto text-xs text-muted-foreground">{row.status === 'passed' && row.detail || STATUS_TEXT[row.status]}</span>
+              <span className="ml-auto text-xs text-base-700">{row.status === 'passed' && row.detail || STATUS_TEXT[row.status]}</span>
             </div>
             {row.status === 'failed' && (
-              <Alert variant="error"><CircleAlert /><AlertTitle>{row.problem}</AlertTitle>
-                <AlertDescription><span>{row.fix}</span>
+              <Alert tone="danger" title={row.problem} action={row.retry && <Button variant="secondary" onClick={row.retry} leftIcon={<RotateCw />}>Retry</Button>}><span>{row.fix}</span>
                   {row.command && <span className="flex items-center gap-2"><code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{row.command}</code>
                     <CopyButton text={row.command} label={`Copy ${row.command}`} /></span>}
-                </AlertDescription>
-                {row.retry && <AlertAction><Button size="xs" variant="outline" onClick={row.retry}><RotateCw /> Retry</Button></AlertAction>}
-              </Alert>
+                </Alert>
             )}
           </li>
         ))}
@@ -362,7 +353,7 @@ function ChecksStep({ run }: { run: Run }) {
   const tools = useBoardStore((s) => s.data.tools);
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
-  if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  if (!project?.repo) return <p className="m-0 text-sm text-base-700">T3 Code no longer has the picked project. Go Back and pick one.</p>;
   if (!checks) return null;
   const source = itemSourceOf(run, project);
   const retryAll = () => void runChecks();
@@ -388,8 +379,7 @@ function ChecksStep({ run }: { run: Run }) {
     <div className="grid gap-4">
       <Progress value={passed} max={rows.length} caption={caption} aria-label={caption} />
       {checks.commands.state === 'failed' && (
-        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t check the commands</AlertTitle><AlertDescription>{checks.commands.error}</AlertDescription>
-          <AlertAction><Button size="xs" variant="outline" onClick={retryAll}><RotateCw /> Retry</Button></AlertAction></Alert>
+        <Alert tone="danger" title="Can’t check the commands" action={<Button variant="secondary" onClick={retryAll} leftIcon={<RotateCw />}>Retry</Button>}>{checks.commands.error}</Alert>
       )}
       <CheckList title="Required commands" rows={commands} />
       <CheckList title="Setup" rows={setup} />
@@ -403,9 +393,9 @@ function EditPreview({ clash }: { clash: Clash }) {
   return (
     <pre data-edit-preview className={`m-0 ml-7 overflow-x-auto rounded-md bg-muted px-2.5 py-1.5 font-mono text-xs ${clash.wontApply ? 'opacity-60' : ''}`}>
       {edit.kind === 'lines' ? (<>
-        {edit.remove.map((line, i) => <div key={`-${i}`} className="text-destructive-foreground">- {line}</div>)}
+        {edit.remove.map((line, i) => <div key={`-${i}`} className="text-(--lar-danger-text)">- {line}</div>)}
         {edit.add.map((line, i) => <div key={`+${i}`} className="text-success-foreground">+ {line}</div>)}
-      </>) : edit.kind === 'delete' ? <div className="text-destructive-foreground">Delete {clash.file}</div>
+      </>) : edit.kind === 'delete' ? <div className="text-(--lar-danger-text)">Delete {clash.file}</div>
         : <div>Rename {clash.file} to {edit.to}</div>}
     </pre>
   );
@@ -417,11 +407,11 @@ function ClashRow({ clash, picks }: { clash: Clash; picks: Run['cleanup'] }) {
   return (
     <li data-clash={clash.id} className="grid gap-2 px-3 py-2.5">
       <label className={`flex items-start gap-2.5 ${clash.wontApply ? '' : 'cursor-pointer'}`}>
-        <Checkbox checked={ticked(clash, picks)} disabled={!!clash.wontApply} onCheckedChange={(on) => tick(clash.id, on)} className="mt-0.5" />
+        <Checkbox checked={ticked(clash, picks)} disabled={!!clash.wontApply} onChange={(e) => tick(clash.id, e.target.checked)} className="mt-0.5" />
         <span className="grid min-w-0 flex-1 gap-0.5">
           <span className="font-mono text-xs">{clash.file}{clash.line !== undefined && `:${clash.line}`}</span>
-          <span className="text-xs text-muted-foreground">{clash.reason}</span>
-          {clash.wontApply && <span data-wont-apply className="text-xs text-warning-foreground">Won’t go in the PR: {clash.wontApply}</span>}
+          <span className="text-xs text-base-700">{clash.reason}</span>
+          {clash.wontApply && <span data-wont-apply className="text-xs text-(--lar-warning-text)">Won’t go in the PR: {clash.wontApply}</span>}
         </span>
       </label>
       <EditPreview clash={clash} />
@@ -438,26 +428,23 @@ function SkillClashPick({ skill, picks, clashes }: { skill: SkillClash; picks: R
   // A name restored on Resume counts as typed, so its problem shows as an error straight away.
   const [typed, setTyped] = useState(name !== '');
   return (
-    <Alert data-skill-clash={skill.path} variant={problem ? 'warning' : 'default'}><CircleAlert />
-      <AlertTitle>Project skill <span className="font-mono">{skill.name}</span> is named like a bundled skill</AlertTitle>
-      <AlertDescription>
+    <Alert data-skill-clash={skill.path} tone={problem ? 'warning' : 'info'} title={<>Project skill <span className="font-mono">{skill.name}</span> is named like a bundled skill</>}>
         <span><span className="font-mono">{skill.path}</span> would shadow the factory’s <span className="font-mono">{skill.name}</span>. Onboarding can’t go on until you pick one:</span>
         <RadioGroup value={pick?.kind ?? ''} onValueChange={(kind) => pickSkill(skill.path, kind === 'delete' ? { kind } : { kind: 'rename', name })} className="mt-1 gap-2">
-          <label data-skill-pick="delete" className="flex items-center gap-2 text-sm text-foreground"><Radio value="delete" /> Delete it in the PR</label>
-          <label data-skill-pick="rename" className="flex items-center gap-2 text-sm text-foreground"><Radio value="rename" /> Rename it</label>
+          <div data-skill-pick="delete"><RadioGroupItem value="delete" label="Delete it in the PR" /></div>
+          <div data-skill-pick="rename"><RadioGroupItem value="rename" label="Rename it" /></div>
         </RadioGroup>
         {pick?.kind === 'rename' && (
           <div className="mt-1 w-full text-foreground">
             <Field name="skill-name" label="New skill name" problem={problem ?? undefined} invalid={typed}
               hint={<>The PR moves it to <span className="font-mono">{skillsDir(skill.path)}{isSkillName(name) ? name : '…'}/</span> and sets <span className="font-mono">name:</span> in its SKILL.md.</>}>
-              {(described) => <Input size="sm" font="mono" value={name} {...described} onBlur={() => setTyped(true)}
+              {(described) => <Input className="font-mono" value={name} {...described} onBlur={() => setTyped(true)}
                 onChange={(e) => { setTyped(true); pickSkill(skill.path, { kind: 'rename', name: e.target.value }); }} />}
             </Field>
           </div>
         )}
         {problem && pick?.kind !== 'rename' && <span data-problem className="text-xs">{problem}</span>}
-      </AlertDescription>
-    </Alert>
+      </Alert>
   );
 }
 
@@ -474,8 +461,8 @@ function ThreadLink({ run }: { run: ClashRun }) {
   const reason = !run.threadId ? 'T3 Code hasn’t listed the thread yet' : !environment ? 'T3 Code hasn’t written its environment id' : null;
   // Pointer events stay on while it's disabled, so its title says why.
   return reason
-    ? <Button size="xs" variant="ghost" className="disabled:pointer-events-auto" data-thread-link disabled title={reason}><ExternalLink /> Open thread</Button>
-    : <Button size="xs" variant="ghost" data-thread-link render={<a href={threadLink(environment!, run.threadId!)} />}><ExternalLink /> Open thread</Button>;
+    ? <Button variant="quiet" className="disabled:pointer-events-auto" data-thread-link disabled title={reason} leftIcon={<ExternalLink />}>Open thread</Button>
+    : <LinkButton variant="secondary" data-thread-link href={threadLink(environment!, run.threadId!)} leftIcon={<ExternalLink />}>Open thread</LinkButton>;
 }
 
 /** Why a run ended without Clashes, by its state. */
@@ -495,9 +482,9 @@ function ModelPicker({ model, disabled }: { model: ModelChoice | null; disabled:
   const read = useBoardStore((s) => s.data.fetchedAt !== null || s.data.error !== null);
   const pickModel = useWizardStore((s) => s.pickModel);
   if (!groups.length && !read) {
-    return <p data-reading-models className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading T3 Code’s models…</p>;
+    return <p data-reading-models className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading T3 Code’s models…</p>;
   }
-  if (!groups.length) return <p className="m-0 text-sm text-muted-foreground">T3 Code offers no provider with a model. Turn one on in T3 Code’s settings.</p>;
+  if (!groups.length) return <p className="m-0 text-sm text-base-700">T3 Code offers no provider with a model. Turn one on in T3 Code’s settings.</p>;
   const group = groups.find((g) => g.instanceId === model?.instanceId);
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -535,18 +522,17 @@ function ClashAgent({ run }: { run: Run }) {
   const earlier = agent.runs?.slice(0, -1) ?? [];
   return (
     <div data-clash-agent className="grid gap-3">
-      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Clash agent</h4>
-      <p className="m-0 text-xs text-muted-foreground">An agent in a T3 thread in this repository’s project reads every instruction file on a fresh fetch of the default branch and reports rules that work against the factory’s. Next waits for its run. You can close this dialog while it runs: the run goes on, and Resume shows it.</p>
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">Clash agent</h4>
+      <p className="m-0 text-xs text-base-700">An agent in a T3 thread in this repository’s project reads every instruction file on a fresh fetch of the default branch and reports rules that work against the factory’s. Next waits for its run. You can close this dialog while it runs: the run goes on, and Resume shows it.</p>
       <ModelPicker model={model} disabled={running} />
       {/* After a failed start the alert's Retry starts the run, so Look again doesn't offer a second way. */}
       {(!latest || latest.state === 'done') && agent.error?.call !== 'start' && (
-        <Button data-look-for-clashes className="justify-self-start" variant={latest ? 'outline' : 'default'} disabled={!model || running} onClick={look}>
-          {agent.starting ? <><LoaderCircle className="animate-spin" /> Starting…</> : <><Search /> {latest ? 'Look again' : 'Look for Clashes'}</>}</Button>
+        <Button data-look-for-clashes className="justify-self-start" variant={latest ? 'secondary' : 'primary'} disabled={!model || running}
+          loading={agent.starting} leftIcon={agent.starting ? undefined : <Search />} onClick={look}>
+          {agent.starting ? 'Starting…' : latest ? 'Look again' : 'Look for Clashes'}</Button>
       )}
       {agent.error && (
-        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t reach the Clash agent</AlertTitle><AlertDescription>{agent.error.message}</AlertDescription>
-          <AlertAction><Button size="xs" variant="outline" disabled={running} onClick={() => agent.error?.call === 'start' ? look() : void readClashRuns()}>
-            <RotateCw /> Retry</Button></AlertAction></Alert>
+        <Alert tone="danger" title="Can’t reach the Clash agent" action={<Button variant="secondary" disabled={running} onClick={() => agent.error?.call === 'start' ? look() : void readClashRuns()} leftIcon={<RotateCw />}>Retry</Button>}>{agent.error.message}</Alert>
       )}
       {latest?.state === 'running' ? (
         <div data-agent-run="running" className="grid gap-2 rounded-lg border p-3">
@@ -554,7 +540,7 @@ function ClashAgent({ run }: { run: Run }) {
             <LoaderCircle className="size-4 animate-spin text-info" /> Agent running on {modelName(groups, latest.model)}
             <span className="ml-auto"><ThreadLink run={latest} /></span>
           </div>
-          <p data-agent-progress className="m-0 whitespace-pre-wrap text-xs text-muted-foreground">{latest.progress ?? 'Waiting for the agent’s first message.'}</p>
+          <p data-agent-progress className="m-0 whitespace-pre-wrap text-xs text-base-700">{latest.progress ?? 'Waiting for the agent’s first message.'}</p>
         </div>
       ) : latest?.state === 'done' ? (
         <div data-agent-run="done" className="grid gap-1">
@@ -564,17 +550,14 @@ function ClashAgent({ run }: { run: Run }) {
           </div>
           {latest.clashes.length
             ? <ul className="m-0 list-none divide-y rounded-lg border p-0">{latest.clashes.map((clash) => <ClashRow key={clash.id} clash={clash} picks={run.cleanup} />)}</ul>
-            : <p className="m-0 text-sm text-muted-foreground">The agent found no Clash.</p>}
+            : <p className="m-0 text-sm text-base-700">The agent found no Clash.</p>}
         </div>
       ) : latest && (
-        <Alert data-agent-run={latest.state} variant={latest.state === 'failed' ? 'error' : 'warning'}><CircleAlert /><AlertTitle>{ENDED[latest.state]}</AlertTitle>
-          <AlertDescription>{latest.why}</AlertDescription>
-          <AlertAction><ThreadLink run={latest} />
-            <Button size="xs" variant="outline" disabled={!model || running} onClick={look}>{agent.starting ? <LoaderCircle className="animate-spin" /> : <RotateCw />} Retry</Button>
-          </AlertAction></Alert>
+        <Alert data-agent-run={latest.state} tone={latest.state === 'failed' ? 'danger' : 'warning'} title={ENDED[latest.state]} action={<><ThreadLink run={latest} />
+            <Button variant="secondary" disabled={!model || running} loading={agent.starting} leftIcon={agent.starting ? undefined : <RotateCw />} onClick={look}>Retry</Button></>}>{latest.why}</Alert>
       )}
       {earlier.length > 0 && (
-        <ul data-earlier-runs className="m-0 grid list-none gap-1 p-0 text-xs text-muted-foreground">
+        <ul data-earlier-runs className="m-0 grid list-none gap-1 p-0 text-xs text-base-700">
           {earlier.map((r) => (
             <li key={r.title} data-earlier-run={r.title} className="flex items-center gap-2">
               Earlier run on {modelName(groups, r.model)}: {EARLIER[r.state]}
@@ -595,7 +578,7 @@ function PathAndWhat({ path, what }: { path: string; what: string }) {
   return (
     <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
       <span className="font-mono text-xs break-all sm:shrink-0 sm:break-normal">{path}</span>
-      <span className="min-w-0 text-xs text-muted-foreground">{what}</span>
+      <span className="min-w-0 text-xs text-base-700">{what}</span>
     </span>
   );
 }
@@ -611,10 +594,10 @@ function AlwaysWritten({ reused, azure }: { reused: boolean; azure: boolean }) {
   ];
   return (
     <div data-always-written className="grid gap-1">
-      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Always written</h4>
+      <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">Always written</h4>
       <ul className="m-0 grid list-none gap-1 rounded-lg border bg-muted/40 p-3 text-sm">
         {rows.map((row) => (
-          <li key={row.file} data-written={row.file} className="flex items-start gap-2"><Lock className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+          <li key={row.file} data-written={row.file} className="flex items-start gap-2"><Lock className="mt-0.5 size-3 shrink-0 text-base-700" />
             <PathAndWhat path={row.file} what={row.what} /></li>
         ))}
       </ul>
@@ -630,22 +613,21 @@ function CleanupStep({ run }: { run: Run }) {
   const { projects, clashes, findClashes } = useWizardStore();
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
-  if (!project?.repo) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  if (!project?.repo) return <p className="m-0 text-sm text-base-700">T3 Code no longer has the picked project. Go Back and pick one.</p>;
   return (
     <div data-cleanup-step className="grid gap-6">
-      <p className="m-0 text-sm text-muted-foreground">Fixed checks look on {shownRepo(project.repo)}’s default branch for known Clashes: things that make agents work against the factory. Then the Clash agent looks for the rest. Only the edits you tick go into the PR.</p>
+      <p className="m-0 text-sm text-base-700">Fixed checks look on {shownRepo(project.repo)}’s default branch for known Clashes: things that make agents work against the factory. Then the Clash agent looks for the rest. Only the edits you tick go into the PR.</p>
       {(!clashes || clashes.state === 'reading') ? (
-        <p data-reading-clashes className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Running the fixed checks…</p>
+        <p data-reading-clashes className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Running the fixed checks…</p>
       ) : clashes.state === 'failed' ? (
-        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t run the fixed checks</AlertTitle><AlertDescription>{clashes.error}</AlertDescription>
-          <AlertAction><Button size="xs" variant="outline" onClick={() => void findClashes()}><RotateCw /> Retry</Button></AlertAction></Alert>
+        <Alert tone="danger" title="Can’t run the fixed checks" action={<Button variant="secondary" onClick={() => void findClashes()} leftIcon={<RotateCw />}>Retry</Button>}>{clashes.error}</Alert>
       ) : (<>
         {clashes.found.skillClashes.map((skill) => <SkillClashPick key={skill.path} skill={skill} picks={run.cleanup} clashes={clashes} />)}
         <div className="grid gap-1">
-          <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">Fixed checks</h4>
+          <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">Fixed checks</h4>
           {clashes.found.clashes.length
             ? <ul className="m-0 list-none divide-y rounded-lg border p-0">{clashes.found.clashes.map((clash) => <ClashRow key={clash.id} clash={clash} picks={run.cleanup} />)}</ul>
-            : <p className="m-0 text-sm text-muted-foreground">The fixed checks found no Clash.</p>}
+            : <p className="m-0 text-sm text-base-700">The fixed checks found no Clash.</p>}
         </div>
       </>)}
       <ClashAgent run={run} />
@@ -675,16 +657,15 @@ function changeRow(change: OnboardingPrChange): { path: string; what: string } {
 function PrChangeList() {
   const { changes, readPrChanges } = useWizardStore();
   if (!changes || changes.state === 'reading') {
-    return <p data-reading-changes className="m-0 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Reading what the PR changes…</p>;
+    return <p data-reading-changes className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading what the PR changes…</p>;
   }
   if (changes.state === 'failed') {
-    return <Alert variant="error"><CircleAlert /><AlertTitle>Can’t list the PR’s changes</AlertTitle><AlertDescription>{changes.error}</AlertDescription>
-      <AlertAction><Button size="xs" variant="outline" onClick={() => void readPrChanges()}><RotateCw /> Retry</Button></AlertAction></Alert>;
+    return <Alert tone="danger" title="Can’t list the PR’s changes" action={<Button variant="secondary" onClick={() => void readPrChanges()} leftIcon={<RotateCw />}>Retry</Button>}>{changes.error}</Alert>;
   }
   return (
     <ul data-pr-changes className="m-0 grid list-none gap-1 rounded-lg border p-3 text-sm">
       {changes.changes.map(changeRow).map((row, i) => (
-        <li key={i} data-change={row.path} className="flex items-start gap-2"><FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+        <li key={i} data-change={row.path} className="flex items-start gap-2"><FileText className="mt-0.5 size-3.5 shrink-0 text-base-700" />
           <PathAndWhat path={row.path} what={row.what} /></li>
       ))}
     </ul>
@@ -707,62 +688,55 @@ function PrStep({ run }: { run: Run }) {
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
   const config = project && (project.config ?? configOf(run, project));
-  if (!project?.repo || !config) return <p className="m-0 text-sm text-muted-foreground">T3 Code no longer has the picked project. Go Back and pick one.</p>;
+  if (!project?.repo || !config) return <p className="m-0 text-sm text-base-700">T3 Code no longer has the picked project. Go Back and pick one.</p>;
   const repo = shownRepo(project.repo);
   // Open the PR waits for its changes to be listed, so the PR holds only what the step shows.
   const openable = !pr.opening && !!picksOf(run, clashes, agent) && changes?.state === 'read';
   if (run.prUrl && onboarded(run, data)) {
     return (
       <div data-pr-step>
-        <Alert variant="success"><Check /><AlertTitle>{repo} is onboarded</AlertTitle>
-          <AlertDescription>{prName(run.prUrl)} merged. The board reads {repo}’s items from its item source, and Start build and Start refining work for them.</AlertDescription></Alert>
+        <Alert tone="success" title={`${repo} is onboarded`}>{prName(run.prUrl)} merged. The board reads {repo}’s items from its item source, and Start build and Start refining work for them.</Alert>
       </div>
     );
   }
   return (
     <div data-pr-step className="grid gap-4">
       <div className="grid gap-1">
-        <h4 className="m-0 text-xs font-medium text-muted-foreground">One PR on {repo}, branch lar-factory/onboarding</h4>
-        <p className="m-0 text-xs text-muted-foreground">Its one commit is made on {project.provider} from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
+        <h4 className="m-0 text-xs font-medium text-base-700">One PR on {repo}, branch lar-factory/onboarding</h4>
+        <p className="m-0 text-xs text-base-700">Its one commit is made on {project.provider} from the default branch, so your checkout stays as it is. When the branch is taken, its open PR is reused, and with none the PR comes from the first free lar-factory/onboarding-2, -3 and on.</p>
         {listed && (<>
           <PrChangeList />
           {!project.config && <pre className="m-0 overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs">{onboardingConfigFile(config)}</pre>}
         </>)}
       </div>
       {run.prUrl && prClosed(run, data) ? (
-        <Alert variant="warning" data-pr-closed><CircleAlert /><AlertTitle>{prName(run.prUrl)} closed without merging</AlertTitle>
-          <AlertDescription>
+        <Alert tone="warning" data-pr-closed title={<>{prName(run.prUrl)} closed without merging</>} action={<><Button variant="secondary" disabled={pr.opening} loading={pr.reopening}
+              leftIcon={pr.reopening ? undefined : <RotateCw />} onClick={() => void reopenPr()}>Reopen PR</Button>
+            <Button variant="secondary" disabled={pr.reopening || !openable} onClick={() => void startOver()} leftIcon={<GitPullRequest />}>Start over</Button></>}>
             <span>Reopen PR reopens it and waits for its merge again. Start over opens a new PR.</span>
-            {pr.error && <span className="text-destructive-foreground">{pr.error}</span>}
-          </AlertDescription>
-          <AlertAction>
-            <Button size="xs" variant="outline" disabled={pr.reopening || pr.opening} onClick={() => void reopenPr()}>
-              {pr.reopening ? <LoaderCircle className="animate-spin" /> : <RotateCw />} Reopen PR</Button>
-            <Button size="xs" variant="outline" disabled={pr.reopening || !openable} onClick={() => void startOver()}><GitPullRequest /> Start over</Button>
-          </AlertAction></Alert>
+            {pr.error && <span className="block text-(--lar-danger-text)">{pr.error}</span>}
+          </Alert>
       ) : run.prUrl ? (
         <div className="grid gap-3 rounded-lg border p-3">
           <div className="flex items-center gap-2.5 text-sm">
             <LoaderCircle className="size-4 animate-spin text-info" />
             <span><a className="font-medium underline" href={run.prUrl} target="_blank" rel="noreferrer">{prName(run.prUrl)}</a> is open. Waiting for its merge.</span>
-            <Button size="xs" variant="outline" className="ml-auto" disabled={pr.checking} onClick={() => void checkMerge()}>
-              {pr.checking ? <><LoaderCircle className="animate-spin" /> Checking…</> : <><RotateCw /> Check now</>}</Button>
+            <Button variant="secondary" className="ml-auto" loading={pr.checking} leftIcon={pr.checking ? undefined : <RotateCw />}
+              onClick={() => void checkMerge()}>{pr.checking ? 'Checking…' : 'Check now'}</Button>
           </div>
           {pr.checkedAt !== null && !pr.checking && !pr.error && (
-            <p data-checked className="m-0 text-xs text-muted-foreground" role="status">Checked {new Date(pr.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: still open.</p>
+            <p data-checked className="m-0 text-xs text-base-700" role="status">Checked {new Date(pr.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: still open.</p>
           )}
           {pr.error && (
-            <Alert variant="error"><CircleAlert /><AlertTitle>Can’t check the PR</AlertTitle><AlertDescription>{pr.error}</AlertDescription>
-              <AlertAction><Button size="xs" variant="outline" disabled={pr.checking} onClick={() => void checkMerge()}><RotateCw /> Retry</Button></AlertAction></Alert>
+            <Alert tone="danger" title="Can’t check the PR" action={<Button variant="secondary" disabled={pr.checking} onClick={() => void checkMerge()} leftIcon={<RotateCw />}>Retry</Button>}>{pr.error}</Alert>
           )}
-          <p className="m-0 text-xs text-muted-foreground">You can close this dialog: {repo} stays on the board as onboarding, with Resume, and Start build and Start refining stay disabled for its items. The board finishes onboarding on its next check after the merge; Check now checks at once.</p>
+          <p className="m-0 text-xs text-base-700">You can close this dialog: {repo} stays on the board as onboarding, with Resume, and Start build and Start refining stay disabled for its items. The board finishes onboarding on its next check after the merge; Check now checks at once.</p>
         </div>
       ) : pr.error ? (
-        <Alert variant="error"><CircleAlert /><AlertTitle>Can’t open the PR</AlertTitle><AlertDescription>{pr.error}</AlertDescription>
-          <AlertAction><Button size="xs" variant="outline" disabled={!openable} onClick={() => void openPr()}><RotateCw /> Retry</Button></AlertAction></Alert>
+        <Alert tone="danger" title="Can’t open the PR" action={<Button variant="secondary" disabled={!openable} onClick={() => void openPr()} leftIcon={<RotateCw />}>Retry</Button>}>{pr.error}</Alert>
       ) : (
-        <Button className="justify-self-start" disabled={!openable} onClick={() => void openPr()}>
-          {pr.opening ? <><LoaderCircle className="animate-spin" /> Opening the PR…</> : <><GitPullRequest /> Open the PR</>}</Button>
+        <Button className="justify-self-start" disabled={!openable} loading={pr.opening} leftIcon={pr.opening ? undefined : <GitPullRequest />}
+          onClick={() => void openPr()}>{pr.opening ? 'Opening the PR…' : 'Open the PR'}</Button>
       )}
     </div>
   );

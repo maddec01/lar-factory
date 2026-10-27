@@ -5,7 +5,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, test, vi } from 'vite-plus/test';
 import type { SetupAnswers } from '@lar-factory/shared';
-import { $, $$, settle, text } from '../../test/support.ts';
+import { $, $$, checkedOf, settle, text } from '../../test/support.ts';
 import { CustomLabelPicker, SetupFields, type CustomLabelPicks } from './setup-fields.tsx';
 
 const SETUP: SetupAnswers = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '', show: 'all', showPicked: false, role: '' };
@@ -37,8 +37,8 @@ test('the custom label picker offers its labels and the picks, and calls back wi
   const handlers = { onToggle: vi.fn(), onType: vi.fn(), onAdd: vi.fn() };
   await mount(createElement(CustomLabelPicker, { repo: 'maddec01/lar-web', ...PICKS, typed: 'app: ios', ...handlers }));
   expect($$<HTMLElement>('[data-custom]').map((l) => l.dataset.custom)).toEqual(['app: music', 'app: web']);
-  expect($('[data-custom="app: web"] [role="checkbox"]')!.getAttribute('aria-checked')).toBe('true');
-  await settle(() => $('[data-custom="app: music"] [role="checkbox"]')!.click());
+  expect(checkedOf($('[data-custom="app: web"] input[type="checkbox"]')!)).toBe('true');
+  await settle(() => $('[data-custom="app: music"] input[type="checkbox"]')!.click());
   expect(handlers.onToggle).toHaveBeenCalledWith('app: music');
   await type($<HTMLInputElement>('[data-new-custom]')!, 'app: mac');
   expect(handlers.onType).toHaveBeenCalledWith('app: mac');

@@ -1,4 +1,4 @@
-// The onboarding dialog: 768px wide over the board, a scrolling body, the progress bar, and Back and Next.
+// The onboarding dialog: the copied Modal over the board, a scrolling body, the progress bar, and Back and Next.
 
 import { expect, test, vi } from 'vite-plus/test';
 import type { BoardData, OnboardingRepository, SetupAnswers } from '@lar-factory/shared';
@@ -6,15 +6,16 @@ import { $, mountPage, sample, settle, text } from '../../test/support.ts';
 import { dialog, empty, openOnboarding, project, serve } from './onboarding-support.ts';
 
 const inDialog = <T extends HTMLElement = HTMLElement>(selector: string) => dialog()!.querySelector<T>(selector);
-const button = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).trim() === label);
-const radio = (name: string) => [...dialog()!.querySelectorAll<HTMLElement>('[role="radio"]')].find((r) => text(r.closest('label')).startsWith(name))!;
+const button = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).trim() === label);
+const radio = (name: string) => [...dialog()!.querySelectorAll<HTMLElement>('[role="radio"]')].find((r) => text(r.closest('[data-choice]')).startsWith(name))!;
 
-test('the dialog is 768px wide with a scrolling body, the step, its place and the progress bar', async () => {
+test('the dialog is a modal with a scrolling body, the step, its place and the progress bar', async () => {
   await openOnboarding([project('lar-web')]);
-  expect(dialog()!.classList.contains('max-w-3xl'), '48rem is 768px').toBe(true);
-  expect(inDialog('[data-slot="dialog-panel"]')).not.toBeNull();
-  expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('T3 project');
-  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard a repository · step 1 of 6');
+  expect(dialog()!.getAttribute('aria-modal')).toBe('true');
+  expect(dialog()!.getAttribute('aria-describedby'), 'its place describes it').toBe('onboarding-place');
+  expect(inDialog('[data-slot="modal-body"]')).not.toBeNull();
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('T3 project');
+  expect(text(inDialog('#onboarding-place'))).toBe('Onboard a repository · step 1 of 6');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('0');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label'), 'the bar is named by its caption').toBe('0 of 6 done');
 });
@@ -26,12 +27,12 @@ test('Next is disabled until a project is picked, then shows the next step, and 
   await settle(() => radio('lar-web').click());
   expect(button('Next')!.disabled).toBe(false);
   await settle(() => button('Next')!.click());
-  expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('Provider and item source');
-  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 6');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Provider and item source');
+  expect(text(inDialog('#onboarding-place'))).toBe('Onboard lar-web · step 2 of 6');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('1');
   expect(button('Next')!.disabled, 'the step waits for its answers').toBe(true);
   await settle(() => button('Back')!.click());
-  expect(text(inDialog('[data-slot="dialog-title"]'))).toBe('T3 project');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('T3 project');
   expect(radio('lar-web').getAttribute('aria-checked'), 'the pick stays').toBe('true');
 });
 
@@ -39,7 +40,7 @@ test('a run that reuses its .lar-factory.json counts the Pull request step too',
   await openOnboarding([project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] } })]);
   await settle(() => radio('lar-web').click());
   await settle(() => button('Next')!.click());
-  expect(text(inDialog('[data-slot="dialog-description"]'))).toBe('Onboard lar-web · step 2 of 6');
+  expect(text(inDialog('#onboarding-place'))).toBe('Onboard lar-web · step 2 of 6');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuemax')).toBe('6');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label')).toBe('1 of 6 done');
 });
@@ -63,9 +64,9 @@ test('Next and Back move focus to the step heading, and closing returns it to th
   await settle(() => vi.advanceTimersByTime(50));
   await settle(() => radio('lar-web').click());
   await settle(() => button('Next')!.click());
-  expect(document.activeElement, 'Next').toBe(inDialog('[data-slot="dialog-title"]'));
+  expect(document.activeElement, 'Next').toBe(inDialog('[data-slot="modal-header"] h2'));
   await settle(() => button('Back')!.click());
-  expect(document.activeElement, 'Back').toBe(inDialog('[data-slot="dialog-title"]'));
+  expect(document.activeElement, 'Back').toBe(inDialog('[data-slot="modal-header"] h2'));
   // Unpicked, so closing keeps nothing and the empty board's button stays.
   const { useWizardStore } = await import('./wizard-store.ts');
   await settle(() => useWizardStore.getState().chooseNew());

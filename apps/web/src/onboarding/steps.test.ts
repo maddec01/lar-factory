@@ -10,7 +10,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { STATUS_LABELS, WORKFLOW_LABELS, type BundledSkill, type ClashRun, type OnboardingPrChange, type ClashRunState, type FixedClashes, type ModelGroup, type ProjectChoice, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
-import { $, fetchMock, mountPage, sample, settle, text, toolChecks } from '../../test/support.ts';
+import { $, checkedOf, fetchMock, mountPage, sample, settle, text, toolChecks } from '../../test/support.ts';
 import { dialog, openOnboarding, project, serve } from './onboarding-support.ts';
 
 const rows = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-choice]')];
@@ -72,7 +72,7 @@ test("a step that can't read T3's projects shows the problem with Retry", async 
 
 test('with no T3 project the step says so', async () => {
   await openOnboarding([]);
-  expect(text(dialog()!.querySelector('[data-slot="dialog-panel"]'))).toContain('T3 Code has no project yet.');
+  expect(text(dialog()!.querySelector('[data-slot="modal-body"]'))).toContain('T3 Code has no project yet.');
 });
 
 test("while T3's projects are read the step shows a spinner", async () => {
@@ -124,13 +124,13 @@ test("a failing t3 project add shows t3's message and keeps the step", async () 
   const alert = dialog()!.querySelector('[role="alert"]')!;
   expect(text(alert)).toContain('t3 could not add the project: Could not reach the T3 Code server.');
   expect(folderInput().value).toBe('/Users/me/lar-apple');
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('T3 project');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('T3 project');
 });
 
 const field = (name: string) => dialog()!.querySelector<HTMLElement>(`[data-field="${name}"]`);
 const input = (name: string) => field(name)?.querySelector<HTMLInputElement>('input') ?? null;
 const choice = (name: string) => dialog()!.querySelector<HTMLElement>(`[data-choice="${name}"]`)!;
-const nextButton = () => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).trim().startsWith('Next'))!;
+const nextButton = () => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).trim().startsWith('Next'))!;
 
 async function type(into: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(into, value);
@@ -185,10 +185,10 @@ test('an answer Next waits for is muted help until its field is edited or left, 
   const invalid = (name: string) => input(name)!.getAttribute('aria-invalid') === 'true';
   const note = (name: string) => field(name)!.querySelector<HTMLElement>('[data-problem]')!;
   expect([invalid('project-number'), invalid('role')], 'nothing marked before any typing').toEqual([false, false]);
-  expect(note('role').className).toContain('text-muted-foreground');
+  expect(note('role').className).toContain('text-base-700');
   await type(input('project-number')!, '3.5');
   expect([invalid('project-number'), invalid('role')]).toEqual([true, false]);
-  expect(note('project-number').className).toContain('text-destructive-foreground');
+  expect(note('project-number').className).toContain('text-(--lar-danger-text)');
   await settle(() => input('role')!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(invalid('role'), 'left empty').toBe(true);
 });
@@ -196,7 +196,7 @@ test('an answer Next waits for is muted help until its field is edited or left, 
 test("each field's help and problem describe its input, outside its label", async () => {
   await openSetup(project('lar-web'));
   const role = input('role')!;
-  const label = role.closest('label')!;
+  const label = role.labels![0]!;
   expect(label.querySelector('[data-problem]'), 'the problem is not part of the name').toBeNull();
   expect(text(label)).toBe('Repository role');
   const described = role.getAttribute('aria-describedby')!.split(' ').map((id) => text(document.getElementById(id)));
@@ -220,15 +220,15 @@ test('a reused .lar-factory.json shows its values and asks nothing', async () =>
     config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'opted-in', role: 'Web client', labels: [] } }));
   const values = text(dialog()!.querySelector('[data-reused-config]'));
   for (const value of ['GitHub', 'GitHub Project maddec01 #3', 'Opted-in items', 'Web client']) expect(values).toContain(value);
-  expect(text(dialog()!.querySelector('[data-slot="dialog-panel"]'))).toContain('use Edit in Settings › Repositories');
+  expect(text(dialog()!.querySelector('[data-slot="modal-body"]'))).toContain('use Edit in Settings › Repositories');
   expect([...dialog()!.querySelectorAll('button')].some((b) => text(b) === 'Edit'), 'the onboarding dialog has no Edit').toBe(false);
-  expect(dialog()!.querySelector('[data-slot="dialog-panel"] input, [data-slot="dialog-panel"] [role="radio"]')).toBeNull();
+  expect(dialog()!.querySelector('[data-slot="modal-body"] input, [data-slot="modal-body"] [role="radio"]')).toBeNull();
   expect(nextButton().disabled).toBe(false);
 });
 
 test("a .lar-factory.json that can't be reused shows its problem with Retry, and Next waits", async () => {
   await openSetup(project('lar-web', { hasConfig: true, configProblem: '.lar-factory.json field role is missing or not a string.' }));
-  const alert = dialog()!.querySelector('[data-slot="dialog-panel"] [role="alert"]')!;
+  const alert = dialog()!.querySelector('[data-slot="modal-body"] [role="alert"]')!;
   expect(text(alert)).toContain('.lar-factory.json field role is missing or not a string.');
   expect(text(alert.querySelector('button')).trim()).toBe('Retry');
   expect(nextButton().disabled).toBe(true);
@@ -299,7 +299,7 @@ function answerChecks(results: Partial<Record<SetupCheckId, SetupCheckResult>> =
 }
 
 const checkRow = (id: string) => dialog()!.querySelector<HTMLElement>(`[data-check="${id}"]`)!;
-const footerButton = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="dialog-footer"] button')].find((b) => text(b).trim().startsWith(label));
+const footerButton = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).trim().startsWith(label));
 
 /** Moves from the Provider and item source step, answered or reused, past Labels to Checks, and waits for the checks. */
 async function openChecks(): Promise<void> {
@@ -321,7 +321,7 @@ test('the Checks step lists the command checks, then the setup checks, each with
   expect(ids.map((id) => checkRow(id!).dataset.status)).toEqual(Array(8).fill('passed'));
   expect(text(checkRow('gh'))).toContain('Signed in');
   expect(text(checkRow('source'))).toContain('source is fine');
-  expect(dialog()!.querySelector('[data-slot="dialog-panel"] [role="progressbar"]')!.getAttribute('aria-label')).toBe('8 of 8 passed');
+  expect(dialog()!.querySelector('[data-slot="modal-body"] [role="progressbar"]')!.getAttribute('aria-label')).toBe('8 of 8 passed');
   expect(nextButton().disabled).toBe(false);
 });
 
@@ -416,20 +416,20 @@ async function openCleanup(chosen: ProjectChoice, answer: FixedClashes | { error
 
 const cleanup = () => dialog()!.querySelector<HTMLElement>('[data-cleanup-step]')!;
 const clashRow = (id: string) => cleanup().querySelector<HTMLElement>(`[data-clash="${id}"]`)!;
-const checkbox = (id: string) => clashRow(id).querySelector<HTMLElement>('[role="checkbox"]')!;
+const checkbox = (id: string) => clashRow(id).querySelector<HTMLElement>('input[type="checkbox"]')!;
 const skillClash = () => cleanup().querySelector<HTMLElement>('[data-skill-clash]');
 const skillPick = (pick: string) => skillClash()!.querySelector<HTMLElement>(`[data-skill-pick="${pick}"] [role="radio"]`)!;
 
 test("the Cleanup step lists each fixed Clash with its file, reason and edit, CONTEXT.md's rename ticked and .scratch/'s delete not", async () => {
   await openCleanup(project('lar-web'), { ...FOUND, skillClashes: [] });
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Cleanup');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Cleanup');
   expect(text(clashRow('context'))).toContain('CONTEXT.md');
   expect(text(clashRow('context'))).toContain('Rename CONTEXT.md to GLOSSARY.md');
   expect(text(clashRow('scratch'))).toContain("from Matt Pocock's local tracker");
   expect(text(clashRow('scratch'))).toContain('Delete .scratch/');
-  expect([checkbox('context'), checkbox('scratch')].map((c) => c.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+  expect([checkbox('context'), checkbox('scratch')].map(checkedOf)).toEqual(['true', 'false']);
   await settle(() => checkbox('scratch').click());
-  expect(checkbox('scratch').getAttribute('aria-checked')).toBe('true');
+  expect(checkedOf(checkbox('scratch'))).toBe('true');
   const { useWizardStore } = await import('./wizard-store.ts');
   expect(useWizardStore.getState().run!.cleanup).toEqual({ ticks: { scratch: true }, skills: {} });
   expect(nextButton().disabled).toBe(false);
@@ -493,7 +493,7 @@ test('a refused rename restored on Resume shows its problem as an error straight
   const name = skillClash()!.querySelector<HTMLInputElement>('[data-field="skill-name"] input')!;
   expect(name.value).toBe('tdd');
   expect(name.getAttribute('aria-invalid')).toBe('true');
-  expect(skillClash()!.querySelector('[data-problem]')!.className).toContain('text-destructive-foreground');
+  expect(skillClash()!.querySelector('[data-problem]')!.className).toContain('text-(--lar-danger-text)');
 });
 
 test('fixed checks the board can\'t run show why with Retry, and Next waits until Retry runs them', async () => {
@@ -561,7 +561,7 @@ test('the Clash agent asks for a provider and model, and Look for Clashes shows 
   const row = agentRun()!.querySelector<HTMLElement>('[data-clash="agent-1"]')!;
   for (const part of ['AGENTS.md:12', 'It says to push to main.', '- Push to main.', '+ Open a PR.']) expect(text(row)).toContain(part);
   expect(clashRow('context'), 'beside the fixed Clashes').not.toBeNull();
-  await settle(() => row.querySelector<HTMLElement>('[role="checkbox"]')!.click());
+  await settle(() => row.querySelector<HTMLElement>('input[type="checkbox"]')!.click());
   const { useWizardStore } = await import('./wizard-store.ts');
   expect(useWizardStore.getState().run!.cleanup!.ticks).toEqual({ 'agent-1': false });
   expect(nextButton().disabled).toBe(false);
@@ -574,7 +574,7 @@ test.each([
 ] as const)('a %s run shows why with its thread and Retry, which starts a new thread and links both', async (state, title, why) => {
   const runs = [run(1, { state, why })];
   await openCleanup(project('lar-web'), NONE, runs);
-  expect(text(agentRun()!.querySelector('[data-slot="alert-title"]'))).toBe(title);
+  expect(text(agentRun()!.querySelector('[data-slot="title"]'))).toBe(title);
   expect(text(agentRun())).toContain(why);
   expect(threadLinks()).toEqual(['t3code://threads/sample-environment/thread-1']);
   expect(nextButton().disabled).toBe(true);
@@ -597,9 +597,9 @@ test("an agent Clash whose edit won't apply shows why, unticked, and can't be ti
   expect(text(clashRow('agent-2').querySelector('[data-wont-apply]'))).toBe(`Won’t go in the PR: ${wontApply.wontApply}`);
   expect(clashRow('agent-2').querySelector('[data-edit-preview]')!.classList.contains('opacity-60'), 'its edit dimmed').toBe(true);
   expect(clashRow('agent-1').querySelector('[data-edit-preview]')!.classList.contains('opacity-60')).toBe(false);
-  expect(checkbox('agent-2').getAttribute('aria-checked')).toBe('false');
+  expect(checkedOf(checkbox('agent-2'))).toBe('false');
   await settle(() => checkbox('agent-2').click());
-  expect(checkbox('agent-2').getAttribute('aria-checked')).toBe('false');
+  expect(checkedOf(checkbox('agent-2'))).toBe('false');
   const { picksOf, useWizardStore } = await import('./wizard-store.ts');
   const { run: wizardRun, clashes, agent } = useWizardStore.getState();
   expect(picksOf(wizardRun!, clashes, agent)!.clashes.map((clash) => clash.id)).toEqual(['agent-1']);
@@ -632,7 +632,7 @@ test("a Look again the board refuses keeps the old run's ticks, and offers only 
   await settle(() => agentPart().querySelector<HTMLButtonElement>('[data-look-for-clashes]')!.click());
   const { useWizardStore } = await import('./wizard-store.ts');
   expect(useWizardStore.getState().run!.cleanup!.ticks).toEqual({ 'agent-1': false });
-  expect(checkbox('agent-1').getAttribute('aria-checked')).toBe('false');
+  expect(checkedOf(checkbox('agent-1'))).toBe('false');
   expect(text(agentPart().querySelector('[role="alert"]'))).toContain('The board is restarting.');
   expect(agentPart().querySelector('[data-look-for-clashes]'), 'Retry starts it instead').toBeNull();
   expect(button(agentPart(), 'Retry')!.disabled).toBe(false);
@@ -697,7 +697,7 @@ async function openLabels(names: string[], changed?: string[], failure?: string)
 
 test('the Labels step shows each workflow label with what it does and whether the repository has it, or Rename for its old name', async () => {
   await openLabels(['bug', 'decision: grill', 'decision-task', 'decision: task', 'needs-triage', 'status-list']);
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Labels');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Labels');
   expect(labelRow('bug')!.dataset.state).toBe('present');
   expect(text(labelRow('bug'))).toContain('Something broken');
   expect(labelRow('feature')!.dataset.state).toBe('missing');
@@ -705,7 +705,7 @@ test('the Labels step shows each workflow label with what it does and whether th
   const grill = labelRow('decision-grill')!;
   expect(grill.dataset.state).toBe('rename');
   expect(text(grill)).toContain('Rename decision: grill');
-  expect(grill.querySelector('[role="checkbox"]')!.getAttribute('aria-checked')).toBe('true');
+  expect(checkedOf(grill.querySelector('input[type="checkbox"]')!)).toBe('true');
   expect(labelRow('decision-task')!.dataset.state).toBe('present');
   expect(labelRow('status-list')!.dataset.state, 'issues list the status labels').toBe('present');
   expect(labelRow('status-queued')!.dataset.state).toBe('missing');
@@ -745,14 +745,14 @@ test("a Create gh refuses shows gh's message with Retry", async () => {
 const customSection = () => dialog()!.querySelector<HTMLElement>('[data-custom-labels]')!;
 const customRow = (name: string) => customSection().querySelector<HTMLElement>(`[data-custom="${name}"]`);
 const customNames = () => [...customSection().querySelectorAll<HTMLElement>('[data-custom]')].map((r) => r.dataset.custom);
-const picked = (name: string) => customRow(name)!.querySelector('[role="checkbox"]')!.getAttribute('aria-checked');
+const picked = (name: string) => checkedOf(customRow(name)!.querySelector('input[type="checkbox"]')!);
 
 test('the Labels step offers the labels it leaves alone as custom labels to pick, less the status labels and old names', async () => {
   await openLabels([...EVERY_LABEL, 'decision: task', 'app: music', 'web']);
   expect(text(customSection())).toContain('which part of the product an item touches');
   expect(customNames()).toEqual(['app: music', 'web']);
   expect(picked('web')).toBe('false');
-  await settle(() => customRow('web')!.querySelector<HTMLElement>('[role="checkbox"]')!.click());
+  await settle(() => customRow('web')!.querySelector<HTMLElement>('input[type="checkbox"]')!.click());
   expect(picked('web')).toBe('true');
 });
 
@@ -785,7 +785,7 @@ test('a ticked custom label is not listed as left alone too, and a long one brea
   await openLabels([...EVERY_LABEL, 'web', long]);
   const left = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-left]')].map((l) => l.dataset.left);
   expect(left()).toEqual(['web', long]);
-  await settle(() => customRow('web')!.querySelector<HTMLElement>('[role="checkbox"]')!.click());
+  await settle(() => customRow('web')!.querySelector<HTMLElement>('input[type="checkbox"]')!.click());
   expect(left()).toEqual([long]);
   expect(customRow(long)!.querySelector('code')!.className).toContain('break-all');
 });
@@ -798,7 +798,7 @@ test("a reused .lar-factory.json's Labels step lists its custom labels and asks 
   await settle();
   expect(text(customSection())).toContain('.lar-factory.json');
   expect(customNames()).toEqual(['app: music', 'web']);
-  expect(customSection().querySelector('[role="checkbox"], input')).toBeNull();
+  expect(customSection().querySelector('input')).toBeNull();
   expect(dialog()!.querySelector('[data-left="web"]'), "the file's custom labels are not left alone too").toBeNull();
 });
 
@@ -841,7 +841,7 @@ test("on Azure DevOps the Labels step lists the project's tags with the status t
   answerLabels(['decision: grill', 'status-list'], ['decision-grill', 'status-list']);
   await settle(() => nextButton().click());
   await settle();
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Tags');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Tags');
   expect(text(dialog())).toContain('tags on contoso/Fabrikam');
   expect(text(dialog())).not.toContain('build #386');
   expect(text(dialog())).not.toMatch(/\blabels?\b/);
@@ -934,7 +934,7 @@ test("with a reused .lar-factory.json, Cleanup goes on to the Pull request step,
   const previews = answerChanges(WRITTEN);
   await settle(() => nextButton().click());
   await settle();
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Pull request');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Pull request');
   expect(previews).toMatchObject([{ repo: 'maddec01/lar-web', config: null }]);
   expect(changeRows().map((row) => row.split(/(?=Writes|Adds|Replaces)/)[0])).toEqual(['CLAUDE.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md']);
   expect(prStep().querySelector('pre'), 'no .lar-factory.json to show').toBeNull();
@@ -1009,7 +1009,7 @@ test("an Azure DevOps repository's PR adds the team's item source, made on Azure
 
 test('the Pull request step shows the branch and the .lar-factory.json it writes, then Open the PR waits for the merge', async () => {
   await openPrStep(WRITTEN, ['app: music']);
-  expect(text(dialog()!.querySelector('[data-slot="dialog-title"]'))).toBe('Pull request');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Pull request');
   expect(text(prStep())).toContain('lar-factory/onboarding');
   expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: music'] });
   answerPr({ prUrl: PR });
@@ -1040,7 +1040,7 @@ test('Check now is busy until the board reads GitHub, then says when it checked 
   await settle();
   const checking = button(prStep(), 'Checking')!;
   expect(checking.disabled, 'busy until the next board update').toBe(true);
-  expect(checking.querySelector('svg.animate-spin')).not.toBeNull();
+  expect(checking.getAttribute('aria-busy'), 'with a spinner').toBe('true');
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [ON_PR], fetchedAt: new Date(Date.now()).toISOString(), error: null }));
   expect(button(prStep(), 'Check now')!.disabled).toBe(false);
@@ -1122,7 +1122,7 @@ test('once the PR merges the step says the repository is onboarded, and Go to th
   const { useBoardStore } = await import('../board/board-store.ts');
   await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [] }));
   expect(text(prStep())).toContain('maddec01/lar-web is onboarded');
-  const bar = dialog()!.querySelector('[data-slot="dialog-header"] [data-slot="progress"]')!;
+  const bar = dialog()!.querySelector('#onboarding-place + [data-slot="progress"]')!;
   expect([bar.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow'), text(bar.querySelector('[data-slot="progress-caption"]'))], 'the Pull request step is done too').toEqual(['6', 'Onboarded']);
   fetchMock.mockClear();
   await settle(() => footerButton('Go to the board')!.click());

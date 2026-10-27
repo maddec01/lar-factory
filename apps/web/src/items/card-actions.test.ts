@@ -61,7 +61,7 @@ test('a failed Back to List shows as a toast naming the item, which stays until 
   await press(button('back-to-list', 'I_sample05'));
   await answer({ error: 'Could not set List. GitHub is down.' }, 502);
   expect(toast()!.getAttribute('role')).toBe('alert');
-  expect(toast()!.dataset.tone, 'a failure\'s dot is red').toBe('error');
+  expect(toast()!.dataset.toastColor, 'a failure is red').toBe('danger');
   expect(text(toast())).toMatch(/^Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
   expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
   expect($('[data-item-dialog] .action-error'), 'the dialog shows no inline error').toBeNull();

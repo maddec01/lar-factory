@@ -135,8 +135,8 @@ export const bannerText = (el: Element) => ['title', 'description'].map((slot) =
 /** Whether a checkbox, a native one included, or a radio is checked, as aria-checked says it: 'true' or 'false'. */
 export const checkedOf = (el: Element) => (el instanceof HTMLInputElement ? String(el.checked) : el.getAttribute('aria-checked'));
 
-/** The toast on screen. */
-export const toast = () => $('[data-slot="toaster"] [data-toast]');
+/** The toast on screen: the copied Notifications' toast, which holds the board's content and its role. */
+export const toast = () => $('[data-slot="toaster"] [data-toast]')?.closest<HTMLElement>('[data-slot="toast"]') ?? null;
 
 /** Sends `data` down the page's event stream. */
 export const push = (data: BoardData) => settle(() => stream().onmessage!(new MessageEvent('message', { data: JSON.stringify(data) })));

@@ -102,7 +102,7 @@ test("the lost server's banner closes, and the next failure after the server ans
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  const close = $<HTMLButtonElement>('.banner [data-slot="alert-action"] .dismiss')!;
+  const close = $<HTMLButtonElement>('.banner .dismiss')!;
   expect(close.getAttribute('aria-label')).toBe("Dismiss: can't reach the board server");
   close.focus();
   await settle(() => close.click());

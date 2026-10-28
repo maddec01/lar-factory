@@ -45,6 +45,10 @@ cat >"$bin/az" <<'EOF'
 #!/bin/bash
 echo "az $*" >>"$FAKE_GH_LOG"
 if [[ -n ${FAKE_AZ_ERROR:-} ]]; then echo "$FAKE_AZ_ERROR" >&2; exit 1; fi
+if [[ $1 == boards && $2 == work-item && $3 == show ]]; then
+    jq -nc --arg area "${FAKE_AZ_AREA-Fabrikam Fiber\\App}" --arg iteration "${FAKE_AZ_ITERATION-Fabrikam Fiber\\Sprint 12}" '{fields: {"System.AreaPath": $area, "System.IterationPath": $iteration}}'
+    exit 0
+fi
 args="$*" file=${args#*--in-file }
 jq -c . "${file%% *}" >>"$FAKE_GH_LOG"
 echo "WARNING: an az warning on stderr" >&2
@@ -113,18 +117,21 @@ printf '## What to build\n\nA "quoted" line.\n' >"$body"
 status=0
 output=$(bash "$slice" contoso/Fabrikam%20Fiber/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
 errors=$(cat "$bin/err")
-want_patch=$(jq -nc --rawfile body "$body" '[{op: "add", path: "/fields/System.Title", value: "A slice"},
+want_patch=$(jq -nc --rawfile body "$body" '[{op: "add", path: "/fields/System.AreaPath", value: "Fabrikam Fiber\\App"},
+    {op: "add", path: "/fields/System.IterationPath", value: "Fabrikam Fiber\\Sprint 12"},
+    {op: "add", path: "/fields/System.Title", value: "A slice"},
     {op: "add", path: "/fields/System.Description", value: $body},
     {op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown"},
     {op: "add", path: "/relations/-", value: {rel: "System.LinkTypes.Hierarchy-Reverse", url: "https://dev.azure.com/contoso/_apis/wit/workItems/42"}}]')
 if ((status == 0)) && [[ $output == https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/77 && -z $errors ]] &&
-    [[ $(sed -n 1p "$log") == "az devops invoke --area wit --resource workitems --organization https://dev.azure.com/contoso --route-parameters project=Fabrikam Fiber type=Task --http-method POST --media-type application/json-patch+json --in-file "*" --api-version 7.2-preview --output json" ]] &&
-    [[ $(sed -n 2p "$log") == "$want_patch" ]] &&
-    jq -e 'all(.[]; .path != "/fields/System.Tags")' <<<"$(sed -n 2p "$log")" >/dev/null &&
-    (($(wc -l <"$log") == 2)); then
-    pass "on Azure DevOps, creates an untagged slice Task under the build's work item in one call and prints its URL"
+    [[ $(sed -n 1p "$log") == "az boards work-item show --id 42 --organization https://dev.azure.com/contoso --output json" ]] &&
+    [[ $(sed -n 2p "$log") == "az devops invoke --area wit --resource workitems --organization https://dev.azure.com/contoso --route-parameters project=Fabrikam Fiber type=Task --http-method POST --media-type application/json-patch+json --in-file "*" --api-version 7.2-preview --output json" ]] &&
+    [[ $(sed -n 3p "$log") == "$want_patch" ]] &&
+    jq -e 'all(.[]; .path != "/fields/System.Tags")' <<<"$(sed -n 3p "$log")" >/dev/null &&
+    (($(wc -l <"$log") == 3)); then
+    pass "on Azure DevOps, creates an untagged slice Task in the build's area and iteration and prints its URL"
 else
-    fail "on Azure DevOps, creates an untagged slice Task under the build's work item in one call and prints its URL: $status $output / $errors / $(cat "$log")"
+    fail "on Azure DevOps, creates an untagged slice Task in the build's area and iteration and prints its URL: $status $output / $errors / $(cat "$log")"
 fi
 
 : >"$log"
@@ -146,6 +153,26 @@ if ((status != 0)) && [[ -z $output && $errors == *"the parent is the build's wo
     pass "on an Azure repository, a parent that isn't a work item URL stops before any call"
 else
     fail "on an Azure repository, a parent that isn't a work item URL stops before any call: $status $output / $errors / $(cat "$log")"
+fi
+
+# Missing placement must never fall back to the project's template.
+: >"$log"
+status=0
+output=$(FAKE_AZ_AREA='' bash "$slice" contoso/Fabrikam/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
+errors=$(cat "$bin/err")
+if ((status != 0)) && [[ -z $output && $errors == *"the build has no area or iteration"* ]] && ! grep -q -- '--http-method POST' "$log"; then
+    pass "missing parent placement stops before creating anything"
+else
+    fail "missing parent placement stops before creating anything: $status $output / $errors / $(cat "$log")"
+fi
+
+: >"$log"
+status=0
+output=$(FAKE_AZ_ITERATION='Fabrikam Fiber' bash "$slice" contoso/Fabrikam/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
+if ((status == 0)) && jq -e '.[] | select(.path == "/fields/System.IterationPath" and .value == "Fabrikam Fiber")' <<<"$(sed -n 3p "$log")" >/dev/null; then
+    pass "a backlog parent keeps the new child in the backlog"
+else
+    fail "a backlog parent keeps the new child in the backlog: $status $output / $(cat "$log")"
 fi
 
 # A made slice asks the board on LAR_BOARD_PORT to read its build's source.

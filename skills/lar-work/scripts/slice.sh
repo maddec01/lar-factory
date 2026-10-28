@@ -25,7 +25,18 @@ source "$(dirname "$0")/azure.sh"
 if azure_work_item "$parent"; then
     patch=$(mktemp) err=$(mktemp)
     trap 'rm -f "$patch" "$err"' EXIT
-    jq -n --arg title "$title" --rawfile body "$body" --arg parent "$az_org/_apis/wit/workItems/$az_id" '[
+    # Keep slices, decisions and builds in their parent's team and iteration, including backlog work.
+    if ! placement=$(az boards work-item show --id "$az_id" --organization "$az_org" --output json 2>"$err"); then
+        echo "slice.sh: $(az_failure "could not read the build's area and iteration" "$(cat "$err")")" >&2
+        exit 1
+    fi
+    if ! jq -e '.fields | [."System.AreaPath", ."System.IterationPath"] | all(.[]; type == "string" and length > 0)' <<<"$placement" >/dev/null; then
+        echo "slice.sh: the build has no area or iteration. Check it in Azure DevOps before creating a slice." >&2
+        exit 1
+    fi
+    jq -n --argjson placement "$placement" --arg title "$title" --rawfile body "$body" --arg parent "$az_org/_apis/wit/workItems/$az_id" '[
+        {op: "add", path: "/fields/System.AreaPath", value: $placement.fields["System.AreaPath"]},
+        {op: "add", path: "/fields/System.IterationPath", value: $placement.fields["System.IterationPath"]},
         {op: "add", path: "/fields/System.Title", value: $title},
         {op: "add", path: "/fields/System.Description", value: $body},
         {op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown"},

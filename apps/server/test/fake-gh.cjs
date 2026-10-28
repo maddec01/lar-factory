@@ -118,15 +118,29 @@ const main = async () => {
       const nodes = { build: options.builds, blocked: options.blocked, active: options.active }[label];
       return output({ data: { search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: nodes ?? [] } } });
     }
-    // A repository's issues: options.repoIssues holds each repository's, by owner/name, in either state.
+    // A repository's issues: options.repoIssues holds each repository's, by owner/name, in either state. The open page
+    // reads them in full; the light page of closed ones, which reads no sub-issues, gets each one's close, labels, and
+    // its parent's id and labels.
     if (args.some((a) => a.includes('repository(owner:'))) {
       const value = (key) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
-      const states = args.filter((a) => a.startsWith('states[]=')).map((a) => a.slice('states[]='.length));
+      const light = !args.some((a) => a.includes('subIssues('));
+      const state = light ? 'CLOSED' : 'OPEN';
       const since = value('since');
-      const nodes = (options.repoIssues?.[`${value('owner')}/${value('name')}`] ?? [])
-        .filter((issue) => states.includes(issue.state) && (!since || issue.updatedAt >= since))
-        .map((issue) => ({ ...issue, body: undefined }));
+      const issues = options.repoIssues?.[`${value('owner')}/${value('name')}`] ?? [];
+      const lightParent = (ref) => {
+        const parent = (options.repoIssues?.[ref.repository.nameWithOwner] ?? []).find((issue) => issue.number === ref.number);
+        return { id: parent?.id ?? `I_${ref.number}`, labels: parent?.labels ?? { nodes: [] } };
+      };
+      const nodes = issues.filter((issue) => issue.state === state && (!since || issue.updatedAt >= since))
+        .map((issue) => (light ? { id: issue.id, closedAt: issue.closedAt ?? null, stateReason: issue.stateReason ?? null, labels: issue.labels,
+          parent: issue.parent ? lightParent(issue.parent) : null } : { ...issue, body: undefined }));
       return output({ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } } });
+    }
+    // Repository issues by node id, read in full without their bodies; an id no issue has resolves to null.
+    if (args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues('))) {
+      const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
+      const issues = Object.values(options.repoIssues ?? {}).flat();
+      return output({ data: { nodes: ids.map((id) => issues.find((issue) => issue.id === id)).map((issue) => (issue ? { ...issue, body: undefined } : null)) } });
     }
     // One item's details by node id: options.details holds each item's node, by id; an item it doesn't name is not found.
     if (args.some((a) => a.includes('node(id:'))) {

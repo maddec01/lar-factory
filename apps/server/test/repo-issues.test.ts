@@ -36,6 +36,53 @@ test("a repository reading its issues places the open ones by their status label
     'a repository on the Project reads no issues');
 });
 
+/** A lar-apple issue closed as completed `days` ago. */
+const closedIssue = (number: number, days: number, extra: object = {}) =>
+  appleIssue(number, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(days), updatedAt: daysAgo(days), ...extra });
+
+/** A lar-apple issue as a parent or sub-issue reference. */
+const appleRef = (number: number, state: 'OPEN' | 'CLOSED') =>
+  ({ ...sliceRef(number, state), url: `https://github.com/${APPLE}/issues/${number}`, repository: { nameWithOwner: APPLE } });
+
+/** The node ids the board read in full by id, across every call. */
+const readInFull = async (board: Board) => (await board.calls())
+  .filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues(')))
+  .flatMap((args) => args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length)));
+
+test("closed issues are paged light and only the kept ones read in full: a closed slice of a build never is, a closed sub-issue of a concept is", async (t) => {
+  const repoIssues = { [APPLE]: [
+    appleIssue(8, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(30, 'CLOSED')] } }),
+    closedIssue(30, 1, { parent: appleRef(8, 'OPEN') }),
+    appleIssue(20, { labels: { nodes: [{ name: 'concept' }] } }),
+    closedIssue(21, 1, { parent: appleRef(20, 'OPEN') }),
+    closedIssue(22, 1),
+    closedIssue(60, 20, { labels: { nodes: [{ name: 'build' }] } }),
+    closedIssue(23, 1, { parent: appleRef(60, 'CLOSED') }),
+    closedIssue(24, 1, { stateReason: 'NOT_PLANNED' }),
+  ] };
+  const board = await startBoard(t, { repoIssues, repoConfigs });
+  const data = await until(board, (d) => d.fetchedAt !== null);
+  assert.deepEqual(data.items.map((i) => [i.number, i.status]), [[8, 'List'], [20, 'List'], [21, 'Done'], [22, 'Done'], [23, 'Done']]);
+  assert.deepEqual((await readInFull(board)).sort(), ['I_21', 'I_22', 'I_23'], 'a slice whose build was not read stays; one closed as not planned is never read');
+  const closedPages = (await board.calls()).filter((args) => args.some((a) => a.includes('states: [CLOSED]')));
+  assert.ok(closedPages.length > 0 && closedPages.every((args) => !args.some((a) => a.includes('subIssues('))), 'closed pages read no sub-issues');
+});
+
+test("open and kept closed issues normalize together: a closed dossier keeps its map, and an open slice of a closed build has no card", async (t) => {
+  const body = '## Destination\nThere.\n';
+  const repoIssues = { [APPLE]: [
+    closedIssue(40, 1, { body }),
+    appleIssue(41, { parent: appleRef(40, 'CLOSED') }),
+    closedIssue(50, 1, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(51, 'OPEN')] } }),
+    appleIssue(51, { parent: appleRef(50, 'CLOSED') }),
+  ] };
+  const board = await startBoard(t, { repoIssues, repoConfigs });
+  const data = await until(board, (d) => d.fetchedAt !== null);
+  assert.deepEqual(data.items.map((i) => i.number), [41, 40, 50]);
+  assert.equal(data.items.find((i) => i.number === 40)!.map?.destination, 'There.');
+  assert.deepEqual(data.items.find((i) => i.number === 50)!.slices.map((s) => s.number), [51]);
+});
+
 /** A board reading lar-apple's issues, with the Project's items and options for the fake gh. */
 async function issuesBoard(t: TestContext, options: { items?: object[]; repoIssues?: object; fail?: string } = {}, env: Record<string, string> = {}) {
   const items = options.items ?? [];

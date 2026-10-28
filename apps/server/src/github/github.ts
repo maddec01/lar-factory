@@ -83,12 +83,25 @@ const ISSUES_BY_ID_QUERY = `query($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Issue { __typename ${ISSUE_FIELDS} } }
 }`;
 
-/** One page of a repository's issues in the given states, updated since `since` when it is set. */
-const REPO_ISSUES_QUERY = `query($owner: String!, $name: String!, $states: [IssueState!], $since: DateTime, $after: String) {
+/** One page of a repository's open issues. */
+const OPEN_ISSUES_QUERY = `query($owner: String!, $name: String!, $after: String) {
   repository(owner: $owner, name: $name) {
-    issues(first: ${PAGE_SIZE}, after: $after, states: $states, filterBy: { since: $since }) {
+    issues(first: ${PAGE_SIZE}, after: $after, states: [OPEN]) {
       pageInfo { hasNextPage endCursor }
       nodes { __typename ${ISSUE_FIELDS} }
+    }
+  }
+}`;
+
+/**
+ * One page of a repository's issues closed since `since`, with only what decides whether the board keeps one: its close,
+ * its labels, and its parent's id and labels. A light page answers in about half the time of an OPEN_ISSUES_QUERY page.
+ */
+const CLOSED_ISSUES_QUERY = `query($owner: String!, $name: String!, $since: DateTime, $after: String) {
+  repository(owner: $owner, name: $name) {
+    issues(first: ${PAGE_SIZE}, after: $after, states: [CLOSED], filterBy: { since: $since }) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id closedAt stateReason labels(first: 20) { nodes { name } } parent { id labels(first: 20) { nodes { name } } } }
     }
   }
 }`;
@@ -126,8 +139,13 @@ interface RawBodies {
   data: { nodes: ({ id?: string; body?: string } | null)[] };
 }
 
-interface RawRepoIssuesPage {
-  data: { repository: { issues: { pageInfo: PageInfo; nodes: NonNullable<RawItem['content']>[] } } | null };
+/** A closed issue as CLOSED_ISSUES_QUERY reads it. */
+interface LightIssue {
+  id: string;
+  closedAt: string | null;
+  stateReason: string | null;
+  labels: { nodes: { name: string }[] };
+  parent: { id: string; labels: { nodes: { name: string }[] } } | null;
 }
 
 interface RawItemsPage {
@@ -336,29 +354,53 @@ async function boardItems(raws: RawItem[], from: StatusSource = 'field'): Promis
   return normalizeItems(raws, searched, from);
 }
 
+/** Each page of a repository's issues the query reads, after the cursor the one before ended at. */
+async function readRepoPages<T>(repo: string, what: string, query: string, vars: Record<string, string> = {}): Promise<T[]> {
+  const [owner, name] = repo.split('/');
+  const nodes: T[] = [];
+  await readPages(MAX_PAGES, `${repo} has more than ${PAGE_SIZE * MAX_PAGES} ${what} to show; stopped paging`, async (after) => {
+    const page = (await graphql<{ data: { repository: { issues: { pageInfo: PageInfo; nodes: T[] } } | null } }>(query,
+      { owner: owner!, name: name!, ...vars, after })).data.repository?.issues;
+    if (!page) throw new Error(`Repository ${repo} not found`);
+    nodes.push(...page.nodes);
+    return page.pageInfo;
+  });
+  return nodes;
+}
+
+const hasLabel = (labels: { nodes: { name: string }[] }, name: string) => labels.nodes.some((l) => l.name === name);
+
+/**
+ * The closed issues the board keeps, by id: those closed since `since`, except slices and those closed as not planned.
+ * A slice is a sub-issue without `build` of a `build` issue in the same read; a slice whose build wasn't read stays. A
+ * closed build stays even when not planned, since its card is dropped but its slices still are too.
+ */
+function keptClosed(closed: LightIssue[], openIds: ReadonlySet<string>, since: number): string[] {
+  const recent = closed.filter((issue) => issue.closedAt && Date.parse(issue.closedAt) >= since);
+  const read = new Set([...openIds, ...recent.map((issue) => issue.id)]);
+  return recent.filter((issue) => {
+    const build = hasLabel(issue.labels, 'build');
+    const slice = !build && issue.parent !== null && read.has(issue.parent.id) && hasLabel(issue.parent.labels, 'build');
+    const notPlanned = issue.stateReason === 'NOT_PLANNED' || issue.stateReason === 'DUPLICATE';
+    return !slice && (build || !notPlanned);
+  }).map((issue) => issue.id);
+}
+
 /**
  * A repository's open issues, each placed by its `status-<name>` labels, and those closed in the last DONE_WINDOW_MS,
- * without slices.
+ * without slices. Closed issues are paged light, and only the ones the board keeps are read in full.
  */
 export async function fetchRepoIssues(repo: string, now = Date.now()): Promise<Item[]> {
-  const [owner, name] = repo.split('/');
-  const since = new Date(now - DONE_WINDOW_MS).toISOString();
-  const read = async (state: 'OPEN' | 'CLOSED') => {
-    const issues: NonNullable<RawItem['content']>[] = [];
-    await readPages(MAX_PAGES, `${repo} has more than ${PAGE_SIZE * MAX_PAGES} ${state.toLowerCase()} issues to show; stopped paging`, async (after) => {
-      const page = (await graphql<RawRepoIssuesPage>(REPO_ISSUES_QUERY,
-        { owner: owner!, name: name!, states: [state], since: state === 'CLOSED' ? since : null, after })).data.repository?.issues;
-      if (!page) throw new Error(`Repository ${repo} not found`);
-      issues.push(...page.nodes);
-      return page.pageInfo;
-    });
-    return issues;
-  };
-  const [open, closed] = await Promise.all([read('OPEN'), read('CLOSED')]);
-  // An issue updated since the window began may have closed before it.
-  const recent = closed.filter((issue) => issue.closedAt && Date.parse(issue.closedAt) >= now - DONE_WINDOW_MS);
-  // Not on a Project, so an issue's own node id stands in for the Project item id normalizeItems never shows.
-  const raws = [...open, ...recent].map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, status: null, content }));
+  type Content = NonNullable<RawItem['content']>;
+  const [open, closed] = await Promise.all([
+    readRepoPages<Content>(repo, 'open issues', OPEN_ISSUES_QUERY),
+    // An issue updated since the window began may have closed before it, so keptClosed checks closedAt.
+    readRepoPages<LightIssue>(repo, 'closed issues', CLOSED_ISSUES_QUERY, { since: new Date(now - DONE_WINDOW_MS).toISOString() }),
+  ]);
+  const kept = await fetchNodes<Content>(ISSUES_BY_ID_QUERY, keptClosed(closed, new Set(open.map((issue) => issue.id)), now - DONE_WINDOW_MS));
+  // Not on a Project, so an issue's own node id stands in for the Project item id normalizeItems never shows. One
+  // normalization over open and closed together, so a closed dossier keeps its map and a closed build drops its slices.
+  const raws = [...open, ...kept].map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, status: null, content }));
   return boardItems(raws, 'labels');
 }
 

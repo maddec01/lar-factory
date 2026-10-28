@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { renameSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  claudeSessionRecords, codexSessionRecords, firstCopies, parseClaudeLine, scanTranscripts, totalTokens,
+  claudeSessionRecords, codexSessionRecords, firstCopies, parseClaudeLine, scanTranscripts, totalTokens, transcriptMisses, warmTranscripts,
 } from './transcript-usage.ts';
 import type { UsageRecord } from './usage-record.ts';
 import { assistant, claudeHome, codexHome, codexSession, codexTokens } from '../../test/stats-db.ts';
@@ -116,6 +116,20 @@ test('a scan drops the cached records of transcripts it no longer reads, so the 
   utimesSync(path, at, at);
   assert.equal(statSync(path).size, size);
   assert.deepEqual(ids(), ['msg-2:req-msg-2']);
+});
+
+test('a warm reads the transcripts a scan would read afresh, so the scan after it reads none', async (t) => {
+  const home = claudeHome(t, {
+    'session-a': { main: [assistant('msg-1', 1, 0, 0, 1)], subagents: { a1: [assistant('msg-2', 1, 0, 0, 1)] } },
+    'session-b': { main: [assistant('msg-3', 1, 0, 0, 1)] },
+  });
+  const read = claudeSessionRecords(home);
+  const scan = () => read('session-a');
+  const misses = transcriptMisses(scan);
+  assert.deepEqual(misses.map((file) => file.path.split('/').at(-1)), ['session-a.jsonl', 'agent-a1.jsonl'], 'only the sessions the scan reads');
+  await warmTranscripts(misses);
+  assert.deepEqual(transcriptMisses(scan), []);
+  assert.deepEqual(scan().map((r) => r.dedupeKey), ['msg-1:req-msg-1', 'msg-2:req-msg-2']);
 });
 
 test('a Codex session\'s records come from its rollout, found by the session ID in its file name', (t) => {

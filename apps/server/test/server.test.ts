@@ -119,6 +119,9 @@ const rawBuild = (number: number, status: string) => projectIssue(number, status
 
 /** The board's items once its first read lands. */
 const readItems = async (board: Board): Promise<Item[]> => (await until(board, (d) => d.items.length > 0)).items;
+/** The items once the board shows live stats, which wait for T3's transcripts to be read after the first read. */
+const readLiveStats = async (board: Board): Promise<Item[]> =>
+  (await until(board, (d) => d.items.some((i) => typeof i.stats === 'object' && !i.stats.frozen))).items;
 
 test("a refresh finds build sub-issues, active and blocked slices with issue searches, not the board query's labels", async (t) => {
   const repository = { nameWithOwner: 'maddec01/lar-factory' };
@@ -151,7 +154,7 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
       { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
     ] }]);
   const home = claudeHome(t, { 'session-1': { main: [assistant('m0', 1, 2, 3, 4)], subagents: { a1: [assistant('m1', 5, 0, 300, 9)] } } });
-  const items = await readItems(await startBoard(t, { items: [projectIssue(12, 'Done'), projectIssue(13, 'Review')] }, false, false,
+  const items = await readLiveStats(await startBoard(t, { items: [projectIssue(12, 'Done'), projectIssue(13, 'Review')] }, false, false,
     { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) }));
   assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 10 + 314 });
   assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
@@ -218,7 +221,7 @@ test('a merged item shows the figures in its merged PR\'s block, not live ones, 
   };
   const board = await startBoard(t, { items: [merged(12, 40, `PR 40\n\n${block}`), merged(13, 41, 'PR 41'), merged(14, 42, `PR 42\n\n${block}`)] },
     false, true, { T3_STATE_DB: db });
-  const items = await readItems(board);
+  const items = await readLiveStats(board);
   const frozen = { agentMs: 135 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true };
   assert.deepEqual(items.find((i) => i.number === 12)?.stats, frozen, 'the block wins over live stats');
   assert.deepEqual(items.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 }, 'no block: live stats');
@@ -239,7 +242,7 @@ test('an item with a merged and an open linked PR shows live stats, and the open
     { number: 41, url: url(41), state: 'OPEN', isDraft: false, body: 'PR 41', mergedAt: null },
   ] } } }];
   const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
-  const [item] = await readItems(board);
+  const [item] = await readLiveStats(board);
   assert.deepEqual(item?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
   const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
   for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
@@ -303,7 +306,7 @@ test('a parent with two builds merged at different times: each build keeps its o
   const items = [{ ...parent, content: { ...parent.content, subIssuesSummary: { total: 2, completed: 2 },
     closedByPullRequestsReferences: { nodes: [last] } } }, build(12, first), build(14, last)];
   const check = async (board: Awaited<ReturnType<typeof startBoard>>) => {
-    const read = await readItems(board);
+    const read = await readLiveStats(board);
     const of = (number: number) => read.find((i) => i.number === number)!;
     assert.deepEqual(of(12).stats, { agentMs: 60 * 60_000, wallMs: 40 * 60_000, tokens: 2_000_000, costUsd: 10, frozen: true });
     assert.deepEqual(of(14).stats, { agentMs: 120 * 60_000, wallMs: 60 * 60_000, tokens: 3_000_000, costUsd: 20, frozen: true });

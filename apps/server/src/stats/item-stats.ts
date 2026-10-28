@@ -17,8 +17,8 @@ import { readT3Settings } from '../t3/t3-settings.ts';
 import type { InstanceHome, T3Settings, TranscriptDriver } from '../t3/t3-settings.ts';
 import { agentTime } from './agent-time.ts';
 import { codexServiceTier } from './codex-usage.ts';
-import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens } from './transcript-usage.ts';
-import type { SessionRecordsReader } from './transcript-usage.ts';
+import { claudeSessionRecords, codexSessionRecords, firstCopies, scanTranscripts, totalTokens, transcriptMisses } from './transcript-usage.ts';
+import type { SessionRecordsReader, TranscriptFile } from './transcript-usage.ts';
 import type { UsageRecord, UsageSpeed } from './usage-record.ts';
 import { apiCost, createOverrideRateTable, parseRateTable, resolveModelAliases } from './usage-pricing.ts';
 import type { Pricing } from './usage-pricing.ts';
@@ -148,6 +148,10 @@ function recordsByThread(db: DatabaseSync, homes: Map<string, InstanceHome>): Ma
   }
   return records;
 }
+
+/** The transcripts of T3's threads that itemStats would read afresh. */
+export const transcriptsToRead = (db: DatabaseSync, sources: StatsSources): TranscriptFile[] =>
+  transcriptMisses(() => recordsByThread(db, readT3Settings(sources.settings, sources.home).instanceHomes));
 
 /**
  * An item's stats over the rows T3's database `db` gave, with each item's tokens from its threads' transcripts.

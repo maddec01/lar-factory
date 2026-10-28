@@ -1,6 +1,6 @@
 // What the Azure DevOps item sources share: reading a team's work items through az, and writing them through azure-writes.ts.
 // A work item keeps its status as a status-<name> tag in System.Tags, and every other tag is a label.
-// Only the team's requirement backlog types become board items; Tasks contribute to parent counts,
+// The team's requirement backlog types and factory-tagged Tasks become board items; plain Tasks contribute to parent counts,
 // and each type's state categories decide what is Done (Completed) and what is hidden (Removed).
 // A repo-<name> tag says which of the repositories reading the source a work item is for; an untagged one is for each.
 
@@ -216,8 +216,10 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
   const backlogOf = kept(() => invoke<BacklogConfiguration>('work', 'backlogconfiguration', [`team=${team}`]), now);
   const backlogIds = async () => {
     const levels = await backlogOf();
-    const listed = await azureGet<{ workItems: { target: { id: number } }[] }>(
-      `https://dev.azure.com/${organization}/${encodeURIComponent(project)}/${encodeURIComponent(team)}/_apis/work/backlogs/${encodeURIComponent(levels.requirementBacklog.id)}/workItems?api-version=${API_VERSION}`, run);
+    // Discovery names both backlog routes work/backlogs. invoke selects {id}, not {backlogId}/workItems;
+    // include the suffix in id to reach the work-items route through the extension's organization-aware login.
+    const listed = await invoke<{ workItems: { target: { id: number } }[] }>('work', 'backlogs',
+      [`team=${team}`, `id=${levels.requirementBacklog.id}/workItems`]);
     return [...new Set(listed.workItems.map((w) => w.target.id))];
   };
   const typeStates = new Map<string, () => Promise<{ value: { name: string; category: Category }[] }>>();
@@ -271,11 +273,26 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const ids = new Set(known.map((raw) => raw.id));
       return [...new Set(raws.flatMap((raw) => linked(raw, rel)))].filter((id) => !ids.has(id));
     };
-    // A sprint counts only its own children; a backlog counts every linked Task.
-    const parents = listed.filter((raw) => requirements.has(type(raw)));
-    const missing = unread(parents, 'System.LinkTypes.Hierarchy-Forward', listed).filter((id) => childIds === undefined || childIds.includes(id));
-    const withTasks = [...listed, ...await workItems(missing)];
-    const all = [...withTasks, ...await workItems(unread(parents, 'System.LinkTypes.Dependency-Reverse', withTasks))];
+    const factoryTask = (raw: RawWorkItem) => tasks.has(type(raw)) && tagsOf(raw).some((tag) =>
+      tag === 'build' || tag === 'concept' || tag.startsWith('decision-') || STATUS_TAGS.has(tag));
+    const boardItem = (raw: RawWorkItem) => requirements.has(type(raw)) || factoryTask(raw);
+    // Factory children can sit outside the sprint and below other Tasks. Follow their children too,
+    // while plain team Tasks remain counts only. The known IDs also stop malformed hierarchy cycles.
+    const withTasks = [...listed];
+    const attempted = new Set(withTasks.map((raw) => raw.id));
+    let missing = unread(withTasks.filter(boardItem), 'System.LinkTypes.Hierarchy-Forward', withTasks);
+    while (missing.length) {
+      withTasks.push(...await workItems(missing));
+      // An unreadable child must not make the traversal retry forever.
+      missing.forEach((id) => attempted.add(id));
+      missing = unread(withTasks.filter(boardItem), 'System.LinkTypes.Hierarchy-Forward', withTasks).filter((id) => !attempted.has(id));
+    }
+    const parents = withTasks.filter(boardItem);
+    const references = [...new Set([
+      ...unread(parents, 'System.LinkTypes.Dependency-Reverse', withTasks),
+      ...unread(parents.filter(factoryTask), 'System.LinkTypes.Hierarchy-Reverse', withTasks),
+    ])];
+    const all = [...withTasks, ...await workItems(references)];
     const byId = new Map(all.map((raw) => [raw.id, raw]));
     const byType = await categories([...new Set(all.map(type))]);
     const category = (raw: RawWorkItem) => byType.get(type(raw))?.get(field(raw, 'System.State'));
@@ -285,22 +302,22 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
 
     const done = (raw: RawWorkItem) => category(raw) === 'Completed';
     const shown = (raw: RawWorkItem) => category(raw) !== 'Removed';
-    // Requirement-level items become board items; Tasks contribute only to their parent’s counts.
+    // Factory Tasks become board items even when hydration found them outside the listing.
     const placed = new Map<number, NonNullable<Placement>>();
     const childrenOf = new Map<number, RawWorkItem[]>();
-    for (const raw of listed) {
-      if (!requirements.has(type(raw)) || !shown(raw) || (!(typeof completed === 'boolean' ? completed : completed.has(raw.id)) && done(raw))) continue;
+    for (const raw of parents) {
+      if (!shown(raw) || (!(typeof completed === 'boolean' ? completed : completed.has(raw.id)) && done(raw))) continue;
       const where = placement(tagsOf(raw), repos);
       if (!where) continue;
       placed.set(raw.id, where);
-      childrenOf.set(raw.id, withTasks.filter((child) => (childIds === undefined || childIds.includes(child.id)) && tasks.has(type(child)) && shown(child) && Number(child.fields['System.Parent']) === raw.id)
+      childrenOf.set(raw.id, withTasks.filter((child) => (factoryTask(raw) || factoryTask(child) || childIds === undefined || childIds.includes(child.id)) && tasks.has(type(child)) && shown(child) && Number(child.fields['System.Parent']) === raw.id)
         .filter((child) => {
           const tags = tagsOf(child);
           const own = tags.some(isRepoTag) ? placement(tags, repos) : where;
           return own !== null;
         }));
     }
-    const top = listed.filter((raw) => childrenOf.has(raw.id));
+    const top = parents.filter((raw) => childrenOf.has(raw.id));
     // An item outside the listing, such as a predecessor, goes by its own tags.
     const repoOf = (raw: RawWorkItem | undefined) => (raw && (placed.get(raw.id) ?? placement(tagsOf(raw), repos))?.repo) || repos[0]!;
     const blocker = (id: number): Blocker => {
@@ -313,6 +330,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const tags = tagsOf(raw);
       const statuses = labelStatuses(tags);
       const closed = done(raw);
+      const parent = factoryTask(raw) ? byId.get(Number(raw.fields['System.Parent'])) : undefined;
       return {
         id: itemId(raw.id),
         status: closed ? 'Done' : statuses[0] ?? 'List',
@@ -328,7 +346,8 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
         ...order.has(raw.id) && { sourceOrder: order.get(raw.id)! },
         state: closed ? 'closed' : 'open',
         closedAs: closed ? 'done' : null,
-        parent: null,
+        parent: parent ? { number: parent.id, title: field(parent, 'System.Title'), url: url(parent.id), repo: repoOf(parent),
+          state: done(parent) ? 'closed' : 'open', azure: azureWorkItem(parent) } : null,
         subIssues: { total: children.length, completed: children.filter(done).length },
         blockers: linked(raw, 'System.LinkTypes.Dependency-Reverse').map(blocker),
         updatedAt: field(raw, 'System.ChangedDate'),
@@ -354,7 +373,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     },
     // A partial read uses the last listing’s sprint membership for child counts.
     async readSome(items) {
-      const ids = [...new Set(items.map((item) => item.parent?.number ?? item.number!))];
+      const ids = [...new Set(items.map((item) => item.number!))];
       const [listed, levels] = await Promise.all([workItems(ids), backlogOf()]);
       return (await itemsOf({ title: '', items: listed, completed: showsCompleted, ...childIds !== undefined && { childIds } }, levels)).items;
     },

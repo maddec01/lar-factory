@@ -262,7 +262,7 @@ function problem(raw: Record<string, unknown>, azure: boolean): string | null {
   if (typeof raw.role !== 'string' || !raw.role) return 'field role is missing or not a string';
   if ('itemSource' in raw && (typeof source !== 'object' || source === null || Array.isArray(source))) return 'field itemSource must be an object';
   if (source && source.kind !== (azure ? 'azure-board' : 'issues') || azure && !source) return 'has an unsupported item source. Run onboarding again';
-  if (azure && !isTeam(source?.team)) return 'field itemSource.team must name the team for an azure-board';
+  if (azure && !isTeam(source?.team)) return 'name the Azure DevOps team whose backlog and current sprint the board reads';
   if ('show' in raw && !SHOW_SETTINGS.includes(raw.show as ShowSetting)) return 'field show must be "all" or "opted-in"';
   if ('labels' in raw && (!Array.isArray(raw.labels) || raw.labels.some((l) => typeof l !== 'string'))) return 'field labels must be an array of strings';
   return null;

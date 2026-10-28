@@ -18,6 +18,7 @@ export function azureBoard(repos: readonly string[], team: string, run: Az = az)
       childIds: [...sprint.childIds ?? [], ...backlog.items.filter((item) => !sprintIds.has(item.id))
         .flatMap((item) => linked(item, 'System.LinkTypes.Hierarchy-Forward'))],
       completed: sprintIds,
+      ...sprint.currentSprint && { currentSprint: sprint.currentSprint },
     };
   }, run);
 }

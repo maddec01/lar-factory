@@ -31,6 +31,10 @@ export interface ItemDetails {
   area?: string;
   /** Its sub-issues or child work items. */
   subTickets: IssueRef[];
+  /** Named Azure attachments open in Azure DevOps; their contents are never downloaded by the board. */
+  attachments?: { name: string; url: string }[];
+  related?: IssueRef[];
+  blockers?: IssueRef[];
   /** A failed relations read leaves the main details intact. */
   relationsError?: string;
   /** The latest comments, newest first. */

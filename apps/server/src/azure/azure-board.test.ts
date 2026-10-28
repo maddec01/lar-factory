@@ -87,3 +87,22 @@ test('factory Tasks retain sprint completion, Removed filtering, blockers and re
   assert.deepEqual(items.map((i) => [i.number, i.status]), [[1, 'List'], [11, 'Done'], [14, 'Ready']]);
   assert.deepEqual(items[2]!.blockers, [{ number: 11, repo: REPO, state: 'closed' }]);
 });
+
+test('sprint membership names only current children and survives partial reads, without changing all-time backlog counts', async () => {
+  const az = fakeAz({ items: [
+    { id: 1, type: 'User Story', state: 'Active' },
+    { id: 11, type: 'Task', state: 'New', parent: 1 },
+    { id: 12, type: 'Task', state: 'Closed', parent: 1 },
+    { id: 13, type: 'Task', state: 'Closed', parent: 1 },
+    { id: 2, type: 'User Story', state: 'New' },
+    { id: 21, type: 'Task', state: 'Closed', parent: 2 },
+  ], backlog: [1, 2], sprint: [1, 11, 12] });
+  const source = azureBoard([REPO], 'Fabrikam Team', az.run);
+  const read = await source.read();
+  assert.deepEqual(read.items.map((i) => i.currentSprint), [
+    { name: 'Sprint 12', childNumbers: [11, 12] }, { name: 'Sprint 12', childNumbers: [] },
+  ]);
+  assert.deepEqual((await source.readSome!(read.items)).map((i) => i.currentSprint), read.items.map((i) => i.currentSprint));
+  const noSprint = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 11, type: 'Task', state: 'Closed', parent: 1 }], iterations: [] });
+  assert.equal((await azureBoard([REPO], 'Fabrikam Team', noSprint.run).read()).items[0]!.currentSprint, undefined);
+});

@@ -10,6 +10,8 @@ export interface WorkItem {
   tags?: string;
   parent?: number;
   predecessors?: number[];
+  related?: number[];
+  attachments?: { name: string; url: string }[];
   closed?: string;
   /** Its area path; the team's own area when absent. */
   area?: string;
@@ -59,13 +61,15 @@ export const STATES: Record<string, [string, string][]> = {
  * Like az, it refuses a devops invoke at a preview's resource version, and one on wit/workitems' {id} route, which az rest PATCHes.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
-  requirement = 'User Story', requirementTypes = [requirement], areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], tags = [], fail }: {
+  requirement = 'User Story', requirementTypes = [requirement], areas = [{ value: TEAM_AREA, includeChildren: true }], defaultArea = areas[0]?.value, backlogIteration = '', iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], tags = [], fail }: {
   items: WorkItem[];
   sprint?: number[];
   backlog?: number[];
   requirement?: string;
   requirementTypes?: string[];
   areas?: { value: string; includeChildren: boolean }[];
+  defaultArea?: string;
+  backlogIteration?: string;
   iterations?: { id: string; name: string }[];
   pullRequests?: FakePr[];
   tags?: string[];
@@ -99,6 +103,8 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
       ...items.filter((child) => child.parent === i.id)
         .map((child) => ({ rel: 'System.LinkTypes.Hierarchy-Forward', url: `https://dev.azure.com/contoso/_apis/wit/workItems/${child.id}`, attributes: {} })),
       ...(i.predecessors ?? []).map((p) => ({ rel: 'System.LinkTypes.Dependency-Reverse', url: `https://dev.azure.com/contoso/_apis/wit/workItems/${p}`, attributes: {} })),
+      ...(i.related ?? []).map((id) => ({ rel: 'System.LinkTypes.Related', url: `https://dev.azure.com/contoso/_apis/wit/workItems/${id}`, attributes: {} })),
+      ...(i.attachments ?? []).map(({ name, url }) => ({ rel: 'AttachedFile', url, attributes: { name } })),
       { rel: 'ArtifactLink', url: 'vstfs:///Git/Commit/x', attributes: {} },
       ...(i.prs ?? []).map((id) => ({ rel: 'ArtifactLink', url: `vstfs:///Git/PullRequestId/p-guid%2Fr-guid%2F${id}`, attributes: { name: 'Pull Request' } })),
     ],
@@ -143,8 +149,9 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         if (route(args, 'id') !== 'Microsoft.RequirementCategory/workItems') throw new Error('fake az: invoke selects the backlog {id} route');
         return JSON.stringify({ workItems: backlog.map((id) => ({ target: { id } })) });
       }
+      if (resource === 'work/teamsettings') return JSON.stringify({ backlogIteration: { path: backlogIteration }, defaultIteration: { path: 'Fabrikam Fiber\\Sprint 12' } });
       if (resource === 'work/teamfieldvalues') {
-        return JSON.stringify({ field: { referenceName: 'System.AreaPath' }, defaultValue: areas[0]?.value, values: areas });
+        return JSON.stringify({ field: { referenceName: 'System.AreaPath' }, defaultValue: defaultArea, values: areas });
       }
       if (resource === 'wit/workitemsbatch') {
         const { ids } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { ids: number[] };
@@ -159,7 +166,8 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         const value = (path: string) => ops.find((op) => op.path === path)?.value as string | undefined;
         const id = Math.max(100, ...byId.keys()) + 1;
         created.push({ id, type, ops });
-        byId.set(id, { id, type, state: STATES[type]![0]![0], title: value('/fields/System.Title'), tags: value('/fields/System.Tags') });
+        if (requirementTypes.includes(type)) backlog.push(id);
+        byId.set(id, { id, type, state: STATES[type]![0]![0], title: value('/fields/System.Title'), tags: value('/fields/System.Tags'), area: value('/fields/System.AreaPath') ?? 'Fabrikam Fiber', iteration: value('/fields/System.IterationPath') ?? 'Fabrikam Fiber' });
         return JSON.stringify(raw(byId.get(id)!));
       }
       if (resource === 'wit/comments') {

@@ -119,7 +119,7 @@ export interface RawWorkItem {
   id: number;
   rev?: number;
   fields: Record<string, unknown>;
-  relations?: { rel: string; url: string }[] | null;
+  relations?: { rel: string; url: string; attributes?: { name?: string } }[] | null;
 }
 
 type Category = 'Proposed' | 'InProgress' | 'Resolved' | 'Completed' | 'Removed';
@@ -187,6 +187,8 @@ export interface Listing {
   items: RawWorkItem[];
   /** Sprint membership: only these children count; absent for the whole backlog. */
   childIds?: readonly number[];
+  /** Current sprint membership, kept separate from the backlog's all-time child counts. */
+  currentSprint?: { name: string; childIds: readonly number[] };
   /** The backlog priority order; sprint-only items follow it. */
   order?: readonly number[];
   /** Whether a Completed requirement-level item shows, as Done. */
@@ -262,9 +264,10 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
   /** Whether the last listing showed Completed requirement-level items, so an item read alone shows as that listing would. */
   let showsCompleted: Listing['completed'] = true;
   let childIds: readonly number[] | undefined;
+  let currentSprint: Listing['currentSprint'];
   let order = new Map<number, number>();
   /** Requirement-level board items with Task counts, predecessors and PRs. */
-  async function itemsOf({ title, items: listed, completed, childIds }: Listing, levels: BacklogConfiguration): Promise<ItemsRead> {
+  async function itemsOf({ title, items: listed, completed, childIds, currentSprint }: Listing, levels: BacklogConfiguration): Promise<ItemsRead> {
     const type = (raw: RawWorkItem) => field(raw, 'System.WorkItemType');
     const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
     const tasks = new Set(levels.taskBacklog.workItemTypes.map((t) => t.name));
@@ -331,8 +334,10 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const statuses = labelStatuses(tags);
       const closed = done(raw);
       const parent = factoryTask(raw) ? byId.get(Number(raw.fields['System.Parent'])) : undefined;
+      const childNumbers = linked(raw, 'System.LinkTypes.Hierarchy-Forward');
       return {
         id: itemId(raw.id),
+        ...currentSprint && childNumbers.length > 0 && { currentSprint: { name: currentSprint.name, childNumbers: childNumbers.filter((id) => currentSprint.childIds.includes(id)) } },
         status: closed ? 'Done' : statuses[0] ?? 'List',
         statuses,
         content: 'ticket',
@@ -368,6 +373,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const [listing, levels] = await Promise.all([list({ organization, project, boards, invoke, workItems, backlog, backlogIds }), backlog]);
       showsCompleted = listing.completed;
       childIds = listing.childIds;
+      currentSprint = listing.currentSprint;
       order = new Map([...new Set([...(listing.order ?? []), ...listing.items.map((raw) => raw.id)])].map((id, i) => [id, i]));
       return itemsOf(listing, levels);
     },
@@ -375,11 +381,11 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     async readSome(items) {
       const ids = [...new Set(items.map((item) => item.number!))];
       const [listed, levels] = await Promise.all([workItems(ids), backlogOf()]);
-      return (await itemsOf({ title: '', items: listed, completed: showsCompleted, ...childIds !== undefined && { childIds } }, levels)).items;
+      return (await itemsOf({ title: '', items: listed, completed: showsCompleted, ...currentSprint && { currentSprint }, ...childIds !== undefined && { childIds } }, levels)).items;
     },
     ...azureWrites(project, workItems, (id, file) => parsed(workItemPatch(organization, project, id, file)), statesOf),
     // A new work item is in its type's first state, Proposed, so it shows open in List.
-    create: azureCreate(project, invoke, async () => (await backlogOf()).requirementBacklog.defaultWorkItemType.name, (raw, draft) => ({
+    create: azureCreate(project, team, invoke, async () => (await backlogOf()).requirementBacklog.defaultWorkItemType.name, (raw, draft) => ({
       id: itemId(raw.id), status: 'List', statuses: ['List'], content: 'ticket', number: raw.id, title: field(raw, 'System.Title'),
       url: url(raw.id), repo: draft.repo, azure: azureWorkItem(raw), ...!draft.onlyFor && { untaggedFor: [...repos] }, labels: labelsOf(raw), state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 },
       blockers: [], updatedAt: field(raw, 'System.ChangedDate'), closedAt: null, linkedPrs: [], slices: [],

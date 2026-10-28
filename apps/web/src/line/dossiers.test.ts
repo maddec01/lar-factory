@@ -275,7 +275,7 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   expect(dialogTitle()).toBe('#201 Relay: broker only or full TURN?');
 });
 
-test('an item with sub-issues on the board is coupled work; with no map, it says its parts come from GitHub', async () => {
+test('an item with sub-issues on the board is coupled work; with no map, it says its parts come from its children', async () => {
   const parent = rawIssue('I_parent', 100, 'In progress', ['build'], {
     subIssuesSummary: { total: 3, completed: 0 },
     subIssues: { nodes: [sliceRef(101, 'OPEN'), sliceRef(102, 'OPEN'), sliceRef(103, 'OPEN')] },
@@ -286,7 +286,7 @@ test('an item with sub-issues on the board is coupled work; with no map, it says
   await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });
   const d = dossier('I_100');
   expect(text(header('I_100')[0]!.firstElementChild)).toBe('Coupled workIn progress · 0/1 parts done · lar-factory');
-  expect(text(d.querySelector('[data-checklist]')!.previousElementSibling)).toBe("No map yet: the parts come from GitHub's sub-issues.");
+  expect(text(d.querySelector('[data-checklist]')!.previousElementSibling)).toBe("No map yet. The parts come from the item's children.");
   expect(progress('I_100').map((r) => r.dataset.item), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
   expect(phases('I_100').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build lar-factory']);
   expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();

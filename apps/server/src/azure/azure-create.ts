@@ -23,12 +23,21 @@ const refused = (err: unknown) => err instanceof ReadProblem || /\b(?:TF|VS)\d{5
  * The create of an Azure item source on `project`: `type` reads the type to create, and `item` is the board's item for
  * the work item the draft created. A retry resumes from `progress`, so it never creates a second work item.
  */
-export function azureCreate(project: string, invoke: AzureCalls['invoke'], type: () => Promise<string>, item: (raw: RawWorkItem, draft: ItemDraft) => Item) {
+export function azureCreate(project: string, team: string, invoke: AzureCalls['invoke'], type: () => Promise<string>, item: (raw: RawWorkItem, draft: ItemDraft) => Item) {
   return async (draft: ItemDraft, progress: CreationProgress): Promise<CreationResult> => {
     if (progress.creationUncertain) return { item: null, issueUrl: null, uncertain: true, error: UNCERTAIN };
     if (progress.item) return { item: progress.item, issueUrl: progress.item.url, error: null };
     try {
+      const [areas, settings] = await Promise.all([
+        invoke<{ defaultValue?: string }>('work', 'teamfieldvalues', [`team=${team}`]),
+        invoke<{ backlogIteration?: { path?: string } }>('work', 'teamsettings', [`team=${team}`]),
+      ]);
+      if (!areas.defaultValue || typeof settings.backlogIteration?.path !== 'string') throw new Error(`Could not read ${team}'s default area and backlog iteration. Check the team settings in Azure DevOps.`);
+      // Team settings return a project-relative path: the root is empty, and a nested iteration starts with \\.
+      const iteration = `${project}${settings.backlogIteration.path}`;
       const ops = [
+        { op: 'add', path: '/fields/System.AreaPath', value: areas.defaultValue },
+        { op: 'add', path: '/fields/System.IterationPath', value: iteration },
         { op: 'add', path: '/fields/System.Title', value: draft.title },
         { op: 'add', path: '/fields/System.Description', value: draft.description },
         { op: 'add', path: '/multilineFieldsFormat/System.Description', value: 'Markdown' },

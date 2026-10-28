@@ -158,3 +158,34 @@ test('an empty Bug description falls back to Repro Steps, keeping Acceptance Cri
   assert.deepEqual([details.body, details.format], ['<p>Open the broken screen.</p>', 'html']);
   assert.deepEqual(details.sections, [{ title: 'Acceptance Criteria', body: 'The screen opens.', format: 'markdown' }, { title: 'System Info', body: '<div>macOS</div>', format: 'html' }]);
 });
+
+
+test('details keep named Azure attachments, Related work and predecessors alongside children', async () => {
+  const url = 'https://dev.azure.com/contoso/_apis/wit/attachments/document-id';
+  const az = fakeAz({ items: [workItem({ related: [9], predecessors: [7], attachments: [{ name: 'OAuth implementation.pdf', url }] }),
+    { id: 6, type: 'Task', state: 'Active', parent: 5, title: 'Implement OAuth' },
+    { id: 7, type: 'User Story', state: 'Active', title: 'Get credentials' },
+    { id: 9, type: 'User Story', state: 'Closed', title: 'Integrate provider' }] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual(details.attachments, [{ name: 'OAuth implementation.pdf', url }]);
+  assert.deepEqual(details.related?.map((ref) => [ref.number, ref.title, ref.url, ref.state]), [
+    [9, 'Integrate provider', 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/9', 'closed'],
+  ]);
+  assert.deepEqual(details.blockers?.map((ref) => [ref.number, ref.title, ref.url, ref.state]), [
+    [7, 'Get credentials', 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/7', 'open'],
+  ]);
+  assert.deepEqual(details.subTickets.map((ref) => ref.number), [6]);
+});
+
+test('attachments survive a failed relation read and only link to Azure over HTTPS', async () => {
+  const url = 'https://dev.azure.com/contoso/_apis/wit/attachments/document-id';
+  const az = fakeAz({ items: [workItem({ predecessors: [7], attachments: [
+    { name: 'Evidence.pdf', url }, { name: 'Bad scheme', url: 'javascript:alert(1)' },
+    { name: 'Insecure', url: 'http://dev.azure.com/contoso/doc' }, { name: 'Other host', url: 'https://dev.azure.com.example.com/doc' },
+  ] }), { id: 7, type: 'Task', state: 'Active' }], fail: (args) => args.includes('workitemtypestates') ? new Error('Relations unavailable') : undefined });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual(details.attachments, [{ name: 'Evidence.pdf', url }]);
+  assert.equal(details.relationsError, 'Relations unavailable');
+});

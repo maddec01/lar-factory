@@ -22,7 +22,7 @@ import { StartAfterError, StartOrAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
-import { ItemComments, ItemDescription, ItemMeta, SubTickets } from './item-details-view.tsx';
+import { ItemComments, ItemDescription, ItemMeta, ItemRelations } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
 import { ItemProgress } from './item-progress.tsx';
 import { useItemDetails } from './use-item-details.ts';
@@ -58,7 +58,7 @@ function MoveActions({ item, data }: { item: Item; data: BoardData }) {
 /** Whether the sidebar has anything: pull requests, or sub-tickets (as many as the board counts while the details load). */
 const hasRelations = (item: Item, read: ItemDetailsRead): boolean =>
   item.linkedPrs.length > 0
-  || (read.state === 'loaded' ? (read.details.subTickets.length > 0 || Boolean(read.details.relationsError)) : read.state === 'loading' && item.subIssues.total > 0);
+  || (read.state === 'loaded' ? (read.details.subTickets.length > 0 || Boolean(read.details.attachments?.length || read.details.related?.length || read.details.blockers?.length || read.details.relationsError)) : read.state === 'loading' && item.subIssues.total > 0);
 
 const Section = ({ heading, children }: { heading: ReactNode; children: ReactNode }) => (
   <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2"><h2 className="m-0 text-[13px] font-medium">{heading}</h2>{children}</section>
@@ -94,7 +94,7 @@ function ItemDialogContent({ item, data, now }: { item: Item; data: BoardData; n
             <ItemDescription read={read} className="@min-[45rem]:col-start-1" />
             {aside && (
               <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 @min-[45rem]:col-start-2 @min-[45rem]:row-span-2 @min-[45rem]:row-start-1 @min-[45rem]:border-l @min-[45rem]:border-(--border) @min-[45rem]:pl-6">
-                <SubTickets read={read} />
+                <ItemRelations item={item} read={read} />
                 {item.linkedPrs.length > 0 && <Section heading="Pull requests"><PrList item={item} /></Section>}
               </aside>
             )}

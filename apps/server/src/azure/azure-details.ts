@@ -75,10 +75,13 @@ async function inArea<T>(item: Item, run: Az, use: (call: Call, repo: string) =>
 const readComments = (call: Call, item: Item, token?: string) =>
   call<RawComments>('comments', [`workItemId=${item.number}`], COMMENTS_API_VERSION, ['--query-parameters', `$top=${COMMENT_LIMIT}`, 'order=desc', ...token ? [`continuationToken=${token}`] : []]);
 
-/** The work item's child work items as sub-tickets, from batches of at most 200; the Completed ones are closed and the Removed ones, which the board hides, are left out. */
-async function subTicketsOf(call: Call, repo: string, workItem: RawWorkItem): Promise<IssueRef[]> {
-  const ids = [...new Set(linked(workItem, 'System.LinkTypes.Hierarchy-Forward'))];
-  if (!ids.length) return [];
+/** Named children, Related work and predecessors in shared batches of at most 200. Removed children stay hidden. */
+async function relationsOf(call: Call, repo: string, workItem: RawWorkItem): Promise<Pick<ItemDetails, 'subTickets' | 'related' | 'blockers'>> {
+  const childIds = linked(workItem, 'System.LinkTypes.Hierarchy-Forward');
+  const relatedIds = linked(workItem, 'System.LinkTypes.Related');
+  const blockerIds = linked(workItem, 'System.LinkTypes.Dependency-Reverse');
+  const ids = [...new Set([...childIds, ...relatedIds, ...blockerIds])];
+  if (!ids.length) return { subTickets: [] };
   const [organization, project] = repo.split('/') as [string, string];
   const batches = Array.from({ length: Math.ceil(ids.length / 200) }, (_, i) => ids.slice(i * 200, (i + 1) * 200));
   const reads = await Promise.all(batches.map((batch) => withFile({ ids: batch, fields: ['System.Title', 'System.State', 'System.WorkItemType', 'System.AssignedTo'], errorPolicy: 'Omit' }, (file) =>
@@ -87,11 +90,15 @@ async function subTicketsOf(call: Call, repo: string, workItem: RawWorkItem): Pr
   const types = [...new Set(children.map((raw) => field(raw, 'System.WorkItemType')))];
   const states = await Promise.all(types.map((type) => call<{ value: { name: string; category: string }[] }>('workitemtypestates', [`type=${type}`], API_VERSION)));
   const category = new Map(types.map((type, i) => [type, new Map(states[i]!.value.map((s) => [s.name, s.category]))]));
-  return children.flatMap((raw) => {
+  const refs = new Map(children.map((raw): [number, IssueRef] => {
     const kind = category.get(field(raw, 'System.WorkItemType'))?.get(field(raw, 'System.State'));
-    if (kind === 'Removed') return [];
-    return [{ number: raw.id, title: field(raw, 'System.Title'), url: workItemUrl(organization, project, raw.id), repo, state: kind === 'Completed' ? 'closed' : 'open', azure: azureWorkItem(raw) }];
-  });
+    return [raw.id, { number: raw.id, title: field(raw, 'System.Title'), url: workItemUrl(organization, project, raw.id), repo, state: kind === 'Completed' || kind === 'Removed' ? 'closed' : 'open', azure: azureWorkItem(raw) }];
+  }));
+  const references = (ids: number[]) => [...new Set(ids)].flatMap((id) => refs.get(id) ?? []);
+  const removed = new Set(children.filter((raw) => category.get(field(raw, 'System.WorkItemType'))?.get(field(raw, 'System.State')) === 'Removed').map((raw) => raw.id));
+  return { subTickets: references(childIds.filter((id) => !removed.has(id))),
+    ...relatedIds.length > 0 && { related: references(relatedIds) },
+    ...blockerIds.length > 0 && { blockers: references(blockerIds) } };
 }
 
 /**
@@ -125,9 +132,15 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
   });
   const olderCursor = read.continuationToken || null;
   let relationsError: string | undefined;
-  const subTickets = await subTicketsOf(call, repo, workItem).catch((err: unknown) => {
+  const relations = await relationsOf(call, repo, workItem).catch((err: unknown) => {
     relationsError = err instanceof Error ? err.message : String(err);
-    return [];
+    return { subTickets: [] };
+  });
+  const attachments = (workItem.relations ?? []).flatMap((r) => {
+    if (r.rel !== 'AttachedFile' || !URL.canParse(r.url)) return [];
+    const url = new URL(r.url);
+    if (url.protocol !== 'https:' || !(url.hostname === 'dev.azure.com' || url.hostname.endsWith('.visualstudio.com'))) return [];
+    return [{ name: r.attributes?.name || 'Attachment', url: r.url }];
   });
   const assignee = nameOf(workItem.fields['System.AssignedTo']);
   return {
@@ -139,7 +152,8 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
     createdAt: text('System.CreatedDate') ?? null,
     ...text('System.IterationPath') && { iteration: text('System.IterationPath') },
     ...text('System.AreaPath') && { area: text('System.AreaPath') },
-    subTickets,
+    ...relations,
+    ...attachments.length > 0 && { attachments },
     ...relationsError !== undefined && { relationsError },
     comments: read.comments.filter((c) => !c.isDeleted).map(comment),
     hasOlderComments: olderCursor !== null,

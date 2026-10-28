@@ -465,3 +465,24 @@ test('a change to a blocker reads the items it blocks too, and an unknown GitHub
   await sources.read(undefined, pace(4_000));
   assert.deepEqual([project.reads, issues.reads], [2, 1]);
 });
+
+test('a source whose kind waits reads nothing and checks for no changes, and reads whole once it stops waiting', async () => {
+  const checks: number[] = [];
+  const github = Object.assign(countedSource('github', () => [item('I_1', 'maddec01/lar-apple')]), { changes: async (since: number) => { checks.push(since); return []; } });
+  const azure = countedSource('azure', () => [item('I_2', 'maddec01/lar-server')]);
+  const sources = mergeSources([], new Map([['maddec01/lar-apple', github], ['maddec01/lar-server', azure]]), [],
+    new Map([[github, 'issues'], [azure, 'sprint']]));
+  let waiting = new Set<string>(['sprint']);
+  const paced = (now: number) => ({ ...pace(now), waits: (kind: string) => waiting.has(kind) });
+  assert.equal((await sources.read(undefined, { ...paced(0), waits: () => true })).unread, true, 'a read with every source waiting reads nothing');
+  const read = await sources.read(undefined, paced(0));
+  assert.deepEqual(read.items.map((i) => i.id), ['I_1']);
+  assert.equal(read.unread, undefined);
+  assert.deepEqual([github.reads, azure.reads], [1, 0]);
+  waiting = new Set(['issues']);
+  await sources.probe(paced(5_000));
+  assert.deepEqual(checks, [], 'a waiting source checks for no changes');
+  assert.equal(sources.due(paced(5_000)), true, 'the source that stopped waiting is due at once');
+  assert.deepEqual((await sources.read(undefined, paced(5_000))).items.map((i) => i.id), ['I_1', 'I_2'], 'a waiting source lists its last read');
+  assert.deepEqual([github.reads, azure.reads], [1, 1]);
+});

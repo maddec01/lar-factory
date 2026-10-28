@@ -1,7 +1,7 @@
 // The item source interface: where the board server reads its items and writes their changes.
 // Each adapter lives with its provider's code, such as the GitHub Project's in github/github-project.ts.
 
-import type { CreationProgress, CreationResult, IssueRef, Item, ItemDraft, ItemSourceProblem, Status } from '@lar-factory/shared';
+import type { CreationProgress, CreationResult, IssueRef, Item, ItemDraft, ItemSourceKind, ItemSourceProblem, Status } from '@lar-factory/shared';
 
 /** One read of an item source: its title, for the board's header, and its items. */
 export interface ItemsRead {
@@ -9,6 +9,8 @@ export interface ItemsRead {
   items: Item[];
   /** Each repository whose items the read left off, and why; absent when none. */
   problems?: ItemSourceProblem[];
+  /** Set when a merged read has sources and none of them has read yet, as each waits for its tool. */
+  unread?: true;
 }
 
 /** Reports which item sources a read is reading: each source starts and finishes under its name, in whatever order its reads end. */
@@ -33,12 +35,14 @@ export class ReadProblem extends Error {
  * How fast a merged read keeps each source: a source holding an item `active` says is due every `activeMs`, any other
  * every `idleMs`, ACTIVE_READ_MS and IDLE_READ_MS when absent, and every source is idle while `slow` holds, as when a
  * provider's quota runs low. A source whose change check sees every edit keeps only the items `polled` says at
- * `activeMs`, as no check sees a PR's checks finish.
+ * `activeMs`, as no check sees a PR's checks finish. A source of a kind `waits` names reads nothing, as while its
+ * provider's tool is still checking or blocks it.
  */
 export interface ReadPace {
   now: number;
   active(item: Item): boolean;
   polled(item: Item): boolean;
+  waits?(kind: ItemSourceKind): boolean;
   activeMs?: number;
   idleMs?: number;
   slow?: boolean;

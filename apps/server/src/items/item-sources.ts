@@ -1,7 +1,7 @@
 // Every item source the onboarded repositories' configs name, as the one item source the board server reads and writes through.
 // A GitHub Project or a repository's issues read through gh, and an Azure DevOps team's sprint or backlog through az.
 
-import { decodePart, refKey, shownRepo, type Item, type RepoConfig } from '@lar-factory/shared';
+import { decodePart, itemSource, refKey, shownRepo, type Item, type ItemSourceKind, type RepoConfig } from '@lar-factory/shared';
 import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
@@ -34,7 +34,7 @@ export function repoView({ repo, role, itemSource, show, labels }: RepositoryCon
  * Each repository's item source as its config names it, merged, showing each repository's items as its show setting
  * says. Repositories that name the same Project share one adapter, so one read, and so do repositories that read the
  * same Azure DevOps team's sprint or backlog, which then sorts the team's work items among them by their repo- tags.
- * `run` stands in for az in tests.
+ * Each source waits while the pace says its kind waits. `run` stands in for az in tests.
  */
 export function configuredSources(configs: readonly RepositoryConfig[], run: Az = az): MergedSource {
   const projects = new Map<string, ItemSource>();
@@ -59,8 +59,9 @@ export function configuredSources(configs: readonly RepositoryConfig[], run: Az 
     if (!projects.has(key)) projects.set(key, githubProject(itemSource));
     return [repo, projects.get(key)!];
   }));
+  const kinds = new Map(configs.map((config): [ItemSource, ItemSourceKind] => [byRepo.get(config.repo)!, itemSource(repoView(config))]));
   const optedIn = configs.filter((c) => c.show === 'opted-in').map((c) => c.repo);
-  return mergeSources([...projects.values()], byRepo, optedIn);
+  return mergeSources([...projects.values()], byRepo, optedIn, kinds);
 }
 
 /** How often a source holding active work reads, and how often an idle one does: its safety read for edits made elsewhere. */
@@ -112,9 +113,11 @@ function githubRef(url: string): { repo: string; number: number } | undefined {
  * only that source's items instead, and the read names the problem under each of its repositories. A read leaves out
  * each item from a repository in `optedIn` that carries no status, except a closed item a Project lists: being in a
  * Project opts it in. An untagged item that carries no status leaves the opted-in repositories of its `untaggedFor`.
- * A read given a pace reads only the sources due at it, and lists the others from their last good read.
+ * A read given a pace reads only the sources due at it, and lists the others from their last good read; a source whose
+ * kind in `kinds` the pace says waits is never due, and checks for no changes.
  */
-export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = []): MergedSource {
+export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = [],
+  kinds: ReadonlyMap<ItemSource, ItemSourceKind> = new Map()): MergedSource {
   const sourceByRepo = new Map([...byRepo].map(([repo, source]) => [repo.toLowerCase(), source]));
   const optIn = new Set(optedIn.map((repo) => repo.toLowerCase()));
   const optedOut = (repo: string | null) => optIn.has(repo?.toLowerCase() ?? '');
@@ -159,11 +162,17 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
   /** The sources the last read read whole, and the items it read alone. */
   let afresh = new Set<ItemSource>();
   let afreshItems = new Set<string>();
+  /** Whether the pace holds the source back, by its kind. */
+  const waits = (source: ItemSource, pace: ReadPace) => {
+    const kind = kinds.get(source);
+    return kind !== undefined && pace.waits?.(kind) === true;
+  };
   /**
    * What a read at `pace` reads of the source: all of it before its first good read, when asked to, and every idle
    * interval; else its active and asked-for items alone, through readSome, or all of it when it has none; else nothing.
    */
   const planOf = (source: ItemSource, pace: ReadPace): 'whole' | Item[] | null => {
+    if (waits(source, pace)) return null;
     const started = startedAt.get(source);
     if (started === undefined) return 'whole';
     const since = pace.now - started;
@@ -269,14 +278,15 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       }));
       listedBy = listed;
       const problems = reads.flatMap((read) => read.problems ?? []);
-      return { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item, listed.get(item.id)!) ?? []), ...problems.length > 0 && { problems } };
+      return { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item, listed.get(item.id)!) ?? []), ...problems.length > 0 && { problems },
+        ...sources.length > 0 && !sources.some((source) => lastRead.has(source)) && { unread: true as const } };
     },
     async probe(pace) {
       if (pace.slow) return;
       // A check looks back to the last good one, or to the source's first read; a failed check leaves that in place.
       await Promise.allSettled(sources.map(async (source) => {
         const since = probedAt.get(source) ?? wholeAt.get(source);
-        if (!source.changes || !lastRead.has(source) || since === undefined || pace.now < (probeAfter.get(source) ?? since + PROBE_MS)) return;
+        if (!source.changes || !lastRead.has(source) || since === undefined || waits(source, pace) || pace.now < (probeAfter.get(source) ?? since + PROBE_MS)) return;
         probeAfter.set(source, pace.now + PROBE_RETRY_MS);
         ask(source, await source.changes(since));
         probedAt.set(source, pace.now);

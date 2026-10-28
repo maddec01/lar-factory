@@ -143,6 +143,7 @@ free_port() { python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1
 
 url=https://github.com/maddec01/lar-factory/issues/7
 expected="$url → Ready to merge"
+export FAKE_REPO_LABELS="status-ready-to-merge"
 
 # run [port]: runs status.sh with fresh logs, sets $output, $errors, $status and $seconds.
 run() {
@@ -153,7 +154,7 @@ run() {
     seconds=$((SECONDS - start))
     errors=$(cat "$bin/err")
 }
-same_as_today() { ((status == 0)) && [[ $output == "$expected" && -z $errors ]] && (($(grep -c '^edit' "$log") == 1)); }
+same_as_today() { ((status == 0)) && [[ $output == "$expected" && -z $errors ]] && (($(grep -c '^issue-edit' "$log") == 1)); }
 first_write() { grep -v '^project-' "$log" | sed -n 1p; }
 curls() { grep -c '^curl' "$log" || true; }
 
@@ -161,7 +162,7 @@ listen board
 run "$port"
 for _ in $(seq 20); do [[ -s "$bin/request" ]] && break; python3 -c 'import time; time.sleep(0.05)'; done
 request=$(cat "$bin/request" 2>/dev/null || true)
-if same_as_today && (($(curls) == 1)) && [[ $(first_write) == edit* ]] &&
+if same_as_today && (($(curls) == 1)) && [[ $(first_write) == issue-edit* ]] &&
     [[ $request == "POST /api/read HTTP/1.1"* ]] && grep -qi "^Host: 127.0.0.1:$port" <<<"$request" &&
     grep -qi "^Origin: http://127.0.0.1:$port" <<<"$request" && grep -qi '^Content-Type: application/json' <<<"$request" &&
     grep -q -- '--max-time 1' "$log" && grep -qF -- "\\\"url\\\":\\\"$url\\\"" "$log"; then

@@ -21,11 +21,19 @@ function latestThread(item: Item, data: BoardData): { link: string } | { reason:
 export const hasLiveThread = (item: Item): boolean =>
   Array.isArray(item.threads) && item.threads.some((t) => t.state !== 'done');
 
-/** Opens the latest thread in T3 Code: the board app hands the link to T3, a browser asks to open it. */
-export function OpenThread({ item, data, label = 'Open thread' }: { item: Item; data: BoardData; label?: string }) {
+/** A square Open, the thread icon alone, named by its label. */
+const SQUARE = 'w-7 px-0!';
+
+/**
+ * Opens the latest thread in T3 Code: the board app hands the link to T3, a browser asks to open it. `iconOnly` draws
+ * it as a square icon button, its label in its tooltip, as a desk card's corner does.
+ */
+export function OpenThread({ item, data, label = 'Open thread', iconOnly = false }: { item: Item; data: BoardData; label?: string; iconOnly?: boolean }) {
   const thread = latestThread(item, data);
+  const named = iconOnly ? { 'aria-label': label } : {};
+  const shown = iconOnly ? null : label;
   // Pointer events stay on while it's disabled, so its title says why.
   return 'link' in thread
-    ? <LinkButton kind="open" leftIcon={ICON.thread} data-open-thread={item.id} href={thread.link}>{label}</LinkButton>
-    : <Button {...kind('open')} leftIcon={ICON.thread} className="disabled:pointer-events-auto" data-open-thread={item.id} disabled title={thread.reason}>{label}</Button>;
+    ? <LinkButton kind="open" leftIcon={ICON.thread} className={iconOnly ? SQUARE : ''} data-open-thread={item.id} href={thread.link} title={iconOnly ? label : undefined} {...named}>{shown}</LinkButton>
+    : <Button {...kind('open')} leftIcon={ICON.thread} className={`disabled:pointer-events-auto ${iconOnly ? SQUARE : ''}`} data-open-thread={item.id} disabled title={thread.reason} {...named}>{shown}</Button>;
 }

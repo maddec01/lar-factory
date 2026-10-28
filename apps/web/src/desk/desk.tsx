@@ -1,9 +1,10 @@
 // Your desk: the items only you can move, Ready, Needs you, Verify and Ready to merge, as cards in one row that scrolls
-// sideways under the page's padding to the window's edges. A card opens the item dialog, and carries the buttons for
-// its next action: Open thread on every card, Start build on a Ready one, Open PR on Verify and Ready to merge. A Verify
-// card also shows that PR's pipeline: its checks and whether GitHub lets it merge.
+// sideways under the page's padding to the window's edges. A card opens the item dialog. Every card has the same five
+// rows at the same heights, so they line up across cards: status, repository and age; the title; the next step; the
+// step track; and the actions, the card's action on the left and Open thread as an icon in the right corner. Only a
+// Ready card's start message or Start after error, under its actions, makes one card taller than the rest.
 
-import { HINTS, carriesTwoStatuses, itemPr, repoKey, repoName, shortAgo } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, itemPr, openBlockerRefs, ref, repoKey, repoName, shortAgo, startHold } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -11,62 +12,76 @@ import { ItemTitle, StepTrack } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
-import { StartAfterError } from '../items/start-after.tsx';
+import { StartAfterError, showsStartAfter } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 
-/**
- * Open thread, then what the status asks next. A Ready item with a thread at work gets no Start build, so Open thread
- * shows once, and neither does one carrying another status until the user keeps one.
- */
-function Actions({ item, data }: { item: Item; data: BoardData }) {
-  // StartBuild shows Open thread itself for a live thread, which would put it on the card twice.
-  const next = item.status === 'Ready' ? !hasLiveThread(item) && !carriesTwoStatuses(item) && <StartBuild item={item} data={data} />
-    : item.status === 'Verify' || item.status === 'Ready to merge' ? <PrLink item={item} label="Open PR" />
-    : null;
-  return (
-    // A click beside the buttons opens the item dialog, as anywhere else on the card.
-    <KeepClicks className="desk-actions flex min-w-0 flex-wrap gap-2" passEmpty>
-      <OpenThread item={item} data={data} />{next}
-    </KeepClicks>
-  );
+/** Whether the card's action is Start build, or Start after in its place: a Ready item no thread works on yet, carrying no other status. */
+const startsBuild = (item: Item) => item.status === 'Ready' && !hasLiveThread(item) && !carriesTwoStatuses(item);
+
+/** What a Ready card waits on: the open blockers Start after names, what holds its repository, or nothing. */
+function readyStep(item: Item, data: BoardData): string {
+  if (!startsBuild(item)) return hasLiveThread(item) ? 'A thread is at work on it' : 'Ready to build';
+  if (showsStartAfter(item, data)) return `Waits on ${openBlockerRefs(item, true).join(', ')}`;
+  return startHold(data, item.repo) ?? 'Ready to build';
 }
+
+/** Whether the card's action is Open PR: a Verify or Ready to merge item. Only that card reads its PR's merge state and checks. */
+const readsPr = (item: Item) => item.status === 'Verify' || item.status === 'Ready to merge';
 
 const MERGE_COLOR: Record<MergeState, string> = { 'can merge': 'var(--st-done)', checking: 'var(--warning)', blocked: 'var(--muted-foreground)', conflicts: 'var(--error)' };
 
-/** The checks of the PR Open PR opens, counted, or no checks, then its merge state; nothing while there is no PR. */
-function Pipeline({ item }: { item: Item }) {
-  const pipeline = itemPr(item)?.pipeline;
-  if (!pipeline) return null;
-  const { checks, mergeState } = pipeline;
+/**
+ * The one line under the title: the merge state and checks of the PR Open PR opens, what a Ready card waits on, or the
+ * status's hint. The checks leave out a zero count other than passed.
+ */
+function NextStep({ item, data }: { item: Item; data: BoardData }) {
+  const pipeline = readsPr(item) ? itemPr(item)?.pipeline : undefined;
+  if (pipeline) {
+    const { checks, mergeState } = pipeline;
+    const counts = checks
+      ? [`${checks.passed} passed`, checks.running && `${checks.running} running`, checks.failed && `${checks.failed} failed`].filter(Boolean).join(' · ')
+      : 'no checks';
+    return (
+      <>
+        <span className="size-2 shrink-0 rounded-full" style={{ background: MERGE_COLOR[mergeState] }} />
+        <span className="shrink-0 font-medium text-(--foreground)">{mergeState}</span><span className="truncate"> · {counts}</span>
+      </>
+    );
+  }
+  return <span className="truncate">{item.status === 'Ready' ? readyStep(item, data) : HINTS[item.status]}</span>;
+}
+
+/** One row: the card's action on the left, and Open thread as a square icon in the right corner unless it is the action. */
+function Actions({ item, data }: { item: Item; data: BoardData }) {
+  const action = startsBuild(item) ? <StartBuild item={item} data={data} />
+    : readsPr(item) ? <PrLink item={item} label="Open PR" />
+    : null;
   return (
-    <span className="desk-pipeline grid gap-1 text-xs text-(--muted-foreground) tabular-nums">
-      <span>{checks ? `${checks.passed} passed · ${checks.running} running · ${checks.failed} failed` : 'no checks'}</span>
-      {/* The merge state gets its own line, so a narrow card never wraps it after a dangling separator. */}
-      <span className="inline-flex items-center gap-1.5 font-medium text-(--foreground)">
-        <span className="size-2 rounded-full" style={{ background: MERGE_COLOR[mergeState] }} />{mergeState}
-      </span>
-    </span>
+    // A click beside the buttons opens the item dialog, as anywhere else on the card.
+    <KeepClicks className="desk-actions flex h-7 min-w-0 items-center gap-2" passEmpty>
+      {action ?? <OpenThread item={item} data={data} />}
+      {action && <span className="ml-auto flex"><OpenThread item={item} data={data} iconOnly /></span>}
+    </KeepClicks>
   );
 }
 
 function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: number }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
-  const hint = HINTS[item.status];
   // The card takes the click; its summary is a button too, so the keyboard can open the dialog.
   return (
     <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
-      className={`desk-card grid w-70 shrink-0 cursor-pointer content-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
-      <button type="button" className="grid gap-2.5 text-left">
-        <span className="flex items-center gap-2 text-xs">
-          <ItemStatusGlyph item={item} /><span className="font-semibold text-(--warning-foreground)">{item.status}</span>
+      className={`desk-card grid w-70 shrink-0 cursor-pointer content-start gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
+      <button type="button" className="grid min-w-0 gap-2 text-left">
+        <span className="desk-meta flex h-4 min-w-0 items-center gap-2 text-xs">
+          <ItemStatusGlyph item={item} /><span className="shrink-0 font-semibold text-(--warning-foreground)">{item.status}</span>
           <span className="truncate text-(--muted-foreground)">· {repoName(repoKey(item), data.repos)} · {shortAgo(item.updatedAt, now)}</span>
         </span>
-        <span className="line-clamp-2 font-medium leading-snug"><ItemTitle item={item} /></span>
-        {hint && <span className="text-xs text-(--muted-foreground)">{hint}</span>}
-        {item.status === 'Verify' && <Pipeline item={item} />}
-        <StepTrack status={item.status} />
+        {/* Two lines tall whatever the title's length, so the rows under it start at the same height on every card. */}
+        <span className="desk-title line-clamp-2 h-10 text-sm/5 font-medium" title={`${ref(item)} ${item.title}`}><ItemTitle item={item} /></span>
+        <span className="desk-next flex h-4 min-w-0 items-center gap-1.5 text-xs text-(--muted-foreground) tabular-nums"><NextStep item={item} data={data} /></span>
+        <span className="pt-1"><StepTrack status={item.status} /></span>
       </button>
       <Actions item={item} data={data} />
       {item.status === 'Ready' && <KeepClicks className="desk-start cursor-auto empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
@@ -81,7 +96,7 @@ export function Desk({ items }: { items: Item[] }) {
     <section className="desk grid gap-3" aria-labelledby="desk-h">
       <h2 id="desk-h" className="m-0 text-[13px] font-medium">Your desk <span className="text-(--muted-foreground)">{items.length}</span></h2>
       {items.length
-        ? <div className="-mx-6 flex gap-3 overflow-x-auto px-6 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{items.map((i) => <DeskCard key={i.id} item={i} data={data} now={now} />)}</div>
+        ? <div className="-mx-6 flex items-start gap-3 overflow-x-auto px-6 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{items.map((i) => <DeskCard key={i.id} item={i} data={data} now={now} />)}</div>
         : <p className="m-0 rounded-xl border border-dashed border-(--input) p-6 text-center text-(--muted-foreground)">Desk clear. The line runs without you.</p>}
     </section>
   );

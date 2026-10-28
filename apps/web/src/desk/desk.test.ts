@@ -7,9 +7,11 @@ import { $, $$, mountPage, pressMenu, sample, settle, text } from '../../test/su
 
 const cards = () => $$('.desk-card');
 const card = (id: string) => $(`.desk-card[data-item="${id}"]`)!;
-/** A card's buttons and links, as their text, with a disabled one's title. */
+/** A card's buttons and links, as their text, an icon button's name in brackets, with a disabled one's title. */
 const controls = (id: string) => [...card(id).querySelectorAll('.desk-actions :is(button, a)')]
-  .map((b) => text(b) + ((b as HTMLButtonElement).disabled ? ` (disabled: ${b.getAttribute('title')})` : ''));
+  .map((b) => (text(b) || `[${b.getAttribute('aria-label')}]`) + ((b as HTMLButtonElement).disabled ? ` (disabled: ${b.getAttribute('title')})` : ''));
+/** The card's next-step line. */
+const nextLine = (id: string) => text(card(id).querySelector('.desk-next'));
 const dialog = () => $('[data-item-dialog]');
 const withItem = (id: string, change: Partial<Item>): BoardData =>
   ({ ...sample, items: sample.items.map((i) => (i.id === id ? { ...i, ...change } : i)) });
@@ -24,11 +26,26 @@ test('the desk shows what only you can move, counted, as cards in one row that s
   expect(row).toEqual(expect.arrayContaining(['-mx-6', 'px-6', 'overflow-x-auto', '[scrollbar-width:none]', '[&::-webkit-scrollbar]:hidden']));
 });
 
-test('a desk card shows its status, repository, age, numbered title, hint and status track', async () => {
+test('a desk card shows its status, repository and age, numbered title, next step and status track, in that order', async () => {
   await mountPage();
-  const [meta, title, hint] = [...card('I_sample16').querySelector('button')!.children].map(text);
-  expect([meta, title, hint]).toEqual(['Verify· lar-apple · 1h ago', '#31 New artwork grid layout', 'Test it with the steps in the PR, then merge']);
-  expect(card('I_sample16').querySelectorAll('ol > li')).toHaveLength(10);
+  const rows = [...card('I_sample16').querySelector('button')!.children];
+  expect(rows.slice(0, 3).map(text)).toEqual(['Verify· lar-apple · 1h ago', '#31 New artwork grid layout', 'can merge · 1 passed']);
+  expect(rows[3]!.querySelectorAll('ol > li')).toHaveLength(10);
+});
+
+test('a desk card’s title is always two lines tall, cut short, with the whole title in its tooltip', async () => {
+  await mountPage();
+  const title = card('I_sample28').querySelector('.desk-title')!;
+  expect(title.className.split(' ')).toEqual(expect.arrayContaining(['line-clamp-2', 'h-10']));
+  expect(title.getAttribute('title')).toBe('#147 Fall back to software transcoding when the GPU is busy');
+});
+
+test('every desk card has the same rows at the same heights, and the row lets a card with a start message grow alone', async () => {
+  await mountPage();
+  const heights = (c: HTMLElement) => [c.querySelector('.desk-meta'), c.querySelector('.desk-title'), c.querySelector('.desk-next'), c.querySelector('.desk-actions')]
+    .map((row) => row?.className.split(' ').find((name) => /^h-\d+$/.test(name)));
+  for (const c of cards()) expect(heights(c)).toEqual(['h-4', 'h-10', 'h-4', 'h-7']);
+  expect(cards()[0]!.parentElement!.className.split(' ')).toContain('items-start');
 });
 
 test('a desk card opens the item dialog and stays marked while it shows', async () => {
@@ -45,26 +62,34 @@ test('a desk card is no button wrapping buttons: its summary is the button, and 
   expect(dialog()!.textContent).toContain('New artwork grid layout');
 });
 
-test.each([
-  ['Needs you with no thread', 'I_sample11', ['Open thread (disabled: No T3 thread has worked on this yet)']],
-  ['Needs you', 'I_sample12', ['Open thread']],
-  ['blocked Ready', 'I_sample13', ['Open thread', 'Start after #202 ▾']],
-  ['Verify', 'I_sample16', ['Open thread (disabled: No T3 thread has worked on this yet)', 'Open PR']],
-  ['Ready to merge', 'I_sample17', ['Open thread (disabled: No T3 thread has worked on this yet)', 'Open PR']],
-])('a %s card has the buttons for its next action', async (_status, id, buttons) => {
-  await mountPage();
-  expect(controls(id)).toEqual(buttons);
+const noBlockers = (data: BoardData = sample) => ({ ...data, items: data.items.map((i) => (i.id === 'I_sample13' ? { ...i, blockers: [] } : i)) });
+const liveThread = [{ id: 't1', title: 'Build', state: 'running' as const, updated: '2026-10-21T09:00:00.000Z' }];
+const NO_THREAD = 'No T3 thread has worked on this yet';
+const NO_PROJECT = 'T3 Code has no project for maddec01/lar-server';
+
+test.each<[string, BoardData, string, string, string[]]>([
+  ['Needs you with no thread', sample, 'I_sample11', 'Answer in its T3 thread', [`Open thread (disabled: ${NO_THREAD})`]],
+  ['Needs you', sample, 'I_sample12', 'Answer in its T3 thread', ['Open thread']],
+  ['Needs you with a linked PR', withItem('I_sample12', { linkedPrs: sample.items.find((i) => i.id === 'I_sample16')!.linkedPrs }), 'I_sample12', 'Answer in its T3 thread', ['Open thread']],
+  ['Ready with a thread at work on it', withItem('I_sample13', { threads: liveThread }), 'I_sample13', 'A thread is at work on it', ['Open thread']],
+  ['Ready carrying two statuses', withItem('I_sample13', { statuses: ['Ready', 'Verify'] }), 'I_sample13', 'Ready to build', ['Open thread']],
+  ['Ready held by open blockers', withItem('I_sample13', { blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 9, repo: 'maddec01/lar-apple', state: 'open' }, { number: 7, repo: 'maddec01/lar-server', state: 'closed' }] }),
+    'I_sample13', 'Waits on #202, lar-apple#9', ['Start after lar-apple#9 ▾', '[Open thread]']],
+  ['Ready held by its repository', { ...noBlockers(), repositoryProjects: { 'maddec01/lar-server': NO_PROJECT } }, 'I_sample13', NO_PROJECT, [`Start build (disabled: ${NO_PROJECT})`, '[Open thread]']],
+  ['Ready with nothing holding it', noBlockers(), 'I_sample13', 'Ready to build', ['Start build ▾', '[Open thread]']],
+  ['Verify', sample, 'I_sample16', 'can merge · 1 passed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
+  ['Ready to merge', sample, 'I_sample17', 'can merge · 4 passed · 1 failed', ['Open PR', `[Open thread] (disabled: ${NO_THREAD})`]],
+  ['Verify with no PR', withItem('I_sample16', { linkedPrs: [] }), 'I_sample16', 'Test it with the steps in the PR, then merge',
+    ['Open PR (disabled: No pull request is linked to this item yet)', `[Open thread] (disabled: ${NO_THREAD})`]],
+])('a %s card says its next step and has its action on the left, Open thread in the corner unless that is the action', async (_card, data, id, next, buttons) => {
+  await mountPage(data);
+  expect([nextLine(id), controls(id)]).toEqual([next, buttons]);
 });
 
-test('a Ready card with a thread at work on it has Open thread alone, not a second one in Start build’s place', async () => {
-  const threads = [{ id: 't1', title: 'Build', state: 'running' as const, updated: '2026-10-21T09:00:00.000Z' }];
-  await mountPage(withItem('I_sample13', { threads }));
-  expect(controls('I_sample13')).toEqual(['Open thread']);
-});
-
-test('a Ready card for an issue that also carries Verify offers neither Start build nor Start after until one is kept', async () => {
-  await mountPage(withItem('I_sample13', { statuses: ['Ready', 'Verify'] }));
-  expect(controls('I_sample13')).toEqual(['Open thread']);
+test('Open thread in a card’s corner is a square icon button named and titled Open thread', async () => {
+  await mountPage(noBlockers());
+  const corner = card('I_sample13').querySelector('.desk-actions [data-open-thread]')!;
+  expect([corner.getAttribute('aria-label'), corner.getAttribute('title'), corner.className.split(' ')]).toEqual(['Open thread', 'Open thread', expect.arrayContaining(['w-7'])]);
 });
 
 test('Open thread opens the latest thread in T3, and Open PR the pull request the item dialog links, in a new tab', async () => {
@@ -79,33 +104,19 @@ test('a pull request on Verify opens itself', async () => {
   expect(card('I_sample16').querySelector('[data-pr-link]')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-apple/pull/40');
 });
 
-test('with no pull request linked, Open PR is disabled, saying why', async () => {
-  await mountPage(withItem('I_sample17', { linkedPrs: [] }));
-  expect(controls('I_sample17').at(-1)).toBe('Open PR (disabled: No pull request is linked to this item yet)');
-});
-
-const pipeline = (id: string) => [...card(id).querySelector('.desk-pipeline')!.children].map(text);
-
 test.each([
-  ['an issue whose PR can merge', 'I_sample16', ['1 passed · 0 running · 0 failed', 'can merge']],
-  ['a pull request GitHub is still checking', 'I_sample26', ['4 passed · 2 running · 0 failed', 'checking']],
-  ['an issue whose PR is blocked', 'I_sample27', ['3 passed · 0 running · 1 failed', 'blocked']],
-  ['an issue whose PR has no checks and conflicts', 'I_sample28', ['no checks', 'conflicts']],
-])('a Verify card for %s shows its checks and merge state', async (_what, id, lines) => {
+  ['an issue whose PR GitHub is still checking', 'I_sample26', 'checking · 4 passed · 2 running'],
+  ['an issue whose PR is blocked', 'I_sample27', 'blocked · 3 passed · 1 failed'],
+  ['an issue whose PR has no checks and conflicts', 'I_sample28', 'conflicts · no checks'],
+])('a Verify card for %s says its merge state, then its checks leaving out zero counts other than passed', async (_what, id, line) => {
   await mountPage();
-  expect(pipeline(id)).toEqual(lines);
+  expect(nextLine(id)).toBe(line);
 });
 
 test('a Verify card reads the PR Open PR opens, its first linked one', async () => {
   const linkedPrs = (id: string) => sample.items.find((i) => i.id === id)!.linkedPrs;
   await mountPage(withItem('I_sample16', { linkedPrs: [...linkedPrs('I_sample16'), { ...linkedPrs('I_sample27')[0]!, number: 99 }] }));
-  expect(pipeline('I_sample16')).toEqual(['1 passed · 0 running · 0 failed', 'can merge']);
-});
-
-test('a Verify card with no PR linked shows no pipeline, and only Verify cards show one', async () => {
-  await mountPage(withItem('I_sample16', { linkedPrs: [] }));
-  expect(card('I_sample16').querySelector('.desk-pipeline')).toBeNull();
-  expect(card('I_sample17').querySelector('.desk-pipeline')).toBeNull();
+  expect(nextLine('I_sample16')).toBe('can merge · 1 passed');
 });
 
 test('clicks on a card’s buttons, in the menu one opens, or in its start message open no item dialog', async () => {

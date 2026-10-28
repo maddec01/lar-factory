@@ -299,19 +299,19 @@ export const projectBuilds = (raws: RawItem[]) => new Set(raws.filter((raw) => i
 export const rawBuildPrs = (raws: RawItem[]): RawLinkedPr[] =>
   raws.filter((raw) => isBuild({ labels: rawLabels(raw) })).flatMap((raw) => raw.content?.closedByPullRequestsReferences?.nodes ?? []);
 
-/** The issue search for `build` issues in the repos holding the builds' sub-issues that aren't on the project; null when none is off it. */
-export function buildSubIssueSearch(raws: RawItem[]): string | null {
+/** The issue searches for `build` issues, one per repo holding a build's sub-issue that isn't on the project; none when none is off it. */
+export function buildSubIssueSearches(raws: RawItem[]): string[] {
   const onProject = new Set(raws.map(rawKey));
   const repos = new Set(raws.flatMap((raw) => rawSubIssues(raw)
     .filter((s) => !onProject.has(refKey(s.repository.nameWithOwner, s.number)))
-    .map((s) => `repo:${s.repository.nameWithOwner}`)));
-  return repos.size ? ['is:issue label:build', ...repos].join(' ') : null;
+    .map((s) => s.repository.nameWithOwner)));
+  return [...repos].map((repo) => `is:issue label:build repo:${repo}`);
 }
 
-/** The issue search for open issues with a slice label in the repos holding the builds' open slices; null when none is open. */
-export function sliceLabelSearch(label: 'active' | 'blocked', raws: RawItem[], builds: ReadonlySet<string> = new Set()): string | null {
+/** The issue searches for open issues with a slice label, one per repo holding a build's open slice; none when none is open. */
+export function sliceLabelSearches(label: 'active' | 'blocked', raws: RawItem[], builds: ReadonlySet<string> = new Set()): string[] {
   const repos = new Set(raws.flatMap((raw) =>
-    rawSlices(raw, builds).filter((s) => s.state === 'OPEN').map((s) => `repo:${s.repository.nameWithOwner}`)));
-  return repos.size ? [`is:issue is:open label:${label}`, ...repos].join(' ') : null;
+    rawSlices(raw, builds).filter((s) => s.state === 'OPEN').map((s) => s.repository.nameWithOwner)));
+  return [...repos].map((repo) => `is:issue is:open label:${label} repo:${repo}`);
 }
 

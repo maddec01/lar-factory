@@ -23,6 +23,8 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     if (!error) known.add(status);
     return error;
   }
+  // Whether a read succeeded, after which a read searches the closed issues only when their one page might miss some.
+  let readOnce = false;
   // The last change check's ETag, so the next one is a free 304 while nothing changed.
   let etag: string | undefined;
   /** Adds the status's label and removes every other status label the issue carries. */
@@ -31,7 +33,11 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     return (await ensureLabel(status)) ?? setStatusLabel(repo, number, status, carried, run);
   }
   return {
-    read: async () => ({ title: repo, items: await fetchRepoIssues(repo) }),
+    async read() {
+      const items = await fetchRepoIssues(repo, Date.now(), { searchRanges: !readOnce });
+      readOnce = true;
+      return { title: repo, items };
+    },
     readSome: (items) => fetchIssues(items.map((item) => item.id)),
     // Labels, closes and sub-issues each move an issue's updated_at, and pushes a PR's, so the check sees every edit to an item.
     seesEdits: true,

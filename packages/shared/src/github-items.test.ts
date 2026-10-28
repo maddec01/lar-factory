@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { buildSubIssueSearch, normalizeItem, normalizeItems, normalizeMergeState, rawBuildPrs, rawDossiers, sliceLabelSearch } from './github-items.ts';
+import { buildSubIssueSearches, normalizeItem, normalizeItems, normalizeMergeState, rawBuildPrs, rawDossiers, sliceLabelSearches } from './github-items.ts';
 import type { RawIssueRef, RawItem, RawLinkedPr } from './github-items.ts';
 import type { Item } from './model.ts';
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
@@ -251,27 +251,27 @@ test('a build sub-issue the `build` search found is a board item and counts as a
     'other kinds keep GitHub\'s counts');
 });
 
-test('active and blocked slices each come from one search over the repos of open slices, so the cost stays flat', () => {
+test('active and blocked slices each come from one search per repo of open slices', () => {
   const raws = [
     issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN'), refIn('maddec01/lar-factory', 2, 'OPEN'), refIn('maddec01/lar-apple', 3, 'CLOSED')]),
     issue900(['build'], [refIn('maddec01/lar-server', 4, 'OPEN')]),
     issue900(['concept'], [refIn('maddec01/lar-apple', 5, 'OPEN')]),
     issue900(['concept', 'build'], [refIn('maddec01/lar-apple', 6, 'OPEN')]),
   ];
-  assert.equal(sliceLabelSearch('active', raws), 'is:issue is:open label:active repo:maddec01/lar-server repo:maddec01/lar-factory');
-  assert.equal(sliceLabelSearch('blocked', raws), 'is:issue is:open label:blocked repo:maddec01/lar-server repo:maddec01/lar-factory');
-  assert.equal(sliceLabelSearch('active', [issue900(['build'], [refIn('maddec01/lar-apple', 3, 'CLOSED')])]), null, 'no open slice, no search');
+  assert.deepEqual(sliceLabelSearches('active', raws), ['is:issue is:open label:active repo:maddec01/lar-server', 'is:issue is:open label:active repo:maddec01/lar-factory']);
+  assert.deepEqual(sliceLabelSearches('blocked', raws), ['is:issue is:open label:blocked repo:maddec01/lar-server', 'is:issue is:open label:blocked repo:maddec01/lar-factory']);
+  assert.deepEqual(sliceLabelSearches('active', [issue900(['build'], [refIn('maddec01/lar-apple', 3, 'CLOSED')])]), [], 'no open slice, no search');
 });
 
-test("build sub-issues come from one search over the repos of the builds' sub-issues, open and closed", () => {
-  assert.equal(buildSubIssueSearch([
+test("build sub-issues come from one search per repo of the builds' sub-issues, open and closed", () => {
+  assert.deepEqual(buildSubIssueSearches([
     issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN'), refIn('maddec01/lar-apple', 3, 'CLOSED')]),
     issue900(['build'], [refIn('maddec01/lar-server', 4, 'OPEN')]),
     issue900(['concept'], [refIn('maddec01/lar-factory', 5, 'OPEN')]),
-  ]), 'is:issue label:build repo:maddec01/lar-server repo:maddec01/lar-apple');
-  assert.equal(buildSubIssueSearch([issue900(['build'], [])]), null, 'no sub-issue, no search');
+  ]), ['is:issue label:build repo:maddec01/lar-server', 'is:issue label:build repo:maddec01/lar-apple']);
+  assert.deepEqual(buildSubIssueSearches([issue900(['build'], [])]), [], 'no sub-issue, no search');
   const onProject = rawIssue('PVTI_1', 1, 'In progress', ['build'], { repository: { nameWithOwner: 'maddec01/lar-server' } });
-  assert.equal(buildSubIssueSearch([issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN')]), onProject]), null,
+  assert.deepEqual(buildSubIssueSearches([issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN')]), onProject]), [],
     'a sub-issue on the project is judged by its own labels, so it needs no search');
 });
 

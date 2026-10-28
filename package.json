@@ -7,6 +7,7 @@
   },
   "packageManager": "pnpm@12.14.0",
   "scripts": {
+    "prototype:525": "node scripts/prototype-525.mjs",
     "test": "pnpm -r test",
     "test:shared": "pnpm --filter @lar-factory/shared test",
     "test:ui": "pnpm --filter @lar-factory/ui test",

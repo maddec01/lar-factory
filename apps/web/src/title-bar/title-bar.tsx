@@ -29,6 +29,8 @@ import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { CONTROL } from './control.ts';
 import { Counters } from './counters.tsx';
 import { TrafficLights, useWindowControlsInset } from './window-controls.tsx';
+import { prototype525 } from './prototype-525-state.ts';
+import { PrototypeTitleBar } from './prototype-525-title-bar.tsx';
 
 /** "lar Factory": the copied BrandMark, the mark and "lar", then a muted "Factory" on the same baseline, in
  *  BrandMark's size and type. Screen readers skip it: the page's hidden h1 names the page. */
@@ -139,6 +141,7 @@ export function TitleBar() {
   const board = useBoardStore((state) => failedCheck(state.data.tools, 't3')?.result !== 'missing');
   const data = useBoardStore((state) => state.data);
   const inset = useWindowControlsInset();
+  if (prototype525) return <PrototypeTitleBar brand={<Brand />} scope={<Scope />} refreshed={<Refreshed data={data} />} inset={inset} />;
   return (
     <div className={`title-bar shrink-0 select-none border-b border-base-300 ${inset} ${DRAG}`}>
       <TrafficLights />

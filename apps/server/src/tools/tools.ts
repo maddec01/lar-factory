@@ -258,13 +258,13 @@ async function checkT3(runtime: string): Promise<T3Check> {
 }
 
 /**
- * Checks every command the board needs from the last lookup, together, and az only when `withAz` is set, as
- * only a repository on Azure DevOps needs it. t3 also needs T3 Code running, which T3's runtime file at
- * `t3Runtime` tells. `ghError` is the gh probe's error for the Stale banner.
+ * Checks every command the board needs from the last lookup, together, and gh and az only when `needs` names them, as
+ * only a repository on GitHub needs gh and only one on Azure DevOps needs az. t3 also needs T3 Code running, which
+ * T3's runtime file at `t3Runtime` tells. `ghError` is the gh probe's error for the Stale banner.
  */
-export async function checkTools(withAz: boolean, t3Runtime = serverRuntimePath()): Promise<{ tools: ToolChecks; ghError?: string }> {
-  const [gh, az, t3, git, jq, curl] = await Promise.all([probeGh(), withAz ? probeAz() : undefined, checkT3(t3Runtime),
+export async function checkTools(needs: { gh: boolean; az: boolean }, t3Runtime = serverRuntimePath()): Promise<{ tools: ToolChecks; ghError?: string }> {
+  const [gh, az, t3, git, jq, curl] = await Promise.all([needs.gh ? probeGh() : undefined, needs.az ? probeAz() : undefined, checkT3(t3Runtime),
     checkCommand('git'), checkCommand('jq'), checkCommand('curl')]);
-  const tools: ToolChecks = { gh: gh.check, t3, git, jq, curl, ...(az && { az }) };
-  return { tools, ...(gh.error && { ghError: gh.error }) };
+  const tools: ToolChecks = { t3, git, jq, curl, ...(gh && { gh: gh.check }), ...(az && { az }) };
+  return { tools, ...(gh?.error && { ghError: gh.error }) };
 }

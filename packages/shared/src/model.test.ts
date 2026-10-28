@@ -283,7 +283,7 @@ test('failedCheck gives a failed check, and nothing for one that passed or befor
   assert.equal(failedCheck(undefined, 'gh'), undefined);
 });
 
-test('gh blocks every read while missing or logged out, and only Project reads without the project scope', () => {
+test('gh blocks every GitHub read while missing or logged out, and only Project reads without the project scope', () => {
   const fix = 'gh auth refresh -s project';
   for (const source of ['project', 'issues'] as const) {
     assert.equal(ghBlocksRead(undefined, source), true);
@@ -294,6 +294,11 @@ test('gh blocks every read while missing or logged out, and only Project reads w
   }
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'project'), true);
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'issues'), false);
+  for (const source of ['sprint', 'backlog'] as const) {
+    assert.equal(ghBlocksRead(undefined, source), false, 'gh never blocks an Azure DevOps read');
+    assert.equal(ghBlocksRead({ result: 'missing', fix: 'brew install gh' }, source), false);
+    assert.equal(ghBlocksRead({ result: 'logged-out', fix: 'gh auth login' }, source), false);
+  }
   assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', labels: [] }), 'project');
   assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'project', labels: [] }), 'project');
   assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'issues', labels: [] }), 'issues');

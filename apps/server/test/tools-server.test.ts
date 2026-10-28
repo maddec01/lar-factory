@@ -171,6 +171,31 @@ test('a listed repository on Azure DevOps gets an az check, which Recheck reruns
   assert.deepEqual((await (await recheck(board)).json()).board.tools.az, { result: 'ok', version: '2.67.0' });
 });
 
+test('with only Azure DevOps repositories listed, gh isn\'t checked and a missing gh blocks no read', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-azure-only-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  checkouts(home, { 'lar-api': 'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api' });
+  const az = join(home, 'az');
+  writeFileSync(az, `#!/bin/sh\n[ "$1" = version ] && echo '{"azure-cli": "2.67.0"}' && exit 0\nexit 0\n`, { mode: 0o755 });
+  const env = { HOME: home, AZ_PATH: az, T3_STATE_DB: projectsDb(t, [{ id: 'project-api', root: join(home, 'Developer/lar/lar-api') }]) };
+  const options = { repositories: ['contoso/Fabrikam/lar-api'] };
+  const probed = await startBoard(t, options, false, false, env);
+  const data = await afterRead(probed);
+  assert.equal(data.tools?.gh, undefined);
+  assert.equal(await ghProbes(probed), 0, 'gh isn\'t probed');
+
+  const missing = await afterRead(await startBoard(t, options, false, false, { ...env, GH_PATH: '/nowhere/gh' }));
+  assert.ok(missing.fetchedAt, 'the board reads without gh');
+  assert.equal(missing.error, null);
+  assert.equal(missing.tools?.gh, undefined);
+});
+
+test('onboarding asks for the gh check with no listed repository on GitHub', async (t) => {
+  const board = await startBoard(t, { repositories: [] });
+  assert.equal((await afterRead(board)).tools?.gh, undefined);
+  assert.deepEqual((await (await board.post({ gh: true }, board.url, '/api/recheck')).json()).board.tools.gh, { result: 'ok', version: '2.96.0' });
+});
+
 test("onboarding's Checks step asks for the az check with no listed repository on Azure DevOps", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'lar-azure-onboarding-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));

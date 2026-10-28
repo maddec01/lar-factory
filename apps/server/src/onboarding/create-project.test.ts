@@ -18,7 +18,7 @@ function home(t: TestContext): string {
 const choice = (id: string, folder: string): ProjectChoice =>
   ({ id, name: id, folder, repo: `maddec01/${id}`, provider: 'GitHub', hasConfig: false, onBoard: false });
 
-test('adds the folder to T3 and answers with T3’s projects and the new one’s id', async (t) => {
+test('adds the folder to T3 and answers with T3\'s projects and the new one\'s id', async (t) => {
   const dir = home(t);
   const added: string[] = [];
   const projects = [choice('notes', '/elsewhere'), choice('lar-web', join(dir, 'lar-web'))];
@@ -43,7 +43,7 @@ test('a folder that is missing, relative or no folder is refused before T3 runs'
   const create = (folder: unknown) => createProject({ folder }, async () => [], { HOME: dir }, add);
   assert.deepEqual(await create(undefined), { status: 400, error: 'Name the folder to add.' });
   assert.deepEqual(await create('  '), { status: 400, error: 'Name the folder to add.' });
-  assert.deepEqual(await create('lar-web'), { status: 400, error: 'Give the folder’s full path, such as ~/Developer/lar-web.' });
+  assert.deepEqual(await create('lar-web'), { status: 400, error: 'Give the folder\'s full path, such as ~/Developer/lar-web.' });
   assert.deepEqual(await create(join(dir, 'nope')), { status: 400, error: `There is no folder at ${join(dir, 'nope')}.` });
   assert.equal(ran, false);
 });
@@ -55,11 +55,11 @@ test('a failing t3 project add answers with its message', async (t) => {
   assert.deepEqual(answer, { status: 502, error: 't3 could not add the project: Could not reach the T3 Code server.' });
 });
 
-test('a project T3 doesn’t list after adding it, or projects that can’t be read, answer with the problem', async (t) => {
+test('a project T3 doesn\'t list after adding it, or projects that can\'t be read, answer with the problem', async (t) => {
   const dir = home(t);
   const folder = join(dir, 'lar-web');
   assert.deepEqual(await createProject({ folder }, async () => [choice('notes', '/elsewhere')], { HOME: dir }, async () => null),
-    { status: 502, error: `T3 Code added ${folder}, but its projects don’t list it.` });
+    { status: 502, error: `T3 Code added ${folder}, but its projects don't list it.` });
   assert.deepEqual(await createProject({ folder }, async () => { throw new Error("Can't read T3 Code's projects at /x"); }, { HOME: dir }, async () => null),
     { status: 502, error: "Can't read T3 Code's projects at /x" });
 });

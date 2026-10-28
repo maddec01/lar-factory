@@ -1,7 +1,7 @@
 // The Azure DevOps sprint item source: reads one team's current sprint through az; azure-writes.ts writes its work items.
 
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
-import { az, azureItems, type Az } from './azure-items.ts';
+import { az, azureItems, type Az, type AzureCalls, type Listing } from './azure-items.ts';
 
 /** What fixes a team with no current iteration, short of naming another team, which onboarding's Checks step does by going Back. */
 export const SPRINT_FIX = 'Give the team a sprint whose dates cover today in its project settings';
@@ -13,15 +13,19 @@ export const SPRINT_FIX = 'Give the team a sprint whose dates cover today in its
  * ReadProblem with its fix.
  */
 export function azureSprint(repos: readonly string[], team: string, run: Az = az): ItemSource {
-  return azureItems(repos, team, async ({ organization, project, boards, workItems, backlogIds }) => {
-    const [iteration] = await boards<{ id: string; name: string }[]>(['list', '--timeframe', 'current']);
-    if (!iteration) {
-      throw new ReadProblem(`Team ${team} has no current iteration in ${organization}/${project}. `
-        + `${SPRINT_FIX}, or Edit the repository in Settings › Repositories to name another team.`);
-    }
-    const listed = await boards<{ workItemRelations: { target: { id: number } }[] }>(['list-work-items', '--id', iteration.id]);
-    const order = await backlogIds();
-    const items = await workItems([...new Set(listed.workItemRelations.map((r) => r.target.id))]);
-    return { title: `${team} ${iteration.name}`, items, order, childIds: items.map((raw) => raw.id), completed: true };
-  }, run);
+  return azureItems(repos, team, (calls) => readSprint(team, calls), run);
+}
+
+/** Lists the current sprint, allowing an empty sprint only for the combined board. */
+export async function readSprint(team: string, { organization, project, boards, workItems, backlogIds }: AzureCalls, allowNoSprint = false): Promise<Listing> {
+  const [iteration] = await boards<{ id: string; name: string }[]>(['list', '--timeframe', 'current']);
+  if (!iteration) {
+    if (allowNoSprint) return { title: team, items: [], completed: true };
+    throw new ReadProblem(`Team ${team} has no current iteration in ${organization}/${project}. `
+      + `${SPRINT_FIX}, or Edit the repository in Settings › Repositories to name another team.`);
+  }
+  const listed = await boards<{ workItemRelations: { target: { id: number } }[] }>(['list-work-items', '--id', iteration.id]);
+  const order = await backlogIds();
+  const items = await workItems([...new Set(listed.workItemRelations.map((r) => r.target.id))]);
+  return { title: `${team} ${iteration.name}`, items, order, childIds: items.map((raw) => raw.id), completed: true };
 }

@@ -134,7 +134,7 @@ test('an edit whose lines moved on the default branch fails with its file and li
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
   const { calls, run } = gh({}, {}, { 'AGENTS.md': '# lar-web\n\nRead the README.\n\n- Push to main when done.\n' });
   assert.deepEqual(await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [pushRule], skills: {} } }),
-    { status: 409, error: "AGENTS.md line 3 doesn't have the lines its edit removes. Untick it on Cleanup, or Look again there." });
+    { status: 409, error: 'The text at line 3 in AGENTS.md has changed. Uncheck this change in Cleanup or check instructions again.' });
   assert.deepEqual(writes(calls), []);
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: progress }]);
 });
@@ -234,7 +234,7 @@ test('a repository that lacks a workflow label, or has one under its old name, g
   for (const labels of [ALL.filter((n) => n !== 'blocked'), [...ALL.filter((n) => n !== 'decision-task'), 'decision: task']]) {
     const { calls, run } = gh({}, {}, undefined, labels);
     assert.deepEqual(await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config, picks }),
-      { status: 409, error: 'maddec01/lar-web still lacks a workflow label. Go back to the Labels step and create or rename it.' });
+      { status: 409, error: 'maddec01/lar-web is missing a required label. Go back to Labels to create or rename it.' });
     assert.deepEqual(calls, []);
   }
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: progress }]);
@@ -355,7 +355,7 @@ test("a file that can't be used, or a PR that can't be closed, leaves the onboar
   assert.deepEqual(problems, ['maddec01/lar-web: gh pr close failed: HTTP 403']);
 });
 
-test('a PR closed without merging is marked closed, and the mark goes once it is open again; a file that lands then still finishes', async (t) => {
+test('a PR closed before merging is marked closed, and the mark goes once it is open again; a file that lands then still finishes', async (t) => {
   const kept = { ...progress, step: 'pr', prUrl: PR };
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: kept }]);
   assert.deepEqual(await follow(dir, github({ [PR]: 'CLOSED' })), [{ repo: 'maddec01/lar-web', onboarding: { ...kept, prClosed: true } }]);
@@ -409,7 +409,7 @@ test('a list with no repository resetting is returned as it is, without asking g
   assert.equal(await followResetPrs(list, dir, async () => assert.fail('gh was asked')), list);
 });
 
-test("Reopen PR runs gh pr reopen on the onboarding's PR and drops its closed mark", async (t) => {
+test('Reopen pull request runs gh pr reopen on the onboarding\'s PR and drops its closed mark', async (t) => {
   const kept = { ...progress, step: 'pr', prUrl: PR };
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: { ...kept, prClosed: true } }]);
   const gh = github({});
@@ -417,7 +417,7 @@ test("Reopen PR runs gh pr reopen on the onboarding's PR and drops its closed ma
   assert.deepEqual(gh.changed, [['pr', 'reopen', PR]]);
 });
 
-test("Reopen PR that gh refuses answers with gh's message and keeps the mark; one with no PR or repository is refused", async (t) => {
+test('Reopen pull request that gh refuses answers with gh\'s message and keeps the mark; one with no PR or repository is refused', async (t) => {
   const closed = { ...progress, step: 'pr', prUrl: PR, prClosed: true };
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: closed }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
   const refusing = async () => { throw new Error('gh pr reopen failed: Could not reopen: the branch was deleted'); };
@@ -439,7 +439,7 @@ test('Reset closes an onboarding\'s open PR with a comment, then drops its entry
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
 });
 
-test('Reset of an onboarding whose PR closed without merging, or that has no PR yet, only drops its entry', async (t) => {
+test('Reset of an onboarding whose PR closed before merging, or that has no PR yet, only drops its entry', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } }, { repo: 'maddec01/lar-cli', onboarding: progress }]);
   const gh = github({ [PR]: 'CLOSED' });
   assert.deepEqual(await resetRepository({ repo: 'maddec01/lar-web' }, dir, gh.run), { onboarding: [{ repo: 'maddec01/lar-cli', progress }] });
@@ -537,7 +537,7 @@ test("Reset of an onboarded repository whose PR can't be opened answers with gh'
 const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
 const azureConfig = { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API' };
 
-test('on Azure Repos, a completed PR finishes onboarding, an abandoned one is marked closed and reactivated by Reopen PR', async (t) => {
+test('on Azure Repos, a completed PR finishes onboarding, an abandoned one is marked closed and reactivated by Reopen pull request', async (t) => {
   const merged = `${REPO_URL}/pullrequest/7`;
   const abandoned = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-web/pullrequest/8';
   const dir = await dataDir(t, [{ repo: AZURE, onboarding: { ...progress, step: 'pr', prUrl: merged } },

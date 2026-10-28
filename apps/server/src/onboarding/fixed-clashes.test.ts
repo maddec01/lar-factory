@@ -34,14 +34,14 @@ test('reads the default branch at its head through gh, without a checkout', asyn
 test('CONTEXT.md gets a ticked offer to rename it to GLOSSARY.md', async () => {
   assert.deepEqual((await find(['CONTEXT.md', 'README.md']) as { clashes: unknown }).clashes, [{
     id: 'context', file: 'CONTEXT.md', ticked: true, edit: { kind: 'rename', to: 'GLOSSARY.md' },
-    reason: "The factory's domain docs read GLOSSARY.md, and CONTEXT.md is its old name.",
+    reason: 'Rename CONTEXT.md to GLOSSARY.md so agents can find the project terms.',
   }]);
 });
 
 test('CONTEXT.md beside a GLOSSARY.md gets an unticked offer to delete it, since a rename would overwrite the glossary', async () => {
   assert.deepEqual((await find(['CONTEXT.md', 'GLOSSARY.md']) as { clashes: unknown }).clashes, [{
     id: 'context', file: 'CONTEXT.md', ticked: false, edit: { kind: 'delete' },
-    reason: "The factory's domain docs read GLOSSARY.md, which the repository has, so nothing reads CONTEXT.md.",
+    reason: 'Agents use the existing GLOSSARY.md. Remove CONTEXT.md after checking it has nothing you need.',
   }]);
 });
 
@@ -52,7 +52,7 @@ test('a multi-context layout with GLOSSARY-MAP.md and no GLOSSARY.md gets no Cla
 test('.scratch/ gets an unticked offer to delete it, with its file count', async () => {
   assert.deepEqual((await find(['.scratch/a/1.md', '.scratch/a/2.md', '.scratch/b.md', '.scratchpad.md']) as { clashes: unknown }).clashes, [{
     id: 'scratch', file: '.scratch/', ticked: false, edit: { kind: 'delete' },
-    reason: ".scratch/ holds 3 files from Matt Pocock's local tracker. The factory tracks work on GitHub, so delete it once its tickets are moved.",
+    reason: '.scratch/ holds 3 files from an older local tracker. Move any work you need to GitHub or Azure DevOps before deleting it.',
   }]);
   assert.match((await find(['.scratch/one.md']) as { clashes: { reason: string }[] }).clashes[0]!.reason, /holds 1 file from/);
 });

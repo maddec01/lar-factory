@@ -5,7 +5,7 @@
 # in (version 1, itemSource {"kind": "issues"}, show "all", labels []). role has no default.
 # An Azure repository is its origin URL or <org>/<project>/<repo>; its file is read
 # with az the same way. Its itemSource has no default: a team's current sprint
-# ({"kind": "azure-sprint", "team": ...}) or that team's backlog ({"kind": "azure-backlog", ...}).
+# ({"kind": "azure-sprint", "team": ...}) or that team's backlog ({"kind": "azure-backlog", ...}), or both ({"kind": "azure-board", ...}).
 # --list prints the onboarded repositories, the repositories array of
 # ~/Library/Application Support/Lar Factory/repositories.json, the file the board
 # server reads. A missing file means none: []. It leaves out each entry still
@@ -104,8 +104,8 @@ problem=$(jq -r '
     elif has("itemSource") and (.itemSource | type) != "object" then "field itemSource must be an object"
     elif $provider == "github" and has("itemSource") and (.itemSource.kind | IN("issues", "github-project") | not) then
         "field itemSource.kind must be \"issues\" or \"github-project\""
-    elif $provider == "azure" and (.itemSource.kind | IN("azure-sprint", "azure-backlog") | not) then
-        "field itemSource.kind must be \"azure-sprint\" or \"azure-backlog\""
+    elif $provider == "azure" and (.itemSource.kind | IN("azure-sprint", "azure-backlog", "azure-board") | not) then
+        "field itemSource.kind must be \"azure-sprint\", \"azure-backlog\" or \"azure-board\""
     elif $provider == "azure" and ((.itemSource.team | type) != "string" or .itemSource.team == "") then
         "field itemSource.team must name the team for an \(.itemSource.kind)"
     elif .itemSource.kind == "github-project"

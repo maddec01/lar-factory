@@ -16,7 +16,7 @@
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, customLabelProblem, customTagProblem, isOnboarding, labelPlan, labelsToCreate, missingCustomLabels, sameRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
+  SETUP_CHECKS, customLabelProblem, customTagProblem, isOnboarding, labelPlan, labelsToCreate, missingCustomLabels, sameRepo, shownRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
   type SetupAnswers, type SetupCheckId, type SetupCheckResult, type SkillClash, type SkillPick, type ToolChecks,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
@@ -26,8 +26,8 @@ import { answerSetup, byTeam, setupItemSource, setupProblems, suggestedShow, typ
 
 /** The steps in order. */
 export const STEPS = [
-  { id: 'project', label: 'T3 project' },
-  { id: 'setup', label: 'Provider and item source' },
+  { id: 'project', label: 'Repository' },
+  { id: 'setup', label: 'Board settings' },
   { id: 'labels', label: 'Labels' },
   { id: 'checks', label: 'Checks' },
   { id: 'cleanup', label: 'Cleanup' },
@@ -39,9 +39,9 @@ export type StepId = (typeof STEPS)[number]['id'];
 export const stepTitle = (id: StepId, provider: Provider | null | undefined): string =>
   id === 'labels' && provider === 'Azure DevOps' ? 'Tags' : (STEPS.find((s) => s.id === id) ?? STEPS[0]).label;
 
-/** Where a kept onboarding stopped, as a phrase: waiting for its PR to merge, its PR closed without merging, or stopped at its step. */
+/** Where a kept onboarding stopped, as a phrase: waiting for you to merge its pull request, its pull request closed without merging, or stopped at its step. */
 export function stoppedAt({ step, prUrl, prClosed, answers }: OnboardingProgress): string {
-  if (prUrl) return prClosed ? 'its PR closed without merging' : 'waiting for its PR to merge';
+  if (prUrl) return prClosed ? 'its pull request closed without merging' : 'waiting for you to merge its pull request';
   return `stopped at ${stepTitle(isStep(step) ? step : 'project', answers.provider)}`;
 }
 
@@ -56,7 +56,7 @@ export interface Run {
   provider: Provider | null;
   /** The repository the run was kept under when it was last closed; null for a run never kept. */
   savedAs: string | null;
-  /** The Provider and item source step's answers; null until that step first shows. */
+  /** The Board settings step's answers; null until that step first shows. */
   setup: SetupAnswers | null;
   /** The custom labels the Labels step picked, which the PR's .lar-factory.json lists. */
   customLabels: string[];
@@ -81,9 +81,9 @@ export interface Creating {
  */
 export function unpickable(project: ProjectChoice, run: Run, data: Pick<BoardData, 'onboarding'> = useBoardStore.getState().data): string | null {
   if (project.onBoard && !(project.repo && run.savedAs && sameRepo(project.repo, run.savedAs))) {
-    return isOnboarding(data, project.repo) ? 'It’s onboarding already: close this and press its Resume.' : 'Its repository is on the board already.';
+    return isOnboarding(data, project.repo) ? 'Setup is already in progress. Close this window and choose Resume.' : 'This repository is already on the board.';
   }
-  if (!project.repo) return 'Its folder is no main checkout with a GitHub or Azure DevOps origin.';
+  if (!project.repo) return 'Choose a repository folder connected to GitHub or Azure DevOps.';
   return null;
 }
 
@@ -166,7 +166,7 @@ export const skillsDir = (path: string) => path.replace(/[^/]+\/$/, '');
  */
 export function skillProblem(skill: SkillClash, picks: CleanupPicks | null, clashes: Extract<Clashes, { state: 'read' }>): string | null {
   const pick = picks?.skills[skill.path];
-  if (!pick) return 'Next needs Delete it in the PR, or Rename it.';
+  if (!pick) return 'Choose whether to remove or rename this skill.';
   if (pick.kind === 'delete') return null;
   const renamedBeside = clashes.found.skillClashes.flatMap((other) => {
     const picked = picks.skills[other.path];
@@ -446,12 +446,12 @@ function resumed(repo: string, progress: OnboardingProgress): Run {
 }
 
 /**
- * The setup step's answers before any is given, with the item source's suggested show setting: a GitHub Project of the
- * repository's owner, or on Azure DevOps a team's current sprint.
+ * The setup step's defaults: repository issues on GitHub, or the combined Azure board. The Azure team
+ * starts with the usual project-based name and remains editable.
  */
 function firstSetup(repo: string | null, provider: Provider | null): SetupAnswers {
-  const itemSource = provider === 'Azure DevOps' ? 'azure-sprint' : 'github-project';
-  return { itemSource, projectOwner: provider === 'Azure DevOps' ? '' : repo?.split('/')[0] ?? '', projectNumber: '', team: '', show: suggestedShow(itemSource),
+  const itemSource = provider === 'Azure DevOps' ? 'azure-board' : 'issues';
+  return { itemSource, projectOwner: provider === 'Azure DevOps' ? '' : repo?.split('/')[0] ?? '', projectNumber: '', team: provider === 'Azure DevOps' && repo ? `${shownRepo(repo).split('/')[1]} Team` : '', show: suggestedShow(itemSource),
     showPicked: false, role: '' };
 }
 
@@ -644,7 +644,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       reads++;
       set({ projects: { state: 'loaded', projects: result.projects } });
       const added = result.projects.find((p) => p.id === result.projectId);
-      const reason = added ? unpickable(added, run) : 'T3 Code doesn’t list it.';
+      const reason = added ? unpickable(added, run) : 'T3 Code doesn\'t list it.';
       if (reason) return set({ creating: { ...now, adding: false, error: `T3 Code added the project, but it can't be picked: ${reason}` } });
       get().pick(result.projectId);
     },
@@ -775,12 +775,12 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     previewPr: async () => {
       const { run, projects, clashes, agent } = get();
       const project = run && pickedProject(run, projects);
-      if (!run?.repo || !project) return set({ changes: { state: 'failed', error: 'T3 Code no longer has the picked project. Go Back and pick one.' } });
+      if (!run?.repo || !project) return set({ changes: { state: 'failed', error: 'This project is no longer in T3 Code. Go back and choose another.' } });
       const preview = ++previews;
       const config = prConfig(run, project);
       const picks = picksOf(run, clashes, agent);
       if (config === undefined || !picks) {
-        return set({ changes: { state: 'failed', error: 'Go Back to Cleanup and wait for its checks, then come back to see the PR’s changes.' } });
+        return set({ changes: { state: 'failed', error: 'Go Back to Cleanup and wait for its checks, then come back to see the PR\'s changes.' } });
       }
       set({ changes: { state: 'reading' } });
       const answer = await postAction<{ changes: OnboardingPrChange[] }>('/api/onboarding/pr/changes', { repo: run.repo, config, picks });
@@ -839,7 +839,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       // The run closed, or moved to another PR, while the board read.
       if (get().run?.prUrl !== run.prUrl) return;
       const followed = data?.onboarding?.find((o) => o.progress.prUrl === run.prUrl)?.followProblem;
-      const error = asked.error ?? (data ? data.error ?? followed : 'The board hasn’t read GitHub yet. It checks again on its next refresh.');
+      const error = asked.error ?? (data ? data.error ?? followed : 'The board hasn\'t read GitHub yet. It checks again on its next refresh.');
       set({ pr: { ...get().pr, checking: false, checkedAt: error ? get().pr.checkedAt : Date.now(), error: error ?? null } });
     },
   };

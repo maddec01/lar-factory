@@ -15,17 +15,17 @@ function contextClash(files: Set<string>): Clash | null {
   if (!files.has('CONTEXT.md')) return null;
   if (files.has('GLOSSARY.md')) {
     return { id: 'context', file: 'CONTEXT.md', ticked: false, edit: { kind: 'delete' },
-      reason: "The factory's domain docs read GLOSSARY.md, which the repository has, so nothing reads CONTEXT.md." };
+      reason: "Agents use the existing GLOSSARY.md. Remove CONTEXT.md after checking it has nothing you need." };
   }
   return { id: 'context', file: 'CONTEXT.md', ticked: true, edit: { kind: 'rename', to: 'GLOSSARY.md' },
-    reason: "The factory's domain docs read GLOSSARY.md, and CONTEXT.md is its old name." };
+    reason: "Rename CONTEXT.md to GLOSSARY.md so agents can find the project terms." };
 }
 
 function scratchClash(files: string[]): Clash | null {
   const count = files.filter((file) => file.startsWith('.scratch/')).length;
   if (!count) return null;
   return { id: 'scratch', file: '.scratch/', ticked: false, edit: { kind: 'delete' },
-    reason: `.scratch/ holds ${count} ${count === 1 ? 'file' : 'files'} from Matt Pocock's local tracker. The factory tracks work on GitHub, so delete it once its tickets are moved.` };
+    reason: `.scratch/ holds ${count} ${count === 1 ? 'file' : 'files'} from an older local tracker. Move any work you need to GitHub or Azure DevOps before deleting it.` };
 }
 
 /** Each project skill, a folder with a SKILL.md in an agent's project skill folder, by its path. */

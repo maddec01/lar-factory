@@ -111,10 +111,10 @@ test("an agent Clash whose removed lines aren't at its line on the default branc
   const [run] = runs.list('maddec01/lar-web');
   assert.deepEqual(run?.state === 'done' && run.clashes.map(({ ticked, wontApply }) => [ticked, wontApply]), [
     [true, undefined],
-    [false, "Line 3 of AGENTS.md on the default branch doesn't have the lines this edit removes."],
-    [false, 'It edits the same lines of CLAUDE.md as another Clash, so neither can go in the PR.'],
-    [false, 'It edits the same lines of CLAUDE.md as another Clash, so neither can go in the PR.'],
-    [false, "GEMINI.md isn't on the default branch, so there's nothing to edit."],
+    [false, 'The text at line 3 in AGENTS.md has changed.'],
+    [false, 'Two changes overlap in CLAUDE.md. Check instructions again before continuing.'],
+    [false, 'Two changes overlap in CLAUDE.md. Check instructions again before continuing.'],
+    [false, 'GEMINI.md no longer exists on the default branch.'],
   ]);
 });
 
@@ -130,8 +130,8 @@ test('an agent Clash in a file that is a link on the default branch is unticked 
   ] }) });
   const [run] = runs.list('maddec01/lar-web');
   assert.deepEqual(run?.state === 'done' && run.clashes.map(({ ticked, wontApply }) => [ticked, wontApply]), [
-    [false, 'CLAUDE.md is a link, so this edit has no lines of its own to change.'],
-    [false, 'CLAUDE.md is a link, so this edit has no lines of its own to change.'],
+    [false, 'CLAUDE.md links to another file. Edit that file instead.'],
+    [false, 'CLAUDE.md links to another file. Edit that file instead.'],
   ]);
   assert.deepEqual(looked, ['CLAUDE.md'], 'one git ls-tree per file, however many Clashes it has');
 });
@@ -155,7 +155,7 @@ test('exit 0 with a reply that does not parse is a failed run', async () => {
   await runs.start(INPUT);
   await end({ ended: 'completed', threadId: 'thread-1', reply: 'I found a rule to push to main in AGENTS.md.' });
   assert.deepEqual(runs.list('maddec01/lar-web').map(({ state, threadId }) => [state, threadId]), [['failed', 'thread-1']]);
-  assert.match((runs.list('maddec01/lar-web')[0] as { why: string }).why, /^The agent's reply isn't the JSON the board asked for/);
+  assert.match((runs.list('maddec01/lar-web')[0] as { why: string }).why, /^The agent returned an unreadable reply/);
 });
 
 test('exit 1 is a failed run with why, and exit 2 a run waiting on the user that names the runtime mode', async () => {
@@ -168,8 +168,7 @@ test('exit 1 is a failed run with why, and exit 2 a run waiting on the user that
   const [failed, waiting] = runs.list('maddec01/lar-web') as { state: string; threadId: string; why: string }[];
   assert.deepEqual([failed?.state, failed?.threadId, failed?.why], ['failed', 'thread-1', 'The run ended failed: Rate limited.']);
   assert.deepEqual([waiting?.state, waiting?.threadId], ['waiting', 'thread-2']);
-  assert.match(waiting!.why, /waiting for an answer in T3 Code.*Answer it in the thread, or .*full access/);
-  assert.match(waiting!.why, /Full access lets the agent run any command without asking while it reads this repository's files/);
+  assert.match(waiting!.why, /needs an answer in T3 Code.*Open its thread and respond/);
 });
 
 test('a timeout is its own end, and finds the thread through its title', async () => {

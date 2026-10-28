@@ -29,7 +29,7 @@ test('a repository that reads its issues lists the status labels too, and those 
 });
 
 test("an Azure DevOps team's sprint or backlog lists the status tags too, which a GitHub Project doesn't", () => {
-  for (const source of ['azure-sprint', 'azure-backlog'] as const) assert.equal(labelPlan(ALL, source).status.length, STATUS_LABELS.length);
+  for (const source of ['azure-sprint', 'azure-backlog', 'azure-board'] as const) assert.equal(labelPlan(ALL, source).status.length, STATUS_LABELS.length);
   assert.deepEqual(labelPlan(ALL, 'github-project').status, []);
 });
 
@@ -61,19 +61,19 @@ test('the custom tags to pick from leave out the repo- tags that route Azure wor
 test('a custom label may hold a colon, but is no workflow or status label and not empty', () => {
   assert.equal(customLabelProblem('app: music'), null);
   assert.match(customLabelProblem('  ')!, /name/);
-  assert.match(customLabelProblem('Build')!, /workflow label/);
-  assert.match(customLabelProblem('decision: grill')!, /workflow label/);
-  assert.match(customLabelProblem('status-review')!, /status label/);
+  assert.match(customLabelProblem('Build')!, /reserved for tracking work/);
+  assert.match(customLabelProblem('decision: grill')!, /reserved for tracking work/);
+  assert.match(customLabelProblem('status-review')!, /reserved for board status/);
   assert.equal(customLabelProblem('x'.repeat(50)), null);
-  assert.equal(customLabelProblem('x'.repeat(51)), 'GitHub takes label names of at most 50 characters; this one has 51.');
-  assert.equal(customLabelProblem(' -R'), 'A label’s name can’t start with -.');
+  assert.equal(customLabelProblem('x'.repeat(51)), 'Use at most 50 characters. This name has 51.');
+  assert.equal(customLabelProblem(' -R'), 'Do not start the label name with a hyphen.');
 });
 
 test('a custom tag is refused as a custom label is, and also when it holds a comma or semicolon', () => {
   assert.equal(customTagProblem('app: music'), null);
-  assert.match(customTagProblem('Build')!, /workflow label/);
-  assert.equal(customTagProblem('app, music'), 'A tag’s name can’t hold a comma or semicolon.');
-  assert.equal(customTagProblem('app; music'), 'A tag’s name can’t hold a comma or semicolon.');
+  assert.match(customTagProblem('Build')!, /reserved for tracking work/);
+  assert.equal(customTagProblem('app, music'), 'Use a tag name without commas or semicolons.');
+  assert.equal(customTagProblem('app; music'), 'Use a tag name without commas or semicolons.');
 });
 
 test("a reused file's custom labels the repository lacks are missing, matched without case", () => {

@@ -1,7 +1,7 @@
 // The Azure DevOps backlog item source: reads one team's requirement backlog through az; azure-writes.ts writes its work items.
 
 import type { ItemSource } from '../items/item-source.ts';
-import { az, azureItems, field, type Az, type RawWorkItem } from './azure-items.ts';
+import { az, azureItems, field, type Az, type AzureCalls, type Listing, type RawWorkItem } from './azure-items.ts';
 
 /** The field that places a work item in a team, System.AreaPath unless the project says otherwise, and the team's values of it. */
 interface TeamFieldValues {
@@ -24,13 +24,16 @@ function owns({ field: { referenceName }, values }: TeamFieldValues, raw: RawWor
  * `run` stands in for az in tests. A logged-out az and a missing azure-devops extension are each a ReadProblem with its fix.
  */
 export function azureBacklog(repos: readonly string[], team: string, run: Az = az): ItemSource {
-  return azureItems(repos, team, async ({ invoke, workItems, backlog, backlogIds }) => {
-    const route = [`team=${team}`];
-    const [levels, areas] = await Promise.all([backlog, invoke<TeamFieldValues>('work', 'teamfieldvalues', route)]);
-    const ids = await backlogIds();
-    const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
-    const top = (await workItems(ids))
-      .filter((raw) => requirements.has(field(raw, 'System.WorkItemType')) && owns(areas, raw));
-    return { title: `${team} backlog`, items: top, order: ids, completed: false };
-  }, run);
+  return azureItems(repos, team, (calls) => readBacklog(team, calls), run);
+}
+
+/** Lists the team backlog for both the backlog and combined board sources. */
+export async function readBacklog(team: string, { invoke, workItems, backlog, backlogIds }: AzureCalls): Promise<Listing> {
+  const route = [`team=${team}`];
+  const [levels, areas] = await Promise.all([backlog, invoke<TeamFieldValues>('work', 'teamfieldvalues', route)]);
+  const ids = await backlogIds();
+  const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
+  const top = (await workItems(ids))
+    .filter((raw) => requirements.has(field(raw, 'System.WorkItemType')) && owns(areas, raw));
+  return { title: `${team} backlog`, items: top, order: ids, completed: false };
 }

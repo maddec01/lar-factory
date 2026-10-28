@@ -105,10 +105,10 @@ adding, queuing and starting are disabled in sample mode.
 ## Adding a repository
 
 Open Settings, then Repositories, then Add repository. Pick a repository from
-your T3 Code projects. Choose its provider and item source, check access, and
-create any missing workflow labels. Review the cleanup choices and open the
-onboarding PR. Merge that PR to finish. The board remembers your progress so
-you can resume from Settings.
+your T3 Code projects. GitHub reads its repository issues; Azure DevOps reads the
+team's backlog and current sprint together. Check access and create any missing
+workflow labels. Review the cleanup choices and open the onboarding PR. Merge
+that PR to finish. The board remembers your progress so you can resume from Settings.
 
 ### Manual configuration reference
 
@@ -130,9 +130,13 @@ branch. Its fields:
 - `role`: what the repository is for, which lar-work reads. Required.
 - `itemSource`: where the repository's items come from:
   `{ "kind": "github-project", "owner": "<owner>", "number": <n> }` for a GitHub
-  Project, `{ "kind": "issues" }` for the repository's own issues, the default, or
-  `{ "kind": "azure-sprint", "team": "<team>" }` for an Azure DevOps team's current
-  sprint, read with `az`.
+  Project, or `{ "kind": "issues" }` for the repository's own issues, the GitHub default.
+  Azure DevOps setup writes `{ "kind": "azure-board", "team": "<team>" }`, which
+  combines the team's open backlog and current sprint, with each item once. It
+  keeps completed sprint work and reads the backlog alone when no sprint is current.
+  Existing `{ "kind": "azure-sprint", "team": "<team>" }` and
+  `{ "kind": "azure-backlog", "team": "<team>" }` sources keep their separate behavior.
+  Azure sources read with `az`.
 - `show`: `"all"`, the default, or `"opted-in"`.
 - `labels`: an array of strings, empty by default.
 

@@ -73,17 +73,17 @@ const LONGEST_LABEL = 50;
 /** Why `name` can't be a custom label, or null when it can; unlike a workflow label, it may hold a colon. */
 export function customLabelProblem(name: string): string | null {
   const typed = key(name.trim());
-  if (!typed) return 'Type the label’s name.';
-  if (typed.length > LONGEST_LABEL) return `GitHub takes label names of at most ${LONGEST_LABEL} characters; this one has ${typed.length}.`;
-  if (typed.startsWith('-')) return 'A label’s name can’t start with -.';
-  if (WORKFLOW_LABELS.some((l) => key(l.name) === typed || l.oldName && key(l.oldName) === typed)) return `${name.trim()} is a workflow label.`;
-  if (typed.startsWith('status-')) return `${name.trim()} is a status label.`;
+  if (!typed) return 'Enter a label name.';
+  if (typed.length > LONGEST_LABEL) return `Use at most ${LONGEST_LABEL} characters. This name has ${typed.length}.`;
+  if (typed.startsWith('-')) return 'Do not start the label name with a hyphen.';
+  if (WORKFLOW_LABELS.some((l) => key(l.name) === typed || l.oldName && key(l.oldName) === typed)) return `${name.trim()} is reserved for tracking work.`;
+  if (typed.startsWith('status-')) return `${name.trim()} is reserved for board status.`;
   return null;
 }
 
 /** Why `name` can't be a custom tag on Azure DevOps, or null when it can: a custom label's problems, and System.Tags's separators. */
 export const customTagProblem = (name: string): string | null =>
-  customLabelProblem(name) ?? (/[,;]/.test(name) ? 'A tag’s name can’t hold a comma or semicolon.' : null);
+  customLabelProblem(name) ?? (/[,;]/.test(name) ? 'Use a tag name without commas or semicolons.' : null);
 
 /**
  * The custom labels in `custom`, such as a reused .lar-factory.json's, that a repository with labels `names` lacks and

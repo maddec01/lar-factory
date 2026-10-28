@@ -294,7 +294,7 @@ test('gh blocks every GitHub read while missing or logged out, and only Project 
   }
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'project'), true);
   assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'issues'), false);
-  for (const source of ['sprint', 'backlog'] as const) {
+  for (const source of ['sprint', 'backlog', 'azure-board'] as const) {
     assert.equal(ghBlocksRead(undefined, source), false, 'gh never blocks an Azure DevOps read');
     assert.equal(ghBlocksRead({ result: 'missing', fix: 'brew install gh' }, source), false);
     assert.equal(ghBlocksRead({ result: 'logged-out', fix: 'gh auth login' }, source), false);
@@ -305,7 +305,7 @@ test('gh blocks every GitHub read while missing or logged out, and only Project 
 });
 
 test("a GitHub source reads with gh and an Azure DevOps one with az, and a list uses gh while any repository is on GitHub", () => {
-  assert.deepEqual((['project', 'issues', 'sprint', 'backlog'] as const).map(providerTool), ['gh', 'gh', 'az', 'az']);
+  assert.deepEqual((['project', 'issues', 'sprint', 'backlog', 'azure-board'] as const).map(providerTool), ['gh', 'gh', 'az', 'az', 'az']);
   assert.equal(usesGh([{ repo: 'contoso/web/api' }, { repo: 'maddec01/lar' }]), true);
   assert.equal(usesGh([{ repo: 'contoso/web/api' }]), false);
   assert.equal(usesGh([]), false);
@@ -464,9 +464,9 @@ test('.lar-factory.json as Edit writes it keeps the version the file had', () =>
 test('a skill Clash renames only to a valid name no bundled skill, no other project skill and no rename beside it has', () => {
   const bundled = ['code-review', 'tdd'];
   assert.equal(skillRenameProblem('web-review', bundled, ['code-review', 'ours'], ['web-tdd']), null);
-  assert.match(skillRenameProblem('Web_Review', bundled, [], [])!, /lowercase letters, digits and single hyphens/);
+  assert.match(skillRenameProblem('Web_Review', bundled, [], [])!, /lowercase letters, numbers and single hyphens/);
   assert.match(skillRenameProblem('..', bundled, [], [])!, /lowercase letters/);
-  assert.equal(skillRenameProblem('tdd', bundled, [], []), 'tdd is a bundled skill’s name too.');
-  assert.equal(skillRenameProblem('ours', bundled, ['Ours'], []), 'Another project skill is named ours.');
-  assert.equal(skillRenameProblem('web-skill', bundled, [], ['web-skill']), 'Another skill in its folder is renamed web-skill too.');
+  assert.equal(skillRenameProblem('tdd', bundled, [], []), 'tdd is already a bundled skill.');
+  assert.equal(skillRenameProblem('ours', bundled, ['Ours'], []), 'A local skill already uses ours.');
+  assert.equal(skillRenameProblem('web-skill', bundled, [], ['web-skill']), 'Another skill will use web-skill in this folder.');
 });

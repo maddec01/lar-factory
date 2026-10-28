@@ -17,11 +17,11 @@ test('a new item source takes its suggested show setting until one is picked, th
 test("Save's problems name Save, and whole answers have none", () => {
   expect(setupProblems(SETUP, 'Save')).toEqual({});
   expect(setupProblems({ ...SETUP, projectOwner: '-x', projectNumber: '0', role: ' ' }, 'Save')).toEqual({
-    projectOwner: 'Save needs a GitHub login: letters, digits and single hyphens, not at either end.',
-    projectNumber: 'Save needs the number, a positive whole number like 3.',
-    role: 'Save needs the repository’s role.',
+    projectOwner: 'Enter a GitHub username or organization name to continue with Save.',
+    projectNumber: 'Enter a project number greater than zero to continue with Save.',
+    role: 'Describe what this repository does to continue with Save.',
   });
-  expect(setupProblems({ ...SETUP, role: '' }).role).toBe('Next needs the repository’s role.');
+  expect(setupProblems({ ...SETUP, role: '' }).role).toBe('Describe what this repository does to continue with Next.');
 });
 
 test('the answers name a GitHub Project by its owner and number, or the issues', () => {

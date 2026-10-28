@@ -17,7 +17,7 @@ const check = (input: Record<string, unknown>, parts?: Partial<SetupCheckReads>)
   runSetupCheck({ repo: 'maddec01/lar-web', projectId: 'web', itemSource: PROJECT, ...input }, reads(parts));
 
 test("the main checkout check passes for the picked T3 project whose folder's origin is the repository", async () => {
-  assert.deepEqual(await check({ check: 'checkout' }), { result: { passed: true, detail: '/Users/me/Developer/lar-web · origin maddec01/lar-web' } });
+  assert.deepEqual(await check({ check: 'checkout' }), { result: { passed: true, detail: '/Users/me/Developer/lar-web connects to maddec01/lar-web.' } });
 });
 
 test('the main checkout check fails with its fix for a worktree, another origin, a second checkout or a gone project', async () => {
@@ -26,12 +26,12 @@ test('the main checkout check fails with its fix for a worktree, another origin,
     return `${result.problem} | ${result.fix}`;
   };
   assert.equal(await failed([{ ...WEB, origin: null }]),
-    "/Users/me/Developer/lar-web isn't a main checkout with an origin. | Pick the T3 project of maddec01/lar-web's main checkout, not a worktree.");
+    '/Users/me/Developer/lar-web is not a repository folder with a remote. | Choose the main repository folder for maddec01/lar-web.');
   assert.equal(await failed([{ ...WEB, origin: 'https://github.com/maddec01/lar-cli.git' }]),
-    "/Users/me/Developer/lar-web's origin is maddec01/lar-cli, not maddec01/lar-web. | Go Back and pick the T3 project of maddec01/lar-web's main checkout.");
+    '/Users/me/Developer/lar-web connects to maddec01/lar-cli instead of maddec01/lar-web. | Go back and choose the main repository folder for maddec01/lar-web.');
   assert.equal(await failed([WEB, { ...WEB, id: 'web-2', folder: '/Users/me/lar-web' }]),
-    'Several T3 projects are checkouts of maddec01/lar-web: /Users/me/Developer/lar-web, /Users/me/lar-web. | Remove all but one in T3 Code, then Retry.');
-  assert.equal(await failed([]), 'T3 Code no longer has the picked T3 project. | Go Back and pick one.');
+    'More than one T3 project points to maddec01/lar-web. The folders are /Users/me/Developer/lar-web, /Users/me/lar-web. | Keep one project in T3 Code, then retry.');
+  assert.equal(await failed([]), 'This project is no longer in T3 Code. | Go back and choose another.');
 });
 
 test("the main checkout check names T3's problem when its projects can't be read", async () => {
@@ -42,32 +42,32 @@ test("the main checkout check names T3's problem when its projects can't be read
 test('the item source check reads the GitHub Project or the issues and counts their items', async () => {
   const sources: [RepositoryItemSource, string][] = [];
   const countItems = async (source: RepositoryItemSource, repo: string) => { sources.push([source, repo]); return 23; };
-  assert.deepEqual(await check({ check: 'source' }, { countItems }), { result: { passed: true, detail: 'GitHub Project maddec01 #3 has 23 items to show' } });
+  assert.deepEqual(await check({ check: 'source' }, { countItems }), { result: { passed: true, detail: 'Found 23 items in GitHub Project maddec01 #3.' } });
   assert.deepEqual(await check({ check: 'source', itemSource: { kind: 'issues' } }, { countItems }),
-    { result: { passed: true, detail: "maddec01/lar-web's issues have 23 items to show" } });
+    { result: { passed: true, detail: 'Found 23 items in maddec01/lar-web\'s issues.' } });
   assert.deepEqual(sources, [[PROJECT, 'maddec01/lar-web'], [{ kind: 'issues' }, 'maddec01/lar-web']]);
 });
 
 test("an item source that can't be read shows gh's message and how to fix it", async () => {
   const { result } = await check({ check: 'source' }, { countItems: async () => { throw new Error('Project maddec01/3 not found'); } }) as { result: unknown };
   assert.deepEqual(result, { passed: false, problem: "Can't read GitHub Project maddec01 #3: Project maddec01/3 not found",
-    fix: "Check the Project's owner and number, and that gh's login can read the Project." });
+    fix: 'Check the GitHub Project owner, number and access with gh.' });
 });
 
 test("the push check passes when gh's login can push, and names the fix when it can't", async () => {
-  assert.deepEqual(await check({ check: 'push' }), { result: { passed: true, detail: "gh's login can push to maddec01/lar-web" } });
+  assert.deepEqual(await check({ check: 'push' }), { result: { passed: true, detail: 'gh can push changes to maddec01/lar-web.' } });
   assert.deepEqual(await check({ check: 'push' }, { canPush: async () => false }), { result: { passed: false,
-    problem: "gh's login can't push to maddec01/lar-web, so lar-work's agents can't push their branches.",
-    fix: 'Get write access to maddec01/lar-web, or log gh in as an account that has it:', command: 'gh auth login' } });
+    problem: 'gh cannot push changes to maddec01/lar-web. Agents need this permission to save their work.',
+    fix: 'Ask for write access to maddec01/lar-web, or sign in with an account that has it.', command: 'gh auth login' } });
   const { result } = await check({ check: 'push' }, { canPush: async () => { throw new Error('gh api failed: HTTP 404'); } }) as { result: unknown };
   assert.deepEqual(result, { passed: false, problem: "Can't read maddec01/lar-web's permissions: gh api failed: HTTP 404",
-    fix: "Check that gh's login can read maddec01/lar-web, then Retry." });
+    fix: 'Check access to maddec01/lar-web with gh, then retry.' });
 });
 
 test('a body without a known check, its repository, its T3 project or its item source is refused', async () => {
   for (const input of [{ check: 'labels' }, { check: 'checkout', projectId: 3 }, { check: 'source', itemSource: { kind: 'github-project', owner: 'x' } },
     { check: 'push', repo: '../x' }]) {
-    assert.deepEqual(await check(input), { status: 400, error: 'Send the check to run, the repository, its T3 project and its item source.' }, JSON.stringify(input));
+    assert.deepEqual(await check(input), { status: 400, error: 'Choose a repository and complete its settings before running checks.' }, JSON.stringify(input));
   }
 });
 
@@ -88,36 +88,36 @@ const azureCheck = (input: Record<string, unknown>, run: (args: string[]) => Pro
 
 test("the main checkout check reads an Azure DevOps origin as organization/project/repository", async () => {
   assert.deepEqual(await azureCheck({ check: 'checkout' }, fakeAzRepos().run),
-    { result: { passed: true, detail: '/Users/me/Developer/lar-api · origin contoso/Fabrikam Fiber/lar-api' } });
+    { result: { passed: true, detail: '/Users/me/Developer/lar-api connects to contoso/Fabrikam Fiber/lar-api.' } });
 });
 
 test("the item source check counts an Azure DevOps team's sprint or backlog through az", async () => {
   const az = fakeAz({ items: ITEMS });
-  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Fabrikam Team’s current sprint has 2 items to show' } });
+  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s current sprint.' } });
   assert.deepEqual(await azureCheck({ check: 'source', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' } }, az.run),
-    { result: { passed: true, detail: 'Fabrikam Team’s backlog has 2 items to show' } });
+    { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s backlog.' } });
 });
 
 test("an Azure DevOps item source az can't read shows az's message, with az login for a logged-out az", async () => {
   const failing = (message: string) => fakeAz({ items: ITEMS, fail: () => new Error(message) }).run;
   assert.deepEqual(await azureCheck({ check: 'source' }, failing("az boards failed: TF400898: team 'Nobody' not found")), { result: { passed: false,
-    problem: "Can't read Fabrikam Team’s current sprint: az boards failed: TF400898: team 'Nobody' not found",
-    fix: "Check the team's name, and that az's login can read Fabrikam Fiber's boards." } });
+    problem: 'Can\'t read Fabrikam Team\'s current sprint: az boards failed: TF400898: team \'Nobody\' not found',
+    fix: 'Check the team name and access to Fabrikam Fiber with az.' } });
   assert.deepEqual(await azureCheck({ check: 'source' }, failing('Please run az login to setup account.')), { result: { passed: false,
-    problem: "Can't read Fabrikam Team’s current sprint: az is logged out.", fix: 'Run this, then Retry:', command: 'az login' } });
+    problem: 'Can\'t read Fabrikam Team\'s current sprint: az is logged out.', fix: 'Run this command, then retry.', command: 'az login' } });
 });
 
 test('a team with no current iteration names its sprint fix, or going Back to name another team', async () => {
   assert.deepEqual(await azureCheck({ check: 'source' }, fakeAz({ items: ITEMS, iterations: [] }).run), { result: { passed: false,
-    problem: "Can't read Fabrikam Team’s current sprint: Team Fabrikam Team has no current iteration in contoso/Fabrikam Fiber.",
-    fix: 'Give the team a sprint whose dates cover today in its project settings, then Retry, or go Back and name another team.' } });
+    problem: 'Can\'t read Fabrikam Team\'s current sprint: Team Fabrikam Team has no current iteration in contoso/Fabrikam Fiber.',
+    fix: 'Give the team a sprint whose dates cover today in its project settings, then retry. You can also go back and choose another team.' } });
 });
 
 test("the push check asks Azure DevOps whether az's login can contribute to the repository", async () => {
-  assert.deepEqual(await azureCheck({ check: 'push' }, fakeAzRepos().run), { result: { passed: true, detail: `az's login can push to ${SHOWN_REPO}` } });
+  assert.deepEqual(await azureCheck({ check: 'push' }, fakeAzRepos().run), { result: { passed: true, detail: `az can push changes to ${SHOWN_REPO}.` } });
   assert.deepEqual(await azureCheck({ check: 'push' }, fakeAzRepos({ canPush: false }).run), { result: { passed: false,
-    problem: `az's login can't push to ${SHOWN_REPO}, so lar-work's agents can't push their branches.`,
-    fix: `Get Contribute on ${SHOWN_REPO}, or log az in as an account that has it:`, command: 'az login' } });
+    problem: `az cannot push changes to ${SHOWN_REPO}. Agents need this permission to save their work.`,
+    fix: `Ask for Contribute permission on ${SHOWN_REPO}, or sign in with an account that has it.`, command: 'az login' } });
   const { result } = await azureCheck({ check: 'push' }, fakeAzRepos({ fail: () => new Error('az repos show failed: TF401019: no repository') }).run) as { result: unknown };
   assert.deepEqual(result, { passed: true, detail: `Warning: couldn't check ${SHOWN_REPO}'s push permission: az repos show failed: TF401019: no repository. You can continue; agents will need Contribute permission to push.` });
 });

@@ -222,7 +222,7 @@ test('with no repository onboarded, adding is disabled and says where to add one
   await open(empty);
   expect(submit().disabled).toBe(true);
   expect(dialog()!.textContent).toContain('Create an issue and add it to List.');
-  expect(hint()!.textContent).toBe('No repository is onboarded. See Adding a repository in apps/server/README.md.');
+  expect(hint()!.textContent).toBe('No repository is onboarded. Read how to add a repository.');
   expect(field('item-repo').getAttribute('aria-describedby')).toBe('item-repo-hint');
   addStylesheet();
   expect(getComputedStyle(field('item-kind').closest('.form-field')!).alignContent, 'the hint grows its row without stretching Kind').toBe('start');

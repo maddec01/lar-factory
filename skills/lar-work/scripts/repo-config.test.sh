@@ -248,6 +248,10 @@ file contoso/Fabrikam/api '{"role":"api","itemSource":{"kind":"azure-backlog","t
 run contoso/Fabrikam/api
 check "keeps a team backlog item source" '{"version":1,"role":"api","itemSource":{"kind":"azure-backlog","team":"API"},"show":"opted-in","labels":["area-api"]}'
 
+file contoso/Fabrikam/board '{"role":"api","itemSource":{"kind":"azure-board","team":"API"}}'
+run contoso/Fabrikam/board
+check "reads the combined Azure board" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"all","labels":[]}'
+
 run contoso/Fabrikam/missing
 refuses "Azure's missing item names the repository and the missing file" "contoso/Fabrikam/missing: no .lar-factory.json on its default branch"
 
@@ -257,13 +261,13 @@ refuses "an Azure file that doesn't parse names the repository" "contoso/Fabrika
 
 file contoso/Fabrikam/broken '{"role":"web"}'
 run contoso/Fabrikam/broken
-refuses "an Azure repository has no default item source" "contoso/Fabrikam/broken: .lar-factory.json field itemSource.kind must be \"azure-sprint\" or \"azure-backlog\""
+refuses "an Azure repository has no default item source" "contoso/Fabrikam/broken: .lar-factory.json field itemSource.kind must be \"azure-sprint\", \"azure-backlog\" or \"azure-board\""
 
 file contoso/Fabrikam/broken '{"role":"web","itemSource":{"kind":"issues"}}'
 run contoso/Fabrikam/broken
-refuses "an Azure repository can't read GitHub issues" "field itemSource.kind must be \"azure-sprint\" or \"azure-backlog\""
+refuses "an Azure repository can't read GitHub issues" "field itemSource.kind must be \"azure-sprint\", \"azure-backlog\" or \"azure-board\""
 
-for kind in azure-sprint azure-backlog; do
+for kind in azure-sprint azure-backlog azure-board; do
     file contoso/Fabrikam/broken "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\"}}"
     run contoso/Fabrikam/broken
     refuses "an $kind without team names itemSource.team" "contoso/Fabrikam/broken: .lar-factory.json field itemSource.team must name the team for an $kind"

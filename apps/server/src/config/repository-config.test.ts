@@ -253,6 +253,8 @@ test("a repository without the file, or with a file that doesn't parse or has a 
 test("an Azure DevOps repository's config names its team's sprint or backlog, with no default item source", async () => {
   const files: Record<string, unknown> = { 'contoso/Fabrikam/api': { role: 'API', itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' } },
     'contoso/Fabrikam/web': { role: 'Web', itemSource: { kind: 'azure-backlog', team: 'Web' } },
+    'contoso/Fabrikam/board': { role: 'API', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' } },
+    'contoso/Fabrikam/board-no-team': { role: 'API', itemSource: { kind: 'azure-board' } },
     'contoso/Fabrikam/backlog-no-team': { role: 'x', itemSource: { kind: 'azure-backlog' } },
     'contoso/Fabrikam/none': { role: 'x' }, 'contoso/Fabrikam/issues': { role: 'x', itemSource: { kind: 'issues' } },
     'contoso/Fabrikam/no-team': { role: 'x', itemSource: { kind: 'azure-sprint' } }, 'contoso/Fabrikam/empty-team': { role: 'x', itemSource: { kind: 'azure-sprint', team: '' } } };
@@ -260,9 +262,11 @@ test("an Azure DevOps repository's config names its team's sprint or backlog, wi
   const read = async (args: string[]) => JSON.stringify({ content: JSON.stringify(files[`contoso/Fabrikam/${args.find((a) => a.startsWith('repositoryId='))!.slice(13)}`]) });
   assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/api', read)).itemSource, { kind: 'azure-sprint', team: 'Fabrikam Team' });
   assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/web', read)).itemSource, { kind: 'azure-backlog', team: 'Web' });
+  assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/board', read)).itemSource, { kind: 'azure-board', team: 'Fabrikam Team' });
   const refusals = {
-    'contoso/Fabrikam/none': 'field itemSource.kind must be "azure-sprint" or "azure-backlog"',
-    'contoso/Fabrikam/issues': 'field itemSource.kind must be "azure-sprint" or "azure-backlog"',
+    'contoso/Fabrikam/board-no-team': 'field itemSource.team must name the team for an azure-board',
+    'contoso/Fabrikam/none': 'field itemSource.kind must be "azure-sprint", "azure-backlog" or "azure-board"',
+    'contoso/Fabrikam/issues': 'field itemSource.kind must be "azure-sprint", "azure-backlog" or "azure-board"',
     'contoso/Fabrikam/backlog-no-team': 'field itemSource.team must name the team for an azure-backlog',
     'contoso/Fabrikam/no-team': 'field itemSource.team must name the team for an azure-sprint',
     'contoso/Fabrikam/empty-team': 'field itemSource.team must name the team for an azure-sprint',

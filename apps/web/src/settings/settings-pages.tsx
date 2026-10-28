@@ -92,7 +92,7 @@ function refreshEvery(seconds: number): Control {
   return custom(() => <span className="text-xs text-(--muted-foreground)">{value}</span>);
 }
 
-const ITEM_SOURCES = { project: 'GitHub Project', issues: 'Issues', sprint: 'Current sprint', backlog: 'Backlog' } as const;
+const ITEM_SOURCES = { project: 'GitHub Project', issues: 'Issues', sprint: 'Current sprint', backlog: 'Backlog', 'azure-board': 'Backlog and current sprint' } as const;
 
 /**
  * An item source as Settings names it, with a GitHub Project's owner and number when it has them, like `GitHub Project maddec01 #3`,
@@ -100,9 +100,9 @@ const ITEM_SOURCES = { project: 'GitHub Project', issues: 'Issues', sprint: 'Cur
  */
 const sourceName = (kind: keyof typeof ITEM_SOURCES, project?: { owner: string; number: number | string }, team?: string) =>
   kind === 'project' && project ? `${ITEM_SOURCES.project} ${project.owner} #${project.number}`
-    : kind === 'sprint' && team ? `${team}’s current sprint` : kind === 'backlog' && team ? `${team}’s backlog` : ITEM_SOURCES[kind];
+    : kind === 'azure-board' && team ? `${team}'s backlog and current sprint` : kind === 'sprint' && team ? `${team}’s current sprint` : kind === 'backlog' && team ? `${team}’s backlog` : ITEM_SOURCES[kind];
 /** Settings' name for each item source the setup step offers. */
-const SETUP_SOURCES = { 'github-project': 'project', issues: 'issues', 'azure-sprint': 'sprint', 'azure-backlog': 'backlog' } as const;
+const SETUP_SOURCES = { 'github-project': 'project', issues: 'issues', 'azure-sprint': 'sprint', 'azure-backlog': 'backlog', 'azure-board': 'azure-board' } as const;
 const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
 
 /**
@@ -124,7 +124,7 @@ function onboardingDescription(progress: OnboardingProgress): string {
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'sprint' || itemSource(r) === 'backlog' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.project, r.team)} · {SHOWN[r.show ?? 'all']}
+    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'sprint' || itemSource(r) === 'backlog' || itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.project, r.team)} · {SHOWN[r.show ?? 'all']}
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     below: <ConfigUpdateNotice repo={r} />,
     control: custom(() => <span className="flex items-center gap-2">

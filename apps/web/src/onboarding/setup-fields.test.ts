@@ -20,15 +20,15 @@ async function type(into: HTMLInputElement, value: string): Promise<void> {
   await settle(() => into.dispatchEvent(new Event('input', { bubbles: true })));
 }
 
-test("the setup fields show the answers they're given, name Save in their problems and call back with each change", async () => {
+test('setup shows the fixed source and calls back with description and Show changes', async () => {
   const onAnswer = vi.fn();
-  await mount(createElement(SetupFields, { repo: 'maddec01/lar-web', setup: SETUP, action: 'Save', onAnswer }));
-  expect($<HTMLInputElement>('[data-field="project-owner"] input')!.value).toBe('maddec01');
-  expect($$('[data-problem]').map(text)).toEqual(['Save needs the number, a positive whole number like 3.', 'Save needs the repository’s role.']);
+  await mount(createElement(SetupFields, { repo: 'maddec01/lar-web', setup: { ...SETUP, itemSource: 'issues' }, action: 'Save', onAnswer }));
+  expect($('[data-choice="issues"]')).toBeNull();
+  expect($$('[data-problem]').map(text)).toEqual(['Describe what this repository does to continue with Save.']);
   await type($<HTMLInputElement>('[data-field="role"] input')!, 'Web client');
   expect(onAnswer).toHaveBeenCalledWith({ role: 'Web client' });
-  await settle(() => $('[data-choice="issues"] [role="radio"]')!.click());
-  expect(onAnswer).toHaveBeenLastCalledWith({ itemSource: 'issues' });
+  await settle(() => $('[data-choice="opted-in"] [role="radio"]')!.click());
+  expect(onAnswer).toHaveBeenLastCalledWith({ show: 'opted-in' });
 });
 
 const PICKS: CustomLabelPicks = { offered: ['app: music'], picked: ['app: web'], typed: '', adding: false, busy: false, error: null };
@@ -52,5 +52,5 @@ test("the custom label picker holds Add for a name that can't be a custom label,
   expect($<HTMLButtonElement>('[data-add-custom]')!.disabled).toBe(true);
   await settle(() => $<HTMLInputElement>('[data-new-custom]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(onAdd).not.toHaveBeenCalled();
-  expect(text($('[role="alert"]'))).toContain('Can’t create app: iosgh: HTTP 403');
+  expect(text($('[role="alert"]'))).toContain('Could not add app: iosgh: HTTP 403');
 });

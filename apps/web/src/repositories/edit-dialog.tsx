@@ -1,7 +1,7 @@
 // Edit's dialog over Settings › Repositories: onboarding's setup fields and custom label picker, filled in from the
 // repository's .lar-factory.json on its open Edit PR's branch or else its default branch, then Cancel and Save, which
-// opens a PR on that file or adds a commit to the open one. On Azure DevOps the fields offer the team's sprint and
-// backlog, and the custom labels are tags, which Save leaves for the board to write on first use. While Save runs the fields, Cancel and Esc wait for it.
+// opens a PR on that file or adds a commit to the open one. Existing non-default sources stay read-only. An Azure board's team is editable, and its custom
+// labels are tags, which Save leaves for the board to write on first use. While Save runs the fields, Cancel and Esc wait for it.
 
 import { LoaderCircle } from 'lucide-react';
 import { onAzure, shownRepo } from '@lar-factory/shared';
@@ -23,7 +23,7 @@ function Form({ repo, form }: { repo: string; form: EditForm }) {
       <SetupFields repo={repo} azure={onAzure(repo)} setup={form.setup} action="Save" disabled={form.saving} onAnswer={answer} />
       <CustomLabelPicker repo={repo} azure={onAzure(repo)} offered={form.offered} picked={form.picked} typed={form.typed} adding={false} busy={form.saving} error={null} disabled={form.saving}
         onToggle={toggle} onType={type} onAdd={add} />
-      {form.error && <Alert tone="danger" title="Can’t save">{form.error}</Alert>}
+      {form.error && <Alert tone="danger" title="Can't save">{form.error}</Alert>}
     </fieldset>
   );
 }
@@ -38,19 +38,19 @@ export function EditDialog() {
       {/* ninna-ui's Modal drops the description from aria-describedby, so the description names itself. */}
       <Modal.Content data-edit-dialog title={`Edit ${shownRepo(edit.repo)}`} aria-describedby="edit-description">
         <Text id="edit-description" tone="muted" className="shrink-0 px-5 pb-4 text-xs sm:px-6">
-          {onAzure(edit.repo) ? 'Save opens' : `Save creates the custom labels ${shownRepo(edit.repo)} lacks and opens`} a PR on its .lar-factory.json, its Repository config. The board keeps the default branch’s values until the PR merges.
+          {onAzure(edit.repo) ? 'Save opens' : `Save creates the custom labels ${shownRepo(edit.repo)} lacks and opens`} a PR on its .lar-factory.json, its Repository config. The board keeps the default branch's values until the PR merges.
         </Text>
         <Modal.Body>
-          {form.state === 'loading' && <p className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading .lar-factory.json…</p>}
+          {form.state === 'loading' && <p className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading .lar-factory.json...</p>}
           {form.state === 'failed' && (
-            <Alert tone="danger" title={`Can’t read ${shownRepo(edit.repo)}’s Repository config`}
+            <Alert tone="danger" title={`Can't read ${shownRepo(edit.repo)}'s Repository config`}
               action={<Button {...kind('other')} onClick={() => void retry()}>Retry</Button>}>{form.error}</Alert>
           )}
           {form.state === 'loaded' && <Form repo={edit.repo} form={form} />}
         </Modal.Body>
         <Modal.Footer leading={form.state === 'loaded' && unchanged(form) && <span data-no-changes className="text-xs text-base-700">No changes yet</span>}>
           <Button {...kind('other')} disabled={saving} onClick={close}>Cancel</Button>
-          <Button {...kind('main')} data-save disabled={form.state !== 'loaded' || !canSave(form)} loading={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</Button>
+          <Button {...kind('main')} data-save disabled={form.state !== 'loaded' || !canSave(form)} loading={saving} onClick={() => void save()}>{saving ? 'Saving...' : 'Save'}</Button>
         </Modal.Footer>
       </Modal.Content>
     </Modal>

@@ -23,7 +23,7 @@ export async function createProject(input: Record<string, unknown>, choices: () 
   const named = typeof input.folder === 'string' ? input.folder.trim() : '';
   if (!named) return { status: 400, error: 'Name the folder to add.' };
   if (!isAbsolute(named) && named !== '~' && !named.startsWith('~/')) {
-    return { status: 400, error: 'Give the folder’s full path, such as ~/Developer/lar-web.' };
+    return { status: 400, error: 'Give the folder\'s full path, such as ~/Developer/lar-web.' };
   }
   const folder = resolve(expandHome(named, env.HOME ?? ''));
   if (!statSync(folder, { throwIfNoEntry: false })?.isDirectory()) return { status: 400, error: `There is no folder at ${folder}.` };
@@ -34,5 +34,5 @@ export async function createProject(input: Record<string, unknown>, choices: () 
   catch (err) { return { status: 502, error: err instanceof Error ? err.message : String(err) }; }
   const real = realFolder(folder);
   const created = projects.find((p) => realFolder(p.folder) === real);
-  return created ? { projects, projectId: created.id } : { status: 502, error: `T3 Code added ${folder}, but its projects don’t list it.` };
+  return created ? { projects, projectId: created.id } : { status: 502, error: `T3 Code added ${folder}, but its projects don't list it.` };
 }

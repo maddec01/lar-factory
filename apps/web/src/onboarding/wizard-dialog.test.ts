@@ -14,8 +14,8 @@ test('the dialog is a modal with a scrolling body, the step, its place and the p
   expect(dialog()!.getAttribute('aria-modal')).toBe('true');
   expect(dialog()!.getAttribute('aria-describedby'), 'its place describes it').toBe('onboarding-place');
   expect(inDialog('[data-slot="modal-body"]')).not.toBeNull();
-  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('T3 project');
-  expect(text(inDialog('#onboarding-place'))).toBe('Onboard a repository · step 1 of 6');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Repository');
+  expect(text(inDialog('#onboarding-place'))).toBe('Set up a repository. Step 1 of 6.');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('0');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label'), 'the bar is named by its caption').toBe('0 of 6 done');
 });
@@ -27,12 +27,12 @@ test('Next is disabled until a project is picked, then shows the next step, and 
   await settle(() => radio('lar-web').click());
   expect(button('Next')!.disabled).toBe(false);
   await settle(() => button('Next')!.click());
-  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Provider and item source');
-  expect(text(inDialog('#onboarding-place'))).toBe('Onboard lar-web · step 2 of 6');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Board settings');
+  expect(text(inDialog('#onboarding-place'))).toBe('Set up lar-web. Step 2 of 6.');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('1');
   expect(button('Next')!.disabled, 'the step waits for its answers').toBe(true);
   await settle(() => button('Back')!.click());
-  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('T3 project');
+  expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Repository');
   expect(radio('lar-web').getAttribute('aria-checked'), 'the pick stays').toBe('true');
 });
 
@@ -40,12 +40,12 @@ test('a run that reuses its .lar-factory.json counts the Pull request step too',
   await openOnboarding([project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] } })]);
   await settle(() => radio('lar-web').click());
   await settle(() => button('Next')!.click());
-  expect(text(inDialog('#onboarding-place'))).toBe('Onboard lar-web · step 2 of 6');
+  expect(text(inDialog('#onboarding-place'))).toBe('Set up lar-web. Step 2 of 6.');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuemax')).toBe('6');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-label')).toBe('1 of 6 done');
 });
 
-test('Onboard a repository after a close starts a new run', async () => {
+test('Add a repository after a close starts a new run', async () => {
   await openOnboarding([project('lar-web')]);
   await settle(() => radio('lar-web').click());
   await settle(() => inDialog<HTMLButtonElement>('[aria-label="Close"]')!.click());

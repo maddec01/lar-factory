@@ -85,7 +85,7 @@ One repository's factory settings (its role, item source, show setting and label
 _Avoid_: onboarding config, project config, board config
 
 **Onboarding**:
-Setting up one repository for the factory: its T3 project, provider, item source, labels, domain docs and cleanup.
+Setting up one repository for the factory: its T3 project, hosting service, board settings, labels, domain docs and cleanup.
 _Avoid_: initialization, setup
 
 **Reset**:
@@ -287,11 +287,14 @@ The service that hosts a repository and its tickets: GitHub or Azure DevOps. A t
 _Avoid_: platform, board provider, host
 
 **Item source**:
-Where the board finds one repository's items: a GitHub Project, the repository's issues, an Azure DevOps team's current sprint, or that team's backlog. It lists the items that can show.
+Where the board finds one repository's items: a GitHub Project, the repository's issues, an Azure DevOps team's current sprint, that team's backlog, or its Azure board. It lists the items that can show.
 _Avoid_: list source, board source, project
 
+**Azure board**:
+An Azure DevOps team's open backlog and current sprint together, with each work item shown once. It keeps completed sprint work and reads the backlog alone when no sprint is current.
+
 **Show setting**:
-A repository's choice of which items the board shows: All items, every open item its item source lists, or Opted-in items, only those that carry a status.
+A repository's choice of which items the board shows: All items, every item its item source lists, or Items with a status, only those that carry a status.
 _Avoid_: filter, visibility
 
 **Opt-in**:

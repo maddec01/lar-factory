@@ -13,6 +13,15 @@ import { StepBody } from './steps.tsx';
 import { type Run, type StepId, STEPS, onboarded, pickedProject, prClosed, stepReady, stepTitle, useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
+const STEP_HELP: Record<StepId, string> = {
+  project: 'Connect a repository folder so agents know where to work.',
+  setup: 'Choose what to show and tell agents what this repository does.',
+  labels: 'Set up labels to group work and track its progress.',
+  checks: 'Check tools and access so agents can read work and push changes.',
+  cleanup: 'Check agent instructions to prevent rules from working against each other.',
+  pr: 'Review and merge a pull request to save the setup in your repository.',
+};
+
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
 /**
@@ -72,14 +81,14 @@ function WizardModal({ run }: { run: Run }) {
   // Once its PR merged, the Pull request step is done too.
   const finished = onboarded(run, data);
   const doneCount = finished ? steps : run.done.length;
-  const done = finished ? 'Onboarded' : `${doneCount} of ${steps} done`;
+  const done = finished ? 'Ready' : `${doneCount} of ${steps} done`;
   return (
     <Modal onClose={close}>
       {/* ninna-ui's Modal drops the description from aria-describedby, so the step's place names itself. */}
-      <Modal.Content ref={dialog} data-onboarding-dialog title={stepTitle(step.id, run.provider)} aria-describedby="onboarding-place" focusFirstField={false}>
+      <Modal.Content ref={dialog} data-onboarding-dialog title={stepTitle(step.id, run.provider)} aria-describedby="onboarding-place" description={run.step === 'labels' && run.provider === 'Azure DevOps' ? 'Set up tags to group work and track its progress.' : STEP_HELP[run.step]} focusFirstField={false}>
         <div className="grid shrink-0 gap-2 px-5 pb-4 sm:px-6">
           <Text id="onboarding-place" tone="muted">
-            Onboard {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'} · step {indexOf(run) + 1} of {steps}
+            Set up {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'}. Step {indexOf(run) + 1} of {steps}.
           </Text>
           <Progress value={doneCount} max={steps} caption={done} aria-label={done} />
         </div>

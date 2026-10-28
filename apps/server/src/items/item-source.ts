@@ -11,12 +11,16 @@ export interface ItemsRead {
   problems?: ItemSourceProblem[];
   /** Set when a merged read has sources and none of them has read yet, as each waits for its tool. */
   unread?: true;
+  /** The repositories whose source a merged read hasn't read yet, as it still reads or waits for its tool; absent when none. */
+  waiting?: string[];
 }
 
 /** Reports which item sources a read is reading: each source starts and finishes under its name, in whatever order its reads end. */
 export interface ReadProgress {
   started(name: string): void;
   finished(name: string): void;
+  /** A source's read landed while another still reads: the merged read so far, as a whole read would list it then. */
+  landed?(read: ItemsRead): void;
 }
 
 /**

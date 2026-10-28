@@ -1,3 +1,5 @@
+> Historical setup plan. The board now reads GitHub repository issues with status labels, or an Azure team’s backlog and current sprint together. The Project setup and reads below are retired.
+
 # Lar Factory plan
 
 Written 2026-10-20. Nothing in this plan has been applied yet. Start once the

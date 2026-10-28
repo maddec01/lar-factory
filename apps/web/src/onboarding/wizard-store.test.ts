@@ -10,7 +10,7 @@ const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoic
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
 });
 /** The setup step's answers before any is given: a GitHub Project of the repository's owner, with All items suggested. */
-const SETUP: SetupAnswers = { itemSource: 'issues', projectOwner: 'maddec01', projectNumber: '', team: '', show: 'opted-in', showPicked: false, role: '' };
+const SETUP: SetupAnswers = { itemSource: 'issues', team: '', show: 'opted-in', showPicked: false, role: '' };
 const PROJECTS = [project('lar-web'), project('lar-server', { onBoard: true }), project('notes', { repo: null, provider: null, hasConfig: null })];
 
 /** The store, fresh, with T3's projects answered by `reply`; each onboarding it keeps is kept. */
@@ -138,12 +138,12 @@ test('the suggested show setting follows the item source until one is picked', a
   const setup = () => wizard.getState().run!.setup!;
   wizard.getState().answer({ itemSource: 'issues' });
   expect(setup()).toMatchObject({ itemSource: 'issues', show: 'opted-in', showPicked: false });
-  wizard.getState().answer({ itemSource: 'github-project' });
-  expect(setup().show).toBe('all');
+  wizard.getState().answer({ itemSource: 'issues' });
+  expect(setup().show).toBe('opted-in');
   wizard.getState().answer({ show: 'opted-in' });
   wizard.getState().answer({ itemSource: 'issues' });
-  wizard.getState().answer({ itemSource: 'github-project' });
-  expect(setup()).toMatchObject({ itemSource: 'github-project', show: 'opted-in', showPicked: true });
+  wizard.getState().answer({ itemSource: 'issues' });
+  expect(setup()).toMatchObject({ itemSource: 'issues', show: 'opted-in', showPicked: true });
 });
 
 test('GitHub setup needs only a repository description', async () => {
@@ -173,7 +173,7 @@ const AZURE = project('lar-web', { repo: 'contoso/Fabrikam/lar-web', provider: '
 
 test('Azure setup defaults to the combined board and a team name based on the project', async () => {
   const { wizard } = await onSetup([AZURE]);
-  expect(wizard.getState().run!.setup).toEqual({ itemSource: 'azure-board', projectOwner: '', projectNumber: '', team: 'Fabrikam Team', show: 'opted-in', showPicked: false, role: '' });
+  expect(wizard.getState().run!.setup).toEqual({ itemSource: 'azure-board', team: 'Fabrikam Team', show: 'opted-in', showPicked: false, role: '' });
 });
 
 test("Next waits for an Azure DevOps sprint's or backlog's team, and the item source names it", async () => {
@@ -186,8 +186,8 @@ test("Next waits for an Azure DevOps sprint's or backlog's team, and the item so
   wizard.getState().answer({ team: ' Fabrikam Team ' });
   expect(ready()).toBe(true);
   expect(source()).toEqual({ kind: 'azure-board', team: 'Fabrikam Team' });
-  wizard.getState().answer({ itemSource: 'azure-backlog' });
-  expect(source()).toEqual({ kind: 'azure-backlog', team: 'Fabrikam Team' });
+  wizard.getState().answer({ itemSource: 'azure-board' });
+  expect(source()).toEqual({ kind: 'azure-board', team: 'Fabrikam Team' });
 });
 
 const onboardingBoard = (step: string): BoardData => ({ ...sample,
@@ -364,17 +364,6 @@ test('a failed check holds Next until its Retry passes, and Retry reruns only th
   expect(ready()).toBe(true);
 });
 
-test('a failing command holds Next; gh without the project scope passes only for issues', async () => {
-  const { checksPassed } = await import('./wizard-store.ts');
-  const checks = { commands: { state: 'done' as const }, setup: { checkout: { state: 'done' as const, result: PASS }, source: { state: 'done' as const, result: PASS },
-    push: { state: 'done' as const, result: PASS } } };
-  const noScope = toolChecks({ gh: { result: 'no-project-scope', fix: 'gh auth refresh -s project' } });
-  expect(checksPassed(checks, noScope, { kind: 'issues' })).toBe(true);
-  expect(checksPassed(checks, noScope, { kind: 'github-project', owner: 'maddec01', number: 3 })).toBe(false);
-  expect(checksPassed(checks, toolChecks({ t3: { result: 'not-running' } }), { kind: 'issues' })).toBe(false);
-  expect(checksPassed({ ...checks, commands: { state: 'running' } }, toolChecks(), { kind: 'issues' })).toBe(false);
-});
-
 test("an Azure DevOps run asks the board for az's check, which holds Next in place of gh's, and checks the team's sprint", async () => {
   const azure = project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps' });
   const loggedOut = toolChecks({ gh: { result: 'missing', fix: 'brew install gh' }, az: { result: 'logged-out', fix: 'az login' } });
@@ -503,7 +492,7 @@ test('Resume on Cleanup brings back the ticks and skill picks, and runs the fixe
   expect(clashPosts()).toEqual([{ repo: 'maddec01/lar-web' }]);
 });
 
-const REUSED = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client', labels: ['app: music'] } });
+const REUSED = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['app: music'] } });
 
 test('Resume on the Checks step runs the checks again once it has read the projects', async () => {
   const wizard = await checkingStore([project('lar-web')]);
@@ -919,7 +908,7 @@ test("on Azure DevOps the Labels step reads the project's tags, goes on with tag
   await settle(() => wizard.getState().start());
   wizard.getState().pick('lar-api');
   wizard.getState().next();
-  wizard.getState().answer({ itemSource: 'azure-sprint', team: 'Fabrikam Team', role: 'API' });
+  wizard.getState().answer({ itemSource: 'azure-board', team: 'Fabrikam Team', role: 'API' });
   wizard.getState().next();
   await settle();
   expect(wizard.getState().run!.step).toBe('labels');

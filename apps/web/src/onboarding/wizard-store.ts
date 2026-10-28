@@ -129,7 +129,7 @@ export const commandChecks = (source: RepositoryItemSource | null): CheckedTool[
 /** Whether a command's check passes for the item source; gh needs the project scope only to read a GitHub Project. */
 export function commandPasses(name: CheckedTool, tools: ToolChecks | undefined, source: RepositoryItemSource | null): boolean {
   const check = tools?.[name];
-  return check?.result === 'ok' || check?.result === 'no-project-scope' && source?.kind === 'issues' && !check.upgrade;
+  return check?.result === 'ok';
 }
 
 /** A setup check on the Checks step: waiting for the checks before it, running, or done with its result. */
@@ -249,7 +249,7 @@ export interface Labels {
 
 /** The Labels step's plan for the run's repository once its labels are read; null before. */
 export function labelsPlan(run: Run, project: ProjectChoice, labels: Labels | null): LabelPlan | null {
-  return labels?.read.state === 'loaded' ? labelPlan(labels.read.names, itemSourceOf(run, project)?.kind ?? 'github-project') : null;
+  return labels?.read.state === 'loaded' ? labelPlan(labels.read.names) : null;
 }
 
 /** The custom labels a reused .lar-factory.json lists that the repository lacks, which Create makes too; none for a run that picks its own. */
@@ -451,7 +451,7 @@ function resumed(repo: string, progress: OnboardingProgress): Run {
  */
 function firstSetup(repo: string | null, provider: Provider | null): SetupAnswers {
   const itemSource = provider === 'Azure DevOps' ? 'azure-board' : 'issues';
-  return { itemSource, projectOwner: provider === 'Azure DevOps' ? '' : repo?.split('/')[0] ?? '', projectNumber: '', team: provider === 'Azure DevOps' && repo ? `${shownRepo(repo).split('/')[1]} Team` : '', show: suggestedShow(itemSource),
+  return { itemSource, team: provider === 'Azure DevOps' && repo ? `${shownRepo(repo).split('/')[1]} Team` : '', show: suggestedShow(),
     showPicked: false, role: '' };
 }
 

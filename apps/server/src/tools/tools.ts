@@ -171,28 +171,13 @@ function olderThanFloor(version: string | undefined): boolean {
   return i !== -1 && parts[i]! < floor[i]!;
 }
 
-/**
- * The token's scopes from `gh auth status`, or null when the board can't read them: no scopes line
- * (GH_TOKEN, a fine-grained token), a line naming none, or one line per account.
- */
-function scopesOf(status: string): string[] | null {
-  const lines = status.match(/Token scopes:.*/g);
-  if (lines?.length !== 1) return null;
-  const scopes = [...lines[0]!.matchAll(/'([^']+)'/g)].map((match) => match[1]!);
-  return scopes.length ? scopes : null;
-}
-
 const GH_UPGRADE = 'brew upgrade gh';
 
 /** What a logged-in gh's version and scopes say: a missing project scope first, as it blocks reading, noting a gh also too old. */
-function loggedInCheck(version: string | undefined, scopes: string[] | null): GhCheck {
+function loggedInCheck(version: string | undefined): GhCheck {
   const outdated = olderThanFloor(version);
-  if (scopes && !scopes.includes('project')) {
-    return { result: 'no-project-scope', ...(version && { version }), fix: 'gh auth refresh -s project', ...(outdated && { upgrade: GH_UPGRADE }) };
-  }
-  const unread = scopes ? {} : { scopes: 'unread' as const };
-  if (outdated) return { result: 'outdated', version: version!, fix: GH_UPGRADE, ...unread };
-  return { result: 'ok', ...(version && { version }), ...unread };
+  if (outdated) return { result: 'outdated', version: version!, fix: GH_UPGRADE };
+  return { result: 'ok', ...(version && { version }) };
 }
 
 /**
@@ -214,7 +199,7 @@ export async function probeGh(): Promise<GhProbe> {
   const version = versionOf(versionRun.stdout);
   const status = await run(['auth', 'status']);
   // Older gh prints the status to stderr.
-  if (status.code === 0) return { check: loggedInCheck(version, scopesOf(`${status.stdout}\n${status.stderr}`)) };
+  if (status.code === 0) return { check: loggedInCheck(version) };
   if (typeof status.code === 'number' && LOGGED_OUT.test(status.stderr || status.stdout)) {
     return { check: { result: 'logged-out', ...(version && { version }), fix: 'gh auth login' } };
   }

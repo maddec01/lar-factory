@@ -11,10 +11,8 @@ import { showPrToast } from '../notices/toasts.tsx';
 import { answerSetup, setupItemSource, setupProblems, type SetupChange } from '../onboarding/setup-answers.ts';
 
 /** The answers Edit starts from: the file's values, with its show setting picked, so a new item source keeps it. */
-function setupOf(repo: string, { itemSource, show, role }: RepositoryConfigAnswers): SetupAnswers {
-  const project = itemSource.kind === 'github-project' ? { projectOwner: itemSource.owner, projectNumber: String(itemSource.number) }
-    : { projectOwner: repo.split('/')[0] ?? '', projectNumber: '' };
-  return { itemSource: itemSource.kind, ...project, ...'team' in itemSource && { team: itemSource.team }, show, showPicked: true, role };
+function setupOf( { itemSource, show, role }: RepositoryConfigAnswers): SetupAnswers {
+  return { itemSource: itemSource.kind, ...'team' in itemSource && { team: itemSource.team }, show, showPicked: true, role };
 }
 
 /** The editing form, once the repository's values loaded. */
@@ -84,7 +82,7 @@ export const useEditStore = create<EditState>()((set, get) => {
     if (!read.config || !read.labels) return set({ edit: { repo, form: { state: 'failed', error: read.error ?? 'The board sent no Repository config.' } } });
     const { config, labels } = read;
     set({ edit: { repo, form: {
-      state: 'loaded', loaded: config, editPr: read.editPr ?? null, offered: customLabelChoices(labelPlan(labels, config.itemSource.kind)), setup: setupOf(repo, config),
+      state: 'loaded', loaded: config, editPr: read.editPr ?? null, offered: customLabelChoices(labelPlan(labels)), setup: setupOf(config),
       picked: config.labels, typed: '', saving: false, error: null,
     } } });
   };

@@ -1,8 +1,8 @@
+import { azureBoard } from './azure-board.ts';
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { Status } from '@lar-factory/shared';
 import { DONE_REFUSED } from '../items/item-source.ts';
-import { azureSprint } from './azure-sprint.ts';
 import { fakeAz, type WorkItem } from './fake-az.ts';
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
@@ -21,7 +21,7 @@ const ITEMS: WorkItem[] = [
 /** The sprint over ITEMS, its fake az, and the item numbered `id` as the board read it. */
 async function board(id: number, fail?: (args: string[]) => Error | undefined) {
   const az = fakeAz({ items: ITEMS, requirement: 'User Story', fail });
-  const source = azureSprint([REPO], TEAM, az.run);
+  const source = azureBoard([REPO], TEAM, az.run);
   const { items } = await source.read();
   // The read shows only the requirement level's type, so another type's item stands in as the first item renumbered.
   const item = items.find((i) => i.number === id) ?? { ...items[0]!, number: id, statuses: [] as Status[] };

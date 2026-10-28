@@ -180,9 +180,6 @@ export const onboarded = (board: Board) => until(board, (data) => data.repos.len
 /** Whether a gh call reads a repository's .lar-factory.json. */
 export const readsRepositoryConfig = (args: readonly string[]) => args[0] === 'api' && !!args[1]?.endsWith('/.lar-factory.json');
 
-/** A draft project item, as the fake gh returns it. */
-export const draftItem = (status: string) => ({ id: 'PVTI_draft', updatedAt: '2026-10-21T09:00:00Z', status: { name: status },
-  content: { __typename: 'DraftIssue', id: 'DI_draft', title: 'Idea', updatedAt: '2026-10-21T09:00:00Z' } });
 
 /** Environment for a board that can Start maddec01/lar-factory items: a temporary home holding its
  * checkout, and a T3 database with a live project there. */

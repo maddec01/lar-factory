@@ -230,7 +230,7 @@ const API = 'contoso/Fabrikam/api';
 /** The Queued #129 as an untagged Azure work item that `untaggedFor` read. */
 const untagged = (untaggedFor: string[]): BoardData => ({
   ...withChoices,
-  repos: [...withChoices.repos, { repo: WEB, role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }, { repo: API, role: 'api', items: 'sprint', team: 'Web', show: 'all', labels: [] }],
+  repos: [...withChoices.repos, { repo: WEB, role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }, { repo: API, role: 'api', items: 'azure-board', team: 'Web', show: 'all', labels: [] }],
   items: withChoices.items.map((i) => (i.id === 'I_sample05' ? { ...i, repo: WEB, untaggedFor } : i)),
 });
 const repoEntries = () => $$('[role="menu"] [data-start-repo]');

@@ -45,8 +45,6 @@ test('choosing a repository in the left pane shows only its items on the right',
   await settle(() => group('lar-apple').click());
   expect(rows()).toEqual(['I_sample03']);
   expect(group('lar-apple').getAttribute('aria-current')).toBe('page');
-  await settle(() => group('Draft').click());
-  expect(rows()).toEqual(['I_sample04']);
   await settle(() => group('All repositories').click());
   expect(rows()).toHaveLength(4);
 });
@@ -54,18 +52,18 @@ test('choosing a repository in the left pane shows only its items on the right',
 test('the left pane lists All, each repository with its count, then Draft under No repository', async () => {
   await mountPage();
   await open();
-  expect(counts()).toEqual([['All repositories', '4'], ['lar-server', '2'], ['lar-apple', '1'], ['Draft', '1']]);
+  expect(counts()).toEqual([['All repositories', '4'], ['lar-server', '3'], ['lar-apple', '1']]);
   const nav = $('[data-list-modal] nav[aria-label="Repositories"]')!;
-  expect(nav.querySelector('[role="group"][aria-label="No repository"] .name')?.textContent).toBe('Draft');
+  expect(nav.querySelector('[aria-label="No repository"]')).toBeNull();
 });
 
 test('the repositories go by their items in List, most first, whatever the config\'s order', async () => {
   await mountPage({ ...sample, repos: [...sample.repos].reverse() });
   await open();
-  expect(counts()).toEqual([['All repositories', '4'], ['lar-server', '2'], ['lar-apple', '1'], ['Draft', '1']]);
+  expect(counts()).toEqual([['All repositories', '4'], ['lar-server', '3'], ['lar-apple', '1']]);
   // The order holds while the search changes the counts.
   await type('subtitle');
-  expect(counts().map(([name]) => name)).toEqual(['All repositories', 'lar-server', 'lar-apple', 'Draft']);
+  expect(counts().map(([name]) => name)).toEqual(['All repositories', 'lar-server', 'lar-apple']);
 });
 
 test('the List modal starts on the board\'s scope', async () => {
@@ -79,22 +77,12 @@ test('the List modal starts on the board\'s scope', async () => {
   expect(rows()).toEqual(['I_sample03']);
 });
 
-test('a picked group that leaves shows All repositories, marked as the one picked', async () => {
-  await mountPage();
-  await open();
-  await settle(() => group('Draft').click());
-  await push(moved('I_sample04', 'Queued'));
-  expect(groups().map((b) => text(b.querySelector('.name')))).not.toContain('Draft');
-  expect(active()).toEqual(['All repositories']);
-  expect(rows()).toHaveLength(3);
-});
-
 test('under All repositories a row names its repository, except a Draft', async () => {
   await mountPage();
   await open();
   const meta = (id: string) => text($(`[data-list-modal] button[data-item="${id}"] span span:last-child`));
   expect(meta('I_sample03')).toMatch(/^lar-apple · /);
-  expect(meta('I_sample04')).toMatch(/^draft · /);
+  expect(meta('I_sample04')).toMatch(/^lar-server · /);
 });
 
 test('a repository whose items have not landed yet says it is reading, not that its List is empty', async () => {
@@ -118,7 +106,7 @@ test('the search filters the right pane and the counts on the left follow it', a
   await open();
   await type('subtitle');
   expect(rows()).toEqual(['I_sample03']);
-  expect(counts()).toEqual([['All repositories', '1'], ['lar-server', '0'], ['lar-apple', '1'], ['Draft', '0']]);
+  expect(counts()).toEqual([['All repositories', '1'], ['lar-server', '0'], ['lar-apple', '1']]);
   await settle(() => group('lar-server').click());
   expect(rows()).toEqual([]);
   expect(text($('[data-list-modal] .empty'))).toBe('Nothing here matches.');

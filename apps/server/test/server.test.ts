@@ -4,7 +4,7 @@ import { get } from 'node:http';
 import assert from 'node:assert/strict';
 import { freePort, onboarded, readsRepositoryConfig, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,7 +23,7 @@ test('writes reject foreign and missing origins before touching GitHub', async (
   }
   const calls = await board.calls();
   // Reads and the startup gh probe touch nothing; the startup read's offers look for open PRs.
-  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && args[0] !== '--version' && args[0] !== 'auth' && !readsRepositoryConfig(args)
+  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && !(args[0] === 'api' && args[1] === '-i') && args[0] !== '--version' && args[0] !== 'auth' && !readsRepositoryConfig(args)
     && !(args[0] === 'pr' && args[1] === 'list'));
   assert.equal(writes.length, 0);
 });
@@ -45,27 +45,6 @@ test('a completed submission is immediately visible and duplicate delivery reuse
   assert.equal((await board.post(body)).status, 200, 'lost HTTP response can be delivered again');
   const calls = await board.calls();
   assert.equal(calls.filter((args) => args[0] === 'api' && args[1] === '--method').length, 1);
-});
-
-test('partial HTTP success links the issue and retry finishes project assignment once', async (t) => {
-  const board = await startBoard(t, { fail: 'status' });
-  await onboarded(board);
-  const initial = await board.board();
-  const body = { session: initial.capture.session, requestId: randomUUID(), draft };
-  const first = await board.post(body);
-  assert.equal(first.status, 502);
-  const partial = await first.json();
-  assert.equal(partial.issueUrl, 'https://github.com/maddec01/lar-factory/issues/900001');
-  assert.match(partial.error, /List status/);
-  assert.equal(partial.board.items.length, 0);
-  assert.equal((await board.post({ ...body, draft: { ...draft, title: 'Another item' } })).status, 409);
-  await board.update({});
-  const retry = await board.post(body);
-  assert.equal(retry.status, 200);
-  assert.equal((await retry.json()).item.title, 'Capture an item');
-  const calls = await board.calls();
-  assert.equal(calls.filter((args) => args[0] === 'api' && args[1] === '--method').length, 1);
-  assert.equal(calls.filter((args) => args[1] === 'item-add').length, 1);
 });
 
 test('HTTP validation rejects malformed, oversized and mismatched drafts without a GitHub write', async (t) => {
@@ -101,13 +80,13 @@ test('sample mode never writes through the local GitHub login', async (t) => {
   assert.equal((await board.calls()).length, 0);
 });
 
-test('successful refreshes eventually remove a created item whose project membership is absent', async (t) => {
+test('successful refreshes eventually remove a created item whose issue is absent', async (t) => {
   const board = await startBoard(t, {}, false, true);
   await onboarded(board);
   const initial = await board.board();
   const response = await board.post({ session: initial.capture.session, requestId: randomUUID(), draft });
   assert.equal((await response.json()).board.items.length, 1, 'creation appears immediately');
-  // GitHub keeps returning no membership, as when the item was removed before reconciliation.
+  // GitHub keeps returning no issue, as when the item was removed before reconciliation.
   for (let attempt = 0; attempt < 40; attempt++) {
     if (!(await board.board()).items.length) return;
     await new Promise((r) => setTimeout(r, 50));
@@ -115,7 +94,7 @@ test('successful refreshes eventually remove a created item whose project member
   assert.equal((await board.board()).items.length, 0, 'a temporary overlay cannot outlive repeated authoritative reads');
 });
 
-const rawBuild = (number: number, status: string) => projectIssue(number, status, undefined, ['build']);
+const rawBuild = (number: number, status: string) => boardIssue(number, status, undefined, ['build']);
 
 /** The board's items once its first read lands. */
 const readItems = async (board: Board): Promise<Item[]> => (await until(board, (d) => d.items.length > 0)).items;
@@ -128,7 +107,7 @@ test("a refresh finds build sub-issues, active and blocked slices with issue sea
   const ref = (number: number) => ({ number, title: `Issue ${number}`, url: `https://github.com/maddec01/lar-factory/issues/${number}`,
     state: 'OPEN', stateReason: null, repository });
   const parent = rawBuild(13, 'In progress');
-  const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref(12), ref(15), ref(16)] } } }, rawBuild(12, 'In progress'), projectIssue(15, 'In progress')];
+  const items = [{ ...parent, content: { ...parent.content, subIssues: { nodes: [ref(12), ref(15), ref(16)] } } }, rawBuild(12, 'In progress'), boardIssue(15, 'In progress')];
   const board = await startBoard(t, { items, builds: [{ number: 12, repository }], active: [{ number: 15, repository }, { number: 16, repository }],
     blocked: [{ number: 16, repository }] });
   const read = await readItems(board);
@@ -154,11 +133,11 @@ test('each refresh attaches item stats from T3 Code\'s database and Claude trans
       { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
     ] }]);
   const home = claudeHome(t, { 'session-1': { main: [assistant('m0', 1, 2, 3, 4)], subagents: { a1: [assistant('m1', 5, 0, 300, 9)] } } });
-  const items = await readLiveStats(await startBoard(t, { items: [projectIssue(12, 'Done'), projectIssue(13, 'Review')] }, false, false,
+  const items = await readLiveStats(await startBoard(t, { items: [boardIssue(12, 'Done'), boardIssue(13, 'Review')] }, false, false,
     { T3_STATE_DB: db, T3_SETTINGS: t3Settings(t, { claudeAgent_personal: home }) }));
   assert.deepEqual(items.find((i) => i.number === 12)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 10 + 314 });
   assert.equal(items.find((i) => i.number === 13)?.stats, undefined);
-  const [without] = await readItems(await startBoard(t, { items: [projectIssue(12, 'Done')] }));
+  const [without] = await readItems(await startBoard(t, { items: [boardIssue(12, 'Done')] }));
   assert.equal(without?.stats, undefined);
 });
 
@@ -168,14 +147,14 @@ test('each refresh attaches item threads and T3\'s environment id, and leaves th
   const environment = join(mkdtempSync(join(tmpdir(), 'lar-t3-env-')), 'environment-id');
   t.onTestFinished(() => rmSync(join(environment, '..'), { recursive: true, force: true }));
   writeFileSync(environment, 'env-1\n');
-  const board = await startBoard(t, { items: [projectIssue(12, 'In progress'), projectIssue(13, 'Review')] }, false, false,
+  const board = await startBoard(t, { items: [boardIssue(12, 'In progress'), boardIssue(13, 'Review')] }, false, false,
     { T3_STATE_DB: db, T3_ENVIRONMENT_ID: environment });
   const data = await until(board, (d) => d.items.length > 0);
   assert.equal(data.t3EnvironmentId, 'env-1');
   assert.deepEqual(data.items.find((i) => i.number === 12)?.threads,
     [{ id: 'build', title: 'Build: owner accounts', state: 'running', updated: '2026-10-20T09:00:00.000Z' }]);
   assert.equal(data.items.find((i) => i.number === 13)?.threads, undefined);
-  const without = await until(await startBoard(t, { items: [projectIssue(12, 'In progress')] }), (d) => d.items.length > 0);
+  const without = await until(await startBoard(t, { items: [boardIssue(12, 'In progress')] }), (d) => d.items.length > 0);
   assert.equal(without.t3EnvironmentId, undefined);
   assert.equal(without.items[0]?.threads, undefined);
 });
@@ -261,7 +240,7 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
     { number: 41, url: 'https://github.com/maddec01/lar-factory/pull/41', state: 'OPEN', isDraft: false, body: 'PR 41' },
   ] };
   const build = rawBuild(12, 'Done');
-  const parent = projectIssue(13, 'In progress');
+  const parent = boardIssue(13, 'In progress');
   const items = [{ ...parent, content: { ...parent.content, closedByPullRequestsReferences: prs } },
     { ...build, content: { ...build.content, closedByPullRequestsReferences: { nodes: [prs.nodes[0]] } } }];
   const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
@@ -277,7 +256,7 @@ test("only a build's linked PRs have their body and merge time read, once each, 
   const pr = (number: number) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body: `PR ${number}` });
   const linked = (raw: ReturnType<typeof rawBuild>, numbers: number[]) =>
     ({ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: numbers.map(pr) } } });
-  const items = [linked(projectIssue(13, 'In progress'), [40, 41]), linked(rawBuild(12, 'Review'), [40]), linked(rawBuild(14, 'Review'), [40, 42])];
+  const items = [linked(boardIssue(13, 'In progress'), [40, 41]), linked(rawBuild(12, 'Review'), [40]), linked(rawBuild(14, 'Review'), [40, 42])];
   const board = await startBoard(t, { items });
   await readItems(board);
   const first = (await board.calls()).find((args) => args.some((a) => a.includes('... on PullRequest { id body mergedAt }')));
@@ -298,10 +277,10 @@ test('a parent with two builds merged at different times: each build keeps its o
     repository: { nameWithOwner: 'maddec01/lar-factory' } };
   const build = (number: number, linked: object) => {
     const raw = rawBuild(number, 'Done');
-    return { ...raw, content: { ...raw.content, state: 'CLOSED', closedAt: '2026-10-20T10:00:00Z', parent: parentRef,
+    return { ...raw, content: { ...raw.content, state: 'CLOSED', closedAt: new Date().toISOString(), parent: parentRef,
       closedByPullRequestsReferences: { nodes: [linked] } } };
   };
-  const parent = projectIssue(13, 'In progress');
+  const parent = boardIssue(13, 'In progress');
   // The last build's PR also closes the parent.
   const items = [{ ...parent, content: { ...parent.content, subIssuesSummary: { total: 2, completed: 2 },
     closedByPullRequestsReferences: { nodes: [last] } } }, build(12, first), build(14, last)];

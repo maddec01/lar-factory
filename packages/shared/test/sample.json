@@ -7,19 +7,37 @@
       "repo": "maddec01/lar-server",
       "path": "~/test/lar-server",
       "role": "Backend API server",
-      "labels": ["area: server", "area: web"]
+      "labels": [
+        "area: server",
+        "area: web"
+      ],
+      "items": "issues"
     },
     {
       "repo": "maddec01/lar-apple",
       "path": "~/test/lar-apple",
       "role": "Apple client app",
-      "labels": ["app: music", "app: video", "app: photos", "app: books", "os: ios", "os: macos", "os: tvos", "os: watchos"]
+      "labels": [
+        "app: music",
+        "app: video",
+        "app: photos",
+        "app: books",
+        "os: ios",
+        "os: macos",
+        "os: tvos",
+        "os: watchos"
+      ],
+      "items": "issues"
     }
   ],
   "refreshSeconds": 45,
   "fetchedAt": "2026-10-21T09:40:00.000Z",
   "error": "gh api graphql failed: error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com",
-  "firstRead": { "step": "finishing", "running": [], "settled": true },
+  "firstRead": {
+    "step": "finishing",
+    "running": [],
+    "settled": true
+  },
   "modelChoices": [],
   "t3EnvironmentId": "sample-environment",
   "items": [
@@ -117,11 +135,13 @@
         "List"
       ],
       "content": "ticket",
-      "number": null,
+      "number": 900004,
       "title": "Shared playback history across devices",
-      "url": null,
-      "repo": null,
-      "labels": [],
+      "url": "https://github.com/maddec01/lar-server/issues/900004",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -196,11 +216,13 @@
         "Queued"
       ],
       "content": "ticket",
-      "number": null,
+      "number": 900021,
       "title": "Offline downloads on watchOS",
-      "url": null,
-      "repo": null,
-      "labels": [],
+      "url": "https://github.com/maddec01/lar-server/issues/900021",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -949,12 +971,14 @@
       "statuses": [
         "Verify"
       ],
-      "content": "pr",
+      "content": "ticket",
       "number": 210,
       "title": "Bump FFmpeg to 7.1",
-      "url": "https://github.com/maddec01/lar-server/pull/210",
+      "url": "https://github.com/maddec01/lar-server/issues/210",
       "repo": "maddec01/lar-server",
-      "labels": [],
+      "labels": [
+        "improvement"
+      ],
       "state": "open",
       "closedAs": null,
       "parent": null,
@@ -965,18 +989,23 @@
       "blockers": [],
       "updatedAt": "2026-10-21T09:20:00Z",
       "closedAt": null,
-      "linkedPrs": [],
-      "slices": [],
-      "pipeline": {
-        "checks": {
-          "passed": 4,
-          "failed": 0,
-          "running": 2,
-          "total": 6,
-          "since": "2026-10-21T09:15:00Z"
-        },
-        "mergeState": "checking"
-      }
+      "linkedPrs": [
+        {
+          "number": 210,
+          "url": "https://github.com/maddec01/lar-server/pull/210",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "passed": 4,
+            "failed": 0,
+            "running": 2,
+            "total": 6,
+            "since": "2026-10-21T09:15:00Z"
+          },
+          "mergeState": "checking"
+        }
+      ],
+      "slices": []
     },
     {
       "id": "I_sample27",

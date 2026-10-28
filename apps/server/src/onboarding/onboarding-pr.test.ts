@@ -535,7 +535,7 @@ test("Reset of an onboarded repository whose PR can't be opened answers with gh'
 });
 
 const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
-const azureConfig = { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API' };
+const azureConfig = { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API' };
 
 test('on Azure Repos, a completed PR finishes onboarding, an abandoned one is marked closed and reactivated by Reopen pull request', async (t) => {
   const merged = `${REPO_URL}/pullrequest/7`;

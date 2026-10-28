@@ -76,7 +76,7 @@ test('Next and Back move focus to the step heading, and closing returns it to th
 });
 
 const PR = 'https://github.com/maddec01/lar-apple/pull/14';
-const SETUP: SetupAnswers = { itemSource: 'issues', projectOwner: 'maddec01', projectNumber: '', show: 'opted-in', showPicked: false, role: 'iOS app' };
+const SETUP: SetupAnswers = { itemSource: 'issues', show: 'opted-in', showPicked: false, role: 'iOS app' };
 const waiting: OnboardingRepository = { repo: 'maddec01/lar-apple', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-apple', setup: SETUP }, prUrl: PR } };
 
 /** Resumes lar-apple's onboarding from its card, waiting for its PR, has the board finish it with `after`, then presses Go to the board. */

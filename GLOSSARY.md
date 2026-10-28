@@ -114,8 +114,8 @@ while GitHub catches up; GitHub remains authoritative.
 _Avoid_: Source of truth (for the overlay)
 
 **Active work**:
-An item whose provider data an agent, a check or the board is changing now. In a Project or an Azure DevOps team, which
-have no change check that sees every edit, it reads alone every 15 seconds; a repository's issues read only what their
+An item whose provider data an agent, a check or the board is changing now. In an Azure DevOps team, which
+has no change check that sees every edit, it reads alone every 15 seconds; a repository's issues read only what their
 change check finds changed. See ADR 0028.
 _Avoid_: Busy item, hot item
 
@@ -287,7 +287,7 @@ The service that hosts a repository and its tickets: GitHub or Azure DevOps. A t
 _Avoid_: platform, board provider, host
 
 **Item source**:
-Where the board finds one repository's items: a GitHub Project, the repository's issues, an Azure DevOps team's current sprint, that team's backlog, or its Azure board. It lists the items that can show.
+Where the board finds one repository's items: the repository's GitHub issues or an Azure DevOps team's backlog and current sprint together. It lists the items that can show.
 _Avoid_: list source, board source, project
 
 **Azure board**:

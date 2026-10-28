@@ -45,7 +45,7 @@ export async function createRepositoryLabels(input: Record<string, unknown>, run
   if (onAzure(repo)) return NO_TAG_CREATE;
   const before = await read(repo, run);
   if ('error' in before) return before;
-  const labels = [...labelsToCreate(labelPlan(before.labels, itemSource.kind), renaming),
+  const labels = [...labelsToCreate(labelPlan(before.labels), renaming),
     ...missingCustomLabels(before.labels, custom.map((c) => c.trim())).map((name) => ({ name }))];
   for (const label of labels) {
     try { await createLabel(repo, label, run); }
@@ -62,7 +62,7 @@ export async function workflowLabelsProblem(repo: string, run?: Run): Promise<{ 
   if (onAzure(repo)) return null;
   const labels = await read(repo, run);
   if ('error' in labels) return labels;
-  return workflowLabelsMissing(labelPlan(labels.labels, 'github-project'))
+  return workflowLabelsMissing(labelPlan(labels.labels))
     ? { status: 409, error: `${repo} is missing a required label. Go back to Labels to create or rename it.` } : null;
 }
 
@@ -75,7 +75,7 @@ export async function renameRepositoryLabels(input: Record<string, unknown>, run
   if (!isRepo(repo) || !strings(names)) return { status: 400, error: 'Send the repository and the old labels to rename.' };
   const before = await read(repo, run);
   if ('error' in before) return before;
-  const plan = labelPlan(before.labels, 'github-project');
+  const plan = labelPlan(before.labels);
   const renames = [];
   for (const name of names) {
     const row = plan.workflow.find((r) => r.state === 'rename' && r.oldName.toLowerCase() === name.toLowerCase());

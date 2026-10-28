@@ -191,12 +191,11 @@ test('the scope menu is headed Show, then All repositories, a separator and a re
   expect(menu()).toBeNull();
   await pressMenu(trigger());
   expect(text($('[role="menu"] [role="menuitemradio"]')!.parentElement!.previousElementSibling)).toBe('Show');
-  expect(entries().map(text)).toEqual(['All repositories', 'lar-server', 'lar-apple', 'Draft']);
-  expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false', 'false']);
+  expect(entries().map(text)).toEqual(['All repositories', 'lar-server', 'lar-apple']);
+  expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
   expect($('[role="menu"] [role="separator"]')).not.toBeNull();
   expect(entries()[1]!.querySelector('.repo-tone-0')).not.toBeNull();
   expect(entries()[2]!.querySelector('.repo-tone-1')).not.toBeNull();
-  expect(entries()[3]!.querySelector('.repo-tone-none')).not.toBeNull();
   expect(entries()[0]!.querySelector('[class*="repo-tone-"]'), 'All repositories has no dot').toBeNull();
 });
 
@@ -207,7 +206,7 @@ test('picking a repository sets the scope and closes the menu; All repositories 
   expect(text(trigger())).toBe('lar-apple');
   expect(menu()).toBeNull();
   await pressMenu(trigger());
-  expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true', 'false']);
+  expect(entries().map((e) => e.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true']);
   await settle(() => entries()[0]!.click());
   expect(text(trigger())).toBe('All repositories');
   expect(menu()).toBeNull();
@@ -225,7 +224,7 @@ test('the menu works from the keyboard', async () => {
   await mountPage();
   trigger().focus();
   await settle(() => trigger().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
-  expect(entries()).toHaveLength(4);
+  expect(entries()).toHaveLength(3);
   await settle(() => entries()[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(text(trigger())).toBe('lar-server');
 });

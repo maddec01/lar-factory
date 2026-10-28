@@ -1,8 +1,7 @@
-// Reads the lar project through the local `gh` CLI (`gh api graphql`).
+// Reads repository issues and linked PRs through the local `gh` CLI (`gh api graphql`).
 
-import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, isDraft, normalizeItems, projectBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
-import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, RawLinkedPr, Searched, Status, StatusSource } from '@lar-factory/shared';
-import type { ItemsRead } from '../items/item-source.ts';
+import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
+import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, RawLinkedPr, Searched, Status } from '@lar-factory/shared';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -28,7 +27,7 @@ const CHECKS = `statusCheckRollup {
     }
   }`;
 
-/** The fields the board reads of an issue, on the Project or in a repository. */
+/** The fields the board reads of a repository issue. */
 const ISSUE_FIELDS = `id number title url state stateReason closedAt updatedAt
   repository { nameWithOwner }
   labels(first: 20) { nodes { name } }
@@ -43,48 +42,13 @@ const ISSUE_FIELDS = `id number title url state stateReason closedAt updatedAt
     }
   }`;
 
-/** The fields the board reads of a Project item. */
-const PROJECT_ITEM_FIELDS = `id
-  updatedAt
-  status: fieldValueByName(name: "Status") {
-    ... on ProjectV2ItemFieldSingleSelectValue { name }
-  }
-  content {
-    __typename
-    ... on DraftIssue { id title updatedAt }
-    ... on Issue { ${ISSUE_FIELDS} }
-    ... on PullRequest {
-      id number title url state closedAt updatedAt isDraft mergeStateStatus
-      repository { nameWithOwner }
-      labels(first: 20) { nodes { name } }
-      ${CHECKS}
-    }
-  }`;
-
-export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String) {
-  user(login: $owner) {
-    projectV2(number: $number) {
-      title
-      items(first: ${PAGE_SIZE}, after: $after) {
-        pageInfo { hasNextPage endCursor }
-        nodes { ${PROJECT_ITEM_FIELDS} }
-      }
-    }
-  }
-}`;
-
-/** Project items by their Project item ids, up to PAGE_SIZE a call, for a read of the active items alone. */
-const PROJECT_ITEMS_BY_ID_QUERY = `query($ids: [ID!]!) {
-  nodes(ids: $ids) { ... on ProjectV2Item { ${PROJECT_ITEM_FIELDS} } }
-}`;
-
 /** Issues by their node ids, up to PAGE_SIZE a call, for a read of a repository's active issues alone. */
 const ISSUES_BY_ID_QUERY = `query($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Issue { __typename ${ISSUE_FIELDS} } }
 }`;
 
 /** One page of a repository's open issues. */
-const OPEN_ISSUES_QUERY = `query($owner: String!, $name: String!, $after: String) {
+export const OPEN_ISSUES_QUERY = `query($owner: String!, $name: String!, $after: String) {
   repository(owner: $owner, name: $name) {
     issues(first: ${PAGE_SIZE}, after: $after, states: [OPEN]) {
       pageInfo { hasNextPage endCursor }
@@ -121,7 +85,7 @@ const RECENT_CLOSED_QUERY = `query($owner: String!, $name: String!, $since: Date
 
 /**
  * One page of an issue search, for the sub-issue labels the board needs: `build`,
- * `active` and `blocked`. Labels on every sub-issue in ITEMS_QUERY cost 60 points a page, not 10; a
+ * `active` and `blocked`. Labels on every sub-issue in OPEN_ISSUES_QUERY cost 60 points a page, not 10; a
  * search page costs 1.
  */
 export const ISSUE_SEARCH_QUERY = `query($q: String!, $after: String) {
@@ -165,17 +129,6 @@ interface LightIssue {
   stateReason: string | null;
   labels: { nodes: { name: string }[] };
   parent: { id: string; labels: { nodes: { name: string }[] } } | null;
-}
-
-interface RawItemsPage {
-  data: {
-    user: {
-      projectV2: {
-        title: string;
-        items: { pageInfo: PageInfo; nodes: RawItem[] };
-      } | null;
-    } | null;
-  };
 }
 
 // ---------- gh ----------
@@ -249,12 +202,6 @@ export async function getIfChanged<T>(path: string, etag: string | undefined, ru
   const split = /\r?\n\r?\n/.exec(out);
   const head = split ? out.slice(0, split.index) : '';
   return { etag: /^etag:\s*(.+?)\s*$/im.exec(head)?.[1], body: JSON.parse(split ? out.slice(split.index + split[0].length) : out) as T };
-}
-
-/** A GitHub Project, by its owner and number, as a repository's .lar-factory.json names it. */
-export interface GithubProjectRef {
-  owner: string;
-  number: number;
 }
 
 /**
@@ -341,7 +288,7 @@ async function searchLabels(raws: RawItem[], search: LabelSearch): Promise<Searc
     search(sliceLabelSearches('active', raws)),
     search(sliceLabelSearches('blocked', raws)),
   ]);
-  return { builds: new Set([...projectBuilds(raws), ...builds]), active, blocked };
+  return { builds: new Set([...readBuilds(raws), ...builds]), active, blocked };
 }
 
 /**
@@ -372,25 +319,6 @@ async function readBuildPrBodies(raws: RawItem[]): Promise<void> {
   for (const { id, body, mergedAt } of read) for (const pr of prs.get(id) ?? []) Object.assign(pr, { body, mergedAt });
 }
 
-/** A Project read: its items, and the Project item id of each by its Item.id, for the Project adapter's writes. */
-export interface ProjectRead extends ItemsRead {
-  projectItemIds: Map<string, string>;
-}
-
-export async function fetchProject(owner: string, number: number): Promise<ProjectRead> {
-  const raws: RawItem[] = [];
-  let title = '';
-  await readPages(MAX_PAGES, `Project has more than ${PAGE_SIZE * MAX_PAGES} items; stopped paging`, async (after) => {
-    const project = (await graphql<RawItemsPage>(ITEMS_QUERY, { owner, number, after })).data.user?.projectV2;
-    if (!project) throw new Error(`Project ${owner}/${number} not found`);
-    title = project.title;
-    raws.push(...project.items.nodes);
-    return project.items.pageInfo;
-  });
-  const projectItemIds = new Map(raws.flatMap((raw) => (raw.content ? [[raw.content.id, raw.id]] : [])));
-  return { title, items: await boardItems(raws), projectItemIds };
-}
-
 /**
  * The nodes with these ids, `size` ids a call, all calls at once; an id that no longer resolves fails the call, as gh
  * does on any GraphQL error.
@@ -401,26 +329,19 @@ async function fetchNodes<T extends object>(query: string, ids: readonly string[
   return read.flat().filter((node): node is T => node !== null && Object.keys(node).length > 0);
 }
 
-/** The Project items with these Project item ids, read afresh, with each one's Project item id by its Item.id. */
-export async function fetchProjectItems(ids: readonly string[]): Promise<Omit<ProjectRead, 'title'>> {
-  const raws = await fetchNodes<RawItem>(PROJECT_ITEMS_BY_ID_QUERY, ids);
-  const projectItemIds = new Map(raws.flatMap((raw) => (raw.content ? [[raw.content.id, raw.id]] : [])));
-  return { items: await boardItems(raws), projectItemIds };
-}
-
 /** The issues with these node ids, read afresh, each placed by its `status-<name>` labels. */
 export async function fetchIssues(ids: readonly string[]): Promise<Item[]> {
   const issues = await fetchNodes<NonNullable<RawItem['content']>>(ISSUES_BY_ID_QUERY, ids);
-  return boardItems(issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, status: null, content })), 'labels');
+  return boardItems(issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, content })));
 }
 
 /** The board's items from raw items, once all are read, without slices and with each dossier's map. */
-async function boardItems(raws: RawItem[], from: StatusSource = 'field', search = searchOnce()): Promise<Item[]> {
+async function boardItems(raws: RawItem[], search = searchOnce()): Promise<Item[]> {
   // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
   // decide which sub-issues are slices, so the dossiers, items with sub-issues on the board, are known once they land.
   const searching = searchLabels(raws, search);
   const [searched] = await Promise.all([searching, readDossierBodies(raws, searching), readBuildPrBodies(raws)]);
-  return normalizeItems(raws, searched, from);
+  return normalizeItems(raws, searched);
 }
 
 /** Each page of a repository's issues the query reads, after the cursor the one before ended at. */
@@ -502,7 +423,7 @@ async function readClosed(repo: string, since: number, now: number, onRead: (iss
  */
 export async function fetchRepoIssues(repo: string, now = Date.now(), { searchRanges = false } = {}): Promise<Item[]> {
   type Content = NonNullable<RawItem['content']>;
-  const asRaws = (issues: Content[]) => issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, status: null, content }));
+  const asRaws = (issues: Content[]) => issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, content }));
   const since = now - DONE_WINDOW_MS;
   const search = searchOnce();
   // Each closed issue the board keeps whatever else the read holds is read in full as soon as its search lands.
@@ -525,61 +446,12 @@ export async function fetchRepoIssues(repo: string, now = Date.now(), { searchRa
   ]);
   readInFull(keptClosed(closed, new Set(open.map((issue) => issue.id)), since).filter((id) => !asked.has(id)));
   const kept = (await Promise.all(reads)).flat();
-  // Not on a Project, so an issue's own node id stands in for the Project item id normalizeItems never shows. One
-  // normalization over open and closed together, so a closed dossier keeps its map and a closed build drops its slices.
-  return boardItems(asRaws([...open, ...kept]), 'labels', search);
+  // One normalization over open and closed together, so a closed dossier keeps its map and a closed build drops its slices.
+  return boardItems(asRaws([...open, ...kept]), search);
 }
 
 /** An error's message, for a write's error text. */
 export const message = (err: unknown) => (err instanceof Error ? err.message : 'GitHub request failed.');
-
-/** Looks up the project's Status option once and returns a writer for it. */
-async function statusWriter(project: GithubProjectRef, name: Status, run: (args: string[]) => Promise<string>) {
-  const { owner, number } = project;
-  const view = JSON.parse(await run(['project', 'view', String(number), '--owner', owner, '--format', 'json'])) as { id: string };
-  const fields = JSON.parse(await run(['project', 'field-list', String(number), '--owner', owner, '--format', 'json'])) as {
-    fields: { id: string; name: string; options?: { id: string; name: string }[] }[];
-  };
-  const status = fields.fields.find((f) => f.name === 'Status');
-  const option = status?.options?.find((o) => o.name === name);
-  if (!view.id || !status || !option) throw new Error(`The project has no ${name} status.`);
-  const setStatus = (itemId: string) => run(['project', 'item-edit', '--project-id', view.id, '--id', itemId,
-    '--field-id', status.id, '--single-select-option-id', option.id]);
-  return { number, setStatus };
-}
-
-/** Sets an existing project item's Status; returns the error, or null when GitHub accepted it. */
-export async function setItemStatus(
-  project: GithubProjectRef,
-  itemId: string,
-  name: Status,
-  run: (args: string[]) => Promise<string> = gh,
-): Promise<string | null> {
-  try {
-    await (await statusWriter(project, name, run)).setStatus(itemId);
-    return null;
-  } catch (err) {
-    return `Could not set ${name}. ${message(err)}`;
-  }
-}
-
-/** Adds an issue to the project if it isn't there, as status.sh does, then sets its Status; returns the error, or null. */
-export async function setIssueStatus(
-  project: GithubProjectRef,
-  url: string,
-  name: Status,
-  run: (args: string[]) => Promise<string> = gh,
-): Promise<string | null> {
-  try {
-    const { number, setStatus } = await statusWriter(project, name, run);
-    const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', project.owner, '--url', url, '--format', 'json'])) as { id?: string };
-    if (!member.id) throw new Error('GitHub did not return a project item.');
-    await setStatus(member.id);
-    return null;
-  } catch (err) {
-    return `Could not set ${name}. ${message(err)}`;
-  }
-}
 
 /** Adds a label to an issue; returns the error, or null when GitHub accepted it. */
 export async function addIssueLabel(repo: string, number: number, label: string,
@@ -800,55 +672,6 @@ export async function abandonIssue(item: Item, run: (args: string[]) => Promise<
   }
 }
 
-/** Closes an issue as not planned, or removes a draft from the project by its Project item id; returns the error, or null when GitHub accepted it. */
-export async function abandonItem(
-  project: GithubProjectRef,
-  item: Item,
-  projectItemId: string | undefined,
-  run: (args: string[]) => Promise<string> = gh,
-): Promise<string | null> {
-  if (!isDraft(item)) return abandonIssue(item, run);
-  try {
-    if (!projectItemId) throw new Error('The board has not read this draft from the project.');
-    await run(['project', 'item-delete', String(project.number), '--owner', project.owner, '--id', projectItemId]);
-    return null;
-  } catch (err) {
-    return `Could not remove draft ${item.title}. ${message(err)}`;
-  }
-}
-
-/**
- * How an item source takes in the issue Add item creates: `setup` runs before the issue exists, and returns the steps
- * that follow its creation, each named for the error.
- */
-type IssueHome = () => Promise<{ step: string; run: (issue: NonNullable<CreationProgress['issue']>) => Promise<void> }[]>;
-
-/** Add item's progress in the Project: the shared progress, and the new issue's Project item id once it has one. */
-export type ProjectCreationProgress = CreationProgress & { projectItemId?: string };
-
-/** Creates an issue, adds it to the configured project and explicitly assigns List. */
-export async function addProjectItem(
-  project: GithubProjectRef,
-  draft: ItemDraft,
-  progress: ProjectCreationProgress,
-  run: (args: string[]) => Promise<string> = gh,
-): Promise<CreationResult> {
-  return createIssue(draft, progress, run, async () => {
-    const { number, setStatus } = await statusWriter(project, 'List', run);
-    return [
-      { step: 'project membership', run: async (issue) => {
-        if (progress.projectItemId) return;
-        // GitHub item-add reuses membership when the issue is already on this project.
-        const member = JSON.parse(await run(['project', 'item-add', String(number), '--owner', project.owner,
-          '--url', issue.html_url, '--format', 'json'])) as { id: string };
-        if (!member.id) throw new Error('GitHub did not return a project item.');
-        progress.projectItemId = member.id;
-      } },
-      { step: 'List status', run: () => setStatus(progress.projectItemId!).then(() => undefined) },
-    ];
-  });
-}
-
 /**
  * Creates the issue a draft describes, and nothing else, resuming from `progress` after a failed try; `home` adds the
  * steps an item source needs around it. The issue shows as List.
@@ -857,15 +680,15 @@ export async function createIssue(
   draft: ItemDraft,
   progress: CreationProgress,
   run: (args: string[]) => Promise<string> = gh,
-  home: IssueHome = async () => [],
+  prepare: () => Promise<void> = async () => {},
 ): Promise<CreationResult> {
-  let step = 'project setup';
+  let step = 'issue setup';
   const uncertain = (): CreationResult => ({ item: null, issueUrl: null, uncertain: true,
     error: 'Issue creation could not be confirmed. Check the repository issues before starting a new item; this submission will not create another issue.' });
   if (progress.creationUncertain) return uncertain();
   try {
     if (progress.item) return { item: progress.item, issueUrl: progress.item.url, error: null };
-    const after = await home();
+    await prepare();
     const labels = [draft.kind, ...draft.labels];
     step = 'issue creation';
     if (!progress.issue) {
@@ -881,10 +704,6 @@ export async function createIssue(
       progress.creationUncertain = false;
     }
     const issue = progress.issue;
-    for (const next of after) {
-      step = next.step;
-      await next.run(issue);
-    }
     progress.item = {
       id: issue.node_id, status: 'List', statuses: ['List'], content: 'ticket', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'open', closedAs: null,

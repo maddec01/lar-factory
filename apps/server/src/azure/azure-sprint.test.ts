@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import type { Item } from '@lar-factory/shared';
 import { mergeSources } from '../items/item-sources.ts';
 import type { ItemSource } from '../items/item-source.ts';
-import { azureSprint } from './azure-sprint.ts';
+import { readSprint } from './azure-sprint.ts';
 import { REPO_URL, STATES, fakeAz, type FakePr, type WorkItem } from './fake-az.ts';
+
+import { azureItems, type Az } from './azure-items.ts';
+const azureSprint = (repos: readonly string[], team: string, run: Az) => azureItems(repos, team, (calls) => readSprint(team, calls), run);
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
 const TEAM = 'Fabrikam Team';
@@ -99,7 +102,7 @@ test('status tags give the statuses and every other tag is a label; an item carr
 });
 
 test('a repository showing Opted-in items hides an item with no status tag', async () => {
-  const source = mergeSources([], new Map([[REPO, azureSprint([REPO], TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run)]]), [REPO.toUpperCase()]);
+  const source = mergeSources(new Map([[REPO, azureSprint([REPO], TEAM, fakeAz({ items: SPRINT, sprint: [1, 5, 6] }).run)]]), [REPO.toUpperCase()]);
   assert.deepEqual((await source.read()).items.map((i) => i.number), [1, 5]);
 });
 
@@ -112,19 +115,17 @@ const otherRepo: ItemSource = {
   create: async () => ({ item: null, issueUrl: null, error: null }), setParentStatus: async () => null, abandon: async () => null,
 };
 
-test("no current iteration, a logged-out az and a missing azure-devops extension each name their fix, and another repository's items still show", async () => {
+test("a logged-out az and a missing azure-devops extension each name their fix, and another repository's items still show", async () => {
   const failing = {
-    'no iteration': fakeAz({ items: SPRINT, iterations: [] }),
     'logged out': fakeAz({ items: SPRINT, fail: () => new Error("az boards iteration failed: ERROR: Please run 'az login' to setup account.") }),
     'no extension': fakeAz({ items: SPRINT, fail: (args) => args[0] === 'boards' ? new Error("az boards iteration failed: ERROR: 'boards' is misspelled or not recognized by the system.") : undefined }),
   };
   const expected = {
-    'no iteration': { repo: REPO, problem: `Team ${TEAM} has no current iteration in contoso/Fabrikam Fiber. Give the team a sprint whose dates cover today in its project settings, or Edit the repository in Settings › Repositories to name another team.` },
     'logged out': { repo: REPO, problem: 'az is logged out.', fix: 'az login' },
     'no extension': { repo: REPO, problem: 'az has no azure-devops extension.', fix: 'az extension add --name azure-devops' },
   };
   for (const [name, az] of Object.entries(failing)) {
-    const source = mergeSources([], new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint([REPO], TEAM, az.run)]]));
+    const source = mergeSources(new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint([REPO], TEAM, az.run)]]));
     const read = await source.read();
     assert.deepEqual(read.items.map((i) => i.repo), ['maddec01/lar-apple'], name);
     assert.deepEqual(read.problems, [expected[name as keyof typeof expected]], name);
@@ -133,7 +134,7 @@ test("no current iteration, a logged-out az and a missing azure-devops extension
 
 test('any other az failure fails the read, naming the repository', async () => {
   const az = fakeAz({ items: SPRINT, fail: () => new Error('az boards iteration failed: TF400813: not authorized') });
-  const source = mergeSources([], new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint([REPO], TEAM, az.run)]]));
+  const source = mergeSources(new Map([['maddec01/lar-apple', otherRepo], [REPO, azureSprint([REPO], TEAM, az.run)]]));
   await assert.rejects(source.read(), { message: `${REPO}: az boards iteration failed: TF400813: not authorized` });
 });
 

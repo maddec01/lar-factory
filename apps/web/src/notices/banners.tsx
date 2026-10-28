@@ -24,7 +24,7 @@ export function Banners() {
         </ClosableBanner>
       )}
       {t3?.result === 'not-running' && <T3NotRunningBanner check={t3} />}
-      {gh && <GhBanner check={gh} readsProject={data.repos.some((r) => itemSource(r) === 'project')} />}
+      {gh && <GhBanner check={gh} />}
       {(['git', 'jq', 'curl'] as const).map((name) => {
         const check = failedCheck(data.tools, name);
         return check && <CommandBanner key={name} name={name} check={check} />;

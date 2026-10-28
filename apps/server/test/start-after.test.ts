@@ -12,7 +12,7 @@ const OPUS = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
 
 /** A lar-factory issue in `status`, blocked by issues 5 and 6 in the given states. */
 const blockedIssue = (number: number, status: string, labels: string[], states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED']): RawItem =>
-  rawIssue(`PVTI_${number}`, number, status, labels, {
+  rawIssue(`I_${number}`, number, status, labels, {
     blockedBy: { nodes: states.map((state, n) => ({ number: 5 + n, state, repository: { nameWithOwner: 'maddec01/lar-factory' } })) },
   });
 
@@ -74,20 +74,6 @@ test('a refresh with a blocker still open starts nothing; once the last closes, 
   assert.ok((await board.t3Calls())[0]!.includes('--worktree'), 'a build starts in its own worktree');
 });
 
-test('a start armed under its Project item id, before items were keyed by node id, moves to the node id on the first read and still fires', async (t) => {
-  const env: Record<string, string> = { ...startableEnv(t), ...SAMPLE_MODELS };
-  mkdirSync(dirname(armedPath(env.HOME!)), { recursive: true });
-  writeFileSync(armedPath(env.HOME!), JSON.stringify({ PVTI_12: { model: OPUS } }));
-  const { board } = await armableBoard(t, [blockedBuild()], {}, env);
-  const moved = await until(board, (d) => !!d.armed?.I_12);
-  assert.deepEqual(moved.armed, { I_12: { model: OPUS } });
-  assert.deepEqual(armedFile(env.HOME!), { I_12: { model: OPUS } });
-  await board.update({ items: [blockedBuild(['CLOSED', 'CLOSED'])] });
-  await read(board);
-  await until(board, (d) => !!d.startedBuilds?.I_12);
-  assert.deepEqual(armedFile(env.HOME!), {});
-});
-
 test("a Queued decision starts with today's Start once its blockers close", async (t) => {
   const decision = (states: ['OPEN' | 'CLOSED', 'OPEN' | 'CLOSED']) => blockedIssue(20, 'Queued', ['decision-grill'], states);
   const { board } = await armableBoard(t, [decision(['OPEN', 'OPEN'])]);
@@ -112,7 +98,7 @@ test('a failed start disarms the part and shows its error on it, until it is arm
 });
 
 test("a part whose repository has no T3 project can't be armed, as its start would fail", async (t) => {
-  const server = rawIssue('PVTI_30', 30, 'Ready', ['build'], {
+  const server = rawIssue('I_30', 30, 'Ready', ['build'], {
     url: 'https://github.com/maddec01/lar-server/issues/30', repository: { nameWithOwner: 'maddec01/lar-server' },
     blockedBy: { nodes: [{ number: 5, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } }] },
   });
@@ -153,7 +139,7 @@ test('an armed start whose repository Reset takes off the board drops on the nex
 });
 
 test('only a blocked Ready or Queued issue, on an offered model, from this page and session, can be armed', async (t) => {
-  const { board } = await armableBoard(t, [blockedBuild(), rawIssue('PVTI_13', 13, 'Ready', []),
+  const { board } = await armableBoard(t, [blockedBuild(), rawIssue('I_13', 13, 'Ready', []),
     blockedIssue(14, 'In progress', [], ['OPEN', 'OPEN'])]);
   assert.match((await (await arm(board, 'I_13')).json()).error, /^Nothing blocks this item now/);
   assert.match((await (await arm(board, 'I_14')).json()).error, /^Only Ready and Queued items can start after their blockers; this one is in In progress\.$/);

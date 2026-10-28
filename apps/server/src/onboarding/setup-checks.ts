@@ -6,11 +6,9 @@
 import { SETUP_CHECKS, decodePart, onAzure, sameRepo, shownRepo, type RepositoryItemSource, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
 import { az, type Az } from '../azure/azure-items.ts';
 import { azureBoard } from '../azure/azure-board.ts';
-import { azureBacklog } from '../azure/azure-backlog.ts';
 import { canPush as azureCanPush } from '../azure/azure-repos.ts';
-import { SPRINT_FIX, azureSprint } from '../azure/azure-sprint.ts';
 import { isItemSource, isRepo } from '../config/repository-config.ts';
-import { canPush, fetchProject, fetchRepoIssues, message } from '../github/github.ts';
+import { canPush, fetchRepoIssues, message } from '../github/github.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { type Checkout, azureRepo, checkouts, githubRepo, onAzureDevOps } from '../t3/repository-project.ts';
 
@@ -27,10 +25,7 @@ export function setupCheckReads(run: Az = az): SetupCheckReads {
   return {
     checkouts: () => checkouts(process.env),
     countItems: async (source, repo) => {
-      if (source.kind === 'azure-sprint' || source.kind === 'azure-backlog' || source.kind === 'azure-board') {
-        return (await (source.kind === 'azure-sprint' ? azureSprint : source.kind === 'azure-board' ? azureBoard : azureBacklog)([repo], source.team, run).read()).items.length;
-      }
-      return source.kind === 'github-project' ? (await fetchProject(source.owner, source.number)).items.length : (await fetchRepoIssues(repo)).length;
+      return source.kind === 'azure-board' ? (await azureBoard([repo], source.team, run).read()).items.length : (await fetchRepoIssues(repo)).length;
     },
     canPush: (repo) => (onAzure(repo) ? azureCanPush(repo, run) : canPush(repo)),
   };
@@ -66,15 +61,12 @@ async function checkCheckout(key: string, projectId: string, reads: SetupCheckRe
 
 /** The item source as the check names it. */
 function sourceName(repo: string, source: RepositoryItemSource): string {
-  if (source.kind === 'github-project') return `GitHub Project ${source.owner} #${source.number}`;
   if (source.kind === 'azure-board') return `${source.team}'s backlog and current sprint`;
-  if (source.kind === 'azure-sprint') return `${source.team}'s current sprint`;
-  return source.kind === 'azure-backlog' ? `${source.team}'s backlog` : `${repo}'s issues`;
+  return `${repo}'s issues`;
 }
 
 /** How to fix an item source that can't be read. */
 function sourceFix(repo: string, source: RepositoryItemSource): string {
-  if (source.kind === 'github-project') return "Check the GitHub Project owner, number and access with gh.";
   if (source.kind === 'issues') return `Check that gh can read issues in ${repo}.`;
   return `Check the team name and access to ${decodePart(repo.split('/')[1]!)} with az.`;
 }
@@ -87,9 +79,6 @@ async function checkSource(repo: string, source: RepositoryItemSource, reads: Se
   } catch (err) {
     // A logged-out az or a missing azure-devops extension names the command that fixes it.
     if (err instanceof ReadProblem && err.fix) return failed(`Can't read ${named}: ${err.message}`, 'Run this command, then retry.', err.fix);
-    // A team with no current iteration: the repository isn't onboarded yet, so another team is named by going Back.
-    const sprintless = err instanceof ReadProblem ? err.message.indexOf(SPRINT_FIX) : -1;
-    if (sprintless >= 0) return failed(`Can't read ${named}: ${message(err).slice(0, sprintless).trimEnd()}`, `${SPRINT_FIX}, then retry. You can also go back and choose another team.`);
     if (onAzure(repo) && /request is invalid|HTTP 400|Bad Request/i.test(message(err))) {
       return failed(`Can't read ${named}: ${message(err)}`, 'Azure DevOps rejected the board’s request. Retry, and report this request error if it persists.');
     }

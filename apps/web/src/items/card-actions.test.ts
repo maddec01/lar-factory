@@ -75,7 +75,7 @@ test('a failed Back to List shows as a toast naming the item, which stays until 
   expect(document.activeElement, 'back to the button that failed').toBe(button('back-to-list', 'I_sample05'));
 });
 
-test('Abandon asks first, naming the issue it closes or the draft it removes; Cancel returns focus', async () => {
+test('Abandon asks first, naming the issue it closes for its repository; Cancel returns focus', async () => {
   await mountPage();
   await openItem('I_sample01');
   await press(button('abandon', 'I_sample01'));
@@ -94,8 +94,8 @@ test('Abandon asks first, naming the issue it closes or the draft it removes; Ca
 
   await openItem('I_sample04');
   await press(button('abandon', 'I_sample04'));
-  expect(text($('#abandon-dialog h2'))).toMatch(/^Remove draft Shared playback history across devices\?$/);
-  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Remove draft']);
+  expect(text($('#abandon-dialog h2'))).toMatch(/^Delete #900004 Shared playback history across devices\?$/);
+  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Abandon']);
   await settle(() => vi.advanceTimersByTime(100));
   await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await settle(() => vi.advanceTimersByTime(100));

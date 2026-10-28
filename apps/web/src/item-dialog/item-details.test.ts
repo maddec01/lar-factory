@@ -41,7 +41,7 @@ const reply = (held: Map<string, (response: Response) => void>, itemId: string, 
 const azureItem = (): [BoardData, string] => {
   const id = 'azure:contoso/310';
   const item: Item = { ...sample.items[0]!, id, number: 310, repo: 'contoso/Fabrikam/web', url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/310', labels: ['bug'] };
-  return [{ ...sample, repos: [...sample.repos, { repo: item.repo!, role: 'Web client', items: 'sprint', team: 'Web', show: 'all', labels: [] }], items: [item, ...sample.items.slice(1)] }, id];
+  return [{ ...sample, repos: [...sample.repos, { repo: item.repo!, role: 'Web client', items: 'azure-board', team: 'Web', show: 'all', labels: [] }], items: [item, ...sample.items.slice(1)] }, id];
 };
 
 test('while the details load the dialog shows the board data and a loading state, then the issue as GitHub shows it', async () => {
@@ -75,17 +75,16 @@ test('while the details load the dialog shows the board data and a loading state
   expect($$('[data-item-dialog] aside li a').map((a) => a.getAttribute('href'))).toContain('https://github.com/maddec01/lar-server/issues/145');
 });
 
-test('a pull request item shows its description, comments and people with its checks in the meta area', async () => {
+test('an issue with a linked PR shows its description, comments and people', async () => {
   await mountPage();
   await openItem('I_sample26');
-  expect(meta()).toMatch(/checks running.*4\/6 passed/);
   expect(text(description())).toContain('Bumps FFmpeg from 7.0 to 7.1.');
   expect($$('[data-comments] li')).toHaveLength(1);
   expect(meta()).toMatch(/Author.claude-bot/);
   expect(meta()).toMatch(/Assignees.maddec01/);
 });
 
-test('a draft shows its body', async () => {
+test('an issue shows its body', async () => {
   await mountPage();
   await openItem('I_sample04');
   expect(text(description())).toContain('Keep one watch history per household');

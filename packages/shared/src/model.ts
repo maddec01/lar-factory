@@ -327,11 +327,9 @@ export interface RepoConfig {
   repo: string;
   /** Repository role: what this repository is to the others. */
   role: string;
-  /** Its item source: the GitHub Project its .lar-factory.json names, the repository's issues, or an Azure DevOps team's current sprint, backlog or combined board. */
+  /** Its item source: GitHub repository issues or an Azure team's combined board. */
   items?: ItemSourceKind;
-  /** The GitHub Project its item source names, by owner and number; absent for the other item sources. */
-  project?: { owner: string; number: number };
-  /** The Azure DevOps team whose current sprint, backlog or combined board its item source is; absent for the other item sources. */
+  /** The Azure DevOps team whose backlog and current sprint its item source is; absent for the other item sources. */
   team?: string;
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
@@ -348,7 +346,7 @@ export interface RepoConfig {
   configUpdate?: number;
 }
 
-export const ITEM_SOURCE_KINDS = ['project', 'issues', 'sprint', 'backlog', 'azure-board'] as const;
+export const ITEM_SOURCE_KINDS = ['issues', 'azure-board'] as const;
 
 export type ItemSourceKind = (typeof ITEM_SOURCE_KINDS)[number];
 
@@ -392,7 +390,7 @@ export type FirstReadStep = 'repositories' | 'items' | 'finishing';
 /** The board server's first read of every repository since it started, and whether it has settled. */
 export interface FirstRead {
   step: FirstReadStep;
-  /** The item sources still being read, named by their repositories or Project; each drops off as its read finishes. */
+  /** The item sources still being read, named by their repositories; each drops off as its read finishes. */
   running: string[];
   /**
    * The onboarded repositories whose items haven't landed yet, by owner/name, as their source still reads or waits for
@@ -410,7 +408,7 @@ export const SETTLED_FIRST_READ: FirstRead = { step: 'finishing', running: [], s
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
-  /** The first item source's title: the first GitHub Project's when a repository reads one, else a repository's owner/name. */
+  /** The first item source's title. */
   project: { title: string };
   repos: RepoConfig[];
   /** Each onboarded repository the latest read left off the board because its .lar-factory.json couldn't be read, and why. */
@@ -489,17 +487,13 @@ type Passed = { result: 'ok'; version?: string };
 /** A missing command, naming the override that pointed nowhere if one did. */
 type Missing = { result: 'missing'; override?: string };
 
-/**
- * gh's check: it runs; it's missing; it's logged out; it's older than GH_FLOOR; or its login has no `project`
- * scope, with `upgrade` set to the upgrade command when it's also older than GH_FLOOR.
- * `scopes: 'unread'` marks a gh whose scopes the board couldn't read, which blocks nothing.
- */
+/** gh runs, is missing or logged out, or needs an upgrade for lar-work’s commands. */
 export type GhCheck =
-  | Passed & { scopes?: 'unread' }
+  | Passed
   | Missing & { fix: string }
   | { result: 'logged-out'; version?: string; fix: string }
-  | { result: 'outdated'; version: string; fix: string; scopes?: 'unread' }
-  | { result: 'no-project-scope'; version?: string; fix: string; upgrade?: string };
+  | { result: 'outdated'; version: string; fix: string };
+
 
 /** t3's check: it runs, it's missing, or T3 Code isn't running, so `t3` can't start threads. Its fix is to install or open T3 Code. */
 export type T3Check = Passed | Missing | { result: 'not-running'; version?: string };
@@ -542,17 +536,17 @@ export function failedCheck<N extends CheckedTool>(tools: ToolChecks | undefined
   return check && check.result !== 'ok' ? check as FailedCheck<NonNullable<ToolChecks[N]>> : undefined;
 }
 
-/** Where a repository's items come from: its GitHub Project, its issues, or an Azure DevOps team's current sprint, backlog or combined board. */
+/** Where a repository's items come from: its issues or an Azure team's combined board. */
 export type ItemSource = ItemSourceKind;
 
-/** Where a repository's items come from: the GitHub Project, unless its config says its issues. */
+/** Where a repository's items come from, defaulting to GitHub issues. */
 export function itemSource(repo: RepoConfig): ItemSource {
-  return repo.items ?? 'project';
+  return repo.items ?? 'issues';
 }
 
-/** The provider's tool a source reads with: az for an Azure DevOps sprint or backlog, gh for a GitHub Project or issues. */
+/** The provider's tool a source reads with: az for an Azure DevOps board, gh for GitHub issues. */
 export function providerTool(source: ItemSource): ProviderTool {
-  return source === 'sprint' || source === 'backlog' || source === 'azure-board' ? 'az' : 'gh';
+  return source === 'azure-board' ? 'az' : 'gh';
 }
 
 /** Whether any of the repositories is on GitHub, so the board reads it with gh. */
@@ -562,13 +556,13 @@ export function usesGh(repos: readonly { repo: string }[]): boolean {
 
 /**
  * Whether gh's check stops the board reading a repository whose items come from `source`: for a GitHub source, before
- * gh's check, while gh is missing or logged out, and for a Project while the login has no `project` scope. gh never
+ * gh's check, or while gh is missing or logged out. gh never
  * stops an Azure DevOps read.
  */
 export function ghBlocksRead(check: GhCheck | undefined, source: ItemSource): boolean {
   if (providerTool(source) === 'az') return false;
   if (!check || check.result === 'missing' || check.result === 'logged-out') return true;
-  return check.result === 'no-project-scope' && source === 'project';
+  return false;
 }
 
 // ---------- kinds ----------
@@ -775,11 +769,10 @@ export const PROVIDERS = ['GitHub', 'Azure DevOps'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 /**
- * Where a repository's items come from: a GitHub Project, which other repositories may name too, its own issues, or an
- * Azure DevOps team's current sprint, backlog or combined board in the repository's project.
+ * Where a repository's items come from: its own GitHub issues, or an Azure DevOps team's
+ * backlog and current sprint together in the repository's project.
  */
-export type RepositoryItemSource = { kind: 'github-project'; owner: string; number: number } | { kind: 'issues' }
-  | { kind: 'azure-sprint'; team: string } | { kind: 'azure-backlog'; team: string } | { kind: 'azure-board'; team: string };
+export type RepositoryItemSource = { kind: 'issues' } | { kind: 'azure-board'; team: string };
 
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
 export interface RepositoryConfigAnswers {
@@ -801,13 +794,10 @@ export const onboardingConfigFile = ({ role, itemSource, show, labels }: Reposit
   `${JSON.stringify({ version, role, itemSource, show, labels }, null, 2)}\n`;
 
 /**
- * What the Provider and item source step has answered so far, as typed; the GitHub Project's fields count only for a
- * Project, and the team only for an Azure DevOps sprint or backlog.
+ * What the setup step has answered so far, as typed. Only Azure DevOps asks for a team.
  */
 export interface SetupAnswers {
   itemSource: RepositoryItemSource['kind'];
-  projectOwner: string;
-  projectNumber: string;
   /** The Azure DevOps team whose sprint, backlog or combined board is the item source; absent in answers saved before the team was asked. */
   team?: string;
   show: ShowSetting;

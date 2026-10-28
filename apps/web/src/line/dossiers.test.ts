@@ -276,11 +276,11 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
 });
 
 test('an item with sub-issues on the board is coupled work; with no map, it says its parts come from GitHub', async () => {
-  const parent = rawIssue('PVTI_parent', 100, 'In progress', ['build'], {
+  const parent = rawIssue('I_parent', 100, 'In progress', ['build'], {
     subIssuesSummary: { total: 3, completed: 0 },
     subIssues: { nodes: [sliceRef(101, 'OPEN'), sliceRef(102, 'OPEN'), sliceRef(103, 'OPEN')] },
   });
-  const child = rawIssue('PVTI_102', 102, 'In progress', ['build'], {
+  const child = rawIssue('I_102', 102, 'In progress', ['build'], {
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
   await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });

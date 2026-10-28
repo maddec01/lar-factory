@@ -313,7 +313,7 @@ test('in sample mode, Start build opens its menu and no entry starts anything', 
 
 // A build's slices.
 
-const build = (count: number) => rawIssue('PVTI_build', 59, 'In progress', ['build'], {
+const build = (count: number) => rawIssue('I_build', 59, 'In progress', ['build'], {
   subIssuesSummary: { total: count, completed: 1 },
   subIssues: { nodes: Array.from({ length: count }, (_, i) => sliceRef(100 + i, i ? 'OPEN' : 'CLOSED')) },
 });
@@ -326,7 +326,7 @@ const count = (id = 'I_59') => cells(id)[0]!.querySelector<HTMLButtonElement>('b
 const list = (id = 'I_59') => row(id).parentElement!.querySelector(':scope > div:last-child ul');
 
 test('a build shows its slice bar and its count, naming the blocked slices before the active ones', async () => {
-  const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
+  const raw = rawIssue('I_build', 59, 'In progress', ['build'], {
     subIssuesSummary: { total: 4, completed: 1 },
     subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
   });
@@ -340,7 +340,7 @@ test('a build shows its slice bar and its count, naming the blocked slices befor
 });
 
 test('a build\'s count leaves out slices closed as not planned, and names none while none is active or blocked', async () => {
-  const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
+  const raw = rawIssue('I_build', 59, 'In progress', ['build'], {
     subIssuesSummary: { total: 4, completed: 2 },
     subIssues: { nodes: [sliceRef(65, 'CLOSED'), { ...sliceRef(66, 'CLOSED'), stateReason: 'NOT_PLANNED' }, sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
   });
@@ -349,13 +349,13 @@ test('a build\'s count leaves out slices closed as not planned, and names none w
 });
 
 test('an open slice the project auto-added is no row of its own', async () => {
-  const slice = rawIssue('PVTI_slice66', 66, 'In progress', ['improvement'], {
+  const slice = rawIssue('I_slice66', 66, 'In progress', ['improvement'], {
     parent: { number: 59, title: 'Issue 59', url: 'https://github.com/maddec01/lar-factory/issues/59', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
-  const raw = rawIssue('PVTI_build', 59, 'In progress', ['build'], {
+  const raw = rawIssue('I_build', 59, 'In progress', ['build'], {
     subIssuesSummary: { total: 3, completed: 1 }, subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
   });
-  await mountPage(boardOf([slice, raw, rawIssue('PVTI_other', 70, 'In progress', ['bug'])]));
+  await mountPage(boardOf([slice, raw, rawIssue('I_other', 70, 'In progress', ['bug'])]));
   expect(rows().map((r) => r.dataset.item)).toEqual(['I_59', 'I_70']);
 });
 

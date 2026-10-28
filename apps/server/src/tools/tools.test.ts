@@ -153,36 +153,13 @@ async function probeWith(t: TestContext, version: string, status: string) {
   return (await probeGh()).check;
 }
 
-const withProject = "'gist', 'project', 'read:org', 'repo', 'workflow'";
+const scopes = "'read:org', 'repo'";
 
 test('a gh older than 2.94.0 is outdated, with brew upgrade gh as its fix', async (t) => {
-  assert.deepEqual(await probeWith(t, 'gh version 2.93.2 (2026-06-01)\nhttps://github.com/cli/cli/releases/tag/v2.93.2', authStatus(withProject)),
+  assert.deepEqual(await probeWith(t, 'gh version 2.93.2 (2026-06-01)\nhttps://github.com/cli/cli/releases/tag/v2.93.2', authStatus(scopes)),
     { result: 'outdated', version: '2.93.2', fix: 'brew upgrade gh' });
-  assert.deepEqual(await probeWith(t, 'gh version 2.9.0 (2020-01-01)', authStatus(withProject)),
+  assert.deepEqual(await probeWith(t, 'gh version 2.9.0 (2020-01-01)', authStatus(scopes)),
     { result: 'outdated', version: '2.9.0', fix: 'brew upgrade gh' });
-});
-
-test('a gh at 2.94.0 or newer with the project scope passes', async (t) => {
-  assert.deepEqual(await probeWith(t, 'gh version 2.94.0 (2026-07-01)', authStatus(withProject)), { result: 'ok', version: '2.94.0' });
-  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', authStatus(withProject)), { result: 'ok', version: '2.102.0' });
-});
-
-test('a login without the project scope has gh auth refresh -s project as its fix, and an old gh also names its upgrade', async (t) => {
-  const noProject = authStatus("'gist', 'read:org', 'repo', 'workflow'");
-  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', noProject),
-    { result: 'no-project-scope', version: '2.102.0', fix: 'gh auth refresh -s project' });
-  assert.deepEqual(await probeWith(t, 'gh version 2.93.2 (2026-06-01)', noProject),
-    { result: 'no-project-scope', version: '2.93.2', fix: 'gh auth refresh -s project', upgrade: 'brew upgrade gh' });
-});
-
-test('scopes the board can\'t read block nothing', async (t) => {
-  // GH_TOKEN, a fine-grained token or several accounts: no scopes line, an empty one, or one per account.
-  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', authStatus(null)), { result: 'ok', version: '2.102.0', scopes: 'unread' });
-  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', authStatus('none')), { result: 'ok', version: '2.102.0', scopes: 'unread' });
-  assert.deepEqual(await probeWith(t, 'gh version 2.102.0 (2026-09-30)', `${authStatus("'repo'")}\n${authStatus(withProject)}`),
-    { result: 'ok', version: '2.102.0', scopes: 'unread' });
-  assert.deepEqual(await probeWith(t, 'gh version 2.93.2 (2026-06-01)', authStatus(null)),
-    { result: 'outdated', version: '2.93.2', fix: 'brew upgrade gh', scopes: 'unread' });
 });
 
 test('a missing or logged-out gh still blocks reading', async (t) => {

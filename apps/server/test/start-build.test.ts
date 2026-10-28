@@ -1,14 +1,14 @@
 import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { draftItem, NOT_LANDED, readsRepositoryConfig, SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { NOT_LANDED, readsRepositoryConfig, SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
+import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, RawItem } from '@lar-factory/shared';
 
 /** A Ready issue in lar-factory, with labels and, optionally, a parent. */
 const readyIssue = (number: number, labels: string[], parent?: number): RawItem =>
-  rawIssue(`PVTI_${number}`, number, 'Ready', labels, parent ? { parent: sliceRef(parent, 'OPEN') } : {});
+  rawIssue(`I_${number}`, number, 'Ready', labels, parent ? { parent: sliceRef(parent, 'OPEN') } : {});
 
 /** A board that can start lar-factory builds, and the home it runs in; `skillCheck` answers its skill checks as the board app. */
 async function buildBoard(t: TestContext, items: object[], options: object = {}, env: Record<string, string> = {}, skillCheck?: () => string | null) {
@@ -24,25 +24,24 @@ const startBuild = (board: Board, itemId: string, model?: unknown, origin = boar
 const message = (home: string, number: number) =>
   `Build maddec01/lar-factory#${number}. Read ${home}/.agents/skills/lar-work/agents/builder.md and follow it.`;
 
-const statusEdit = (itemId: string, option: string) => ['project', 'item-edit', '--project-id', 'PVT_1', '--id', itemId,
-  '--field-id', 'FIELD_1', '--single-select-option-id', option];
+const statusEdit = (number: string, status: string) => ['issue', 'edit', number, '-R', 'maddec01/lar-factory', '--add-label', status, '--remove-label', 'status-ready'];
 
 /** The gh calls Start build makes: label and status writes and issue reads, not the board's project reads. */
 const writes = async (board: Board) => (await board.calls())
-  .filter((args) => ['edit', 'item-add', 'item-edit'].includes(args[1]!) || (args[0] === 'api' && args[1] !== 'graphql' && !readsRepositoryConfig(args)));
+  .filter((args) => args[0] === 'issue' && args[1] === 'edit');
 
 test('Start build labels the build, moves its parent to In progress and starts the build thread in a new worktree', async (t) => {
-  const { board, home } = await buildBoard(t, [readyIssue(12, ['feature'], 40), projectIssue(40, 'Ready', undefined, ['concept'])]);
+  const { board, home } = await buildBoard(t, [readyIssue(12, ['feature'], 40), boardIssue(40, 'Ready', undefined, ['concept'])]);
   const response = await startBuild(board, 'I_12');
   assert.equal(response.status, 200);
   const answer = await response.json();
   assert.equal(answer.thread.threadId, 'thread-1');
   assert.equal(answer.board.startedBuilds.I_12.threadId, 'thread-1');
-  assert.deepEqual(answer.board.items.find((i: { id: string }) => i.id === 'I_12').labels, ['feature', 'build']);
+  assert.deepEqual(answer.board.items.find((i: { id: string }) => i.id === 'I_12').labels, ['feature', 'status-ready', 'build']);
   assert.equal(answer.board.items.find((i: { id: string }) => i.id === 'I_40').status, 'In progress');
   assert.deepEqual(await writes(board), [
     ['issue', 'edit', '12', '-R', 'maddec01/lar-factory', '--add-label', 'build'],
-    statusEdit('PVTI_40', 'IN_PROGRESS_1'),
+    statusEdit('40', 'status-in-progress'),
   ]);
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', message(home, 12), '--worktree', 'main', '--branch', 'feat/12-issue-12', '--json'],
@@ -58,7 +57,7 @@ test('Start build asks the board app to check the skills before it starts the th
 
 test('a refused skill check refuses Start build with its reason, writes nothing to GitHub and runs no t3', async (t) => {
   let refusal: string | null = 'Lar Factory can\'t check the skill tdd: a folder it didn\'t install has its name.';
-  const { board } = await buildBoard(t, [readyIssue(12, ['feature'], 40), projectIssue(40, 'Ready', undefined, ['concept'])],
+  const { board } = await buildBoard(t, [readyIssue(12, ['feature'], 40), boardIssue(40, 'Ready', undefined, ['concept'])],
     {}, { BOARD_SKILL_CHECK: '1' }, () => refusal);
   const refused = await startBuild(board, 'I_12');
   assert.equal(refused.status, 409);
@@ -94,8 +93,8 @@ test('Start build runs the thread on the picked model choice', async (t) => {
 
 test('Start build leaves a labelled build, a parent build and a parent already In progress alone', async (t) => {
   const { board } = await buildBoard(t, [
-    readyIssue(12, ['build'], 40), projectIssue(40, 'In progress', undefined, ['build']),
-    readyIssue(13, ['build'], 41), projectIssue(41, 'In progress', undefined, ['concept']),
+    readyIssue(12, ['build'], 40), boardIssue(40, 'In progress', undefined, ['build']),
+    readyIssue(13, ['build'], 41), boardIssue(41, 'In progress', undefined, ['concept']),
     readyIssue(14, ['improvement', 'build'])]);
   for (const id of ['I_12', 'I_13', 'I_14']) assert.equal((await startBuild(board, id)).status, 200);
   assert.deepEqual(await writes(board), []);
@@ -112,7 +111,7 @@ test("Start build reads the labels of a parent that isn't on the board, and adds
   assert.deepEqual(await writes(board), [
     ['api', 'repos/maddec01/lar-factory/issues/40'],
     ['project', 'item-add', '1', '--owner', 'maddec01', '--url', 'https://github.com/maddec01/lar-factory/issues/40', '--format', 'json'],
-    statusEdit('PVTI_900001', 'IN_PROGRESS_1'),
+    ['issue', 'edit', '900001', '-R', 'maddec01/lar-factory', '--add-label', 'status-in-progress'],
     ['api', 'repos/maddec01/lar-factory/issues/41'],
   ]);
   assert.equal((await board.t3Calls()).length, 2);
@@ -123,7 +122,7 @@ for (const [name, fail, error] of [
   ["the parent's status", 'status', /^Could not set In progress\. /],
 ] as const) {
   test(`a failed write to ${name} starts no thread, and Start build can be pressed again`, async (t) => {
-    const items = [readyIssue(12, ['feature'], 40), projectIssue(40, 'Ready', undefined, ['concept'])];
+    const items = [readyIssue(12, ['feature'], 40), boardIssue(40, 'Ready', undefined, ['concept'])];
     const { board } = await buildBoard(t, items, { fail });
     const failed = await startBuild(board, 'I_12');
     assert.equal(failed.status, 502);
@@ -136,7 +135,7 @@ for (const [name, fail, error] of [
 }
 
 test('a refused repository project writes nothing to GitHub and runs no t3', async (t) => {
-  const { board } = await buildBoard(t, [rawIssue('PVTI_30', 30, 'Ready', ['feature'],
+  const { board } = await buildBoard(t, [rawIssue('I_30', 30, 'Ready', ['feature'],
     { url: 'https://github.com/maddec01/lar-server/issues/30', repository: { nameWithOwner: 'maddec01/lar-server' } })]);
   const response = await startBuild(board, 'I_30');
   assert.equal(response.status, 409);
@@ -156,7 +155,7 @@ test("Start build is refused while the build's repository is still onboarding, a
 });
 
 test('Start build is refused while an issue the build is blocked by is open, and runs once it closes', async (t) => {
-  const blocked = (state: 'OPEN' | 'CLOSED') => rawIssue('PVTI_12', 12, 'Ready', ['build'], {
+  const blocked = (state: 'OPEN' | 'CLOSED') => rawIssue('I_12', 12, 'Ready', ['build'], {
     blockedBy: { nodes: [{ number: 5, state, repository: { nameWithOwner: 'maddec01/lar-factory' } }] },
   });
   const { board } = await buildBoard(t, [blocked('OPEN')]);
@@ -195,9 +194,8 @@ for (const fail of ['killed', 'garbage']) {
 }
 
 test('Start build only runs for Ready issues from this board page and session', async (t) => {
-  const { board } = await buildBoard(t, [projectIssue(12, 'Queued'), { ...draftItem('Ready') }]);
+  const { board } = await buildBoard(t, [boardIssue(12, 'Queued')]);
   assert.match((await (await startBuild(board, 'I_12')).json()).error, /^Only Ready items can start a build; this one is in Queued\.$/);
-  assert.match((await (await startBuild(board, 'DI_draft')).json()).error, /needs an issue/);
   assert.equal((await startBuild(board, 'I_missing')).status, 404);
   const restarted = await board.post({ session: 'old', itemId: 'I_12' }, board.url, '/api/start-build');
   assert.equal(restarted.status, 409);
@@ -209,7 +207,7 @@ test('Start build only runs for Ready issues from this board page and session', 
 });
 
 test('the board data says, per repository, whether Start build finds its repository project', async (t) => {
-  const { board } = await buildBoard(t, [projectIssue(12, 'Ready')]);
+  const { board } = await buildBoard(t, [boardIssue(12, 'Ready')]);
   const data = await until(board, (d) => !!d.repositoryProjects) as BoardData;
   assert.deepEqual(data.repositoryProjects, {
     'maddec01/lar-server': 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code',

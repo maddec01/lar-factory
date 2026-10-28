@@ -1,9 +1,9 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { draftItem, onboarded, startBoard, until } from './server-support.ts';
+import { onboarded, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import type { ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
 
 const SAMPLE_DETAILS = JSON.parse(readFileSync(new URL(import.meta.resolve('@lar-factory/shared/test/sample-details.json')), 'utf8')) as Record<string, ItemDetails>;
@@ -38,23 +38,22 @@ test('outside sample mode a GitHub item reads its details from GitHub in one gra
   const nodes = {
     I_12: { __typename: 'Issue', body: 'The **description**.', author: { login: 'maddec01' }, assignees: { nodes: [] }, createdAt: '2026-10-12T09:14:00Z', milestone: { title: 'v1' },
       subIssues: { nodes: [] }, comments: { pageInfo: { hasPreviousPage: false, startCursor: 'C1' }, nodes: [{ id: 'IC_1', author: { login: 'claude-bot' }, createdAt: '2026-10-13T08:00:00Z', body: 'Looks good.' }] } },
-    DI_draft: { __typename: 'DraftIssue', body: 'An idea.', creator: { login: 'maddec01' }, assignees: { nodes: [] }, createdAt: '2026-10-12T09:14:00Z' },
   };
-  const board = await startBoard(t, { items: [projectIssue(12, 'List'), draftItem('List')], details: nodes });
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: nodes });
   await onboarded(board);
-  const data = await until(board, (d) => d.items.length === 2);
+  const data = await until(board, (d) => d.items.length === 1);
   const before = (await board.calls()).length;
   const answers = [];
   for (const item of data.items) {
     const response = await details(board, `?itemId=${item.id}`);
     answers.push([response.status, ((await response.json()) as { details: ItemDetails }).details.body]);
   }
-  assert.deepEqual(answers.sort(), [[200, 'An idea.'], [200, 'The **description**.']]);
-  assert.equal((await board.calls()).length - before, 2, 'one call per open');
+  assert.deepEqual(answers.sort(), [[200, 'The **description**.']]);
+  assert.equal((await board.calls()).length - before, 1, 'one call per open');
 });
 
 test('an item GitHub no longer has answers 404', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(12, 'List')], details: {} });
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: {} });
   await onboarded(board);
   const [item] = (await until(board, (d) => d.items.length === 1)).items;
   const response = await details(board, `?itemId=${item!.id}`);
@@ -93,7 +92,7 @@ test('older comments of an item the board does not hold are 404, and a request n
 
 test('outside sample mode older comments are one graphql call for the page before the cursor', async (t) => {
   const node = { __typename: 'Issue', comments: { pageInfo: { hasPreviousPage: true, startCursor: 'C0' }, nodes: [{ id: 'IC_1', author: { login: 'claude-bot' }, createdAt: '2026-10-13T08:00:00Z', body: 'Older.' }] } };
-  const board = await startBoard(t, { items: [projectIssue(12, 'List')], details: { I_12: node } });
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: node } });
   await onboarded(board);
   const [item] = (await until(board, (d) => d.items.length === 1)).items;
   const before = (await board.calls()).length;

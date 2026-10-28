@@ -315,7 +315,7 @@ test('Reset of an onboarded repository opens its reset PR and takes it off the b
   const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
   writeList(home, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web' }]);
-  const options = { files: ['.lar-factory.json', 'AGENTS.md'], items: [rawIssue('PVTI_1', 1, 'List', []), rawIssue('PVTI_2', 2, 'List', [], { repository: { nameWithOwner: 'maddec01/lar-web' } })] };
+  const options = { files: ['.lar-factory.json', 'AGENTS.md'], items: [rawIssue('I_1', 1, 'List', []), rawIssue('I_2', 2, 'List', [], { repository: { nameWithOwner: 'maddec01/lar-web' } })] };
   const board = await startBoard(t, options, false, false, { HOME: home });
   await until(board, (d) => d.items.length === 2);
   const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/repositories/reset');

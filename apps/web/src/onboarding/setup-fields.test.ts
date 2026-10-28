@@ -8,7 +8,7 @@ import type { SetupAnswers } from '@lar-factory/shared';
 import { $, $$, checkedOf, settle, text } from '../../test/support.ts';
 import { CustomLabelPicker, SetupFields, type CustomLabelPicks } from './setup-fields.tsx';
 
-const SETUP: SetupAnswers = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '', show: 'all', showPicked: false, role: '' };
+const SETUP: SetupAnswers = { itemSource: 'issues', show: 'all', showPicked: false, role: '' };
 
 async function mount(element: ReturnType<typeof createElement>): Promise<void> {
   document.body.innerHTML = '<div id="root"></div>';

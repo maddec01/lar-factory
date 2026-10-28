@@ -1,4 +1,4 @@
-// An issue's, pull request's or draft's description and comments, which the item dialog reads when it opens.
+// An issue's description and comments, which the item dialog reads when it opens.
 // The board-wide read in github.ts leaves them out.
 
 import type { IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
@@ -16,33 +16,25 @@ const TEXT = `body ${PEOPLE}
   ${comments(`last: ${COMMENT_LIMIT}`)}`;
 
 /**
- * One item's details by node id, in one call: an issue and a pull request share their fields, an issue
- * adds its sub-issues, and a draft has a body and creator but no comments.
+ * One issue's details and sub-issues by node id, in one call.
  */
 export const ITEM_DETAILS_QUERY = `query($id: ID!) {
   node(id: $id) {
     __typename
-    ... on DraftIssue { body creator { login } ${PEOPLE} }
     ... on Issue {
       ${TEXT}
       author { login }
       milestone { title }
       subIssues(first: ${SUB_TICKET_LIMIT}) { nodes { number title url state repository { nameWithOwner } } }
     }
-    ... on PullRequest {
-      ${TEXT}
-      author { login }
-      milestone { title }
-    }
   }
 }`;
 
-/** The 10 comments before a cursor, on an issue or a pull request; a draft has none. */
+/** The 10 comments before a cursor, on an issue. */
 export const OLDER_COMMENTS_QUERY = `query($id: ID!, $before: String!) {
   node(id: $id) {
     __typename
     ... on Issue { ${comments(`last: ${COMMENT_LIMIT}, before: $before`)} }
-    ... on PullRequest { ${comments(`last: ${COMMENT_LIMIT}, before: $before`)} }
   }
 }`;
 
@@ -65,7 +57,6 @@ interface RawComments {
 interface RawDetails {
   body?: string;
   author?: RawLogin | null;
-  creator?: RawLogin | null;
   createdAt?: string;
   assignees?: { nodes: RawLogin[] };
   milestone?: { title: string } | null;
@@ -92,7 +83,7 @@ export async function readGithubItemDetails(item: Item, run?: (args: string[]) =
   return {
     body: node.body ?? '',
     format: 'markdown',
-    author: (node.author ?? node.creator)?.login ?? null,
+    author: node.author?.login ?? null,
     assignees: node.assignees?.nodes.map((a) => a.login) ?? [],
     createdAt: node.createdAt ?? null,
     ...(node.milestone ? { milestone: node.milestone.title } : {}),

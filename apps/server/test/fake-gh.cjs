@@ -3,6 +3,15 @@
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
+options.delayedRepos ??= (options.repositories ?? ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec01/lar-factory']).filter((repo) => !(repo in (options.repoIssues ?? {})));
+for (const { content } of options.items ?? []) {
+  if (!content || content.__typename !== 'Issue') continue;
+  const repo = content.repository.nameWithOwner;
+  options.repoIssues ??= {};
+  if (!options.repoIssues[repo]) options.repoIssues[repo] = [];
+  if (!options.repoIssues[repo].some((issue) => issue.id === content.id)) options.repoIssues[repo].push(content);
+}
+delete options.items;
 const output = (value) => process.stdout.write(JSON.stringify(value));
 /** An issue's or Project item's content as the board query reads it: no body, and its linked PRs by id without body or merge time. */
 const read = (content) => ({ ...content, body: undefined, ...(content.closedByPullRequestsReferences && { closedByPullRequestsReferences: {
@@ -33,7 +42,6 @@ if (args[0] === 'api' && args[1] === '-i') {
 fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
 const WORKFLOW_LABELS = ['bug', 'feature', 'improvement', 'concept', 'decision-grill', 'decision-prototype', 'decision-research', 'decision-task',
   'build', 'active', 'blocked'];
-const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued' }, { id: 'IN_PROGRESS_1', name: 'In progress' }];
 const main = async () => {
   if (args[0] === '--version') return void process.stdout.write(`gh version ${options.ghVersion ?? '2.96.0'} (2026-09-01)\n`);
   if (args[0] === 'auth' && args[1] === 'status') {
@@ -55,7 +63,7 @@ const main = async () => {
   if (configPath) {
     const repo = configPath[1];
     const config = options.repoConfigs && repo in options.repoConfigs ? options.repoConfigs[repo]
-      : { version: 1, role: `${repo}'s role`, itemSource: { kind: 'github-project', owner: 'maddec01', number: 1 } };
+      : { version: 1, role: `${repo}'s role`, itemSource: { kind: 'issues' } };
     if (config === false) {
       process.stderr.write('HTTP 502: Bad Gateway\n');
       process.exitCode = 1;
@@ -123,7 +131,6 @@ const main = async () => {
       process.exitCode = 1;
       return;
     }
-    if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'lar' }] } } } });
     // A search for a repository's issues closed in a close-date range, `closed:<from>..<to>` or `closed:>=<from>`, read
     // light; options.unindexed names the issues the search index doesn't list yet.
     const q = args.find((a) => a.startsWith('q='))?.slice(2) ?? '';
@@ -143,7 +150,7 @@ const main = async () => {
     // below leave both out, as the real board query does.
     if (args.some((a) => a.includes('... on PullRequest { id body mergedAt }'))) {
       const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
-      const prs = [...(options.items ?? []).map((i) => i.content), ...Object.values(options.repoIssues ?? {}).flat()]
+      const prs = Object.values(options.repoIssues ?? {}).flat()
         .flatMap((c) => c?.closedByPullRequestsReferences?.nodes ?? []);
       const nodes = ids.map((id) => prs.find((pr) => (pr.id ?? pr.url) === id)).map((pr) => pr && { id: pr.id ?? pr.url, body: pr.body, mergedAt: pr.mergedAt ?? null });
       return output({ data: { nodes } });
@@ -152,6 +159,13 @@ const main = async () => {
     // reads them in full; the light page of closed ones, which reads no sub-issues, gets each one's close, labels, and
     // its parent's id and labels.
     if (args.some((a) => a.includes('repository(owner:'))) {
+      const readingRepo = ['owner', 'name'].map((key) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1)).join('/');
+      if (options.readDelay && options.delayedRepos.includes(readingRepo) && args.some((a) => a.includes('states: [OPEN]'))) {
+        const lock = process.env.FAKE_GH_STATE + '.reading-' + encodeURIComponent(readingRepo);
+        try { fs.writeFileSync(lock, '', { flag: 'wx' }); } catch { fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', '["overlap"]\n'); }
+        await new Promise((r) => setTimeout(r, options.readDelay));
+        fs.rmSync(lock, { force: true });
+      }
       const value = (key) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
       const light = !args.some((a) => a.includes('subIssues('));
       const state = light ? 'CLOSED' : 'OPEN';
@@ -171,54 +185,32 @@ const main = async () => {
       const id = args.find((a) => a.startsWith('id='))?.slice('id='.length);
       return output({ data: { node: options.details?.[id] ?? null } });
     }
-    // Project items by their Project item ids, for a read of a few items; an id no item has resolves to null.
-    if (args.some((a) => a.includes('on ProjectV2Item {'))) {
-      const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
-      const nodes = ids.map((id) => (options.items ?? []).find((i) => i.id === id) ?? null)
-        .map((item) => item && { ...item, content: item.content && read(item.content) });
-      return output({ data: { nodes } });
-    }
     // Dossier bodies by node id; the project read below leaves bodies out, as the real query does.
     if (args.some((a) => a.includes('nodes(ids:'))) {
       const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
-      const contents = [...(options.items ?? []).map((i) => i.content), ...Object.values(options.repoIssues ?? {}).flat()];
+      const contents = Object.values(options.repoIssues ?? {}).flat();
       const nodes = ids.map((id) => contents.find((c) => c?.id === id)).map((c) => c && { id: c.id, body: c.body ?? '' });
       return output({ data: { nodes } });
     }
-    if (options.readDelay) {
-      // Two project reads at once log an overlap, so tests can check the board never runs them together.
-      const lock = process.env.FAKE_GH_STATE + '.reading';
-      try { fs.writeFileSync(lock, '', { flag: 'wx' }); } catch { fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', '["overlap"]\n'); }
-      await new Promise((r) => setTimeout(r, options.readDelay));
-      fs.rmSync(lock, { force: true });
-    }
-    return output({ data: { user: { projectV2: { title: 'lar',
-      items: { pageInfo: { hasNextPage: false, endCursor: null },
-        nodes: (options.items ?? []).map(({ content, ...item }) => ({ ...item, content: content && read(content) })) } } } } });
+    throw new Error('Unexpected fake GraphQL query');
   }
-  if (args[1] === 'view') return output({ id: 'PVT_1' });
-  if (args[1] === 'field-list') return output({ fields: [{ id: 'FIELD_1', name: 'Status', options: OPTIONS }] });
-  if ((options.fail === 'membership' && args[1] === 'item-add') || (options.fail === 'status' && args[1] === 'item-edit')) {
-    process.stderr.write('GitHub temporarily unavailable');
-    process.exitCode = 1;
-    return;
-  }
-  if (options.fail === 'abandon' && (args[1] === 'close' || args[1] === 'item-delete')) {
+  if (options.fail === 'abandon' && args[1] === 'close') {
     process.stderr.write('HTTP 403: Must have write access to Repository.');
     process.exitCode = 1;
     return;
   }
   if (args[0] === 'issue' && args[1] === 'edit') {
-    if (options.fail === 'label') {
+    if (options.writeDelay) await new Promise((r) => setTimeout(r, options.writeDelay));
+    if (options.fail === 'label' || options.fail === 'status') {
       process.stderr.write('HTTP 403: Resource not accessible by integration');
       process.exitCode = 1;
       return;
     }
     // Later reads see the labels added and removed, like GitHub, on the Project's items and the repositories' issues.
-    const contents = [...(options.items ?? []).map((i) => i.content), ...(options.repoIssues?.[args[4]] ?? [])];
+    const contents = (options.repoIssues?.[args[4]] ?? []);
     const content = contents.find((c) => c?.number === Number(args[2]) && c.repository?.nameWithOwner === args[4]);
     const values = (flag) => args.filter((_, i) => args[i - 1] === flag);
-    if (content) {
+    if (content && !options.ignoreEdits) {
       const kept = content.labels.nodes.filter((l) => !values('--remove-label').includes(l.name));
       content.labels.nodes = [...kept, ...values('--add-label').filter((name) => !kept.some((l) => l.name === name)).map((name) => ({ name }))];
     }
@@ -248,7 +240,7 @@ const main = async () => {
   }
   if (args[0] === 'label' && args[1] === 'create') {
     if (options.fail === 'label-create') {
-      process.stderr.write('HTTP 403: Must have admin rights to Repository.');
+      process.stderr.write('HTTP 403: Must have write access to Repository.');
       process.exitCode = 1;
       return;
     }
@@ -259,7 +251,9 @@ const main = async () => {
   }
   // An issue read: options.issues holds the labels of issues off the project.
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+\/issues\/\d+$/.test(args[1])) {
-    const issue = options.issues?.[args[1].slice('repos/'.length)];
+    const [, owner, repo, , number] = args[1].split('/');
+    const content = options.repoIssues?.[`${owner}/${repo}`]?.find((issue) => issue.number === Number(number));
+    const issue = options.issues?.[args[1].slice('repos/'.length)] ?? (content && { labels: content.labels.nodes });
     if (!issue) {
       process.stderr.write('HTTP 404: Not Found');
       process.exitCode = 1;
@@ -267,14 +261,13 @@ const main = async () => {
     }
     return output(issue);
   }
-  if (options.writeDelay && ['item-edit', 'close', 'item-delete'].includes(args[1])) await new Promise((r) => setTimeout(r, options.writeDelay));
-  // Closes and draft removals leave options.items alone, like a GitHub read that still lags behind.
+  if (options.writeDelay && ['edit', 'close'].includes(args[1])) await new Promise((r) => setTimeout(r, options.writeDelay));
+  // Deletes leave options.items alone, like a GitHub read that still lags behind.
   if (args[0] === 'issue' && args[1] === 'close') return;
-  if (args[1] === 'item-delete') return output({});
   // A PR read: options.liveBodies holds bodies edited since the board's read.
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+\/pulls\/\d+$/.test(args[1])) {
     const url = `https://github.com/${args[1].slice('repos/'.length).replace('/pulls/', '/pull/')}`;
-    const read = (options.items ?? []).flatMap((item) => item.content?.closedByPullRequestsReferences?.nodes ?? []).find((pr) => pr.url === url);
+    const read = Object.values(options.repoIssues ?? {}).flat().flatMap((issue) => issue.closedByPullRequestsReferences?.nodes ?? []).find((pr) => pr.url === url);
     return output({ url, body: options.liveBodies?.[url] ?? read?.body ?? null });
   }
   if (args[0] === 'api' && args[2] === 'PATCH') {
@@ -287,8 +280,8 @@ const main = async () => {
     // Later reads see the new body, like GitHub.
     const url = `https://github.com/${args[3].slice('repos/'.length).replace('/pulls/', '/pull/')}`;
     const body = args[args.indexOf('-f') + 1].slice('body='.length);
-    for (const item of options.items ?? []) {
-      for (const pr of item.content?.closedByPullRequestsReferences?.nodes ?? []) if (pr.url === url) pr.body = body;
+    for (const item of Object.values(options.repoIssues ?? {}).flat()) {
+      for (const pr of item.closedByPullRequestsReferences?.nodes ?? []) if (pr.url === url) pr.body = body;
     }
     if (options.liveBodies?.[url] !== undefined) options.liveBodies[url] = body;
     fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
@@ -298,16 +291,6 @@ const main = async () => {
     if (options.createDelay) await new Promise((r) => setTimeout(r, options.createDelay));
     const repo = args[3].slice('repos/'.length, -'/issues'.length);
     return output({ number: 900001, node_id: 'I_900001', html_url: `https://github.com/${repo}/issues/900001`, updated_at: '2026-10-21T10:00:00Z' });
-  }
-  if (args[1] === 'item-add') return output({ id: 'PVTI_900001' });
-  if (args[1] === 'item-edit') {
-    // Later reads report the edit, like GitHub, unless the test says they lag.
-    const item = options.items?.find((i) => i.id === args[args.indexOf('--id') + 1]);
-    if (item && !options.ignoreEdits) {
-      item.status = { name: OPTIONS.find((o) => o.id === args[args.indexOf('--single-select-option-id') + 1]).name };
-      fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
-    }
-    return output({});
   }
   throw new Error('Unexpected fake gh command');
 };

@@ -1,5 +1,5 @@
 // The item source interface: where the board server reads its items and writes their changes.
-// Each adapter lives with its provider's code, such as the GitHub Project's in github/github-project.ts.
+// Each adapter lives with its provider's code, such as GitHub issues in github/repo-issues.ts.
 
 import type { CreationProgress, CreationResult, IssueRef, Item, ItemDraft, ItemSourceKind, ItemSourceProblem, Status } from '@lar-factory/shared';
 
@@ -90,5 +90,4 @@ export interface ItemSource {
   setParentStatus(parent: IssueRef, status: Status): Promise<string | null>;
   abandon(item: Item): Promise<string | null>;
   /** The Item.id now of an item a record saved under an id from before Item.id was the content's node id; undefined when none is. */
-  renamedId?(savedId: string): string | undefined;
 }

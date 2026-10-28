@@ -57,6 +57,7 @@ html[data-prototype525] {
   .desk-card-fixed .desk-actions [data-slot="button"] { flex-shrink: 1; min-width: 0; }
 
   /* E: one status strip, centred in the window while there is room for it. */
+  .prototype-settings svg { width: --spacing(5); height: --spacing(5); }
   .prototype-status .refreshed { height: --spacing(6); }
   .prototype-status .counters button { height: --spacing(6); min-height: --spacing(6); }
   @container (min-width: 72rem) {

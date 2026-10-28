@@ -23,11 +23,11 @@ function Update() {
   );
 }
 
-/** Settings drawn as List is: an app control with its icon and its name, so it reads at a glance. */
+/** Settings: icon only, but its icon is 20px and in the text colour, so it holds its own beside labelled buttons. */
 function Settings() {
   return (
-    <Button variant="quiet" className={`open-settings ${CONTROL} px-2`} leftIcon={<SettingsIcon />} title="Settings (⌘,)"
-      onClick={() => useSettingsStore.getState().setOpen(true)}>Settings</Button>
+    <Button variant="quiet" className="open-settings prototype-settings h-7 w-7 p-0 text-base-content sm:h-7" aria-label="Settings" title="Settings (⌘,)"
+      onClick={() => useSettingsStore.getState().setOpen(true)}><SettingsIcon /></Button>
   );
 }
 

@@ -158,11 +158,11 @@ test('GitHub setup needs only a repository description', async () => {
   expect(wizard.getState().run).toMatchObject({ step: 'labels', done: ['project', 'setup'] });
 });
 
-test(".lar-factory.json's values pass the step with no answers; a file that can't be read or reused can't", async () => {
+test(".lar-factory.json's values pass the step with no answers; a file that cannot be read waits for Retry", async () => {
   const config = { itemSource: { kind: 'issues' as const }, show: 'opted-in' as const, role: 'Web client', labels: [] };
   expect((await onSetup([project('lar-web', { hasConfig: true, config })])).ready()).toBe(true);
   for (const parts of [{ provider: 'Azure DevOps' as const, repo: 'contoso/Fabrikam/lar-web', hasConfig: null },
-    { hasConfig: true, configProblem: '.lar-factory.json isn\'t valid JSON.' }, { hasConfig: null }]) {
+    { hasConfig: null }]) {
     const { wizard, ready } = await onSetup([project('lar-web', parts)]);
     wizard.getState().answer({ itemSource: 'issues', role: 'Web client' });
     expect(ready(), JSON.stringify(parts)).toBe(false);

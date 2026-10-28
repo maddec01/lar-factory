@@ -35,3 +35,6 @@ export function setupProblems(setup: SetupAnswers, action: SetupAction = 'Next')
 /** The item source the answers name, once setupProblems finds nothing in them. */
 export const setupItemSource = (setup: SetupAnswers): RepositoryItemSource => byTeam(setup.itemSource) ? { kind: setup.itemSource, team: setup.team!.trim() }
   : { kind: 'issues' };
+
+/** Why onboarding starts with fresh answers instead of reusing an invalid file. */
+export const REPLACE_SETTINGS_HELP = "Its settings file can't be used. Run onboarding to replace it.";

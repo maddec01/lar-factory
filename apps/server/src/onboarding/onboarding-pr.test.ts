@@ -133,7 +133,7 @@ test('reusing a .lar-factory.json the default branch lacks is refused, writing n
 test('an edit whose lines moved on the default branch fails with its file and line, and writes nothing', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
   const { calls, run } = gh({}, {}, { 'AGENTS.md': '# lar-web\n\nRead the README.\n\n- Push to main when done.\n' });
-  assert.deepEqual(await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config, picks: { clashes: [pushRule], skills: {} } }),
+  assert.deepEqual(await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress: { ...progress, step: 'pr' }, config, picks: { clashes: [pushRule], skills: {} } }),
     { status: 409, error: 'The text at line 3 in AGENTS.md has changed. Uncheck this change in Cleanup or check instructions again.' });
   assert.deepEqual(writes(calls), []);
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', onboarding: progress }]);
@@ -730,4 +730,19 @@ test('on Azure Repos, each refresh drops a resetting entry whose reset PR comple
   assert.deepEqual(await followResetPrs(readRepositoryList(dir), dir, az.run, { failed: () => assert.fail(), dropped: (repo) => dropped.push(repo) }),
     [{ repo: web, resetting: { prUrl: `${REPO_URL}/pullrequest/8` } }]);
   assert.deepEqual(dropped, [AZURE]);
+});
+
+test('onboarding replaces an unusable settings file for a repository already on the local list', async (t) => {
+  const repo = 'maddec01/lar-web';
+  const dir = await dataDir(t, [{ repo }]);
+  const old = '{"role":"API","itemSource":{"kind":"github-project","owner":"maddec01","number":3}}';
+  const boundary = gh({}, {}, { 'AGENTS.md': RULES, '.lar-factory.json': old });
+  const answer = await createPrOpener(dir, boundary.run)({ repo, progress, config, picks: { clashes: [], skills: {} } });
+  assert.ok('prUrl' in answer, JSON.stringify(answer));
+  const preview = await previewOnboardingPr({ repo, config, picks: { clashes: [], skills: {} } }, boundary.run);
+  assert.ok('changes' in preview);
+  const replacement = preview.changes.find((change) => change.path === '.lar-factory.json');
+  assert.equal(replacement?.kind, 'write');
+  assert.equal(replacement?.preview?.before, old);
+  assert.match(replacement?.preview?.after ?? '', /"kind": "issues"/);
 });

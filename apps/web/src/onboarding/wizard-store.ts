@@ -93,7 +93,7 @@ export function pickedProject(run: Run, projects: Projects): ProjectChoice | nul
 }
 
 /** Whether the setup step asks its questions: a repository on a provider, with no .lar-factory.json to reuse. */
-export const asksSetup = (project: ProjectChoice): boolean => !!project.provider && project.hasConfig === false;
+export const asksSetup = (project: ProjectChoice): boolean => !!project.provider && (project.hasConfig === false || !!project.configProblem);
 
 /** Whether the setup step's answers are whole, as setupProblems says. */
 const setupAnswered = (setup: SetupAnswers | null): boolean => !!setup && Object.keys(setupProblems(setup)).length === 0;

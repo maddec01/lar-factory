@@ -99,3 +99,14 @@ test('the board offers each T3 project whose GitHub or Azure DevOps repository h
   assert.deepEqual(offers, [{ projectId: 'lar-web', name: 'lar-web', repo: 'maddec01/lar-web', provider: 'GitHub' },
     { projectId: 'lar-api', name: 'lar-api', repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps' }]);
 });
+
+test('listed and unlisted repositories with unusable settings are offered fresh onboarding', async (t) => {
+  const { env } = t3Home(t, { listed: 'git@github.com:maddec01/listed.git', unlisted: 'git@github.com:maddec01/unlisted.git', healthy: 'git@github.com:maddec01/healthy.git' });
+  const checks = createConfigChecks(async (args) => args[1]!.includes('/healthy/') ? '{"role":"API"}' : '{"role":"API","itemSource":{"kind":"github-project","owner":"maddec01","number":1}}', () => {});
+  const choices = await projectChoices([{ repo: 'maddec01/listed' }, { repo: 'maddec01/healthy' }], checks.configOf, env);
+  assert.equal(choices[0]!.onBoard, false);
+  assert.equal(choices[0]!.config, undefined);
+  assert.ok(choices[0]!.configProblem);
+  assert.deepEqual(onboardingOffers(choices).map((offer) => offer.repo), ['maddec01/listed', 'maddec01/unlisted']);
+  assert.equal(choices[2]!.onBoard, true);
+});

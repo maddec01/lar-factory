@@ -271,7 +271,7 @@ The screen the board app and the board page show until the first read settles, a
 _Avoid_: splash, spinner, starting page
 
 **First read**:
-The board server's first read of every repository after it starts. It settles when the read finishes, fails, or gh blocks it.
+The board server's first read of every repository after it starts. It settles when the read finishes, fails, or the provider's tool blocks it.
 _Avoid_: initial load, first sync
 
 **Title bar**:

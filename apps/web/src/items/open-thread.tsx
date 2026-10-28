@@ -1,10 +1,11 @@
-// Open thread: a link that opens an item's latest T3 thread in T3 Code, or a disabled button whose
+// Open thread: an Open, a link that opens an item's latest T3 thread in T3 Code, or a disabled button whose
 // title says why it can't: the item has no thread yet, T3's database can't be read, or T3 hasn't
 // written its environment id.
 
 import { threadLink } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { LinkButton } from './link-button.tsx';
 
 /** The `t3code://` link to the item's latest thread, or why there is none. */
@@ -21,12 +22,10 @@ export const hasLiveThread = (item: Item): boolean =>
   Array.isArray(item.threads) && item.threads.some((t) => t.state !== 'done');
 
 /** Opens the latest thread in T3 Code: the board app hands the link to T3, a browser asks to open it. */
-export function OpenThread({ item, data, label = 'Open thread', variant = 'primary' }: {
-  item: Item; data: BoardData; label?: string; variant?: 'primary' | 'secondary';
-}) {
+export function OpenThread({ item, data, label = 'Open thread' }: { item: Item; data: BoardData; label?: string }) {
   const thread = latestThread(item, data);
   // Pointer events stay on while it's disabled, so its title says why.
   return 'link' in thread
-    ? <LinkButton variant={variant} data-open-thread={item.id} href={thread.link}>{label}</LinkButton>
-    : <Button variant={variant} className="disabled:pointer-events-auto" data-open-thread={item.id} disabled title={thread.reason}>{label}</Button>;
+    ? <LinkButton kind="open" leftIcon={ICON.thread} data-open-thread={item.id} href={thread.link}>{label}</LinkButton>
+    : <Button {...kind('open')} leftIcon={ICON.thread} className="disabled:pointer-events-auto" data-open-thread={item.id} disabled title={thread.reason}>{label}</Button>;
 }

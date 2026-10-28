@@ -7,7 +7,7 @@
 // thread. The Pull request step lists what the PR changes, opens it, then waits for its merge.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { Check, ExternalLink, FileText, FolderPlus, GitPullRequest, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
+import { Check, FileText, FolderPlus, GitPullRequest, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
 import {
   SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, shownRepo, threadLink, type Clash, type ClashRun, type CheckedTool, type LabelPlan, type LabelRow,
   type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupCheckId,
@@ -24,6 +24,7 @@ import { Progress } from '@lar-factory/ui/progress';
 import { useBoardStore } from '../board/board-store.ts';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { LinkButton } from '../items/link-button.tsx';
+import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import { Choice, CustomLabelPicker, CustomLabelsTitle, Field, customLabelsHelp, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
 import {
@@ -461,8 +462,8 @@ function ThreadLink({ run }: { run: ClashRun }) {
   const reason = !run.threadId ? 'T3 Code hasn’t listed the thread yet' : !environment ? 'T3 Code hasn’t written its environment id' : null;
   // Pointer events stay on while it's disabled, so its title says why.
   return reason
-    ? <Button variant="quiet" className="disabled:pointer-events-auto" data-thread-link disabled title={reason} leftIcon={<ExternalLink />}>Open thread</Button>
-    : <LinkButton variant="secondary" data-thread-link href={threadLink(environment!, run.threadId!)} leftIcon={<ExternalLink />}>Open thread</LinkButton>;
+    ? <Button {...kind('open')} className="disabled:pointer-events-auto" data-thread-link disabled title={reason} leftIcon={ICON.thread}>Open thread</Button>
+    : <LinkButton kind="open" data-thread-link href={threadLink(environment!, run.threadId!)} leftIcon={ICON.thread}>Open thread</LinkButton>;
 }
 
 /** Why a run ended without Clashes, by its state. */

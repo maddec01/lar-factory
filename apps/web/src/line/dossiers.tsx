@@ -9,6 +9,7 @@ import { Check, ChevronDown, ChevronRight, CircleHelp, FlaskConical, GitPullRequ
 import { carriesTwoStatuses, duration, formatTokens, formatUsd, itemTotal, kindOf, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Blocker, EndToEndCheck, Item, ItemThread } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { ItemTitle, RepoTag, SliceBar } from '../items/item-parts.tsx';
@@ -73,7 +74,7 @@ function ThreadLine({ thread, waits }: { thread: ItemThread | undefined; waits: 
 function PartAction({ part, data }: { part: Part; data: BoardData }) {
   switch (part.item.status) {
     case 'Ready': case 'Queued': return <PartStart part={part} data={data} />;
-    case 'Shaping': case 'In progress': case 'Review': return <OpenThread item={part.item} data={data} variant="secondary" />;
+    case 'Shaping': case 'In progress': case 'Review': return <OpenThread item={part.item} data={data} />;
     default: return null;
   }
 }
@@ -149,8 +150,8 @@ function CheckPhase({ check, parent, builds, data }: { check: EndToEndCheck; par
           <span className="shrink-0 rounded border border-(--border) px-1 text-[10px] text-(--muted-foreground)"><FlaskConical className="inline size-3" /> end-to-end</span>
           <span className="ml-auto flex shrink-0 gap-1" onClick={stop}>
             {/* Pointer events stay on while they're disabled, so their titles say why. */}
-            <Button variant="secondary" className="disabled:pointer-events-auto" disabled title={`Run end-to-end ${NOT_BUILT}`}>Run end-to-end</Button>
-            <Button variant="secondary" className="disabled:pointer-events-auto" disabled title={`Watch run ${NOT_BUILT}`}>Watch run</Button>
+            <Button {...kind('start')} leftIcon={ICON.play} className="disabled:pointer-events-auto" disabled title={`Run end-to-end ${NOT_BUILT}`}>Run end-to-end</Button>
+            <Button {...kind('start')} leftIcon={ICON.play} className="disabled:pointer-events-auto" disabled title={`Watch run ${NOT_BUILT}`}>Watch run</Button>
           </span>
         </span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-5.5 text-[11px] text-(--muted-foreground)">

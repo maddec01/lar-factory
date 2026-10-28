@@ -141,7 +141,7 @@ test.each([
   ['a Queued draft', 'I_sample21', ['← Back to List', 'Abandon']],
   ['Shaping', 'I_sample07', ['GitHub', 'Open thread']],
   ['Needs you', 'I_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
-  ['blocked Ready', 'I_sample13', ['GitHub', 'Start build (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']],
+  ['blocked Ready', 'I_sample13', ['GitHub', 'Start after #202 ▾']],
   ['In progress', 'I_sample14', ['GitHub', 'Open thread']],
   ['Review', 'I_sample15', ['GitHub', 'Open thread']],
   ['Verify', 'I_sample16', ['GitHub', 'Verify build']],
@@ -167,6 +167,9 @@ test('GitHub opens the item, and Verify build and Merge PR open its pull request
   await openItem('I_sample16');
   const links = [...footer().querySelectorAll('a')].map((a) => [text(a).trim(), a.getAttribute('href'), a.target]);
   expect(links).toEqual([['GitHub', 'https://github.com/maddec01/lar-apple/issues/31', '_blank'], ['Verify build', 'https://github.com/maddec01/lar-apple/pull/32', '_blank']]);
+  const verify = footer().querySelector<HTMLAnchorElement>('[data-pr-link]')!;
+  expect([verify.dataset.kind, Boolean(verify.querySelector('[data-slot="icon"] .lucide-git-pull-request'))], 'an Open with the pull request icon').toEqual(['open', true]);
+  expect(verify.className.split(' '), "a link takes its kind's height, not the Copy's").not.toContain('h-9');
   await openItem('I_sample17');
   expect(footer().querySelector('a:last-child')!.getAttribute('href')).toMatch(/\/pull\/\d+$/);
 });
@@ -178,11 +181,11 @@ test('an Azure work item\'s footer opens it on Azure DevOps', async () => {
   expect([...footer().querySelectorAll('a')].map((a) => [text(a).trim(), a.getAttribute('href')])).toEqual([['Azure DevOps', url]]);
 });
 
-test('a Queued item blocked by an open issue has Start refining disabled in the footer, with Start after', async () => {
+test('a Queued item blocked by an open issue has only Start after in the footer', async () => {
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample05'
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) });
   await openItem('I_sample05');
-  expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', 'Start refining (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']);
+  expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', 'Start after #202 ▾']);
 });
 
 /** The sample with `itemId`'s threads replaced. */

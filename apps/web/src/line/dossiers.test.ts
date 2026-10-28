@@ -111,7 +111,7 @@ test('each step shows its kind, what it waits on, its figures and its own thread
   const lines = (id: string) => [...step(id).children].map(text);
   expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?grillOpen thread', 'Shaping28m · 1.87M · $2.71waits on #203', 'T3 · Grill: relay broker only or full TURN· running']);
   expect(lines('I_sample12')).toEqual(['#202 Sign-in screenprototypeon your desk', 'Needs you41m · 2.95M · $4.35', 'T3 · Prototype: sign-in screen· needs you']);
-  expect(lines('I_sample13')).toEqual(['#140 Owner accountsbuildStart buildStart after #202 ▾', 'Ready1/3 sliceswaits on #202', '', 'T3 · Shape: owner accounts· done']);
+  expect(lines('I_sample13')).toEqual(['#140 Owner accountsbuildStart after #202 ▾', 'Ready1/3 sliceswaits on #202', '', 'T3 · Shape: owner accounts· done']);
   const chip = button(step('I_sample13'), '#202');
   expect(chip.className, 'an open blocker').toContain('text-(--warning-foreground)');
   expect(button(step('I_sample10'), '#203').querySelector('.lucide-check'), 'a closed one is ticked').not.toBeNull();
@@ -136,11 +136,11 @@ test('the progress rows sit on the stage track, done parts folded, each side say
   expect(button(dossier(C180), 'Hide 2 done')).toBeDefined();
 });
 
-test('Start build on a blocked build is disabled, its title naming the blocker, and Start after joins it', async () => {
+test('a blocked build shows only Start after, a Start, in place of Start build', async () => {
   await mountPage();
-  const start = startIn(step('I_sample13'))!;
-  expect([text(start), start.disabled, start.title]).toEqual(['Start build', true, 'Blocked by #202 until it closes']);
-  expect(text(step('I_sample13').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
+  expect(startIn(step('I_sample13'))).toBeNull();
+  const after = step('I_sample13').querySelector<HTMLElement>('[data-start-after]')!;
+  expect([text(after), after.dataset.kind]).toEqual(['Start after #202 ▾', 'start']);
   expect(text(header()[3]), 'the header offers no start while a part waits on you').toBe('#202 waits on you');
 });
 
@@ -182,13 +182,12 @@ test("Start on a Queued decision is today's Start", async () => {
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_d204' }]]);
 });
 
-test('Start on a Queued decision is disabled while a blocker is open, its title naming it, and Start after names the last open one', async () => {
+test('a Queued decision shows only Start after while a blocker is open, naming the last open one', async () => {
   const data = withDecision([{ number: 201, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
     { number: 140, repo: 'maddec01/lar-server', state: 'open' }]);
   holdPosts(data);
   await mountPage(data);
-  const start = startIn(step('I_d204'))!;
-  expect([text(start), start.disabled, start.title]).toEqual(['Start', true, 'Blocked by #201, #140 until they close']);
+  expect(startIn(step('I_d204'))).toBeNull();
   const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Starts by itself once #201, #140 close']);
   await pressMenu(after);
@@ -227,7 +226,8 @@ test("the end-to-end check comes from the map: its title, numbered steps and wai
   expect(text(check)).toContain('waitingwaits on #140Thread starts when #140 is done');
   for (const label of ['Run end-to-end', 'Watch run']) {
     const b = button(check, label);
-    expect([b.disabled, b.title, b.className.includes('disabled:pointer-events-auto')]).toEqual([true, `${label} isn't built yet: no workflow runs an end-to-end check`, true]);
+    expect([b.disabled, b.title, b.className.includes('disabled:pointer-events-auto'), b.dataset.kind, Boolean(b.querySelector('[data-slot="icon"] svg'))])
+      .toEqual([true, `${label} isn't built yet: no workflow runs an end-to-end check`, true, 'start', true]);
   }
 });
 

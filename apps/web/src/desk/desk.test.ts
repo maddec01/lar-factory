@@ -48,7 +48,7 @@ test('a desk card is no button wrapping buttons: its summary is the button, and 
 test.each([
   ['Needs you with no thread', 'I_sample11', ['Open thread (disabled: No T3 thread has worked on this yet)']],
   ['Needs you', 'I_sample12', ['Open thread']],
-  ['blocked Ready', 'I_sample13', ['Open thread', 'Start build (disabled: Blocked by #202 until it closes)', 'Start after #202 ▾']],
+  ['blocked Ready', 'I_sample13', ['Open thread', 'Start after #202 ▾']],
   ['Verify', 'I_sample16', ['Open thread (disabled: No T3 thread has worked on this yet)', 'Open PR']],
   ['Ready to merge', 'I_sample17', ['Open thread (disabled: No T3 thread has worked on this yet)', 'Open PR']],
 ])('a %s card has the buttons for its next action', async (_status, id, buttons) => {

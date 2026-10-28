@@ -131,7 +131,7 @@ test('the side says where the item waits on you, or shows its thread and its nex
   expect(say('I_sample07')).toEqual(['shaping thread running', ['Open thread']]);
   expect(say('I_sample14')).toEqual(['build thread running', ['Open thread']]);
   expect(say('I_sample15')).toEqual(['reviewers running', ['Open thread']]);
-  expect(say('I_sample13')).toEqual(['blocked by 1', ['Start build', 'Start after #202 ▾']]);
+  expect(say('I_sample13')).toEqual(['blocked by 1', ['Start after #202 ▾']]);
 });
 
 test('Start after on a blocked Ready row arms its start on the picked model, then reads Starts after until pressed again', async () => {
@@ -179,7 +179,7 @@ test('a start armed before its repository lost its T3 project still shows Starts
     armed: { I_sample13: { model: { instanceId: 'codex', model: 'gpt-5.5' } } } };
   holdPosts(armed);
   await mountPage(armed);
-  expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
+  expect(startBuild(), 'a blocker holds it too, so Start after stands alone').toBeNull();
   const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
   expect([text(after), after.getAttribute('aria-pressed')]).toEqual(['Starts after #202 ✓', 'true']);
   await press(after);
@@ -198,33 +198,29 @@ test("a start the board ran by itself and that failed shows its error under the 
   expect(posted()).toEqual([['/api/disarm', { session: 's1', itemId: 'I_sample13' }]]);
 });
 
-test('Open thread on a row opens the latest thread, as an outline button, without opening the dialog', async () => {
+test('Open thread on a row opens the latest thread, as an Open with the thread icon, without opening the dialog', async () => {
   await mountPage(withItem('I_sample14', { threads: [thread('t1', 'running')] }, withItem('I_sample15', { threads: [] })));
   const open = side('I_sample14').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
-  expect([open.getAttribute('href'), open.className.includes('border-base-400/90')]).toEqual(['t3code://threads/sample-environment/t1', true]);
+  expect([open.getAttribute('href'), open.dataset.kind, open.className.includes('border-base-400/90'), Boolean(open.querySelector('[data-slot="icon"] .lucide-message-square-text'))])
+    .toEqual(['t3code://threads/sample-environment/t1', 'open', true, true]);
   await press(open);
   expect(dialog()).toBeNull();
   const none = side('I_sample15').querySelector<HTMLButtonElement>('[data-open-thread]')!;
-  expect([none.disabled, none.title]).toEqual([true, 'No T3 thread has worked on this yet']);
+  expect([none.disabled, none.title, none.dataset.kind]).toEqual([true, 'No T3 thread has worked on this yet', 'open']);
 });
 
-test('Start build is disabled while a blocker is open, its title naming it, and pointer events stay on for the title', async () => {
+test('a blocked Ready row shows only Start after, a Start with its icon, never a disabled Start build beside it', async () => {
   await mountPage(loose);
-  expect([text(startBuild()), startBuild().disabled, startBuild().title]).toEqual(['Start build', true, 'Blocked by #202 until it closes']);
-  expect(startBuild().className).toContain('disabled:pointer-events-auto');
-  expect(startBuild().className, 'an outline button, as the line draws a held action').toContain('border-base-400/90');
-  const many = withItem('I_sample13', { blockers: [
-    { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
-    { number: 12, repo: 'maddec01/lar-apple', state: 'open' },
-  ] }, loose);
-  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(many));
-  expect(startBuild().title, 'only the open ones, another repository\'s in full').toBe('Blocked by #202, maddec01/lar-apple#12 until they close');
+  expect(startBuild()).toBeNull();
+  const after = side('I_sample13').querySelector<HTMLButtonElement>('[data-start-after]')!;
+  expect([after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual(['start', true]);
 });
 
 test('Start build is disabled with the hint while T3 has no project for the repository', async () => {
   const hint = 'No T3 project is a checkout of maddec01/lar-server; add the checkout in T3 Code';
   await mountPage({ ...unblocked(), repositoryProjects: { 'maddec01/lar-server': hint, 'maddec01/lar-apple': null } });
-  expect([startBuild().disabled, startBuild().title]).toEqual([true, hint]);
+  expect([startBuild().disabled, startBuild().title, startBuild().dataset.kind]).toEqual([true, hint, 'start']);
+  expect(startBuild().className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
     .receive({ ...unblocked(), repositoryProjects: { 'maddec01/lar-server': null } }));
   expect([startBuild().disabled, text(startBuild())], 'a found project enables it').toEqual([false, 'Start build ▾']);

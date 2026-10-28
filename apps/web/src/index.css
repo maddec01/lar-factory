@@ -2,6 +2,7 @@
    system (packages/ui). Each feature folder holds its own layout rules; all of them use only the design
    system's tokens and Tailwind's spacing scale. */
 @import "@lar-factory/ui/styles.css";
+@import "./buttons/button-kinds.css";
 @import "./items/items.css";
 @import "./loading/loading-screen.css";
 @import "./notices/notices.css";

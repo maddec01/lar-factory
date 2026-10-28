@@ -8,6 +8,7 @@ import { GripVertical } from 'lucide-react';
 import { carriesTwoStatuses, isKindLabel, itemRepoNames, openBlockers, repoKey, sameRepo, startHold, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
@@ -41,14 +42,14 @@ const canStart = (data: BoardData) => (item: Item) => Boolean(workMessage(item))
   && !startHold(data, item.repo) && !hasLiveThread(item) && !carriesTwoStatuses(item);
 
 /** A row's action: Start refining, Open thread while the item has a live thread, or why a draft can't start. */
-function RowAction({ item, data, first }: { item: Item; data: BoardData; first: boolean }) {
+function RowAction({ item, data }: { item: Item; data: BoardData }) {
   if (!workMessage(item)) return <span className="queue-hint shrink-0 text-[11px] text-(--muted-foreground)" title={DRAFT_HINT}>Needs an issue to start</span>;
   if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-  return <StartOrAfter item={item} data={data} label="Start refining" variant={first ? 'primary' : 'secondary'} />;
+  return <StartOrAfter item={item} data={data} label="Start refining" />;
 }
 
-/** `first` marks the row Start next starts, whose Start is the primary one. */
-function Row({ item, n, data, now, first, waits }: { item: Item; n: number; data: BoardData; now: number; first: boolean; waits: boolean }) {
+/** `waits` marks the row Start next starts while every build slot is taken. */
+function Row({ item, n, data, now, waits }: { item: Item; n: number; data: BoardData; now: number; waits: boolean }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   const repo = repoKey(item);
   const labels = shownLabels(item, data);
@@ -66,7 +67,7 @@ function Row({ item, n, data, now, first, waits }: { item: Item; n: number; data
         <span className="queue-meta truncate text-[11px] text-(--muted-foreground)">{itemRepoNames(item, data.repos)} · queued {shortAgo(item.updatedAt, now)}{labels.length > 0 && ` · ${labels.join(', ')}`}</span>
       </button>
       {waits && <span className="shrink-0 text-[11px] text-(--muted-foreground)">next when a build slot frees</span>}
-      <span className="ml-auto min-w-0 max-w-full" onClick={stop}><RowAction item={item} data={data} first={first} /></span>
+      <span className="ml-auto min-w-0 max-w-full" onClick={stop}><RowAction item={item} data={data} /></span>
       <div className="basis-full empty:hidden" onClick={stop}><StartMessage item={item} /></div>
     </li>
   );
@@ -86,7 +87,7 @@ function BuildSlots({ building }: { building: number }) {
   );
 }
 
-/** Start next starts `next`; with none, while items are queued, it shows disabled and says why. */
+/** Start next, the Queue's Main action, starts `next`; with none, while items are queued, it shows disabled and says why. */
 function Header({ items, building, next, data }: { items: Item[]; building: number; next: Item | undefined; data: BoardData }) {
   return (
     <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-(--border) px-3 py-2.5">
@@ -99,8 +100,8 @@ function Header({ items, building, next, data }: { items: Item[]; building: numb
           className="inline-flex items-center gap-1.5 rounded-full border border-(--border) px-2 py-0.5">
           <span className="relative h-3 w-5 rounded-full bg-(--input)"><span className="absolute left-0.5 top-0.5 size-2 rounded-full bg-(--card)" /></span>Auto-start
         </button>
-        {next ? <StartControl item={next} data={data} label="Start next" />
-          : items.length > 0 && <Button className="disabled:pointer-events-auto" disabled title={NONE_STARTS}>Start next</Button>}
+        {next ? <StartControl item={next} data={data} label="Start next" main />
+          : items.length > 0 && <Button {...kind('main')} className="disabled:pointer-events-auto" disabled title={NONE_STARTS}>Start next</Button>}
       </span>
     </header>
   );
@@ -119,7 +120,7 @@ export function Queue({ items }: { items: Item[] }) {
       {queued.length ? (
         <ol className="m-0 grid list-none p-0">
           {/* The row Start next starts is the one that waits for a slot. */}
-          {queued.map((i, n) => <Row key={i.id} item={i} n={n} data={data} now={now} first={i === next} waits={i === next && building >= BUILD_LIMIT} />)}
+          {queued.map((i, n) => <Row key={i.id} item={i} n={n} data={data} now={now} waits={i === next && building >= BUILD_LIMIT} />)}
         </ol>
       ) : <p className="m-0 p-6 text-center text-(--muted-foreground)">Queue empty. Queue items from the List.</p>}
     </section>

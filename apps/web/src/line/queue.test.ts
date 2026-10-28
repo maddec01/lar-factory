@@ -91,7 +91,6 @@ test('while the slots are full, the row Start next starts waits for one, not a d
   expect(text(rows()[0]!), 'the draft can\'t start').not.toContain('next when a build slot frees');
   expect(text(row('I_sample05'))).toContain('next when a build slot frees');
   expect(startNext().getAttribute('data-start')).toBe('I_sample05');
-  expect(start().className, 'the primary Start is on the row Start next starts').toContain('bg-primary');
 });
 
 test('the header shows the build slots; while they are full the first row waits for one, and Start still works', async () => {
@@ -105,15 +104,14 @@ test('the header shows the build slots; while they are full the first row waits 
   expect(startNext().getAttribute('aria-disabled')).not.toBe('true');
 });
 
-test('a Queued item blocked by an open issue has its Start refining disabled, with Start after, and Start next passes over it', async () => {
+test('a Queued item blocked by an open issue shows only Start after, a Start, and Start next passes over it', async () => {
   const blocked = { ...withChoices, items: sample.items.map((i) => (i.id === 'I_sample05'
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };
   await mountPage(blocked);
-  expect([text(start()), start().disabled, start().title]).toEqual(['Start refining', true, 'Blocked by #202 until it closes']);
-  expect(text(row('I_sample05').querySelector('[data-start-after]'))).toBe('Start after #202 ▾');
+  expect(row('I_sample05').querySelector('[data-start]'), 'no disabled Start beside it').toBeNull();
+  const after = row('I_sample05').querySelector<HTMLElement>('[data-start-after]')!;
+  expect([text(after), after.dataset.kind, Boolean(after.querySelector('[data-slot="icon"] svg'))]).toEqual(['Start after #202 ▾', 'start', true]);
   expect(startNext().getAttribute('data-start')).toBe('I_sample06');
-  expect(start('I_sample06').className, 'the primary Start follows Start next').toContain('bg-primary');
-  expect(start().className).not.toContain('bg-primary');
 });
 
 test("a Queued item whose repository has no T3 project has its Start refining disabled with the project's hint, and Start next passes over it", async () => {
@@ -145,6 +143,7 @@ test('when no queued item can start, Start next shows disabled and says why', as
   const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
   expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs an issue or a T3 project, waits for onboarding, or has a thread at work.']);
   expect(next.className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
+  expect(next.dataset.kind, 'a Main action while disabled too').toBe('main');
   expect(text(queue()), 'no row waits for a slot').not.toContain('next when a build slot frees');
 });
 
@@ -169,13 +168,14 @@ test('the drag handles and Auto-start are disabled and say they are not built ye
     .toEqual(['Auto-start', true, 'false', "Auto-start isn't built yet: it will start the next item whenever a build slot frees"]);
 });
 
-test('Start refining sits on Queued issues, primary on the row Start next starts; a queued draft asks for an issue instead', async () => {
+test('Start refining sits on Queued issues, one Start on every row, and Start next is filled; a queued draft asks for an issue instead', async () => {
   await mountPage();
   expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['I_sample05', 'I_sample06']);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-label')])
     .toEqual(['Start refining ▾', 'menu', `Start refining #129 ${sample05.title}`]);
-  expect(start().className).toContain('bg-primary');
-  expect(start('I_sample06').className, 'later rows are outlined').not.toContain('bg-primary');
+  expect([start(), start('I_sample06')].map((b) => [b.dataset.kind, Boolean(b.querySelector('[data-slot="icon"] svg'))]), 'every row the same Start, with its icon')
+    .toEqual([['start', true], ['start', true]]);
+  expect(startNext().dataset.kind, "Start next is the Queue's Main action").toBe('main');
   expect(text(row('I_sample21').querySelector('.queue-hint'))).toBe('Needs an issue to start');
   expect(row('I_sample21').querySelector<HTMLElement>('.queue-hint')!.title).toBe('This draft needs an issue before it can start. Convert it to an issue in a repo.');
 });

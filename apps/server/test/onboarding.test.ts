@@ -224,7 +224,7 @@ test("the Labels step reads a repository's labels, creates the missing workflow 
 
 test('the sample board runs no onboarding check, finds no Clash, runs no Clash agent and touches no label', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs', '/api/onboarding/labels', '/api/onboarding/labels/create', '/api/onboarding/labels/rename', '/api/onboarding/labels/custom']) {
+  for (const path of ['/api/onboarding/teams', '/api/onboarding/checks', '/api/onboarding/clashes', '/api/onboarding/clash-runs', '/api/onboarding/labels', '/api/onboarding/labels/create', '/api/onboarding/labels/rename', '/api/onboarding/labels/custom']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }
@@ -361,4 +361,17 @@ test('the sample board opens, reopens and resets no onboarding PR', async (t) =>
     const response = await board.post({ repo: 'maddec01/lar-web', progress, config }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }
+});
+
+test('label creation streams successful updates through the guarded HTTP route', async (t) => {
+  const board = await startBoard(t);
+  const response = await fetch(`${board.url}/api/onboarding/labels/create`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', Origin: board.url },
+    body: JSON.stringify({ repo: 'maddec01/lar-web', itemSource: { kind: 'issues' }, renaming: [] }),
+  });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type')!, /application\/x-ndjson/);
+  const events = (await response.text()).trim().split('\n').map((line) => JSON.parse(line));
+  assert.ok(events[0].progress.labels.length > 0);
+  assert.equal(events.at(-1).result.error, null);
 });

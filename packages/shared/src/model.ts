@@ -908,7 +908,7 @@ export const SETUP_CHECKS = ['checkout', 'source', 'push'] as const;
 export type SetupCheckId = (typeof SETUP_CHECKS)[number];
 
 /** A setup check's result: what it found, or the problem with its fix and the command that fixes it, when one does. */
-export type SetupCheckResult = { passed: true; detail: string } | { passed: false; problem: string; fix: string; command?: string };
+export type SetupCheckResult = { passed: true; detail: string; counts?: Record<ShowSetting, number> } | { passed: false; problem: string; fix: string; command?: string };
 
 /** What a Clash's fix does to its file: swaps lines for others, deletes the file or folder, or renames it. */
 export type ClashEdit = { kind: 'lines'; remove: string[]; add: string[] } | { kind: 'delete' } | { kind: 'rename'; to: string };

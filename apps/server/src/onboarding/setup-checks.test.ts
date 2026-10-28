@@ -10,7 +10,7 @@ const PROJECT: RepositoryItemSource = { kind: 'issues' };
 
 /** Reads that find `projects` as T3's, read the item source's items as `items` and answer `push` for the permission. */
 function reads(parts: Partial<SetupCheckReads> = {}): SetupCheckReads {
-  return { checkouts: async () => [WEB], countItems: async () => 23, canPush: async () => true, ...parts };
+  return { checkouts: async () => [WEB], countItems: async () => ({ all: 23, 'opted-in': 0 }), canPush: async () => true, ...parts };
 }
 
 const check = (input: Record<string, unknown>, parts?: Partial<SetupCheckReads>) =>
@@ -41,10 +41,10 @@ test("the main checkout check names T3's problem when its projects can't be read
 
 test('the item source check reads GitHub issues and counts their items', async () => {
   const sources: [RepositoryItemSource, string][] = [];
-  const countItems = async (source: RepositoryItemSource, repo: string) => { sources.push([source, repo]); return 23; };
-  assert.deepEqual(await check({ check: 'source' }, { countItems }), { result: { passed: true, detail: 'Found 23 items in maddec01/lar-web\'s issues.' } });
+  const countItems = async (source: RepositoryItemSource, repo: string) => { sources.push([source, repo]); return { all: 23, 'opted-in': 0 }; };
+  assert.deepEqual(await check({ check: 'source' }, { countItems }), { result: { passed: true, detail: 'Found 23 items in maddec01/lar-web\'s issues.', counts: { all: 23, 'opted-in': 0 } } });
   assert.deepEqual(await check({ check: 'source', itemSource: { kind: 'issues' } }, { countItems }),
-    { result: { passed: true, detail: 'Found 23 items in maddec01/lar-web\'s issues.' } });
+    { result: { passed: true, detail: 'Found 23 items in maddec01/lar-web\'s issues.', counts: { all: 23, 'opted-in': 0 } } });
   assert.deepEqual(sources, [[PROJECT, 'maddec01/lar-web'], [{ kind: 'issues' }, 'maddec01/lar-web']]);
 });
 
@@ -93,9 +93,9 @@ test("the main checkout check reads an Azure DevOps origin as organization/proje
 
 test("the item source check counts an Azure DevOps team's sprint or backlog through az", async () => {
   const az = fakeAz({ items: ITEMS });
-  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s backlog and current sprint.' } });
+  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s backlog and current sprint.', counts: { all: 2, 'opted-in': 0 } } });
   assert.deepEqual(await azureCheck({ check: 'source', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' } }, az.run),
-    { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s backlog and current sprint.' } });
+    { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s backlog and current sprint.', counts: { all: 2, 'opted-in': 0 } } });
 });
 
 test("an Azure DevOps item source az can't read shows az's message, with az login for a logged-out az", async () => {
@@ -125,4 +125,9 @@ test('an empty Azure permission evaluation is inconclusive and allows continuing
   const az = fakeAzRepos();
   const answer = await azureCheck({ check: 'push' }, async (args) => args[0] === 'rest' ? '{"count":0,"value":[]}' : az.run(args));
   assert.deepEqual(answer, { result: { passed: true, detail: `Warning: couldn't check ${SHOWN_REPO}'s push permission: Azure DevOps returned no push permission decision. You can continue; agents will need Contribute permission to push.` } });
+});
+
+test('the source check returns both Show counts from its existing item read', async () => {
+  assert.deepEqual(await check({ check: 'source', itemSource: { kind: 'issues' } }, { countItems: async () => ({ all: 23, 'opted-in': 0 }) }),
+    { result: { passed: true, detail: "Found 23 items in maddec01/lar-web's issues.", counts: { all: 23, 'opted-in': 0 } } });
 });

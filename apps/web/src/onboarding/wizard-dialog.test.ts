@@ -26,7 +26,9 @@ test('Next is disabled until a project is picked, then shows the next step, and 
   expect(button('Next')!.disabled).toBe(true);
   await settle(() => radio('lar-web').click());
   expect(button('Next')!.disabled).toBe(false);
+  inDialog('[data-slot="modal-body"]')!.scrollTop = 300;
   await settle(() => button('Next')!.click());
+  expect(inDialog('[data-slot="modal-body"]')!.scrollTop).toBe(0);
   expect(text(inDialog('[data-slot="modal-header"] h2'))).toBe('Board settings');
   expect(text(inDialog('#onboarding-place'))).toBe('Set up lar-web. Step 2 of 6.');
   expect(inDialog('[role="progressbar"]')!.getAttribute('aria-valuenow')).toBe('1');

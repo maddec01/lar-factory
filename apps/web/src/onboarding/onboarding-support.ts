@@ -14,6 +14,7 @@ export const project = (name: string, parts: Partial<ProjectChoice> = {}): Proje
 export function serve(data: BoardData, projects: ProjectChoice[] | { error: string }, keep: object = { error: null }, status = 200): void {
   fetchMock.mockImplementation(async (url: string) => url === '/api/onboarding/projects'
     ? new Response(JSON.stringify(Array.isArray(projects) ? { projects } : projects), { status: Array.isArray(projects) ? 200 : 502 })
+    : url === '/api/onboarding/teams' ? new Response(JSON.stringify({ teams: ['Fabrikam Team', 'Other team'] }))
     : url === '/api/onboarding/repositories' ? new Response(JSON.stringify(keep), { status })
     : new Response(JSON.stringify(data)));
 }

@@ -26,6 +26,7 @@ import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import {
   createPrOpener, followOnboardingPrs, followResetPrs, previewOnboardingPr, reopenOnboardingPr, resetRepository,
 } from './onboarding/onboarding-pr.ts';
+import { readProjectTeams } from './onboarding/project-teams.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
 import { findFixedClashes } from './onboarding/fixed-clashes.ts';
 import { createCustomLabel, createRepositoryLabels, readRepositoryLabels, renameRepositoryLabels } from './onboarding/repository-labels.ts';
@@ -590,7 +591,8 @@ const { server, endStreams } = createBoardServer({
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input),
-  repositoryLabels: { read: (input) => readRepositoryLabels(input), create: (input) => createRepositoryLabels(input), rename: (input) => renameRepositoryLabels(input),
+  readProjectTeams,
+  repositoryLabels: { read: (input) => readRepositoryLabels(input), create: (input, progress) => createRepositoryLabels(input, undefined, progress), rename: (input) => renameRepositoryLabels(input),
     custom: (input) => createCustomLabel(input) },
   findFixedClashes: (input) => findFixedClashes(input),
   startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo),

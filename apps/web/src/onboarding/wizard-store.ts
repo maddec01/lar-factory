@@ -243,6 +243,7 @@ export interface Labels {
   /** The custom labels the step created on the repository, which it doesn't list as left alone. */
   created: string[];
   busy: LabelAction | null;
+  progress?: { created: number; total: number };
   /** A change that failed, with the custom label it was adding for a typed one. */
   error: { action: LabelAction; message: string; name?: string } | null;
 }
@@ -272,6 +273,7 @@ export function stepReady(run: Run, projects: Projects, checks: Checks | null = 
   if (run.step === 'project') return true;
   if (run.step === 'setup') return !!project.config || asksSetup(project) && setupAnswered(run.setup);
   if (run.step === 'labels') {
+    if (labels?.busy) return false;
     const plan = labelsPlan(run, project, labels);
     return !!plan && (project.provider === 'Azure DevOps' || !workflowLabelsMissing(plan));
   }
@@ -447,11 +449,11 @@ function resumed(repo: string, progress: OnboardingProgress): Run {
 
 /**
  * The setup step's defaults: repository issues on GitHub, or the combined Azure board. The Azure team
- * starts with the usual project-based name and remains editable.
+ * is chosen from the project's teams.
  */
-function firstSetup(repo: string | null, provider: Provider | null): SetupAnswers {
+function firstSetup(provider: Provider | null): SetupAnswers {
   const itemSource = provider === 'Azure DevOps' ? 'azure-board' : 'issues';
-  return { itemSource, team: provider === 'Azure DevOps' && repo ? `${shownRepo(repo).split('/')[1]} Team` : '', show: suggestedShow(),
+  return { itemSource, team: '', show: suggestedShow(),
     showPicked: false, role: '' };
 }
 
@@ -481,7 +483,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes, agent, labels))) return;
     const to = STEPS[STEPS.findIndex((s) => s.id === run.step) + by]?.id;
     if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done,
-      setup: run.setup ?? (to === 'setup' ? firstSetup(run.repo, run.provider) : null), cleanup: run.cleanup ?? (to === 'cleanup' ? NO_PICKS : null) } });
+      setup: run.setup ?? (to === 'setup' ? firstSetup(run.provider) : null), cleanup: run.cleanup ?? (to === 'cleanup' ? NO_PICKS : null) } });
     if (to === 'labels') void get().loadLabels();
     if (to === 'checks') void get().runChecks();
     if (to === 'cleanup') {
@@ -508,7 +510,13 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     const { run } = get();
     if (!run?.repo) return;
     const runId = ++labelRuns;
-    const answer = await postAction<{ labels: string[] }>(path, { repo: run.repo, ...body });
+    const answer = await postAction<{ labels: string[] }>(path, { repo: run.repo, ...body }, action === 'create' ? (update) => {
+      const now = currentLabels(runId);
+      if (!now || !update.labels) return;
+      const before = now.read.state === 'loaded' ? now.read.names : [];
+      const added = update.labels.filter((name) => !before.includes(name)).length;
+      set({ labels: { ...now, read: { state: 'loaded', names: update.labels }, progress: now.progress && { ...now.progress, created: now.progress.created + added } } });
+    } : undefined);
     const now = currentLabels(runId);
     if (!now) return;
     if (answer.labels) {
@@ -651,7 +659,9 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     answer: (change) => {
       const { run } = get();
       if (!run?.setup) return;
-      set({ run: { ...run, setup: answerSetup(run.setup, change) } });
+      const teamChanged = change.team !== undefined && change.team !== run.setup.team;
+      if (teamChanged) checkRuns++;
+      set({ run: { ...run, setup: answerSetup(run.setup, change) }, ...teamChanged && { checks: null } });
     },
     next: () => move(1),
     back: () => move(-1),
@@ -670,7 +680,7 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const step = labelStep();
       const custom = step ? customLabelsToCreate(step.project, step.labels) : [];
       if (!step || step.project.provider === 'Azure DevOps' || !labelsToCreate(step.plan, renaming(step.plan, step.labels)).length && !custom.length) return;
-      set({ labels: { ...step.labels, busy: 'create', error: null } });
+      set({ labels: { ...step.labels, busy: 'create', progress: { created: 0, total: labelsToCreate(step.plan, renaming(step.plan, step.labels)).length + custom.length }, error: null } });
       await labelsPost('/api/onboarding/labels/create', { itemSource: itemSourceOf(step.run, step.project), renaming: renaming(step.plan, step.labels), custom }, 'create');
     },
     renameLabels: async () => {

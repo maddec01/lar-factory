@@ -5,7 +5,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, test, vi } from 'vite-plus/test';
 import type { SetupAnswers } from '@lar-factory/shared';
-import { $, $$, checkedOf, settle, text } from '../../test/support.ts';
+import { $, $$, checkedOf, fetchMock, settle, text } from '../../test/support.ts';
 import { CustomLabelPicker, SetupFields, type CustomLabelPicks } from './setup-fields.tsx';
 
 const SETUP: SetupAnswers = { itemSource: 'issues', show: 'all', showPicked: false, role: '' };
@@ -53,4 +53,36 @@ test("the custom label picker holds Add for a name that can't be a custom label,
   await settle(() => $<HTMLInputElement>('[data-new-custom]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(onAdd).not.toHaveBeenCalled();
   expect(text($('[role="alert"]'))).toContain('Could not add app: iosgh: HTTP 403');
+});
+
+test('Azure offers real teams, leaves several unselected, and preselects a sole team', async () => {
+  const onAnswer = vi.fn();
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ teams: ['App', 'Controls', 'DepotAndTrading'] })));
+  await mount(createElement(SetupFields, { repo: 'contoso/VanEckDirect/api', azure: true, setup: { ...SETUP, itemSource: 'azure-board', team: '' }, onAnswer }));
+  await settle(() => {});
+  expect($$<HTMLOptionElement>('[data-field="team"] option').map((o) => o.value)).toEqual(['', 'App', 'Controls', 'DepotAndTrading']);
+  expect(onAnswer).not.toHaveBeenCalled();
+  const select = $<HTMLSelectElement>('[data-field="team"] select')!;
+  await settle(() => { select.value = 'App'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(onAnswer).toHaveBeenCalledWith({ team: 'App' });
+  onAnswer.mockClear();
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ teams: ['Only team'] })));
+  await mount(createElement(SetupFields, { repo: 'contoso/Other/api', azure: true, setup: { ...SETUP, itemSource: 'azure-board', team: '' }, onAnswer }));
+  expect(onAnswer).toHaveBeenCalledWith({ team: 'Only team' });
+});
+
+test('Show choices include counts when available, including zero', async () => {
+  await mount(createElement(SetupFields, { repo: 'maddec01/api', setup: SETUP, counts: { all: 23, 'opted-in': 0 }, onAnswer: vi.fn() }));
+  expect(text($('[data-choice="all"]'))).toContain('23 items');
+  expect(text($('[data-choice="opted-in"]'))).toContain('0 items');
+});
+
+test('a team read failure offers Retry without guessing a name', async () => {
+  fetchMock.mockRejectedValue(new Error('offline'));
+  await mount(createElement(SetupFields, { repo: 'contoso/Example/api', azure: true, setup: { ...SETUP, itemSource: 'azure-board', team: '' }, onAnswer: vi.fn() }));
+  await settle();
+  expect(text($('[role="alert"]'))).toContain("Can't reach the board");
+  fetchMock.mockResolvedValue(new Response(JSON.stringify({ teams: ['App', 'Controls'] })));
+  await settle(() => $('[role="alert"] button')!.click());
+  expect($$<HTMLOptionElement>('[data-field="team"] option').map((o) => o.value)).toEqual(['', 'App', 'Controls']);
 });

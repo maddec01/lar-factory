@@ -37,6 +37,7 @@ export interface HttpDeps {
   ready(): Promise<void> | undefined;
   /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
   projectChoices(): Promise<ProjectChoice[]>;
+  readProjectTeams(input: Record<string, unknown>): Promise<{ teams: string[] } | Refused>;
   /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
   keepOnboarding(input: Record<string, unknown>): { onboarding: OnboardingRepository[] } | Refused;
   /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
@@ -50,7 +51,7 @@ export interface HttpDeps {
   /** The repository's Clash agent runs, oldest first. */
   clashRuns(repo: string): ClashRun[];
   /** Reads, creates or renames the labels of onboarding's Labels step, or creates a custom label, answering with the repository's labels, or gh's problem. */
-  repositoryLabels: Record<'read' | 'create' | 'rename' | 'custom', (input: Record<string, unknown>) => Promise<{ labels: string[] } | Refused>>;
+  repositoryLabels: Record<'read' | 'create' | 'rename' | 'custom', (input: Record<string, unknown>, progress?: (labels: string[]) => void) => Promise<{ labels: string[] } | Refused>>;
   /** Opens an onboarding's PR and keeps its URL, returning it and the repositories still onboarding, or gh's problem. */
   openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string; onboarding: OnboardingRepository[] } | Refused>;
   /** What an onboarding's PR would change against its default branch with the body's answers and picks, or why it can't say. */
@@ -90,7 +91,8 @@ interface Write {
   disabled?: string;
   /** The answer when the page's session is from an earlier board run; a write without one skips the check. */
   restarted?: () => object;
-  run(input: Record<string, unknown>): Promise<Reply>;
+  progress?: boolean;
+  run(input: Record<string, unknown>, progress?: (body: object) => void): Promise<Reply>;
 }
 
 const SECURITY_HEADERS = {
@@ -148,7 +150,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
   return async (input) => typeof input.itemId === 'string' ? run(input.itemId, input) : { status: 400, body: { error: unnamed } };
 }
 
-export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
+export function createBoardServer({ board, commands, startAfter, page, appSecret, sample, recheck, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
   runSetupCheck, repositoryLabels, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, reopenOnboardingPr,
   resetRepository, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
@@ -180,9 +182,10 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
 
   /** A write of onboarding's Labels step, which answers with the repository's labels. */
   const labelsWrite = (action: keyof HttpDeps['repositoryLabels']): Write => ({
+    progress: action === 'create',
     what: `the labels to ${action}`, disabled: 'Sample mode onboards no repository.',
-    async run(input) {
-      const answer = await repositoryLabels[action](input);
+    async run(input, progress) {
+      const answer = await repositoryLabels[action](input, (labels) => progress?.({ labels }));
       return 'error' in answer ? { status: answer.status, body: { error: answer.error } } : { status: 200, body: { ...answer, error: null } };
     },
   });
@@ -245,6 +248,13 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
         board.update({ onboarding: kept.onboarding });
         board.push();
         return { status: 200, body: withBoard({ error: null }) };
+      },
+    },
+    '/api/onboarding/teams': {
+      what: 'the repository whose teams to load', disabled: 'Sample mode onboards no repository.',
+      async run(input) {
+        const answer = await readProjectTeams(input);
+        return 'error' in answer ? { status: answer.status, body: { error: answer.error } } : { status: 200, body: answer };
       },
     },
     '/api/onboarding/checks': {
@@ -385,8 +395,14 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     try {
       const input = await writeInput(req, res, write);
       if (!input) return;
-      const { status, body } = await write.run(input);
-      json(res, status, body);
+      const streaming = write.progress && req.headers.accept === 'application/x-ndjson';
+      const emit = (body: object) => {
+        if (!res.headersSent) res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+        res.write(`${JSON.stringify(body)}\n`);
+      };
+      const { status, body } = await write.run(input, streaming ? (progress) => emit({ progress }) : undefined);
+      if (res.headersSent) { emit({ result: body }); res.end(); }
+      else json(res, status, body);
     } finally {
       if (--runningWrites === 0) for (const resolve of drained.splice(0)) resolve();
     }

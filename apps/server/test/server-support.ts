@@ -12,8 +12,10 @@ import type { BoardData, SkillCheckAnswer } from '@lar-factory/shared';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
+/** The calls the fakes logged, skipping a last line a running fake has not finished writing. */
 async function readCalls(file: string): Promise<string[][]> {
-  return (await readFile(file, 'utf8')).trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
+  const lines = (await readFile(file, 'utf8')).split('\n');
+  return lines.slice(0, -1).filter(Boolean).map((l) => JSON.parse(l) as string[]);
 }
 
 /** The board data sample mode serves. */

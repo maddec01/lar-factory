@@ -23,9 +23,18 @@ async function dataDir(t: TestContext, entries: object[] = []): Promise<string> 
 
 const ALL = WORKFLOW_LABELS.map((l) => l.name);
 
-/** A call's value for a gh api field, such as `ref` for `-f ref=...`; the values of `tree[][path]` for an array's. */
-const field = (args: string[], name: string) => args.filter((a, i) => /^-[fF]$/.test(args[i - 1] ?? '') && a.startsWith(`${name}=`))
-  .map((a) => a.slice(name.length + 1));
+/** The gh boundary's fields, read from JSON stdin for tree requests and flags for other requests. */
+const inputs = new WeakMap<string[], string>();
+const field = (args: string[], name: string): string[] => {
+  const input = inputs.get(args);
+  if (input) {
+    const payload = JSON.parse(input) as { base_tree: string; tree: Record<string, string>[] };
+    if (name === 'base_tree') return [payload.base_tree];
+    const key = /^tree\[\]\[(.+)\]$/.exec(name)?.[1];
+    if (key) return payload.tree.flatMap((entry) => typeof entry[key] === 'string' ? [entry[key]] : []);
+  }
+  return args.filter((a, i) => /^-[fF]$/.test(args[i - 1] ?? '') && a.startsWith(`${name}=`)).map((a) => a.slice(name.length + 1));
+};
 
 const RULES = '# lar-web\n\n- Push to main when done.\n';
 const LAR_CONFIG = JSON.stringify({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: [] });
@@ -39,7 +48,8 @@ const LAR_CONFIG = JSON.stringify({ version: 1, role: 'Web client', itemSource: 
 function gh(fails: Record<string, string> = {}, branches: Record<string, string | null> = {}, files: Record<string, string> = { 'AGENTS.md': RULES },
   labels = ALL) {
   const calls: string[][] = [];
-  const run = async (args: string[]) => {
+  const run = async (args: string[], input?: string) => {
+    if (input !== undefined) inputs.set(args, input);
     if (args[0] === 'label' && args[1] === 'list') return JSON.stringify(labels.map((name) => ({ name })));
     calls.push(args);
     const failure = fails[args.slice(0, 2).join(' ')] ?? fails[args[1]!];
@@ -259,7 +269,8 @@ test('a body without the repository, its progress, a whole Repository config or 
  */
 function github(byUrl: Record<string, string>, files: Record<string, object> = {}) {
   const changed: string[][] = [];
-  const run = async (args: string[]) => {
+  const run = async (args: string[], input?: string) => {
+    if (input !== undefined) inputs.set(args, input);
     if (args[0] === 'pr' && (args[1] === 'close' || args[1] === 'reopen')) {
       changed.push(args);
       return '';

@@ -724,7 +724,7 @@ export function ref(item: Item): string {
   return item.number === null ? 'draft' : `#${item.number}`;
 }
 
-/** Abandon deletes a List or Queued issue, or removes such a draft. Pull requests stay. */
+/** Abandon closes a List or Queued issue, or removes such a draft. Pull requests stay. */
 export function canAbandon(item: Item): boolean {
   return (item.status === 'List' || item.status === 'Queued') && item.content === 'ticket';
 }

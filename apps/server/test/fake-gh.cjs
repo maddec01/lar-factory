@@ -203,8 +203,8 @@ const main = async () => {
     process.exitCode = 1;
     return;
   }
-  if (options.fail === 'delete' && (args[1] === 'delete' || args[1] === 'item-delete')) {
-    process.stderr.write('HTTP 403: Must have admin rights to Repository.');
+  if (options.fail === 'abandon' && (args[1] === 'close' || args[1] === 'item-delete')) {
+    process.stderr.write('HTTP 403: Must have write access to Repository.');
     process.exitCode = 1;
     return;
   }
@@ -267,9 +267,9 @@ const main = async () => {
     }
     return output(issue);
   }
-  if (options.writeDelay && ['item-edit', 'delete', 'item-delete'].includes(args[1])) await new Promise((r) => setTimeout(r, options.writeDelay));
-  // Deletes leave options.items alone, like a GitHub read that still lags behind.
-  if (args[0] === 'issue' && args[1] === 'delete') return;
+  if (options.writeDelay && ['item-edit', 'close', 'item-delete'].includes(args[1])) await new Promise((r) => setTimeout(r, options.writeDelay));
+  // Closes and draft removals leave options.items alone, like a GitHub read that still lags behind.
+  if (args[0] === 'issue' && args[1] === 'close') return;
   if (args[1] === 'item-delete') return output({});
   // A PR read: options.liveBodies holds bodies edited since the board's read.
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+\/pulls\/\d+$/.test(args[1])) {

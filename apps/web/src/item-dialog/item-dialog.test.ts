@@ -440,7 +440,7 @@ test('Abandon in the dialog asks first, then deletes the item, closes the dialog
   expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
   expect(text(button('abandon', 'I_sample01'))).toBe('Abandoning…');
   await answer({ error: null, board: without('I_sample01') });
-  expect(text(toast())).toBe(`Deleted #61 ${sample.items[0]!.title}.`);
+  expect(text(toast())).toBe(`Closed #61 ${sample.items[0]!.title} as "not planned".`);
   expect($('[data-item-dialog]'), 'the dialog closes').toBeNull();
 });
 
@@ -450,8 +450,8 @@ test('a failed Abandon in the dialog is a toast, and focus goes back to Abandon'
   await openItem('I_sample01');
   await press(button('abandon', 'I_sample01'));
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
-  await answer({ error: 'Could not delete #61.' }, 502);
-  expect(text(toast())).toMatch(/^Couldn't abandon #61 .*\. Could not delete #61\.$/);
+  await answer({ error: 'Could not abandon #61.' }, 502);
+  expect(text(toast())).toMatch(/^Couldn't abandon #61 .*\. Could not abandon #61\.$/);
   expect(inDialog('.action-error'), 'no inline error').toBeNull();
   await settle(() => vi.advanceTimersByTime(20));
   expect(document.activeElement).toBe(button('abandon', 'I_sample01'));

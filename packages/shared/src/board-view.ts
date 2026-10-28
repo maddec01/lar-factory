@@ -1,7 +1,7 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
 // Abandon asks.
 
-import { STATUSES, inRepo, isDraft, isRecentlyDone, kindOf, ref, repoKey, repoName, sameRepo } from './model.ts';
+import { STATUSES, inRepo, isDraft, isRecentlyDone, kindOf, onAzure, ref, repoKey, repoName, sameRepo } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
 import { slug } from './format.ts';
 
@@ -98,11 +98,14 @@ export function prLabel(pr: LinkedPr): string {
 
 export const UNREADABLE = 'The T3 Code database could not be read';
 
-/** What Abandon asks before it deletes, and what it says after. */
+/** What Abandon asks, and how the provider keeps the issue recoverable. Draft removal stays permanent. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
-  return isDraft(item)
-    ? { question: `Remove draft ${item.title}?`, detail: "This removes the draft from the project. It can't be undone.",
-        confirm: 'Remove draft', done: `Removed draft ${item.title}.` }
-    : { question: `Delete ${ref(item)} ${item.title}?`, detail: `This permanently deletes the issue from ${item.repo} on GitHub. It can't be undone.`,
-        confirm: 'Delete issue', done: `Deleted ${ref(item)} ${item.title}.` };
+  if (isDraft(item)) return { question: `Remove draft ${item.title}?`, detail: "This removes the draft from the project. It can't be undone.",
+    confirm: 'Remove draft', done: `Removed draft ${item.title}.` };
+  const azure = onAzure(item.repo ?? '');
+  return { question: `Abandon ${ref(item)} ${item.title}?`, confirm: 'Abandon',
+    detail: azure ? 'This moves the work item to Removed in Azure DevOps. You can reactivate it in Azure DevOps.'
+      : 'This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.',
+    done: azure ? `Moved ${ref(item)} ${item.title} to Removed.` : `Closed ${ref(item)} ${item.title} as "not planned".`,
+  };
 }

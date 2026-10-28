@@ -2,7 +2,7 @@
 
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, ITEMS_QUERY, PR_BODIES_QUERY, getIfChanged } from './github.ts';
+import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, ITEMS_QUERY, PR_BODIES_QUERY, createTree, getIfChanged } from './github.ts';
 
 test('the board query reads the blocked-by issues, and no issue or linked PR bodies', () => {
   assert.match(ITEMS_QUERY, /blockedBy\(first: \d+\) \{ nodes \{ number state repository \{ nameWithOwner \} \} \}/, 'each blocked-by issue comes with its repo and state');
@@ -46,4 +46,24 @@ test('a change check asks again with the last ETag, and an unchanged answer, a 3
   assert.equal(await getIfChanged('repos/a/b/issues', 'W/"1"', answer), null);
   assert.deepEqual(asked, [['api', '-i', 'repos/a/b/issues'], ['api', '-i', '-H', 'If-None-Match: W/"1"', 'repos/a/b/issues']]);
   await assert.rejects(getIfChanged('repos/a/b/issues', undefined, async () => { throw new Error('HTTP 404'); }), /404/);
+});
+
+
+test('a tree sends edits, kept blobs and deletions as JSON without gh form parsing', async () => {
+  let payload: unknown;
+  const sha = await createTree('owner/repo', 'base123', [
+    { path: 'AGENTS.md', mode: '100644', content: '# Rules\n"Keep quotes"\n' },
+    { path: 'renamed.md', mode: '100755', sha: 'blob123' },
+    { path: '.lar-factory.json', mode: '100644', sha: null },
+  ], async (args, input?: string) => {
+    assert.deepEqual(args, ['api', 'repos/owner/repo/git/trees', '--method', 'POST', '--input', '-', '--jq', '.sha']);
+    payload = JSON.parse(input!);
+    return 'tree123\n';
+  });
+  assert.equal(sha, 'tree123');
+  assert.deepEqual(payload, { base_tree: 'base123', tree: [
+    { path: 'AGENTS.md', mode: '100644', type: 'blob', content: '# Rules\n"Keep quotes"\n' },
+    { path: 'renamed.md', mode: '100755', type: 'blob', sha: 'blob123' },
+    { path: '.lar-factory.json', mode: '100644', type: 'blob', sha: null },
+  ] });
 });

@@ -124,7 +124,7 @@ test('a gh older than 2.94.0 shows its notice and the board still reads GitHub',
 
 test('a login without the project scope reads no Project until Recheck finds the scope', async (t) => {
   const board = await startBoard(t, { ghScopes: "'repo'" });
-  const data = await board.board();
+  const data = await checked(board);
   assert.deepEqual(data.tools?.gh, { result: 'no-project-scope', version: '2.96.0', fix: 'gh auth refresh -s project' });
   assert.equal(data.error, null);
   assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0);

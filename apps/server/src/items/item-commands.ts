@@ -336,7 +336,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       let pending = abandoning.get(itemId);
       if (!pending) {
         const item = board.find(itemId);
-        // A second press after the delete finished has nothing left to do.
+        // A second press after Abandon finished has nothing left to do.
         if (!item && board.removed(itemId)) return withBoard(200, { error: null });
         if (!item) return withBoard(404, { error: GONE });
         if (!canAbandon(item)) return reply(409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${aType(item)} in ${item.status}.` });

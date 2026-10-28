@@ -13,9 +13,18 @@ const FILE = JSON.stringify({ version: 2, role: 'Web client', itemSource: { kind
 const PR_FILE = JSON.stringify({ version: 3, role: 'Web client on the PR', show: 'opted-in', labels: ['app: video'] });
 const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: ' Web client for the API ', labels: ['app: music', 'app: video'] };
 
-/** A call's values for a gh api field, such as `ref` for `-f ref=...`. */
-const field = (args: string[], name: string) => args.filter((a, i) => /^-[fF]$/.test(args[i - 1] ?? '') && a.startsWith(`${name}=`))
-  .map((a) => a.slice(name.length + 1));
+/** The gh boundary's fields, read from JSON stdin for tree requests and flags for other requests. */
+const inputs = new WeakMap<string[], string>();
+const field = (args: string[], name: string): string[] => {
+  const input = inputs.get(args);
+  if (input) {
+    const payload = JSON.parse(input) as { base_tree: string; tree: Record<string, string>[] };
+    if (name === 'base_tree') return [payload.base_tree];
+    const key = /^tree\[\]\[(.+)\]$/.exec(name)?.[1];
+    if (key) return payload.tree.flatMap((entry) => typeof entry[key] === 'string' ? [entry[key]] : []);
+  }
+  return args.filter((a, i) => /^-[fF]$/.test(args[i - 1] ?? '') && a.startsWith(`${name}=`)).map((a) => a.slice(name.length + 1));
+};
 
 /**
  * A gh that records each call and answers it like GitHub, over a repository whose default branch holds `file` as its
@@ -25,7 +34,8 @@ const field = (args: string[], name: string) => args.filter((a, i) => /^-[fF]$/.
  */
 function gh({ file = FILE as string | null, labels = ['bug', 'app: music'], fails = {} as Record<string, string>, branch = false, openPr = '' } = {}) {
   const calls: string[][] = [];
-  const run = async (args: string[]) => {
+  const run = async (args: string[], input?: string) => {
+    if (input !== undefined) inputs.set(args, input);
     calls.push(args);
     const failure = fails[args.slice(0, 2).join(' ')] ?? fails[args[1]!];
     if (failure) throw new Error(failure);

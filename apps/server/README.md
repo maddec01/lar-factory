@@ -63,9 +63,10 @@ new build or `src/` change.
 - **Back to List**, in the footer row of a Queued issue or draft card, is the
   reverse of Queue: it sets the item's Status back to List, and the board moves
   the card there at once. **Abandon**, on the right of the same row, works as
-  it does on List rows: after the same prompt it deletes the issue for good or
-  removes the draft. Queued pull requests get no footer row. Once a card's
-  Start is running, may have started or has started, the row disappears and
+  it does on List rows: it asks first, then closes a GitHub issue as "not planned"
+  or moves an Azure DevOps work item to Removed. Reopen it in its provider to
+  bring it back. Abandon removes a draft for good. Queued pull requests get no
+  footer row. Once a card's Start is running, may have started or has started, the row disappears and
   the board refuses both actions for it; while either is running, it refuses
   Start. The board remembers Started only until it restarts.
 - **Notices**: a success (Added, Moved, Abandoned, Started, a finished update)
@@ -103,8 +104,15 @@ adding, queuing and starting are disabled in sample mode.
 
 ## Adding a repository
 
-Until the board can onboard a repository itself, you add one by hand. The board
-reads two files in the board app's data folder, `~/Library/Application Support/Lar Factory/`:
+Open Settings, then Repositories, then Add repository. Pick a repository from
+your T3 Code projects. Choose its provider and item source, check access, and
+create any missing workflow labels. Review the cleanup choices and open the
+onboarding PR. Merge that PR to finish. The board remembers your progress so
+you can resume from Settings.
+
+### Manual configuration reference
+
+The board reads two files in the board app's data folder, `~/Library/Application Support/Lar Factory/`:
 
 - `repositories.json` lists the onboarded repositories, each GitHub one as
   `owner/name` and each Azure DevOps one as `organization/project/repository`, as

@@ -7,9 +7,18 @@ import { openResetPr } from './reset-pr.ts';
 const PR = 'https://github.com/maddec01/lar-web/pull/9';
 const LINK = '120000';
 
-/** A call's values for a gh api field, such as `ref` for `-f ref=...`; each of an array's, such as `tree[][path]`. */
-const field = (args: string[], name: string) => args.filter((a, i) => /^-[fF]$/.test(args[i - 1] ?? '') && a.startsWith(`${name}=`))
-  .map((a) => a.slice(name.length + 1));
+/** The gh boundary's fields, read from JSON stdin for tree requests and flags for other requests. */
+const inputs = new WeakMap<string[], string>();
+const field = (args: string[], name: string): string[] => {
+  const input = inputs.get(args);
+  if (input) {
+    const payload = JSON.parse(input) as { base_tree: string; tree: Record<string, string>[] };
+    if (name === 'base_tree') return [payload.base_tree];
+    const key = /^tree\[\]\[(.+)\]$/.exec(name)?.[1];
+    if (key) return payload.tree.flatMap((entry) => typeof entry[key] === 'string' ? [entry[key]] : []);
+  }
+  return args.filter((a, i) => /^-[fF]$/.test(args[i - 1] ?? '') && a.startsWith(`${name}=`)).map((a) => a.slice(name.length + 1));
+};
 
 /**
  * A gh that records each call and answers it like GitHub. The default branch, main at abc123, holds `files`, each a
@@ -18,7 +27,8 @@ const field = (args: string[], name: string) => args.filter((a, i) => /^-[fF]$/.
  */
 function gh(files: Record<string, string | { link: string }>, { branch, fails = {} }: { branch?: string | null; fails?: Record<string, string> } = {}) {
   const calls: string[][] = [];
-  const run = async (args: string[]) => {
+  const run = async (args: string[], input?: string) => {
+    if (input !== undefined) inputs.set(args, input);
     calls.push(args);
     const failure = fails[args.slice(0, 2).join(' ')];
     if (failure) throw new Error(failure);
@@ -49,16 +59,8 @@ function gh(files: Record<string, string | { link: string }>, { branch, fails = 
 const treeCall = (calls: string[][]) => calls.find((args) => args[1] === 'repos/maddec01/lar-web/git/trees')!;
 /** The tree's entries by path: the text a file gets, or null for a file it deletes. */
 function entries(calls: string[][]): Record<string, string | null> {
-  const args = treeCall(calls);
-  const out: Record<string, string | null> = {};
-  let path = '';
-  for (let i = 0; i < args.length; i++) {
-    const value = args[i]!;
-    if (value.startsWith('tree[][path]=')) path = value.slice('tree[][path]='.length);
-    else if (value.startsWith('tree[][content]=')) out[path] = value.slice('tree[][content]='.length);
-    else if (value === 'tree[][sha]=null') out[path] = null;
-  }
-  return out;
+  const payload = JSON.parse(inputs.get(treeCall(calls))!) as { tree: { path: string; content?: string; sha?: null }[] };
+  return Object.fromEntries(payload.tree.map((entry) => [entry.path, entry.content ?? entry.sha ?? null]));
 }
 
 const DOCS = ['docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md'];

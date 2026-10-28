@@ -158,3 +158,11 @@ test('a change check leaves out an edit to an issue that closed before it, as a 
   const issues = repoIssues(REPO, fakeGh(() => `HTTP/2.0 200 OK\r\n\r\n${JSON.stringify(page)}`).run);
   assert.deepEqual(await issues.changes!(Date.parse('2026-10-21T08:10:00Z')), [`https://github.com/${REPO}/issues/4`]);
 });
+
+test('Abandon closes an issue as not planned and reports close failures', async () => {
+  const gh = fakeGh();
+  assert.equal(await repoIssues(REPO, gh.run).abandon(item(['List'])), null);
+  assert.deepEqual(gh.calls, [['issue', 'close', '7', '-R', REPO, '--reason', 'not planned']]);
+  const failed = fakeGh(() => { throw new Error('GitHub unavailable'); });
+  assert.equal(await repoIssues(REPO, failed.run).abandon(item(['Queued'])), 'Could not abandon #7. GitHub unavailable');
+});

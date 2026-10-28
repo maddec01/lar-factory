@@ -183,7 +183,7 @@ interface RawItemsPage {
 type RateLimits = Record<string, { limit: number; remaining: number; reset: number }>;
 
 /** GitHub's rate limits by resource, from its rate_limit endpoint, which costs no quota. */
-const rateLimits = async (): Promise<RateLimits> => (JSON.parse(await gh(['api', 'rate_limit'], false)) as { resources: RateLimits }).resources;
+const rateLimits = async (): Promise<RateLimits> => (JSON.parse(await gh(['api', 'rate_limit'], undefined, false)) as { resources: RateLimits }).resources;
 
 /** When the exhausted rate limit resets, in ms since the epoch; null when none is exhausted, as after a secondary limit. */
 async function ghReset(): Promise<number | null> {
@@ -200,11 +200,11 @@ export async function ghQuotaLow(): Promise<boolean> {
 /** gh's cooldown: once GitHub answers with a rate limit, every gh call fails at once until the limit resets. */
 export const ghCooldown = createCooldown('gh', ghReset);
 
-async function gh(args: string[], cools = true): Promise<string> {
+async function gh(args: string[], input?: string, cools = true): Promise<string> {
   const command = toolCommand('gh');
   if (!command) throw new Error(`${missingTool('gh')}. Install it with \`brew install gh\` or set GH_PATH.`);
   if (cools) ghCooldown.check();
-  const result = await runTool(command.file, args, { env: command.env, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
+  const result = await runTool(command.file, args, { env: command.env, input, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
   if (result.code !== 0) {
     if (cools) await ghCooldown.failed(result.stderr || result.detail);
     throw new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${result.detail}`);
@@ -708,13 +708,10 @@ export async function readBlob(repo: string, sha: string, run: (args: string[]) 
 export type TreeEntry = { path: string; mode: string } & ({ content: string } | { sha: string | null });
 
 /** Makes a tree on GitHub from `base` with the entries changed, and returns its SHA. */
-export async function createTree(repo: string, base: string, entries: TreeEntry[], run: (args: string[]) => Promise<string> = gh): Promise<string> {
-  const fields = entries.flatMap((entry) => [
-    '-f', `tree[][path]=${entry.path}`, '-f', `tree[][mode]=${entry.mode}`, '-f', 'tree[][type]=blob',
-    // -F sends null as JSON's null, which deletes the file; -f sends text and SHAs as they are.
-    ...'content' in entry ? ['-f', `tree[][content]=${entry.content}`] : entry.sha === null ? ['-F', 'tree[][sha]=null'] : ['-f', `tree[][sha]=${entry.sha}`],
-  ]);
-  return (await run(['api', `repos/${repo}/git/trees`, '--method', 'POST', '-f', `base_tree=${base}`, ...fields, '--jq', '.sha'])).trim();
+export async function createTree(repo: string, base: string, entries: TreeEntry[],
+  run: (args: string[], input?: string) => Promise<string> = gh): Promise<string> {
+  const input = JSON.stringify({ base_tree: base, tree: entries.map((entry) => ({ ...entry, type: 'blob' })) });
+  return (await run(['api', `repos/${repo}/git/trees`, '--method', 'POST', '--input', '-', '--jq', '.sha'], input)).trim();
 }
 
 /** Makes a commit on GitHub of the tree with one parent, and returns its SHA. */
@@ -740,7 +737,7 @@ export async function createBranch(repo: string, branch: string, sha: string, ru
  * the same on Azure Repos.
  */
 export async function pushCommit(repo: string, branch: string, commit: { message: string; parent: string; entries: TreeEntry[] },
-  run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  run: (args: string[], input?: string) => Promise<string> = gh): Promise<void> {
   const [head, tree] = await Promise.all([branchHead(repo, branch, run), commitTree(repo, commit.parent, run)]);
   const sha = await createCommit(repo, commit.message, await createTree(repo, tree.sha, commit.entries, run), commit.parent, run);
   await (head === null ? createBranch : moveBranch)(repo, branch, sha, run);
@@ -793,24 +790,24 @@ export async function reopenPr(url: string, run: (args: string[]) => Promise<str
   await run(['pr', 'reopen', url]);
 }
 
-/** Deletes an issue for good, which needs admin rights on its repository; returns the error, or null when GitHub accepted it. */
-export async function deleteIssue(item: Item, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
+/** Closes an issue as not planned; returns the error, or null when GitHub accepted it. */
+export async function abandonIssue(item: Item, run: (args: string[]) => Promise<string> = gh): Promise<string | null> {
   try {
-    await run(['issue', 'delete', String(item.number), '-R', item.repo!, '--yes']);
+    await run(['issue', 'close', String(item.number), '-R', item.repo!, '--reason', 'not planned']);
     return null;
   } catch (err) {
-    return `Could not delete #${item.number}. ${message(err)}`;
+    return `Could not abandon #${item.number}. ${message(err)}`;
   }
 }
 
-/** Deletes an issue for good, or removes a draft from the project by its Project item id; returns the error, or null when GitHub accepted it. */
+/** Closes an issue as not planned, or removes a draft from the project by its Project item id; returns the error, or null when GitHub accepted it. */
 export async function abandonItem(
   project: GithubProjectRef,
   item: Item,
   projectItemId: string | undefined,
   run: (args: string[]) => Promise<string> = gh,
 ): Promise<string | null> {
-  if (!isDraft(item)) return deleteIssue(item, run);
+  if (!isDraft(item)) return abandonIssue(item, run);
   try {
     if (!projectItemId) throw new Error('The board has not read this draft from the project.');
     await run(['project', 'item-delete', String(project.number), '--owner', project.owner, '--id', projectItemId]);

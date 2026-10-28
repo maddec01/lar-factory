@@ -80,6 +80,10 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
   );
 }
 
+/** Whether StartOrAfter shows Start after: a blocker is open, and its repository holds no start or one is armed. */
+export const showsStartAfter = (item: Item, data: BoardData): boolean =>
+  openBlockers(item).length > 0 && (!startHold(data, item.repo) || !!data.armed?.[item.id]);
+
 /**
  * The item's Start, the StartControl named `label`, while nothing holds it. An open blocker holds it, and so does its
  * repository, where a refining thread and a build both start, while it is still onboarding or T3 has no project for
@@ -90,9 +94,8 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
  */
 export function StartOrAfter({ item, data, label = 'Start', kind = 'refine' }: { item: Item; data: BoardData; label?: string; kind?: StartKind }) {
   if (carriesTwoStatuses(item)) return null;
+  if (showsStartAfter(item, data)) return <StartAfter item={item} data={data} />;
   const hold = startHold(data, item.repo);
-  const blocked = openBlockers(item).length > 0;
-  if (blocked && (!hold || data.armed?.[item.id])) return <StartAfter item={item} data={data} />;
   if (!hold) return <StartControl item={item} data={data} label={label} kind={kind} />;
   // Pointer events stay on while it's disabled, so its title says why.
   return (

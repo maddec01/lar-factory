@@ -16,17 +16,17 @@ const recipes = {
     'border-base-400/90 bg-base-100 text-base-content shadow-xs/5 hover:bg-base-200/70 dark:border-base-400 dark:bg-base-400/30 dark:hover:bg-base-400/60 [&_[data-slot=icon]]:text-base-700',
 } as const;
 
-export type LinkButtonProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'className'> & {
+export type LinkButtonProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   href: string;
   /** The button kinds a link can be: a Main action, an Open or an Other. */
   kind: 'main' | 'open' | 'other';
   leftIcon?: ReactNode;
 };
 
-export function LinkButton({ kind, leftIcon, children, ...props }: LinkButtonProps) {
+export function LinkButton({ kind, leftIcon, className = '', children, ...props }: LinkButtonProps) {
   const { variant, ...mark } = kindOf(kind);
   return (
-    <a {...props} {...mark} data-slot="button" className={`${base} ${recipes[variant]}`}>
+    <a {...props} {...mark} data-slot="button" className={`${base} ${recipes[variant]} ${className}`}>
       {leftIcon && <span data-slot="icon">{leftIcon}</span>}
       {children}
     </a>

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { loadT3Reads } from './t3-reads.ts';
-import { statsDb } from '../../test/stats-db.ts';
+import { loadT3Reads, warmT3Stats } from './t3-reads.ts';
+import { assistant, claudeHome, statsDb, tempDir } from '../../test/stats-db.ts';
 
 /** A home folder, settings and price table that don't exist, so tests never read real transcripts. */
 const NOWHERE = {
@@ -56,4 +56,15 @@ test('stats read more than the thread rows, so they can be unavailable while the
   assert.equal(reads.stats(item(1)), 'unavailable');
   assert.equal(reads.statsUnavailable, true);
   assert.deepEqual(found(reads.threads(item(1))).map((th) => th.id), ['a']);
+});
+
+test("a warm reads the transcripts of T3's threads not read yet, so the stats read after it reads none", async (t) => {
+  const home = tempDir(t, 'lar-home-');
+  claudeHome(t, { 'session-a': { main: [assistant('msg-1', 0, 0, 0, 7)] }, 'session-other': { main: [assistant('msg-2', 0, 0, 0, 9)] } }, join(home, '.claude'));
+  const db = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`], sessions: ['session-a'], turns: [turn] }]);
+  const sources = { ...NOWHERE, db, home };
+  assert.equal(await warmT3Stats(sources), 1, 'only the transcript of a T3 thread');
+  assert.equal(await warmT3Stats(sources), 0);
+  assert.equal(found(loadT3Reads(sources, NOW).stats(item(1))).tokens, 7);
+  assert.equal(await warmT3Stats({ ...sources, db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite') }), 0, 'no database, nothing to read');
 });

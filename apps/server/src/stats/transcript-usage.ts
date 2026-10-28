@@ -14,6 +14,7 @@
 // soft: a missing or garbled transcript only leaves its records out.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { codexRecords } from './codex-usage.ts';
 import { isObject, parseTimestampMs } from './usage-record.ts';
@@ -123,12 +124,52 @@ function list(dir: string): string[] {
   }
 }
 
+// The transcripts the running scan would read afresh, while transcriptMisses runs it.
+let missed: TranscriptFile[] | undefined;
+
+/** A transcript, and how its lines give its records. */
+export interface TranscriptFile {
+  path: string;
+  parse: (lines: string[]) => UsageRecord[];
+}
+
+/** The transcripts `scan` would read afresh, as it isn't cached or changed since; running it this way reads none. */
+export function transcriptMisses(scan: () => unknown): TranscriptFile[] {
+  const files: TranscriptFile[] = [];
+  missed = files;
+  try {
+    scan();
+    return files;
+  } finally {
+    missed = undefined;
+  }
+}
+
+/**
+ * Reads each transcript into the cache, one at a time and without blocking between them, so a scan after it reads
+ * none: a cold scan of every transcript takes seconds, which the board shouldn't stop for.
+ */
+export async function warmTranscripts(files: TranscriptFile[]): Promise<void> {
+  for (const { path, parse } of files) {
+    try {
+      const { mtimeMs, size } = await stat(path);
+      cache.set(path, { mtimeMs, size, records: parse((await readFile(path, 'utf8')).split('\n')) });
+    } catch {
+      // A transcript gone since is read, or left out, by the next scan.
+    }
+  }
+}
+
 function fileRecords(path: string, parse: (lines: string[]) => UsageRecord[]): UsageRecord[] {
   try {
     const { mtimeMs, size } = statSync(path);
     scanned?.add(path);
     const hit = cache.get(path);
     if (hit && hit.mtimeMs === mtimeMs && hit.size === size) return hit.records;
+    if (missed) {
+      missed.push({ path, parse });
+      return [];
+    }
     const records = parse(readFileSync(path, 'utf8').split('\n'));
     cache.set(path, { mtimeMs, size, records });
     return records;

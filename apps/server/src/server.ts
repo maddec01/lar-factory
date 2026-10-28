@@ -39,7 +39,7 @@ import { createStartAfter } from './start-after/start-after.ts';
 import type { StatsSources } from './stats/item-stats.ts';
 import { loadModelChoices } from './t3/model-choices.ts';
 import { anyOnAzureDevOps, repositoryProjectHints } from './t3/repository-project.ts';
-import { loadT3Reads } from './t3/t3-reads.ts';
+import { loadT3Reads, warmT3Stats } from './t3/t3-reads.ts';
 import { environmentIdPath, modelManifestPath, readEnvironmentId, statsDbPath, t3SettingsPath, usageRatesPath } from './t3/t3-settings.ts';
 import { TOOL_NAMES, checkTools, lookUpTools, missingTool, probeGh, tools } from './tools/tools.ts';
 
@@ -182,8 +182,24 @@ const firstReadProgress: ReadProgress = {
   },
 };
 
-/** The first read ends: it read the repositories, failed, or the provider's tool blocked it. */
-const settleFirstRead = () => moveFirstRead({ running: [], settled: true });
+/** Whether T3's transcripts are being read, or were, for the stats. */
+let warming = false;
+/**
+ * The first read ends: it read the repositories, failed, or the provider's tool blocked it. Then the board reads T3's
+ * transcripts for the stats, which would slow the first read, as their parsing shares its thread, and shows and writes
+ * them.
+ */
+const settleFirstRead = () => {
+  moveFirstRead({ running: [], settled: true });
+  if (warming || fixture) return;
+  warming = true;
+  void warmT3Stats(statsSources).finally(() => {
+    transcriptsRead = true;
+    refreshLocal();
+    // The first read had no fresh stats to write to the builds' open PRs; they have now.
+    void syncPrStats(board.snapshot().items);
+  });
+};
 
 /**
  * Whether sources of `kind` wait for their provider's tool: while its first check runs, or while gh's check blocks a
@@ -209,20 +225,27 @@ const pricingUnavailable = flipLog(`API cost unavailable: can't read rates from 
 const modelsUnavailable = flipLog(`only T3 default offered: no models read from ${statsSources.settings} and ${modelManifest}`, 'model choices readable again');
 
 /**
+ * Whether T3's transcripts were read once since the board started. A cold read of every transcript takes about 12 s,
+ * so warmT3Stats reads them without blocking once the first read settles, and the board shows without waiting for it.
+ */
+let transcriptsRead = false;
+
+/**
  * Attaches each item's stats and T3 threads, from one read of T3 Code's database. Stats are those frozen in its
- * latest merged linked PR's block once no linked PR is open, else read afresh from the database and transcripts;
- * threads are read afresh. The board keeps working without either.
+ * latest merged linked PR's block once no linked PR is open, else read afresh from the database and transcripts once
+ * those were read; threads are read afresh. The board keeps working without either.
  */
 function withT3Reads(items: Item[], withStats = true): Item[] {
   const now = Date.now();
-  const { stats, threads, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, withStats);
-  if (withStats) {
+  const fresh = withStats && transcriptsRead;
+  const { stats, threads, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, fresh);
+  if (fresh) {
     statsReadAt = now;
     statsUnavailable(unreadable);
     if (priced !== null) pricingUnavailable(!priced);
   }
   return items.map((item) => {
-    const shown = { ...item, stats: withStats ? mergedStats(item) ?? stats(item) : item.stats, threads: threads(item) };
+    const shown = { ...item, stats: withStats ? mergedStats(item) ?? (fresh ? stats(item) : item.stats) : item.stats, threads: threads(item) };
     // A slice's implementer thread names the slice, so a build is running while a thread runs for it or any slice.
     const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
     if (running(shown.threads) || item.slices.some((slice) => running(threads(slice)))) lastRunning.set(item.id, now);

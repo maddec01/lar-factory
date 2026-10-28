@@ -3,7 +3,8 @@
 
 import { existsSync } from 'node:fs';
 import type { Item, ItemStats, ItemThread } from '@lar-factory/shared';
-import { itemStats } from '../stats/item-stats.ts';
+import { itemStats, transcriptsToRead } from '../stats/item-stats.ts';
+import { warmTranscripts } from '../stats/transcript-usage.ts';
 import type { ItemStatsReader, StatsSources } from '../stats/item-stats.ts';
 import { itemThreads } from '../threads/item-threads.ts';
 import type { ItemThreadsReader } from '../threads/item-threads.ts';
@@ -57,4 +58,21 @@ export function loadT3Reads(sources: StatsSources, now: number, withStats = true
   } catch {
     return { ...unavailable, threads: every('unavailable' as const) };
   }
+}
+
+/**
+ * Reads the transcripts of T3's threads that the next stats read would read afresh, without blocking, and resolves with
+ * how many: the first stats read reads every transcript, seconds of work the board shouldn't stop for. A database that
+ * can't be read leaves it to the stats read to say so.
+ */
+export async function warmT3Stats(sources: StatsSources): Promise<number> {
+  if (!existsSync(sources.db)) return 0;
+  let files;
+  try {
+    files = readT3Db(sources.db, (db) => transcriptsToRead(db, sources));
+  } catch {
+    return 0;
+  }
+  await warmTranscripts(files);
+  return files.length;
 }

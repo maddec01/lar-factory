@@ -12,7 +12,7 @@ import { Button } from '@lar-factory/ui/design-system/Button';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ItemTitle, RepoTag, SliceBar } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, RepoTag, SliceBar } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
@@ -98,6 +98,7 @@ function Step({ part, data }: { part: Part; data: BoardData }) {
       </span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5.5 text-[11px] text-(--muted-foreground)">
         <span>{item.status}</span>
+        <AzureFields azure={item.azure} />
         {s && <span className="tabular-nums">{duration(s.agentMs)} · {formatTokens(s.tokens)} · {s.costUsd !== undefined ? formatUsd(s.costUsd) : '–'}</span>}
         {item.slices.length > 0 && <span className="tabular-nums">{item.slices.filter((x) => x.progress === 'done').length}/{item.slices.length} slices</span>}
         {part.waitsOn.length > 0 && <span className="inline-flex flex-wrap items-center gap-1">{started(item) ? 'after' : 'waits on'} <WaitChips waitsOn={part.waitsOn} data={data} /></span>}
@@ -270,6 +271,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
             <span className="truncate">{parent.status} · {done}/{items.length} parts done · {names.join(' + ')}</span>
           </span>
           <span className="truncate text-base font-medium tracking-tight"><ItemTitle item={parent} /></span>
+          <AzureFields azure={parent.azure} />
           <span className="truncate text-[11px] text-(--muted-foreground)">
             {plural(threads.length, 'T3 thread')} · {threads.filter((t) => t.state === 'running').length} running · {threads.filter((t) => t.state === 'needs you').length} need you
           </span>

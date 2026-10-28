@@ -18,6 +18,9 @@ export interface WorkItem {
   /** Its description, and the format Azure DevOps says it is in, which only a 7.2-preview read returns. */
   description?: string;
   descriptionFormat?: 'Markdown' | 'Html';
+  reproSteps?: string;
+  acceptanceCriteria?: string;
+  systemInfo?: string;
   createdBy?: string;
   assignedTo?: string;
   created?: string;
@@ -43,6 +46,7 @@ export const STATES: Record<string, [string, string][]> = {
   'Product Backlog Item': [['New', 'Proposed'], ['Approved', 'Proposed'], ['Committed', 'InProgress'], ['Done', 'Completed'], ['Removed', 'Removed']],
   'Issue': [['To Do', 'Proposed'], ['Doing', 'InProgress'], ['Done', 'Completed']],
   'Requirement': [['Proposed', 'Proposed'], ['Active', 'InProgress'], ['Resolved', 'Resolved'], ['Closed', 'Completed']],
+  'Bug': [['New', 'Proposed'], ['Approved', 'Proposed'], ['Committed', 'InProgress'], ['Done', 'Completed'], ['Removed', 'Removed']],
   'Task': [['New', 'Proposed'], ['Active', 'InProgress'], ['Closed', 'Completed'], ['Removed', 'Removed']],
   'Epic': [['New', 'Proposed'], ['Active', 'InProgress'], ['Closed', 'Completed'], ['Removed', 'Removed']],
 };
@@ -55,11 +59,12 @@ export const STATES: Record<string, [string, string][]> = {
  * Like az, it refuses a devops invoke at a preview's resource version, and one on wit/workitems' {id} route, which az rest PATCHes.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
-  requirement = 'User Story', areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], tags = [], fail }: {
+  requirement = 'User Story', requirementTypes = [requirement], areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], tags = [], fail }: {
   items: WorkItem[];
   sprint?: number[];
   backlog?: number[];
   requirement?: string;
+  requirementTypes?: string[];
   areas?: { value: string; includeChildren: boolean }[];
   iterations?: { id: string; name: string }[];
   pullRequests?: FakePr[];
@@ -82,6 +87,9 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
     id: i.id, rev: 1, ...version?.startsWith('7.2-preview') && i.descriptionFormat && { multilineFieldsFormat: { 'System.Description': i.descriptionFormat } }, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
     fields: {
       'System.WorkItemType': i.type, 'System.State': i.state, 'System.AreaPath': i.area ?? TEAM_AREA, 'System.Title': i.title ?? `Item ${i.id}`, 'System.ChangedDate': '2026-10-21T08:00:00Z',
+      ...i.reproSteps !== undefined && { 'Microsoft.VSTS.TCM.ReproSteps': i.reproSteps },
+      ...i.acceptanceCriteria !== undefined && { 'Microsoft.VSTS.Common.AcceptanceCriteria': i.acceptanceCriteria },
+      ...i.systemInfo !== undefined && { 'Microsoft.VSTS.TCM.SystemInfo': i.systemInfo },
       ...i.description !== undefined && { 'System.Description': i.description }, ...i.createdBy && { 'System.CreatedBy': { displayName: i.createdBy, uniqueName: `${i.createdBy}@contoso.com` } },
       ...i.assignedTo && { 'System.AssignedTo': { displayName: i.assignedTo } }, ...i.created && { 'System.CreatedDate': i.created }, ...i.iteration && { 'System.IterationPath': i.iteration },
       ...i.tags && { 'System.Tags': i.tags }, ...i.parent && { 'System.Parent': i.parent }, ...i.closed && { 'Microsoft.VSTS.Common.ClosedDate': i.closed },
@@ -114,6 +122,11 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
       if (!pr) throw new Error('az repos pr show failed: TF401180: The requested pull request was not found.');
       return JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'lar-api', webUrl: REPO_URL } });
     }
+    if (args[0] === 'rest' && flag(args, '--method') === 'get') {
+      const url = new URL(flag(args, '--url'));
+      if (!url.pathname.endsWith('/_apis/work/backlogs/Microsoft.RequirementCategory/workItems')) throw new Error(`fake az: unexpected GET ${url}`);
+      return JSON.stringify({ workItems: backlog.map((id) => ({ target: { id } })) });
+    }
     if (args[0] === 'rest' && flag(args, '--method') === 'patch') {
       const id = Number(/\/_apis\/wit\/workitems\/(\d+)\?/.exec(flag(args, '--url'))?.[1]);
       if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
@@ -127,20 +140,19 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
       if (/-preview\.\d/.test(version)) throw new Error(`az devops invoke failed: ERROR: could not convert string to float: '${version.replace('-preview', '')}'`);
       if (resource === 'wit/workitems' && route(args, 'id')) throw new Error("az devops invoke failed: ERROR: 'type'");
       if (resource === 'work/backlogconfiguration') {
-        return JSON.stringify({ requirementBacklog: { id: 'Microsoft.RequirementCategory', workItemTypes: [{ name: requirement }], defaultWorkItemType: { name: requirement } },
+        return JSON.stringify({ requirementBacklog: { id: 'Microsoft.RequirementCategory', workItemTypes: requirementTypes.map((name) => ({ name })), defaultWorkItemType: { name: requirement } },
           taskBacklog: { id: 'Microsoft.TaskCategory', workItemTypes: [{ name: 'Task' }] } });
       }
-      if (resource === 'work/workitems' && route(args, 'backlogId') === 'Microsoft.RequirementCategory') {
-        return JSON.stringify({ workItems: backlog.map((id) => ({ rel: null, source: null, target: { id, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${id}` } })) });
-      }
+      if (resource === 'work/workitems') throw new Error('ERROR: The request is invalid.');
       if (resource === 'work/teamfieldvalues') {
         return JSON.stringify({ field: { referenceName: 'System.AreaPath' }, defaultValue: areas[0]?.value, values: areas });
       }
       if (resource === 'wit/workitemsbatch') {
         const { ids } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { ids: number[] };
         batches.push(ids);
+        if (ids.length > 200) throw new Error(`VS403474: You requested ${ids.length} work items which exceeds the limit of 200`);
         const found = ids.flatMap((id) => byId.has(id) ? [raw(byId.get(id)!, version)] : []);
-        return JSON.stringify({ count: found.length, value: found });
+        return JSON.stringify({ count: found.length, value: found.sort((a, b) => a.id - b.id) });
       }
       if (resource === 'wit/workitems' && route(args, 'type')) {
         const type = route(args, 'type')!;
@@ -283,17 +295,17 @@ export function fakeAzRepos({ files = {}, defaultBranch = 'main', branches = {},
       if (resource === 'wit/tags' && !args.includes('--http-method')) {
         return JSON.stringify({ count: tags.length, value: tags.map((name, at) => ({ id: `tag-${at}`, name, active: true })) });
       }
-      if (resource === 'security/permissions') {
-        // The Git Repositories namespace's GenericContribute bit, on the repository's token, for the caller.
-        const asked = [route(args, 'securityNamespaceId'), route(args, 'permissions'), route(args, 'tokens')];
-        if (asked.join(' ') !== '2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87 4 repoV2/project-1/repo-1') throw new Error(`fake az: unexpected permission ${asked.join(' ')}`);
-        return JSON.stringify({ count: 1, value: [canPush] });
-      }
+      if (resource === 'security/permissions') throw new Error('ERROR: --area is not present in current organization');
       if (resource === 'git/pullRequestThreads') {
         const body = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { comments: { content: string }[] };
         comments.push({ id: Number(route(args, 'pullRequestId')), content: body.comments[0]!.content });
         return '{}';
       }
+    }
+    if (args[0] === 'rest' && flag(args, '--method') === 'get') {
+      const url = new URL(flag(args, '--url'));
+      if (url.pathname !== '/contoso/_apis/permissions/2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87/4' || url.searchParams.get('tokens') !== 'repoV2/project-1/repo-1') throw new Error(`fake az: unexpected permission GET ${url}`);
+      return JSON.stringify({ count: 1, value: [canPush] });
     }
     if (command === 'repos show --repository') {
       return JSON.stringify({ id: 'repo-1', name: 'lar-api', defaultBranch: `refs/heads/${defaultBranch}`, webUrl: REPO_URL, project: { id: 'project-1', name: 'Fabrikam Fiber' } });

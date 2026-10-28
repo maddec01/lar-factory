@@ -10,7 +10,7 @@ import type { Item, ItemComment, ItemDetails } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { RichText } from '@lar-factory/ui/rich-text';
-import { AgentWork, AgentWorkNote, ChecksBadge } from '../items/item-parts.tsx';
+import { AzureFields, AgentWork, AgentWorkNote, ChecksBadge } from '../items/item-parts.tsx';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
 import type { DetailsEntry } from './details-cache.ts';
@@ -75,11 +75,12 @@ function Comments({ itemId, entry, now, className }: { itemId: string; entry: De
 export function ItemDescription({ read, className }: { read: ItemDetailsRead; className: string }) {
   if (read.state === 'loading') return <div className={className}><Loading /></div>;
   if (read.state === 'failed') return <p className={`m-0 text-sm text-(--error-foreground) ${className}`} role="alert">Could not load the details: {read.error}</p>;
-  const { body, format } = read.details;
+  const { body, format, sections } = read.details;
   return (
     <div className={`grid min-w-0 gap-2 ${className}`} data-description>
       <Heading>Description</Heading>
       {body ? <RichText text={body} format={format} /> : <p className="m-0 text-sm text-(--muted-foreground)">No description.</p>}
+      {sections?.map((section) => <section key={section.title} className="grid min-w-0 gap-2"><Heading>{section.title}</Heading><RichText text={section.body} format={section.format} /></section>)}
     </div>
   );
 }
@@ -113,6 +114,7 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
   const azure = Boolean(item.repo && onAzure(item.repo));
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2" data-meta>
+      {item.azure && <><Fact label="Azure type">{item.azure.type}</Fact><Fact label="Azure state">{item.azure.state}</Fact></>}
       <FromDetails read={read} label="Author" show={(d) => d.author && <Person name={d.author} />} />
       <FromDetails read={read} label="Assignees" show={(d) => d.assignees.length > 0 && <span className="flex flex-wrap gap-x-3 gap-y-1">{d.assignees.map((a) => <Person key={a} name={a} />)}</span>} />
       {item.labels.length > 0 && (
@@ -132,16 +134,17 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
 
 /** The item's sub-tickets, each a link with its open or closed mark, in a sidebar section; a placeholder while the details load, nothing once they failed or hold none. */
 export function SubTickets({ read }: { read: ItemDetailsRead }) {
-  if (read.state === 'failed' || (read.state === 'loaded' && read.details.subTickets.length === 0)) return null;
+  if (read.state === 'failed' || (read.state === 'loaded' && read.details.subTickets.length === 0 && !read.details.relationsError)) return null;
   return (
     <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
       <h2 className="m-0 text-[13px] font-medium">Sub-tickets</h2>
+      {read.state === 'loaded' && read.details.relationsError && <p role="alert" className="m-0 text-sm text-(--error-foreground)">Could not load sub-tickets: {read.details.relationsError}</p>}
       {read.state === 'loading' ? <Placeholder className="h-4 w-24" /> : (
         <ul className="m-0 grid list-none gap-1.5 p-0">
           {read.details.subTickets.map((s) => (
             <li key={s.url} className="flex items-start gap-2 text-sm">
               {s.state === 'closed' ? <CircleCheck className="mt-0.5 size-3.5 shrink-0 text-(--success)" /> : <CircleDot className="mt-0.5 size-3.5 shrink-0 text-(--muted-foreground)" />}
-              <a href={s.url} target="_blank" rel="noopener" className="min-w-0 wrap-anywhere hover:underline"><span className="text-(--muted-foreground)">#{s.number}</span> {s.title}</a>
+              <span className="min-w-0"><a href={s.url} target="_blank" rel="noopener" className="wrap-anywhere hover:underline"><span className="text-(--muted-foreground)">#{s.number}</span> {s.title}</a><AzureFields azure={s.azure} /></span>
             </li>
           ))}
         </ul>

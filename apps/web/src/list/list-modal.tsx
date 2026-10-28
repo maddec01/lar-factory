@@ -18,7 +18,7 @@ import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-syst
 import { useAddItemStore } from '../add-item/add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { repoTone } from '../items/item-parts.tsx';
+import { AzureFields, repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { matchesSearch } from './list-search.ts';
@@ -30,6 +30,7 @@ const SORTS = {
   updated: { label: 'Recently updated', compare: (a: Item, b: Item) => b.updatedAt.localeCompare(a.updatedAt) },
   oldest: { label: 'Oldest', compare: (a: Item, b: Item) => a.updatedAt.localeCompare(b.updatedAt) },
   title: { label: 'Title', compare: (a: Item, b: Item) => a.title.localeCompare(b.title) },
+  priority: { label: 'Backlog priority', compare: (a: Item, b: Item) => (a.sourceOrder ?? Infinity) - (b.sourceOrder ?? Infinity) },
 } as const;
 type Sort = keyof typeof SORTS;
 const isSort = (value: string): value is Sort => value in SORTS;
@@ -62,6 +63,7 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
       <ItemStatusGlyph item={item} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-[18px] text-base-content">{item.title}</span>
+        <AzureFields azure={item.azure} />
         <span className="block truncate text-xs leading-4 tabular-nums text-base-700">
           {showRepo && repoKey(item) !== DRAFT && `${repoName(repoKey(item), repos)} · `}{ref(item)} · {shortAgo(item.updatedAt, now)}
         </span>
@@ -109,7 +111,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
   // The chosen group's repository, or `null` for All repositories.
   const [pick, setPick] = useState<string | null>(scope);
-  const [sort, setSort] = useState<Sort>('updated');
+  const [sort, setSort] = useState<Sort | null>(null);
   const searchField = useRef<HTMLInputElement>(null);
   useFocusSearchWhenOpenerGoes(searchField);
   const q = query.trim().toLowerCase();
@@ -118,7 +120,9 @@ function ListModal({ onClose }: { onClose: () => void }) {
   // A picked group that's gone, such as Draft once its last item leaves List, shows All repositories.
   const picked = groups.find((group) => group.repo === pick);
   const active = picked?.repo ?? null;
-  const items = (picked ? picked.items : groups.flatMap((group) => group.items)).sort(SORTS[sort].compare);
+  const unsorted = picked ? [...picked.items] : groups.flatMap((group) => group.items);
+  const effectiveSort = sort ?? (unsorted.some((item) => item.azure) ? 'priority' : 'updated');
+  const items = unsorted.sort(SORTS[effectiveSort].compare);
   const draft = groups.find((group) => group.repo === DRAFT);
   const scoped = picked !== undefined && scope === picked.repo;
   // A repository whose items haven't landed yet isn't empty, so it shows no count.
@@ -151,7 +155,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
                 {scoped ? 'Board scoped' : 'Scope board'}
               </Button>
             )}
-            <SortMenu sort={sort} onSort={setSort} />
+            <SortMenu sort={effectiveSort} onSort={setSort} />
           </div>
         </div>
         <Modal.Body>

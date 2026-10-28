@@ -12,7 +12,7 @@ import { kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
-import { ItemTitle, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, repoTone } from '../items/item-parts.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { StartOrAfter } from '../items/start-after.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
@@ -64,6 +64,7 @@ function Row({ item, n, data, now, waits }: { item: Item; n: number; data: Board
       {/* With no room for the action beside a readable title, it wraps under it, at the right. */}
       <button type="button" className="grid min-w-28 flex-1 gap-0.5 text-left">
         <span className="queue-title flex min-w-0 items-center gap-1.5 text-[13px]"><TwoStatusesMark item={item} className="size-3" /><span className="truncate"><ItemTitle item={item} /></span></span>
+        <AzureFields azure={item.azure} />
         <span className="queue-meta truncate text-[11px] text-(--muted-foreground)">{itemRepoNames(item, data.repos)} · queued {shortAgo(item.updatedAt, now)}{labels.length > 0 && ` · ${labels.join(', ')}`}</span>
       </button>
       {waits && <span className="shrink-0 text-[11px] text-(--muted-foreground)">next when a build slot frees</span>}

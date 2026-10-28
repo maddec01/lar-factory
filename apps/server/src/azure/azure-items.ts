@@ -1,6 +1,6 @@
 // What the Azure DevOps item sources share: reading a team's work items through az, and writing them through azure-writes.ts.
 // A work item keeps its status as a status-<name> tag in System.Tags, and every other tag is a label.
-// Only the team's requirement backlog level's types show at the top level, each with its Tasks as children,
+// Only the team's requirement backlog types become board items; Tasks contribute to parent counts,
 // and each type's state categories decide what is Done (Completed) and what is hidden (Removed).
 // A repo-<name> tag says which of the repositories reading the source a work item is for; an untagged one is for each.
 
@@ -8,7 +8,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { STATUSES, decodePart, labelStatuses, repoTag, statusLabel } from '@lar-factory/shared';
-import type { Blocker, IssueRef, Item, LinkedPr } from '@lar-factory/shared';
+import type { AzureWorkItem, Blocker, Item, LinkedPr } from '@lar-factory/shared';
 import { ReadProblem, type ItemSource, type ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -80,6 +80,13 @@ export async function az(args: string[]): Promise<string> {
   return result.stdout;
 }
 
+/** A read through az rest, bypassing invoke's ambiguous or undiscoverable routes. */
+export async function azureGet<T>(url: string, run: Az = az): Promise<T> {
+  try {
+    return JSON.parse(await run(['rest', '--method', 'get', '--resource', DEVOPS_RESOURCE, '--url', url, '--output', 'json'])) as T;
+  } catch (err) { throw problemOf(err); }
+}
+
 /**
  * The `az rest` arguments that PATCH the work item `id` in `project` of `organization` with the JSON patch in `file`.
  * az devops invoke can't: of wit/workitems' two routes, ${type} to create and {id}, it always takes the first.
@@ -119,6 +126,13 @@ type Category = 'Proposed' | 'InProgress' | 'Resolved' | 'Completed' | 'Removed'
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 export const field = (raw: RawWorkItem, name: string) => text(raw.fields[name]);
+/** Native Azure fields kept alongside factory status, including on child references. */
+export function azureWorkItem(raw: RawWorkItem): AzureWorkItem {
+  const identity = raw.fields['System.AssignedTo'] as { displayName?: string } | string | undefined;
+  return { type: field(raw, 'System.WorkItemType'), state: field(raw, 'System.State'),
+    assignee: (typeof identity === 'string' ? identity : identity?.displayName) || null };
+}
+
 /** A work item's page, in the organization and the project as its repository's name encodes it. */
 export const workItemUrl = (organization: string, encodedProject: string, id: number) => `https://dev.azure.com/${organization}/${encodedProject}/_workitems/edit/${id}`;
 /** The ids a work item's links of `rel` point at: the last part of each link's URL. */
@@ -162,14 +176,20 @@ export interface AzureCalls {
   workItems: (ids: readonly number[]) => Promise<RawWorkItem[]>;
   /** The team's backlog levels, kept for SETTINGS_TTL. */
   backlog: Promise<BacklogConfiguration>;
+  /** Requirement backlog IDs in the team's priority order, through the unambiguous GET route. */
+  backlogIds: () => Promise<number[]>;
 }
 
 /** What a lister found: the board's title and the work items to show. */
 export interface Listing {
   title: string;
-  /** The requirement-level items, and any other work item the listing holds; the read adds each item's Tasks through its child links. */
+  /** Requirement-level items and any Tasks already read for their counts. */
   items: RawWorkItem[];
-  /** Whether a Completed requirement-level item shows, as Done; a Completed Task always does. */
+  /** Sprint membership: only these children count; absent for the whole backlog. */
+  childIds?: readonly number[];
+  /** The backlog priority order; sprint-only items follow it. */
+  order?: readonly number[];
+  /** Whether a Completed requirement-level item shows, as Done. */
   completed: boolean;
 }
 
@@ -194,6 +214,12 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
   const invoke = <T>(area: string, resource: string, route: string[], more: string[] = [], version = API_VERSION) =>
     call<T>(['devops', 'invoke', '--area', area, '--resource', resource, '--route-parameters', `project=${project}`, ...route, ...more, '--api-version', version]);
   const backlogOf = kept(() => invoke<BacklogConfiguration>('work', 'backlogconfiguration', [`team=${team}`]), now);
+  const backlogIds = async () => {
+    const levels = await backlogOf();
+    const listed = await azureGet<{ workItems: { target: { id: number } }[] }>(
+      `https://dev.azure.com/${organization}/${encodeURIComponent(project)}/${encodeURIComponent(team)}/_apis/work/backlogs/${encodeURIComponent(levels.requirementBacklog.id)}/workItems?api-version=${API_VERSION}`, run);
+    return [...new Set(listed.workItems.map((w) => w.target.id))];
+  };
   const typeStates = new Map<string, () => Promise<{ value: { name: string; category: Category }[] }>>();
   /** The type's states, each with its category. */
   const statesOf = (type: string) => {
@@ -210,7 +236,8 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     const batches = Array.from({ length: Math.ceil(ids.length / BATCH) }, (_, i) => ids.slice(i * BATCH, (i + 1) * BATCH));
     const reads = await Promise.all(batches.map((batch) => withFile({ ids: batch, $expand: 'Relations', errorPolicy: 'Omit' }, (file) =>
       invoke<{ value: (RawWorkItem | null)[] }>('wit', 'workitemsbatch', [], ['--http-method', 'POST', '--in-file', file]))));
-    return reads.flatMap((read) => read.value.filter((raw): raw is RawWorkItem => raw !== null));
+    const byId = new Map(reads.flatMap((read) => read.value.filter((raw): raw is RawWorkItem => raw !== null)).map((raw) => [raw.id, raw]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
   }
 
   /** Each type's state categories, by type and state name. */
@@ -232,8 +259,10 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
 
   /** Whether the last listing showed Completed requirement-level items, so an item read alone shows as that listing would. */
   let showsCompleted = true;
-  /** The board's items from a listing, with their Tasks, predecessors and PRs. */
-  async function itemsOf({ title, items: listed, completed }: Listing, levels: BacklogConfiguration): Promise<ItemsRead> {
+  let childIds: readonly number[] | undefined;
+  let order = new Map<number, number>();
+  /** Requirement-level board items with Task counts, predecessors and PRs. */
+  async function itemsOf({ title, items: listed, completed, childIds }: Listing, levels: BacklogConfiguration): Promise<ItemsRead> {
     const type = (raw: RawWorkItem) => field(raw, 'System.WorkItemType');
     const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
     const tasks = new Set(levels.taskBacklog.workItemTypes.map((t) => t.name));
@@ -242,10 +271,11 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const ids = new Set(known.map((raw) => raw.id));
       return [...new Set(raws.flatMap((raw) => linked(raw, rel)))].filter((id) => !ids.has(id));
     };
-    // A requirement-level item's Tasks come through its child links, so a sprint shows one in another iteration too.
+    // A sprint counts only its own children; a backlog counts every linked Task.
     const parents = listed.filter((raw) => requirements.has(type(raw)));
-    const withTasks = [...listed, ...await workItems(unread(parents, 'System.LinkTypes.Hierarchy-Forward', listed))];
-    const all = [...withTasks, ...await workItems(unread(withTasks, 'System.LinkTypes.Dependency-Reverse', withTasks))];
+    const missing = unread(parents, 'System.LinkTypes.Hierarchy-Forward', listed).filter((id) => childIds === undefined || childIds.includes(id));
+    const withTasks = [...listed, ...await workItems(missing)];
+    const all = [...withTasks, ...await workItems(unread(parents, 'System.LinkTypes.Dependency-Reverse', withTasks))];
     const byId = new Map(all.map((raw) => [raw.id, raw]));
     const byType = await categories([...new Set(all.map(type))]);
     const category = (raw: RawWorkItem) => byType.get(type(raw))?.get(field(raw, 'System.State'));
@@ -255,8 +285,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
 
     const done = (raw: RawWorkItem) => category(raw) === 'Completed';
     const shown = (raw: RawWorkItem) => category(raw) !== 'Removed';
-    // Each shown requirement-level item and its shown Tasks, placed in one pass before any item is built: the item by
-    // its tags, and each Task by its own, or with its parent when it has no repo- tag. A hidden item hides its Tasks.
+    // Requirement-level items become board items; Tasks contribute only to their parent’s counts.
     const placed = new Map<number, NonNullable<Placement>>();
     const childrenOf = new Map<number, RawWorkItem[]>();
     for (const raw of listed) {
@@ -264,25 +293,23 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const where = placement(tagsOf(raw), repos);
       if (!where) continue;
       placed.set(raw.id, where);
-      childrenOf.set(raw.id, withTasks.filter((child) => tasks.has(type(child)) && shown(child) && Number(child.fields['System.Parent']) === raw.id)
+      childrenOf.set(raw.id, withTasks.filter((child) => (childIds === undefined || childIds.includes(child.id)) && tasks.has(type(child)) && shown(child) && Number(child.fields['System.Parent']) === raw.id)
         .filter((child) => {
           const tags = tagsOf(child);
           const own = tags.some(isRepoTag) ? placement(tags, repos) : where;
-          if (own) placed.set(child.id, own);
           return own !== null;
         }));
     }
     const top = listed.filter((raw) => childrenOf.has(raw.id));
     // An item outside the listing, such as a predecessor, goes by its own tags.
     const repoOf = (raw: RawWorkItem | undefined) => (raw && (placed.get(raw.id) ?? placement(tagsOf(raw), repos))?.repo) || repos[0]!;
-    const ref = (raw: RawWorkItem): IssueRef => ({ number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), repo: repoOf(raw), state: done(raw) ? 'closed' : 'open' });
     const blocker = (id: number): Blocker => {
       const raw = byId.get(id);
       // A Removed predecessor no longer holds anything up; one the board can't read is taken as open.
       const closed = raw !== undefined && (done(raw) || category(raw) === 'Removed');
       return { number: id, repo: repoOf(raw), state: closed ? 'closed' : 'open' };
     };
-    const item = (raw: RawWorkItem, parent: RawWorkItem | null, children: RawWorkItem[]): Item => {
+    const item = (raw: RawWorkItem, children: RawWorkItem[]): Item => {
       const tags = tagsOf(raw);
       const statuses = labelStatuses(tags);
       const closed = done(raw);
@@ -297,9 +324,11 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
         ...placed.get(raw.id)!,
         ...abandonRefusal(raw),
         labels: labelsOf(raw),
+        azure: azureWorkItem(raw),
+        ...order.has(raw.id) && { sourceOrder: order.get(raw.id)! },
         state: closed ? 'closed' : 'open',
         closedAs: closed ? 'done' : null,
-        parent: parent && ref(parent),
+        parent: null,
         subIssues: { total: children.length, completed: children.filter(done).length },
         blockers: linked(raw, 'System.LinkTypes.Dependency-Reverse').map(blocker),
         updatedAt: field(raw, 'System.ChangedDate'),
@@ -308,32 +337,32 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
         slices: [],
       };
     };
-    const shownPrs = await prsOf([...top, ...top.flatMap((raw) => childrenOf.get(raw.id)!)]);
-    const items = top.flatMap((raw) => {
-      const children = childrenOf.get(raw.id)!;
-      return [item(raw, null, children), ...children.map((child) => item(child, raw, []))];
-    });
+    const shownPrs = await prsOf(top);
+    const items = top.map((raw) => item(raw, childrenOf.get(raw.id)!));
+    items.sort((a, b) => (a.sourceOrder ?? Infinity) - (b.sourceOrder ?? Infinity));
     return { title, items };
   }
 
   return {
     async read() {
       const backlog = backlogOf();
-      const [listing, levels] = await Promise.all([list({ organization, project, boards, invoke, workItems, backlog }), backlog]);
+      const [listing, levels] = await Promise.all([list({ organization, project, boards, invoke, workItems, backlog, backlogIds }), backlog]);
       showsCompleted = listing.completed;
+      childIds = listing.childIds;
+      order = new Map([...new Set([...(listing.order ?? []), ...listing.items.map((raw) => raw.id)])].map((id, i) => [id, i]));
       return itemsOf(listing, levels);
     },
-    // A Task comes with its parent, so a Task asked for reads its parent, and the read places it as a whole read does.
+    // A partial read uses the last listing’s sprint membership for child counts.
     async readSome(items) {
       const ids = [...new Set(items.map((item) => item.parent?.number ?? item.number!))];
       const [listed, levels] = await Promise.all([workItems(ids), backlogOf()]);
-      return (await itemsOf({ title: '', items: listed, completed: showsCompleted }, levels)).items;
+      return (await itemsOf({ title: '', items: listed, completed: showsCompleted, ...childIds !== undefined && { childIds } }, levels)).items;
     },
     ...azureWrites(project, workItems, (id, file) => parsed(workItemPatch(organization, project, id, file)), statesOf),
     // A new work item is in its type's first state, Proposed, so it shows open in List.
     create: azureCreate(project, invoke, async () => (await backlogOf()).requirementBacklog.defaultWorkItemType.name, (raw, draft) => ({
       id: itemId(raw.id), status: 'List', statuses: ['List'], content: 'ticket', number: raw.id, title: field(raw, 'System.Title'),
-      url: url(raw.id), repo: draft.repo, ...!draft.onlyFor && { untaggedFor: [...repos] }, labels: labelsOf(raw), state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 },
+      url: url(raw.id), repo: draft.repo, azure: azureWorkItem(raw), ...!draft.onlyFor && { untaggedFor: [...repos] }, labels: labelsOf(raw), state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 },
       blockers: [], updatedAt: field(raw, 'System.ChangedDate'), closedAt: null, linkedPrs: [], slices: [],
     })),
   };

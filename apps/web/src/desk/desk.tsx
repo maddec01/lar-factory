@@ -8,7 +8,7 @@ import { HINTS, carriesTwoStatuses, itemPr, openBlockerRefs, ref, repoKey, repoN
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ItemTitle, StepTrack } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, StepTrack } from '../items/item-parts.tsx';
 import { KeepClicks } from '../items/keep-clicks.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
@@ -80,6 +80,7 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
         </span>
         {/* Two lines tall whatever the title's length, so the rows under it start at the same height on every card. */}
         <span className="desk-title line-clamp-2 h-10 text-sm/5 font-medium" title={`${ref(item)} ${item.title}`}><ItemTitle item={item} /></span>
+        <AzureFields azure={item.azure} />
         <span className="desk-next flex h-4 min-w-0 items-center gap-1.5 text-xs text-(--muted-foreground) tabular-nums"><NextStep item={item} data={data} /></span>
         <span className="pt-1"><StepTrack status={item.status} /></span>
       </button>

@@ -204,3 +204,20 @@ test('a reply for an item that is no longer open is ignored', async () => {
   expect(text(description())).toContain('Bumps FFmpeg');
   expect(text(description())).not.toContain('Owner accounts');
 });
+
+test('Azure native fields and extra description sections remain visible when relations fail', async () => {
+  const held = holdReads();
+  const [data, id] = azureItem();
+  data.items[0]!.azure = { type: 'Bug', state: 'Committed', assignee: 'Ana Silva' };
+  await mountPage(data);
+  await openItem(id);
+  await reply(held, id, new Response(JSON.stringify({ details: {
+    body: '<p>Reproduce the bug.</p>', format: 'html', sections: [{ title: 'Acceptance Criteria', body: '**Fixed**', format: 'markdown' }],
+    author: 'Ana Silva', assignees: ['Ana Silva'], createdAt: null, subTickets: [], relationsError: 'Timed out', comments: [], hasOlderComments: false, olderCursor: null,
+  } })));
+  expect(meta()).toContain('Azure typeBugAzure stateCommitted');
+  expect(meta()).toContain('AssigneesAAna Silva');
+  expect(text(description())).toContain('Reproduce the bug.Acceptance CriteriaFixed');
+  expect(description()!.querySelector('strong')!.textContent).toBe('Fixed');
+  expect(sidebar()).toContain('Could not load sub-tickets: Timed out');
+});

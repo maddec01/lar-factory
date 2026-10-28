@@ -40,7 +40,7 @@ test("an item tagged for a repository that isn't onboarded, or with two repo- ta
   assert.deepEqual(placed(read.items), [[3, WEB, null]]);
 });
 
-test("an untagged Task goes with its parent, and a tagged one is for the repository it names", async () => {
+test("Tasks contribute to parent counts without becoming board items", async () => {
   const items: WorkItem[] = [
     { id: 1, type: 'User Story', state: 'New', tags: 'repo-web' },
     { id: 11, type: 'Task', state: 'New', parent: 1 },
@@ -49,8 +49,8 @@ test("an untagged Task goes with its parent, and a tagged one is for the reposit
     { id: 21, type: 'Task', state: 'New', parent: 2 },
   ];
   const read = await azureSprint([WEB, API], TEAM, fakeAz({ items }).run).read();
-  assert.deepEqual(placed(read.items), [[1, WEB, null], [11, WEB, null], [12, API, null], [2, WEB, [WEB, API]], [21, WEB, [WEB, API]]]);
-  assert.equal(read.items[2]!.parent?.repo, WEB, 'the parent keeps its own repository');
+  assert.deepEqual(placed(read.items), [[1, WEB, null], [2, WEB, [WEB, API]]]);
+  assert.deepEqual(read.items.map((i) => i.subIssues), [{ total: 2, completed: 0 }, { total: 1, completed: 0 }]);
 });
 
 test('one repository reading the sprint still leaves an untagged item untagged, for Start to tag', async () => {
@@ -121,12 +121,11 @@ test(`a read runs at most ${PR_READS} az repos pr show calls at once`, async () 
 
 test("an item whose type has no Removed state, such as Basic's Issue, carries why Abandon can't run; one whose type has one carries nothing", async () => {
   const items: WorkItem[] = [{ id: 1, type: 'Issue', state: 'To Do' }, { id: 11, type: 'Task', state: 'New', parent: 1 }];
-  const [issue, task] = (await azureSprint([WEB], TEAM, fakeAz({ items, requirement: 'Issue' }).run).read()).items;
+  const [issue] = (await azureSprint([WEB], TEAM, fakeAz({ items, requirement: 'Issue' }).run).read()).items;
   assert.equal(issue!.abandonRefusal, "Issue has no Removed state in Fabrikam Fiber, so the board can't abandon it. Close or delete it in Azure DevOps.");
-  assert.equal(task!.abandonRefusal, undefined);
 });
 
-test('an item read alone reads its work item and its Tasks, with no sprint listing, and a Task asked for reads its parent', async () => {
+test('an item read alone keeps sprint child counts without relisting the sprint', async () => {
   const items: WorkItem[] = [
     { id: 1, type: 'User Story', state: 'New', tags: 'repo-web' },
     { id: 11, type: 'Task', state: 'New', parent: 1 },
@@ -136,7 +135,23 @@ test('an item read alone reads its work item and its Tasks, with no sprint listi
   const sprint = azureSprint([WEB, API], TEAM, az.run);
   const read = await sprint.read();
   az.calls.length = 0;
-  const some = await sprint.readSome!([read.items.find((i) => i.number === 11)!]);
-  assert.deepEqual(placed(some), [[1, WEB, null], [11, WEB, null]]);
+  const some = await sprint.readSome!([read.items.find((i) => i.number === 1)!]);
+  assert.deepEqual(placed(some), [[1, WEB, null]]);
+  assert.deepEqual(some[0]!.subIssues, { total: 1, completed: 0 });
   assert.equal(az.calls.some((args) => args.includes('iteration') || args.includes('wiql')), false, 'no listing call');
+});
+
+test('native Azure type, state and assignee survive independently of factory status', async () => {
+  const az = fakeAz({ items: [{ id: 1, type: 'Product Backlog Item', state: 'Committed', assignedTo: 'Ana Silva' }], requirement: 'Product Backlog Item' });
+  const [item] = (await azureSprint([WEB], TEAM, az.run).read()).items;
+  assert.equal(item!.status, 'List');
+  assert.deepEqual(item!.azure, { type: 'Product Backlog Item', state: 'Committed', assignee: 'Ana Silva' });
+});
+
+test('sprint counts stay scoped when a listing also contains children from the backlog', async () => {
+  const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' },
+    { id: 11, type: 'Task', state: 'Active', parent: 1 }, { id: 12, type: 'Task', state: 'Closed', parent: 1 }] });
+  const source = azureItems([WEB], TEAM, async ({ workItems }) => ({ title: 'Team', items: await workItems([1, 11, 12]), childIds: [11], completed: true }), az.run);
+  const [item] = (await source.read()).items;
+  assert.deepEqual(item!.subIssues, { total: 1, completed: 0 });
 });

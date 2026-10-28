@@ -24,13 +24,13 @@ function owns({ field: { referenceName }, values }: TeamFieldValues, raw: RawWor
  * `run` stands in for az in tests. A logged-out az and a missing azure-devops extension are each a ReadProblem with its fix.
  */
 export function azureBacklog(repos: readonly string[], team: string, run: Az = az): ItemSource {
-  return azureItems(repos, team, async ({ invoke, workItems, backlog }) => {
+  return azureItems(repos, team, async ({ invoke, workItems, backlog, backlogIds }) => {
     const route = [`team=${team}`];
     const [levels, areas] = await Promise.all([backlog, invoke<TeamFieldValues>('work', 'teamfieldvalues', route)]);
-    const listed = await invoke<{ workItems: { target: { id: number } }[] }>('work', 'workitems', [...route, `backlogId=${levels.requirementBacklog.id}`]);
+    const ids = await backlogIds();
     const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
-    const top = (await workItems([...new Set(listed.workItems.map((w) => w.target.id))]))
+    const top = (await workItems(ids))
       .filter((raw) => requirements.has(field(raw, 'System.WorkItemType')) && owns(areas, raw));
-    return { title: `${team} backlog`, items: top, completed: false };
+    return { title: `${team} backlog`, items: top, order: ids, completed: false };
   }, run);
 }

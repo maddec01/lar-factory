@@ -7,7 +7,7 @@ import { BookOpen, FlaskConical, Hammer, ListChecks, Lightbulb, MessagesSquare, 
 import { ref, refKey, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, EndToEndCheck } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ItemTitle, SliceBar, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, SliceBar, repoTone } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
 import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, waitText } from './dossier-parts.ts';
@@ -108,6 +108,7 @@ function PartNode({ part, data, now, width }: { part: Part; data: BoardData; now
         </span>
       </span>
       <span className="pointer-events-none relative line-clamp-2 text-[13px] font-medium leading-snug"><ItemTitle item={item} /></span>
+      <AzureFields azure={item.azure} />
       {item.slices.length > 0 && <span className="pointer-events-none relative"><SliceBar item={item} /></span>}
       <span className="pointer-events-none relative mt-auto flex items-center gap-1.5 text-xs">
         <ItemStatusGlyph item={item} className="size-3" />{item.status}

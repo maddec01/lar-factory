@@ -12,6 +12,7 @@ import { Text } from '@lar-factory/ui/design-system/Typography';
 import { useBoardStore } from '../board/board-store.ts';
 import { prName } from '../onboarding/steps.tsx';
 import { useResetStore } from './reset-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 /** "labels", or "tags" on Azure DevOps. */
 const labels = (repo: string) => (onAzure(repo) ? 'tags' : 'labels');
@@ -51,7 +52,7 @@ function CancelButton({ disabled, onClick }: { disabled: boolean; onClick: () =>
     const timer = setTimeout(() => ref.current?.focus());
     return () => clearTimeout(timer);
   }, []);
-  return <Button ref={ref} variant="secondary" disabled={disabled} onClick={onClick}>Cancel</Button>;
+  return <Button {...kind('other')} ref={ref} disabled={disabled} onClick={onClick}>Cancel</Button>;
 }
 
 export function ResetDialog() {
@@ -76,7 +77,7 @@ export function ResetDialog() {
         </Modal.Body>
         <Modal.Footer>
           <CancelButton disabled={reset.resetting} onClick={close} />
-          <Button variant="destructive" loading={reset.resetting} onClick={() => void confirm()}>{reset.resetting ? 'Resetting…' : 'Reset'}</Button>
+          <Button {...kind('main', 'danger')} loading={reset.resetting} onClick={() => void confirm()}>{reset.resetting ? 'Resetting…' : 'Reset'}</Button>
         </Modal.Footer>
       </Modal.Content>
     </Modal>

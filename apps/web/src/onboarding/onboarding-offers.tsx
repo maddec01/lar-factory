@@ -6,6 +6,7 @@ import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { useBoardStore } from '../board/board-store.ts';
 import { useWizardStore } from './wizard-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 export function OnboardingOffers() {
   const offers = useBoardStore((state) => state.data.onboardingOffers);
@@ -15,7 +16,7 @@ export function OnboardingOffers() {
     <div className="grid w-full gap-2 text-left">
       {offers.map((offer) => (
         <Alert key={offer.repo} tone="info" role="note" data-onboarding-offer={offer.repo} title={`${offer.name} already has a Repository config`}
-          action={<Button onClick={() => start(offer)}>Onboard {offer.name}</Button>}>
+          action={<Button {...kind('other')} onClick={() => start(offer)}>Onboard {offer.name}</Button>}>
           {shownRepo(offer.repo)} has <code>.lar-factory.json</code> on its default branch. Onboarding reuses its answers.
         </Alert>
       ))}

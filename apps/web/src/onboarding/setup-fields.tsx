@@ -13,6 +13,7 @@ import { Input } from '@lar-factory/ui/design-system/Input';
 import { RadioGroup, RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { byTeam, setupProblems, suggestedShow, type SetupAction, type SetupChange } from './setup-answers.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 /** One choice of a radio group: its title, then a line of detail. */
 export function Choice({ value, title, children, disabled }: { value: string; title: ReactNode; children?: ReactNode; disabled?: boolean }) {
@@ -187,7 +188,7 @@ export function CustomLabelPicker({ repo, azure = false, offered, picked, typed,
       <span className="flex gap-2">
         <Input data-new-custom className="font-mono" placeholder="app: music" aria-label={`New custom ${noun}`} value={typed} disabled={adding}
           onChange={(e) => onType(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-        <Button data-add-custom variant="secondary" disabled={disabled} loading={adding} onClick={add}>{adding ? 'Adding…' : 'Add'}</Button>
+        <Button {...kind('other')} data-add-custom disabled={disabled} loading={adding} onClick={add}>{adding ? 'Adding…' : 'Add'}</Button>
       </span>
       {problem && <p className="m-0 text-xs text-(--lar-danger-text)">{problem}</p>}
       {error && <Alert tone="danger" title={`Can’t create ${error.name}`}>{error.message}</Alert>}

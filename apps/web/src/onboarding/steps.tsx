@@ -7,7 +7,7 @@
 // thread. The Pull request step lists what the PR changes, opens it, then waits for its merge.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { Check, FileText, FolderPlus, GitPullRequest, LoaderCircle, Lock, RotateCw, Search, X } from 'lucide-react';
+import { Check, FileText, FolderPlus, GitPullRequest, LoaderCircle, Lock, X } from 'lucide-react';
 import {
   SETUP_CHECKS, customLabelChoices, customLabelProblem, isOnboarding, isSkillName, labelsToCreate, onboardingConfigFile, shownRepo, threadLink, type Clash, type ClashRun, type CheckedTool, type LabelPlan, type LabelRow,
   type LeftAloneLabel, type ModelChoice, type ModelGroup, type OnboardingPrChange, type ProjectChoice, type RepositoryItemSource, type SetupCheckId,
@@ -43,7 +43,7 @@ function ConfigBadge({ project }: { project: ProjectChoice }) {
 function Problem({ title, children }: { title: string; children: ReactNode }) {
   const loadProjects = useWizardStore((s) => s.loadProjects);
   return (
-    <Alert tone="danger" title={title} action={<Button variant="secondary" onClick={() => void loadProjects()} leftIcon={<RotateCw />}>Retry</Button>}>{children}</Alert>
+    <Alert tone="danger" title={title} action={<Button {...kind('other')} onClick={() => void loadProjects()}>Retry</Button>}>{children}</Alert>
   );
 }
 
@@ -67,7 +67,7 @@ function NewProject({ creating }: { creating: Creating }) {
         {(described) => <span className="flex gap-2">
           <Input data-new-folder className="font-mono" placeholder="~/Developer/lar-web" value={creating.folder} disabled={creating.adding} {...described}
             onChange={(e) => setFolder(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-          <Button data-add-project variant="secondary" disabled={!creating.folder.trim()} loading={creating.adding}
+          <Button {...kind('other')} data-add-project disabled={!creating.folder.trim()} loading={creating.adding}
             leftIcon={creating.adding ? undefined : <FolderPlus />} onClick={add}>{creating.adding ? 'Adding…' : 'Add to T3 Code'}</Button>
         </span>}
       </Field>
@@ -264,7 +264,7 @@ function LabelsStep({ run }: { run: Run }) {
     return <p className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading {shownRepo(project.repo)}’s {nouns}…</p>;
   }
   if (labels.read.state === 'failed') {
-    return <Alert tone="danger" title={<>Can’t read {shownRepo(project.repo)}’s {nouns}</>} action={<Button variant="secondary" onClick={() => void loadLabels()} leftIcon={<RotateCw />}>Retry</Button>}>{labels.read.error}</Alert>;
+    return <Alert tone="danger" title={<>Can’t read {shownRepo(project.repo)}’s {nouns}</>} action={<Button {...kind('other')} onClick={() => void loadLabels()}>Retry</Button>}>{labels.read.error}</Alert>;
   }
   const plan = labelsPlan(run, project, labels)!;
   const creates = azure ? 0 : labelsToCreate(plan, renaming(plan, labels)).length + customLabelsToCreate(project, labels).length;
@@ -280,13 +280,13 @@ function LabelsStep({ run }: { run: Run }) {
       <LabelList title={`Workflow ${nouns}`} rows={plan.workflow} labels={labels} azure={azure} />
       {plan.status.length > 0 && <LabelList title={`Status ${nouns}`} note={azure ? STATUS_TAGS_NOTE : STATUS_LABELS_NOTE} rows={plan.status} labels={labels} azure={azure} />}
       {(creates > 0 || renames > 0) && <div className="flex gap-2">
-        {creates > 0 && <Button data-create-labels disabled={!!labels.busy} loading={labels.busy === 'create'} onClick={() => void createLabels()}>
+        {creates > 0 && <Button {...kind('other')} data-create-labels disabled={!!labels.busy} loading={labels.busy === 'create'} onClick={() => void createLabels()}>
           {labels.busy === 'create' ? 'Creating…' : `Create ${creates} missing`}</Button>}
-        {renames > 0 && <Button data-rename-labels variant="secondary" disabled={!!labels.busy} loading={labels.busy === 'rename'} onClick={() => void renameLabels()}>
+        {renames > 0 && <Button {...kind('other')} data-rename-labels disabled={!!labels.busy} loading={labels.busy === 'rename'} onClick={() => void renameLabels()}>
           {labels.busy === 'rename' ? 'Renaming…' : `Rename ${renames}`}</Button>}
       </div>}
       {labels.error && labels.error.action !== 'custom' && (
-        <Alert tone="danger" title={labels.error.action === 'create' ? `Can’t create the ${nouns}` : `Can’t rename the ${nouns}`} action={<Button variant="secondary" disabled={!!labels.busy} onClick={() => void retry()} leftIcon={<RotateCw />}>Retry</Button>}>{labels.error.message}</Alert>
+        <Alert tone="danger" title={labels.error.action === 'create' ? `Can’t create the ${nouns}` : `Can’t rename the ${nouns}`} action={<Button {...kind('other')} disabled={!!labels.busy} onClick={() => void retry()}>Retry</Button>}>{labels.error.message}</Alert>
       )}
       <CustomLabels run={run} project={project} plan={plan} labels={labels} />
       <LeftAlone labels={plan.leftAlone.filter((l) => !labels.created.includes(l.name) && !chosen.has(l.name.toLowerCase()))} azure={azure} />
@@ -332,7 +332,7 @@ function CheckList({ title, rows }: { title: string; rows: CheckRow[] }) {
               <span className="ml-auto text-xs text-base-700">{row.status === 'passed' && row.detail || STATUS_TEXT[row.status]}</span>
             </div>
             {row.status === 'failed' && (
-              <Alert tone="danger" title={row.problem} action={row.retry && <Button variant="secondary" onClick={row.retry} leftIcon={<RotateCw />}>Retry</Button>}><span>{row.fix}</span>
+              <Alert tone="danger" title={row.problem} action={row.retry && <Button {...kind('other')} onClick={row.retry}>Retry</Button>}><span>{row.fix}</span>
                   {row.command && <span className="flex items-center gap-2"><code className="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs">{row.command}</code>
                     <CopyButton text={row.command} label={`Copy ${row.command}`} /></span>}
                 </Alert>
@@ -380,7 +380,7 @@ function ChecksStep({ run }: { run: Run }) {
     <div className="grid gap-4">
       <Progress value={passed} max={rows.length} caption={caption} aria-label={caption} />
       {checks.commands.state === 'failed' && (
-        <Alert tone="danger" title="Can’t check the commands" action={<Button variant="secondary" onClick={retryAll} leftIcon={<RotateCw />}>Retry</Button>}>{checks.commands.error}</Alert>
+        <Alert tone="danger" title="Can’t check the commands" action={<Button {...kind('other')} onClick={retryAll}>Retry</Button>}>{checks.commands.error}</Alert>
       )}
       <CheckList title="Required commands" rows={commands} />
       <CheckList title="Setup" rows={setup} />
@@ -528,12 +528,12 @@ function ClashAgent({ run }: { run: Run }) {
       <ModelPicker model={model} disabled={running} />
       {/* After a failed start the alert's Retry starts the run, so Look again doesn't offer a second way. */}
       {(!latest || latest.state === 'done') && agent.error?.call !== 'start' && (
-        <Button data-look-for-clashes className="justify-self-start" variant={latest ? 'secondary' : 'primary'} disabled={!model || running}
-          loading={agent.starting} leftIcon={agent.starting ? undefined : <Search />} onClick={look}>
+        <Button {...kind('other')} data-look-for-clashes className="justify-self-start" disabled={!model || running}
+          loading={agent.starting} onClick={look}>
           {agent.starting ? 'Starting…' : latest ? 'Look again' : 'Look for Clashes'}</Button>
       )}
       {agent.error && (
-        <Alert tone="danger" title="Can’t reach the Clash agent" action={<Button variant="secondary" disabled={running} onClick={() => agent.error?.call === 'start' ? look() : void readClashRuns()} leftIcon={<RotateCw />}>Retry</Button>}>{agent.error.message}</Alert>
+        <Alert tone="danger" title="Can’t reach the Clash agent" action={<Button {...kind('other')} disabled={running} onClick={() => agent.error?.call === 'start' ? look() : void readClashRuns()}>Retry</Button>}>{agent.error.message}</Alert>
       )}
       {latest?.state === 'running' ? (
         <div data-agent-run="running" className="grid gap-2 rounded-lg border p-3">
@@ -555,7 +555,7 @@ function ClashAgent({ run }: { run: Run }) {
         </div>
       ) : latest && (
         <Alert data-agent-run={latest.state} tone={latest.state === 'failed' ? 'danger' : 'warning'} title={ENDED[latest.state]} action={<><ThreadLink run={latest} />
-            <Button variant="secondary" disabled={!model || running} loading={agent.starting} leftIcon={agent.starting ? undefined : <RotateCw />} onClick={look}>Retry</Button></>}>{latest.why}</Alert>
+            <Button {...kind('other')} disabled={!model || running} loading={agent.starting} onClick={look}>Retry</Button></>}>{latest.why}</Alert>
       )}
       {earlier.length > 0 && (
         <ul data-earlier-runs className="m-0 grid list-none gap-1 p-0 text-xs text-base-700">
@@ -621,7 +621,7 @@ function CleanupStep({ run }: { run: Run }) {
       {(!clashes || clashes.state === 'reading') ? (
         <p data-reading-clashes className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Running the fixed checks…</p>
       ) : clashes.state === 'failed' ? (
-        <Alert tone="danger" title="Can’t run the fixed checks" action={<Button variant="secondary" onClick={() => void findClashes()} leftIcon={<RotateCw />}>Retry</Button>}>{clashes.error}</Alert>
+        <Alert tone="danger" title="Can’t run the fixed checks" action={<Button {...kind('other')} onClick={() => void findClashes()}>Retry</Button>}>{clashes.error}</Alert>
       ) : (<>
         {clashes.found.skillClashes.map((skill) => <SkillClashPick key={skill.path} skill={skill} picks={run.cleanup} clashes={clashes} />)}
         <div className="grid gap-1">
@@ -661,7 +661,7 @@ function PrChangeList() {
     return <p data-reading-changes className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading what the PR changes…</p>;
   }
   if (changes.state === 'failed') {
-    return <Alert tone="danger" title="Can’t list the PR’s changes" action={<Button variant="secondary" onClick={() => void readPrChanges()} leftIcon={<RotateCw />}>Retry</Button>}>{changes.error}</Alert>;
+    return <Alert tone="danger" title="Can’t list the PR’s changes" action={<Button {...kind('other')} onClick={() => void readPrChanges()}>Retry</Button>}>{changes.error}</Alert>;
   }
   return (
     <ul data-pr-changes className="m-0 grid list-none gap-1 rounded-lg border p-3 text-sm">
@@ -711,9 +711,9 @@ function PrStep({ run }: { run: Run }) {
         </>)}
       </div>
       {run.prUrl && prClosed(run, data) ? (
-        <Alert tone="warning" data-pr-closed title={<>{prName(run.prUrl)} closed without merging</>} action={<><Button variant="secondary" disabled={pr.opening} loading={pr.reopening}
-              leftIcon={pr.reopening ? undefined : <RotateCw />} onClick={() => void reopenPr()}>Reopen PR</Button>
-            <Button variant="secondary" disabled={pr.reopening || !openable} onClick={() => void startOver()} leftIcon={<GitPullRequest />}>Start over</Button></>}>
+        <Alert tone="warning" data-pr-closed title={<>{prName(run.prUrl)} closed without merging</>} action={<><Button {...kind('other')} disabled={pr.opening} loading={pr.reopening}
+              onClick={() => void reopenPr()}>Reopen PR</Button>
+            <Button {...kind('other')} disabled={pr.reopening || !openable} onClick={() => void startOver()}>Start over</Button></>}>
             <span>Reopen PR reopens it and waits for its merge again. Start over opens a new PR.</span>
             {pr.error && <span className="block text-(--lar-danger-text)">{pr.error}</span>}
           </Alert>
@@ -722,21 +722,21 @@ function PrStep({ run }: { run: Run }) {
           <div className="flex items-center gap-2.5 text-sm">
             <LoaderCircle className="size-4 animate-spin text-info" />
             <span><a className="font-medium underline" href={run.prUrl} target="_blank" rel="noreferrer">{prName(run.prUrl)}</a> is open. Waiting for its merge.</span>
-            <Button variant="secondary" className="ml-auto" loading={pr.checking} leftIcon={pr.checking ? undefined : <RotateCw />}
+            <Button {...kind('other')} className="ml-auto" loading={pr.checking}
               onClick={() => void checkMerge()}>{pr.checking ? 'Checking…' : 'Check now'}</Button>
           </div>
           {pr.checkedAt !== null && !pr.checking && !pr.error && (
             <p data-checked className="m-0 text-xs text-base-700" role="status">Checked {new Date(pr.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: still open.</p>
           )}
           {pr.error && (
-            <Alert tone="danger" title="Can’t check the PR" action={<Button variant="secondary" disabled={pr.checking} onClick={() => void checkMerge()} leftIcon={<RotateCw />}>Retry</Button>}>{pr.error}</Alert>
+            <Alert tone="danger" title="Can’t check the PR" action={<Button {...kind('other')} disabled={pr.checking} onClick={() => void checkMerge()}>Retry</Button>}>{pr.error}</Alert>
           )}
           <p className="m-0 text-xs text-base-700">You can close this dialog: {repo} stays on the board as onboarding, with Resume, and Start build and Start refining stay disabled for its items. The board finishes onboarding on its next check after the merge; Check now checks at once.</p>
         </div>
       ) : pr.error ? (
-        <Alert tone="danger" title="Can’t open the PR" action={<Button variant="secondary" disabled={!openable} onClick={() => void openPr()} leftIcon={<RotateCw />}>Retry</Button>}>{pr.error}</Alert>
+        <Alert tone="danger" title="Can’t open the PR" action={<Button {...kind('other')} disabled={!openable} onClick={() => void openPr()}>Retry</Button>}>{pr.error}</Alert>
       ) : (
-        <Button className="justify-self-start" disabled={!openable} loading={pr.opening} leftIcon={pr.opening ? undefined : <GitPullRequest />}
+        <Button {...kind('main')} className="justify-self-start" disabled={!openable} loading={pr.opening} leftIcon={pr.opening ? undefined : <GitPullRequest />}
           onClick={() => void openPr()}>{pr.opening ? 'Opening the PR…' : 'Open the PR'}</Button>
       )}
     </div>

@@ -9,6 +9,7 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { TitleLink } from '../items/item-parts.tsx';
 import { clearToast, showToast } from './toasts.tsx';
 import type { Toast } from './toasts.tsx';
+import { kind } from '../buttons/button-kinds.tsx';
 
 export type Notice =
   | { verb: 'Added' | 'Moved'; item: Item; to: Status }
@@ -30,7 +31,7 @@ function viewItem(itemId: string): void {
   useItemDialogStore.getState().open(itemId);
 }
 
-const viewButton = (item: Item) => <Button variant="secondary" className="view-item" onClick={() => viewItem(item.id)}>View item</Button>;
+const viewButton = (item: Item) => <Button {...kind('other')} className="view-item" onClick={() => viewItem(item.id)}>View item</Button>;
 
 function toastOf(notice: Notice): Toast {
   const { item } = notice;

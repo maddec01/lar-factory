@@ -5,7 +5,7 @@
 // and updates, which only the board app has, show the prototype's values, disabled with that reason.
 
 import type { ComponentProps, ReactNode } from 'react';
-import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, Plus, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
+import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
 import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -17,6 +17,7 @@ import { useResetStore } from '../repositories/reset-store.ts';
 import { ChannelChoice, ProfileSwitch, ProfilesNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { type Control, ToolState, notBuilt } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 interface Row {
   id: string;
@@ -135,20 +136,20 @@ function repositoryGroup(data: BoardData): Group {
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     below: <ConfigUpdateNotice repo={r} />,
     control: custom(() => <span className="flex items-center gap-2">
-      <Button variant="secondary" onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>
-      <Button variant="secondary" onClick={() => useResetStore.getState().open(r.repo)}>Reset</Button>
+      <Button {...kind('other')} onClick={() => void useEditStore.getState().open(r.repo)}>Edit</Button>
+      <Button {...kind('other')} onClick={() => useResetStore.getState().open(r.repo)}>Reset</Button>
     </span>),
   }));
   const onboarding: Row[] = (data.onboarding ?? []).map(({ repo, progress }) => ({
     id: `repo-${repo}`, title: shownRepo(repo), description: onboardingDescription(progress),
     control: custom(() => <span className="flex items-center gap-2">
-      <Button onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>
-      <Button variant="secondary" onClick={() => useResetStore.getState().open(repo)}>Reset</Button>
+      <Button {...kind('other')} onClick={() => useWizardStore.getState().resume(repo)}>Resume</Button>
+      <Button {...kind('other')} onClick={() => useResetStore.getState().open(repo)}>Reset</Button>
     </span>),
   }));
   return { title: 'Repositories', description: 'Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list.',
     rows: [...onboarded, ...onboarding],
-    footer: <Button variant="secondary" onClick={() => useWizardStore.getState().start()}><Plus /> Add repository</Button> };
+    footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add repository</Button> };
 }
 
 function profileGroup({ app, profiles }: PagesInput): Group {

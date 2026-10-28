@@ -10,6 +10,7 @@ import { useUpdateStore } from '../updates/update-store.ts';
 import { canCheckForUpdate, getUpdateDisabledReason, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from '../updates/update-button-logic.ts';
 import { SmallButton, Choice, Switch } from './controls.tsx';
 import { type SettingsResult, profilePath, useSettingsStore } from './settings-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
   { value: 'nightly', label: 'Nightly' },
@@ -81,7 +82,7 @@ export function UpdateAction() {
   if (!state || (pill !== 'available' && pill !== 'ready')) return <CheckNow />;
   const busy = installing || pending || resolveUpdateButtonAction(state) === 'none';
   return (
-    <Button className="update-action" disabled={busy} onClick={() => void run()}>
+    <Button {...kind('other')} className="update-action" disabled={busy} onClick={() => void run()}>
       {installing ? 'Installing…' : pill === 'ready' ? 'Restart to update' : 'Download'}
     </Button>
   );

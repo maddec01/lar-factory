@@ -193,6 +193,14 @@ test('closing the item dialog of an item that left List meanwhile puts focus on 
   expect(document.activeElement).toBe(search());
 });
 
+test('Add item looks as it does in the title bar: the List modal\'s Main action, with the same icon', async () => {
+  await mountPage();
+  await open();
+  const add = $('[data-list-modal] button.add-item')!;
+  expect(add.getAttribute('data-kind')).toBe('main');
+  expect(add.querySelector('svg')!.outerHTML).toBe($('.title-bar button.add-item svg')!.outerHTML);
+});
+
 test('Add item opens the Add item flow over the List modal, and closing it hands focus back to Add item', async () => {
   await mountPage();
   await open();

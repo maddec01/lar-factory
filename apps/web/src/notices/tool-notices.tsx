@@ -9,6 +9,7 @@ import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
 import { CopyButton } from '../copy/copy-button.tsx';
 import { Banner } from './banner.tsx';
 import { useRecheckStore } from './recheck-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 const LOOKS_AGAIN = 'The board also looks again every 10 seconds.';
 
@@ -24,7 +25,7 @@ function Recheck({ check }: { check: FailedCheck }) {
   const note = answer && !checking ? answer.error ?? STILL[check.result] : null;
   return (
     <>
-      <Button variant="secondary" className="recheck" data-recheck disabled={checking} onClick={() => void recheck()}>{checking ? 'Checking…' : 'Recheck'}</Button>
+      <Button {...kind('other')} className="recheck" data-recheck disabled={checking} onClick={() => void recheck()}>{checking ? 'Checking…' : 'Recheck'}</Button>
       {note && <> <span className="recheck-note" role="status">{note}</span></>}
     </>
   );

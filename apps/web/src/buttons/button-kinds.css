@@ -13,3 +13,6 @@
 }
 [data-kind="start"]:not(:disabled, [aria-disabled="true"]):hover, [data-kind="start"][data-state="open"] { background: color-mix(in srgb, var(--primary) 18%, var(--card)); }
 [data-kind="start"] [data-slot="icon"] { color: inherit; }
+
+/* The copied Modal's Close: 28 px square, like every icon-only button. */
+[data-slot="modal-close"] { width: --spacing(7); height: --spacing(7); }

@@ -20,6 +20,8 @@ test("lar-server's Modal opens a titled dialog with its close button and content
   expect(dialog.querySelector('h2')?.textContent).toBe('Edit settings');
   expect([...dialog.querySelectorAll('button')].map((button) => button.textContent || button.getAttribute('aria-label'))).toEqual(['Close', 'Save']);
 
+  // button-kinds.css sizes the close button by this slot.
+  expect(dialog.querySelector('button[aria-label="Close"]')?.getAttribute('data-slot')).toBe('modal-close');
   await act(async () => dialog.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click());
   expect(onClose).toHaveBeenCalledOnce();
   await act(async () => root.unmount());

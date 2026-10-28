@@ -8,7 +8,6 @@
 // item, and the one action the item's status asks for, with Back to List and Abandon at its left.
 
 import { useEffect, type ReactNode } from 'react';
-import { ExternalLink } from 'lucide-react';
 import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, ref, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
@@ -109,7 +108,7 @@ function ItemDialogContent({ item, data, now }: { item: Item; data: BoardData; n
       </Modal.Body>
       <Modal.Footer leading={<span className="inline-flex items-center gap-3 text-xs"><MoveActions item={item} data={data} /></span>}>
         <span className="inline-flex items-center gap-1.5">
-          {item.url && <LinkButton kind="other" leftIcon={<ExternalLink />} href={item.url} target="_blank" rel="noopener">{item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}</LinkButton>}
+          {item.url && <LinkButton kind="other" href={item.url} target="_blank" rel="noopener">{item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}</LinkButton>}
           <StatusAction item={item} data={data} />
         </span>
       </Modal.Footer>

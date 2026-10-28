@@ -7,6 +7,7 @@ import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
 import { useAbandonStore } from './abandon-store.ts';
 import { abandonItem } from './card-actions.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 export function AbandonDialog() {
   const { open, item, close } = useAbandonStore();
@@ -22,8 +23,8 @@ export function AbandonDialog() {
       <Modal.Content id="abandon-dialog" role="alertdialog" title={prompt.question} aria-describedby="abandon-detail" closeOnOverlayClick={false}>
         <Modal.Body><Text id="abandon-detail" tone="muted">{prompt.detail}</Text></Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={close}>Cancel</Button>
-          <Button variant="destructive" onClick={confirm}>{prompt.confirm}</Button>
+          <Button {...kind('other')} onClick={close}>Cancel</Button>
+          <Button {...kind('main', 'danger')} onClick={confirm}>{prompt.confirm}</Button>
         </Modal.Footer>
       </Modal.Content>
     </Modal>

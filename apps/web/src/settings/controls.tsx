@@ -7,6 +7,7 @@ import { Input } from '@lar-factory/ui/design-system/Input';
 import { OptionSelect } from '@lar-factory/ui/design-system/OptionSelect';
 import { RadioGroup, RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
 import { Switch as DesignSwitch } from '@lar-factory/ui/design-system/Switch';
+import { kind } from '../buttons/button-kinds.tsx';
 
 /** A control that shows a value only; the rows that work render their own. */
 export type Control =
@@ -59,7 +60,7 @@ function Kbd({ children }: { children: ReactNode }) {
 
 /** lar-server's secondary button, disabled with `reason` as its tooltip when it doesn't work here. */
 export function SmallButton({ children, reason, onClick, className }: { children: ReactNode; reason?: string; onClick?: () => void; className?: string }) {
-  return <Button variant="secondary" className={className} disabled={!!reason} title={reason} onClick={onClick}>{children}</Button>;
+  return <Button {...kind('other')} className={className} disabled={!!reason} title={reason} onClick={onClick}>{children}</Button>;
 }
 
 /** A state's colour; muted for a check that didn't run. */

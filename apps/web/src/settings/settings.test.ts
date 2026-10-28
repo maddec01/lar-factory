@@ -202,8 +202,8 @@ test('each onboarded repository has Edit and Reset, and Add repository opens the
   serve(sample, [project('lar-web')]);
   await open('Repositories', sample);
   expect($$<HTMLButtonElement>('.settings-body button').map((b) => [text(b), b.disabled])).toEqual([
-    ...sample.repos.flatMap(() => [['Edit', false], ['Reset', false]]), [' Add repository', false]]);
-  const add = $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === ' Add repository')!;
+    ...sample.repos.flatMap(() => [['Edit', false], ['Reset', false]]), ['Add repository', false]]);
+  const add = $$<HTMLButtonElement>('.settings-body button').find((b) => text(b) === 'Add repository')!;
   // A click focuses the button it presses.
   add.focus();
   await settle(() => add.click());

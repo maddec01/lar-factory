@@ -3,7 +3,7 @@
 // opens a PR on that file or adds a commit to the open one. On Azure DevOps the fields offer the team's sprint and
 // backlog, and the custom labels are tags, which Save leaves for the board to write on first use. While Save runs the fields, Cancel and Esc wait for it.
 
-import { LoaderCircle, RotateCw } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 import { onAzure, shownRepo } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
@@ -12,6 +12,7 @@ import { Text } from '@lar-factory/ui/design-system/Typography';
 import { CustomLabelPicker, SetupFields } from '../onboarding/setup-fields.tsx';
 import { prName } from '../onboarding/steps.tsx';
 import { type EditForm, canSave, unchanged, useEditStore } from './edit-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 function Form({ repo, form }: { repo: string; form: EditForm }) {
   const { answer, toggle, type, add } = useEditStore();
@@ -43,13 +44,13 @@ export function EditDialog() {
           {form.state === 'loading' && <p className="m-0 flex items-center gap-2 text-sm text-base-700"><LoaderCircle className="size-4 animate-spin" /> Reading .lar-factory.json…</p>}
           {form.state === 'failed' && (
             <Alert tone="danger" title={`Can’t read ${shownRepo(edit.repo)}’s Repository config`}
-              action={<Button variant="secondary" leftIcon={<RotateCw />} onClick={() => void retry()}>Retry</Button>}>{form.error}</Alert>
+              action={<Button {...kind('other')} onClick={() => void retry()}>Retry</Button>}>{form.error}</Alert>
           )}
           {form.state === 'loaded' && <Form repo={edit.repo} form={form} />}
         </Modal.Body>
         <Modal.Footer leading={form.state === 'loaded' && unchanged(form) && <span data-no-changes className="text-xs text-base-700">No changes yet</span>}>
-          <Button variant="secondary" disabled={saving} onClick={close}>Cancel</Button>
-          <Button data-save disabled={form.state !== 'loaded' || !canSave(form)} loading={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</Button>
+          <Button {...kind('other')} disabled={saving} onClick={close}>Cancel</Button>
+          <Button {...kind('main')} data-save disabled={form.state !== 'loaded' || !canSave(form)} loading={saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</Button>
         </Modal.Footer>
       </Modal.Content>
     </Modal>

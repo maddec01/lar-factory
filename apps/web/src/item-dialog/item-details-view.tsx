@@ -14,6 +14,7 @@ import { AgentWork, AgentWorkNote, ChecksBadge } from '../items/item-parts.tsx';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
 import type { DetailsEntry } from './details-cache.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 const Heading = ({ children }: { children: ReactNode }) => <h2 className="m-0 text-[13px] font-medium text-(--muted-foreground)">{children}</h2>;
 
@@ -62,7 +63,7 @@ function Comments({ itemId, entry, now, className }: { itemId: string; entry: De
         : <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>}
       {older.hasMore && (
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary" loading={older.loading} onClick={older.loadMore}>Load 10 more</Button>
+          <Button {...kind('other')} loading={older.loading} onClick={older.loadMore}>Load 10 more</Button>
           {older.error && <p className="m-0 text-xs text-(--error-foreground)" role="alert">Could not load older comments: {older.error}</p>}
         </div>
       )}

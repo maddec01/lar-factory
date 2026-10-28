@@ -334,7 +334,12 @@ az boards query --organization "$org" --project "$project" \
 
 Every child is a Task: a decision, a slice, and a build in another repository.
 Create one with `slice.sh` given the parent's work item URL. It prints the
-child's URL; retain it at once, then add the child's tags:
+child's URL; retain it at once, then add the child's tags. Tasks with `build`,
+`decision-*`, `concept` or a valid `status-*` tag appear on the board, including
+factory children found through their parent's links outside the sprint.
+Tag every decision `decision-<method>` and every build `build`; a kind or
+`repo-` tag alone does not make a Task a board item. Plain team Tasks stay
+off the board and contribute only to parent counts:
 
 ```sh
 child_url=$(bash <lar-work>/scripts/slice.sh "$azure_repo" "$parent_url" "Decide the approach" /path/to/decision.md)
@@ -361,12 +366,13 @@ az boards work-item show --id "$child" --expand relations --organization "$org" 
 
 **Work in another repository.** When shaping finds that another Azure
 repository changes, that work is a build: a child Task of the item, tagged
-`repo-<that repository>` (its name as Azure shows it) and its kind, that the
-item waits for. Reuse an open child Task that covers the work.
+`build`, `repo-<that repository>` (its name as Azure shows it) and its kind,
+that the item waits for. Reuse an open child Task that covers the work.
 
 ```sh
 build_url=$(bash <lar-work>/scripts/slice.sh "$azure_repo" "$item_url" "<title>" /path/to/brief.md)
 build=${build_url##*/}
+retag "$build" "" build
 retag "$build" "" "repo-<that repository>"
 retag "$build" "" "<kind>"
 az boards work-item relation add --id "$item" --relation-type predecessor --target-id "$build" --organization "$org"
@@ -381,7 +387,9 @@ no link between providers yet: tell the user and leave it out.
 A slice is a child Task of a work item tagged `build`; a child tagged `build`
 is a build, never a slice. Create it with
 `bash <lar-work>/scripts/slice.sh "$azure_repo" "$build_url" "<title>" /path/to/slice.md`,
-which needs no board cleanup, then add its predecessor links. The `active` and
+which creates an untagged Task, then add its predecessor links. Slices carry
+only slice tags (`active` or `blocked`), with no factory Status; reserve `build`,
+`decision-*` and `concept` for board items. The `active` and
 `blocked` tags mean what the labels mean in [Slices](#slices).
 
 ```sh

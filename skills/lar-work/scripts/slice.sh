@@ -2,10 +2,12 @@
 # Usage: slice.sh <owner/repo> <parent number or URL> <title> <body-file>
 # Creates a slice as a sub-issue of its build and prints the slice's URL. The
 # build's repository is the parent URL's, else <owner/repo>. The board displays
-# slices inside their build’s card.
+# slices inside their build's card.
 # On Azure DevOps the parent is the build's work item URL, and the slice is a Task
 # in the build's project, created with its parent link and a markdown description
-# in one call. <owner/repo> is then the Azure repository, as repo-config.sh takes it.
+# in one call. It sets no tags: slices stay off the board, while callers creating
+# a decision or build add decision-* or build afterward. <owner/repo> is then
+# the Azure repository, as repo-config.sh takes it.
 # Once the slice is made, it asks each running local board to read the build's
 # source, as boards.sh says, so the new slice shows on the build's card.
 set -euo pipefail

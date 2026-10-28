@@ -72,9 +72,8 @@ first needed.
 
 Status lives on the item. The statuses are List, Queued, Shaping, Needs you,
 Ready, In progress, Review, Verify, Ready to merge and Done. A repository's
-`.lar-factory.json` names its item source. A repository that reads a GitHub
-Project keeps them in that Project's Status field. One that reads its issues
-keeps them on its issues as `status-<name>` labels, and an Azure DevOps
+`.lar-factory.json` names its item source. GitHub issues keep their status as
+`status-<name>` labels, and an Azure DevOps
 work item as `status-<name>` tags: the status lowercased with
 hyphens for spaces, such as `status-shaping` or `status-ready-to-merge`. An issue carries one. No write
 stores Done: closing the issue, or moving the work item to a Completed-category
@@ -82,10 +81,10 @@ State, makes it Done.
 
 Move an item with `bash <lar-work>/scripts/status.sh <issue-url> "<Status>"`
 as the workflow directs, passing a work item's URL on Azure DevOps. It swaps the
-issue's label or the work item's tag, or sets the Project's field. On a work
+issue's label or the work item's tag. On a work
 item it also moves State when the state category changes: the first
 InProgress-category state for any status after Queued, the first
-Proposed-category state for List or Queued. It refuses Done, a pull request on a repository that reads its issues,
+Proposed-category state for List or Queued. It refuses Done, a pull request,
 and an issue with two status labels until someone removes all but one.
 
 ## Native relationships
@@ -153,11 +152,8 @@ and [issue dependencies API](https://docs.github.com/en/rest/issues/issue-depend
 
 GitHub only; on Azure DevOps see [Azure slices](#azure-slices). A slice is a native sub-issue of a `build` issue; a sub-issue labelled
 `build` is a build, never a slice. Create it only with `slice.sh`: it makes the
-sub-issue and prints its URL. When the build's repository reads a GitHub
-Project, it also deletes the item GitHub auto-adds to that Project, so slices
-stay off the board with no Status. Later label and body edits, closing and
-reopening never put it back. Put a build on that Project before slicing it,
-since adding a build later pulls its slices onto the Project.
+sub-issue and prints its URL. The board shows slices inside their build's card,
+with no board status of their own.
 Then add its blocked-by links with `--add-blocked-by`
 above.
 

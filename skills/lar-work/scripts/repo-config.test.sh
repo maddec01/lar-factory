@@ -13,7 +13,15 @@ fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 # branch. It prints the file "$FAKE_FILES/<owner>/<name>", or GitHub's 404 when
 # that file is missing. With FAKE_LOGGED_OUT set it fails as a logged-out gh does.
 bin=$(mktemp -d)
-trap 'rm -rf "$bin"' EXIT
+trap 'for kind in github-project azure-sprint azure-backlog unknown; do
+    for repo in maddec01/broken contoso/Fabrikam/broken; do
+        file "$repo" "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\",\"team\":\"Team\"}}"
+        run "$repo"
+        refuses "removed or unknown $kind asks for onboarding on $repo" "$repo: .lar-factory.json has an unsupported item source. Run onboarding again."
+    done
+done
+
+rm -rf "$bin"' EXIT
 export FAKE_FILES="$bin/files"
 cat >"$bin/gh" <<'GH'
 #!/bin/bash
@@ -154,9 +162,9 @@ file maddec01/lar-factory '{"role":"factory"}'
 run maddec01/lar-factory
 check "fills in the defaults" '{"version":1,"role":"factory","itemSource":{"kind":"issues"},"show":"all","labels":[]}'
 
-file maddec01/lar-server '{"version":1,"role":"server","itemSource":{"kind":"github-project","owner":"maddec01","number":3},"show":"opted-in","labels":["area-api"]}'
+file maddec01/lar-server '{"version":1,"role":"server","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"]}'
 run maddec01/lar-server
-check "keeps the fields the file sets" '{"version":1,"role":"server","itemSource":{"kind":"github-project","owner":"maddec01","number":3},"show":"opted-in","labels":["area-api"]}'
+check "keeps the fields the file sets" '{"version":1,"role":"server","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"]}'
 
 run maddec01/lar-apple
 refuses "a 404 names the repository and the missing file" "maddec01/lar-apple: no .lar-factory.json on its default branch"
@@ -175,31 +183,7 @@ refuses "a file without role names the repository and role" "maddec01/broken: .l
 
 file maddec01/broken '{"role":"factory","itemSource":{"kind":"azure-boards"}}'
 run maddec01/broken
-refuses "an unknown item source kind names itemSource.kind" "maddec01/broken: .lar-factory.json field itemSource.kind"
-
-file maddec01/broken '{"role":"factory","itemSource":{"kind":"github-project","number":3}}'
-run maddec01/broken
-refuses "a github-project without owner names itemSource.owner" "maddec01/broken: .lar-factory.json field itemSource.owner"
-
-file maddec01/broken '{"role":"factory","itemSource":{"kind":"github-project","owner":"maddec01"}}'
-run maddec01/broken
-refuses "a github-project without number names itemSource.number" "maddec01/broken: .lar-factory.json field itemSource.number"
-
-file maddec01/broken '{"role":"factory","itemSource":{"kind":"github-project","owner":"lar\" or true or \"","number":3}}'
-run maddec01/broken
-refuses "a github-project owner that isn't a GitHub login names itemSource.owner" "maddec01/broken: .lar-factory.json field itemSource.owner must be a GitHub login"
-
-file maddec01/broken '{"role":"factory","itemSource":{"kind":"github-project","owner":"maddec01\n","number":3}}'
-run maddec01/broken
-refuses "a github-project owner ending in a newline names itemSource.owner" "maddec01/broken: .lar-factory.json field itemSource.owner must be a GitHub login"
-
-file maddec01/broken '{"role":"factory","itemSource":{"kind":"github-project","owner":"maddec01","number":1.5}}'
-run maddec01/broken
-refuses "a github-project number that isn't a positive whole number names itemSource.number" "maddec01/broken: .lar-factory.json field itemSource.number must be a positive whole number"
-
-file maddec01/broken '{"role":"factory","itemSource":{"kind":"github-project","owner":"maddec01","number":0}}'
-run maddec01/broken
-refuses "a github-project number of 0 names itemSource.number" "maddec01/broken: .lar-factory.json field itemSource.number must be a positive whole number"
+refuses "an unknown item source kind names itemSource.kind" "maddec01/broken: .lar-factory.json has an unsupported item source. Run onboarding again."
 
 file maddec01/broken '{"role":"factory","show":"some"}'
 run maddec01/broken
@@ -229,9 +213,9 @@ refuses "no argument shows the usage" "usage: repo-config.sh"
 
 # An Azure repository
 
-sprint='{"role":"web","itemSource":{"kind":"azure-sprint","team":"Web Team"},"show":"all"}'
+sprint='{"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all"}'
 file contoso/Fabrikam/web "$sprint"
-want='{"version":1,"role":"web","itemSource":{"kind":"azure-sprint","team":"Web Team"},"show":"all","labels":[]}'
+want='{"version":1,"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all","labels":[]}'
 for origin in https://dev.azure.com/contoso/Fabrikam/_git/web https://contoso@dev.azure.com/contoso/Fabrikam/_git/web \
     git@ssh.dev.azure.com:v3/contoso/Fabrikam/web https://contoso.visualstudio.com/Fabrikam/_git/web contoso/Fabrikam/web; do
     : >"$FAKE_AZ_LOG"
@@ -244,9 +228,9 @@ file "contoso/Fabrikam Fiber/web" "$sprint"
 run "https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/web"
 check "passes a percent-encoded project name to az as its name" "$want"
 
-file contoso/Fabrikam/api '{"role":"api","itemSource":{"kind":"azure-backlog","team":"API"},"show":"opted-in","labels":["area-api"]}'
+file contoso/Fabrikam/api '{"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"opted-in","labels":["area-api"]}'
 run contoso/Fabrikam/api
-check "keeps a team backlog item source" '{"version":1,"role":"api","itemSource":{"kind":"azure-backlog","team":"API"},"show":"opted-in","labels":["area-api"]}'
+check "keeps a combined Azure board source" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"opted-in","labels":["area-api"]}'
 
 file contoso/Fabrikam/board '{"role":"api","itemSource":{"kind":"azure-board","team":"API"}}'
 run contoso/Fabrikam/board
@@ -261,13 +245,13 @@ refuses "an Azure file that doesn't parse names the repository" "contoso/Fabrika
 
 file contoso/Fabrikam/broken '{"role":"web"}'
 run contoso/Fabrikam/broken
-refuses "an Azure repository has no default item source" "contoso/Fabrikam/broken: .lar-factory.json field itemSource.kind must be \"azure-sprint\", \"azure-backlog\" or \"azure-board\""
+refuses "an Azure repository has no default item source" ".lar-factory.json has an unsupported item source. Run onboarding again."
 
 file contoso/Fabrikam/broken '{"role":"web","itemSource":{"kind":"issues"}}'
 run contoso/Fabrikam/broken
-refuses "an Azure repository can't read GitHub issues" "field itemSource.kind must be \"azure-sprint\", \"azure-backlog\" or \"azure-board\""
+refuses "an Azure repository can't read GitHub issues" ".lar-factory.json has an unsupported item source. Run onboarding again."
 
-for kind in azure-sprint azure-backlog azure-board; do
+for kind in azure-board; do
     file contoso/Fabrikam/broken "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\"}}"
     run contoso/Fabrikam/broken
     refuses "an $kind without team names itemSource.team" "contoso/Fabrikam/broken: .lar-factory.json field itemSource.team must name the team for an $kind"
@@ -276,9 +260,9 @@ for kind in azure-sprint azure-backlog azure-board; do
     refuses "an $kind with an empty team names itemSource.team" "field itemSource.team must name the team"
 done
 
-file maddec01/broken '{"role":"factory","itemSource":{"kind":"azure-sprint","team":"Web"}}'
+file maddec01/broken '{"role":"factory","itemSource":{"kind":"azure-board","team":"Web"}}'
 run maddec01/broken
-refuses "a GitHub repository can't read an Azure sprint" "maddec01/broken: .lar-factory.json field itemSource.kind must be \"issues\" or \"github-project\""
+refuses "a GitHub repository can't read an Azure sprint" ".lar-factory.json has an unsupported item source. Run onboarding again."
 
 FAKE_LOGGED_OUT=1 run contoso/Fabrikam/web
 refuses "with az logged out, says to run az login" "az is logged out. Run az login"
@@ -290,6 +274,14 @@ for bad in https://dev.azure.com/contoso/Fabrikam/web https://dev.azure.com/cont
     contoso/Fabrikam%2F..%2Fx/web contoso/%2E%2E/web contoso/Fabrikam/%5Cweb; do
     run "$bad"
     refuses "an Azure repository $bad shows the usage" "usage: repo-config.sh"
+done
+
+for kind in github-project azure-sprint azure-backlog unknown; do
+    for repo in maddec01/broken contoso/Fabrikam/broken; do
+        file "$repo" "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\",\"team\":\"Team\"}}"
+        run "$repo"
+        refuses "removed or unknown $kind asks for onboarding on $repo" "$repo: .lar-factory.json has an unsupported item source. Run onboarding again."
+    done
 done
 
 ((failures == 0))

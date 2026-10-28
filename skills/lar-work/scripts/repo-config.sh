@@ -4,8 +4,8 @@
 # read from its default branch with gh, never from a checkout, with defaults filled
 # in (version 1, itemSource {"kind": "issues"}, show "all", labels []). role has no default.
 # An Azure repository is its origin URL or <org>/<project>/<repo>; its file is read
-# with az the same way. Its itemSource has no default: a team's current sprint
-# ({"kind": "azure-sprint", "team": ...}) or that team's backlog ({"kind": "azure-backlog", ...}), or both ({"kind": "azure-board", ...}).
+# with az the same way. Its itemSource names the team’s backlog and current sprint
+# together: {"kind": "azure-board", "team": ...}.
 # --list prints the onboarded repositories, the repositories array of
 # ~/Library/Application Support/Lar Factory/repositories.json, the file the board
 # server reads. A missing file means none: []. It leaves out each entry still
@@ -102,18 +102,11 @@ problem=$(jq -r '
     elif has("version") and (.version | type) != "number" then "field version must be a number"
     elif (.role | type) != "string" or .role == "" then "field role is missing or not a string"
     elif has("itemSource") and (.itemSource | type) != "object" then "field itemSource must be an object"
-    elif $provider == "github" and has("itemSource") and (.itemSource.kind | IN("issues", "github-project") | not) then
-        "field itemSource.kind must be \"issues\" or \"github-project\""
-    elif $provider == "azure" and (.itemSource.kind | IN("azure-sprint", "azure-backlog", "azure-board") | not) then
-        "field itemSource.kind must be \"azure-sprint\", \"azure-backlog\" or \"azure-board\""
+    elif ($provider == "github" and has("itemSource") and .itemSource.kind != "issues")
+        or ($provider == "azure" and .itemSource.kind != "azure-board") then
+        "has an unsupported item source. Run onboarding again"
     elif $provider == "azure" and ((.itemSource.team | type) != "string" or .itemSource.team == "") then
-        "field itemSource.team must name the team for an \(.itemSource.kind)"
-    elif .itemSource.kind == "github-project"
-        and ((.itemSource.owner | type) != "string" or (.itemSource.owner | test("^[A-Za-z0-9](-?[A-Za-z0-9])*\\z") | not)) then
-        "field itemSource.owner must be a GitHub login for a github-project"
-    elif .itemSource.kind == "github-project"
-        and ((.itemSource.number | type) != "number" or .itemSource.number < 1 or .itemSource.number != (.itemSource.number | floor)) then
-        "field itemSource.number must be a positive whole number for a github-project"
+        "field itemSource.team must name the team for an azure-board"
     elif has("show") and (.show | IN("all", "opted-in") | not) then "field show must be \"all\" or \"opted-in\""
     elif has("labels") and ((.labels | type) != "array" or any(.labels[]; type != "string")) then
         "field labels must be an array of strings"

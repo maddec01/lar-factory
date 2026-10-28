@@ -3,9 +3,7 @@
 # Sets the item's Status on the item, as the item's repository config from
 # repo-config.sh says. An issue from a repository that reads its issues swaps its
 # status-<name> label for the new one, creating the label when the repository lacks
-# it. An item from a repository that reads a GitHub Project is added to that Project
-# if it isn't there yet, and its Status field is set. A pull request from a
-# repository that reads its issues is refused: it has no Project to hold a Status.
+# it. A pull request has no board status; set the status on its tracked issue.
 # An Azure DevOps work item swaps its status-<name> tag in System.Tags and moves
 # State only across state categories, from its type's states: entering any status
 # after Queued moves a Proposed-category item to the first InProgress-category
@@ -73,19 +71,6 @@ set_label() {
         edit+=(--remove-label "${current[0]}")
     fi
     gh issue edit "$number" --repo "$repo" "${edit[@]}" >/dev/null
-}
-
-set_field() {
-    local owner=$1 project=$2 project_id field_id option_id item_id
-    project_id=$(gh project view "$project" --owner "$owner" --format json --jq .id)
-    read -r field_id option_id < <(gh project field-list "$project" --owner "$owner" --format json |
-        jq -r --arg status "$status" '.fields[] | select(.name == "Status") | [.id, (.options[] | select(.name == $status) | .id)] | @tsv')
-    if [[ -z "${option_id:-}" ]]; then
-        echo "Unknown status \"$status\"." >&2
-        exit 1
-    fi
-    item_id=$(gh project item-add "$project" --owner "$owner" --url "$url" --format json --jq .id)
-    gh project item-edit --project-id "$project_id" --id "$item_id" --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null
 }
 
 # set_tag: on the Azure work item in az_org and az_id, swaps the status tag and moves State as above.
@@ -156,13 +141,11 @@ if azure_work_item "$url"; then
 elif [[ $url =~ ^https://github\.com/([^/]+/[^/]+)/(issues|pull)/([0-9]+)$ ]]; then
     repo=${BASH_REMATCH[1]} kind=${BASH_REMATCH[2]} number=${BASH_REMATCH[3]}
     # repo-config.sh names its failure on stderr, which passes straight through.
-    config=$(bash "$(dirname "$0")/repo-config.sh" "$repo")
-    if [[ $(jq -r .itemSource.kind <<<"$config") == github-project ]]; then
-        set_field "$(jq -r .itemSource.owner <<<"$config")" "$(jq -r .itemSource.number <<<"$config")"
-    elif [[ $kind == issues ]]; then
+    bash "$(dirname "$0")/repo-config.sh" "$repo" >/dev/null
+    if [[ $kind == issues ]]; then
         set_label "$repo" "$number"
     else
-        echo "$repo reads its issues, not a Project, so its pull request $url has no Status to set." >&2
+        echo "$url has no board status. Set the status on the issue it tracks." >&2
         exit 1
     fi
 else

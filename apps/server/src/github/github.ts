@@ -279,8 +279,8 @@ function searchOnce(): LabelSearch {
 
 /**
  * Runs the issue searches at once. The slice label searches look in every repository holding a build's open sub-issue,
- * not only its slices: the sub-issues that are builds take no slice label, so they find the same slices. A project
- * item's own labels decide whether it's a build.
+ * not only its slices: the sub-issues that are builds take no slice label, so they find the same slices. An issue's
+ * own labels decide whether it's a build.
  */
 async function searchLabels(raws: RawItem[], search: LabelSearch): Promise<Searched> {
   const [builds, active, blocked] = await Promise.all([
@@ -673,8 +673,8 @@ export async function abandonIssue(item: Item, run: (args: string[]) => Promise<
 }
 
 /**
- * Creates the issue a draft describes, and nothing else, resuming from `progress` after a failed try; `home` adds the
- * steps an item source needs around it. The issue shows as List.
+ * Creates the issue a draft describes, resuming from `progress` after a failed try. `prepare` ensures its status
+ * label exists before creation. The issue shows as List.
  */
 export async function createIssue(
   draft: ItemDraft,

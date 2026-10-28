@@ -1,8 +1,8 @@
-// The Azure DevOps sprint item source: reads one team's current sprint through az; azure-writes.ts writes its work items.
+// Reads one team's current sprint for its combined Azure board.
 
 import { type AzureCalls, type Listing } from './azure-items.ts';
 
-/** Lists the current sprint, allowing an empty sprint only for the combined board. */
+/** Lists the current sprint, or no items when the team has no current sprint. */
 export async function readSprint(team: string, { boards, workItems, backlogIds }: AzureCalls): Promise<Listing> {
   const [iteration] = await boards<{ id: string; name: string }[]>(['list', '--timeframe', 'current']);
   if (!iteration) {

@@ -240,7 +240,7 @@ const main = async () => {
   }
   if (args[0] === 'label' && args[1] === 'create') {
     if (options.fail === 'label-create') {
-      process.stderr.write('HTTP 403: Must have write access to Repository.');
+      process.stderr.write('HTTP 403: Must have admin rights to Repository.');
       process.exitCode = 1;
       return;
     }

@@ -94,7 +94,7 @@ test('Abandon asks first, naming the issue it closes for its repository; Cancel 
 
   await openItem('I_sample04');
   await press(button('abandon', 'I_sample04'));
-  expect(text($('#abandon-dialog h2'))).toMatch(/^Delete #900004 Shared playback history across devices\?$/);
+  expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #900004 Shared playback history across devices\?$/);
   expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Abandon']);
   await settle(() => vi.advanceTimersByTime(100));
   await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));

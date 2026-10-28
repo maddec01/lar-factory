@@ -126,7 +126,7 @@ const readsAzureTeam = (source: RepositoryItemSource | null): boolean => !!sourc
 /** The commands the Checks step checks for the item source: az for an Azure DevOps team's, gh for a GitHub one. */
 export const commandChecks = (source: RepositoryItemSource | null): CheckedTool[] => [readsAzureTeam(source) ? 'az' : 'gh', 't3', 'git', 'jq', 'curl'];
 
-/** Whether a command's check passes for the item source; gh needs the project scope only to read a GitHub Project. */
+/** Whether a command's check passes for the item source. */
 export function commandPasses(name: CheckedTool, tools: ToolChecks | undefined, source: RepositoryItemSource | null): boolean {
   const check = tools?.[name];
   return check?.result === 'ok';

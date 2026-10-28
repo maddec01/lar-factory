@@ -70,6 +70,17 @@ test('a logged-out gh shows its notice and reads nothing until Recheck finds it 
   assert.ok((await afterRead(board)).fetchedAt, 'the board reads GitHub once gh works');
 });
 
+test('a gh that logs out after a whole read shows its notice, and the board keeps reading so it never shows Stale', async (t) => {
+  const board = await startBoard(t, {}, false, true);
+  await until(board, (d) => d.fetchedAt !== null);
+  await board.update({ ghAuth: 'logged-out', fail: 'read' });
+  const blocked = await until(board, (d) => d.tools?.gh?.result === 'logged-out');
+  assert.equal(blocked.error, null);
+  const read = await until(board, (d) => d.fetchedAt !== blocked.fetchedAt);
+  assert.equal(read.error, null);
+  assert.equal(read.tools?.gh?.result, 'logged-out');
+});
+
 test('a logged-out gh that logs in is found by the timed retry, which keeps the login PATH it read', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'lar-shell-log-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));

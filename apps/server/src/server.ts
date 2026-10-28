@@ -16,7 +16,7 @@ import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
-import type { ReadPace, ReadProgress } from './items/item-source.ts';
+import type { ItemsRead, ReadPace, ReadProgress } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
 import { createClashRuns } from './onboarding/clash-runs.ts';
@@ -190,7 +190,7 @@ let warming = false;
  * them.
  */
 const settleFirstRead = () => {
-  moveFirstRead({ running: [], settled: true });
+  moveFirstRead({ running: [], waiting: undefined, settled: true });
   if (warming || fixture) return;
   warming = true;
   void warmT3Stats(statsSources).finally(() => {
@@ -201,15 +201,14 @@ const settleFirstRead = () => {
   });
 };
 
-/**
- * Whether sources of `kind` wait for their provider's tool: while its first check runs, or while gh's check blocks a
- * GitHub source. A gh that wasn't checked, as no listed repository was on GitHub, blocks nothing.
- */
-function waitsForTool(kind: ItemSource): boolean {
-  if (unchecked.has(providerTool(kind))) return true;
+/** Whether gh's check blocks sources of `kind`. A gh that wasn't checked, as no listed repository was on GitHub, blocks nothing. */
+function blockedByTool(kind: ItemSource): boolean {
   const gh = board.snapshot().tools?.gh;
   return gh !== undefined && ghBlocksRead(gh, kind);
 }
+
+/** Whether sources of `kind` wait for their provider's tool: while its first check runs, or while it blocks them. */
+const waitsForTool = (kind: ItemSource) => unchecked.has(providerTool(kind)) || blockedByTool(kind);
 
 /** Logs `whenSet` or `whenCleared` each time the condition it's given flips; it starts cleared. */
 function flipLog(whenSet: string, whenCleared: string): (set: boolean) => void {
@@ -300,7 +299,7 @@ function readPace(): ReadPace {
   const armed = board.snapshot().armed ?? {};
   const waitedOn = new Set(board.snapshot().items.filter((i) => armed[i.id]).flatMap((i) => i.blockers.map((b) => refKey(b.repo, b.number))));
   return { now, slow: quotaLow, activeMs: TEST_READ_MS || ACTIVE_READ_MS, idleMs: idleMs(),
-    active: (item) => isActive(item, now, waitedOn), polled: (item) => checksRunning(item, now), waits: waitsForTool };
+    active: (item) => isActive(item, now, waitedOn), polled: (item) => checksRunning(item, now), waits: waitsForTool, blocked: blockedByTool };
 }
 
 /** Whether gh's quota ran low at its last check, made at most every QUOTA_CHECK_MS. */
@@ -490,14 +489,24 @@ async function refresh(): Promise<void> {
     offerModelChoices();
     // The app installs after the board server starts, so each read picks up the latest install's state.
     board.update({ bundledSkills: bundledSkills() });
-    const snapshot = await items.read(firstReadProgress, pace);
-    // Every source waited for its tool, so nothing read: the board keeps showing no read, as before it.
-    if (snapshot.unread) return;
     const { error, fetchedAt } = board.snapshot();
+    // During the first read, each source's read shows its repositories' items as it lands, though another still reads.
+    const landed = (partial: ItemsRead) => {
+      if (board.snapshot().firstRead.settled) return;
+      // A read so far confirms no change the board made, as the source of one may not have read yet, and isn't the
+      // whole read fetchedAt times.
+      board.applyRead(partial.items, readRevision, withT3Reads, () => false);
+      board.update({ project: { title: partial.title }, itemSourceProblems: partial.problems ?? [] });
+      moveFirstRead({ waiting: partial.waiting });
+    };
+    const snapshot = await items.read({ ...firstReadProgress, landed }, pace);
+    const repos = items.repos();
+    // Before the first whole read, every source waited for its tool's check or was blocked by it, so nothing read: the
+    // board keeps showing no read, as before it. After one, a source its tool blocks keeps its last read, which stays fresh.
+    if (fetchedAt === null && repos.length > 0 && repos.every((repo) => snapshot.waiting?.includes(repo.repo) || blockedByTool(itemSource(repo)))) return;
     const recovered = error !== null && error !== settings.problem || fetchedAt === null;
     board.applyRead(snapshot.items, readRevision, withT3Reads, items.readAfresh);
-    const repos = items.repos();
-    moveFirstRead({ step: 'finishing' });
+    moveFirstRead({ step: 'finishing', waiting: snapshot.waiting });
     board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: settings.problem ?? null, itemSourceProblems: snapshot.problems ?? [],
       t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);

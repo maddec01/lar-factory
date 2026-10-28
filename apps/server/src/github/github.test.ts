@@ -2,7 +2,7 @@
 
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, ITEMS_QUERY } from './github.ts';
+import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, ITEMS_QUERY, getIfChanged } from './github.ts';
 
 test('the board query reads the blocked-by issues, no issue bodies, and linked PR bodies', () => {
   assert.match(ITEMS_QUERY, /blockedBy\(first: \d+\) \{ nodes \{ number state repository \{ nameWithOwner \} \} \}/, 'each blocked-by issue comes with its repo and state');
@@ -29,4 +29,17 @@ test('an issue search page reads only each issue\'s number and repo', () => {
 
 test("the dossier bodies query reads only each issue's id and body", () => {
   assert.match(DOSSIER_BODIES_QUERY, /nodes\(ids: \$ids\) \{ \.\.\. on Issue \{ id body \} \}/);
+});
+
+test('a change check asks again with the last ETag, and an unchanged answer, a 304, is null', async () => {
+  const asked: string[][] = [];
+  const answer = async (args: string[]) => {
+    asked.push(args);
+    if (args.includes('If-None-Match: W/"1"')) throw new Error('gh api -H failed: gh: HTTP 304');
+    return 'HTTP/2.0 200 OK\r\nEtag: W/"1"\r\nX-Ratelimit-Remaining: 4999\r\n\r\n[{"number":1}]';
+  };
+  assert.deepEqual(await getIfChanged('repos/a/b/issues', undefined, answer), { etag: 'W/"1"', body: [{ number: 1 }] });
+  assert.equal(await getIfChanged('repos/a/b/issues', 'W/"1"', answer), null);
+  assert.deepEqual(asked, [['api', '-i', 'repos/a/b/issues'], ['api', '-i', '-H', 'If-None-Match: W/"1"', 'repos/a/b/issues']]);
+  await assert.rejects(getIfChanged('repos/a/b/issues', undefined, async () => { throw new Error('HTTP 404'); }), /404/);
 });

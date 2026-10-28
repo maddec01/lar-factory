@@ -32,11 +32,13 @@ export class ReadProblem extends Error {
 /**
  * How fast a merged read keeps each source: a source holding an item `active` says is due every `activeMs`, any other
  * every `idleMs`, ACTIVE_READ_MS and IDLE_READ_MS when absent, and every source is idle while `slow` holds, as when a
- * provider's quota runs low.
+ * provider's quota runs low. A source whose change check sees every edit keeps only the items `polled` says at
+ * `activeMs`, as no check sees a PR's checks finish.
  */
 export interface ReadPace {
   now: number;
   active(item: Item): boolean;
+  polled(item: Item): boolean;
   activeMs?: number;
   idleMs?: number;
   slow?: boolean;
@@ -59,6 +61,14 @@ export interface ItemSource {
    * no longer lists is left out. Absent on a source that reads only whole.
    */
   readSome?(items: Item[]): Promise<Item[]>;
+  /**
+   * What changed since `since`, in ms since the epoch, by a check that costs no quota while nothing did: the URLs of
+   * the changed issues and PRs; null when the check can't tell which, so the whole source reads. Absent on a source
+   * with no such check.
+   */
+  changes?(since: number): Promise<string[] | null>;
+  /** Whether `changes` names every edit to an item: its state, labels, slices and PRs. */
+  seesEdits?: boolean;
   /** Sets the item's status, dropping every other status it carries. Callers check `statusRefusal` first. */
   setStatus(item: Item, status: Status): Promise<string | null>;
   /** Why a status write on an item, or on a parent that isn't on the board, would be refused before it runs; null when it may run. */

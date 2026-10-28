@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, ghBlocksRead, itemSource, refKey, type BoardData, type FirstRead, type Item, type ItemSource, type GhCheck, type ModelGroup, type Status, type ToolChecks } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, refKey, type BoardData, type FirstRead, type Item, type ItemSource, type GhCheck, type ModelGroup, type Status, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
@@ -222,22 +222,35 @@ const lastRunning = new Map<string, number>();
  * it GitHub hasn't reported, or an armed start waits on it or for it.
  */
 function isActive(item: Item, now: number, waitedOn: ReadonlySet<string>): boolean {
-  const shown = board.find(item.id) ?? item;
   if (now - (lastRunning.get(item.id) ?? -Infinity) < SETTLE_MS) return true;
-  if (item.state === 'open' && AGENT_STATUSES.has(item.status) && !Array.isArray(shown.threads)) return true;
+  if (item.state === 'open' && AGENT_STATUSES.has(item.status) && board.snapshot().tools?.t3.result !== 'ok') return true;
   if (item.closedAt && now - Date.parse(item.closedAt) < SETTLE_MS) return true;
-  if ([item.pipeline, ...item.linkedPrs].some((pr) => pr?.checks?.running)) return true;
+  if (checksRunning(item, now)) return true;
   if (board.changing(item.id) || board.snapshot().armed?.[item.id]) return true;
   return item.repo !== null && item.number !== null && waitedOn.has(refKey(item.repo, item.number));
 }
+
+/** When the board first saw each PR's checks running, by its URL or its item's pipeline, for checks GitHub gives no start time. */
+const checksSeenAt = new Map<string, number>();
+
+/** Whether the item's PR's checks run, short of SLOW_CHECKS_MS: a check stuck past it, as an EXPECTED one that never reports, stops polling. */
+const checksRunning = (item: Item, now: number) => [[`${item.id} pipeline`, item.pipeline] as const, ...item.linkedPrs.map((pr) => [pr.url, pr] as const)]
+  .some(([key, pr]) => {
+    if (!pr?.checks?.running) return void checksSeenAt.delete(key);
+    if (!checksSeenAt.has(key)) checksSeenAt.set(key, now);
+    return now - (pr.checks.since ? Date.parse(pr.checks.since) : checksSeenAt.get(key)!) < SLOW_CHECKS_MS;
+  });
+
+/** The idle pace: settings.json's refreshSeconds, at least a minute, so a setting saved from before ADR 0028 spends no more. */
+const idleMs = () => TEST_READ_MS || Math.max(60, settings.refreshSeconds) * 1000;
 
 /** The pace reads run at now: slow while gh's quota runs low. */
 function readPace(): ReadPace {
   const now = Date.now();
   const armed = board.snapshot().armed ?? {};
   const waitedOn = new Set(board.snapshot().items.filter((i) => armed[i.id]).flatMap((i) => i.blockers.map((b) => refKey(b.repo, b.number))));
-  return { now, slow: quotaLow, activeMs: TEST_READ_MS || ACTIVE_READ_MS, idleMs: TEST_READ_MS || settings.refreshSeconds * 1000,
-    active: (item) => isActive(item, now, waitedOn) };
+  return { now, slow: quotaLow, activeMs: TEST_READ_MS || ACTIVE_READ_MS, idleMs: idleMs(),
+    active: (item) => isActive(item, now, waitedOn), polled: (item) => checksRunning(item, now) };
 }
 
 /** Whether gh's quota ran low at its last check, made at most every QUOTA_CHECK_MS. */
@@ -397,6 +410,7 @@ async function refresh(): Promise<void> {
   try {
     await checkQuota();
     const pace = readPace();
+    await items.probe(pace);
     if (!items.due(pace)) return;
     offerModelChoices();
     // The app installs after the board server starts, so each read picks up the latest install's state.
@@ -423,13 +437,21 @@ async function refresh(): Promise<void> {
     settleFirstRead();
   }
   board.push();
-  // Repositories not answered yet take a gh call each, so the offers follow the read instead of holding it up.
-  void offerOnboarding().then(() => board.push());
+  // Repositories not answered yet take a gh call each, so the offers follow the read instead of holding it up, at the idle
+  // pace or after a read request naming no item, not after each read of active work.
+  if (read && (offersAsked || Date.now() - offeredAt >= idleMs())) {
+    offersAsked = false;
+    offeredAt = Date.now();
+    void offerOnboarding().then(() => board.push());
+  }
   // PR edits take a gh call or two each, and a start runs t3; the board doesn't wait for them.
   if (read) void syncPrStats(board.snapshot().items);
   if (read) void startAfter.startUnblocked();
   if (readAgain) void refresh();
 }
+
+let offeredAt = -Infinity;
+let offersAsked = false;
 
 /** Offers to onboard each T3 project whose repository has .lar-factory.json and isn't on the list; none while T3's projects can't be read. */
 async function offerOnboarding(): Promise<void> {
@@ -447,8 +469,10 @@ async function offerOnboarding(): Promise<void> {
  * or once more after the running read, so a change made during that read is read too.
  */
 function readSoon(url?: string): void {
-  if (url === undefined) items.reload();
-  else items.invalidate(url);
+  if (url === undefined) {
+    items.reload();
+    offersAsked = true;
+  } else items.invalidate(url);
   if (refreshing) readAgain = true;
   else void refresh();
 }

@@ -10,6 +10,17 @@ if (args[0] === 'api' && args[1] === 'rate_limit') {
   output({ resources: { core: { limit: 5000, remaining, reset: 1 }, graphql: { limit: 5000, remaining, reset: 1 } } });
   process.exit(0);
 }
+// A change check while nothing changed is a 304, which costs no quota either, so only an answer that changed is a call.
+// options.changes sets the issues it lists.
+if (args[0] === 'api' && args[1] === '-i') {
+  if (!options.changes) {
+    process.stderr.write('gh: HTTP 304\n');
+    process.exit(1);
+  }
+  fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
+  process.stdout.write(`HTTP/2.0 200 OK\r\nEtag: W/"${options.changes.length}"\r\n\r\n${JSON.stringify(options.changes)}`);
+  process.exit(0);
+}
 fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
 const WORKFLOW_LABELS = ['bug', 'feature', 'improvement', 'concept', 'decision-grill', 'decision-prototype', 'decision-research', 'decision-task',
   'build', 'active', 'blocked'];

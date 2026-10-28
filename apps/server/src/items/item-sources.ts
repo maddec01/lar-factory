@@ -1,7 +1,7 @@
 // Every item source the onboarded repositories' configs name, as the one item source the board server reads and writes through.
 // A GitHub Project or a repository's issues read through gh, and an Azure DevOps team's sprint or backlog through az.
 
-import { decodePart, shownRepo, type Item, type RepoConfig } from '@lar-factory/shared';
+import { decodePart, refKey, shownRepo, type Item, type RepoConfig } from '@lar-factory/shared';
 import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
@@ -66,6 +66,10 @@ export function configuredSources(configs: readonly RepositoryConfig[], run: Az 
 /** How often a source holding active work reads, and how often an idle one does: its safety read for edits made elsewhere. */
 export const ACTIVE_READ_MS = 15_000;
 const IDLE_READ_MS = 5 * 60_000;
+/** How often each source checks for changes made elsewhere, as on github.com: a check that finds none costs no quota. */
+const PROBE_MS = 5_000;
+/** How long a source waits after a failed change check, which costs quota, unlike a 304. */
+const PROBE_RETRY_MS = 60_000;
 /** The shortest gap between two reads of one source, however often status.sh or the board asks for one. */
 const MIN_GAP_MS = 2_000;
 /** The shortest gap at the pace. */
@@ -73,20 +77,30 @@ const minGap = (pace: ReadPace) => Math.min(MIN_GAP_MS, pace.activeMs ?? ACTIVE_
 
 /** A merged item source that reads each source at its own pace. */
 export interface MergedSource extends ItemSource {
+  /**
+   * Runs the change check of each source due one at `pace`, unless `slow` holds, and makes each changed item it lists
+   * due on the next read, or the whole source when the check can't tell or names an item the source doesn't list.
+   */
+  probe(pace: ReadPace): Promise<void>;
   /** Whether a read at `pace` would read any source. */
   due(pace: ReadPace): boolean;
   /**
-   * Makes the source that lists the item at `url`, as an item, slice or linked PR, due on the next read; every source
-   * when none lists it, or when `url` is undefined.
+   * Makes the item at `url`, or the item that lists it as a slice or linked PR, due on the next read; when none does,
+   * the whole source of the GitHub repository it names, else every source, as when `url` is undefined.
    */
   invalidate(url?: string): void;
   /** Whether the last read read the item's source afresh, rather than listing it from an earlier read. */
   readAfresh(item: Item): boolean;
 }
 
-/** Whether the item, one of its slices or one of its linked PRs is at `url`. */
+/** Whether the item, one of its slices or one of its linked PRs is at `url`, ignoring case, as GitHub's owner names do. */
 const listsUrl = (item: Item, url: string) =>
-  item.url === url || item.slices.some((s) => s.url === url) || item.linkedPrs.some((pr) => pr.url === url);
+  [item.url, ...item.slices.map((s) => s.url), ...item.linkedPrs.map((pr) => pr.url)].some((at) => at?.toLowerCase() === url.toLowerCase());
+/** The repository, lowercased, and number a GitHub issue or PR URL names; undefined for any other URL. */
+function githubRef(url: string): { repo: string; number: number } | undefined {
+  const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:issues|pull)\/(\d+)/i.exec(url);
+  return match ? { repo: match[1]!.toLowerCase(), number: Number(match[2]) } : undefined;
+}
 
 /**
  * Merges the Projects and the other sources, each standing for the repositories `byRepo` gives it. A read lists every
@@ -140,6 +154,8 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
   /** The sources asked to read whole, and the items asked for by Item.id, since their last read started. */
   const askedWhole = new Set<ItemSource>();
   const askedItems = new Set<string>();
+  /** The sources whose last read failed, which retry at the active pace. */
+  const failed = new Set<ItemSource>();
   /** The sources the last read read whole, and the items it read alone. */
   let afresh = new Set<ItemSource>();
   let afreshItems = new Set<string>();
@@ -154,11 +170,11 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
     const activeMs = pace.activeMs ?? ACTIVE_READ_MS;
     // A source that never read retries at the active pace, not on every tick.
     if (!lastRead.has(source)) return since >= activeMs ? 'whole' : null;
-    if (askedWhole.has(source) && since >= minGap(pace)) return 'whole';
+    if (askedWhole.has(source) && since >= (failed.has(source) ? activeMs : minGap(pace))) return 'whole';
     if (pace.now - wholeAt.get(source)! >= (pace.idleMs ?? IDLE_READ_MS)) return 'whole';
     const listed = lastRead.get(source)!.items;
     const asked = listed.filter((item) => askedItems.has(item.id));
-    const active = pace.slow ? [] : listed.filter(pace.active);
+    const active = pace.slow ? [] : listed.filter(source.seesEdits ? pace.polled : pace.active);
     if (!(asked.length && since >= minGap(pace)) && !(active.length && since >= activeMs)) return null;
     return source.readSome ? [...new Set([...asked, ...active])] : 'whole';
   };
@@ -170,9 +186,43 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
     try { fresh = await source.readSome!(plan); }
     catch { return readOf(source, progress); }
     const byId = new Map(fresh.map((item) => [item.id, item]));
-    // An item the provider no longer lists, as when it was deleted, leaves; a planned item is never added twice.
+    // A planned item the provider no longer lists, as when it was deleted, leaves. A read can bring more than it was
+    // asked for, as an Azure item's Tasks, new ones too, so every item it brings replaces or joins the last read. A
+    // dossier read alone can't tell its sub-issues are on the board, so it keeps its map from the whole read.
     const planned = new Set(plan.map((item) => item.id));
-    return { ...last, items: last.items.flatMap((item) => (planned.has(item.id) ? byId.get(item.id) ?? [] : [item])) };
+    const kept = last.items.flatMap((item) => {
+      const fresh = byId.get(item.id);
+      if (!fresh) return planned.has(item.id) ? [] : [item];
+      byId.delete(item.id);
+      return [fresh.map === undefined && item.map ? { ...fresh, map: item.map } : fresh];
+    });
+    return { ...last, items: [...kept, ...byId.values()] };
+  };
+  /** When each source's last good change check started, and when one that failed may check again. */
+  const probedAt = new Map<ItemSource, number>();
+  const probeAfter = new Map<ItemSource, number>();
+  /**
+   * The items, of any source, at `url` or listing it as a slice or linked PR, and those it blocks: a blocker closing
+   * changes what they show, and Start after, but moves none of their updated_at.
+   */
+  const listing = (url: string) => {
+    const all = sources.flatMap((source) => lastRead.get(source)?.items ?? []);
+    const found = all.filter((item) => listsUrl(item, url));
+    const ref = githubRef(url);
+    const keys = new Set([...found.map((item) => refKey(item.repo, item.number)), ...ref ? [refKey(ref.repo, ref.number)] : []].map((key) => key.toLowerCase()));
+    return [...found, ...all.filter((item) => !found.includes(item) && item.blockers.some((b) => keys.has(refKey(b.repo, b.number).toLowerCase())))];
+  };
+  /**
+   * Asks for the items the changed URLs name, wherever they're listed, as a slice in another repository's source; a
+   * URL none lists, as a new issue or a PR that just linked one, which moves no issue's updated_at, reads its source whole.
+   */
+  const ask = (source: ItemSource, changed: string[] | null) => {
+    if (changed === null) return void askedWhole.add(source);
+    for (const url of changed) {
+      const found = listing(url);
+      for (const item of found) askedItems.add(item.id);
+      if (!found.length) askedWhole.add(source);
+    }
   };
   /** The source that listed each item, by Item.id, in the last read. */
   let listedBy = new Map<string, ItemSource>();
@@ -195,11 +245,19 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       }
       // A source that read keeps its read though another failed, so the next read needn't read it again.
       const settled = await Promise.allSettled(plans.map(({ source, plan }) => readPlanned(source, plan, progress)));
+      // A failed read asks again for what it read, so a change a check found isn't lost to a passing error.
       settled.forEach((read, index) => {
-        if (read.status === 'fulfilled') lastRead.set(plans[index]!.source, read.value);
+        const { source } = plans[index]!;
+        if (read.status === 'fulfilled') {
+          lastRead.set(source, read.value);
+          failed.delete(source);
+        } else if (lastRead.has(source)) {
+          failed.add(source);
+          askedWhole.add(source);
+        }
       });
-      const failed = settled.find((read) => read.status === 'rejected');
-      if (failed) throw failed.reason;
+      const rejected = settled.find((read) => read.status === 'rejected');
+      if (rejected) throw rejected.reason;
       afresh = new Set(plans.filter(({ plan }) => plan === 'whole').map(({ source }) => source));
       afreshItems = new Set(plans.flatMap(({ plan }) => (plan === 'whole' ? [] : plan.map((item) => item.id))));
       const reads = sources.map((source) => lastRead.get(source) ?? { title: '', items: [] });
@@ -213,11 +271,27 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       const problems = reads.flatMap((read) => read.problems ?? []);
       return { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item, listed.get(item.id)!) ?? []), ...problems.length > 0 && { problems } };
     },
+    async probe(pace) {
+      if (pace.slow) return;
+      // A check looks back to the last good one, or to the source's first read; a failed check leaves that in place.
+      await Promise.allSettled(sources.map(async (source) => {
+        const since = probedAt.get(source) ?? wholeAt.get(source);
+        if (!source.changes || !lastRead.has(source) || since === undefined || pace.now < (probeAfter.get(source) ?? since + PROBE_MS)) return;
+        probeAfter.set(source, pace.now + PROBE_RETRY_MS);
+        ask(source, await source.changes(since));
+        probedAt.set(source, pace.now);
+        probeAfter.delete(source);
+      }));
+    },
     due: (pace) => sources.some((source) => planOf(source, pace) !== null),
     invalidate(url) {
-      const listing = url === undefined ? [] : sources.flatMap((source) => lastRead.get(source)?.items.filter((item) => listsUrl(item, url)) ?? []);
-      if (listing.length) for (const item of listing) askedItems.add(item.id);
-      else for (const source of sources) askedWhole.add(source);
+      const found = url === undefined ? [] : listing(url);
+      for (const item of found) askedItems.add(item.id);
+      if (found.length) return;
+      // A GitHub repository no source names may still be in a Project, never in another repository's issues.
+      const ref = url === undefined ? undefined : githubRef(url);
+      const own = ref && sourceByRepo.get(ref.repo);
+      for (const source of own ? [own] : ref ? projects : sources) askedWhole.add(source);
     },
     readAfresh: (item) => afresh.has(sourceOf(item)) || afreshItems.has(item.id),
     setStatus: (item, status) => sourceOf(item).setStatus(item, status),
@@ -270,6 +344,7 @@ export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = 
       const read = await current.read(progress, pace);
       return { ...read, items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')) };
     },
+    probe: (pace) => current.probe(pace),
     due: (pace) => loadDue(pace) || current.due(pace),
     invalidate: (url) => current.invalidate(url),
     readAfresh: (item) => current.readAfresh(item),

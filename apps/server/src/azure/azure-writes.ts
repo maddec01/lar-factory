@@ -26,10 +26,18 @@ export function writeFailure(what: string, project: string, err: unknown): strin
 
 type Operation = { op: 'test' | 'replace'; path: string; value: unknown };
 
-/** The writes of an Azure item source on `project`, through its `invoke` and its kept `statesOf`. */
-export function azureWrites(project: string, invoke: AzureCalls['invoke'], typeStates: (type: string) => Promise<{ value: { name: string; category: string }[] }>):
+/**
+ * The writes of an Azure item source on `project`, through its batch `workItems` read, its `patchWorkItem` of a work item
+ * with the JSON patch in a file, and its kept `statesOf`.
+ */
+export function azureWrites(project: string, workItems: AzureCalls['workItems'], patchWorkItem: (id: number, file: string) => Promise<unknown>,
+  typeStates: (type: string) => Promise<{ value: { name: string; category: string }[] }>):
   Pick<ItemSource, 'setStatus' | 'statusRefusal' | 'addLabel' | 'setParentStatus' | 'abandon'> {
-  const read = (id: number) => invoke<RawWorkItem & { rev: number }>('wit', 'workitems', [`id=${id}`]);
+  const read = async (id: number) => {
+    const [raw] = await workItems([id]);
+    if (!raw) throw new Error(`Work item ${id} does not exist in ${project}, or you have no right to read it.`);
+    return raw as RawWorkItem & { rev: number };
+  };
   const full = (id: number) => new Error(`Work item ${id} has ${TAG_LIMIT} tags, Azure's limit. Remove a tag in Azure DevOps, then try again.`);
 
   /** The states of the work item's type, each with its category, in the type's order. */
@@ -38,7 +46,7 @@ export function azureWrites(project: string, invoke: AzureCalls['invoke'], typeS
   /** Writes the operations to the work item read at `raw`, failing if it changed since. */
   const patch = (raw: RawWorkItem & { rev: number }, ops: Operation[]) =>
     withFile([{ op: 'test', path: '/rev', value: raw.rev }, ...ops], (file) =>
-      invoke('wit', 'workitems', [`id=${raw.id}`], ['--http-method', 'PATCH', '--media-type', 'application/json-patch+json', '--in-file', file]));
+      patchWorkItem(raw.id, file));
 
   /** Runs a write, returning null, the refusal it returns, or `what` failed with the failure's message and fix. */
   async function attempt(what: string, write: () => Promise<string | void>): Promise<string | null> {

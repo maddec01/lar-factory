@@ -149,7 +149,7 @@ test("a GitHub repository still lacking a workflow label holds onboarding's PR b
 });
 
 const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
-const tagsCall = ['devops', 'invoke', '--area', 'wit', '--resource', 'tags', '--route-parameters', 'project=Fabrikam Fiber', '--api-version', '7.1-preview.1',
+const tagsCall = ['devops', 'invoke', '--area', 'wit', '--resource', 'tags', '--route-parameters', 'project=Fabrikam Fiber', '--api-version', '7.1',
   '--org', 'https://dev.azure.com/contoso', '--detect', 'false', '--output', 'json'];
 
 test("on Azure DevOps the step reads the project's tags with az", async () => {

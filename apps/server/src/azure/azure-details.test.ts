@@ -34,11 +34,12 @@ test('a description whose format is missing is HTML when it opens with a tag, el
   }
 });
 
-test('the work item is read at 7.2-preview.3 and its comments at 7.1-preview.4, 10 newest first', async () => {
+test('the work item is one batch read at 7.2-preview and its comments are read at 7.1-preview, 10 newest first', async () => {
   const az = fakeAz({ items: [workItem()] });
   await readAzureItemDetails(item(5), az.run);
   const version = (resource: string) => { const call = az.calls.find((args) => args.includes(resource))!; return call[call.indexOf('--api-version') + 1]; };
-  assert.deepEqual([version('workitems'), version('comments')], ['7.2-preview.3', '7.1-preview.4']);
+  assert.deepEqual([version('workitemsbatch'), version('comments')], ['7.2-preview', '7.1-preview']);
+  assert.deepEqual(az.batches, [[5]]);
   const comments = az.calls.find((args) => args.includes('comments'))!;
   assert.deepEqual(comments.slice(comments.indexOf('--query-parameters') + 1, comments.indexOf('--query-parameters') + 3), ['$top=10', 'order=desc']);
   assert.ok(comments.includes('workItemId=5') && comments.includes('project=Fabrikam Fiber') && comments.includes('https://dev.azure.com/contoso'));
@@ -77,16 +78,14 @@ test('the child work items answer as sub-tickets, Completed ones closed and Remo
     { number: 6, title: 'Write the exporter', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/6', repo: REPO, state: 'open' },
     { number: 7, title: 'Add the button', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/7', repo: REPO, state: 'closed' },
   ]);
-  assert.deepEqual(az.batches, [[6, 7, 8]]);
-  const read = az.calls.find((args) => args.includes('workitems'))!;
-  assert.ok(read.slice(read.indexOf('--query-parameters')).some((a) => /^\$expand=relations$/i.test(a)));
+  assert.deepEqual(az.batches, [[5], [6, 7, 8]]);
 });
 
 test('a work item with no child links reads no batch', async () => {
   const az = fakeAz({ items: [workItem()] });
   const details = await readAzureItemDetails(item(5), az.run);
   assert.ok(!('error' in details));
-  assert.deepEqual([details.subTickets, az.batches], [[], []]);
+  assert.deepEqual([details.subTickets, az.batches], [[], [[5]]]);
 });
 
 test('an az failure answers its message', async () => {
@@ -98,6 +97,11 @@ test('a logged-out az answers the fix', async () => {
   const az = fakeAz({ items: [workItem()], fail: () => new Error('Please run az login to setup account.') });
   const answer = await readAzureItemDetails(item(5), az.run);
   assert.ok('error' in answer && /az login/.test(answer.error));
+});
+
+test('a work item az no longer finds answers 404', async () => {
+  const az = fakeAz({ items: [] });
+  assert.deepEqual(await readAzureItemDetails(item(5), az.run), { status: 404, error: 'Work item 5 does not exist, or you have no right to read it.' });
 });
 
 test('an item without an Azure DevOps repository answers 404', async () => {
@@ -114,7 +118,7 @@ test('older comments are one comments call with the continuation token, 10 newes
   const call = az.calls[0]!;
   assert.ok(call.includes('comments') && call.includes('workItemId=5'));
   assert.deepEqual(call.slice(call.indexOf('--query-parameters') + 1, call.indexOf('--query-parameters') + 4), ['$top=10', 'order=desc', 'continuationToken=10']);
-  assert.equal(call[call.indexOf('--api-version') + 1], '7.1-preview.4');
+  assert.equal(call[call.indexOf('--api-version') + 1], '7.1-preview');
 });
 
 test('the oldest page answers no token', async () => {

@@ -15,14 +15,14 @@ export interface WorkItem {
   area?: string;
   /** The ids of the pull requests linked to it, each read from `pullRequests`. */
   prs?: number[];
-  /** Its description, and the format Azure DevOps says it is in, which only a 7.2-preview.3 read returns. */
+  /** Its description, and the format Azure DevOps says it is in, which only a 7.2-preview read returns. */
   description?: string;
   descriptionFormat?: 'Markdown' | 'Html';
   createdBy?: string;
   assignedTo?: string;
   created?: string;
   iteration?: string;
-  /** Its comments, oldest first; a comment without a format is one a 7.1-preview.4 read gives none. */
+  /** Its comments, oldest first; a comment without a format is one a 7.1-preview read gives none. */
   comments?: FakeComment[];
 }
 
@@ -52,6 +52,7 @@ export const STATES: Record<string, [string, string][]> = {
  * reading `items` (listed or not), with `requirement` its requirement backlog level's type and `areas` its area paths.
  * `pullRequests` are the PRs az repos pr show prints, and `tags` the project's tags, which a tag PATCH renames. It records
  * each call, each work item patch, each work item created and each tag renamed, and `fail` throws for a call it matches.
+ * Like az, it refuses a devops invoke at a preview's resource version, and one on wit/workitems' {id} route, which az rest PATCHes.
  */
 export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items.filter((i) => i.type !== 'Task').map((i) => i.id),
   requirement = 'User Story', areas = [{ value: TEAM_AREA, includeChildren: true }], iterations = [{ id: 'it-12', name: 'Sprint 12' }], pullRequests = [], tags = [], fail }: {
@@ -78,7 +79,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
   const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
   const raw = (i: WorkItem, version?: string) => ({
-    id: i.id, rev: 1, ...version === '7.2-preview.3' && i.descriptionFormat && { multilineFieldsFormat: { 'System.Description': i.descriptionFormat } }, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
+    id: i.id, rev: 1, ...version?.startsWith('7.2-preview') && i.descriptionFormat && { multilineFieldsFormat: { 'System.Description': i.descriptionFormat } }, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
     fields: {
       'System.WorkItemType': i.type, 'System.State': i.state, 'System.AreaPath': i.area ?? TEAM_AREA, 'System.Title': i.title ?? `Item ${i.id}`, 'System.ChangedDate': '2026-10-21T08:00:00Z',
       ...i.description !== undefined && { 'System.Description': i.description }, ...i.createdBy && { 'System.CreatedBy': { displayName: i.createdBy, uniqueName: `${i.createdBy}@contoso.com` } },
@@ -113,8 +114,18 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
       if (!pr) throw new Error('az repos pr show failed: TF401180: The requested pull request was not found.');
       return JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'lar-api', webUrl: REPO_URL } });
     }
+    if (args[0] === 'rest' && flag(args, '--method') === 'patch') {
+      const id = Number(/\/_apis\/wit\/workitems\/(\d+)\?/.exec(flag(args, '--url'))?.[1]);
+      if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
+      patches.push({ id, ops: JSON.parse(readFileSync(flag(args, '--body').slice(1), 'utf8')) as unknown[] });
+      return JSON.stringify(raw(byId.get(id)!));
+    }
     if (args[0] === 'devops' && args[1] === 'invoke') {
       const resource = `${flag(args, '--area')}/${flag(args, '--resource')}`;
+      // az turns the version into a number by dropping -preview, and takes wit/workitems' ${type} route over its {id} one.
+      const version = flag(args, '--api-version');
+      if (/-preview\.\d/.test(version)) throw new Error(`az devops invoke failed: ERROR: could not convert string to float: '${version.replace('-preview', '')}'`);
+      if (resource === 'wit/workitems' && route(args, 'id')) throw new Error("az devops invoke failed: ERROR: 'type'");
       if (resource === 'work/backlogconfiguration') {
         return JSON.stringify({ requirementBacklog: { id: 'Microsoft.RequirementCategory', workItemTypes: [{ name: requirement }], defaultWorkItemType: { name: requirement } },
           taskBacklog: { id: 'Microsoft.TaskCategory', workItemTypes: [{ name: 'Task' }] } });
@@ -128,7 +139,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
       if (resource === 'wit/workitemsbatch') {
         const { ids } = JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as { ids: number[] };
         batches.push(ids);
-        const found = ids.flatMap((id) => byId.has(id) ? [raw(byId.get(id)!)] : []);
+        const found = ids.flatMap((id) => byId.has(id) ? [raw(byId.get(id)!, version)] : []);
         return JSON.stringify({ count: found.length, value: found });
       }
       if (resource === 'wit/workitems' && route(args, 'type')) {
@@ -139,15 +150,6 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
         created.push({ id, type, ops });
         byId.set(id, { id, type, state: STATES[type]![0]![0], title: value('/fields/System.Title'), tags: value('/fields/System.Tags') });
         return JSON.stringify(raw(byId.get(id)!));
-      }
-      if (resource === 'wit/workitems') {
-        const id = Number(route(args, 'id'));
-        if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
-        if (args.includes('--http-method')) patches.push({ id, ops: JSON.parse(readFileSync(flag(args, '--in-file'), 'utf8')) as unknown[] });
-        // A single work item read carries its links only when asked with $expand=relations.
-        const read = raw(byId.get(id)!, flag(args, '--api-version'));
-        const expanded = args.some((a) => /^\$expand=(relations|all)$/i.test(a));
-        return JSON.stringify(args.includes('--http-method') || expanded ? read : { ...read, relations: undefined });
       }
       if (resource === 'wit/comments') {
         // Newest first, $top at a time; the continuation token is how many it has already given.

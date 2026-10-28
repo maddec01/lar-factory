@@ -8,8 +8,11 @@ import { ReadProblem } from '../items/item-source.ts';
 import { withFile, type AzureCalls, type RawWorkItem } from './azure-items.ts';
 import { writeFailure } from './azure-writes.ts';
 
-/** The REST API version of the create call, the first that takes a markdown description. */
-const CREATE_API_VERSION = '7.2-preview.3';
+/**
+ * The REST API version of the create call, which az sends as 7.2-preview.3, the first that takes a markdown description:
+ * az devops invoke reads the version as a number, so it can't pass the .3 itself.
+ */
+const CREATE_API_VERSION = '7.2-preview';
 const WHAT = 'Could not create the work item.';
 const UNCERTAIN = 'Work item creation could not be confirmed. Check the work items in Azure DevOps before starting a new item; this submission will not create another work item.';
 

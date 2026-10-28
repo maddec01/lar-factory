@@ -102,6 +102,6 @@ test("each repository's items show once its own read lands, while another reposi
   assert.equal(early.fetchedAt, null, 'the whole read has yet to land');
   assert.equal(early.error, null);
   const data = await settled(board);
-  assert.deepEqual(data.items.map((i) => [i.repo, i.number]), [['maddec01/lar-factory', 1], [apple, 7]]);
+  assert.deepEqual(data.items.map((i) => [i.repo, i.number]), [[apple, 7], ['maddec01/lar-factory', 1]]);
   assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
 });

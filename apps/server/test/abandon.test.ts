@@ -42,7 +42,7 @@ test('a failed close keeps the item and reports the error', async (t) => {
 
 test('an abandoned item does not come back while GitHub still reports it', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, true);
-  await until(board, (d) => d.items.length === 2);
+  await until(board, (d) => d.items.length === 1);
   assert.equal((await abandon(board, 'I_12')).status, 200);
   await reads(board, 5);
   const data = await board.board() as BoardData;

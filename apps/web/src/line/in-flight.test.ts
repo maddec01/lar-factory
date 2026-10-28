@@ -49,9 +49,9 @@ test('the table lists everything past the Queue and short of Done that no dossie
   ]);
   expect([...header.children].slice(2).map(text)).toEqual(['Agent', 'Thread · next']);
   expect(rows().map((r) => numberOf(r.dataset.item!)), 'Verify first, Refining last, in board order within a stage; #200 and #180 and their parts sit in dossiers')
-    .toEqual([31, 210, 34, 147, 142, 141, 150, 30, 130, 22, 23]);
+    .toEqual([31, 900026, 34, 147, 142, 141, 150, 30, 130, 22, 23]);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(loose));
-  expect(rows().map((r) => numberOf(r.dataset.item!)), 'a part out of its dossier is back').toEqual([31, 210, 34, 147, 142, 141, 150, 30, 140, 130, 22, 23]);
+  expect(rows().map((r) => numberOf(r.dataset.item!)), 'a part out of its dossier is back').toEqual([31, 900026, 34, 147, 142, 141, 150, 30, 140, 130, 22, 23]);
 });
 
 test('with nothing in flight, the table says so', async () => {

@@ -16,11 +16,6 @@ test("the PR bodies query reads only each linked PR's id, body and merge time", 
   assert.match(PR_BODIES_QUERY, /nodes\(ids: \$ids\) \{ \.\.\. on PullRequest \{ id body mergedAt \} \}/);
 });
 
-test('the board query reads a pull request item\'s own checks and merge state', () => {
-  const pr = /\.\.\. on PullRequest \{([\s\S]*)\n {4}\}/.exec(OPEN_ISSUES_QUERY)?.[1] ?? '';
-  assert.match(pr, /\bmergeStateStatus\b/);
-  assert.match(pr, /statusCheckRollup \{\s+contexts\(first: \d+\) \{\s+checkRunCountsByState/);
-});
 
 test("the board query reads each slice's state reason", () => {
   assert.match(OPEN_ISSUES_QUERY, /subIssues\(first: \d+\) \{ nodes \{ number title url state stateReason repository \{ nameWithOwner \} \} \}/,

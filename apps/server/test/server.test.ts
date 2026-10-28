@@ -277,7 +277,7 @@ test('a parent with two builds merged at different times: each build keeps its o
     repository: { nameWithOwner: 'maddec01/lar-factory' } };
   const build = (number: number, linked: object) => {
     const raw = rawBuild(number, 'Done');
-    return { ...raw, content: { ...raw.content, state: 'CLOSED', closedAt: new Date().toISOString(), parent: parentRef,
+    return { ...raw, content: { ...raw.content, state: 'CLOSED', closedAt: new Date(Date.now() - 60_000).toISOString(), updatedAt: new Date(Date.now() - 60_000).toISOString(), parent: parentRef,
       closedByPullRequestsReferences: { nodes: [linked] } } };
   };
   const parent = boardIssue(13, 'In progress');

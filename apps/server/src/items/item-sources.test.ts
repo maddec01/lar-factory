@@ -452,5 +452,5 @@ test('repositories reading one Azure board share its backlog and sprint and rout
     [1, 'contoso/Fabrikam/web', ['contoso/Fabrikam/web', 'Contoso/fabrikam/api']], [2, 'Contoso/fabrikam/api', null],
   ]);
   assert.equal(az.calls.filter((c) => c[3] === 'list-work-items').length, 1);
-  assert.equal(az.calls.filter((c) => c.includes('backlogId=Microsoft.RequirementCategory')).length, 1);
+  assert.equal(az.calls.filter((c) => c.some((arg) => arg.includes('/_apis/work/backlogs/Microsoft.RequirementCategory/workItems?'))).length, 1);
 });

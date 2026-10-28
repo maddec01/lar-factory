@@ -11,6 +11,8 @@
 # On Azure DevOps the parent is the build's work item URL, and the slice is a Task
 # in the build's project, created with its parent link and a markdown description
 # in one call. <owner/repo> is then the Azure repository, as repo-config.sh takes it.
+# Once the slice is made, it asks each running local board to read the build's
+# source, as boards.sh says, so the new slice shows on the build's card.
 set -euo pipefail
 
 usage="usage: slice.sh <owner/repo> <parent number or URL> <title> <body-file>"
@@ -21,6 +23,8 @@ body=${4:?$usage}
 interval=${SLICE_POLL_INTERVAL:-2}
 timeout=${SLICE_POLL_TIMEOUT:-20}
 
+# shellcheck source-path=SCRIPTDIR source=boards.sh
+source "$(dirname "$0")/boards.sh"
 # shellcheck source-path=SCRIPTDIR source=azure.sh
 source "$(dirname "$0")/azure.sh"
 if azure_work_item "$parent"; then
@@ -40,6 +44,7 @@ if azure_work_item "$parent"; then
         exit 1
     fi
     echo "$az_org/$az_project/_workitems/edit/$(jq -r .id <<<"$created")"
+    ask_boards_to_read "$parent"
     exit 0
 fi
 if azure_repo "$repo"; then
@@ -51,11 +56,14 @@ build_repo=$repo
 if [[ $parent =~ ^https://github\.com/([^/]+/[^/]+)/issues/[0-9]+$ ]]; then build_repo=${BASH_REMATCH[1]}; fi
 # repo-config.sh names its failure on stderr, which passes straight through.
 config=$(bash "$(dirname "$0")/repo-config.sh" "$build_repo")
+parent_url=$parent
+[[ $parent =~ ^[0-9]+$ ]] && parent_url="https://github.com/$build_repo/issues/$parent"
 
 url=$(gh issue create --repo "$repo" --parent "$parent" --title "$title" --body-file "$body")
 
 if [[ $(jq -r .itemSource.kind <<<"$config") != github-project ]]; then
     echo "$url"
+    ask_boards_to_read "$parent_url"
     exit 0
 fi
 owner=$(jq -r .itemSource.owner <<<"$config")
@@ -112,3 +120,4 @@ if [[ -n "$ids" ]]; then
     exit 1
 fi
 echo "$url"
+ask_boards_to_read "$parent_url"

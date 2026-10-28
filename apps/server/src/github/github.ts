@@ -1,7 +1,7 @@
 // Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
-import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, statusLabel } from '@lar-factory/shared';
-import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, Searched, Status, StatusSource } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearch, statusLabel } from '@lar-factory/shared';
+import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, RawLinkedPr, Searched, Status, StatusSource } from '@lar-factory/shared';
 import type { ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -38,7 +38,7 @@ const ISSUE_FIELDS = `id number title url state stateReason closedAt updatedAt
   blockedBy(first: ${BLOCKER_LIMIT}) { nodes { number state repository { nameWithOwner } } }
   closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
     nodes {
-      number url state isDraft body mergedAt mergeStateStatus
+      id number url state isDraft mergeStateStatus
       ${CHECKS}
     }
   }`;
@@ -122,6 +122,14 @@ export const ISSUE_SEARCH_QUERY = `query($q: String!, $after: String) {
  */
 export const DOSSIER_BODIES_QUERY = `query($ids: [ID!]!) {
   nodes(ids: $ids) { ... on Issue { id body } }
+}`;
+
+/**
+ * Linked PRs' bodies and merge times, by PR node id, up to PAGE_SIZE ids a call. Only a build's merged stats and its
+ * stats write-back read them, so the board query skips them on every other item's linked PRs.
+ */
+export const PR_BODIES_QUERY = `query($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on PullRequest { id body mergedAt } }
 }`;
 
 // ---------- raw GraphQL shapes ----------
@@ -303,6 +311,15 @@ async function readDossierBodies(raws: RawItem[], searched: Searched): Promise<v
   }
 }
 
+/** Puts each build's linked PRs' body and merge time on them, for the build's merged stats and its stats write-back. */
+async function readBuildPrBodies(raws: RawItem[]): Promise<void> {
+  // Two builds can link the same PR; it's read once.
+  const prs = new Map<string, RawLinkedPr[]>();
+  for (const pr of rawBuildPrs(raws)) if (pr.id) prs.set(pr.id, [...prs.get(pr.id) ?? [], pr]);
+  const read = await fetchNodes<Pick<RawLinkedPr, 'body' | 'mergedAt'> & { id: string }>(PR_BODIES_QUERY, [...prs.keys()]);
+  for (const { id, body, mergedAt } of read) for (const pr of prs.get(id) ?? []) Object.assign(pr, { body, mergedAt });
+}
+
 /** A Project read: its items, and the Project item id of each by its Item.id, for the Project adapter's writes. */
 export interface ProjectRead extends ItemsRead {
   projectItemIds: Map<string, string>;
@@ -349,8 +366,10 @@ export async function fetchIssues(ids: readonly string[]): Promise<Item[]> {
 async function boardItems(raws: RawItem[], from: StatusSource = 'field'): Promise<Item[]> {
   // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
   // decide which sub-issues are slices, so they run before the dossiers, items with sub-issues on the board, are known.
-  const searched = await searchLabels(raws);
-  await readDossierBodies(raws, searched);
+  const [searched] = await Promise.all([
+    searchLabels(raws).then(async (found) => { await readDossierBodies(raws, found); return found; }),
+    readBuildPrBodies(raws),
+  ]);
   return normalizeItems(raws, searched, from);
 }
 

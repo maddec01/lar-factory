@@ -7,6 +7,12 @@ const output = (value) => process.stdout.write(JSON.stringify(value));
 /** An issue's or Project item's content as the board query reads it: no body, and its linked PRs by id without body or merge time. */
 const read = (content) => ({ ...content, body: undefined, ...(content.closedByPullRequestsReferences && { closedByPullRequestsReferences: {
   nodes: content.closedByPullRequestsReferences.nodes.map(({ body, mergedAt, ...pr }) => ({ ...pr, id: pr.id ?? pr.url })) } }) });
+/** A closed issue as the light queries read it: its close, its labels, and its parent's id and labels. */
+const lightIssue = (issue) => {
+  const parent = issue.parent && (options.repoIssues?.[issue.parent.repository.nameWithOwner] ?? []).find((p) => p.number === issue.parent.number);
+  return { id: issue.id, closedAt: issue.closedAt ?? null, stateReason: issue.stateReason ?? null, labels: issue.labels,
+    parent: issue.parent ? { id: parent?.id ?? `I_${issue.parent.number}`, labels: parent?.labels ?? { nodes: [] } } : null };
+};
 // GitHub's rate_limit costs no quota, so it stays out of the calls the tests count. options.remaining sets what is left.
 if (args[0] === 'api' && args[1] === 'rate_limit') {
   const remaining = options.remaining ?? 5000;
@@ -118,6 +124,16 @@ const main = async () => {
       return;
     }
     if (args.some((a) => a.includes('projectsV2(first:'))) return output({ data: { user: { projectsV2: { nodes: [{ number: 1, title: 'lar' }] } } } });
+    // A search for a repository's issues closed in a close-date range, `closed:<from>..<to>` or `closed:>=<from>`, read
+    // light; options.unindexed names the issues the search index doesn't list yet.
+    const q = args.find((a) => a.startsWith('q='))?.slice(2) ?? '';
+    if (args.some((a) => a.includes('search(type: ISSUE')) && q.includes('is:closed')) {
+      const [from, to] = /closed:(?:>=)?(\S+?)(?:\.\.(\S+))?(?:\s|$)/.exec(q).slice(1);
+      const nodes = (options.repoIssues?.[/repo:(\S+)/.exec(q)[1]] ?? []).filter((issue) => issue.state === 'CLOSED' && issue.closedAt
+        && Date.parse(issue.closedAt) >= Date.parse(from) && (!to || Date.parse(issue.closedAt) <= Date.parse(to)) && !options.unindexed?.includes(issue.id))
+        .map(lightIssue);
+      return output({ data: { search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } });
+    }
     if (args.some((a) => a.includes('search(type: ISSUE'))) {
       const label = ['build', 'blocked', 'active'].find((l) => args.some((a) => a.includes(`label:${l} `)));
       const nodes = { build: options.builds, blocked: options.blocked, active: options.active }[label];
@@ -141,13 +157,7 @@ const main = async () => {
       const state = light ? 'CLOSED' : 'OPEN';
       const since = value('since');
       const issues = options.repoIssues?.[`${value('owner')}/${value('name')}`] ?? [];
-      const lightParent = (ref) => {
-        const parent = (options.repoIssues?.[ref.repository.nameWithOwner] ?? []).find((issue) => issue.number === ref.number);
-        return { id: parent?.id ?? `I_${ref.number}`, labels: parent?.labels ?? { nodes: [] } };
-      };
-      const nodes = issues.filter((issue) => issue.state === state && (!since || issue.updatedAt >= since))
-        .map((issue) => (light ? { id: issue.id, closedAt: issue.closedAt ?? null, stateReason: issue.stateReason ?? null, labels: issue.labels,
-          parent: issue.parent ? lightParent(issue.parent) : null } : read(issue)));
+      const nodes = issues.filter((issue) => issue.state === state && (!since || issue.updatedAt >= since)).map((issue) => (light ? lightIssue(issue) : read(issue)));
       return output({ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } } });
     }
     // Repository issues by node id, read in full without their bodies; an id no issue has resolves to null.

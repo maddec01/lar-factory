@@ -1,6 +1,6 @@
 // Reads the lar project through the local `gh` CLI (`gh api graphql`).
 
-import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearch, statusLabel } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, isDraft, normalizeItems, projectBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, RawLinkedPr, Searched, Status, StatusSource } from '@lar-factory/shared';
 import type { ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
@@ -93,15 +93,28 @@ const OPEN_ISSUES_QUERY = `query($owner: String!, $name: String!, $after: String
   }
 }`;
 
+/** What decides whether the board keeps a closed issue: its close, its labels, and its parent's id and labels. */
+const LIGHT_ISSUE_FIELDS = 'id closedAt stateReason labels(first: 20) { nodes { name } } parent { id labels(first: 20) { nodes { name } } }';
+
+/** How many close-date ranges a repository's closed issues are searched in at once, mostly a page each: more calls at once answer slower. */
+const CLOSED_RANGES = 10;
+
 /**
- * One page of a repository's issues closed since `since`, with only what decides whether the board keeps one: its close,
- * its labels, and its parent's id and labels. A light page answers in about half the time of an OPEN_ISSUES_QUERY page.
+ * One page of a search for a repository's issues closed in a close-date range, light. A light page answers in about half
+ * the time of an OPEN_ISSUES_QUERY page, and the ranges search at once, where the issues connection pages one by one.
  */
-const CLOSED_ISSUES_QUERY = `query($owner: String!, $name: String!, $since: DateTime, $after: String) {
+const CLOSED_SEARCH_QUERY = `query($q: String!, $after: String) {
+  search(type: ISSUE, first: ${SEARCH_PAGE_SIZE}, after: $after, query: $q) {
+    pageInfo { hasNextPage endCursor }
+    nodes { ... on Issue { ${LIGHT_ISSUE_FIELDS} } }
+  }
+}`;
+
+/** A repository's issues closed and updated since `since`, the last updated first, light: one page, for those the search doesn't list yet. */
+const RECENT_CLOSED_QUERY = `query($owner: String!, $name: String!, $since: DateTime) {
   repository(owner: $owner, name: $name) {
-    issues(first: ${PAGE_SIZE}, after: $after, states: [CLOSED], filterBy: { since: $since }) {
-      pageInfo { hasNextPage endCursor }
-      nodes { id closedAt stateReason labels(first: 20) { nodes { name } } parent { id labels(first: 20) { nodes { name } } } }
+    issues(first: ${PAGE_SIZE}, states: [CLOSED], filterBy: { since: $since }, orderBy: { field: UPDATED_AT, direction: DESC }) {
+      nodes { ${LIGHT_ISSUE_FIELDS} }
     }
   }
 }`;
@@ -139,15 +152,13 @@ interface PageInfo {
   endCursor: string | null;
 }
 
-interface RawIssueSearch {
-  data: { search: { pageInfo: PageInfo; nodes: { number?: number; repository?: { nameWithOwner: string } }[] } };
+/** An issue as ISSUE_SEARCH_QUERY reads it. */
+interface SearchedIssue {
+  number?: number;
+  repository?: { nameWithOwner: string };
 }
 
-interface RawBodies {
-  data: { nodes: ({ id?: string; body?: string } | null)[] };
-}
-
-/** A closed issue as CLOSED_ISSUES_QUERY reads it. */
+/** A closed issue as CLOSED_SEARCH_QUERY and RECENT_CLOSED_QUERY read it. */
 interface LightIssue {
   id: string;
   closedAt: string | null;
@@ -276,38 +287,79 @@ async function readPages(maxPages: number, tooMany: string, readPage: (after: st
   throw new Error(tooMany);
 }
 
-/** The `repo#number` keys of the issues a search finds; none for no search. */
-async function searchIssues(q: string | null): Promise<Set<string>> {
-  const keys = new Set<string>();
-  if (!q) return keys;
+/** Each issue an issue search finds, across its pages. */
+async function searchPages<T>(q: string, query = ISSUE_SEARCH_QUERY): Promise<T[]> {
+  const nodes: T[] = [];
   await readPages(MAX_SEARCH_PAGES, `Issue search "${q}" has more than ${SEARCH_PAGE_SIZE * MAX_SEARCH_PAGES} results; stopped paging`, async (after) => {
-    const { search } = (await graphql<RawIssueSearch>(ISSUE_SEARCH_QUERY, { q, after })).data;
-    for (const n of search.nodes) if (n.repository && n.number) keys.add(refKey(n.repository.nameWithOwner, n.number));
+    const { search } = (await graphql<{ data: { search: { pageInfo: PageInfo; nodes: T[] } } }>(query, { q, after })).data;
+    nodes.push(...search.nodes);
     return search.pageInfo;
   });
+  return nodes;
+}
+
+/** The `repo#number` keys of the issues a search finds. */
+async function searchIssues(q: string): Promise<Set<string>> {
+  const keys = new Set<string>();
+  for (const n of await searchPages<SearchedIssue>(q)) {
+    if (n.repository && n.number) keys.add(refKey(n.repository.nameWithOwner, n.number));
+  }
   return keys;
 }
 
-/** Runs the issue searches; the slice label searches need the builds found, to know which sub-issues are slices. A project item's own labels decide whether it's a build. */
-async function searchLabels(raws: RawItem[]): Promise<Searched> {
-  const builds = new Set([...projectBuilds(raws), ...await searchIssues(buildSubIssueSearch(raws))]);
-  const [active, blocked] = await Promise.all([
-    searchIssues(sliceLabelSearch('active', raws, builds)),
-    searchIssues(sliceLabelSearch('blocked', raws, builds)),
-  ]);
-  return { builds, active, blocked };
+/** The `repo#number` keys the issue searches find together, each search in one repository; none for no search. */
+type LabelSearch = (searches: readonly string[]) => Promise<Set<string>>;
+
+/**
+ * A LabelSearch for one read that runs each search once, so the read can start the ones it expects early and use
+ * them when its items are all read.
+ */
+function searchOnce(): LabelSearch {
+  const runs = new Map<string, Promise<Set<string>>>();
+  return async (searches) => {
+    const found = await Promise.all(searches.map((q) => {
+      let run = runs.get(q);
+      if (!run) {
+        runs.set(q, (run = searchIssues(q)));
+        // A search started early may fail before anything waits on it; the read that uses it fails then.
+        run.catch(() => {});
+      }
+      return run;
+    }));
+    return new Set(found.flatMap((keys) => [...keys]));
+  };
 }
 
-/** Puts each dossier's body on its raw item, for its map. */
-async function readDossierBodies(raws: RawItem[], searched: Searched): Promise<void> {
-  const dossiers = new Map(rawDossiers(raws, searched).flatMap((raw) => (raw.content ? [[raw.content.id, raw.content]] : [])));
-  const ids = [...dossiers.keys()];
-  for (let start = 0; start < ids.length; start += PAGE_SIZE) {
-    const { nodes } = (await graphql<RawBodies>(DOSSIER_BODIES_QUERY, { ids: ids.slice(start, start + PAGE_SIZE) })).data;
-    for (const node of nodes) {
-      const content = node?.id ? dossiers.get(node.id) : undefined;
-      if (node && content) content.body = node.body ?? '';
-    }
+/**
+ * Runs the issue searches at once. The slice label searches look in every repository holding a build's open sub-issue,
+ * not only its slices: the sub-issues that are builds take no slice label, so they find the same slices. A project
+ * item's own labels decide whether it's a build.
+ */
+async function searchLabels(raws: RawItem[], search: LabelSearch): Promise<Searched> {
+  const [builds, active, blocked] = await Promise.all([
+    search(buildSubIssueSearches(raws)),
+    search(sliceLabelSearches('active', raws)),
+    search(sliceLabelSearches('blocked', raws)),
+  ]);
+  return { builds: new Set([...projectBuilds(raws), ...builds]), active, blocked };
+}
+
+/**
+ * Puts each dossier's body on its raw item, for its map. The searches decide which sub-issues are slices, so which items
+ * are dossiers: the bodies are read meanwhile for each item that is one when no sub-issue is a slice, and kept for the
+ * dossiers alone.
+ */
+async function readDossierBodies(raws: RawItem[], searched: Promise<Searched>): Promise<void> {
+  const contentOf = (dossiers: RawItem[]) => new Map(dossiers.flatMap((raw) => (raw.content ? [[raw.content.id, raw.content]] : [])));
+  const everySubIssue = new Set(raws.flatMap((raw) => raw.content?.subIssues?.nodes ?? []).map((s) => refKey(s.repository.nameWithOwner, s.number)));
+  const [bodies, found] = await Promise.all([
+    fetchNodes<{ id?: string; body?: string }>(DOSSIER_BODIES_QUERY, [...contentOf(rawDossiers(raws, { builds: everySubIssue })).keys()]),
+    searched,
+  ]);
+  const dossiers = contentOf(rawDossiers(raws, found));
+  for (const node of bodies) {
+    const content = node.id ? dossiers.get(node.id) : undefined;
+    if (content) content.body = node.body ?? '';
   }
 }
 
@@ -339,14 +391,14 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
   return { title, items: await boardItems(raws), projectItemIds };
 }
 
-/** The nodes with these ids, PAGE_SIZE ids a call; an id that no longer resolves fails the call, as gh does on any GraphQL error. */
-async function fetchNodes<T extends object>(query: string, ids: readonly string[]): Promise<T[]> {
-  const found: T[] = [];
-  for (let start = 0; start < ids.length; start += PAGE_SIZE) {
-    const { nodes } = (await graphql<{ data: { nodes: (T | null)[] } }>(query, { ids: ids.slice(start, start + PAGE_SIZE) })).data;
-    found.push(...nodes.filter((node): node is T => node !== null && Object.keys(node).length > 0));
-  }
-  return found;
+/**
+ * The nodes with these ids, `size` ids a call, all calls at once; an id that no longer resolves fails the call, as gh
+ * does on any GraphQL error.
+ */
+async function fetchNodes<T extends object>(query: string, ids: readonly string[], size = PAGE_SIZE): Promise<T[]> {
+  const chunks = Array.from({ length: Math.ceil(ids.length / size) }, (_, i) => ids.slice(i * size, (i + 1) * size));
+  const read = await Promise.all(chunks.map(async (chunk) => (await graphql<{ data: { nodes: (T | null)[] } }>(query, { ids: chunk })).data.nodes));
+  return read.flat().filter((node): node is T => node !== null && Object.keys(node).length > 0);
 }
 
 /** The Project items with these Project item ids, read afresh, with each one's Project item id by its Item.id. */
@@ -363,13 +415,11 @@ export async function fetchIssues(ids: readonly string[]): Promise<Item[]> {
 }
 
 /** The board's items from raw items, once all are read, without slices and with each dossier's map. */
-async function boardItems(raws: RawItem[], from: StatusSource = 'field'): Promise<Item[]> {
+async function boardItems(raws: RawItem[], from: StatusSource = 'field', search = searchOnce()): Promise<Item[]> {
   // A slice and its build can sit on different pages, so slices are dropped once all are read. The searches
-  // decide which sub-issues are slices, so they run before the dossiers, items with sub-issues on the board, are known.
-  const [searched] = await Promise.all([
-    searchLabels(raws).then(async (found) => { await readDossierBodies(raws, found); return found; }),
-    readBuildPrBodies(raws),
-  ]);
+  // decide which sub-issues are slices, so the dossiers, items with sub-issues on the board, are known once they land.
+  const searching = searchLabels(raws, search);
+  const [searched] = await Promise.all([searching, readDossierBodies(raws, searching), readBuildPrBodies(raws)]);
   return normalizeItems(raws, searched, from);
 }
 
@@ -389,38 +439,95 @@ async function readRepoPages<T>(repo: string, what: string, query: string, vars:
 
 const hasLabel = (labels: { nodes: { name: string }[] }, name: string) => labels.nodes.some((l) => l.name === name);
 
+const notPlanned = (issue: LightIssue) => issue.stateReason === 'NOT_PLANNED' || issue.stateReason === 'DUPLICATE';
+
 /**
- * The closed issues the board keeps, by id: those closed since `since`, except slices and those closed as not planned.
- * A slice is a sub-issue without `build` of a `build` issue in the same read; a slice whose build wasn't read stays. A
- * closed build stays even when not planned, since its card is dropped but its slices still are too.
+ * Whether the board keeps a closed issue: one closed since `since`, unless it's a slice or closed as not planned. A
+ * closed build stays even when not planned, since its card is dropped but its slices still are too. A sub-issue without
+ * `build` of a `build` issue is a slice when its build is in the same read, which only the whole read tells: undefined.
  */
+function keeps(issue: LightIssue, since: number): boolean | undefined {
+  if (!issue.closedAt || Date.parse(issue.closedAt) < since) return false;
+  const build = hasLabel(issue.labels, 'build');
+  if (!build && issue.parent !== null && hasLabel(issue.parent.labels, 'build')) return undefined;
+  return build || !notPlanned(issue);
+}
+
+/** The closed issues the board keeps, by id, once the read is whole: a slice whose build wasn't read stays. */
 function keptClosed(closed: LightIssue[], openIds: ReadonlySet<string>, since: number): string[] {
-  const recent = closed.filter((issue) => issue.closedAt && Date.parse(issue.closedAt) >= since);
-  const read = new Set([...openIds, ...recent.map((issue) => issue.id)]);
-  return recent.filter((issue) => {
-    const build = hasLabel(issue.labels, 'build');
-    const slice = !build && issue.parent !== null && read.has(issue.parent.id) && hasLabel(issue.parent.labels, 'build');
-    const notPlanned = issue.stateReason === 'NOT_PLANNED' || issue.stateReason === 'DUPLICATE';
-    return !slice && (build || !notPlanned);
-  }).map((issue) => issue.id);
+  const read = new Set([...openIds, ...closed.filter((issue) => keeps(issue, since) !== false).map((issue) => issue.id)]);
+  return closed.filter((issue) => keeps(issue, since) ?? (!read.has(issue.parent!.id) && !notPlanned(issue))).map((issue) => issue.id);
+}
+
+/** Issues read in full by id a call: a full issue is heavy, so 100 take about 4 s and four calls of 25 at once about 1 s. */
+const FULL_ISSUES_SIZE = 25;
+
+/** GitHub's search syntax for a time: to the second, in UTC. */
+const searchTime = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+/**
+ * A repository's issues closed since `since`, light. The closed issues updated last fill one page, which holds them all
+ * unless it's full; when it might miss some, they're searched in CLOSED_RANGES close-date ranges at once, the last open
+ * ended, so a clock behind GitHub's misses none, and the page joins them, as the search index lags a close by seconds.
+ * An issue updated since `since` may have closed before it, which keeps checks. `atOnce`, as on the source's first
+ * read, searches the ranges alongside the page instead of waiting to see whether it's full. `onRead` gets each
+ * search's issues, and the page's, as each lands.
+ */
+async function readClosed(repo: string, since: number, now: number, onRead: (issues: LightIssue[]) => void, atOnce: boolean): Promise<LightIssue[]> {
+  const [owner, name] = repo.split('/');
+  const step = (now - since) / CLOSED_RANGES;
+  const ranges = Array.from({ length: CLOSED_RANGES }, (_, i) => {
+    const from = searchTime(since + i * step);
+    return i === CLOSED_RANGES - 1 ? `>=${from}` : `${from}..${searchTime(since + (i + 1) * step)}`;
+  });
+  const searchRanges = () => Promise.all(ranges.map((range) => searchPages<LightIssue>(`repo:${repo} is:issue is:closed closed:${range}`, CLOSED_SEARCH_QUERY)
+    .then((issues) => (onRead(issues), issues))));
+  const searching = atOnce ? searchRanges() : undefined;
+  // A search started at once may fail while the page is read; the read fails once it waits on it.
+  searching?.catch(() => {});
+  const { data } = await graphql<{ data: { repository: { issues: { nodes: LightIssue[] } } | null } }>(RECENT_CLOSED_QUERY,
+    { owner: owner!, name: name!, since: searchTime(since) });
+  if (!data.repository) throw new Error(`Repository ${repo} not found`);
+  const recent = data.repository.issues.nodes;
+  onRead(recent);
+  const searched = searching ?? (recent.length < PAGE_SIZE ? undefined : searchRanges());
+  // Ranges share their ends, so an issue closed on one is found twice.
+  return [...new Map([...recent, ...(await searched ?? []).flat()].map((issue) => [issue.id, issue])).values()];
 }
 
 /**
  * A repository's open issues, each placed by its `status-<name>` labels, and those closed in the last DONE_WINDOW_MS,
- * without slices. Closed issues are paged light, and only the ones the board keeps are read in full.
+ * without slices. Closed issues are read light, and only the ones the board keeps are read in full. `searchRanges`, for
+ * the source's first read, searches the closed issues' ranges at once, as readClosed's `atOnce` says.
  */
-export async function fetchRepoIssues(repo: string, now = Date.now()): Promise<Item[]> {
+export async function fetchRepoIssues(repo: string, now = Date.now(), { searchRanges = false } = {}): Promise<Item[]> {
   type Content = NonNullable<RawItem['content']>;
+  const asRaws = (issues: Content[]) => issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, status: null, content }));
+  const since = now - DONE_WINDOW_MS;
+  const search = searchOnce();
+  // Each closed issue the board keeps whatever else the read holds is read in full as soon as its search lands.
+  const asked = new Set<string>();
+  const reads: Promise<Content[]>[] = [];
+  const readInFull = (ids: string[]) => {
+    for (const id of ids) asked.add(id);
+    const read = fetchNodes<Content>(ISSUES_BY_ID_QUERY, ids, FULL_ISSUES_SIZE);
+    // A read that fails before the closed ones are all read fails the read once it's waited on.
+    read.catch(() => {});
+    reads.push(read);
+  };
   const [open, closed] = await Promise.all([
-    readRepoPages<Content>(repo, 'open issues', OPEN_ISSUES_QUERY),
-    // An issue updated since the window began may have closed before it, so keptClosed checks closedAt.
-    readRepoPages<LightIssue>(repo, 'closed issues', CLOSED_ISSUES_QUERY, { since: new Date(now - DONE_WINDOW_MS).toISOString() }),
+    // The open issues name most of the searches the read needs, so those start while the closed ones are read.
+    readRepoPages<Content>(repo, 'open issues', OPEN_ISSUES_QUERY).then((issues) => {
+      void searchLabels(asRaws(issues), search).catch(() => {});
+      return issues;
+    }),
+    readClosed(repo, since, now, (issues) => readInFull(issues.filter((issue) => keeps(issue, since) && !asked.has(issue.id)).map((issue) => issue.id)), searchRanges),
   ]);
-  const kept = await fetchNodes<Content>(ISSUES_BY_ID_QUERY, keptClosed(closed, new Set(open.map((issue) => issue.id)), now - DONE_WINDOW_MS));
+  readInFull(keptClosed(closed, new Set(open.map((issue) => issue.id)), since).filter((id) => !asked.has(id)));
+  const kept = (await Promise.all(reads)).flat();
   // Not on a Project, so an issue's own node id stands in for the Project item id normalizeItems never shows. One
   // normalization over open and closed together, so a closed dossier keeps its map and a closed build drops its slices.
-  const raws = [...open, ...kept].map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, status: null, content }));
-  return boardItems(raws, 'labels');
+  return boardItems(asRaws([...open, ...kept]), 'labels', search);
 }
 
 /** An error's message, for a write's error text. */

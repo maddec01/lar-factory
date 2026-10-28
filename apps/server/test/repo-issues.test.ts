@@ -64,8 +64,67 @@ test("closed issues are paged light and only the kept ones read in full: a close
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => [i.number, i.status]), [[8, 'List'], [20, 'List'], [21, 'Done'], [22, 'Done'], [23, 'Done']]);
   assert.deepEqual((await readInFull(board)).sort(), ['I_21', 'I_22', 'I_23'], 'a slice whose build was not read stays; one closed as not planned is never read');
-  const closedPages = (await board.calls()).filter((args) => args.some((a) => a.includes('states: [CLOSED]')));
+  const closedPages = (await board.calls()).filter((args) => args.some((a) => a.includes('states: [CLOSED]') || a.includes('is:closed')));
   assert.ok(closedPages.length > 0 && closedPages.every((args) => !args.some((a) => a.includes('subIssues('))), 'closed pages read no sub-issues');
+});
+
+test("closed issues are searched in close-date ranges at once, and one the search doesn't list yet shows from the issues updated last", async (t) => {
+  const repoIssues = { [APPLE]: [closedIssue(22, 1), closedIssue(25, 3.5), closedIssue(26, 6.9), closedIssue(27, 0.001), closedIssue(28, 8)] };
+  const board = await startBoard(t, { repoIssues, repoConfigs, unindexed: ['I_27'] });
+  const data = await until(board, (d) => d.fetchedAt !== null);
+  assert.deepEqual(data.items.map((i) => [i.number, i.status]).sort(), [[22, 'Done'], [25, 'Done'], [26, 'Done'], [27, 'Done']]);
+  const ranges = (await board.calls()).flatMap((args) => args.filter((a) => a.startsWith('q=') && a.includes('is:closed')).map((a) => /closed:(\S+)/.exec(a)![1]));
+  assert.equal(new Set(ranges).size, 10, 'one search per tenth of the week');
+  const recent = (await board.calls()).filter((args) => args.some((a) => a.includes('states: [CLOSED]')));
+  assert.equal(recent.length, 1, 'one page of the closed issues updated last, never paged');
+  assert.ok(recent[0]!.some((a) => a.includes('UPDATED_AT')));
+});
+
+/** How many closed-range searches and pages of the closed issues updated last the board has run. */
+const closedReads = async (board: Board) => {
+  const calls = await board.calls();
+  return { ranges: calls.filter((args) => args.some((a) => a.startsWith('q=') && a.includes('is:closed'))).length,
+    pages: calls.filter((args) => args.some((a) => a.includes('states: [CLOSED]'))).length };
+};
+
+/** Waits for the board's reads to run at least `count` of the closed reads of that kind, and gives them all. */
+async function untilClosed(board: Board, kind: 'ranges' | 'pages', count: number) {
+  for (let attempt = 0; attempt < 200 && (await closedReads(board))[kind] < count; attempt++) await new Promise((r) => setTimeout(r, 25));
+  return closedReads(board);
+}
+
+test('after the first read, a whole read searches the close-date ranges only when the page of closed issues updated last is full', async (t) => {
+  const few = await startBoard(t, { repoIssues: { [APPLE]: [closedIssue(22, 1), closedIssue(25, 3)] }, repoConfigs }, false, true);
+  const read = await untilClosed(few, 'pages', 3);
+  assert.ok(read.pages >= 3, 'the board read whole again');
+  assert.equal(read.ranges, 10, 'only the first read searched the ranges');
+  assert.deepEqual((await few.board() as BoardData).items.map((i) => i.number).sort(), [22, 25]);
+
+  const full = await startBoard(t, { repoIssues: { [APPLE]: Array.from({ length: 100 }, (_, i) => closedIssue(100 + i, 1)) }, repoConfigs }, false, true);
+  assert.ok((await untilClosed(full, 'ranges', 20)).ranges >= 20, 'a full page might miss some, so a later read searches the ranges again');
+});
+
+test('the kept closed issues are read in full in calls of at most 25 issues', async (t) => {
+  const repoIssues = { [APPLE]: Array.from({ length: 30 }, (_, i) => closedIssue(100 + i, 1)) };
+  const board = await startBoard(t, { repoIssues, repoConfigs });
+  await until(board, (d) => d.fetchedAt !== null);
+  const calls = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues(')));
+  assert.deepEqual(calls.map((args) => args.filter((a) => a.startsWith('ids[]=')).length).sort((a, b) => b - a), [25, 5]);
+});
+
+test('a repository read runs each label search once, one repository a search', async (t) => {
+  const serverRef = { ...sliceRef(70, 'OPEN'), url: 'https://github.com/maddec01/lar-server/issues/70', repository: { nameWithOwner: 'maddec01/lar-server' } };
+  const repoIssues = { [APPLE]: [
+    appleIssue(8, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(11, 'OPEN'), serverRef] } }),
+    closedIssue(50, 1, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(51, 'OPEN')] } }),
+  ] };
+  const board = await startBoard(t, { repoIssues, repoConfigs });
+  await until(board, (d) => d.fetchedAt !== null);
+  const searches = (await board.calls()).flatMap((args) => args.filter((a) => a.startsWith('q=') && !a.includes('is:closed')));
+  assert.deepEqual([...searches].sort(), [...new Set(searches)].sort(), 'no search runs twice');
+  assert.ok(searches.every((q) => q.match(/repo:/g)?.length === 1), 'one repository a search');
+  assert.deepEqual(searches.filter((q) => q.includes('label:active')).sort(),
+    [`q=is:issue is:open label:active repo:${APPLE}`, 'q=is:issue is:open label:active repo:maddec01/lar-server']);
 });
 
 test("open and kept closed issues normalize together: a closed dossier keeps its map, and an open slice of a closed build has no card", async (t) => {

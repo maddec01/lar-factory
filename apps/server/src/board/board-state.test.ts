@@ -24,6 +24,16 @@ test('a change stays until GitHub reports it, or for three reads at most', () =>
   assert.deepEqual(statuses(board.snapshot()), ['a:List']);
 });
 
+test("a read that listed the item's source from an earlier read doesn't count toward giving up on its change", () => {
+  const board = createBoardState(empty());
+  board.showChanged(item('a', 'Queued'));
+  assert.equal(board.changing('a'), true);
+  for (let read = 1; read <= 5; read++) board.applyRead([item('a', 'List')], board.revision(), (items) => items, () => false);
+  assert.deepEqual(statuses(board.snapshot()), ['a:Queued']);
+  board.applyRead([item('a', 'Queued')], board.revision(), (items) => items);
+  assert.equal(board.changing('a'), false);
+});
+
 test('a read that started before a change keeps the change', () => {
   const board = createBoardState(empty());
   const since = board.revision();

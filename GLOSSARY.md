@@ -113,6 +113,11 @@ The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.
 _Avoid_: Source of truth (for the overlay)
 
+**Active work**:
+An item whose provider data an agent, a check or the board is changing now, so its item source reads every 15 seconds
+instead of every five minutes. See ADR 0028.
+_Avoid_: Busy item, hot item
+
 ### Threads and roles
 
 **User**:

@@ -234,7 +234,7 @@ export function stillOnboarding(list: readonly OnboardedRepository[], followProb
 
 /** settings.json, with each missing field, or the whole file, taking its default; a file it can't use takes them all, with the problem. */
 export function readBoardSettings(dir = boardDataDir()): BoardSettings {
-  const defaults = { refreshSeconds: 45 };
+  const defaults = { refreshSeconds: 300 };
   const file = join(dir, 'settings.json');
   if (!existsSync(file)) return defaults;
   let raw: unknown;
@@ -242,7 +242,7 @@ export function readBoardSettings(dir = boardDataDir()): BoardSettings {
   catch (err) { return { ...defaults, problem: (err as Error).message }; }
   const seconds = (raw as { refreshSeconds?: unknown } | null)?.refreshSeconds;
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || seconds !== undefined && !(typeof seconds === 'number' && seconds > 0)) {
-    return { ...defaults, problem: `${file}: expected an object with a positive refreshSeconds, like {"refreshSeconds": 45}.` };
+    return { ...defaults, problem: `${file}: expected an object with a positive refreshSeconds, like {"refreshSeconds": 300}.` };
   }
   return { refreshSeconds: seconds ?? defaults.refreshSeconds };
 }

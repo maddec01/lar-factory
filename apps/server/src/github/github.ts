@@ -3,6 +3,7 @@
 import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearch, isDraft, normalizeItems, projectBuilds, rawDossiers, refKey, sliceLabelSearch, statusLabel } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, Searched, Status, StatusSource } from '@lar-factory/shared';
 import type { ItemsRead } from '../items/item-source.ts';
+import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 
@@ -42,33 +43,44 @@ const ISSUE_FIELDS = `id number title url state stateReason closedAt updatedAt
     }
   }`;
 
+/** The fields the board reads of a Project item. */
+const PROJECT_ITEM_FIELDS = `id
+  updatedAt
+  status: fieldValueByName(name: "Status") {
+    ... on ProjectV2ItemFieldSingleSelectValue { name }
+  }
+  content {
+    __typename
+    ... on DraftIssue { id title updatedAt }
+    ... on Issue { ${ISSUE_FIELDS} }
+    ... on PullRequest {
+      id number title url state closedAt updatedAt isDraft mergeStateStatus
+      repository { nameWithOwner }
+      labels(first: 20) { nodes { name } }
+      ${CHECKS}
+    }
+  }`;
+
 export const ITEMS_QUERY = `query($owner: String!, $number: Int!, $after: String) {
   user(login: $owner) {
     projectV2(number: $number) {
       title
       items(first: ${PAGE_SIZE}, after: $after) {
         pageInfo { hasNextPage endCursor }
-        nodes {
-          id
-          updatedAt
-          status: fieldValueByName(name: "Status") {
-            ... on ProjectV2ItemFieldSingleSelectValue { name }
-          }
-          content {
-            __typename
-            ... on DraftIssue { id title updatedAt }
-            ... on Issue { ${ISSUE_FIELDS} }
-            ... on PullRequest {
-              id number title url state closedAt updatedAt isDraft mergeStateStatus
-              repository { nameWithOwner }
-              labels(first: 20) { nodes { name } }
-              ${CHECKS}
-            }
-          }
-        }
+        nodes { ${PROJECT_ITEM_FIELDS} }
       }
     }
   }
+}`;
+
+/** Project items by their Project item ids, up to PAGE_SIZE a call, for a read of the active items alone. */
+const PROJECT_ITEMS_BY_ID_QUERY = `query($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on ProjectV2Item { ${PROJECT_ITEM_FIELDS} } }
+}`;
+
+/** Issues by their node ids, up to PAGE_SIZE a call, for a read of a repository's active issues alone. */
+const ISSUES_BY_ID_QUERY = `query($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on Issue { __typename ${ISSUE_FIELDS} } }
 }`;
 
 /** One page of a repository's issues in the given states, updated since `since` when it is set. */
@@ -131,11 +143,36 @@ interface RawItemsPage {
 
 // ---------- gh ----------
 
-async function gh(args: string[]): Promise<string> {
+type RateLimits = Record<string, { limit: number; remaining: number; reset: number }>;
+
+/** GitHub's rate limits by resource, from its rate_limit endpoint, which costs no quota. */
+const rateLimits = async (): Promise<RateLimits> => (JSON.parse(await gh(['api', 'rate_limit'], false)) as { resources: RateLimits }).resources;
+
+/** When the exhausted rate limit resets, in ms since the epoch; null when none is exhausted, as after a secondary limit. */
+async function ghReset(): Promise<number | null> {
+  const resets = Object.values(await rateLimits()).filter((r) => r.remaining === 0).map((r) => r.reset * 1000);
+  return resets.length ? Math.max(...resets) : null;
+}
+
+/** Whether less than a fifth of gh's REST or GraphQL quota is left, so the board keeps every source at its idle pace. */
+export async function ghQuotaLow(): Promise<boolean> {
+  const limits = await rateLimits();
+  return ['core', 'graphql'].some((name) => limits[name] !== undefined && limits[name].remaining < limits[name].limit / 5);
+}
+
+/** gh's cooldown: once GitHub answers with a rate limit, every gh call fails at once until the limit resets. */
+export const ghCooldown = createCooldown('gh', ghReset);
+
+async function gh(args: string[], cools = true): Promise<string> {
   const command = toolCommand('gh');
   if (!command) throw new Error(`${missingTool('gh')}. Install it with \`brew install gh\` or set GH_PATH.`);
+  if (cools) ghCooldown.check();
   const result = await runTool(command.file, args, { env: command.env, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
-  if (result.code !== 0) throw new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${result.detail}`);
+  if (result.code !== 0) {
+    if (cools) await ghCooldown.failed(result.stderr || result.detail);
+    throw new Error(`gh ${args.slice(0, 2).join(' ')} failed: ${result.detail}`);
+  }
+  if (cools) ghCooldown.succeeded();
   return result.stdout;
 }
 
@@ -237,6 +274,29 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
   });
   const projectItemIds = new Map(raws.flatMap((raw) => (raw.content ? [[raw.content.id, raw.id]] : [])));
   return { title, items: await boardItems(raws), projectItemIds };
+}
+
+/** The nodes with these ids, PAGE_SIZE ids a call; an id that no longer resolves is left out. */
+async function fetchNodes<T extends object>(query: string, ids: readonly string[]): Promise<T[]> {
+  const found: T[] = [];
+  for (let start = 0; start < ids.length; start += PAGE_SIZE) {
+    const { nodes } = (await graphql<{ data: { nodes: (T | null)[] } }>(query, { ids: ids.slice(start, start + PAGE_SIZE) })).data;
+    found.push(...nodes.filter((node): node is T => node !== null && Object.keys(node).length > 0));
+  }
+  return found;
+}
+
+/** The Project items with these Project item ids, read afresh, with each one's Project item id by its Item.id. */
+export async function fetchProjectItems(ids: readonly string[]): Promise<Omit<ProjectRead, 'title'>> {
+  const raws = await fetchNodes<RawItem>(PROJECT_ITEMS_BY_ID_QUERY, ids);
+  const projectItemIds = new Map(raws.flatMap((raw) => (raw.content ? [[raw.content.id, raw.id]] : [])));
+  return { items: await boardItems(raws), projectItemIds };
+}
+
+/** The issues with these node ids, read afresh, each placed by its `status-<name>` labels. */
+export async function fetchIssues(ids: readonly string[]): Promise<Item[]> {
+  const issues = await fetchNodes<NonNullable<RawItem['content']>>(ISSUES_BY_ID_QUERY, ids);
+  return boardItems(issues.map((content): RawItem => ({ id: content.id, updatedAt: content.updatedAt, status: null, content })), 'labels');
 }
 
 /** The board's items from raw items, once all are read, without slices and with each dossier's map. */

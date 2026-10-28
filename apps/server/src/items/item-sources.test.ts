@@ -12,6 +12,9 @@ const item = (id: string, repo: string, status: Status = 'List'): Item => ({
   updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [],
 });
 
+/** The source as the one Project of a merged source, as onboardedSources builds one. */
+const merged = (source: ItemSource) => mergeSources([source], new Map());
+
 /** A source that lists `items` and records each write it is asked for. */
 function fakeSource(title: string, items: Item[], writes: string[]): ItemSource {
   const write = (what: string) => async () => { writes.push(`${title} ${what}`); return null; };
@@ -121,7 +124,7 @@ test('each read loads the configs first and builds the sources again only when t
   const built: string[][] = [];
   const sources = onboardedSources(async () => ({ configs, problems: [], resetting: [] }), (read) => {
     built.push(read.map((c) => `${c.repo} ${c.show}`));
-    return fakeSource(read.map((c) => c.repo).join(',') || 'none', [], []);
+    return merged(fakeSource(read.map((c) => c.repo).join(',') || 'none', [], []));
   });
   assert.deepEqual(sources.repos(), []);
   assert.equal((await sources.read()).title, 'maddec01/lar-apple');
@@ -139,7 +142,7 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
   const sources = onboardedSources(async () => {
     if (fail) throw new Error('repositories.json isn\'t valid JSON.');
     return { configs: [config('maddec01/lar-apple')], problems: [], resetting: [] };
-  }, () => fakeSource('apple', [], writes));
+  }, () => merged(fakeSource('apple', [], writes)));
   await sources.read();
   fail = true;
   await assert.rejects(sources.read(), /valid JSON/);
@@ -151,14 +154,14 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
 test("a read leaves out the items of a repository whose config couldn't be read, though its Project lists them", async () => {
   const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple'), item('I_3', 'maddec01/LAR-APPLE')];
   const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')],
-    problems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }], resetting: [] }), () => fakeSource('lar', listed, []));
+    problems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }], resetting: [] }), () => merged(fakeSource('lar', listed, [])));
   assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
 });
 
 test('a read leaves out the items of a resetting repository, though its Project lists them', async () => {
   const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple'), item('I_3', 'maddec01/LAR-APPLE')];
   const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')], problems: [], resetting: ['maddec01/lar-apple'] }),
-    () => fakeSource('lar', listed, []));
+    () => merged(fakeSource('lar', listed, [])));
   assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
 });
 
@@ -222,8 +225,112 @@ test("a source without a name is named by its repositories, and a failed read st
 
 test('the onboarded sources pass the progress to the sources they build', async () => {
   const events: string[] = [];
-  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-apple')], problems: [], resetting: [] }), () => ({
-    ...fakeSource('lar', [], []), read: async (progress) => { progress?.started('lar'); progress?.finished('lar'); return { title: 'lar', items: [] }; } }));
+  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-apple')], problems: [], resetting: [] }),
+    () => merged({ ...fakeSource('lar', [], []), name: 'lar' }));
   await sources.read({ started: (name) => events.push(`+${name}`), finished: (name) => events.push(`-${name}`) });
   assert.deepEqual(events, ['+lar', '-lar']);
+});
+
+/** A source that counts its reads and lists `items` as they are at each read. */
+function countedSource(name: string, items: () => Item[]): ItemSource & { reads: number } {
+  const source = { ...fakeSource(name, [], []), name, reads: 0, read: async () => { source.reads++; return { title: name, items: items() }; } };
+  return source;
+}
+
+const pace = (now: number, active: (i: Item) => boolean = (i) => i.status === 'In progress') => ({ now, active });
+
+test('a paced read reads a source with active work every 15 seconds and an idle one every 5 minutes', async () => {
+  const busy = countedSource('busy', () => [item('I_1', 'maddec01/lar-apple', 'In progress')]);
+  const idle = countedSource('idle', () => [item('I_2', 'maddec01/lar-server', 'Queued')]);
+  const sources = mergeSources([], new Map([['maddec01/lar-apple', busy], ['maddec01/lar-server', idle]]));
+  await sources.read(undefined, pace(0));
+  assert.equal(sources.due(pace(14_999)), false);
+  const read = await sources.read(undefined, pace(15_000));
+  assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_2'], 'the idle source lists its items from its last read');
+  assert.deepEqual([busy.reads, idle.reads], [2, 1]);
+  assert.equal(sources.readAfresh(read.items[0]!), true);
+  assert.equal(sources.readAfresh(read.items[1]!), false);
+  await sources.read(undefined, pace(300_000));
+  assert.deepEqual([busy.reads, idle.reads], [3, 2]);
+  await sources.read(undefined, { ...pace(330_000), slow: true });
+  assert.deepEqual([busy.reads, idle.reads], [3, 2], 'a slow pace keeps even active work on the idle cadence');
+});
+
+test('invalidating an item reads only the source that lists it, at once, and an unknown one reads every source', async () => {
+  const apple = countedSource('apple', () => [{ ...item('I_1', 'maddec01/lar-apple'), slices: [{ number: 9, title: 's', url: 'https://github.com/maddec01/lar-apple/issues/9', state: 'open', repo: 'maddec01/lar-apple', progress: 'active' }] }]);
+  const server = countedSource('server', () => [item('I_2', 'maddec01/lar-server')]);
+  const sources = mergeSources([], new Map([['maddec01/lar-apple', apple], ['maddec01/lar-server', server]]));
+  await sources.read(undefined, pace(0));
+  sources.invalidate('https://github.com/maddec01/lar-apple/issues/9');
+  assert.equal(sources.due(pace(1_999)), false, 'two reads of one source are at least 2 seconds apart');
+  await sources.read(undefined, pace(2_000));
+  assert.deepEqual([apple.reads, server.reads], [2, 1]);
+  sources.invalidate('https://github.com/maddec01/lar-apple/issues/404');
+  await sources.read(undefined, pace(4_000));
+  assert.deepEqual([apple.reads, server.reads], [3, 2]);
+});
+
+test('a source whose read failed is read again, while one that read keeps its read', async () => {
+  let fail = true;
+  const good = countedSource('good', () => [item('I_1', 'maddec01/lar-apple')]);
+  const flaky: ItemSource & { reads: number } = { ...countedSource('flaky', () => []), read: async () => {
+    flaky.reads++;
+    if (fail) throw new Error('boom');
+    return { title: 'flaky', items: [item('I_2', 'maddec01/lar-server')] };
+  } };
+  const sources = mergeSources([], new Map([['maddec01/lar-apple', good], ['maddec01/lar-server', flaky]]));
+  await assert.rejects(sources.read(undefined, pace(0)), /boom/);
+  fail = false;
+  assert.equal(sources.due(pace(14_999)), false, 'a source that never read retries at the active pace');
+  const read = await sources.read(undefined, pace(15_000));
+  assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_2']);
+  assert.deepEqual([good.reads, flaky.reads], [1, 2]);
+});
+
+test('a paced read loads the configs again only every 5 minutes, or after reload', async () => {
+  let loads = 0;
+  const sources = onboardedSources(async () => { loads++; return { configs: [config('maddec01/lar-apple')], problems: [], resetting: [] }; },
+    () => merged(fakeSource('lar', [], [])));
+  await sources.read(undefined, pace(0));
+  await sources.read(undefined, pace(299_999));
+  assert.equal(loads, 1);
+  sources.reload();
+  assert.equal(sources.due(pace(1_999)), false, 'a reload waits out the 2 seconds since the last load, as the sources do');
+  assert.equal(sources.due(pace(2_000)), true);
+  await sources.read(undefined, pace(2_000));
+  await sources.read(undefined, pace(302_000));
+  assert.equal(loads, 3);
+});
+
+test('a source that reads items alone reads only its active and asked-for items between its whole reads', async () => {
+  let listed = [item('I_1', 'maddec01/lar-apple', 'In progress'), item('I_2', 'maddec01/lar-apple', 'Queued'), item('I_3', 'maddec01/lar-apple', 'Queued')];
+  const some: string[][] = [];
+  const project = Object.assign(countedSource('project', () => listed), { readSome: async (items: Item[]) => {
+    some.push(items.map((i) => i.id));
+    return listed.filter((i) => items.some((asked) => asked.id === i.id));
+  } });
+  const sources = mergeSources([project], new Map());
+  await sources.read(undefined, pace(0));
+  listed = [{ ...listed[0]!, status: 'Review', statuses: ['Review'] }, listed[1]!];
+  const read = await sources.read(undefined, pace(15_000));
+  assert.deepEqual([project.reads, some], [1, [['I_1']]]);
+  assert.deepEqual(read.items.map((i) => `${i.id}:${i.status}`), ['I_1:Review', 'I_2:Queued', 'I_3:Queued'], 'the idle items keep their last read');
+  assert.equal(sources.readAfresh(read.items[0]!), true);
+  assert.equal(sources.readAfresh(read.items[1]!), false);
+  sources.invalidate(listed[1]!.url!);
+  sources.invalidate('https://github.com/maddec01/lar-apple/issues/3');
+  const asked = await sources.read(undefined, pace(17_000));
+  assert.deepEqual(some.at(-1), ['I_2', 'I_3'], 'the asked-for items read at once, alone');
+  assert.deepEqual(asked.items.map((i) => i.id), ['I_1', 'I_2'], 'an asked-for item the source no longer lists leaves');
+  await sources.read(undefined, pace(300_000));
+  assert.equal(project.reads, 2, 'the idle interval reads it whole');
+});
+
+test('a read of a few items that fails reads the whole source instead', async () => {
+  const project = Object.assign(countedSource('project', () => [item('I_1', 'maddec01/lar-apple', 'In progress')]),
+    { readSome: async () => { throw new Error('Could not resolve to a node'); } });
+  const sources = mergeSources([project], new Map());
+  await sources.read(undefined, pace(0));
+  await sources.read(undefined, pace(15_000));
+  assert.equal(project.reads, 2);
 });

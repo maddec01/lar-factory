@@ -109,3 +109,20 @@ test('the sample board answers a read request and reads nothing', async (t) => {
   await new Promise((r) => setTimeout(r, 200));
   assert.equal((await board.calls()).length, 0);
 });
+
+test("a read request naming an item reads that item alone, without loading the configs again", async (t) => {
+  const board = await startBoard(t, { items: [projectIssue(1, 'Queued')] });
+  await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
+  const [item] = (await board.board()).items;
+  const configReads = async () => (await board.calls()).filter((args) => args.some((a) => a.endsWith('/.lar-factory.json'))).length;
+  const [readsBefore, configsBefore] = [await reads(board), await configReads()];
+  await new Promise((r) => setTimeout(r, 2_000));
+  assert.equal((await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: item!.url }) })).status, 202);
+  const itemReads = async () => (await board.calls()).filter((args) => args.some((a) => a.includes('on ProjectV2Item {'))).length;
+  await waitFor(async () => await itemReads() === 1, 'the requested read');
+  assert.equal(await reads(board), readsBefore, 'the Project is not read whole');
+  assert.equal(await configReads(), configsBefore);
+  assert.equal((await askRead(board)).status, 202);
+  await waitFor(async () => await configReads() > configsBefore, 'a read request naming nothing loads the configs again');
+});

@@ -71,7 +71,7 @@ test("a settings file that isn't valid JSON leaves the board on its defaults, wi
     items: [projectIssue(1, 'Queued', FACTORY)] }, false, false, { HOME: home });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(data.error, `${join(dir, 'settings.json')} isn't valid JSON.`);
-  assert.equal(data.refreshSeconds, 45);
+  assert.equal(data.refreshSeconds, 300);
   assert.deepEqual(data.items.map((i) => i.number), [1]);
 });
 

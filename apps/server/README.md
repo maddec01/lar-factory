@@ -8,7 +8,12 @@
 # Board
 
 A local board for the lar project. It reads the onboarded repositories through your
-`gh` login every 45 seconds (see [Adding a repository](#adding-a-repository)) and
+`gh` login (see [Adding a repository](#adding-a-repository)), each item source at
+its own pace ([ADR 0028](../../docs/adr/0028-each-item-source-reads-at-the-pace-of-its-work.md)):
+every 15 seconds while it holds active work, every `refreshSeconds` (5 minutes)
+otherwise, and at once when `status.sh` or `slice.sh` names one of its items. A
+rate-limited `gh` or `az` makes no calls until its limit resets. T3's threads
+refresh every 2 seconds and its stats every 30, with no `gh` or `az` call. It
 serves the board on the first free port from 4317 to 4416, which it logs;
 `BOARD_PORT` pins the port. The board app's board usually gets 4317.
 `BOARD_APP_SECRET`, which the board app sets on each launch, makes every write
@@ -101,11 +106,12 @@ reads two files in the board app's data folder, `~/Library/Application Support/L
   `owner/name` and each Azure DevOps one as `organization/project/repository`, as
   its origin URL names them. Without it, the board shows no repository.
 - `settings.json` holds the board-wide settings. Today that is `refreshSeconds`,
-  how often the board reads GitHub, 45 when the file or the field is missing.
+  how often the board reads item sources with no active work and the Repository
+  configs, 300 when the file or the field is missing.
 
 Each onboarded repository keeps its Repository config in `.lar-factory.json` at its
-root. The board reads it with `gh` from the repository's default branch on each
-refresh, never from a checkout, so a change shows once it merges to the default
+root. The board reads it with `gh` from the repository's default branch every
+`refreshSeconds` and on a read request naming no item, never from a checkout, so a change shows once it merges to the default
 branch. Its fields:
 
 - `version`: the file's shape, `1`. A missing `version` counts as `1`.

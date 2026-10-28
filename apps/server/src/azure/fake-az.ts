@@ -122,11 +122,6 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
       if (!pr) throw new Error('az repos pr show failed: TF401180: The requested pull request was not found.');
       return JSON.stringify({ mergeStatus: 'succeeded', ...pr, repository: { name: 'lar-api', webUrl: REPO_URL } });
     }
-    if (args[0] === 'rest' && flag(args, '--method') === 'get') {
-      const url = new URL(flag(args, '--url'));
-      if (!url.pathname.endsWith('/_apis/work/backlogs/Microsoft.RequirementCategory/workItems')) throw new Error(`fake az: unexpected GET ${url}`);
-      return JSON.stringify({ workItems: backlog.map((id) => ({ target: { id } })) });
-    }
     if (args[0] === 'rest' && flag(args, '--method') === 'patch') {
       const id = Number(/\/_apis\/wit\/workitems\/(\d+)\?/.exec(flag(args, '--url'))?.[1]);
       if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
@@ -144,6 +139,10 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
           taskBacklog: { id: 'Microsoft.TaskCategory', workItemTypes: [{ name: 'Task' }] } });
       }
       if (resource === 'work/workitems') throw new Error('ERROR: The request is invalid.');
+      if (resource === 'work/backlogs') {
+        if (route(args, 'id') !== 'Microsoft.RequirementCategory/workItems') throw new Error('fake az: invoke selects the backlog {id} route');
+        return JSON.stringify({ workItems: backlog.map((id) => ({ target: { id } })) });
+      }
       if (resource === 'work/teamfieldvalues') {
         return JSON.stringify({ field: { referenceName: 'System.AreaPath' }, defaultValue: areas[0]?.value, values: areas });
       }

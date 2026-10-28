@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vite-plus/test';
+import { isBuild, openBlockers } from '@lar-factory/shared';
 import { azureBoard } from './azure-board.ts';
 import { fakeAz } from './fake-az.ts';
 
@@ -46,4 +47,43 @@ test('combined reads keep backlog priority and count sprint children only for sp
     [2, 0, { total: 1, completed: 1 }], [1, 1, { total: 1, completed: 0 }],
   ]);
   assert.deepEqual((await source.readSome!(read.items)).map((i) => i.subIssues), read.items.map((i) => i.subIssues));
+});
+
+test('a concept exposes its Ready child build outside the sprint, while plain team Tasks stay hidden', async () => {
+  const az = fakeAz({ items: [
+    { id: 1, type: 'User Story', state: 'Active', tags: 'concept; status-shaping' },
+    { id: 11, type: 'Task', state: 'New', parent: 1, tags: 'build; status-ready' },
+    { id: 12, type: 'Task', state: 'New', parent: 1, title: 'Implement' },
+    { id: 111, type: 'Task', state: 'New', parent: 11, title: 'A slice', tags: 'active' },
+  ], backlog: [1], sprint: [] });
+  const source = azureBoard([REPO], 'Fabrikam Team', az.run);
+  const read = await source.read();
+  assert.deepEqual(read.items.map((i) => i.number), [1, 11]);
+  const build = read.items[1]!;
+  assert.equal(build.status, 'Ready');
+  assert.equal(isBuild(build), true);
+  assert.deepEqual(openBlockers(build), []);
+  assert.equal(build.parent?.number, 1);
+  assert.deepEqual(build.subIssues, { total: 1, completed: 0 });
+  assert.deepEqual((await source.readSome!([build])).map((i) => [i.number, i.status, i.parent?.number]), [[11, 'Ready', 1]]);
+});
+
+test('factory tags expose Tasks, while kind, repository and slice tags alone keep team Tasks hidden', async () => {
+  const tags = ['build', 'decision-grill', 'decision-prototype', 'decision-research', 'decision-task', 'concept', 'status-queued',
+    'feature', 'repo-lar-api', 'active', 'blocked', 'status-unknown'];
+  const az = fakeAz({ items: tags.map((tag, i) => ({ id: i + 1, type: 'Task', state: 'New', tags: tag })), backlog: [] });
+  assert.deepEqual((await azureBoard([REPO], 'Fabrikam Team', az.run).read()).items.map((i) => i.number), [1, 2, 3, 4, 5, 6, 7]);
+});
+
+test('factory Tasks retain sprint completion, Removed filtering, blockers and repository placement', async () => {
+  const az = fakeAz({ items: [
+    { id: 1, type: 'User Story', state: 'Active', tags: 'concept' },
+    { id: 11, type: 'Task', state: 'Closed', parent: 1, tags: 'decision-research' },
+    { id: 12, type: 'Task', state: 'Removed', parent: 1, tags: 'build' },
+    { id: 13, type: 'Task', state: 'New', parent: 1, tags: 'build; repo-other' },
+    { id: 14, type: 'Task', state: 'New', parent: 1, tags: 'build; status-ready', predecessors: [11] },
+  ], backlog: [1], sprint: [1, 11, 12, 13, 14] });
+  const items = (await azureBoard([REPO], 'Fabrikam Team', az.run).read()).items;
+  assert.deepEqual(items.map((i) => [i.number, i.status]), [[1, 'List'], [11, 'Done'], [14, 'Ready']]);
+  assert.deepEqual(items[2]!.blockers, [{ number: 11, repo: REPO, state: 'closed' }]);
 });

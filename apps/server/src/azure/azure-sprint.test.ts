@@ -46,13 +46,13 @@ test("a sprint read lists requirement-level items with Task counts, a Completed 
   assert.deepEqual(az.batches, [[1, 11, 12, 13, 2, 3, 4, 5, 6], [99]]);
 });
 
-test('a sprint counts only its own Tasks and never exposes Tasks as board items, including on a partial refresh', async () => {
+test('a sprint counts only its own Tasks and keeps plain Tasks off the board, including on a partial refresh', async () => {
   const az = fakeAz({ items: SPRINT, sprint: [1, 11, 2] });
   const source = azureSprint([REPO], TEAM, az.run);
   const read = await source.read();
   assert.deepEqual(shown(read.items), [[1, 'Shaping', null], [2, 'Done', null]]);
   assert.deepEqual(read.items[0]!.subIssues, { total: 1, completed: 0 });
-  assert.deepEqual(az.batches, [[1, 11, 2], [99]]);
+  assert.deepEqual(az.batches, [[1, 11, 2], [12, 13], [99]], 'children outside the sprint are checked for factory tags');
   assert.deepEqual((await source.readSome!([read.items[0]!]))[0]!.subIssues, { total: 1, completed: 0 });
 });
 

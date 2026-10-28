@@ -151,6 +151,9 @@ Tag broad work \`concept\`.
 Its decisions and builds are child Tasks with \`decision-*\` or \`build\` tags.
 A build becomes one PR in Azure Repos.
 Its slices are child Tasks.
+Tasks with \`build\`, \`decision-*\`, \`concept\` or a valid \`status-*\` tag appear on the board.
+Slices carry only slice tags (\`active\` or \`blocked\`), with no factory Status.
+Plain team Tasks stay off the board and contribute only to parent counts.
 
 ## When a skill says "publish to the issue tracker"
 

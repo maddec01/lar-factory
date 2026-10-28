@@ -118,7 +118,7 @@ test("the push check asks Azure DevOps whether az's login can contribute to the 
 
 test('a malformed Azure request names a request problem without blaming the team or login', async () => {
   const answer = await azureCheck({ check: 'source' }, fakeAz({ items: ITEMS, fail: () => new Error('ERROR: The request is invalid.') }).run);
-  assert.deepEqual(answer, { result: { passed: false, problem: "Can't read Fabrikam Team's backlog and current sprint: ERROR: The request is invalid.", fix: 'Azure DevOps rejected the board’s request. Retry, and report this request error if it persists.' } });
+  assert.deepEqual(answer, { result: { passed: false, problem: "Can't read Fabrikam Team's backlog and current sprint: ERROR: The request is invalid.", fix: 'Azure DevOps rejected the board\'s request. Retry, and report this request error if it persists.' } });
 });
 
 test('an empty Azure permission evaluation is inconclusive and allows continuing with a warning', async () => {

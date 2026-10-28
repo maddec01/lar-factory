@@ -80,7 +80,7 @@ async function checkSource(repo: string, source: RepositoryItemSource, reads: Se
     // A logged-out az or a missing azure-devops extension names the command that fixes it.
     if (err instanceof ReadProblem && err.fix) return failed(`Can't read ${named}: ${err.message}`, 'Run this command, then retry.', err.fix);
     if (onAzure(repo) && /request is invalid|HTTP 400|Bad Request/i.test(message(err))) {
-      return failed(`Can't read ${named}: ${message(err)}`, 'Azure DevOps rejected the board’s request. Retry, and report this request error if it persists.');
+      return failed(`Can't read ${named}: ${message(err)}`, 'Azure DevOps rejected the board\'s request. Retry, and report this request error if it persists.');
     }
     return failed(`Can't read ${named}: ${message(err)}`, sourceFix(repo, source));
   }

@@ -56,9 +56,11 @@ test("the backlog's calls name the team and its requirement backlog, and every i
     assert.equal(call[call.indexOf('--org') + 1], 'https://dev.azure.com/contoso', call.join(' '));
     assert.ok(call.includes('project=Fabrikam Fiber') && call[call.indexOf('--api-version') + 1], call.join(' '));
   }
-  const backlog = az.calls.find((c) => c[0] === 'rest')!;
-  assert.equal(backlog[backlog.indexOf('--method') + 1], 'get');
-  assert.equal(backlog[backlog.indexOf('--url') + 1], 'https://dev.azure.com/contoso/Fabrikam%20Fiber/Fabrikam%20Team/_apis/work/backlogs/Microsoft.RequirementCategory/workItems?api-version=7.1');
+  assert.equal(az.calls.some((c) => c[0] === 'rest'), false, 'reads use the organization-aware extension login');
+  const backlog = az.calls.find((c) => c[c.indexOf('--resource') + 1] === 'backlogs')!;
+  assert.ok(backlog.includes(`team=${TEAM}`));
+  assert.ok(backlog.includes('id=Microsoft.RequirementCategory/workItems'));
+  assert.equal(backlog[backlog.indexOf('--api-version') + 1], '7.1');
   assert.ok(az.calls.find((c) => c[c.indexOf('--resource') + 1] === 'teamfieldvalues')!.includes(`team=${TEAM}`));
 });
 

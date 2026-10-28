@@ -85,3 +85,10 @@ test('removing the block at the end of a file keeps everything before it', () =>
 test('a file with no block has nothing to remove', () => {
   assert.equal(withoutAgentSkills('# lar-web\n\n### Agent skills\n'), null);
 });
+
+test('the Azure guide distinguishes factory child Tasks from slices and plain team Tasks', () => {
+  const guide = agentSetupWrites({}, 'Azure DevOps').find(({ path }) => path === 'docs/agents/issue-tracker.md')!.content;
+  assert.match(guide, /Its decisions and builds are child Tasks with `decision-\*` or `build` tags/);
+  assert.match(guide, /Tasks with `build`, `decision-\*`, `concept` or a valid `status-\*` tag appear on the board/);
+  assert.match(guide, /Slices carry only slice tags \(`active` or `blocked`\), with no factory Status/);
+});

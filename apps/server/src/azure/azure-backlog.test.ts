@@ -29,15 +29,14 @@ test("a backlog read lists the team's open requirement-level items under its are
   const read = await azureBacklog([REPO], TEAM, az.run).read();
   assert.equal(read.title, 'Fabrikam Team backlog');
   // 4 is Completed, 5 Removed, 6 an Epic and 7 under another team's area path.
-  assert.deepEqual(shown(read.items), [[1, 'Shaping', null], [11, 'List', 1], [12, 'Done', 1], [2, 'List', null], [3, 'List', null]]);
+  assert.deepEqual(shown(read.items), [[1, 'Shaping', null], [2, 'List', null], [3, 'List', null]]);
 });
 
-test("Tasks show under their parent, read through its child links, and Predecessors as blockers", async () => {
+test("Tasks count toward their parent, read through its child links, and Predecessors are blockers", async () => {
   const az = fakeAz({ items: BACKLOG, backlog: [1] });
-  const [seek, task] = (await azureBacklog([REPO], TEAM, az.run).read()).items;
+  const [seek] = (await azureBacklog([REPO], TEAM, az.run).read()).items;
   assert.deepEqual(seek!.subIssues, { total: 2, completed: 1 });
   assert.deepEqual(seek!.blockers, [{ number: 2, repo: REPO, state: 'open' }, { number: 99, repo: REPO, state: 'closed' }]);
-  assert.deepEqual(task!.parent, { number: 1, title: 'Seek', url: seek!.url, repo: REPO, state: 'open' });
   // The Tasks, then the predecessors outside the backlog, each in a batch of their own.
   assert.deepEqual(az.batches, [[1], [11, 12, 13], [2, 99]]);
 });
@@ -50,12 +49,13 @@ test("an area path the team doesn't include with its children leaves out the ite
 test("the backlog's calls name the team and its requirement backlog, and every invoke passes --api-version", async () => {
   const az = fakeAz({ items: BACKLOG, backlog: [1, 2] });
   await azureBacklog([REPO], TEAM, az.run).read();
-  for (const call of az.calls) {
+  for (const call of az.calls.filter((c) => c[0] === 'devops')) {
     assert.equal(call[call.indexOf('--org') + 1], 'https://dev.azure.com/contoso', call.join(' '));
     assert.ok(call.includes('project=Fabrikam Fiber') && call[call.indexOf('--api-version') + 1], call.join(' '));
   }
-  const backlog = az.calls.find((c) => c[c.indexOf('--resource') + 1] === 'workitems')!;
-  assert.ok(backlog.includes(`team=${TEAM}`) && backlog.includes('backlogId=Microsoft.RequirementCategory'), backlog.join(' '));
+  const backlog = az.calls.find((c) => c[0] === 'rest')!;
+  assert.equal(backlog[backlog.indexOf('--method') + 1], 'get');
+  assert.equal(backlog[backlog.indexOf('--url') + 1], 'https://dev.azure.com/contoso/Fabrikam%20Fiber/Fabrikam%20Team/_apis/work/backlogs/Microsoft.RequirementCategory/workItems?api-version=7.1');
   assert.ok(az.calls.find((c) => c[c.indexOf('--resource') + 1] === 'teamfieldvalues')!.includes(`team=${TEAM}`));
 });
 
@@ -68,4 +68,20 @@ test('a logged-out az names its fix, and a move on the backlog writes its work i
   const [item] = (await backlog.read()).items;
   assert.equal(await backlog.setStatus(item!, 'Queued'), null);
   assert.deepEqual(az.patches.map((p) => p.id), [2]);
+});
+
+test('backlog priority order survives hydration that returns work items in ID order', async () => {
+  const az = fakeAz({ items: BACKLOG, backlog: [3, 1, 2] });
+  const source = azureBacklog([REPO], TEAM, az.run);
+  const items = (await source.read()).items;
+  assert.deepEqual(items.map((item) => [item.number, item.sourceOrder]), [[3, 0], [1, 1], [2, 2]]);
+  assert.equal((await source.readSome!([items[1]!]))[0]!.sourceOrder, 1);
+});
+
+test('the team can put both PBIs and Bugs in its Requirement category', async () => {
+  const az = fakeAz({ requirement: 'Product Backlog Item', requirementTypes: ['Product Backlog Item', 'Bug'], backlog: [2, 1], items: [
+    { id: 1, type: 'Product Backlog Item', state: 'Committed' }, { id: 2, type: 'Bug', state: 'Approved' }, { id: 3, type: 'Task', state: 'Active', parent: 1 },
+  ] });
+  const items = (await azureBacklog([REPO], TEAM, az.run).read()).items;
+  assert.deepEqual(items.map((item) => [item.number, item.azure!.type, item.subIssues.total]), [[2, 'Bug', 0], [1, 'Product Backlog Item', 1]]);
 });

@@ -77,6 +77,13 @@ export type CheckState = 'running' | 'passed' | 'failed';
 /** Running checks past this long are shown amber, so a stuck runner gets noticed. */
 export const SLOW_CHECKS_MS = 30 * 60 * 1000;
 
+/** Azure's native work item fields, alongside the factory status. */
+export interface AzureWorkItem {
+  type: string;
+  state: string;
+  assignee: string | null;
+}
+
 /** Another issue an item links to; it may or may not be on the board. */
 export interface IssueRef {
   number: number;
@@ -84,6 +91,7 @@ export interface IssueRef {
   url: string;
   repo: string;
   state: 'open' | 'closed';
+  azure?: AzureWorkItem;
 }
 
 /** An issue blocking an item, by GitHub's blocked-by link. */
@@ -224,6 +232,9 @@ export interface Item {
   /** Why Abandon can't run on the item, which its greyed-out Abandon shows: an Azure work item whose type has no Removed state. Absent when it can. */
   abandonRefusal?: string;
   labels: string[];
+  azure?: AzureWorkItem;
+  /** Azure backlog priority position, retained through partial reads and UI sorting. */
+  sourceOrder?: number;
   /** A draft is open. */
   state: 'open' | 'closed';
   /** How a closed item closed: `done` when completed or merged, `not-planned` otherwise; null while open. */

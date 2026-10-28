@@ -4,7 +4,7 @@
 
 import { Check, GitPullRequest } from 'lucide-react';
 import { STATUSES, UNREADABLE, checkState, duration, formatTokens, formatUsd, prLabel, ref, repoName, sameRepo } from '@lar-factory/shared';
-import type { Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
+import type { AzureWorkItem, Checks, Item, RepoConfig, SliceProgress, Status } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { STATUS_COLOR } from './status-glyph.tsx';
 
@@ -32,6 +32,13 @@ export function TitleLink({ item, className = 'title' }: { item: Item; className
 /** An item's title with its issue number before it, muted, the way the board lists every item. */
 export function ItemTitle({ item }: { item: Item }) {
   return <><span className="font-normal text-(--muted-foreground) tabular-nums">{ref(item)}</span> {item.title}</>;
+}
+
+/** Azure's type, state and assignee as one compact line beside factory status. */
+export function AzureFields({ azure }: { azure: AzureWorkItem | undefined }) {
+  if (!azure) return null;
+  const text = [azure.type, azure.state, azure.assignee].filter(Boolean).join(' · ');
+  return <span data-azure title={text} className="block min-w-0 truncate text-xs text-(--muted-foreground)">{text}</span>;
 }
 
 /** Ten steps as a track; the past filled, the current one in its colour. */

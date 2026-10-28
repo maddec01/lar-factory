@@ -118,7 +118,7 @@ test('a write reads the work item with one batch read and PATCHes it through az 
 });
 
 test('no right to create tags shows its message and fix', async () => {
-  const { source, item } = await board(4, (args) => (args[0] === 'rest'
+  const { source, item } = await board(4, (args) => (args[0] === 'rest' && args.includes('patch')
     ? new Error('az devops invoke failed: ERROR: TF401289: The current user does not have permissions to create tags.') : undefined));
   const fix = 'You have no right to create tags in Fabrikam Fiber. Ask a project administrator to allow you Create tag definition, then try again.';
   assert.equal(await source.addLabel(item, 'build'), `Could not add the build tag. ${fix}`);
@@ -126,8 +126,8 @@ test('no right to create tags shows its message and fix', async () => {
 });
 
 test('a logged-out az shows its fix, and any other az error shows as it is', async () => {
-  const loggedOut = await board(4, (args) => (args[0] === 'rest' ? new Error('Please run az login to set up an account.') : undefined));
+  const loggedOut = await board(4, (args) => (args[0] === 'rest' && args.includes('patch') ? new Error('Please run az login to set up an account.') : undefined));
   assert.equal(await loggedOut.source.setStatus(loggedOut.item, 'Review'), 'Could not set Review. az is logged out. Run az login, then try again.');
-  const changed = await board(4, (args) => (args[0] === 'rest' ? new Error('az devops invoke failed: TF26071: changed since you opened it') : undefined));
+  const changed = await board(4, (args) => (args[0] === 'rest' && args.includes('patch') ? new Error('az devops invoke failed: TF26071: changed since you opened it') : undefined));
   assert.equal(await changed.source.abandon(changed.item), 'Could not abandon work item 4. az devops invoke failed: TF26071: changed since you opened it');
 });

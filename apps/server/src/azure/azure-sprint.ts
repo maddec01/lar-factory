@@ -13,14 +13,15 @@ export const SPRINT_FIX = 'Give the team a sprint whose dates cover today in its
  * ReadProblem with its fix.
  */
 export function azureSprint(repos: readonly string[], team: string, run: Az = az): ItemSource {
-  return azureItems(repos, team, async ({ organization, project, boards, workItems }) => {
+  return azureItems(repos, team, async ({ organization, project, boards, workItems, backlogIds }) => {
     const [iteration] = await boards<{ id: string; name: string }[]>(['list', '--timeframe', 'current']);
     if (!iteration) {
       throw new ReadProblem(`Team ${team} has no current iteration in ${organization}/${project}. `
         + `${SPRINT_FIX}, or Edit the repository in Settings › Repositories to name another team.`);
     }
     const listed = await boards<{ workItemRelations: { target: { id: number } }[] }>(['list-work-items', '--id', iteration.id]);
+    const order = await backlogIds();
     const items = await workItems([...new Set(listed.workItemRelations.map((r) => r.target.id))]);
-    return { title: `${team} ${iteration.name}`, items, completed: true };
+    return { title: `${team} ${iteration.name}`, items, order, childIds: items.map((raw) => raw.id), completed: true };
   }, run);
 }

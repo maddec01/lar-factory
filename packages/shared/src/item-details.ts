@@ -18,6 +18,8 @@ export interface ItemDetails {
   /** The description; empty when there is none. */
   body: string;
   format: TextFormat;
+  /** Additional type-specific description fields, each with its own format. */
+  sections?: { title: string; body: string; format: TextFormat }[];
   /** The person who opened it; null when the provider doesn't say. */
   author: string | null;
   assignees: string[];
@@ -29,6 +31,8 @@ export interface ItemDetails {
   area?: string;
   /** Its sub-issues or child work items. */
   subTickets: IssueRef[];
+  /** A failed relations read leaves the main details intact. */
+  relationsError?: string;
   /** The latest comments, newest first. */
   comments: ItemComment[];
   /** Whether older comments exist than the ones listed. */

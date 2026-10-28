@@ -35,7 +35,7 @@ test('the new work item carries its title, its markdown description and its kind
     error: null,
     issueUrl: `https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/${id}`,
     item: {
-      id: `azure:contoso/${id}`, status: 'List', statuses: ['List'], content: 'ticket', number: id, title: 'Export the report',
+      azure: { type: 'User Story', state: 'New', assignee: null }, id: `azure:contoso/${id}`, status: 'List', statuses: ['List'], content: 'ticket', number: id, title: 'Export the report',
       url: `https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/${id}`, repo: REPO, untaggedFor: [REPO], labels: ['feature', 'area: api'],
       state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
       updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [],

@@ -59,7 +59,7 @@ function MoveActions({ item, data }: { item: Item; data: BoardData }) {
 /** Whether the sidebar has anything: pull requests, or sub-tickets (as many as the board counts while the details load). */
 const hasRelations = (item: Item, read: ItemDetailsRead): boolean =>
   item.linkedPrs.length > 0
-  || (read.state === 'loaded' ? read.details.subTickets.length > 0 : read.state === 'loading' && item.subIssues.total > 0);
+  || (read.state === 'loaded' ? (read.details.subTickets.length > 0 || Boolean(read.details.relationsError)) : read.state === 'loading' && item.subIssues.total > 0);
 
 const Section = ({ heading, children }: { heading: ReactNode; children: ReactNode }) => (
   <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2"><h2 className="m-0 text-[13px] font-medium">{heading}</h2>{children}</section>

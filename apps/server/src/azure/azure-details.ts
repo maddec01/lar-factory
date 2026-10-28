@@ -6,7 +6,7 @@ import { decodePart, onAzure } from '@lar-factory/shared';
 import type { IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails, TextFormat } from '@lar-factory/shared';
 import type { Refused } from '../config/edit-config.ts';
 import { ReadProblem } from '../items/item-source.ts';
-import { API_VERSION, az, field, linked, orgFlags, problemOf, withFile, workItemUrl, type Az, type RawWorkItem } from './azure-items.ts';
+import { API_VERSION, az, azureWorkItem, field, linked, orgFlags, problemOf, withFile, workItemUrl, type Az, type RawWorkItem } from './azure-items.ts';
 
 /** The work items batch read that returns a work item's `multilineFieldsFormat`, which az sends as 7.2-preview.1. */
 const DETAIL_API_VERSION = '7.2-preview';
@@ -75,21 +75,22 @@ async function inArea<T>(item: Item, run: Az, use: (call: Call, repo: string) =>
 const readComments = (call: Call, item: Item, token?: string) =>
   call<RawComments>('comments', [`workItemId=${item.number}`], COMMENTS_API_VERSION, ['--query-parameters', `$top=${COMMENT_LIMIT}`, 'order=desc', ...token ? [`continuationToken=${token}`] : []]);
 
-/** The work item's child work items as sub-tickets, from one batch read; the Completed ones are closed and the Removed ones, which the board hides, are left out. */
+/** The work item's child work items as sub-tickets, from batches of at most 200; the Completed ones are closed and the Removed ones, which the board hides, are left out. */
 async function subTicketsOf(call: Call, repo: string, workItem: RawWorkItem): Promise<IssueRef[]> {
-  const ids = linked(workItem, 'System.LinkTypes.Hierarchy-Forward');
+  const ids = [...new Set(linked(workItem, 'System.LinkTypes.Hierarchy-Forward'))];
   if (!ids.length) return [];
   const [organization, project] = repo.split('/') as [string, string];
-  const { value } = await withFile({ ids, fields: ['System.Title', 'System.State', 'System.WorkItemType'], errorPolicy: 'Omit' }, (file) =>
-    call<{ value: (RawWorkItem | null)[] }>('workitemsbatch', [], API_VERSION, ['--http-method', 'POST', '--in-file', file]));
-  const children = value.filter((raw): raw is RawWorkItem => raw !== null);
+  const batches = Array.from({ length: Math.ceil(ids.length / 200) }, (_, i) => ids.slice(i * 200, (i + 1) * 200));
+  const reads = await Promise.all(batches.map((batch) => withFile({ ids: batch, fields: ['System.Title', 'System.State', 'System.WorkItemType', 'System.AssignedTo'], errorPolicy: 'Omit' }, (file) =>
+    call<{ value: (RawWorkItem | null)[] }>('workitemsbatch', [], API_VERSION, ['--http-method', 'POST', '--in-file', file]))));
+  const children = reads.flatMap(({ value }) => value.filter((raw): raw is RawWorkItem => raw !== null));
   const types = [...new Set(children.map((raw) => field(raw, 'System.WorkItemType')))];
   const states = await Promise.all(types.map((type) => call<{ value: { name: string; category: string }[] }>('workitemtypestates', [`type=${type}`], API_VERSION)));
   const category = new Map(types.map((type, i) => [type, new Map(states[i]!.value.map((s) => [s.name, s.category]))]));
   return children.flatMap((raw) => {
     const kind = category.get(field(raw, 'System.WorkItemType'))?.get(field(raw, 'System.State'));
     if (kind === 'Removed') return [];
-    return [{ number: raw.id, title: field(raw, 'System.Title'), url: workItemUrl(organization, project, raw.id), repo, state: kind === 'Completed' ? 'closed' : 'open' }];
+    return [{ number: raw.id, title: field(raw, 'System.Title'), url: workItemUrl(organization, project, raw.id), repo, state: kind === 'Completed' ? 'closed' : 'open', azure: azureWorkItem(raw) }];
   });
 }
 
@@ -97,7 +98,7 @@ async function subTicketsOf(call: Call, repo: string, workItem: RawWorkItem): Pr
  * Reads one work item's details, or says why it can't: the item's repository is not on Azure DevOps, or the `az` error.
  * The work item is a batch read at DETAIL_API_VERSION with its links, as az devops invoke can't reach wit/workitems' {id}
  * route, and its last COMMENT_LIMIT comments are read at COMMENTS_API_VERSION, newest first.
- * Its child work items are one more batch read, with a states read per child type.
+ * Its child work items are batched by 200, with a states read per child type.
  * `run` stands in for az in tests.
  */
 export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDetails | Refused> => inArea(item, run, async (call, repo) => {
@@ -108,19 +109,38 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
     call<{ value: ((RawWorkItem & { multilineFieldsFormat?: Record<string, string> }) | null)[] }>('workitemsbatch', [], DETAIL_API_VERSION, ['--http-method', 'POST', '--in-file', file]));
   if (!workItem) return { status: 404, error: `Work item ${item.number} does not exist, or you have no right to read it.` };
   const read = await comments;
-  const body = typeof workItem.fields['System.Description'] === 'string' ? workItem.fields['System.Description'] : '';
   const text = (name: string) => (typeof workItem.fields[name] === 'string' ? workItem.fields[name] : undefined);
+  const hasContent = (value: string) => Boolean(value.replace(/<[^>]*>|&nbsp;|&#160;/g, '').trim()) || /<(?:img|video|iframe)\b/i.test(value);
+  const description = text('System.Description') ?? '';
+  const bodyField = hasContent(description) ? 'System.Description' : 'Microsoft.VSTS.TCM.ReproSteps';
+  const body = text(bodyField) ?? '';
+  const descriptionFields = [
+    ['Microsoft.VSTS.TCM.ReproSteps', 'Repro Steps'],
+    ['Microsoft.VSTS.Common.AcceptanceCriteria', 'Acceptance Criteria'],
+    ['Microsoft.VSTS.TCM.SystemInfo', 'System Info'],
+  ] as const;
+  const sections = descriptionFields.flatMap(([name, title]) => {
+    const body = text(name) ?? '';
+    return name !== bodyField && hasContent(body) ? [{ title, body, format: formatOf(workItem.multilineFieldsFormat?.[name], body) }] : [];
+  });
   const olderCursor = read.continuationToken || null;
+  let relationsError: string | undefined;
+  const subTickets = await subTicketsOf(call, repo, workItem).catch((err: unknown) => {
+    relationsError = err instanceof Error ? err.message : String(err);
+    return [];
+  });
   const assignee = nameOf(workItem.fields['System.AssignedTo']);
   return {
     body,
-    format: formatOf(workItem.multilineFieldsFormat?.['System.Description'], body),
+    format: formatOf(workItem.multilineFieldsFormat?.[bodyField], body),
+    ...sections.length > 0 && { sections },
     author: nameOf(workItem.fields['System.CreatedBy']),
     assignees: assignee ? [assignee] : [],
     createdAt: text('System.CreatedDate') ?? null,
     ...text('System.IterationPath') && { iteration: text('System.IterationPath') },
     ...text('System.AreaPath') && { area: text('System.AreaPath') },
-    subTickets: await subTicketsOf(call, repo, workItem),
+    subTickets,
+    ...relationsError !== undefined && { relationsError },
     comments: read.comments.filter((c) => !c.isDeleted).map(comment),
     hasOlderComments: olderCursor !== null,
     olderCursor,

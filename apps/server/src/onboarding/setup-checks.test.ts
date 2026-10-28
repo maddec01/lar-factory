@@ -93,9 +93,9 @@ test("the main checkout check reads an Azure DevOps origin as organization/proje
 
 test("the item source check counts an Azure DevOps team's sprint or backlog through az", async () => {
   const az = fakeAz({ items: ITEMS });
-  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Fabrikam Team’s current sprint has 3 items to show' } });
+  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Fabrikam Team’s current sprint has 2 items to show' } });
   assert.deepEqual(await azureCheck({ check: 'source', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' } }, az.run),
-    { result: { passed: true, detail: 'Fabrikam Team’s backlog has 3 items to show' } });
+    { result: { passed: true, detail: 'Fabrikam Team’s backlog has 2 items to show' } });
 });
 
 test("an Azure DevOps item source az can't read shows az's message, with az login for a logged-out az", async () => {
@@ -119,6 +119,16 @@ test("the push check asks Azure DevOps whether az's login can contribute to the 
     problem: `az's login can't push to ${SHOWN_REPO}, so lar-work's agents can't push their branches.`,
     fix: `Get Contribute on ${SHOWN_REPO}, or log az in as an account that has it:`, command: 'az login' } });
   const { result } = await azureCheck({ check: 'push' }, fakeAzRepos({ fail: () => new Error('az repos show failed: TF401019: no repository') }).run) as { result: unknown };
-  assert.deepEqual(result, { passed: false, problem: `Can't read ${SHOWN_REPO}'s permissions: az repos show failed: TF401019: no repository`,
-    fix: `Check that az's login can read ${SHOWN_REPO}, then Retry.` });
+  assert.deepEqual(result, { passed: true, detail: `Warning: couldn't check ${SHOWN_REPO}'s push permission: az repos show failed: TF401019: no repository. You can continue; agents will need Contribute permission to push.` });
+});
+
+test('a malformed Azure request names a request problem without blaming the team or login', async () => {
+  const answer = await azureCheck({ check: 'source' }, fakeAz({ items: ITEMS, fail: () => new Error('ERROR: The request is invalid.') }).run);
+  assert.deepEqual(answer, { result: { passed: false, problem: "Can't read Fabrikam Team’s current sprint: ERROR: The request is invalid.", fix: 'Azure DevOps rejected the board’s request. Retry, and report this request error if it persists.' } });
+});
+
+test('an empty Azure permission evaluation is inconclusive and allows continuing with a warning', async () => {
+  const az = fakeAzRepos();
+  const answer = await azureCheck({ check: 'push' }, async (args) => args[0] === 'rest' ? '{"count":0,"value":[]}' : az.run(args));
+  assert.deepEqual(answer, { result: { passed: true, detail: `Warning: couldn't check ${SHOWN_REPO}'s push permission: Azure DevOps returned no push permission decision. You can continue; agents will need Contribute permission to push.` } });
 });

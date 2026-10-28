@@ -7,7 +7,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { duration, formatTokens, formatUsd, openBlockers, ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, ItemStats, Status } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { ItemTitle, SliceBar, SliceList, repoTone } from '../items/item-parts.tsx';
+import { AzureFields, ItemTitle, SliceBar, SliceList, repoTone } from '../items/item-parts.tsx';
 import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
 
 const STAGES: { name: string; short: string; statuses: Status[] }[] = [
@@ -134,6 +134,7 @@ export function Row({ item, data, now, side, waiting, nested, children }: {
               <span className="truncate">{item.status} · {repoName(repo, data.repos)} · {shortAgo(item.updatedAt, now)}</span>
               {blocked > 0 && <span className="shrink-0 rounded bg-(--error-surface) px-1 text-(--error-foreground)">blocked by {blocked}</span>}
             </span>
+            <AzureFields azure={item.azure} />
             {item.slices.length > 0 && <SliceSummary item={item} open={slices} onToggle={() => setSlices(!slices)} />}
           </span>
         </span>

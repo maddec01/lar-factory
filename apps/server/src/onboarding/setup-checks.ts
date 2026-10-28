@@ -88,6 +88,9 @@ async function checkSource(repo: string, source: RepositoryItemSource, reads: Se
     // A team with no current iteration: the repository isn't onboarded yet, so another team is named by going Back.
     const sprintless = err instanceof ReadProblem ? err.message.indexOf(SPRINT_FIX) : -1;
     if (sprintless >= 0) return failed(`Can't read ${named}: ${message(err).slice(0, sprintless).trimEnd()}`, `${SPRINT_FIX}, then Retry, or go Back and name another team.`);
+    if (onAzure(repo) && /request is invalid|HTTP 400|Bad Request/i.test(message(err))) {
+      return failed(`Can't read ${named}: ${message(err)}`, 'Azure DevOps rejected the board’s request. Retry, and report this request error if it persists.');
+    }
     return failed(`Can't read ${named}: ${message(err)}`, sourceFix(repo, source));
   }
 }
@@ -97,7 +100,10 @@ async function checkPush(key: string, reads: SetupCheckReads): Promise<SetupChec
   const repo = shownRepo(key);
   let pushes;
   try { pushes = await reads.canPush(key); }
-  catch (err) { return failed(`Can't read ${repo}'s permissions: ${message(err)}`, `Check that ${login}'s login can read ${repo}, then Retry.`); }
+  catch (err) {
+    if (onAzure(key)) return { passed: true, detail: `Warning: couldn't check ${repo}'s push permission: ${message(err)}. You can continue; agents will need Contribute permission to push.` };
+    return failed(`Can't read ${repo}'s permissions: ${message(err)}`, `Check that ${login}'s login can read ${repo}, then Retry.`);
+  }
   if (pushes) return { passed: true, detail: `${login}'s login can push to ${repo}` };
   return failed(`${login}'s login can't push to ${repo}, so lar-work's agents can't push their branches.`,
     `Get ${login === 'az' ? 'Contribute on' : 'write access to'} ${repo}, or log ${login} in as an account that has it:`, login === 'az' ? 'az login' : 'gh auth login');

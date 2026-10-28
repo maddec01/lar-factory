@@ -155,7 +155,7 @@ test('the sort menu reorders the items', async () => {
   expect(text(sort)).toBe('Recently updated');
   await press(sort);
   const options = $$<HTMLElement>('[role="menuitemradio"]');
-  expect(options.map(text)).toEqual(['Recently updated', 'Oldest', 'Title']);
+  expect(options.map(text)).toEqual(['Recently updated', 'Oldest', 'Title', 'Backlog priority']);
   await settle(() => options[1]!.click());
   expect(rows()).toEqual(['I_sample04', 'I_sample03', 'I_sample01', 'I_sample02']);
   await press($('[data-list-modal] button.sort')!);
@@ -229,4 +229,14 @@ test('the List\'s items sit in the copied Modal.Body, which fades at its scrolle
   await mountPage();
   await open();
   expect($('[data-list-modal] [data-slot="modal-body"]')!.className).toContain('mask-image');
+});
+
+test('Azure List defaults to backlog priority and retains native work item fields alongside factory status', async () => {
+  const azure = { type: 'Product Backlog Item', state: 'Committed', assignee: 'Ana Silva' };
+  const data = { ...sample, items: sample.items.filter((item) => item.id === 'I_sample01' || item.id === 'I_sample02').map((item, i) => ({ ...item, azure, sourceOrder: i })) };
+  await mountPage(data);
+  await open();
+  expect(text($('[data-list-modal] button.sort'))).toBe('Backlog priority');
+  expect(rows()).toEqual(['I_sample01', 'I_sample02']);
+  expect(text($('[data-list-modal] [data-azure]'))).toBe('Product Backlog Item · Committed · Ana Silva');
 });

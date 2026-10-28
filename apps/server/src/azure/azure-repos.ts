@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decodePart } from '@lar-factory/shared';
 import type { CommitTree, TreeEntry } from '../github/github.ts';
-import { API_VERSION, az, orgFlags, withFile, type Az } from './azure-items.ts';
+import { API_VERSION, az, azureGet, orgFlags, withFile, type Az } from './azure-items.ts';
 import { prStateOf, type AzurePr } from './azure-prs.ts';
 
 /** The az flags that name the repository's organization, with its project and repository names as az takes them. */
@@ -143,10 +143,11 @@ const GENERIC_CONTRIBUTE = 4;
 /** Whether az's login can push to the repository, as Azure DevOps evaluates GenericContribute on it for the caller. */
 export async function canPush(repo: string, run: Az = az): Promise<boolean> {
   const { id, project } = await repos<{ id: string; project: { id: string } }>(run, repo, ['show']);
-  const { value } = await json<{ value: boolean[] }>(run, ['devops', 'invoke', '--area', 'security', '--resource', 'permissions', '--route-parameters',
-    `securityNamespaceId=${GIT_REPOSITORIES}`, `permissions=${GENERIC_CONTRIBUTE}`, '--query-parameters', `tokens=repoV2/${project.id}/${id}`,
-    '--api-version', API_VERSION], repo);
-  return value[0] === true;
+  const [organization] = repo.split('/');
+  const { value } = await azureGet<{ value: unknown[] }>(
+    `https://dev.azure.com/${organization}/_apis/permissions/${GIT_REPOSITORIES}/${GENERIC_CONTRIBUTE}?tokens=${encodeURIComponent(`repoV2/${project.id}/${id}`)}&api-version=${API_VERSION}`, run);
+  if (value?.length !== 1 || typeof value[0] !== 'boolean') throw new Error('Azure DevOps returned no push permission decision');
+  return value[0];
 }
 
 /** Whether the repository has the branch on Azure Repos. */

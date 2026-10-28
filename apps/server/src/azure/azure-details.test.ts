@@ -75,8 +75,8 @@ test('the child work items answer as sub-tickets, Completed ones closed and Remo
   const details = await readAzureItemDetails(item(5), az.run);
   assert.ok(!('error' in details));
   assert.deepEqual(details.subTickets, [
-    { number: 6, title: 'Write the exporter', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/6', repo: REPO, state: 'open' },
-    { number: 7, title: 'Add the button', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/7', repo: REPO, state: 'closed' },
+    { number: 6, title: 'Write the exporter', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/6', repo: REPO, state: 'open', azure: { type: 'Task', state: 'Active', assignee: null } },
+    { number: 7, title: 'Add the button', url: 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/7', repo: REPO, state: 'closed', azure: { type: 'Task', state: 'Closed', assignee: null } },
   ]);
   assert.deepEqual(az.batches, [[5], [6, 7, 8]]);
 });
@@ -132,4 +132,29 @@ test('older comments of a repository not on Azure DevOps, or of a failed az, ans
   assert.deepEqual(await readAzureOlderComments({ id: 'I_1', content: 'ticket', repo: 'maddec01/lar', number: 5 } as Item, '10', fakeAz({ items: [] }).run), { status: 404, error: 'That item is not an Azure DevOps work item.' });
   const failing = async () => { throw new Error('az exploded'); };
   assert.deepEqual(await readAzureOlderComments(item(5), '10', failing), { status: 502, error: 'az exploded' });
+});
+
+test('details hydrate 217 children in batches of at most 200', async () => {
+  const az = fakeAz({ items: [workItem({ description: 'Keep this description' }), ...Array.from({ length: 217 }, (_, i): WorkItem => ({ id: i + 10, type: 'Task', state: 'Closed', parent: 5 }))] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.equal(details.body, 'Keep this description');
+  assert.equal(details.subTickets.length, 217);
+  assert.deepEqual(az.batches.map((ids) => ids.length).sort((a, b) => a - b), [1, 17, 200]);
+});
+
+test('a child relations failure preserves the main description, people and comments and names the failed section', async () => {
+  const az = fakeAz({ items: [workItem({ description: 'Main text', comments: [comment(1)] }), { id: 6, type: 'Task', state: 'Active', parent: 5 }],
+    fail: (args) => args.includes('workitemtypestates') ? new Error('Relations unavailable') : undefined });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual([details.body, details.assignees, details.comments.length, details.subTickets, details.relationsError], ['Main text', ['Rui Costa'], 1, [], 'Relations unavailable']);
+});
+
+test('an empty Bug description falls back to Repro Steps, keeping Acceptance Criteria and System Info', async () => {
+  const az = fakeAz({ items: [workItem({ type: 'Bug', description: '<div><br></div>', reproSteps: '<p>Open the broken screen.</p>', acceptanceCriteria: 'The screen opens.', systemInfo: '<div>macOS</div>' })] });
+  const details = await readAzureItemDetails(item(5), az.run);
+  assert.ok(!('error' in details));
+  assert.deepEqual([details.body, details.format], ['<p>Open the broken screen.</p>', 'html']);
+  assert.deepEqual(details.sections, [{ title: 'Acceptance Criteria', body: 'The screen opens.', format: 'markdown' }, { title: 'System Info', body: '<div>macOS</div>', format: 'html' }]);
 });

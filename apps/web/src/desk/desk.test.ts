@@ -89,7 +89,7 @@ test.each<[string, BoardData, string, string, string[]]>([
 test('Open thread in a card’s corner is a square icon button named and titled Open thread', async () => {
   await mountPage(noBlockers());
   const corner = card('I_sample13').querySelector('.desk-actions [data-open-thread]')!;
-  expect([corner.getAttribute('aria-label'), corner.getAttribute('title'), corner.className.split(' ')]).toEqual(['Open thread', 'Open thread', expect.arrayContaining(['w-7'])]);
+  expect([corner.getAttribute('aria-label'), corner.getAttribute('title'), corner.getAttribute('data-icon-only')]).toEqual(['Open thread', 'Open thread', '']);
 });
 
 test('Open thread opens the latest thread in T3, and Open PR the pull request the item dialog links, in a new tab', async () => {

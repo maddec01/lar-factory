@@ -3,6 +3,9 @@
 // request icon; an App control has no border and an icon; any Other button is outlined, with no icon. A dialog or a
 // form is an area of its own, so its submit is its Main action. Each kind keeps its look while disabled. Its button
 // carries `data-kind`, which button-kinds.css sizes to 28 px and tints for a Start, so no Copy in packages/ui changes.
+// The sheet reads three marks a call site adds: `data-icon-only` makes a button 28 px square, its icon 20 px when the
+// mark is "large"; `data-tint` gives an App control Start's tint, as Update has; and `data-toggle` keeps a toggle at
+// its own size, off the kinds' 28 px.
 
 import { GitPullRequest, MessageSquareText, Play } from 'lucide-react';
 import type { ButtonProps } from '@lar-factory/ui/design-system/Button';

@@ -1,4 +1,4 @@
-// The title bar's five counters, on the right before the List button: need you, building, queued, shipped and spend,
+// The title bar's five counters, in its status strip after the Refreshed time: need you, building, queued, shipped and spend,
 // as lar-server's summary buttons, always for the whole factory whatever repository the board is scoped to. Each shows
 // only its glyph, in the status's own colour, and its number; its label is its accessible name and its tooltip says
 // more. Each opens a popover listing the items behind the number; picking one opens the item dialog. The row keeps its
@@ -13,15 +13,15 @@ import { Button } from '@lar-factory/ui/design-system/Button';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from '../board/board-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { BUILD_LIMIT, buildsInSlots } from '../items/build-slots.ts';
 import { ItemTitle, repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph, STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
-import { CONTROL } from './control.ts';
 
 const costOf = (item: Item) => (item.stats && item.stats !== 'unavailable' ? item.stats.costUsd ?? 0 : 0);
 
-/** One toolbar counter: a summary button with a glyph and a tabular count, named by its label. */
+/** One toolbar counter: an App control with a glyph and a tabular count, named by its label. */
 function Counter({ icon, value, label, hint, hideBelow, children }: {
   icon: ReactNode; value: ReactNode; label: string; hint: string; hideBelow?: string; children: ReactNode;
 }) {
@@ -30,8 +30,8 @@ function Counter({ icon, value, label, hint, hideBelow, children }: {
       <Tooltip>
         <TooltipTrigger asChild>
           <Popover.Trigger asChild>
-            <Button variant="summary" aria-label={`${label}: ${hint}`}
-              className={`${CONTROL} gap-1.5 text-base-700 hover:text-base-content data-[state=open]:text-base-content ${hideBelow ?? ''}`}>
+            <Button {...kind('control')} aria-label={`${label}: ${hint}`}
+              className={`min-w-0 gap-1.5 [&_svg]:size-4 text-base-700 hover:text-base-content data-[state=open]:text-base-content ${hideBelow ?? ''}`}>
               {icon}
               <span className="font-medium tabular-nums text-base-content">{value}</span>
             </Button>

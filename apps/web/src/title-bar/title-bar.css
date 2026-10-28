@@ -12,3 +12,7 @@
   from { transform: scale(1); opacity: 0.6; }
   to { transform: scale(3); opacity: 0; }
 }
+
+/* Inside the status strip the counters are 24 px tall, as the Refreshed time is, under the button kinds' 28, and
+   padded as lar-server's summary buttons. Unlayered, so this wins over the copied Button's utilities. */
+.status-strip [data-kind] { height: --spacing(6); padding-inline: --spacing(1.5); }

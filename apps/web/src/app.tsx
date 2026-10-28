@@ -1,11 +1,13 @@
 // The page, the control room: the title bar, then a card for each repository still onboarding, the offers to onboard
 // T3 projects that have a Repository config, the banners, Your desk and the line, scoped to the repository the title
-// bar or the List modal picked. While no t3 is found, the notice replaces the content and the title bar shows only its
+// bar or the List modal picked; a repository whose items the first read hasn't landed yet says it's reading instead
+// of an empty desk and line. While no t3 is found, the notice replaces the content and the title bar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
 // it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
-// settled.
+// settled or a repository's items have landed.
 
-import { boardSections, failedCheck, inRepo, noneOnboarded } from '@lar-factory/shared';
+import { LoaderCircle } from 'lucide-react';
+import { boardSections, failedCheck, inRepo, noneOnboarded, repoName, stillReading } from '@lar-factory/shared';
 import { Notifications } from '@lar-factory/ui/design-system/Notifications';
 import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
@@ -37,8 +39,12 @@ function Content() {
         <OnboardingCards />
         <OnboardingOffers />
         <Banners />
-        <Desk items={boardSections({ ...data, items }, now).needsYou} />
-        <Line items={items} />
+        {scope && stillReading(data, scope)
+          ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Reading {repoName(scope, data.repos)}…</p>
+          : <>
+            <Desk items={boardSections({ ...data, items }, now).needsYou} />
+            <Line items={items} />
+          </>}
       </div>
     </div>
   );

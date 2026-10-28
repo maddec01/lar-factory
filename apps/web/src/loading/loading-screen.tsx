@@ -1,6 +1,6 @@
 // The loading screen: the lar Factory lockup over one line naming the first read's step. It covers the board from the
-// page's first paint until the first read has settled and the mark has drawn, then fades out. It comes back whenever
-// the server's first read is unsettled again, after a restart.
+// page's first paint until the first read has settled, or a repository's items have landed, and the mark has drawn,
+// then fades out. It comes back whenever the server's first read is unsettled again with nothing read, after a restart.
 
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -89,7 +89,9 @@ function useInertBoard(covered: boolean) {
 
 export function LoadingScreen() {
   const read = useBoardStore((state) => state.data.firstRead);
-  const { phase, drawn } = useScreen(read.settled);
+  // The board fills in as each repository's read lands, so the first to land ends the screen.
+  const landed = useBoardStore((state) => state.data.firstRead.waiting !== undefined);
+  const { phase, drawn } = useScreen(read.settled || landed);
   const { current, leaving, rolled } = useLines(stepText(read));
   useInertBoard(phase !== 'gone');
   if (phase === 'gone') return null;

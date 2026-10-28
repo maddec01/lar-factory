@@ -66,6 +66,17 @@ test('the table takes the main area\'s scope', async () => {
   expect(rows().map((r) => numberOf(r.dataset.item!))).toEqual([31, 34, 30, 22, 23]);
 });
 
+test("scoped to a repository whose items haven't landed yet, the main area says it's reading instead of an empty desk and line", async () => {
+  await mountPage({ ...sample, items: sample.items.filter((i) => i.repo !== 'maddec01/lar-apple'),
+    firstRead: { step: 'items', running: ['lar-apple'], waiting: ['maddec01/lar-apple'], settled: false } });
+  const { useScopeStore } = await import('../board/scope-store.ts');
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
+  expect(text($('[data-reading]'))).toBe('Reading lar-apple…');
+  expect([table(), $('section.desk')]).toEqual([null, null]);
+  await settle(() => useScopeStore.getState().setScope('maddec01/lar-server'));
+  expect([$('[data-reading]'), table() !== null]).toEqual([null, true]);
+});
+
 test('a row shows its numbered title, status, repository and age, and a red badge while it is blocked', async () => {
   await mountPage(loose);
   const [title] = cells('I_sample13');

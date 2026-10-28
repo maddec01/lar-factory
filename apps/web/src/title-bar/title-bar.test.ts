@@ -241,6 +241,18 @@ test('before the first read it says so behind a grey dot, or an amber one if tha
   expect(isAmber(dot())).toBe(true);
 });
 
+test('while some repositories still read, it names them behind a grey dot, never Stale, until every read lands', async () => {
+  const reading = (waiting: string[]) => ({ ...fresh(), firstRead: { step: 'items' as const, running: [], waiting, settled: false } });
+  await mountPage(reading(['maddec01/lar-server', 'maddec01/lar-apple']));
+  expect(text(refreshed())).toBe('Reading lar-server and lar-apple');
+  expect([isAmber(dot()), isGreen(dot())]).toEqual([false, false]);
+  await push(reading(['maddec01/lar-apple']));
+  expect(text(refreshed())).toBe('Reading lar-apple');
+  await push({ ...fresh(), firstRead: { step: 'finishing', running: [], settled: true } });
+  expect(text(refreshed())).toBe('0s ago');
+  expect(isGreen(dot())).toBe(true);
+});
+
 test('the tooltip gives the exact time and when reads happen', async () => {
   await mountPage(fresh(11_000));
   const read = clock(new Date(NOW - 11_000).toISOString(), undefined);

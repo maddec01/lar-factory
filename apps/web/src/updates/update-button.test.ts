@@ -75,7 +75,8 @@ describe('available', () => {
     const { bridge } = stubBridge(available);
     await mountPage();
     expect(text(pill())).toBe('Update available');
-    expect(pill()!.classList).toContain('rounded-full');
+    expect(pill()!.classList, 'an App control\'s corners, not a pill').not.toContain('rounded-full');
+    expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')]).toEqual(['control', true]);
     expect(icon('arrow-down-to-line')).not.toBeNull();
     const controls = [...pill()!.closest('.title-bar')!.querySelectorAll('button')];
     expect(controls[controls.indexOf(pill() as HTMLButtonElement) + 1]!.classList, 'Settings comes right after it').toContain('open-settings');
@@ -158,6 +159,7 @@ describe('downloading', () => {
     const circumference = 2 * Math.PI * 7;
     expect(Number(ring.getAttribute('stroke-dashoffset'))).toBeCloseTo(circumference * (1 - 0.42));
     expect(text(pill())).toBe('Downloading 42%');
+    expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')]).toEqual(['control', true]);
     expect(pill()!.tagName, 'nothing to click while it downloads').not.toBe('BUTTON');
     expect(['role', 'aria-label', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow'].map((name) => pill()!.getAttribute(name)))
       .toEqual(['progressbar', 'Downloading 1.1.0', '0', '100', '42']);
@@ -183,6 +185,8 @@ describe('downloaded', () => {
     const { bridge } = stubBridge(downloaded);
     await mountPage();
     expect(text(pill())).toBe('Restart to update');
+    expect([pill()!.getAttribute('data-kind'), pill()!.hasAttribute('data-tint')], 'tinted, not filled').toEqual(['control', true]);
+    expect(pill()!.classList).not.toContain('bg-primary');
     expect(icon('rotate-ccw')).not.toBeNull();
     await click();
     expect(bridge.confirmRestart).toHaveBeenCalledExactlyOnceWith('The board app will restart to install 1.1.0.');

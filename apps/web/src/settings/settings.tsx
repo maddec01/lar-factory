@@ -5,18 +5,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { boardApp } from '@lar-factory/shared';
-import { IconButton } from '@lar-factory/ui/design-system/IconButton';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { SidebarNavigationItem } from '@lar-factory/ui/design-system/SidebarNavigationItem';
 import { SidebarNavigationGroup, SidebarPane } from '@lar-factory/ui/design-system/SidebarPane';
 import { SettingsIcon } from '@lar-factory/ui/design-system/NavigationIcons';
 import { useBoardStore } from '../board/board-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { ShownControl, notBuilt } from './controls.tsx';
 import { type Group, type Page, pages } from './settings-pages.tsx';
 import { useSettingsStore } from './settings-store.ts';
-import { ICON_CONTROL } from '../title-bar/control.ts';
 
 /** The section list's groups, by section id. */
 const NAV: { label: string; ids: string[] }[] = [
@@ -25,11 +25,12 @@ const NAV: { label: string; ids: string[] }[] = [
   { label: 'App', ids: ['updates', 'archive', 'diagnostics'] },
 ];
 
-/** The title bar's last button, which opens Settings: lar-server's header icon button, its label in its title. */
+/** The title bar's last button, which opens Settings: an icon-only App control, its label in its title. Its 20 px icon
+ *  takes the text colour, not the muted one, so it holds its own beside the labelled controls. */
 export function SettingsButton() {
   return (
-    <IconButton variant="header" className={`open-settings ${ICON_CONTROL}`} aria-label="Settings" title="Settings" icon={<SettingsIcon />}
-      onClick={() => useSettingsStore.getState().setOpen(true)} />
+    <Button {...kind('control')} data-icon-only="large" className="open-settings text-base-content" aria-label="Settings" title="Settings"
+      onClick={() => useSettingsStore.getState().setOpen(true)}><SettingsIcon /></Button>
   );
 }
 

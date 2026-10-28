@@ -124,6 +124,14 @@ test('Scope board scopes the board to the chosen repository, and is only there f
   expect(text(scope())).toBe('Scope board');
 });
 
+test('Scope board is a toggle, so it keeps its own size, not the button kinds\' 28 px', async () => {
+  await mountPage();
+  await open();
+  await settle(() => group('lar-apple').click());
+  const scope = $('[data-list-modal] button.scope-board')!;
+  expect([scope.getAttribute('data-kind'), scope.hasAttribute('data-toggle')]).toEqual(['other', true]);
+});
+
 test('the sort menu reorders the items', async () => {
   await mountPage();
   await open();

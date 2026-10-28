@@ -1,5 +1,6 @@
 // The title bar's update pill, a Port of T3 Code's update pill (apps/web/src/components/sidebar/SidebarUpdatePill.tsx
-// at d53873b) on the copied Popover, Button and Tooltip, laid out as the prototype draws it. With no update it
+// at d53873b) on the copied Popover, Button and Tooltip, drawn as the board's other App controls are, tinted in
+// every state (buttons/button-kinds.tsx), instead of as T3's pill. With no update it
 // doesn't show; Settings › Updates checks. An available update reads "Update available", a download shows a progress
 // ring with the percentage, and a downloaded update reads "Restart to update". Clicking the pill runs that step, with
 // T3's toasts from the store; installing asks first in the app's native dialog, as T3 does. While the app installs,
@@ -17,11 +18,11 @@ import { Popover } from '@lar-factory/ui/design-system/Popover';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
 import { useUpdateStore } from './update-store.ts';
 import { downloadPercent, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from './update-button-logic.ts';
-import { CONTROL } from '../title-bar/control.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 import { UpdateStatusIcon } from './UpdateStatusIcon.tsx';
 
-/** The pill's shape, over the copied Button's own, at the title bar's 28 px. */
-const PILL = `update-button ${CONTROL} gap-1.5 rounded-full pl-2 pr-2.5 font-medium`;
+/** The pill's shape: an App control, with its corners and 28 px height, tinted in every state. */
+const PILL = 'update-button gap-1.5 font-medium';
 const CLOSE_DELAY_MS = 150;
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -83,7 +84,8 @@ function Downloading({ state }: { state: UpdateState }) {
       <TooltipTrigger asChild>
         <span tabIndex={0} role="progressbar" aria-label={`Downloading ${state.availableVersion ?? 'the update'}`}
           aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}
-          className={`${PILL} inline-flex items-center bg-base-200 text-base-700 outline-none focus-visible:ring-2 focus-visible:ring-primary`}>
+          data-kind="control" data-tint
+          className={`${PILL} inline-flex items-center rounded-md px-[11px] outline-none focus-visible:ring-2 focus-visible:ring-primary`}>
           <UpdateStatusIcon status="downloading" downloadPercent={percent} />
           Downloading <span className="w-7 tabular-nums">{percent}%</span>
         </span>
@@ -102,9 +104,9 @@ function NextStep({ state, ready }: { state: UpdateState; ready: boolean }) {
     <Popover open={open} onOpenChange={(next) => !next && close()}>
       <Popover.Trigger asChild>
         <Button
-          variant={ready ? 'primary' : 'quiet'}
+          {...kind('control')} data-tint
           aria-disabled={disabled || undefined}
-          className={`${PILL} ${ready ? '' : 'bg-primary/12 text-primary ring-1 ring-primary/30 ring-inset hover:bg-primary/18 data-[state=open]:bg-primary/18'} ${disabled ? 'cursor-not-allowed' : ''}`}
+          className={`${PILL} ${disabled ? 'cursor-not-allowed' : ''}`}
           // The pill runs the step; the changelog opens on hover and focus, not on the click.
           onClick={(event) => {
             event.preventDefault();
@@ -124,7 +126,7 @@ function NextStep({ state, ready }: { state: UpdateState; ready: boolean }) {
           {state.releaseNotes.length > 0 && (
             <div className="max-h-[min(28rem,calc(100vh-10rem))] overflow-y-auto"><ReleaseNotes state={state} /></div>
           )}
-          <Button className="update-next justify-self-start" disabled={disabled} onClick={() => void run()}>
+          <Button {...kind('main')} className="update-next justify-self-start" disabled={disabled} onClick={() => void run()}>
             {ready ? 'Restart now' : 'Download'}
           </Button>
         </div>

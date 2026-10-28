@@ -1,18 +1,25 @@
 /* The button kinds (button-kinds.tsx), over the copied Button's recipes and LinkButton's. Unlayered, so these win over
    the Copy's Tailwind utilities, which sit in a layer. */
 
-/* Every kind is 28 px tall, with 12 px text. */
-[data-kind] { height: --spacing(7); font-size: var(--text-xs); }
+/* Every kind is 28 px tall, with 12 px text, except a toggle marked data-toggle (Scope board), which keeps its own
+   size. `:where` keeps the selector as specific as [data-kind], so the title bar's strip still sizes its counters. */
+[data-kind]:where(:not([data-toggle])) { height: --spacing(7); font-size: var(--text-xs); }
 
-/* Start: the primary colour, tinted on the card, with no border or shadow; its icon takes the text colour. */
-[data-kind="start"] {
+/* Start, and an App control marked data-tint (Update): the primary colour, tinted on the card, with no border or
+   shadow; its icon takes the text colour. */
+[data-kind="start"], [data-tint] {
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, var(--card));
   border-color: transparent;
   box-shadow: none;
 }
-[data-kind="start"]:not(:disabled, [aria-disabled="true"]):hover, [data-kind="start"][data-state="open"] { background: color-mix(in srgb, var(--primary) 18%, var(--card)); }
-[data-kind="start"] [data-slot="icon"] { color: inherit; }
+:is([data-kind="start"], [data-tint]):not(:disabled, [aria-disabled="true"]):hover, :is([data-kind="start"], [data-tint])[data-state="open"] { background: color-mix(in srgb, var(--primary) 18%, var(--card)); }
+:is([data-kind="start"], [data-tint]) [data-slot="icon"] { color: inherit; }
+
+/* An icon-only button: 28 px square, keeping its kind's 16 px icon (a desk card's Open thread), or a 20 px one when
+   marked large (Settings). */
+[data-kind][data-icon-only] { width: --spacing(7); padding: 0; }
+[data-kind][data-icon-only="large"] svg { width: --spacing(5); height: --spacing(5); }
 
 /* The copied Modal's Close: 28 px square, like every icon-only button. */
 [data-slot="modal-close"] { width: --spacing(7); height: --spacing(7); }

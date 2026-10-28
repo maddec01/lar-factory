@@ -21,7 +21,6 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
-import { CONTROL } from '../title-bar/control.ts';
 import { matchesSearch } from './list-search.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
@@ -145,7 +144,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
             <span className="truncate text-sm font-semibold text-base-content">{picked ? picked.name : 'All repositories'}</span>
             <Badge>{items.length}</Badge>
             {picked && (
-              <Button {...kind('other')} className="scope-board" aria-pressed={scoped} selected={scoped} onClick={() => setScope(scoped ? null : picked.repo)}>
+              <Button {...kind('other')} data-toggle className="scope-board" aria-pressed={scoped} selected={scoped} onClick={() => setScope(scoped ? null : picked.repo)}>
                 {scoped ? 'Board scoped' : 'Scope board'}
               </Button>
             )}
@@ -167,8 +166,8 @@ export function ListButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="quiet" className={`list-button ${CONTROL} px-2`} leftIcon={<Inbox />} title="List" onClick={() => setOpen(true)}>
-        <span className="@max-[70rem]:sr-only [.title-bar:has(.update-button)_&]:@max-[74rem]:sr-only">List</span><Badge>{count}</Badge>
+      <Button {...kind('control')} className="list-button px-2" leftIcon={<Inbox />} title="List" onClick={() => setOpen(true)}>
+        <span className="@max-[70rem]:sr-only">List</span><Badge>{count}</Badge>
       </Button>
       {open && <ListModal onClose={() => setOpen(false)} />}
     </>

@@ -1,6 +1,6 @@
-// The board's title bar, in the board app and in a browser: on the left the brand, the scope menu and the Refreshed
-// time; on the right the counters, the List button, Add item, the "for T3 Code" tag, the update pill while there's an
-// update, and Settings, past the traffic lights; above the missing-t3 notice only the brand and Settings.
+// The board's title bar, in the board app and in a browser, past the traffic lights: on the left the brand and the
+// scope menu; in the middle the status strip, the Refreshed time and the counters; on the right List, Add item, a
+// divider, Update while there's an update, and Settings. Above the missing-t3 notice only the brand and Settings.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { clock } from '@lar-factory/shared';
@@ -29,39 +29,71 @@ const tooltip = async () => {
 /** The title bar's controls, left to right, by name. */
 const CONTROLS = {
   brand: '.brand', scope: 'button.scope', refreshed: '.refreshed', counters: '.counters', list: '.list-button',
-  'add item': '.add-item', 't3 tag': '.t3-tag', update: '.update-button', settings: '.open-settings',
+  'add item': '.add-item', divider: '.app-divider', update: '.update-button', settings: '.open-settings',
 } as const;
 const controls = () => [...titleBar().querySelectorAll(Object.values(CONTROLS).join(', '))]
   .map((el) => Object.entries(CONTROLS).find(([, selector]) => el.matches(selector))![0]);
 const inset = () => titleBar().className.split(' ').includes('pl-[74px]');
 
-test('the title bar holds the brand, Scope and Refreshed on the left, then the counters, List, Add item, the T3 tag, the update pill and Settings on the right', async () => {
+test('the title bar holds the brand and Scope, the status strip, then List, Add item, a divider, Update and Settings', async () => {
   stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'available' as const, availableVersion: '1.1.0', message: null })) });
   await mountPage();
-  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 't3 tag', 'update', 'settings']);
+  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 'divider', 'update', 'settings']);
   const header = titleBar().querySelector('header')!;
-  const [, , left, right] = [...header.children];
-  expect(left!.contains(refreshed()) && !left!.querySelector('.counters'), 'the left holds Scope and Refreshed, not the counters').toBe(true);
-  expect(right!.firstElementChild!.matches('.counters'), 'the counters open the right, before List').toBe(true);
-  expect(text(titleBar().querySelector('.t3-tag'))).toBe('for T3 Code');
+  const [, , middle, right] = [...header.children];
+  const strip = middle!.querySelector('.status-strip')!;
+  expect([...strip.children].map((el) => el.matches('.refreshed') ? 'refreshed' : el.matches('.counters') ? 'counters' : 'rule'),
+    'the strip holds Refreshed, a rule, then the counters').toEqual(['refreshed', 'rule', 'counters']);
+  expect(right!.firstElementChild!.matches('.list-button'), 'the right opens on List').toBe(true);
+  expect(text(titleBar()), 'no "for T3 Code" tag').not.toContain('T3 Code');
   expect(header.className.split(' ')).toContain('h-13');
 });
 
-// jsdom lays nothing out, so this checks the classes: every control is 28 px tall, an icon-only one 28 px square.
-test('every control in the title bar is 28 px tall', async () => {
+// jsdom lays nothing out, so this checks the classes: the copied TitleBar's header is the container, and from 72rem the
+// strip is centred in it. Below that it sits in flow right after Scope, with no auto margin, and the title zone's
+// flex-1 keeps List and the rest at the right edge.
+test('the status strip is centred in the bar while the bar is 72rem wide, and follows Scope below that', async () => {
+  await mountPage();
+  const strip = titleBar().querySelector('.status-strip')!;
+  expect(titleBar().querySelector('header')!.className.split(' ')).toContain('@container');
+  const classes = strip.className.split(' ');
+  expect(classes).toEqual(expect.arrayContaining(['@min-[72rem]:absolute', '@min-[72rem]:left-1/2', '@min-[72rem]:-translate-x-1/2']));
+  expect(classes.filter((c) => c.includes('ml-auto')), 'nothing pushes the strip toward List').toEqual([]);
+  expect(strip.previousElementSibling!.matches('button.scope'), 'the strip comes right after Scope').toBe(true);
+  expect(strip.parentElement!.className.split(' '), 'the title zone fills the room up to List').toContain('flex-1');
+});
+
+// Measured in Chrome with a 150 px Update: centred from 72rem, the strip runs under List until the bar is about 76rem.
+test('while Update shows, the strip stays after Scope up to 80rem, so it never runs under List', async () => {
+  await mountPage();
+  const classes = titleBar().querySelector('.status-strip')!.className.split(' ');
+  expect(classes).toEqual(expect.arrayContaining(['[.title-bar:has(.update-button)_&]:@max-[80rem]:static', '[.title-bar:has(.update-button)_&]:@max-[80rem]:translate-x-0']));
+});
+
+test('while the strip is centred, Scope is capped short of it and truncates its label', async () => {
+  await mountPage();
+  const scope = titleBar().querySelector('button.scope')!;
+  expect(scope.className.split(' ')).toEqual(expect.arrayContaining(['@min-[72rem]:max-w-[calc(50cqw-23rem)]', '[.title-bar:has(.update-button)_&]:@max-[80rem]:max-w-none']));
+  expect(scope.querySelector('span')!.className.split(' ')).toContain('truncate');
+});
+
+// The kinds' sheet sizes each to 28 px (buttons/button-kinds.css); inside the strip the title bar's sheet makes them 24.
+test('Add item is the bar\'s Main action and every other control an App control; Settings is icon-only', async () => {
   stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'available' as const, availableVersion: '1.1.0', message: null })) });
   await mountPage();
-  const classes = (el: Element) => el.className.split(' ');
-  for (const el of titleBar().querySelectorAll('button.scope, .refreshed, .counters button, .list-button, .add-item, .t3-tag, .update-button')) {
-    expect(classes(el), el.className).toContain('h-7');
-    if (el.matches('button')) expect(classes(el), 'the copied Button sets its height again from sm').toContain('sm:h-7');
-  }
-  expect(classes(titleBar().querySelector('.open-settings')!)).toContain('size-7');
+  const kindOf = (selector: string) => titleBar().querySelector(selector)!.getAttribute('data-kind');
+  expect(kindOf('.add-item')).toBe('main');
+  for (const selector of ['button.scope', '.list-button', '.update-button', '.open-settings']) expect(kindOf(selector), selector).toBe('control');
+  expect([...titleBar().querySelectorAll('.counters button')].map((b) => b.getAttribute('data-kind'))).toEqual(Array(5).fill('control'));
+  const settings = titleBar().querySelector('.open-settings')!;
+  expect([settings.getAttribute('data-icon-only'), settings.getAttribute('aria-label'), text(settings)]).toEqual(['large', 'Settings', '']);
+  expect(settings.className.split(' '), 'its icon takes the text colour').toContain('text-base-content');
+  expect(refreshed().className.split(' '), 'Refreshed is 24 px, as the strip\'s counters').toContain('h-6');
 });
 
 test('in a browser, where nothing updates, there\'s no update pill', async () => {
   await mountPage();
-  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 't3 tag', 'settings']);
+  expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 'divider', 'settings']);
 });
 
 test('the brand reads "lar Factory": the copied BrandMark, then Factory on its baseline', async () => {
@@ -288,9 +320,8 @@ test('the first read of a page that had none pings, a failed read does not', asy
   expect(ping()).toBeNull();
 });
 
-// jsdom lays nothing out, so this checks the classes behind the fold. Beside the update pill the List and Add item
-// labels and the T3 tag come back at 74rem instead of 70rem, since the pill takes the room Scope needs. The counters
-// never show their labels.
+// jsdom lays nothing out, so this checks the classes behind the fold. The List and Add item labels fold at 70rem, with
+// Update or without it, before Spend folds at 66rem. The counters never show their labels.
 test('the bar folds by its own width instead of squeezing: the counters keep theirs, and labels go before controls', async () => {
   stubApp({ getUpdateState: vi.fn(async () => ({ ...updatesOff, enabled: true, status: 'downloaded' as const, availableVersion: '1.1.0', downloadedVersion: '1.1.0', message: null })) });
   await mountPage();
@@ -300,12 +331,9 @@ test('the bar folds by its own width instead of squeezing: the counters keep the
   expect(classes(counters)).toContain('shrink-0');
   expect(classes(counters), 'a size container would have no width of its own').not.toContain('@container');
   expect(classes(counters.parentElement), 'its slot never shrinks below it').not.toContain('min-w-0');
-  expect(classes(titleBar().querySelector('.t3-tag'))).toContain('@max-[70rem]:hidden');
-  expect(classes(titleBar().querySelector('.t3-tag'))).toContain('[.title-bar:has(.update-button)_&]:@max-[74rem]:hidden');
   for (const [button, label] of [['.list-button', 'List'], ['.add-item', 'Add item']] as const) {
     const span = [...titleBar().querySelectorAll(`${button} span`)].find((s) => text(s) === label);
     expect(classes(span ?? null), `${label}'s label stays for screen readers`).toContain('@max-[70rem]:sr-only');
-    expect(classes(span ?? null), `beside the update pill ${label}'s label folds sooner`).toContain('[.title-bar:has(.update-button)_&]:@max-[74rem]:sr-only');
   }
   expect(text(counters), 'the counters show no labels').not.toMatch(/need you|building|queued|shipped|spend/);
   expect(classes(trigger())).toContain('min-w-0');

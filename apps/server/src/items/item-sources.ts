@@ -114,7 +114,8 @@ function githubRef(url: string): { repo: string; number: number } | undefined {
  * each item from a repository in `optedIn` that carries no status, except a closed item a Project lists: being in a
  * Project opts it in. An untagged item that carries no status leaves the opted-in repositories of its `untaggedFor`.
  * A read given a pace reads only the sources due at it, and lists the others from their last good read; a source whose
- * kind in `kinds` the pace says waits is never due, and checks for no changes.
+ * kind in `kinds` the pace says waits is never due, and checks for no changes. Each source's read that lands while
+ * another still reads reports the read so far to the progress; a read names the repositories whose source hasn't read.
  */
 export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = [],
   kinds: ReadonlyMap<ItemSource, ItemSourceKind> = new Map()): MergedSource {
@@ -237,6 +238,21 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
   let listedBy = new Map<string, ItemSource>();
   const forRepo = (repo: string | null) => (repo && sourceByRepo.get(repo.toLowerCase())) || projects[0] || unlisted;
   const sourceOf = (item: Item) => listedBy.get(item.id) ?? forRepo(item.repo);
+  /** Every source's last good read merged, with the source that listed each item, by Item.id. */
+  const merged = () => {
+    const reads = sources.map((source) => lastRead.get(source) ?? { title: '', items: [] });
+    const listed = new Map<string, ItemSource>();
+    const items = reads.flatMap((read, index) => read.items.filter((item) => {
+      if (listed.has(item.id)) return false;
+      listed.set(item.id, sources[index]!);
+      return true;
+    }));
+    const problems = reads.flatMap((read) => read.problems ?? []);
+    const waiting = [...byRepo].filter(([, source]) => !lastRead.has(source)).map(([repo]) => repo);
+    const read: ItemsRead = { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item, listed.get(item.id)!) ?? []), ...problems.length > 0 && { problems },
+      ...sources.length > 0 && !sources.some((source) => lastRead.has(source)) && { unread: true as const }, ...waiting.length > 0 && { waiting } };
+    return { read, listed };
+  };
   return {
     async read(progress, pace) {
       const plans = sources.flatMap((source) => {
@@ -252,15 +268,22 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
           for (const item of lastRead.get(source)?.items ?? []) askedItems.delete(item.id);
         } else for (const item of plan) askedItems.delete(item.id);
       }
-      // A source that read keeps its read though another failed, so the next read needn't read it again.
-      const settled = await Promise.allSettled(plans.map(({ source, plan }) => readPlanned(source, plan, progress)));
+      // A source that read keeps its read though another failed, so the next read needn't read it again. Each read
+      // that lands while another still reads shows what has landed so far.
+      let reading = plans.length;
+      const settled = await Promise.allSettled(plans.map(async ({ source, plan }) => {
+        try {
+          lastRead.set(source, await readPlanned(source, plan, progress));
+          failed.delete(source);
+          if (reading > 1) progress?.landed?.(merged().read);
+        } finally {
+          reading--;
+        }
+      }));
       // A failed read asks again for what it read, so a change a check found isn't lost to a passing error.
       settled.forEach((read, index) => {
         const { source } = plans[index]!;
-        if (read.status === 'fulfilled') {
-          lastRead.set(source, read.value);
-          failed.delete(source);
-        } else if (lastRead.has(source)) {
+        if (read.status === 'rejected' && lastRead.has(source)) {
           failed.add(source);
           askedWhole.add(source);
         }
@@ -269,17 +292,9 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       if (rejected) throw rejected.reason;
       afresh = new Set(plans.filter(({ plan }) => plan === 'whole').map(({ source }) => source));
       afreshItems = new Set(plans.flatMap(({ plan }) => (plan === 'whole' ? [] : plan.map((item) => item.id))));
-      const reads = sources.map((source) => lastRead.get(source) ?? { title: '', items: [] });
-      const listed = new Map<string, ItemSource>();
-      const items = reads.flatMap((read, index) => read.items.filter((item) => {
-        if (listed.has(item.id)) return false;
-        listed.set(item.id, sources[index]!);
-        return true;
-      }));
+      const { read, listed } = merged();
       listedBy = listed;
-      const problems = reads.flatMap((read) => read.problems ?? []);
-      return { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item, listed.get(item.id)!) ?? []), ...problems.length > 0 && { problems },
-        ...sources.length > 0 && !sources.some((source) => lastRead.has(source)) && { unread: true as const } };
+      return read;
     },
     async probe(pace) {
       if (pace.slow) return;
@@ -326,8 +341,8 @@ export interface OnboardedSources extends MergedSource {
  * The item source the onboarded repositories name as `load` reads their configs: a read loads them first when it has
  * no pace, before the first read, when reload asked for it or once the pace's idle time has passed since they loaded, and builds the merged source
  * again when they changed, so a config merged to a default branch shows within an idle read. A read leaves out the
- * items of each repository whose config `load` couldn't read or that is resetting, which a Project may still list. A
- * write goes through the source the last read built.
+ * items of each repository whose config `load` couldn't read or that is resetting, which a Project may still list, and
+ * so does each read so far it reports as landed. A write goes through the source the last read built.
  */
 export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = configuredSources): OnboardedSources {
   let configs: RepositoryConfig[] = [];
@@ -351,8 +366,9 @@ export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = 
         }
         leftOff = new Set([...loaded.problems.map((p) => p.repo), ...loaded.resetting].map((repo) => repo.toLowerCase()));
       }
-      const read = await current.read(progress, pace);
-      return { ...read, items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')) };
+      const shown = (read: ItemsRead) => ({ ...read, items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')) });
+      const landed = progress?.landed;
+      return shown(await current.read(landed ? { ...progress!, landed: (read) => landed(shown(read)) } : progress, pace));
     },
     probe: (pace) => current.probe(pace),
     due: (pace) => loadDue(pace) || current.due(pace),

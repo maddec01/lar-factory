@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { Item, Status } from '@lar-factory/shared';
-import { ReadProblem, type ItemSource } from './item-source.ts';
+import { ReadProblem, type ItemSource, type ItemsRead } from './item-source.ts';
 import type { RepositoryConfig } from '../config/repository-config.ts';
 import { fakeAz } from '../azure/fake-az.ts';
 import { configuredSources, mergeSources, onboardedSources } from './item-sources.ts';
@@ -193,10 +193,10 @@ test('a problem with a source that repositories share shows under each of them',
 });
 
 /** A source whose read finishes when `finish` is called. */
-function slowSource(name: string): { source: ItemSource; finish: () => void } {
+function slowSource(name: string, items: Item[] = []): { source: ItemSource; finish: () => void } {
   let finish = () => {};
   const done = new Promise<void>((resolve) => { finish = resolve; });
-  return { source: { ...fakeSource(name, [], []), name, read: async () => { await done; return { title: name, items: [] }; } }, finish };
+  return { source: { ...fakeSource(name, [], []), name, read: async () => { await done; return { title: name, items }; } }, finish };
 }
 
 test('a read marks each source as started at once and as finished when its own read ends, without waiting for the others', async () => {
@@ -221,6 +221,34 @@ test("a source without a name is named by its repositories, and a failed read st
   const sources = mergeSources([], new Map([['contoso/p%20q/web', failing], ['contoso/p%20q/api', failing]]));
   await assert.rejects(sources.read(progress), /boom/);
   assert.deepEqual(events, ['+web, api', '-web, api']);
+});
+
+test("each source's read lands while another still reads, with the items read so far and the repositories still waiting", async () => {
+  const fast = slowSource('lar-apple', [item('I_2', 'maddec01/lar-apple')]);
+  const slow = slowSource('lar', [item('I_1', 'maddec01/lar-server')]);
+  const landed: ItemsRead[] = [];
+  const progress = { started: () => {}, finished: () => {}, landed: (read: ItemsRead) => landed.push(read) };
+  const reading = mergeSources([slow.source], new Map([['maddec01/lar-server', slow.source], ['maddec01/lar-apple', fast.source]])).read(progress);
+  fast.finish();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(landed.map((read) => [read.items.map((i) => i.id), read.waiting]), [[['I_2'], ['maddec01/lar-server']]]);
+  slow.finish();
+  const read = await reading;
+  assert.equal(landed.length, 1, 'the last read to land is the read itself');
+  assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_2']);
+  assert.equal(read.waiting, undefined);
+});
+
+test('the onboarded sources pass on what has landed, leaving out the repositories they leave out', async () => {
+  const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple')];
+  const landed: ItemsRead[] = [];
+  const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')], problems: [], resetting: ['maddec01/lar-apple'] }),
+    () => ({ ...merged(fakeSource('lar', [], [])), read: async (progress) => {
+      progress?.landed?.({ title: 'lar', items: listed, waiting: ['maddec01/lar-factory'] });
+      return { title: 'lar', items: listed };
+    } }));
+  await sources.read({ started: () => {}, finished: () => {}, landed: (read) => landed.push(read) });
+  assert.deepEqual(landed.map((read) => [read.items.map((i) => i.id), read.waiting]), [[['I_1'], ['maddec01/lar-factory']]]);
 });
 
 test('the onboarded sources pass the progress to the sources they build', async () => {
@@ -478,6 +506,7 @@ test('a source whose kind waits reads nothing and checks for no changes, and rea
   const read = await sources.read(undefined, paced(0));
   assert.deepEqual(read.items.map((i) => i.id), ['I_1']);
   assert.equal(read.unread, undefined);
+  assert.deepEqual(read.waiting, ['maddec01/lar-server'], 'the waiting source\'s repository is still waiting');
   assert.deepEqual([github.reads, azure.reads], [1, 0]);
   waiting = new Set(['issues']);
   await sources.probe(paced(5_000));

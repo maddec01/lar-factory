@@ -75,6 +75,9 @@ const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
 
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
 
+/** Whether the checks ran without gh, as no listed repository is on GitHub; Settings then leaves gh out. */
+const ghSkipped = (data: BoardData): boolean => !!data.tools && !data.tools.gh;
+
 /** Why az isn't checked, once the checks ran without it; else nothing. */
 function azSkipped(data: BoardData): string {
   return data.tools && !data.tools.az ? ' Not checked: no listed repository is on Azure DevOps.' : '';
@@ -264,8 +267,8 @@ export function pages(input: PagesInput): Page[] {
     ] },
     { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, description: 'The repositories the board reads, and the command line logins it reads them through.', groups: [
       { title: 'Command line tools', description: 'The board reads each provider through your own login and never stores a token.', rows: [
-        { id: 'gh', title: 'GitHub CLI', description: toolDescription('gh, for repositories on GitHub.', data.tools?.gh),
-          control: custom(() => <ToolState {...toolState(data.tools?.gh, true)} />) },
+        ...ghSkipped(data) ? [] : [{ id: 'gh', title: 'GitHub CLI', description: toolDescription('gh, for repositories on GitHub.', data.tools?.gh),
+          control: custom(() => <ToolState {...toolState(data.tools?.gh, true)} />) }],
         { id: 'az', title: 'Azure CLI', description: toolDescription(`az with the azure-devops extension, for repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),
           control: custom(() => <ToolState {...toolState(data.tools?.az, true)} />) },
       ] },
@@ -319,7 +322,7 @@ export function pages(input: PagesInput): Page[] {
     ] },
     { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, description: 'The commands the board runs, and its server.', groups: [
       { title: 'Tools', rows: [
-        ...DIAGNOSED.map(([name, does]): Row => ({
+        ...DIAGNOSED.filter(([name]) => name !== 'gh' || !ghSkipped(data)).map(([name, does]): Row => ({
           id: `d-${name}`, title: name, description: toolDescription(does, data.tools?.[name]), control: custom(() => <ToolState {...toolState(data.tools?.[name])} />),
         })),
         { id: 'd-az', title: 'az', description: toolDescription(`Reads repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),

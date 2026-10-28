@@ -349,6 +349,8 @@ test('reaching Checks runs the command checks, then each setup check with the re
   await toChecks(wizard, 'lar-web');
   const sent = { repo: 'maddec01/lar-web', projectId: 'lar-web', itemSource: { kind: 'issues' } };
   expect(checkPosts()).toEqual(['recheck', { check: 'checkout', ...sent }, { check: 'source', ...sent }, { check: 'push', ...sent }]);
+  const recheck = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/recheck')!;
+  expect(JSON.parse(String(recheck[1].body)), 'a GitHub run asks for gh\'s check').toEqual({ gh: true });
   const { run, projects, checks } = wizard.getState();
   expect(checks!.commands).toEqual({ state: 'done' });
   expect(stepReady(run!, projects, checks, toolChecks())).toBe(true);

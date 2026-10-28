@@ -278,6 +278,15 @@ test('the Command line tools rows show signed out, missing or the problem found,
   expect(text(row('az'))).toContain('Fix: brew install azure-cli');
 });
 
+test('Settings hides gh once the checks ran without it, as no listed repository is on GitHub', async () => {
+  const { gh: _, ...withoutGh } = toolChecks({ az: { result: 'ok', version: '2.67.0' } });
+  await open('Repositories', { ...sample, tools: withoutGh });
+  expect(groups()[0]).toEqual(['Command line tools', ['az']]);
+  await settle(() => section('Diagnostics').click());
+  expect($('.settings-row[data-row="d-gh"]')).toBeNull();
+  expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');
+});
+
 test('Diagnostics shows az with its version or its problem and fix', async () => {
   await open('Diagnostics', { ...sample, tools: toolChecks({ az: { result: 'ok', version: '2.67.0' } }) });
   expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');

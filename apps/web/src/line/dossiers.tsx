@@ -20,7 +20,7 @@ import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
 import { THREAD_GLYPH, dossiersOf, isDone, openWaits, started, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
-import { AgentCell, GRID, OnYourDesk, Row, StageHeader, THREAD_TEXT, Track, YOURS, picked, statsOf } from './stage-track.tsx';
+import { AgentCell, GRID, OnYourDesk, Row, StageHeader, threadText, Track, YOURS, picked, statsOf } from './stage-track.tsx';
 import { WorkMap } from './work-map.tsx';
 
 const NOT_BUILT = "isn't built yet: no workflow runs an end-to-end check";
@@ -190,7 +190,7 @@ function PartSide({ part, data }: { part: Part; data: BoardData }) {
   if (waits.length) return <span className="inline-flex items-center gap-1">waits on <WaitChips waitsOn={waits} data={data} /></span>;
   const pr = item.linkedPrs[0];
   if (pr) return <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>;
-  return <span>{part.thread?.state ?? THREAD_TEXT[item.status] ?? ''}</span>;
+  return <span>{threadText(item)}</span>;
 }
 
 /** What the dossier is for, from its map: its destination, decisions so far, open questions and end-to-end check. */
@@ -249,12 +249,22 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
   const find: FindRef = (repo = parent.repo ?? '', n) => data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
   const decisions = parts.filter((p) => p.kind !== 'build');
   const builds = parts.filter((p) => p.kind === 'build');
-  const repos = [...new Set(builds.map((p) => p.item.repo ?? ''))];
-  // The other repositories whose builds this repository's builds wait on.
-  const after = (repo: string) => [...new Set(builds.filter((b) => b.item.repo === repo).flatMap((b) => b.waitsOn)
-    .flatMap((w) => builds.filter((o) => o.item.number === w.number && o.item.repo === w.repo && o.item.repo !== repo).map((o) => o.item.repo ?? '')))];
-  const repoHint = (repo: string) => repos.length < 2 ? undefined
-    : after(repo).length ? `after ${after(repo).map((r) => repoName(r, data.repos)).join(', ')}` : repos.some((r) => after(r).includes(repo)) ? 'goes first' : 'runs in parallel';
+  // Keep adjacent builds together without pulling a later build ahead of another repository it waits on.
+  const groups: Part[][] = [];
+  builds.forEach((part) => {
+    const previous = groups.at(-1);
+    if (previous?.[0]?.item.repo === part.item.repo) previous.push(part);
+    else groups.push([part]);
+  });
+  const repoHint = (group: Part[]) => {
+    if (new Set(builds.map((b) => b.item.repo)).size < 2) return undefined;
+    const repo = group[0]!.item.repo;
+    const before = [...new Set(group.flatMap((b) => b.waitsOn).flatMap((w) => builds
+      .filter((b) => b.item.repo === w.repo && b.item.number === w.number && w.repo !== repo).map((b) => b.item.repo!)))];
+    if (before.length) return `after ${before.map((r) => repoName(r, data.repos)).join(', ')}`;
+    return builds.some((b) => b.item.repo !== repo && b.waitsOn.some((w) => group.some((p) => p.item.repo === w.repo && p.item.number === w.number)))
+      ? 'goes first' : 'runs in parallel';
+  };
   const names = [...new Set(items.map((i) => repoName(repoKey(i), data.repos)))];
   const done = items.filter(isDone).length;
   const threads = [parent, ...items].flatMap(threadsOf);
@@ -296,8 +306,8 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
           <div className="grid content-start gap-3" data-checklist>
             <Heading>Parts, in order</Heading>
             {decisions.length > 0 && <Phase title="Decide" hint={`${decisions.filter((p) => isDone(p.item)).length}/${decisions.length} answered`} parts={decisions} data={data} />}
-            {repos.map((repo) => (
-              <Phase key={repo} title={<>Build <RepoTag repo={repo || 'Draft'} repos={data.repos} /></>} hint={repoHint(repo)} parts={builds.filter((b) => b.item.repo === repo)} data={data} />
+            {groups.map((group) => (
+              <Phase key={group[0]!.item.id} title={<>Build <RepoTag repo={group[0]!.item.repo || 'Draft'} repos={data.repos} /></>} hint={repoHint(group)} parts={group} data={data} />
             ))}
             {check && <CheckPhase check={check} parent={parent} builds={builds} data={data} />}
           </div>

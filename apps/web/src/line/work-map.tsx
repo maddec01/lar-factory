@@ -10,7 +10,7 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar, repoTone } from '../items/item-parts.tsx';
 import { OpenThread } from '../items/open-thread.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
-import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, waitText } from './dossier-parts.ts';
+import { DECISION_KINDS, THREAD_GLYPH, isDone, openWaits, partWaves, waitText } from './dossier-parts.ts';
 import type { Part, PartKind } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
 
@@ -32,16 +32,7 @@ interface Placed { key: string; part: Part | null; col: number; x: number; y: nu
 function layout(parts: Part[], data: BoardData, width: number) {
   const keys = new Map(parts.map((p) => [keyOf(p), p]));
   const ups = (p: Part) => p.waitsOn.flatMap((b) => keys.get(refKey(b.repo, b.number)) ?? []);
-  const depth = new Map<string, number>();
-  const at = (p: Part, path: string[]): number => {
-    const known = depth.get(keyOf(p));
-    if (known !== undefined) return known;
-    const before = ups(p).filter((u) => !path.includes(keyOf(u)));
-    const d = before.length ? Math.max(...before.map((u) => at(u, [...path, keyOf(p)]))) + 1 : 0;
-    depth.set(keyOf(p), d);
-    return d;
-  };
-  parts.forEach((p) => at(p, []));
+  const depth = partWaves(parts);
   const laneOf = (p: Part) => (DECISION_KINDS.includes(p.kind) ? DECISIONS : repoKey(p.item));
   const named = [DECISIONS, ...data.repos.map((r) => r.repo), ...parts.map(laneOf)];
   const lanes = [...new Set(named)].filter((l) => parts.some((p) => laneOf(p) === l));

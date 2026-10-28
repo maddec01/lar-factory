@@ -11,6 +11,7 @@ interface FixtureTurn {
   id: string;
   startedAt: string;
   completedAt?: string | null;
+  status?: 'completed' | 'interrupted' | 'failed' | 'cancelled';
   /** An open turn whose run T3 gave up on: its provider thread is idle, not active. */
   abandoned?: boolean;
   /** A provider thread shared with the thread's other turns that name it; by default the turn's own. */
@@ -116,7 +117,7 @@ export function statsDb(t: TestContext, threads: FixtureThread[], requests: Fixt
       const codex = tu.codex;
       const attemptId = codex ? `${tu.id}:attempt` : null;
       // T3's own token counts, which item stats no longer read.
-      turn.run(tu.id, th.id, providerThread, attemptId, completedAt ? 'completed' : 'running', tu.startedAt, completedAt,
+      turn.run(tu.id, th.id, providerThread, attemptId, tu.status ?? (completedAt ? 'completed' : 'running'), tu.startedAt, completedAt,
         JSON.stringify({ id: tu.id, turnTokenUsage: { inputTokens: 999, cachedInputTokens: 0, outputTokens: 9, usageStatus: 'complete' },
           ...(codex ? { nativeTurnRef: { driver: 'codex', nativeId: codex.nativeTurn } } : {}) }));
       if (codex && attemptId) {

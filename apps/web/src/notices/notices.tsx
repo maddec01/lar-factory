@@ -1,7 +1,7 @@
 // What this page just did to an item, announced in a toast: added, moved or kept with View item,
 // abandoned, started in T3, or a Queued card's action that failed.
 
-import { ref, workTitle, abandonPrompt } from '@lar-factory/shared';
+import { ref, threadLink, abandonPrompt } from '@lar-factory/shared';
 import type { Item, StartedThread, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { useBoardStore } from '../board/board-store.ts';
@@ -9,6 +9,8 @@ import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { TitleLink } from '../items/item-parts.tsx';
 import { clearToast, showToast } from './toasts.tsx';
 import type { Toast } from './toasts.tsx';
+import { LinkButton } from '../items/link-button.tsx';
+import type { StartKind } from '../items/start-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
 export type Notice =
@@ -18,7 +20,7 @@ export type Notice =
   | { verb: 'Abandoned'; item: Item }
   /** A Queued card's Back to List (`to`) or Abandon (no `to`) failed. */
   | { verb: 'Failed'; item: Item; to?: Status; message: string }
-  | { verb: 'Started'; item: Item; thread: StartedThread };
+  | { verb: 'Started'; item: Item; thread: StartedThread; kind: StartKind };
 
 /** Notices share one toast: a new one replaces the last. */
 const SLOT = 'notice';
@@ -47,11 +49,10 @@ function toastOf(notice: Notice): Toast {
         focusAfter: [`[data-${notice.to ? 'back-to-list' : 'abandon'}="${CSS.escape(item.id)}"]`],
       };
     case 'Started': {
-      const { title, threadId } = notice.thread;
+      const environment = useBoardStore.getState().data.t3EnvironmentId;
       return {
         slot: SLOT, what: `started ${ref(item)}`,
-        // T3 titles a thread after line 1 of the work message; don't repeat the issue.
-        body: <>Started T3 thread{title !== workTitle(item) && <> <b>{title}</b></>} <code className="thread-id">{threadId}</code> for <TitleLink item={item} />.</>,
+        body: <>{notice.kind === 'build' ? 'Build' : 'Refining'} started for {ref(item)}. {environment && <LinkButton kind="open" href={threadLink(environment, notice.thread.threadId)}>Open thread</LinkButton>}</>,
       };
     }
     case 'Kept':

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { duration, formatTokens, formatUsd, openBlockers, ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
-import type { BoardData, Item, ItemStats, Status } from '@lar-factory/shared';
+import type { BoardData, Item, ItemStats, Status, ThreadState } from '@lar-factory/shared';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
 import { AzureFields, ItemTitle, SliceBar, SliceList, repoTone } from '../items/item-parts.tsx';
 import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
@@ -34,10 +34,15 @@ const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 /** The desk's statuses the line takes no action on. Ready is on the desk too, but keeps Start build on the line. */
 export const YOURS: Status[] = ['Needs you', 'Verify', 'Ready to merge'];
 
-/** What an item's thread is doing at each status where one is at work, or about to be. */
-export const THREAD_TEXT: Partial<Record<Status, string>> = {
-  Shaping: 'shaping thread running', Ready: 'build starts on Start', 'In progress': 'build thread running', Review: 'reviewers running',
+/** Activity comes from T3, never from the item's workflow status. */
+const THREAD_TEXT: Record<ThreadState, string> = {
+  running: 'Thread running', 'needs you': 'Thread needs you', stopped: 'Run stopped', done: 'Run finished',
 };
+export function threadText(item: Item): string {
+  if (item.threads === 'unavailable') return 'Thread unavailable';
+  const latest = item.threads?.[0];
+  return latest ? THREAD_TEXT[latest.state] : 'Not started';
+}
 
 /** Where to act on an item that waits on you. */
 export function OnYourDesk({ status }: { status: Status }) {

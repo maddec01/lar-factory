@@ -42,17 +42,21 @@ export function latestActivity({ turns, waits, lastMessages }: Pick<ThreadRows, 
 export function itemThreads(rows: ThreadRows): ItemThreadsReader {
   const { threads, turns, waits, active } = rows;
   const updated = latestActivity(rows);
-  const threadOfTurn = new Map(turns.map((turn) => [turn.id, turn.thread]));
-  const asking = new Set(waits.flatMap((wait) => (wait.resolvedAt ? [] : [threadOfTurn.get(wait.turn)])));
-  // A turn is in flight while it is open and the latest on its active provider thread;
-  // one whose run failed can stay open for good, its provider thread back to idle.
-  const latestTurn = new Map<string, TurnRow>();
+  const asking = new Set(waits.flatMap((wait) => (wait.resolvedAt ? [] : [wait.turn])));
+  const newest = new Map<string, TurnRow>();
   for (const turn of turns) {
-    const latest = latestTurn.get(turn.providerThread);
-    if (!latest || Date.parse(turn.startedAt ?? '') > Date.parse(latest.startedAt ?? '')) latestTurn.set(turn.providerThread, turn);
+    const previous = newest.get(turn.thread);
+    if (!previous || Date.parse(turn.startedAt ?? '') > Date.parse(previous.startedAt ?? '')) newest.set(turn.thread, turn);
   }
-  const running = new Set([...latestTurn.values()].filter((turn) => !turn.completedAt && active.has(turn.providerThread)).map((turn) => turn.thread));
-  const state = (thread: string): ThreadState => (asking.has(thread) ? 'needs you' : running.has(thread) ? 'running' : 'done');
+  const state = (thread: string): ThreadState => {
+    const turn = newest.get(thread);
+    if (!turn) return 'done';
+    if (['interrupted', 'failed', 'cancelled'].includes(turn.status)) return 'stopped';
+    if (asking.has(turn.id)) return 'needs you';
+    if (turn.completedAt) return 'done';
+    // A failed run can leave an open turn behind after its provider thread returns to idle.
+    return active.has(turn.providerThread) ? 'running' : 'stopped';
+  };
 
   const byIssue = new Map<string, ItemThread[]>();
   for (const { id, title, deletedAt, text } of threads) {

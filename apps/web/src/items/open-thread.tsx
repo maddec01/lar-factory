@@ -19,7 +19,7 @@ function latestThread(item: Item, data: BoardData): { link: string } | { reason:
 
 /** Whether a thread on the item is running or waits on you, so starting another would make a second one. */
 export const hasLiveThread = (item: Item): boolean =>
-  Array.isArray(item.threads) && item.threads.some((t) => t.state !== 'done');
+  Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running' || t.state === 'needs you');
 
 /**
  * Opens the latest thread in T3 Code: the board app hands the link to T3, a browser asks to open it. `iconOnly` draws

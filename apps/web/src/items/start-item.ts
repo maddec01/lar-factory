@@ -27,7 +27,7 @@ export async function startItem(itemId: string, choice?: ModelChoice, kind: Star
     // A refused or failed start keeps the previous choice.
     if (remembersChoice(result)) starts.remember(choice);
     const item = useBoardStore.getState().data.items.find((i) => i.id === itemId);
-    if (result.thread && item) notify({ verb: 'Started', item, thread: result.thread });
+    if (result.thread && item) notify({ verb: 'Started', item, thread: result.thread, kind });
   });
   // The Start button is gone once a thread starts or may have started; move focus to what replaced it.
   refocus([`[data-start-result="${CSS.escape(itemId)}"]`]);

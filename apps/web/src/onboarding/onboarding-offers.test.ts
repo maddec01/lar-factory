@@ -34,3 +34,19 @@ test('the offer opens the onboarding dialog with its project picked', async () =
   expect(dialog()).not.toBeNull();
   expect(dialog()!.querySelector('[data-choice="lar-web"] [role="radio"]')!.getAttribute('aria-checked')).toBe('true');
 });
+
+test('several offers share one compact notice until the user expands it', async () => {
+  const data = { ...sample, onboardingOffers: ['a', 'b', 'c', 'd'].map((name) => ({ projectId: name, name, repo: `owner/${name}`, provider: 'GitHub' as const })) };
+  serve(data, []);
+  await mountPage(data);
+  expect($$('[data-onboarding-offer]')).toHaveLength(0);
+  const toggle = $<HTMLButtonElement>('[data-onboarding-offers] button')!;
+  expect(text($('[data-onboarding-offers]'))).toContain('Add 4 repositories');
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect($('.desk')).not.toBeNull();
+  await settle(() => toggle.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect($$('[data-onboarding-offer]')).toHaveLength(4);
+  await settle(() => toggle.click());
+  expect($$('[data-onboarding-offer]')).toHaveLength(0);
+});

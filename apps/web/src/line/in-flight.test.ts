@@ -139,9 +139,9 @@ test('the side says where the item waits on you, or shows its thread and its nex
   expect(say('I_sample16')).toEqual(['on your desk', []]);
   expect(say('I_sample17')).toEqual(['on your desk', []]);
   expect(say('I_sample11')).toEqual(['on your desk', []]);
-  expect(say('I_sample07')).toEqual(['shaping thread running', ['Open thread']]);
-  expect(say('I_sample14')).toEqual(['build thread running', ['Open thread']]);
-  expect(say('I_sample15')).toEqual(['reviewers running', ['Open thread']]);
+  expect(say('I_sample07')).toEqual(['Thread running', ['Open thread']]);
+  expect(say('I_sample14')).toEqual(['Thread running', ['Open thread']]);
+  expect(say('I_sample15')).toEqual(['Thread running', ['Open thread']]);
   expect(say('I_sample13')).toEqual(['blocked by 1', ['Start after #202 ▾']]);
 });
 
@@ -263,7 +263,7 @@ test('Start build sends the build with the chosen model, then shows the thread i
   const tag = row('I_sample13').querySelector('[data-start-result]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread thread-1']);
   expect(startBuild()).toBeNull();
-  expect(text(toast())).toBe('Started T3 thread Build maddec01/lar-server#140 thread-1 for #140 Owner accounts.');
+  expect(text(toast())).toBe('Build started for #140. Open thread');
   expect(JSON.parse(localStorage.getItem('lar-board:model-choice')!)).toEqual({ instanceId: 'codex', model: 'gpt-5.5' });
 });
 
@@ -383,4 +383,40 @@ test('a 3-slice and a 14-slice build render the same row structure', async () =>
   const many = shape();
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(boardOf([build(3)], { active: [101, 102] })));
   expect(shape()).toBe(many);
+});
+
+test.each(['Shaping', 'In progress', 'Review'] as const)('line activity follows the latest real thread at %s', async (status) => {
+  const id = 'I_sample14';
+  const data = withItem(id, { status, threads: [] });
+  await mountPage(data);
+  const activity = () => text(side(id).firstElementChild);
+  expect(activity()).toBe('Not started');
+  const { useBoardStore } = await import('../board/board-store.ts');
+  for (const [state, expected] of [['running', 'Thread running'], ['stopped', 'Run stopped'], ['done', 'Run finished'], ['needs you', 'Thread needs you']] as const) {
+    await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: [thread('t1', state)] })));
+    expect(activity()).toBe(expected);
+  }
+  await settle(() => useBoardStore.getState().receive(withItem(id, { status, threads: 'unavailable' })));
+  expect(activity()).toBe('Thread unavailable');
+});
+
+test('a stopped build replaces its remembered Started tag with recovery, also in the item dialog', async () => {
+  const data = unblocked();
+  holdPosts(data);
+  await mountPage(data);
+  await pressMenu(startBuild());
+  await press(entries()[0]!);
+  const started = { threadId: 'stopped-build', title: 'Build maddec01/lar-server#140' };
+  await answer({ thread: started, error: null });
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive(withItem('I_sample13', { threads: [thread('stopped-build', 'stopped')] }, {
+    ...data, startedBuilds: { I_sample13: started },
+  })));
+  expect(text(side('I_sample13'))).toContain('Run stopped.');
+  expect(side('I_sample13').querySelector('[data-start-result]')).toBeNull();
+  expect(side('I_sample13').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/stopped-build');
+  await press(row('I_sample13'));
+  expect(text(dialog()!.querySelector('[data-slot="modal-footer"]'))).toContain('Run stopped.');
+  expect(dialog()!.querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/stopped-build');
+  expect(posted()).toHaveLength(1);
 });

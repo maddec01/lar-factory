@@ -35,7 +35,7 @@ FROM orchestration_v2_projection_subagents WHERE child_thread_id IS NOT NULL`;
 
 const TURNS = `
 SELECT provider_turn_id AS id, thread_id AS thread, provider_thread_id AS providerThread,
-  started_at AS startedAt, completed_at AS completedAt
+  started_at AS startedAt, completed_at AS completedAt, status
 FROM orchestration_v2_projection_provider_turns`;
 
 const WAITS = `
@@ -66,6 +66,7 @@ export interface TurnRow {
   id: string;
   thread: string;
   providerThread: string;
+  status: string;
   startedAt: string | null;
   completedAt: string | null;
 }

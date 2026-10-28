@@ -334,7 +334,7 @@ test('Start refining opens the model menu, and picking a model starts the item a
   expect(text(tag)).toBe('Started');
   expect(document.activeElement, 'focus moves to the dialog’s tag').toBe(tag);
   expect(inDialog('[data-back-to-list], [data-abandon]'), 'a started item can’t go back').toBeNull();
-  expect(text(toast())).toMatch(/^Started T3 thread Other title thread-1 for #129 /);
+  expect(text(toast())).toBe('Refining started for #129. Open thread');
 });
 
 test('a failed Start shows in the dialog and offers Retry start', async () => {

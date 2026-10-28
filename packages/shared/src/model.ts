@@ -260,8 +260,8 @@ export interface Item {
   threads?: ItemThread[] | 'unavailable';
 }
 
-/** `running` while a turn is in flight, `needs you` while a runtime request is open, else `done`. */
-export type ThreadState = 'running' | 'needs you' | 'done';
+/** `running` during a turn, `needs you` at a request, `stopped` after an interrupted or failed turn, else `done`. */
+export type ThreadState = 'running' | 'needs you' | 'stopped' | 'done';
 
 /** A T3 Code thread whose first user message names the item before any other issue. */
 export interface ItemThread {

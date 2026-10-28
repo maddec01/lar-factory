@@ -269,6 +269,19 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
   assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH'), []);
 });
 
+test("only a build's linked PRs have their body and merge time read, once each, and an item that isn't a build's never", async (t) => {
+  const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
+  const pr = (number: number) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body: `PR ${number}` });
+  const linked = (raw: ReturnType<typeof rawBuild>, numbers: number[]) =>
+    ({ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: numbers.map(pr) } } });
+  const items = [linked(projectIssue(13, 'In progress'), [40, 41]), linked(rawBuild(12, 'Review'), [40]), linked(rawBuild(14, 'Review'), [40, 42])];
+  const board = await startBoard(t, { items });
+  await readItems(board);
+  const first = (await board.calls()).find((args) => args.some((a) => a.includes('... on PullRequest { id body mergedAt }')));
+  const asked = first?.filter((a) => a.startsWith('ids[]='));
+  assert.deepEqual(asked, [`ids[]=${url(40)}`, `ids[]=${url(42)}`]);
+});
+
 test('a parent with two builds merged at different times: each build keeps its own frozen figures, the parent writes no block, its total counts all once', async (t) => {
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
   // The parent's own thread is live; the builds' threads are gone from T3 Code, as after transcript deletion.

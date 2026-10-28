@@ -4,6 +4,9 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
 const output = (value) => process.stdout.write(JSON.stringify(value));
+/** An issue's or Project item's content as the board query reads it: no body, and its linked PRs by id without body or merge time. */
+const read = (content) => ({ ...content, body: undefined, ...(content.closedByPullRequestsReferences && { closedByPullRequestsReferences: {
+  nodes: content.closedByPullRequestsReferences.nodes.map(({ body, mergedAt, ...pr }) => ({ ...pr, id: pr.id ?? pr.url })) } }) });
 // GitHub's rate_limit costs no quota, so it stays out of the calls the tests count. options.remaining sets what is left.
 if (args[0] === 'api' && args[1] === 'rate_limit') {
   const remaining = options.remaining ?? 5000;
@@ -118,6 +121,15 @@ const main = async () => {
       const nodes = { build: options.builds, blocked: options.blocked, active: options.active }[label];
       return output({ data: { search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: nodes ?? [] } } });
     }
+    // Linked PRs by node id, a PR's url when the test gave it no id, with only their body and merge time; the reads
+    // below leave both out, as the real board query does.
+    if (args.some((a) => a.includes('... on PullRequest { id body mergedAt }'))) {
+      const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
+      const prs = [...(options.items ?? []).map((i) => i.content), ...Object.values(options.repoIssues ?? {}).flat()]
+        .flatMap((c) => c?.closedByPullRequestsReferences?.nodes ?? []);
+      const nodes = ids.map((id) => prs.find((pr) => (pr.id ?? pr.url) === id)).map((pr) => pr && { id: pr.id ?? pr.url, body: pr.body, mergedAt: pr.mergedAt ?? null });
+      return output({ data: { nodes } });
+    }
     // A repository's issues: options.repoIssues holds each repository's, by owner/name, in either state. The open page
     // reads them in full; the light page of closed ones, which reads no sub-issues, gets each one's close, labels, and
     // its parent's id and labels.
@@ -133,14 +145,14 @@ const main = async () => {
       };
       const nodes = issues.filter((issue) => issue.state === state && (!since || issue.updatedAt >= since))
         .map((issue) => (light ? { id: issue.id, closedAt: issue.closedAt ?? null, stateReason: issue.stateReason ?? null, labels: issue.labels,
-          parent: issue.parent ? lightParent(issue.parent) : null } : { ...issue, body: undefined }));
+          parent: issue.parent ? lightParent(issue.parent) : null } : read(issue)));
       return output({ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } } });
     }
     // Repository issues by node id, read in full without their bodies; an id no issue has resolves to null.
     if (args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues('))) {
       const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
       const issues = Object.values(options.repoIssues ?? {}).flat();
-      return output({ data: { nodes: ids.map((id) => issues.find((issue) => issue.id === id)).map((issue) => (issue ? { ...issue, body: undefined } : null)) } });
+      return output({ data: { nodes: ids.map((id) => issues.find((issue) => issue.id === id)).map((issue) => (issue ? read(issue) : null)) } });
     }
     // One item's details by node id: options.details holds each item's node, by id; an item it doesn't name is not found.
     if (args.some((a) => a.includes('node(id:'))) {
@@ -151,7 +163,7 @@ const main = async () => {
     if (args.some((a) => a.includes('on ProjectV2Item {'))) {
       const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
       const nodes = ids.map((id) => (options.items ?? []).find((i) => i.id === id) ?? null)
-        .map((item) => item && { ...item, content: item.content && { ...item.content, body: undefined } });
+        .map((item) => item && { ...item, content: item.content && read(item.content) });
       return output({ data: { nodes } });
     }
     // Dossier bodies by node id; the project read below leaves bodies out, as the real query does.
@@ -170,7 +182,7 @@ const main = async () => {
     }
     return output({ data: { user: { projectV2: { title: 'lar',
       items: { pageInfo: { hasNextPage: false, endCursor: null },
-        nodes: (options.items ?? []).map(({ content, ...item }) => ({ ...item, content: content && { ...content, body: undefined } })) } } } } });
+        nodes: (options.items ?? []).map(({ content, ...item }) => ({ ...item, content: content && read(content) })) } } } } });
   }
   if (args[1] === 'view') return output({ id: 'PVT_1' });
   if (args[1] === 'field-list') return output({ fields: [{ id: 'FIELD_1', name: 'Status', options: OPTIONS }] });

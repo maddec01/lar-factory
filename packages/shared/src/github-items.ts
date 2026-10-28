@@ -67,11 +67,15 @@ interface RawStateCount {
 }
 
 export interface RawLinkedPr {
+  /** The PR's node id, which its body and merge time are read by. */
+  id?: string;
   number: number;
   url: string;
   state: string;
   isDraft: boolean;
+  /** Read for builds' linked PRs only, in a query of their own. */
   body?: string;
+  /** Read for builds' linked PRs only, with the body. */
   mergedAt?: string | null;
   mergeStateStatus?: string;
   statusCheckRollup?: {
@@ -148,7 +152,7 @@ export function normalizeMergeState(status: string | undefined): MergeState {
   return (status && Object.hasOwn(MERGE_STATES, status) ? MERGE_STATES[status] : undefined) ?? 'checking';
 }
 
-function normalizeLinkedPr({ statusCheckRollup, mergeStateStatus, state, ...pr }: RawLinkedPr): LinkedPr {
+function normalizeLinkedPr({ id: _id, statusCheckRollup, mergeStateStatus, state, ...pr }: RawLinkedPr): LinkedPr {
   const prState = state === 'MERGED' ? 'merged' : state === 'CLOSED' ? 'closed' : 'open';
   return { ...pr, state: prState, checks: normalizeChecks(statusCheckRollup), mergeState: normalizeMergeState(mergeStateStatus) };
 }
@@ -290,6 +294,10 @@ const rawKey = (raw: RawItem) => refKey(raw.content?.repository?.nameWithOwner ?
 
 /** The project's own items labelled `build`, read from the project query, so the search index's lag can't miss them. */
 export const projectBuilds = (raws: RawItem[]) => new Set(raws.filter((raw) => isBuild({ labels: rawLabels(raw) })).map(rawKey));
+
+/** The builds' linked PRs, whose bodies hold a build's stats block: the only linked PRs whose body and merge time the board reads. */
+export const rawBuildPrs = (raws: RawItem[]): RawLinkedPr[] =>
+  raws.filter((raw) => isBuild({ labels: rawLabels(raw) })).flatMap((raw) => raw.content?.closedByPullRequestsReferences?.nodes ?? []);
 
 /** The issue search for `build` issues in the repos holding the builds' sub-issues that aren't on the project; null when none is off it. */
 export function buildSubIssueSearch(raws: RawItem[]): string | null {

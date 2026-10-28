@@ -2,14 +2,18 @@
 
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, ITEMS_QUERY, getIfChanged } from './github.ts';
+import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, ITEMS_QUERY, PR_BODIES_QUERY, getIfChanged } from './github.ts';
 
-test('the board query reads the blocked-by issues, no issue bodies, and linked PR bodies', () => {
+test('the board query reads the blocked-by issues, and no issue or linked PR bodies', () => {
   assert.match(ITEMS_QUERY, /blockedBy\(first: \d+\) \{ nodes \{ number state repository \{ nameWithOwner \} \} \}/, 'each blocked-by issue comes with its repo and state');
   assert.doesNotMatch(ITEMS_QUERY, /blocking\(/, 'the query reads no blocking links');
   assert.doesNotMatch(ITEMS_QUERY, /issueDependenciesSummary/, 'the open blockers come from the blocked-by issues, not a summary count');
   assert.doesNotMatch(ITEMS_QUERY, /\.\.\. on Issue \{[^}]*\bbody\b/, "issue bodies are read for dossiers only, in a query of their own");
-  assert.match(ITEMS_QUERY, /number url state isDraft body mergedAt mergeStateStatus\n/, 'linked PR bodies come with the board query, not a call per item');
+  assert.match(ITEMS_QUERY, /id number url state isDraft mergeStateStatus\n/, "linked PRs' bodies and merge times are read for builds only, by id");
+});
+
+test("the PR bodies query reads only each linked PR's id, body and merge time", () => {
+  assert.match(PR_BODIES_QUERY, /nodes\(ids: \$ids\) \{ \.\.\. on PullRequest \{ id body mergedAt \} \}/);
 });
 
 test('the board query reads a pull request item\'s own checks and merge state', () => {

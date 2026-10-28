@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { buildSubIssueSearch, normalizeItem, normalizeItems, normalizeMergeState, rawDossiers, sliceLabelSearch } from './github-items.ts';
+import { buildSubIssueSearch, normalizeItem, normalizeItems, normalizeMergeState, rawBuildPrs, rawDossiers, sliceLabelSearch } from './github-items.ts';
 import type { RawIssueRef, RawItem, RawLinkedPr } from './github-items.ts';
 import type { Item } from './model.ts';
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
@@ -102,6 +102,19 @@ test("the dossiers' items, whose bodies the board reads: every concept, and ever
     rawIssue('PVTI_30', 30, 'In progress', ['feature']),
   ];
   assert.deepEqual(rawDossiers(raws).map((r) => r.id), ['PVTI_1', 'PVTI_10']);
+});
+
+test("the linked PRs whose body and merge time the board reads: a build's, never another item's or a concept's", () => {
+  const linked = (id: string): RawLinkedPr => ({ id, number: 1, url: `https://github.com/maddec01/lar-factory/pull/${id}`, state: 'OPEN', isDraft: false });
+  const withPrs = (id: string, number: number, labels: string[], prs: RawLinkedPr[]) =>
+    rawIssue(id, number, 'In progress', labels, { closedByPullRequestsReferences: { nodes: prs } });
+  const raws = [
+    withPrs('PVTI_1', 1, ['build'], [linked('PR_1'), linked('PR_2')]),
+    withPrs('PVTI_2', 2, ['feature'], [linked('PR_3')]),
+    withPrs('PVTI_3', 3, ['build', 'concept'], [linked('PR_4')]),
+    withPrs('PVTI_4', 4, ['build'], [linked('PR_2')]),
+  ];
+  assert.deepEqual(rawBuildPrs(raws).map((pr) => pr.id), ['PR_1', 'PR_2', 'PR_2']);
 });
 
 test('drafts, unknown statuses and hidden content', () => {

@@ -5,11 +5,11 @@ import type { IncomingMessage } from 'node:http';
 import { once } from 'node:events';
 import { startBoard } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import { boardIssue } from '@lar-factory/shared/test/raw-items';
 
 /** The project item reads the board has started, one per read of GitHub. */
 async function reads(board: Board): Promise<number> {
-  return (await board.calls()).filter((args) => args.some((a) => a.includes('projectV2(number'))).length;
+  return (await board.calls()).filter((args) => args.some((a) => a.includes('states: [OPEN]'))).length;
 }
 
 async function waitFor(check: () => Promise<boolean>, what: string): Promise<void> {
@@ -35,10 +35,10 @@ const askRead = (board: Board, headers: Record<string, string> = {}) => fetch(`$
 
 test("a dossier's map and every item's blockers reach the page; only the bodies of concepts and items with sub-issues on the board are read", async (t) => {
   const body = '## Destination\nThere.\n\n## End-to-end check\nTry it\n1. Step\n';
-  const concept = projectIssue(1, 'Shaping', 'maddec01/lar-server', ['concept']);
-  const feature = projectIssue(2, 'List', 'maddec01/lar-server', ['feature']);
-  const coupled = projectIssue(3, 'In progress', 'maddec01/lar-server', ['feature']);
-  const part = projectIssue(4, 'Ready', 'maddec01/lar-apple', ['build']);
+  const concept = boardIssue(1, 'Shaping', 'maddec01/lar-server', ['concept']);
+  const feature = boardIssue(2, 'List', 'maddec01/lar-server', ['feature']);
+  const coupled = boardIssue(3, 'In progress', 'maddec01/lar-server', ['feature']);
+  const part = boardIssue(4, 'Ready', 'maddec01/lar-apple', ['build']);
   Object.assign(concept.content!, { id: 'I_1', body });
   Object.assign(feature.content!, { id: 'I_2', body, blockedBy: { nodes: [{ number: 1, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } }] } });
   Object.assign(coupled.content!, { id: 'I_3', body });
@@ -54,13 +54,13 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
   assert.deepEqual(plain?.blockers, [{ number: 1, repo: 'maddec01/lar-server', state: 'open' }]);
   assert.ok(!('map' in plain!) && !('body' in plain!), 'a feature gets no map and no body');
   assert.ok(!('map' in child!) && !('body' in child!), 'nor does a part');
-  const bodyReads = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:')));
-  assert.equal(bodyReads.length, 1, "one query reads the dossiers' bodies");
+  const bodyReads = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('id body }')));
+  assert.equal(bodyReads.filter((args) => args.some((a) => a.includes('id body }'))).length, 1, "one query reads the dossiers' bodies");
   assert.deepEqual(bodyReads[0]!.filter((a) => a.startsWith('ids[]=')), ['ids[]=I_1', 'ids[]=I_3'], 'it asks for the concept and the parent only');
 });
 
 test('a read request starts a read of GitHub at once', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await askRead(board)).status, 202);
@@ -68,7 +68,7 @@ test('a read request starts a read of GitHub at once', async (t) => {
 });
 
 test('requests during a read queue one more read after it, never two at once', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')], readDelay: 300 });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 300 });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await askRead(board)).status, 202);
@@ -82,7 +82,7 @@ test('requests during a read queue one more read after it, never two at once', a
 
 test('an interval read during a read is skipped, not queued', async (t) => {
   // Reads take a tick and a half, so the second tick lands during the first interval read.
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')], readDelay: 1500 }, false, true, { FAST_REFRESH_MS: '1000' });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 1500 }, false, true, { FAST_REFRESH_MS: '1000' });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   await waitFor(async () => await reads(board) === before + 1, 'the first interval read');
@@ -92,7 +92,7 @@ test('an interval read during a read is skipped, not queued', async (t) => {
 });
 
 test('a read request without JSON, from another origin or to another host reads nothing', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url }, body: '{}' })).status, 415);
@@ -111,7 +111,7 @@ test('the sample board answers a read request and reads nothing', async (t) => {
 });
 
 test("a read request naming an item reads that item alone, without loading the configs again", async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'Queued')] });
+  const board = await startBoard(t, { items: [boardIssue(1, 'Queued')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const [item] = (await board.board()).items;
   const configReads = async () => (await board.calls()).filter((args) => args.some((a) => a.endsWith('/.lar-factory.json'))).length;
@@ -119,9 +119,9 @@ test("a read request naming an item reads that item alone, without loading the c
   await new Promise((r) => setTimeout(r, 2_000));
   assert.equal((await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json' },
     body: JSON.stringify({ url: item!.url }) })).status, 202);
-  const itemReads = async () => (await board.calls()).filter((args) => args.some((a) => a.includes('on ProjectV2Item {'))).length;
+  const itemReads = async () => (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues('))).length;
   await waitFor(async () => await itemReads() === 1, 'the requested read');
-  assert.equal(await reads(board), readsBefore, 'the Project is not read whole');
+  assert.equal(await reads(board), readsBefore, 'the repository is not read whole');
   assert.equal(await configReads(), configsBefore);
   assert.equal((await askRead(board)).status, 202);
   await waitFor(async () => await configReads() > configsBefore, 'a read request naming nothing loads the configs again');

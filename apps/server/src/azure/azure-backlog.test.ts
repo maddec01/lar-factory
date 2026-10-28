@@ -2,8 +2,11 @@ import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { Item } from '@lar-factory/shared';
 import { mergeSources } from '../items/item-sources.ts';
-import { azureBacklog } from './azure-backlog.ts';
+import { readBacklog } from './azure-backlog.ts';
 import { TEAM_AREA, fakeAz, type WorkItem } from './fake-az.ts';
+
+import { azureItems, type Az } from './azure-items.ts';
+const azureBacklog = (repos: readonly string[], team: string, run: Az) => azureItems(repos, team, (calls) => readBacklog(team, calls), run);
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
 const TEAM = 'Fabrikam Team';
@@ -61,7 +64,7 @@ test("the backlog's calls name the team and its requirement backlog, and every i
 
 test('a logged-out az names its fix, and a move on the backlog writes its work item', async () => {
   const out = fakeAz({ items: BACKLOG, fail: () => new Error("az devops invoke failed: ERROR: Please run 'az login' to setup account.") });
-  assert.deepEqual((await mergeSources([], new Map([[REPO, azureBacklog([REPO], TEAM, out.run)]])).read()).problems,
+  assert.deepEqual((await mergeSources(new Map([[REPO, azureBacklog([REPO], TEAM, out.run)]])).read()).problems,
     [{ repo: REPO, problem: 'az is logged out.', fix: 'az login' }]);
   const az = fakeAz({ items: BACKLOG, backlog: [2] });
   const backlog = azureBacklog([REPO], TEAM, az.run);

@@ -176,8 +176,8 @@ const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3'
 
 test('Repositories shows the command line tools\' logins and each repository with its provider, item source and show setting', async () => {
   const repos = [{ ...sample.repos[0]!, project: { owner: 'maddec01', number: 3 } }, { ...sample.repos[1]!, items: 'issues' as const, show: 'opted-in' as const },
-    { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'sprint' as const, team: 'Fabrikam Team', labels: [] },
-    { repo: 'contoso/Fabrikam/lar-web', role: 'Web', items: 'backlog' as const, team: 'Web Team', labels: [] }];
+    { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'azure-board' as const, team: 'Fabrikam Team', labels: [] },
+    { repo: 'contoso/Fabrikam/lar-web', role: 'Web', items: 'azure-board' as const, team: 'Web Team', labels: [] }];
   await open('Repositories', { ...sample, repos });
   expect(groups()).toEqual([['Command line tools', ['gh', 'az']], ['Repositories', repos.map((r) => `repo-${r.repo}`)]]);
   expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
@@ -188,10 +188,10 @@ test('Repositories shows the command line tools\' logins and each repository wit
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
   expect(repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual([
-    `${repos[0]!.repo}GitHub · GitHub Project maddec01 #3 · All itemsEditReset`,
+    `${repos[0]!.repo}GitHub · Issues · All itemsEditReset`,
     `${repos[1]!.repo}GitHub · Issues · Opted-in itemsEditReset`,
-    'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team’s current sprint · All itemsEditReset',
-    'contoso/Fabrikam/lar-webAzure DevOps · Web Team’s backlog · All itemsEditReset',
+    'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint · All itemsEditReset',
+    'contoso/Fabrikam/lar-webAzure DevOps · Web Team\'s backlog and current sprint · All itemsEditReset',
   ]);
 });
 
@@ -225,22 +225,22 @@ test('each onboarded repository has Edit and Reset, and Add repository opens the
 });
 
 test('an Azure DevOps repository still onboarding names its team’s sprint or backlog', async () => {
-  const setup = { projectOwner: 'contoso', projectNumber: '', team: 'Fabrikam Team', show: 'all' as const, showPicked: true, role: 'API' };
-  const progress = (itemSource: 'azure-sprint' | 'azure-backlog'): OnboardingProgress =>
+  const setup = { team: 'Fabrikam Team', show: 'all' as const, showPicked: true, role: 'API' };
+  const progress = (itemSource: 'azure-board' | 'azure-board'): OnboardingProgress =>
     ({ step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-api', provider: 'Azure DevOps', setup: { ...setup, itemSource } } });
   const data: BoardData = { ...sample, onboarding: [
-    { repo: 'contoso/Fabrikam%20Fiber/lar-api', progress: progress('azure-sprint') },
-    { repo: 'contoso/Fabrikam%20Fiber/lar-web', progress: progress('azure-backlog') },
+    { repo: 'contoso/Fabrikam%20Fiber/lar-api', progress: progress('azure-board') },
+    { repo: 'contoso/Fabrikam%20Fiber/lar-web', progress: progress('azure-board') },
   ] };
   serve(data, []);
   await open('Repositories', data);
   expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api'))).toBe(
-    'contoso/Fabrikam Fiber/lar-apiAzure DevOps · Fabrikam Team’s current sprint · All items · Onboarding, stopped at ChecksResumeReset');
-  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-web'))).toContain('Azure DevOps · Fabrikam Team’s backlog · All items');
+    'contoso/Fabrikam Fiber/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint · All items · Onboarding, stopped at ChecksResumeReset');
+  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-web'))).toContain('Azure DevOps · Fabrikam Team\'s backlog and current sprint · All items');
 });
 
 test('a repository still onboarding is listed with its provider, the answers it has passed and its step, and Resume reopens the dialog there', async () => {
-  const setup = { itemSource: 'issues' as const, projectOwner: 'maddec01', projectNumber: '', show: 'opted-in' as const, showPicked: false, role: 'Notes app' };
+  const setup = { itemSource: 'issues' as const, show: 'opted-in' as const, showPicked: false, role: 'Notes app' };
   const data: BoardData = { ...sample, onboarding: [
     { repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web', provider: 'GitHub', setup: { ...setup, role: '' } } } },
     { repo: 'maddec01/lar-notes', progress: { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-notes', provider: 'GitHub', setup } } },
@@ -251,9 +251,9 @@ test('a repository still onboarding is listed with its provider, the answers it 
   expect(text(row('repo-maddec01/lar-web')), 'answers the step has not passed yet').toBe('maddec01/lar-webGitHub · Onboarding, stopped at Board settingsResumeReset');
   expect(text(row('repo-maddec01/lar-notes'))).toBe('maddec01/lar-notesGitHub · Issues · Opted-in items · Onboarding, stopped at ChecksResumeReset');
   const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-notes', provider: 'GitHub' as const, setup }, prUrl: 'https://github.com/maddec01/lar-notes/pull/2' };
-  const onProject = { ...pr, answers: { ...pr.answers, setup: { ...setup, itemSource: 'github-project' as const, projectNumber: '3', show: 'all' as const } } };
-  await push({ ...data, onboarding: [{ repo: 'maddec01/lar-web', progress: onProject }, { repo: 'maddec01/lar-notes', progress: { ...pr, prClosed: true } }] });
-  expect(text(row('repo-maddec01/lar-web'))).toContain('GitHub · GitHub Project maddec01 #3 · All items · Onboarding, waiting for you to merge its pull request');
+  const allItems = { ...pr, answers: { ...pr.answers, setup: { ...setup, itemSource: 'issues' as const, show: 'all' as const } } };
+  await push({ ...data, onboarding: [{ repo: 'maddec01/lar-web', progress: allItems }, { repo: 'maddec01/lar-notes', progress: { ...pr, prClosed: true } }] });
+  expect(text(row('repo-maddec01/lar-web'))).toContain('GitHub · Issues · All items · Onboarding, waiting for you to merge its pull request');
   expect(text(row('repo-maddec01/lar-notes'))).toContain('Onboarding, its pull request closed without merging');
   await push(data);
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
@@ -347,30 +347,6 @@ test('Repositories shows a gh too old as signed in as well', async () => {
   await open('Repositories', { ...sample, tools: toolChecks({ gh: { result: 'outdated', version: '2.90.0', fix: 'brew upgrade gh' } }) });
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in, 2.90.0, older than 2.94.0');
   expect(text(row('gh'))).toContain('Fix: brew upgrade gh');
-});
-
-test('a login without the project scope on a gh too old names both problems and both fixes', async () => {
-  await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'no-project-scope', version: '2.90.0', fix: 'gh auth refresh -s project', upgrade: 'brew upgrade gh' } }) });
-  expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● No project scope, 2.90.0, older than 2.94.0');
-  expect(text(row('d-gh'))).toContain('Fix: gh auth refresh -s project, then brew upgrade gh');
-});
-
-test('Diagnostics shows a gh login without the project scope with its fix', async () => {
-  await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'no-project-scope', version: '2.102.0', fix: 'gh auth refresh -s project' } }) });
-  expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● No project scope');
-  expect(text(row('d-gh'))).toContain('Fix: gh auth refresh -s project');
-});
-
-const unreadScopes = { ...sample, tools: toolChecks({ gh: { result: 'ok', version: '2.102.0', scopes: 'unread' } }) };
-
-test('Diagnostics says when the board couldn\'t read gh\'s scopes', async () => {
-  await open('Diagnostics', unreadScopes);
-  expect(text(row('d-gh').querySelector('.tool-state'))).toBe('● 2.102.0, couldn\'t read scopes');
-});
-
-test('Repositories says when the board couldn\'t read gh\'s scopes', async () => {
-  await open('Repositories', unreadScopes);
-  expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in, couldn\'t read scopes');
 });
 
 test('Diagnostics shows a missing git, jq or curl with its fix', async () => {

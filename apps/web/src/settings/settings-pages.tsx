@@ -46,13 +46,11 @@ const ONLY_APP_UPDATES = 'Only the board app updates itself.';
  */
 export function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
   if (!check) return { text: 'Not checked', tone: 'muted' };
-  const unread = 'scopes' in check ? ", couldn't read scopes" : '';
   const older = (version: string) => `${version}, older than ${GH_FLOOR}`;
   switch (check.result) {
-    case 'ok': return { text: `${login ? 'Signed in' : check.version || 'OK'}${unread}`, tone: 'success' };
+    case 'ok': return { text: `${login ? 'Signed in' : check.version || 'OK'}`, tone: 'success' };
     case 'logged-out': return { text: login ? 'Signed out' : 'Logged out', tone: 'warning' };
-    case 'outdated': return { text: `${login ? 'Signed in, ' : ''}${older(check.version)}${unread}`, tone: 'warning' };
-    case 'no-project-scope': return { text: `No project scope${check.upgrade && check.version ? `, ${older(check.version)}` : ''}`, tone: 'warning' };
+    case 'outdated': return { text: `${login ? 'Signed in, ' : ''}${older(check.version)}`, tone: 'warning' };
     case 'no-extension': return { text: 'No azure-devops extension', tone: 'warning' };
     case 'not-running': return { text: 'Not running', tone: 'warning' };
     case 'missing': return { text: 'Not found', tone: 'error' };
@@ -92,17 +90,10 @@ function refreshEvery(seconds: number): Control {
   return custom(() => <span className="text-xs text-(--muted-foreground)">{value}</span>);
 }
 
-const ITEM_SOURCES = { project: 'GitHub Project', issues: 'Issues', sprint: 'Current sprint', backlog: 'Backlog', 'azure-board': 'Backlog and current sprint' } as const;
+const ITEM_SOURCES = { issues: 'Issues', 'azure-board': 'Backlog and current sprint' } as const;
+const sourceName = (kind: keyof typeof ITEM_SOURCES, team?: string) =>
+  kind === 'azure-board' && team ? `${team}'s backlog and current sprint` : ITEM_SOURCES[kind];
 
-/**
- * An item source as Settings names it, with a GitHub Project's owner and number when it has them, like `GitHub Project maddec01 #3`,
- * and a sprint's or backlog's team, like `Fabrikam Team’s current sprint`.
- */
-const sourceName = (kind: keyof typeof ITEM_SOURCES, project?: { owner: string; number: number | string }, team?: string) =>
-  kind === 'project' && project ? `${ITEM_SOURCES.project} ${project.owner} #${project.number}`
-    : kind === 'azure-board' && team ? `${team}'s backlog and current sprint` : kind === 'sprint' && team ? `${team}’s current sprint` : kind === 'backlog' && team ? `${team}’s backlog` : ITEM_SOURCES[kind];
-/** Settings' name for each item source the setup step offers. */
-const SETUP_SOURCES = { 'github-project': 'project', issues: 'issues', 'azure-sprint': 'sprint', 'azure-backlog': 'backlog', 'azure-board': 'azure-board' } as const;
 const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
 
 /**
@@ -112,7 +103,7 @@ const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
 function onboardingDescription(progress: OnboardingProgress): string {
   const { done, answers: { provider, setup } } = progress;
   const answered = setup && done.includes('setup')
-    ? [sourceName(SETUP_SOURCES[setup.itemSource], { owner: setup.projectOwner, number: setup.projectNumber }, setup.team), SHOWN[setup.show]] : [];
+    ? [sourceName(setup.itemSource, setup.team), SHOWN[setup.show]] : [];
   return [provider, ...answered, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
 }
 
@@ -124,7 +115,7 @@ function onboardingDescription(progress: OnboardingProgress): string {
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'sprint' || itemSource(r) === 'backlog' || itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.project, r.team)} · {SHOWN[r.show ?? 'all']}
+    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)} · {SHOWN[r.show ?? 'all']}
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     below: <ConfigUpdateNotice repo={r} />,
     control: custom(() => <span className="flex items-center gap-2">
@@ -321,6 +312,5 @@ export function toolDescription(does: string, check: ToolCheck | undefined): Rea
   if (check.result === 'not-running') return 'Open T3 Code.';
   const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';
   if (!('fix' in check)) return `${where}Install T3 Code.`;
-  const upgrade = check.result === 'no-project-scope' && check.upgrade;
-  return <>{where}Fix: <code className="whitespace-nowrap">{check.fix}</code>{upgrade && <>, then <code className="whitespace-nowrap">{upgrade}</code></>}</>;
+  return <>{where}Fix: <code className="whitespace-nowrap">{check.fix}</code></>;
 }

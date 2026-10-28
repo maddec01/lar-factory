@@ -2,7 +2,7 @@ import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { BoardData } from '@lar-factory/shared';
 import { randomUUID } from 'node:crypto';
-import { projectIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
+import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import { startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 
@@ -11,30 +11,10 @@ const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (days: number) => new Date(Date.now() - days * DAY).toISOString();
 
 /** A lar-apple issue as the repository issues query returns it. */
-const appleIssue = (number: number, extra: object = {}) => ({ ...projectIssue(number, 'List', APPLE).content!, ...extra });
+const appleIssue = (number: number, extra: object = {}) => ({ ...boardIssue(number, 'List', APPLE).content!, ...extra });
 
 /** lar-apple's .lar-factory.json naming its issues, for the fake gh; the other repositories read the lar Project. */
 const repoConfigs = { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } };
-
-test("a repository reading its issues places the open ones by their status labels, shows those closed this week as Done and hides those not planned, without slices; the Project's copy wins", async (t) => {
-  const build = appleIssue(8, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [{ ...sliceRef(11, 'OPEN'), repository: { nameWithOwner: APPLE },
-    url: `https://github.com/${APPLE}/issues/11` }] } });
-  const repoIssues = { [APPLE]: [
-    appleIssue(7), build, appleIssue(11),
-    appleIssue(9, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(2), updatedAt: daysAgo(2) }),
-    appleIssue(10, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(10), updatedAt: daysAgo(1) }),
-    appleIssue(12, { state: 'CLOSED', stateReason: 'COMPLETED', closedAt: daysAgo(20), updatedAt: daysAgo(20) }),
-    appleIssue(13, { labels: { nodes: [{ name: 'status-shaping' }] } }),
-    appleIssue(14, { state: 'CLOSED', stateReason: 'NOT_PLANNED', closedAt: daysAgo(1), updatedAt: daysAgo(1) }),
-  ] };
-  const board = await startBoard(t, { items: [projectIssue(1, 'In progress', 'maddec01/lar-server'), projectIssue(7, 'Queued', APPLE)], repoIssues, repoConfigs });
-  const data = await until(board, (d) => d.fetchedAt !== null);
-  assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]),
-    [['maddec01/lar-server', 1, 'In progress'], [APPLE, 7, 'Queued'], [APPLE, 8, 'List'], [APPLE, 13, 'Shaping'], [APPLE, 9, 'Done']]);
-  assert.equal(data.project.title, 'lar');
-  assert.ok(!(await board.calls()).some((args) => args.some((a) => a.includes('repository(owner:')) && args.includes('name=lar-server')),
-    'a repository on the Project reads no issues');
-});
 
 /** A lar-apple issue closed as completed `days` ago. */
 const closedIssue = (number: number, days: number, extra: object = {}) =>
@@ -60,7 +40,7 @@ test("closed issues are paged light and only the kept ones read in full: a close
     closedIssue(23, 1, { parent: appleRef(60, 'CLOSED') }),
     closedIssue(24, 1, { stateReason: 'NOT_PLANNED' }),
   ] };
-  const board = await startBoard(t, { repoIssues, repoConfigs });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => [i.number, i.status]), [[8, 'List'], [20, 'List'], [21, 'Done'], [22, 'Done'], [23, 'Done']]);
   assert.deepEqual((await readInFull(board)).sort(), ['I_21', 'I_22', 'I_23'], 'a slice whose build was not read stays; one closed as not planned is never read');
@@ -70,7 +50,7 @@ test("closed issues are paged light and only the kept ones read in full: a close
 
 test("closed issues are searched in close-date ranges at once, and one the search doesn't list yet shows from the issues updated last", async (t) => {
   const repoIssues = { [APPLE]: [closedIssue(22, 1), closedIssue(25, 3.5), closedIssue(26, 6.9), closedIssue(27, 0.001), closedIssue(28, 8)] };
-  const board = await startBoard(t, { repoIssues, repoConfigs, unindexed: ['I_27'] });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs, unindexed: ['I_27'] });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => [i.number, i.status]).sort(), [[22, 'Done'], [25, 'Done'], [26, 'Done'], [27, 'Done']]);
   const ranges = (await board.calls()).flatMap((args) => args.filter((a) => a.startsWith('q=') && a.includes('is:closed')).map((a) => /closed:(\S+)/.exec(a)![1]));
@@ -94,19 +74,19 @@ async function untilClosed(board: Board, kind: 'ranges' | 'pages', count: number
 }
 
 test('after the first read, a whole read searches the close-date ranges only when the page of closed issues updated last is full', async (t) => {
-  const few = await startBoard(t, { repoIssues: { [APPLE]: [closedIssue(22, 1), closedIssue(25, 3)] }, repoConfigs }, false, true);
+  const few = await startBoard(t, { repositories: [APPLE], repoIssues: { [APPLE]: [closedIssue(22, 1), closedIssue(25, 3)] }, repoConfigs }, false, true);
   const read = await untilClosed(few, 'pages', 3);
   assert.ok(read.pages >= 3, 'the board read whole again');
   assert.equal(read.ranges, 10, 'only the first read searched the ranges');
   assert.deepEqual((await few.board() as BoardData).items.map((i) => i.number).sort(), [22, 25]);
 
-  const full = await startBoard(t, { repoIssues: { [APPLE]: Array.from({ length: 100 }, (_, i) => closedIssue(100 + i, 1)) }, repoConfigs }, false, true);
+  const full = await startBoard(t, { repositories: [APPLE], repoIssues: { [APPLE]: Array.from({ length: 100 }, (_, i) => closedIssue(100 + i, 1)) }, repoConfigs }, false, true);
   assert.ok((await untilClosed(full, 'ranges', 20)).ranges >= 20, 'a full page might miss some, so a later read searches the ranges again');
 });
 
 test('the kept closed issues are read in full in calls of at most 25 issues', async (t) => {
   const repoIssues = { [APPLE]: Array.from({ length: 30 }, (_, i) => closedIssue(100 + i, 1)) };
-  const board = await startBoard(t, { repoIssues, repoConfigs });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
   await until(board, (d) => d.fetchedAt !== null);
   const calls = (await board.calls()).filter((args) => args.some((a) => a.includes('nodes(ids:') && a.includes('subIssues(')));
   assert.deepEqual(calls.map((args) => args.filter((a) => a.startsWith('ids[]=')).length).sort((a, b) => b - a), [25, 5]);
@@ -118,7 +98,7 @@ test('a repository read runs each label search once, one repository a search', a
     appleIssue(8, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(11, 'OPEN'), serverRef] } }),
     closedIssue(50, 1, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(51, 'OPEN')] } }),
   ] };
-  const board = await startBoard(t, { repoIssues, repoConfigs });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
   await until(board, (d) => d.fetchedAt !== null);
   const searches = (await board.calls()).flatMap((args) => args.filter((a) => a.startsWith('q=') && !a.includes('is:closed')));
   assert.deepEqual([...searches].sort(), [...new Set(searches)].sort(), 'no search runs twice');
@@ -135,7 +115,7 @@ test("open and kept closed issues normalize together: a closed dossier keeps its
     closedIssue(50, 1, { labels: { nodes: [{ name: 'build' }] }, subIssues: { nodes: [appleRef(51, 'OPEN')] } }),
     appleIssue(51, { parent: appleRef(50, 'CLOSED') }),
   ] };
-  const board = await startBoard(t, { repoIssues, repoConfigs });
+  const board = await startBoard(t, { repositories: [APPLE], repoIssues, repoConfigs });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.deepEqual(data.items.map((i) => i.number), [41, 40, 50]);
   assert.equal(data.items.find((i) => i.number === 40)!.map?.destination, 'There.');
@@ -248,7 +228,7 @@ test("Start build moves a parent from a repository's issues to In progress by it
   const parent = { ...sliceRef(8, 'OPEN'), url: `https://github.com/${APPLE}/issues/8`, repository: { nameWithOwner: APPLE } };
   const offBoardParent = { ...parent, number: 20, url: `https://github.com/${APPLE}/issues/20` };
   const board = await issuesBoard(t, {
-    items: [rawIssue('PVTI_12', 12, 'Ready', ['feature'], { parent }), rawIssue('PVTI_13', 13, 'Ready', ['feature'], { parent: offBoardParent })],
+    items: [rawIssue('I_12', 12, 'Ready', ['feature'], { parent }), rawIssue('I_13', 13, 'Ready', ['feature'], { parent: offBoardParent })],
     issues: { [`${APPLE}/issues/20`]: { labels: [{ name: 'concept' }, { name: 'status-ready' }] } },
     repoLabels: { [APPLE]: ['status-in-progress'] },
   } as object, startableEnv(t));

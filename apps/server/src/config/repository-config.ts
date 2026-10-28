@@ -46,7 +46,6 @@ export interface OnboardedRepository {
  * azure_form.
  */
 const REPO = /^(?:(?!\.\.?\/)[A-Za-z0-9._-]+\/(?!\.\.?$)[A-Za-z0-9._-]+|(?!\.\.?\/)[A-Za-z0-9._%~-]+\/(?!\.\.?\/)[A-Za-z0-9._%~-]+\/(?!\.\.?$)[A-Za-z0-9._%~-]+)$/;
-const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 
 /** Whether a value is a repository of the form owner/name or organization/project/repository. */
 export const isRepo = (value: unknown): value is string => typeof value === 'string' && REPO.test(value);
@@ -55,15 +54,12 @@ export const isRepo = (value: unknown): value is string => typeof value === 'str
 const isTeam = (value: unknown): value is string => typeof value === 'string' && value !== '';
 
 /**
- * Whether a value is an item source as .lar-factory.json holds it: a GitHub Project by owner and positive number, the
- * issues, or an Azure DevOps team's current sprint or backlog by team.
+ * Whether a value is an item source as .lar-factory.json holds it: GitHub issues or an Azure DevOps team's combined board.
  */
 export function isItemSource(value: unknown): value is RepositoryItemSource {
   if (!isRecord(value)) return false;
   if (value.kind === 'issues') return true;
-  if (value.kind === 'azure-sprint' || value.kind === 'azure-backlog' || value.kind === 'azure-board') return isTeam(value.team);
-  return value.kind === 'github-project' && typeof value.owner === 'string' && GITHUB_LOGIN.test(value.owner)
-    && Number.isInteger(value.number) && (value.number as number) > 0;
+  return value.kind === 'azure-board' && isTeam(value.team);
 }
 
 /** Whether a value is the Repository config's values as onboarding and Edit send them: an item source, a show setting, a role and custom labels. */
@@ -78,12 +74,12 @@ function readJson(file: string): unknown {
 
 const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((v) => typeof v === 'string');
 
-const SETUP_SOURCES: readonly SetupAnswers['itemSource'][] = ['github-project', 'issues', 'azure-sprint', 'azure-backlog', 'azure-board'];
+const SETUP_SOURCES: readonly SetupAnswers['itemSource'][] = ['issues', 'azure-board'];
 
 /** Whether the Provider and item source step's answers have their shape. */
 function isSetup(value: unknown): value is SetupAnswers {
   return isRecord(value) && SETUP_SOURCES.includes(value.itemSource as SetupAnswers['itemSource'])
-    && (value.team === undefined || typeof value.team === 'string') && typeof value.projectOwner === 'string' && typeof value.projectNumber === 'string' && SHOW_SETTINGS.includes(value.show as ShowSetting)
+    && (value.team === undefined || typeof value.team === 'string') && SHOW_SETTINGS.includes(value.show as ShowSetting)
     && typeof value.showPicked === 'boolean' && typeof value.role === 'string';
 }
 
@@ -249,22 +245,15 @@ export function readBoardSettings(dir = boardDataDir()): BoardSettings {
 
 /**
  * What is wrong with a parsed .lar-factory.json, in repo-config.sh's words, or null when nothing is. A GitHub repository
- * reads a GitHub Project or its issues, and an Azure DevOps one names its team's sprint or backlog, with no default.
+ * reads its issues, and an Azure DevOps one names its team's combined board, with no default.
  */
 function problem(raw: Record<string, unknown>, azure: boolean): string | null {
   const source = raw.itemSource as Record<string, unknown> | undefined;
   if ('version' in raw && typeof raw.version !== 'number') return 'field version must be a number';
   if (typeof raw.role !== 'string' || !raw.role) return 'field role is missing or not a string';
   if ('itemSource' in raw && (typeof source !== 'object' || source === null || Array.isArray(source))) return 'field itemSource must be an object';
-  if (!azure && source && source.kind !== 'issues' && source.kind !== 'github-project') return 'field itemSource.kind must be "issues" or "github-project"';
-  if (azure && source?.kind !== 'azure-sprint' && source?.kind !== 'azure-backlog' && source?.kind !== 'azure-board') return 'field itemSource.kind must be "azure-sprint", "azure-backlog" or "azure-board"';
-  if (azure && !isTeam(source?.team)) return `field itemSource.team must name the team for an ${source?.kind}`;
-  if (source?.kind === 'github-project' && (typeof source.owner !== 'string' || !GITHUB_LOGIN.test(source.owner))) {
-    return 'field itemSource.owner must be a GitHub login for a github-project';
-  }
-  if (source?.kind === 'github-project' && !(Number.isInteger(source.number) && (source.number as number) > 0)) {
-    return 'field itemSource.number must be a positive whole number for a github-project';
-  }
+  if (source && source.kind !== (azure ? 'azure-board' : 'issues') || azure && !source) return 'has an unsupported item source. Run onboarding again';
+  if (azure && !isTeam(source?.team)) return 'field itemSource.team must name the team for an azure-board';
   if ('show' in raw && !SHOW_SETTINGS.includes(raw.show as ShowSetting)) return 'field show must be "all" or "opted-in"';
   if ('labels' in raw && (!Array.isArray(raw.labels) || raw.labels.some((l) => typeof l !== 'string'))) return 'field labels must be an array of strings';
   return null;
@@ -298,8 +287,7 @@ export async function findRepositoryConfig(repo: string, run?: (args: string[]) 
   if (wrong) return { problem: `.lar-factory.json ${wrong}.` };
   const file = raw as Partial<RepositoryConfig> & { role: string };
   const source = file.itemSource;
-  const itemSource: RepositoryItemSource = source?.kind === 'github-project' ? { kind: 'github-project', owner: source.owner, number: source.number }
-    : source?.kind === 'azure-sprint' || source?.kind === 'azure-backlog' || source?.kind === 'azure-board' ? { kind: source.kind, team: source.team } : { kind: 'issues' };
+  const itemSource: RepositoryItemSource = source?.kind === 'azure-board' ? { kind: 'azure-board', team: source.team } : { kind: 'issues' };
   return { repo, version: file.version ?? 1, role: file.role, itemSource, show: file.show ?? 'all', labels: file.labels ?? [] };
 }
 

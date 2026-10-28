@@ -26,11 +26,11 @@ function t3Home(t: TestContext, origins: Record<string, string | null>): { home:
 const gh = (files: Record<string, 'file' | 'wrong' | 'none' | 'fails'>) => createConfigChecks(async (args: string[]) => {
   if (args[0] === 'devops') {
     const repo = `${args[args.indexOf('--org') + 1]!.split('/').at(-1)}/${args.find((a) => a.startsWith('project='))!.slice(8)}/${args.find((a) => a.startsWith('repositoryId='))!.slice(13)}`;
-    if (files[repo] === 'file') return JSON.stringify({ content: '{"role":"API server","itemSource":{"kind":"azure-sprint","team":"Fabrikam Team"}}' });
+    if (files[repo] === 'file') return JSON.stringify({ content: '{"role":"API server","itemSource":{"kind":"azure-board","team":"Fabrikam Team"}}' });
     throw new Error(files[repo] === 'none' ? 'az devops invoke failed: TF401174: The item /.lar-factory.json could not be found' : 'az devops invoke failed: HTTP 502');
   }
   const repo = args[1]!.match(/^repos\/(.+)\/contents\/\.lar-factory\.json$/)![1]!;
-  if (files[repo] === 'file') return '{"role":"Web client","itemSource":{"kind":"github-project","owner":"maddec01","number":3}}';
+  if (files[repo] === 'file') return '{"role":"Web client","itemSource":{"kind":"issues"}}';
   if (files[repo] === 'wrong') return '{"itemSource":{"kind":"issues"}}';
   throw new Error(files[repo] === 'none' ? 'gh: Not Found (HTTP 404)' : 'HTTP 502: Bad Gateway');
 }, () => {}).configOf;
@@ -47,10 +47,10 @@ test('each T3 project shows its provider, whether its repository has .lar-factor
   const folder = (name: string) => join(home, 'Developer/lar', name);
   assert.deepEqual(choices, [
     { id: 'lar-web', name: 'lar-web', folder: folder('lar-web'), repo: 'maddec01/lar-web', provider: 'GitHub', hasConfig: true, onBoard: false,
-      config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client', labels: [] } },
+      config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] } },
     { id: 'lar-server', name: 'lar-server', folder: folder('lar-server'), repo: 'maddec01/lar-server', provider: 'GitHub', hasConfig: false, onBoard: true },
     { id: 'lar-api', name: 'lar-api', folder: folder('lar-api'), repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true, onBoard: false,
-      config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API server', labels: [] } },
+      config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API server', labels: [] } },
     { id: 'lar-cli', name: 'lar-cli', folder: folder('lar-cli'), repo: 'maddec01/lar-cli', provider: 'GitHub', hasConfig: null, onBoard: false },
   ]);
 });

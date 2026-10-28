@@ -2,14 +2,14 @@
 
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, ITEMS_QUERY, PR_BODIES_QUERY, createTree, getIfChanged } from './github.ts';
+import { DOSSIER_BODIES_QUERY, ISSUE_SEARCH_QUERY, OPEN_ISSUES_QUERY, PR_BODIES_QUERY, createTree, getIfChanged } from './github.ts';
 
 test('the board query reads the blocked-by issues, and no issue or linked PR bodies', () => {
-  assert.match(ITEMS_QUERY, /blockedBy\(first: \d+\) \{ nodes \{ number state repository \{ nameWithOwner \} \} \}/, 'each blocked-by issue comes with its repo and state');
-  assert.doesNotMatch(ITEMS_QUERY, /blocking\(/, 'the query reads no blocking links');
-  assert.doesNotMatch(ITEMS_QUERY, /issueDependenciesSummary/, 'the open blockers come from the blocked-by issues, not a summary count');
-  assert.doesNotMatch(ITEMS_QUERY, /\.\.\. on Issue \{[^}]*\bbody\b/, "issue bodies are read for dossiers only, in a query of their own");
-  assert.match(ITEMS_QUERY, /id number url state isDraft mergeStateStatus\n/, "linked PRs' bodies and merge times are read for builds only, by id");
+  assert.match(OPEN_ISSUES_QUERY, /blockedBy\(first: \d+\) \{ nodes \{ number state repository \{ nameWithOwner \} \} \}/, 'each blocked-by issue comes with its repo and state');
+  assert.doesNotMatch(OPEN_ISSUES_QUERY, /blocking\(/, 'the query reads no blocking links');
+  assert.doesNotMatch(OPEN_ISSUES_QUERY, /issueDependenciesSummary/, 'the open blockers come from the blocked-by issues, not a summary count');
+  assert.doesNotMatch(OPEN_ISSUES_QUERY, /\.\.\. on Issue \{[^}]*\bbody\b/, "issue bodies are read for dossiers only, in a query of their own");
+  assert.match(OPEN_ISSUES_QUERY, /id number url state isDraft mergeStateStatus\n/, "linked PRs' bodies and merge times are read for builds only, by id");
 });
 
 test("the PR bodies query reads only each linked PR's id, body and merge time", () => {
@@ -17,13 +17,13 @@ test("the PR bodies query reads only each linked PR's id, body and merge time", 
 });
 
 test('the board query reads a pull request item\'s own checks and merge state', () => {
-  const pr = /\.\.\. on PullRequest \{([\s\S]*)\n {4}\}/.exec(ITEMS_QUERY)?.[1] ?? '';
+  const pr = /\.\.\. on PullRequest \{([\s\S]*)\n {4}\}/.exec(OPEN_ISSUES_QUERY)?.[1] ?? '';
   assert.match(pr, /\bmergeStateStatus\b/);
   assert.match(pr, /statusCheckRollup \{\s+contexts\(first: \d+\) \{\s+checkRunCountsByState/);
 });
 
 test("the board query reads each slice's state reason", () => {
-  assert.match(ITEMS_QUERY, /subIssues\(first: \d+\) \{ nodes \{ number title url state stateReason repository \{ nameWithOwner \} \} \}/,
+  assert.match(OPEN_ISSUES_QUERY, /subIssues\(first: \d+\) \{ nodes \{ number title url state stateReason repository \{ nameWithOwner \} \} \}/,
     'the board query reads each slice\'s state reason; labels there would cost 60 points a page, not 10');
 });
 

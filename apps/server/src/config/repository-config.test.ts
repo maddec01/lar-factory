@@ -28,7 +28,7 @@ function ghWith(files: Record<string, unknown>): (args: string[]) => Promise<str
 }
 
 const progress = (step = 'setup', projectId = 'lar-apple') => ({ step, done: ['project'], answers: { projectId } });
-const setup = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '3', show: 'all', showPicked: false, role: 'Apple app' };
+const setup = { itemSource: 'issues', show: 'all', showPicked: false, role: 'Apple app' };
 const cleanup = { ticks: { context: true, scratch: false }, skills: { '.claude/skills/code-review/': { kind: 'rename', name: 'web-review' }, '.agents/skills/tdd/': { kind: 'delete' } } };
 
 test('the list file names the onboarded repositories, each still onboarding with its progress; a missing one names none', async (t) => {
@@ -40,7 +40,7 @@ test('the list file names the onboarded repositories, each still onboarding with
 });
 
 test("an onboarding's setup answers may name an Azure DevOps team's sprint or backlog", async (t) => {
-  for (const itemSource of ['azure-sprint', 'azure-backlog']) {
+  for (const itemSource of ['azure-board']) {
     const onboarding = { ...progress(), answers: { projectId: 'lar-api', provider: 'Azure DevOps', setup: { ...setup, itemSource, team: 'Fabrikam Team' } } };
     const list = { repositories: [{ repo: 'contoso/Fabrikam/lar-api', onboarding }] };
     assert.deepEqual(readRepositoryList(await dataDir(t, { 'repositories.json': JSON.stringify(list) })), [{ repo: 'contoso/Fabrikam/lar-api', onboarding }]);
@@ -50,7 +50,7 @@ test("an onboarding's setup answers may name an Azure DevOps team's sprint or ba
 test("an onboarding that isn't progress is refused, naming its entry", async (t) => {
   for (const onboarding of [true, { step: 'setup', done: ['project'] }, { step: 3, done: [], answers: { projectId: 'x' } },
     { step: 'setup', done: 'project', answers: { projectId: 'x' } }, { ...progress(), answers: {} }, { ...progress(), prUrl: 4 }, { ...progress(), prClosed: false },
-    ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { projectNumber: 3 }, { showPicked: 'yes' }, { team: 3 }].map((wrong) =>
+    ...[{ itemSource: 'sprint' }, { show: 'some' }, { role: 3 }, { showPicked: 'yes' }, { team: 3 }].map((wrong) =>
       ({ ...progress(), answers: { projectId: 'x', setup: { ...setup, ...wrong } } })), { ...progress(), answers: { projectId: 'x', provider: 'GitLab' } },
     { ...progress(), answers: { projectId: 'x', customLabels: 'app: music' } },
     ...[{ ticks: [] }, { ticks: { context: 'yes' } }, { skills: { tdd: { kind: 'keep' } } }, { skills: { tdd: { kind: 'rename' } } }].map((wrong) =>
@@ -192,16 +192,6 @@ test('a repository is owner/name on GitHub or organization/project/repository on
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'contoso/Fabrikam%20Fiber/lar-api' }]);
 });
 
-test("an item source is a GitHub Project, the repository's issues or an Azure DevOps team's current sprint or backlog, named by team", () => {
-  for (const source of [{ kind: 'issues' }, { kind: 'github-project', owner: 'maddec01', number: 3 }, { kind: 'azure-sprint', team: 'Fabrikam Team' },
-    { kind: 'azure-backlog', team: 'Fabrikam Team' }]) {
-    assert.equal(isItemSource(source), true, JSON.stringify(source));
-  }
-  for (const source of [{ kind: 'azure-sprint' }, { kind: 'azure-sprint', team: '' }, { kind: 'sprint', team: 'x' }, { kind: 'azure-backlog' }, { kind: 'backlog', team: 'x' }]) {
-    assert.equal(isItemSource(source), false, JSON.stringify(source));
-  }
-});
-
 test('the settings file sets the refresh interval; a missing file or field takes 300 seconds', async (t) => {
   assert.deepEqual(readBoardSettings(await dataDir(t, { 'settings.json': '{ "refreshSeconds": 30 }' })), { refreshSeconds: 30 });
   assert.deepEqual(readBoardSettings(await dataDir(t, { 'settings.json': '{}' })), { refreshSeconds: 300 });
@@ -219,7 +209,7 @@ test("a settings file that isn't JSON, or whose refresh interval isn't a positiv
 });
 
 test("a repository's config comes from its default branch, with each missing field taking its default", async () => {
-  const project = { kind: 'github-project', owner: 'maddec01', number: 1 };
+  const project = { kind: 'issues' };
   const gh = ghWith({ 'maddec01/lar-factory': { version: 1, role: 'The factory', itemSource: project, show: 'opted-in', labels: ['area'] },
     'maddec01/lar-apple': { role: 'Apple client' } });
   assert.deepEqual(await readRepositoryConfig('maddec01/lar-factory', gh),
@@ -228,54 +218,8 @@ test("a repository's config comes from its default branch, with each missing fie
     { repo: 'maddec01/lar-apple', version: 1, role: 'Apple client', itemSource: { kind: 'issues' }, show: 'all', labels: [] });
 });
 
-test("a repository without the file, or with a file that doesn't parse or has a wrong field, is refused, naming it", async () => {
-  const gh = ghWith({ 'maddec01/broken': '{ broken', 'maddec01/no-role': {}, 'maddec01/sprint': { role: 'x', itemSource: { kind: 'sprint' } },
-    'maddec01/no-number': { role: 'x', itemSource: { kind: 'github-project', owner: 'maddec01' } }, 'maddec01/some': { role: 'x', show: 'some' },
-    'maddec01/bad-owner': { role: 'x', itemSource: { kind: 'github-project', owner: 'lar" or true or "', number: 3 } },
-    'maddec01/bad-number': { role: 'x', itemSource: { kind: 'github-project', owner: 'maddec01', number: 1.5 } },
-    'maddec01/azure-kind': { role: 'x', itemSource: { kind: 'azure-sprint', team: 'Web' } },
-    'maddec01/azure-backlog': { role: 'x', itemSource: { kind: 'azure-backlog', team: 'Web' } } });
-  const refusals = {
-    'maddec01/missing': 'maddec01/missing: no .lar-factory.json on its default branch.',
-    'maddec01/broken': "maddec01/broken: .lar-factory.json isn't valid JSON.",
-    'maddec01/no-role': 'maddec01/no-role: .lar-factory.json field role is missing or not a string.',
-    'maddec01/sprint': 'maddec01/sprint: .lar-factory.json field itemSource.kind must be "issues" or "github-project".',
-    'maddec01/azure-kind': 'maddec01/azure-kind: .lar-factory.json field itemSource.kind must be "issues" or "github-project".',
-    'maddec01/azure-backlog': 'maddec01/azure-backlog: .lar-factory.json field itemSource.kind must be "issues" or "github-project".',
-    'maddec01/no-number': 'maddec01/no-number: .lar-factory.json field itemSource.number must be a positive whole number for a github-project.',
-    'maddec01/bad-number': 'maddec01/bad-number: .lar-factory.json field itemSource.number must be a positive whole number for a github-project.',
-    'maddec01/bad-owner': 'maddec01/bad-owner: .lar-factory.json field itemSource.owner must be a GitHub login for a github-project.',
-    'maddec01/some': 'maddec01/some: .lar-factory.json field show must be "all" or "opted-in".',
-  };
-  for (const [repo, message] of Object.entries(refusals)) await assert.rejects(readRepositoryConfig(repo, gh), { message });
-});
-
-test("an Azure DevOps repository's config names its team's sprint or backlog, with no default item source", async () => {
-  const files: Record<string, unknown> = { 'contoso/Fabrikam/api': { role: 'API', itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' } },
-    'contoso/Fabrikam/web': { role: 'Web', itemSource: { kind: 'azure-backlog', team: 'Web' } },
-    'contoso/Fabrikam/board': { role: 'API', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' } },
-    'contoso/Fabrikam/board-no-team': { role: 'API', itemSource: { kind: 'azure-board' } },
-    'contoso/Fabrikam/backlog-no-team': { role: 'x', itemSource: { kind: 'azure-backlog' } },
-    'contoso/Fabrikam/none': { role: 'x' }, 'contoso/Fabrikam/issues': { role: 'x', itemSource: { kind: 'issues' } },
-    'contoso/Fabrikam/no-team': { role: 'x', itemSource: { kind: 'azure-sprint' } }, 'contoso/Fabrikam/empty-team': { role: 'x', itemSource: { kind: 'azure-sprint', team: '' } } };
-  // An az that hands back each repository's file, named by the items call's repositoryId.
-  const read = async (args: string[]) => JSON.stringify({ content: JSON.stringify(files[`contoso/Fabrikam/${args.find((a) => a.startsWith('repositoryId='))!.slice(13)}`]) });
-  assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/api', read)).itemSource, { kind: 'azure-sprint', team: 'Fabrikam Team' });
-  assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/web', read)).itemSource, { kind: 'azure-backlog', team: 'Web' });
-  assert.deepEqual((await readRepositoryConfig('contoso/Fabrikam/board', read)).itemSource, { kind: 'azure-board', team: 'Fabrikam Team' });
-  const refusals = {
-    'contoso/Fabrikam/board-no-team': 'field itemSource.team must name the team for an azure-board',
-    'contoso/Fabrikam/none': 'field itemSource.kind must be "azure-sprint", "azure-backlog" or "azure-board"',
-    'contoso/Fabrikam/issues': 'field itemSource.kind must be "azure-sprint", "azure-backlog" or "azure-board"',
-    'contoso/Fabrikam/backlog-no-team': 'field itemSource.team must name the team for an azure-backlog',
-    'contoso/Fabrikam/no-team': 'field itemSource.team must name the team for an azure-sprint',
-    'contoso/Fabrikam/empty-team': 'field itemSource.team must name the team for an azure-sprint',
-  };
-  for (const [repo, problem] of Object.entries(refusals)) await assert.rejects(readRepositoryConfig(repo, read), { message: `${repo}: .lar-factory.json ${problem}.` });
-});
-
 test("an Azure DevOps repository's config is read from its default branch with one az call, and a missing file is no config", async () => {
-  const file = { role: 'API', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in' };
+  const file = { role: 'API', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'opted-in' };
   const az = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify(file) } });
   assert.deepEqual(await findRepositoryConfig('contoso/Fabrikam%20Fiber/lar-api', az.run),
     { repo: 'contoso/Fabrikam%20Fiber/lar-api', version: 1, role: 'API', itemSource: file.itemSource, show: 'opted-in', labels: [] });
@@ -341,4 +285,29 @@ test('a gh failure other than a 404 still fails the whole read', async (t) => {
   const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory' }] }) });
   const gh = async () => { throw new Error('gh api failed: To get started with GitHub CLI, please run:  gh auth login'); };
   await assert.rejects(readOnboardedConfigs(readRepositoryList(dir), gh), /gh auth login/);
+});
+
+
+test('only issues and a combined Azure board are item sources', () => {
+  assert.equal(isItemSource({ kind: 'issues' }), true);
+  assert.equal(isItemSource({ kind: 'azure-board', team: 'Team' }), true);
+  for (const source of [null, {}, { kind: 'azure-board' }, { kind: 'azure-board', team: '' }, { kind: 'unknown' }]) assert.equal(isItemSource(source), false);
+});
+
+test('removed and unknown sources ask for onboarding again, without migration', async () => {
+  for (const kind of ['github-project', 'azure-sprint', 'azure-backlog', 'unknown']) {
+    for (const repo of ['maddec01/lar-factory', 'contoso/Fabrikam/api']) {
+      const raw = JSON.stringify({ role: 'API', itemSource: { kind, owner: 'maddec01', number: 1, team: 'Team' } });
+      const run = async () => repo.split('/').length === 3 ? JSON.stringify({ content: raw }) : raw;
+      assert.deepEqual(await findRepositoryConfig(repo, run), { problem: '.lar-factory.json has an unsupported item source. Run onboarding again.' });
+    }
+  }
+});
+
+test('malformed configs still name their problem', async () => {
+  const gh = ghWith({ 'maddec01/broken': '{ broken', 'maddec01/no-role': {}, 'maddec01/some': { role: 'x', show: 'some' } });
+  for (const [repo, problem] of Object.entries({ missing: 'no .lar-factory.json on its default branch.', broken: ".lar-factory.json isn't valid JSON.",
+    'no-role': '.lar-factory.json field role is missing or not a string.', some: '.lar-factory.json field show must be "all" or "opted-in".' })) {
+    await assert.rejects(readRepositoryConfig(`maddec01/${repo}`, gh), { message: `maddec01/${repo}: ${problem}` });
+  }
 });

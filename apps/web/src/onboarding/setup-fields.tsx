@@ -74,7 +74,7 @@ const azureProject = (repo: string): string => shownRepo(repo).split('/')[1] ?? 
 export function SetupFields({ repo, azure = false, setup, action = 'Next', disabled, onAnswer }: {
   repo: string; azure?: boolean; setup: SetupAnswers; action?: SetupAction; disabled?: boolean; onAnswer: (change: SetupChange) => void;
 }) {
-  const suggested = suggestedShow(setup.itemSource);
+  const suggested = suggestedShow();
   const problems = setupProblems(setup, action);
   const [touched, setTouched] = useState<ReadonlySet<TextAnswer>>(new Set());
   const touch = (key: TextAnswer) => { if (!touched.has(key)) setTouched(new Set([...touched, key])); };
@@ -88,11 +88,7 @@ export function SetupFields({ repo, azure = false, setup, action = 'Next', disab
   return (<>
     <div data-item-source className="grid gap-1.5">
       <span className="text-sm font-medium">Work to read</span>
-      <p className="m-0 text-xs text-base-700">{setup.itemSource === 'github-project'
-        ? `GitHub Project ${setup.projectOwner} #${setup.projectNumber}. This saved source stays the same.`
-        : setup.itemSource === 'azure-sprint' ? `${setup.team}'s current sprint. This saved source stays the same.`
-        : setup.itemSource === 'azure-backlog' ? `${setup.team}'s backlog. This saved source stays the same.`
-        : azure ? "The team's backlog and current sprint. Each item appears once." : "This repository's GitHub issues."}</p>
+      <p className="m-0 text-xs text-base-700">{azure ? "The team's backlog and current sprint. Each item appears once." : "This repository's GitHub issues."}</p>
     </div>
     {setup.itemSource === 'azure-board' && (
       <Field name="team" label="Team" hint={`The team that owns this work in ${azureProject(repo)}.`} {...team.field}>
@@ -104,7 +100,7 @@ export function SetupFields({ repo, azure = false, setup, action = 'Next', disab
         {(['all', 'opted-in'] as const).map((show) => (
           <Choice key={show} value={show} disabled={disabled} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge tone="accent">Suggested</Badge>}</span>}>
             {show === 'all' ? 'Show all available work. Items without a status appear in List.'
-              : `Show work with a board status. To include an item, give it ${setup.itemSource === 'github-project' ? 'the List status in GitHub' : azure ? 'the status-list tag in Azure DevOps' : 'the status-list label in GitHub'}.`}
+              : `Show work with a board status. To include an item, give it ${azure ? 'the status-list tag in Azure DevOps' : 'the status-list label in GitHub'}.`}
           </Choice>
         ))}
       </RadioGroup>

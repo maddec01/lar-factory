@@ -23,7 +23,7 @@ and a small board app, so you can borrow them. Issues and ideas are welcome.
 ## How work moves
 
 Work lives in GitHub Issues, one repo for each part of lar (`lar-server`, `lar-apple`),
-and on one GitHub Project, "lar", whose Status column is the board:
+with status labels on each issue placing it on the board:
 
 ```
 List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review → Verify / Ready to merge → Done
@@ -75,7 +75,7 @@ review.
 Before using the workflow in a destination repository, follow
 [issue-tracking setup](skills/lar-work/issue-tracker.md#label-setup) to create
 missing workflow labels while preserving existing ones. The same guide covers
-native parent/sub-issue and blocked-by commands. Status stays a Project field.
+native parent/sub-issue and blocked-by commands. Status stays on each issue as a `status-<name>` label.
 
 Every thread starts small: steps hand over through the issue and the PR, never
 through a long conversation, and subagents return summaries instead of files.

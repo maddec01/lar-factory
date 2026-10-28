@@ -280,7 +280,7 @@ test('Close returns focus to Add item, and reopening keeps a draft but not a fin
 
 test('on an Azure repository, Only for <repo> starts unticked, and ticked, the draft is only for that repository', async () => {
   const azure: BoardData = { ...withFactory, capture: { session: 's1', enabled: true },
-    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }] };
+    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }] };
   await open(azure);
   expect($$('input[type="checkbox"]').some((each) => each.closest('label')!.textContent!.startsWith('Only for')), 'a GitHub repository has no such box').toBe(false);
   await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam/web');
@@ -299,7 +299,7 @@ test('on an Azure repository, Only for <repo> starts unticked, and ticked, the d
 
 test('on an Azure repository, the custom tags are headed Tags', async () => {
   const azure: BoardData = { ...withFactory, capture: { session: 's1', enabled: true },
-    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: ['area: web'] }] };
+    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: ['area: web'] }] };
   await open(azure);
   await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam/web');
   expect($('.custom-labels')!.textContent).toBe('Tagsarea: web');
@@ -307,7 +307,7 @@ test('on an Azure repository, the custom tags are headed Tags', async () => {
 
 test('on an Azure repository, Add item says work item, and an uncertain creation points at the project\'s work items', async () => {
   const azure: BoardData = { ...withFactory, capture: { session: 's1', enabled: true },
-    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam%20Fiber/lar%20web', role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }] };
+    repos: [...withFactory.repos, { repo: 'contoso/Fabrikam%20Fiber/lar%20web', role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }] };
   await open(azure);
   await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam%20Fiber/lar%20web');
   expect(dialog()!.textContent).toContain('Create a work item in lar web and add it to List.');

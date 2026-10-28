@@ -371,8 +371,7 @@ function logTools(): void {
   const checks = board.snapshot().tools;
   const gh = checks?.gh;
   if (gh?.result === 'logged-out') lines.push('gh is logged out');
-  if (gh?.result === 'outdated' || gh?.result === 'no-project-scope' && gh.upgrade) lines.push(`gh is older than ${GH_FLOOR}`);
-  if (gh?.result === 'no-project-scope') lines.push("gh can't read Projects");
+  if (gh?.result === 'outdated') lines.push(`gh is older than ${GH_FLOOR}`);
   if (checks?.t3?.result === 'not-running') lines.push('T3 Code is not running');
   const az = checks?.az?.result;
   if (az === 'logged-out') lines.push('az is logged out');
@@ -387,7 +386,7 @@ function logTools(): void {
  * reads, while t3 is missing or T3 Code isn't running, once its check landed. An old gh, a missing git, jq or curl and az wait for Recheck.
  */
 function retriesTools(checks: ToolChecks): boolean {
-  return ['missing', 'logged-out', 'no-project-scope'].includes(checks.gh?.result ?? 'ok') || checks.t3 !== undefined && checks.t3.result !== 'ok';
+  return ['missing', 'logged-out'].includes(checks.gh?.result ?? 'ok') || checks.t3 !== undefined && checks.t3.result !== 'ok';
 }
 
 /** Shows the checks, whose failures have notices, and looks again in TOOL_RETRY_MS while retriesTools says so. */
@@ -584,8 +583,7 @@ const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 const clashRuns = createClashRuns(offerModelChoices);
 const commands = createItemCommands({ board, items, repos: items.repos, offerModelChoices, checkSkills: parentSkillCheck() });
 // Sample mode keeps no armed starts: it serves a fixed file and starts nothing.
-const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json'),
-  renamedId: items.renamedId });
+const startAfter = createStartAfter({ board, commands, offerModelChoices, file: fixture ? null : join(boardDataDir(), 'armed-starts.json') });
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
   recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null), readSoon, ready: () => firstGhCheck, projectChoices: choices,

@@ -6,7 +6,7 @@ import type { Checkout } from '../t3/repository-project.ts';
 import { type SetupCheckReads, runSetupCheck, setupCheckReads } from './setup-checks.ts';
 
 const WEB: Checkout = { id: 'web', title: 'lar-web', folder: '/Users/me/Developer/lar-web', origin: 'git@github.com:maddec01/lar-web.git' };
-const PROJECT: RepositoryItemSource = { kind: 'github-project', owner: 'maddec01', number: 3 };
+const PROJECT: RepositoryItemSource = { kind: 'issues' };
 
 /** Reads that find `projects` as T3's, read the item source's items as `items` and answer `push` for the permission. */
 function reads(parts: Partial<SetupCheckReads> = {}): SetupCheckReads {
@@ -39,19 +39,19 @@ test("the main checkout check names T3's problem when its projects can't be read
   assert.deepEqual(result, { passed: false, problem: "Can't read T3 Code's projects: no state.sqlite", fix: 'Open T3 Code, then Retry.' });
 });
 
-test('the item source check reads the GitHub Project or the issues and counts their items', async () => {
+test('the item source check reads GitHub issues and counts their items', async () => {
   const sources: [RepositoryItemSource, string][] = [];
   const countItems = async (source: RepositoryItemSource, repo: string) => { sources.push([source, repo]); return 23; };
-  assert.deepEqual(await check({ check: 'source' }, { countItems }), { result: { passed: true, detail: 'Found 23 items in GitHub Project maddec01 #3.' } });
+  assert.deepEqual(await check({ check: 'source' }, { countItems }), { result: { passed: true, detail: 'Found 23 items in maddec01/lar-web\'s issues.' } });
   assert.deepEqual(await check({ check: 'source', itemSource: { kind: 'issues' } }, { countItems }),
     { result: { passed: true, detail: 'Found 23 items in maddec01/lar-web\'s issues.' } });
   assert.deepEqual(sources, [[PROJECT, 'maddec01/lar-web'], [{ kind: 'issues' }, 'maddec01/lar-web']]);
 });
 
 test("an item source that can't be read shows gh's message and how to fix it", async () => {
-  const { result } = await check({ check: 'source' }, { countItems: async () => { throw new Error('Project maddec01/3 not found'); } }) as { result: unknown };
-  assert.deepEqual(result, { passed: false, problem: "Can't read GitHub Project maddec01 #3: Project maddec01/3 not found",
-    fix: 'Check the GitHub Project owner, number and access with gh.' });
+  const { result } = await check({ check: 'source' }, { countItems: async () => { throw new Error('Repository maddec01/lar-web not found'); } }) as { result: unknown };
+  assert.deepEqual(result, { passed: false, problem: "Can't read maddec01/lar-web's issues: Repository maddec01/lar-web not found",
+    fix: 'Check that gh can read issues in maddec01/lar-web.' });
 });
 
 test("the push check passes when gh's login can push, and names the fix when it can't", async () => {
@@ -75,7 +75,7 @@ const API: Checkout = { id: 'api', title: 'lar-api', folder: '/Users/me/Develope
 const AZURE_REPO = 'contoso/Fabrikam%20Fiber/lar-api';
 /** AZURE_REPO as the checks' text names it, decoded. */
 const SHOWN_REPO = 'contoso/Fabrikam Fiber/lar-api';
-const SPRINT: RepositoryItemSource = { kind: 'azure-sprint', team: 'Fabrikam Team' };
+const SPRINT: RepositoryItemSource = { kind: 'azure-board', team: 'Fabrikam Team' };
 const ITEMS: WorkItem[] = [
   { id: 1, type: 'User Story', state: 'Active', title: 'Seek' },
   { id: 11, type: 'Task', state: 'Active', parent: 1 },
@@ -93,24 +93,18 @@ test("the main checkout check reads an Azure DevOps origin as organization/proje
 
 test("the item source check counts an Azure DevOps team's sprint or backlog through az", async () => {
   const az = fakeAz({ items: ITEMS });
-  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s current sprint.' } });
-  assert.deepEqual(await azureCheck({ check: 'source', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' } }, az.run),
-    { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s backlog.' } });
+  assert.deepEqual(await azureCheck({ check: 'source' }, az.run), { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s backlog and current sprint.' } });
+  assert.deepEqual(await azureCheck({ check: 'source', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' } }, az.run),
+    { result: { passed: true, detail: 'Found 2 items in Fabrikam Team\'s backlog and current sprint.' } });
 });
 
 test("an Azure DevOps item source az can't read shows az's message, with az login for a logged-out az", async () => {
   const failing = (message: string) => fakeAz({ items: ITEMS, fail: () => new Error(message) }).run;
   assert.deepEqual(await azureCheck({ check: 'source' }, failing("az boards failed: TF400898: team 'Nobody' not found")), { result: { passed: false,
-    problem: 'Can\'t read Fabrikam Team\'s current sprint: az boards failed: TF400898: team \'Nobody\' not found',
+    problem: 'Can\'t read Fabrikam Team\'s backlog and current sprint: az boards failed: TF400898: team \'Nobody\' not found',
     fix: 'Check the team name and access to Fabrikam Fiber with az.' } });
   assert.deepEqual(await azureCheck({ check: 'source' }, failing('Please run az login to setup account.')), { result: { passed: false,
-    problem: 'Can\'t read Fabrikam Team\'s current sprint: az is logged out.', fix: 'Run this command, then retry.', command: 'az login' } });
-});
-
-test('a team with no current iteration names its sprint fix, or going Back to name another team', async () => {
-  assert.deepEqual(await azureCheck({ check: 'source' }, fakeAz({ items: ITEMS, iterations: [] }).run), { result: { passed: false,
-    problem: 'Can\'t read Fabrikam Team\'s current sprint: Team Fabrikam Team has no current iteration in contoso/Fabrikam Fiber.',
-    fix: 'Give the team a sprint whose dates cover today in its project settings, then retry. You can also go back and choose another team.' } });
+    problem: 'Can\'t read Fabrikam Team\'s backlog and current sprint: az is logged out.', fix: 'Run this command, then retry.', command: 'az login' } });
 });
 
 test("the push check asks Azure DevOps whether az's login can contribute to the repository", async () => {
@@ -124,7 +118,7 @@ test("the push check asks Azure DevOps whether az's login can contribute to the 
 
 test('a malformed Azure request names a request problem without blaming the team or login', async () => {
   const answer = await azureCheck({ check: 'source' }, fakeAz({ items: ITEMS, fail: () => new Error('ERROR: The request is invalid.') }).run);
-  assert.deepEqual(answer, { result: { passed: false, problem: "Can't read Fabrikam Team’s current sprint: ERROR: The request is invalid.", fix: 'Azure DevOps rejected the board’s request. Retry, and report this request error if it persists.' } });
+  assert.deepEqual(answer, { result: { passed: false, problem: "Can't read Fabrikam Team's backlog and current sprint: ERROR: The request is invalid.", fix: 'Azure DevOps rejected the board’s request. Retry, and report this request error if it persists.' } });
 });
 
 test('an empty Azure permission evaluation is inconclusive and allows continuing with a warning', async () => {

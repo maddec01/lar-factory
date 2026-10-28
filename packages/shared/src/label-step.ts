@@ -3,7 +3,7 @@
 // status label; and every other label, which the step leaves alone. On Azure DevOps the labels are the project's tags. The custom labels to pick come from those left alone. The board and the server read the
 // same plan, so the server creates and renames only what the step offers. GitHub matches label names without case.
 
-import { STATUSES, statusLabel, type RepositoryItemSource } from './model.ts';
+import { STATUSES, statusLabel } from './model.ts';
 import { WORKFLOW_LABELS, type WorkflowLabel } from './workflow-labels.ts';
 
 /** The status labels a repository that reads its issues carries, as the server's createStatusLabel makes them. */
@@ -29,7 +29,7 @@ export interface LabelPlan {
 const key = (name: string) => name.toLowerCase();
 
 /** The step's plan for a repository with labels `names`, read through `source`. */
-export function labelPlan(names: readonly string[], source: RepositoryItemSource['kind']): LabelPlan {
+export function labelPlan(names: readonly string[]): LabelPlan {
   const has = new Map(names.map((n) => [key(n), n]));
   const used = new Set<string>();
   const keptBeside = new Map<string, string>();
@@ -46,7 +46,7 @@ export function labelPlan(names: readonly string[], source: RepositoryItemSource
     return { label, state: 'rename', oldName: old };
   };
   const workflow = WORKFLOW_LABELS.map(row);
-  const status = source === 'github-project' ? [] : STATUS_LABELS.map(row);
+  const status = STATUS_LABELS.map(row);
   const leftAlone = names.filter((n) => !used.has(key(n)))
     .map((name) => ({ name, ...keptBeside.has(key(name)) && { keptBeside: keptBeside.get(key(name))! } }));
   return { workflow, status, leftAlone };

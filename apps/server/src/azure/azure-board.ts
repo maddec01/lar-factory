@@ -7,7 +7,7 @@ import { readSprint } from './azure-sprint.ts';
 
 export function azureBoard(repos: readonly string[], team: string, run: Az = az): ItemSource {
   return azureItems(repos, team, async (calls) => {
-    const [backlog, sprint] = await Promise.all([readBacklog(team, calls), readSprint(team, calls, true)]);
+    const [backlog, sprint] = await Promise.all([readBacklog(team, calls), readSprint(team, calls)]);
     return {
       title: `${team} backlog and current sprint`,
       items: [...new Map([...backlog.items, ...sprint.items].map((item) => [item.id, item])).values()],

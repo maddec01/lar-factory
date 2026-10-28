@@ -58,7 +58,6 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     create: (draft, progress) => createIssue({ ...draft, labels: [...draft.labels, statusLabel('List')] }, progress, run, async () => {
       const error = await ensureLabel('List');
       if (error) throw new Error(error);
-      return [];
     }),
     async setParentStatus(parent, status) {
       if (status === 'Done') return DONE_REFUSED;

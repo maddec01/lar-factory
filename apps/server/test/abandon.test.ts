@@ -1,11 +1,10 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { draftItem, onboarded, startableEnv, startBoard, until } from './server-support.ts';
+import { onboarded, startableEnv, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
-import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import type { BoardData } from '@lar-factory/shared';
 
-const draft = draftItem('List');
 
 const abandon = (board: Board, itemId: string, origin = board.url) => board.postSession({ itemId }, '/api/abandon', origin);
 
@@ -19,7 +18,7 @@ async function reads(board: Board, n: number): Promise<void> {
 }
 
 test('Abandon closes the issue as not planned on GitHub and the board drops it at once', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(12, 'List'), projectIssue(13, 'List')] });
+  const board = await startBoard(t, { items: [boardIssue(12, 'List'), boardIssue(13, 'List')] });
   await until(board, (d) => d.items.length === 2);
   const response = await abandon(board, 'I_12');
   assert.equal(response.status, 200);
@@ -30,17 +29,8 @@ test('Abandon closes the issue as not planned on GitHub and the board drops it a
   assert.deepEqual(await writes(board), [['issue', 'close', '12', '-R', 'maddec01/lar-factory', '--reason', 'not planned']]);
 });
 
-test('Abandon on a draft removes it from the project', async (t) => {
-  const board = await startBoard(t, { items: [draft] });
-  await until(board, (d) => d.items.length === 1);
-  const response = await abandon(board, 'DI_draft');
-  assert.equal(response.status, 200);
-  assert.ok(!has((await response.json()).board, 'DI_draft'));
-  assert.deepEqual(await writes(board), [['project', 'item-delete', '1', '--owner', 'maddec01', '--id', 'PVTI_draft']]);
-});
-
 test('a failed close keeps the item and reports the error', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(12, 'List')], fail: 'abandon' });
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], fail: 'abandon' });
   await until(board, (d) => d.items.length === 1);
   const response = await abandon(board, 'I_12');
   assert.equal(response.status, 502);
@@ -51,13 +41,12 @@ test('a failed close keeps the item and reports the error', async (t) => {
 });
 
 test('an abandoned item does not come back while GitHub still reports it', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(12, 'List'), draft] }, false, true);
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, true);
   await until(board, (d) => d.items.length === 2);
   assert.equal((await abandon(board, 'I_12')).status, 200);
-  assert.equal((await abandon(board, 'DI_draft')).status, 200);
   await reads(board, 5);
   const data = await board.board() as BoardData;
-  assert.ok(!has(data, 'I_12') && !has(data, 'DI_draft'));
+  assert.ok(!has(data, 'I_12'));
 });
 
 test('an item this board just created does not come back after Abandon', async (t) => {
@@ -70,27 +59,13 @@ test('an item this board just created does not come back after Abandon', async (
   assert.equal((await abandon(board, 'I_900001')).status, 200);
   await reads(board, 2);
   assert.ok(!has(await board.board(), 'I_900001'));
-  await board.update({ items: [projectIssue(900001, 'List', 'maddec01/lar-server')] });
+  await board.update({ items: [boardIssue(900001, 'List', 'maddec01/lar-server')] });
   await reads(board, 3);
   assert.ok(!has(await board.board(), 'I_900001'));
 });
 
-test('Abandon closes a Queued issue and removes a Queued draft', async (t) => {
-  const queuedDraft = draftItem('Queued');
-  const board = await startBoard(t, { items: [projectIssue(12, 'Queued'), queuedDraft] });
-  await until(board, (d) => d.items.length === 2);
-  assert.equal((await abandon(board, 'I_12')).status, 200);
-  const response = await abandon(board, 'DI_draft');
-  assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).board.items, []);
-  assert.deepEqual(await writes(board), [
-    ['issue', 'close', '12', '-R', 'maddec01/lar-factory', '--reason', 'not planned'],
-    ['project', 'item-delete', '1', '--owner', 'maddec01', '--id', 'PVTI_draft'],
-  ]);
-});
-
 test('Abandon only removes List and Queued items', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(12, 'Shaping')] });
+  const board = await startBoard(t, { items: [boardIssue(12, 'Shaping')] });
   await until(board, (d) => d.items.length === 1);
   const refused = await abandon(board, 'I_12');
   assert.equal(refused.status, 409);
@@ -101,7 +76,7 @@ test('Abandon only removes List and Queued items', async (t) => {
 });
 
 test('Abandon rejects requests from other pages and sample mode', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(12, 'List')] });
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
   await until(board, (d) => d.items.length === 1);
   for (const origin of ['https://evil.example', 'null', '']) assert.equal((await abandon(board, 'I_12', origin)).status, 403);
   assert.deepEqual(await writes(board), []);
@@ -114,7 +89,7 @@ const startItem = (board: Board, itemId: string) => board.postSession({ itemId }
 
 test('Abandon is refused while a Start is in flight, uncertain or done for the item', async (t) => {
   const refused = 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
-  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')], t3: { delay: 300 } }, false, false, startableEnv(t));
+  const board = await startBoard(t, { items: [boardIssue(12, 'Queued')], t3: { delay: 300 } }, false, false, startableEnv(t));
   await until(board, (d) => d.items.length === 1);
   const starting = startItem(board, 'I_12');
   await new Promise((r) => setTimeout(r, 100));
@@ -123,7 +98,7 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
   assert.equal((await inFlight.json()).error, refused);
   assert.equal((await starting).status, 200);
   assert.equal((await abandon(board, 'I_12')).status, 409, 'done');
-  const unsure = await startBoard(t, { items: [projectIssue(12, 'Queued')], t3: { fail: 'garbage' } }, false, false, startableEnv(t));
+  const unsure = await startBoard(t, { items: [boardIssue(12, 'Queued')], t3: { fail: 'garbage' } }, false, false, startableEnv(t));
   await until(unsure, (d) => d.items.length === 1);
   assert.equal((await startItem(unsure, 'I_12')).status, 502);
   assert.equal((await abandon(unsure, 'I_12')).status, 409, 'uncertain');
@@ -131,7 +106,7 @@ test('Abandon is refused while a Start is in flight, uncertain or done for the i
 });
 
 test('Abandon is refused while Back to List is pending for the item', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(12, 'Queued')], writeDelay: 300 });
+  const board = await startBoard(t, { items: [boardIssue(12, 'Queued')], writeDelay: 300 });
   await until(board, (d) => d.items.length === 1);
   const moving = board.post({ itemId: 'I_12' }, board.url, '/api/back-to-list');
   await new Promise((r) => setTimeout(r, 100));

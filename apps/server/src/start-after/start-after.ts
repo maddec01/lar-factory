@@ -32,8 +32,6 @@ export interface StartAfterDeps {
   offerModelChoices(): ModelGroup[];
   /** The file armed starts live in; null in sample mode, which keeps none. */
   file: string | null;
-  /** The item source's Item.id for an id armed starts were saved under before Item.id was the content's node id. */
-  renamedId?(savedId: string): string | undefined;
 }
 
 const ARMABLE = ['Ready', 'Queued'];
@@ -55,7 +53,7 @@ function readArmed(file: string | null): Record<string, ArmedStart> {
   return Object.fromEntries(entries);
 }
 
-export function createStartAfter({ board, commands, offerModelChoices, file, renamedId }: StartAfterDeps): StartAfter {
+export function createStartAfter({ board, commands, offerModelChoices, file }: StartAfterDeps): StartAfter {
   if (file) board.update({ armed: readArmed(file), armedErrors: {} });
   const armed = () => board.snapshot().armed ?? {};
   const errors = () => board.snapshot().armedErrors ?? {};
@@ -88,17 +86,6 @@ export function createStartAfter({ board, commands, offerModelChoices, file, ren
     board.push();
   }
 
-  /** Moves each armed start saved under an item's old id to the item's id now; it runs once the first read knows both. */
-  function rekeyArmed(): void {
-    const renames = new Map(Object.keys(armed()).flatMap((id) => {
-      const now = board.find(id) ? undefined : renamedId?.(id);
-      return now ? [[id, now]] : [];
-    }));
-    if (!renames.size) return;
-    const error = save(Object.fromEntries(Object.entries(armed()).map(([id, entry]) => [renames.get(id) ?? id, entry])), errors());
-    if (error) log(error);
-  }
-
   return {
     arm(itemId, model, picked) {
       const item = board.find(itemId);
@@ -129,7 +116,6 @@ export function createStartAfter({ board, commands, offerModelChoices, file, ren
     },
 
     async startUnblocked() {
-      rekeyArmed();
       const runs = Object.entries(armed()).flatMap(([itemId, entry]) => {
         const item = board.find(itemId);
         // A part that left the board, or moved on from Ready or Queued, has nothing left to start.

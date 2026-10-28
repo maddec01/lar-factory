@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { WORKFLOW_LABELS } from '@lar-factory/shared';
+import { STATUS_LABELS, WORKFLOW_LABELS } from '@lar-factory/shared';
 import { fakeAz } from '../azure/fake-az.ts';
 import { createCustomLabel, createRepositoryLabels, readRepositoryLabels, renameRepositoryLabels, workflowLabelsProblem } from './repository-labels.ts';
 
@@ -22,7 +22,7 @@ function fakeGh(names: string[], fail: Partial<Record<'list' | 'create' | 'edit'
   return { run, calls, labels };
 }
 
-const ALL = WORKFLOW_LABELS.map((l) => l.name);
+const ALL = [...WORKFLOW_LABELS, ...STATUS_LABELS].map((l) => l.name);
 const REPO = 'maddec01/lar-web';
 
 test("reading a repository's labels lists every label's name", async () => {
@@ -38,7 +38,7 @@ test("labels that can't be read answer with gh's message", async () => {
 
 test('Create makes each missing workflow label with its colour and description, and no other label', async () => {
   const gh = fakeGh([...ALL.filter((n) => n !== 'blocked' && n !== 'decision-grill'), 'needs-triage']);
-  const answer = await createRepositoryLabels({ repo: REPO, itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, renaming: [] }, gh.run);
+  const answer = await createRepositoryLabels({ repo: REPO, itemSource: { kind: 'issues' }, renaming: [] }, gh.run);
   assert.deepEqual(gh.calls.filter((c) => c[1] !== 'list'), [
     ['label', 'create', '-R', REPO, '--color', 'D4C5F9', '--description', 'Concept decision settled by questions', '--', 'decision-grill'],
     ['label', 'create', '-R', REPO, '--color', 'BFD4F2', '--description', "Slice an implementer couldn't finish, waiting for a re-slice", '--', 'blocked'],
@@ -55,7 +55,7 @@ test('Create leaves an old name Rename moves, and makes one Rename leaves', asyn
 });
 
 test('for a repository that reads its issues Create makes the missing status labels with their colour and description', async () => {
-  const gh = fakeGh([...ALL, 'status-list']);
+  const gh = fakeGh([...WORKFLOW_LABELS.map((l) => l.name), 'status-list']);
   await createRepositoryLabels({ repo: REPO, itemSource: { kind: 'issues' }, renaming: [] }, gh.run);
   assert.deepEqual(gh.calls.find((c) => c[1] === 'create'), ['label', 'create', '-R', REPO, '--color', 'EDEDED', '--description', 'Status: Queued', '--', 'status-queued']);
   assert.ok(!gh.calls.some((c) => c[1] === 'create' && c.at(-1) === 'status-list'));
@@ -64,14 +64,14 @@ test('for a repository that reads its issues Create makes the missing status lab
 
 test("Create also makes a reused file's custom labels the repository lacks, with GitHub's colour", async () => {
   const gh = fakeGh([...ALL, 'App: Music']);
-  const source = { kind: 'github-project', owner: 'maddec01', number: 3 };
+  const source = { kind: 'issues' };
   await createRepositoryLabels({ repo: REPO, itemSource: source, renaming: [], custom: ['app: music', 'os: ios'] }, gh.run);
   assert.deepEqual(gh.calls.filter((c) => c[1] === 'create'), [['label', 'create', '-R', REPO, '--', 'os: ios']]);
 });
 
 test("Create leaves out a reused file's custom label that can't be one, and still makes the workflow labels", async () => {
   const gh = fakeGh(ALL.filter((n) => n !== 'blocked'));
-  const source = { kind: 'github-project', owner: 'maddec01', number: 3 };
+  const source = { kind: 'issues' };
   const answer = await createRepositoryLabels({ repo: REPO, itemSource: source, renaming: [],
     custom: ['build', 'status-review', '-R', 'x'.repeat(51), 'web'] }, gh.run);
   assert.deepEqual(gh.calls.filter((c) => c[1] === 'create').map((c) => c.at(-1)), ['blocked', 'web']);
@@ -179,7 +179,7 @@ test("on Azure DevOps a rename that az refuses answers with az's message", async
 
 test('on Azure DevOps nothing creates a tag, and no workflow tag holds the PR back', async () => {
   const az = fakeAz({ items: [] });
-  assert.equal((await createRepositoryLabels({ repo: AZURE, itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, renaming: [] }, az.run) as { status: number }).status, 400);
+  assert.equal((await createRepositoryLabels({ repo: AZURE, itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, renaming: [] }, az.run) as { status: number }).status, 400);
   assert.equal((await createCustomLabel({ repo: AZURE, name: 'web' }, az.run) as { status: number }).status, 400);
   assert.equal(await workflowLabelsProblem(AZURE, az.run), null);
   assert.deepEqual(az.calls, []);

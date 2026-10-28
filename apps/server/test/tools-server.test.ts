@@ -8,7 +8,7 @@ import { startBoard, until } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { Board } from './server-support.ts';
 import type { BoardData, ToolCheck } from '@lar-factory/shared';
-import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import type { TestContext } from 'vite-plus/test';
 
 const recheck = (board: Board) => board.post({}, board.url, '/api/recheck');
@@ -120,25 +120,6 @@ test('a gh older than 2.94.0 shows its notice and the board still reads GitHub',
   assert.ok(data.fetchedAt, 'the board reads GitHub');
   assert.deepEqual(data.tools?.gh, { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' });
   assert.match(board.logs(), /gh is older than 2\.94\.0/);
-});
-
-test('a login without the project scope reads no Project until Recheck finds the scope', async (t) => {
-  const board = await startBoard(t, { ghScopes: "'repo'" });
-  const data = await checked(board);
-  assert.deepEqual(data.tools?.gh, { result: 'no-project-scope', version: '2.96.0', fix: 'gh auth refresh -s project' });
-  assert.equal(data.error, null);
-  assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0);
-  await until(board, (data) => data.toolProgress?.checking.length === 0);
-  assert.match(board.logs(), /gh can't read Projects/);
-  await board.update({});
-  assert.deepEqual(results((await (await recheck(board)).json()).board.tools), allOk);
-  assert.ok((await afterRead(board)).fetchedAt, 'the board reads the Project once the login has the scope');
-});
-
-test('scopes the board can\'t read block nothing', async (t) => {
-  const data = await afterRead(await startBoard(t, { ghScopes: null }));
-  assert.ok(data.fetchedAt, 'the board reads GitHub');
-  assert.deepEqual(data.tools?.gh, { result: 'ok', version: '2.96.0', scopes: 'unread' });
 });
 
 test('a missing gh names its override', async (t) => {
@@ -268,7 +249,7 @@ function azureHome(t: TestContext, held: boolean) {
   checkouts(home, { 'lar-api': 'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api' });
   const log = join(home, 'az-calls');
   const go = join(home, 'az.go');
-  const config = JSON.stringify({ path: '/.lar-factory.json', content: JSON.stringify({ role: 'API', itemSource: { kind: 'azure-sprint', team: 'Team' } }) });
+  const config = JSON.stringify({ path: '/.lar-factory.json', content: JSON.stringify({ role: 'API', itemSource: { kind: 'azure-board', team: 'Team' } }) });
   const az = join(home, 'az');
   writeFileSync(az, `#!/bin/sh
 echo "$*" >> '${log}'
@@ -287,7 +268,7 @@ echo 'ERROR: offline' >&2; exit 1
   return { home, env, itemReads, release: () => writeFileSync(go, '') };
 }
 
-const mixed = { items: [projectIssue(1, 'List', 'maddec01/lar-factory')], repositories: ['maddec01/lar-factory', 'contoso/Fabrikam/lar-api'] };
+const mixed = { items: [boardIssue(1, 'List', 'maddec01/lar-factory')], repositories: ['maddec01/lar-factory', 'contoso/Fabrikam/lar-api'] };
 
 test('a slow az check holds up neither the page nor the GitHub read, and the Azure DevOps read waits for it', async (t) => {
   const azure = azureHome(t, true);
@@ -325,7 +306,7 @@ test('a slow t3 or jq check holds up neither the page nor the read, and its noti
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const t3 = heldCommand(dir, 't3', 'echo t3 v0.1.4-nightly.1');
   const jq = heldCommand(dir, 'jq', 'echo jq-1.7.1');
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')] }, false, false,
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')] }, false, false,
     { T3_PATH: t3.path, JQ_PATH: jq.path, T3_SERVER_RUNTIME: join(dir, 'no-runtime.json') });
   const read = await until(board, (d) => d.firstRead.settled);
   assert.ok(read.fetchedAt, 'the board reads GitHub');

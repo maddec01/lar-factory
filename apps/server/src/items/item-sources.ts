@@ -1,17 +1,14 @@
 // Every item source the onboarded repositories' configs name, as the one item source the board server reads and writes through.
-// A GitHub Project or a repository's issues read through gh, and an Azure DevOps team's sprint or backlog through az.
+// GitHub repository issues read through gh, and an Azure DevOps team's backlog and current sprint through az.
 
 import { decodePart, itemSource, refKey, shownRepo, type Item, type ItemSourceKind, type RepoConfig } from '@lar-factory/shared';
 import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
-import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
 import { azureBoard } from '../azure/azure-board.ts';
-import { azureBacklog } from '../azure/azure-backlog.ts';
 import { az, type Az } from '../azure/azure-items.ts';
-import { azureSprint } from '../azure/azure-sprint.ts';
 import { ReadProblem, type ItemSource, type ItemsRead, type ReadPace, type ReadProgress } from './item-source.ts';
 
-/** Who writes for a repository no source names, on a board that reads no Project. */
+/** Who writes for a repository no source names, when its repository is not onboarded. */
 const NOT_ONBOARDED = "That item's repository isn't onboarded.";
 const unlisted: ItemSource = {
   read: async () => ({ title: '', items: [] }),
@@ -26,44 +23,36 @@ const unlisted: ItemSource = {
 /** A repository's config as the page sees it: its role, item source, show setting and custom labels. */
 export function repoView({ repo, role, itemSource, show, labels }: RepositoryConfig): RepoConfig {
   if (itemSource.kind === 'issues') return { repo, role, items: 'issues', show, labels };
-  if (itemSource.kind === 'azure-sprint') return { repo, role, items: 'sprint', team: itemSource.team, show, labels };
-  if (itemSource.kind === 'azure-board') return { repo, role, items: 'azure-board', team: itemSource.team, show, labels };
-  if (itemSource.kind === 'azure-backlog') return { repo, role, items: 'backlog', team: itemSource.team, show, labels };
-  return { repo, role, items: 'project', project: { owner: itemSource.owner, number: itemSource.number }, show, labels };
+  return { repo, role, items: 'azure-board', team: itemSource.team, show, labels };
 }
 
 /**
  * Each repository's item source as its config names it, merged, showing each repository's items as its show setting
- * says. Repositories that name the same Project share one adapter, so one read, and so do repositories that read the
- * same Azure DevOps team's sprint or backlog, which then sorts the team's work items among them by their repo- tags.
+ * says. Repositories reading the same Azure DevOps team's board share one adapter, which then sorts the team's work items among them by their repo- tags.
  * Each source waits while the pace says its kind waits. `run` stands in for az in tests.
  */
 export function configuredSources(configs: readonly RepositoryConfig[], run: Az = az): MergedSource {
-  const projects = new Map<string, ItemSource>();
   // Azure DevOps names ignore case.
   const teamKey = (repo: string, kind: string, team: string) => [kind, ...repo.split('/').slice(0, 2).map(decodePart), team].join('/').toLowerCase();
   const teams = new Map<string, string[]>();
   for (const { repo, itemSource } of configs) {
-    if (itemSource.kind !== 'azure-sprint' && itemSource.kind !== 'azure-backlog' && itemSource.kind !== 'azure-board') continue;
+    if (itemSource.kind !== 'azure-board') continue;
     const key = teamKey(repo, itemSource.kind, itemSource.team);
     teams.set(key, [...teams.get(key) ?? [], repo]);
   }
   const azure = new Map<string, ItemSource>();
-  const teamSource = (repo: string, kind: 'azure-sprint' | 'azure-backlog' | 'azure-board', team: string) => {
+  const teamSource = (repo: string, kind: 'azure-board', team: string) => {
     const key = teamKey(repo, kind, team);
-    if (!azure.has(key)) azure.set(key, (kind === 'azure-sprint' ? azureSprint : kind === 'azure-board' ? azureBoard : azureBacklog)(teams.get(key)!, team, run));
+    if (!azure.has(key)) azure.set(key, azureBoard(teams.get(key)!, team, run));
     return azure.get(key)!;
   };
   const byRepo = new Map(configs.map(({ repo, itemSource }): [string, ItemSource] => {
     if (itemSource.kind === 'issues') return [repo, repoIssues(repo)];
-    if (itemSource.kind === 'azure-sprint' || itemSource.kind === 'azure-backlog' || itemSource.kind === 'azure-board') return [repo, teamSource(repo, itemSource.kind, itemSource.team)];
-    const key = `${itemSource.owner.toLowerCase()}/${itemSource.number}`;
-    if (!projects.has(key)) projects.set(key, githubProject(itemSource));
-    return [repo, projects.get(key)!];
+    return [repo, teamSource(repo, itemSource.kind, itemSource.team)];
   }));
   const kinds = new Map(configs.map((config): [ItemSource, ItemSourceKind] => [byRepo.get(config.repo)!, itemSource(repoView(config))]));
   const optedIn = configs.filter((c) => c.show === 'opted-in').map((c) => c.repo);
-  return mergeSources([...projects.values()], byRepo, optedIn, kinds);
+  return mergeSources(byRepo, optedIn, kinds);
 }
 
 /** How often a source holding active work reads, and how often an idle one does: its safety read for edits made elsewhere. */
@@ -106,38 +95,30 @@ function githubRef(url: string): { repo: string; number: number } | undefined {
 }
 
 /**
- * Merges the Projects and the other sources, each standing for the repositories `byRepo` gives it. A read lists every
- * source's items under the first source's title, the first Project's when there is one; an item two sources list shows
- * once, as the first lists it, Projects first. A write goes to the source that last listed the item, or, for an item
- * none has listed, to the source its repository names, else the first Project. A read fails whole when any source's
- * read fails, so items never vanish on a passing error; a source other than a Project starts its error with its
- * repositories, so the user knows which repository to fix. A ReadProblem from a source other than a Project leaves out
- * only that source's items instead, and the read names the problem under each of its repositories. A read leaves out
- * each item from a repository in `optedIn` that carries no status, except a closed item a Project lists: being in a
- * Project opts it in. An untagged item that carries no status leaves the opted-in repositories of its `untaggedFor`.
- * A read given a pace reads only the sources due at it, and lists the others from their last good read; a source whose
- * kind in `kinds` the pace says waits is never due, and checks for no changes. Each source's read that lands while
- * another still reads reports the read so far to the progress; a read names the repositories whose source hasn't read
- * yet, leaving out a source whose read failed and one the pace says its tool blocks, as neither is about to read.
+ * Merges the repositories' sources, keeping the first copy of each item. Writes go to the source that listed the
+ * item, or to its repository's source. An unknown repository refuses writes. Failed reads preserve previous data;
+ * a ReadProblem leaves out only its source's items and names the problem for each repository it serves.
+ * Opted-in repositories show only items carrying a status. A paced read refreshes due sources and keeps the rest
+ * from their last good read, reporting progress as each source lands.
  */
-export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = [],
+export function mergeSources(byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = [],
   kinds: ReadonlyMap<ItemSource, ItemSourceKind> = new Map()): MergedSource {
   const sourceByRepo = new Map([...byRepo].map(([repo, source]) => [repo.toLowerCase(), source]));
   const optIn = new Set(optedIn.map((repo) => repo.toLowerCase()));
   const optedOut = (repo: string | null) => optIn.has(repo?.toLowerCase() ?? '');
   /** The item as a read shows it, or null when it's left out. */
-  const shown = (item: Item, source: ItemSource): Item | null => {
-    if (item.statuses.length > 0 || (item.state === 'closed' && projects.includes(source))) return item;
+  const shown = (item: Item): Item | null => {
+    if (item.statuses.length > 0) return item;
     if (!item.untaggedFor) return optedOut(item.repo) ? null : item;
     const kept = item.untaggedFor.filter((repo) => !optedOut(repo));
     if (kept.length === item.untaggedFor.length) return item;
     return kept.length ? { ...item, repo: kept[0]!, untaggedFor: kept } : null;
   };
-  const sources = [...new Set([...projects, ...byRepo.values()])];
+  const sources = [...new Set([...byRepo.values()])];
   const named = new Map<ItemSource, string[]>();
-  for (const [repo, source] of byRepo) if (!projects.includes(source)) named.set(source, [...named.get(source) ?? [], repo]);
-  /** How a read names the source: its own name, else the repositories it stands for, else a Project no one named. */
-  const nameOf = (source: ItemSource) => source.name ?? named.get(source)?.map((repo) => shownRepo(repo).split('/').at(-1)).join(', ') ?? 'a Project';
+  for (const [repo, source] of byRepo) named.set(source, [...named.get(source) ?? [], repo]);
+  /** How a read names the source: its own name, else the repositories it stands for, else a generic source name. */
+  const nameOf = (source: ItemSource) => source.name ?? named.get(source)?.map((repo) => shownRepo(repo).split('/').at(-1)).join(', ') ?? 'an item source';
   const readOf = async (source: ItemSource, progress?: ReadProgress): Promise<ItemsRead> => {
     const name = nameOf(source);
     progress?.started(name);
@@ -239,7 +220,7 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
   };
   /** The source that listed each item, by Item.id, in the last read. */
   let listedBy = new Map<string, ItemSource>();
-  const forRepo = (repo: string | null) => (repo && sourceByRepo.get(repo.toLowerCase())) || projects[0] || unlisted;
+  const forRepo = (repo: string | null) => (repo && sourceByRepo.get(repo.toLowerCase())) || unlisted;
   const sourceOf = (item: Item) => listedBy.get(item.id) ?? forRepo(item.repo);
   /**
    * Every source's last good read merged, with the source that listed each item, by Item.id, and the repositories
@@ -259,7 +240,7 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       return kind !== undefined && pace?.blocked?.(kind) === true;
     };
     const waiting = [...byRepo].filter(([, source]) => !lastRead.has(source) && !failed.has(source) && !blocked(source)).map(([repo]) => repo);
-    const read: ItemsRead = { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item, listed.get(item.id)!) ?? []), ...problems.length > 0 && { problems },
+    const read: ItemsRead = { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item) ?? []), ...problems.length > 0 && { problems },
       ...waiting.length > 0 && { waiting } };
     return { read, listed };
   };
@@ -324,10 +305,10 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       const found = url === undefined ? [] : listing(url);
       for (const item of found) askedItems.add(item.id);
       if (found.length) return;
-      // A GitHub repository no source names may still be in a Project, never in another repository's issues.
+      // A GitHub URL outside the onboarded repositories cannot affect any source.
       const ref = url === undefined ? undefined : githubRef(url);
       const own = ref && sourceByRepo.get(ref.repo);
-      for (const source of own ? [own] : ref ? projects : sources) askedWhole.add(source);
+      for (const source of own ? [own] : ref ? [] : sources) askedWhole.add(source);
     },
     readAfresh: (item) => afresh.has(sourceOf(item)) || afreshItems.has(item.id),
     setStatus: (item, status) => sourceOf(item).setStatus(item, status),
@@ -336,7 +317,6 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
     create: (draft, progress) => forRepo(draft.repo).create(draft, progress),
     setParentStatus: (parent, status) => forRepo(parent.repo).setParentStatus(parent, status),
     abandon: (item) => sourceOf(item).abandon(item),
-    renamedId: (savedId) => sources.map((source) => source.renamedId?.(savedId)).find((id) => id !== undefined),
   };
 }
 
@@ -352,7 +332,7 @@ export interface OnboardedSources extends MergedSource {
  * The item source the onboarded repositories name as `load` reads their configs: a read loads them first when it has
  * no pace, before the first read, when reload asked for it or once the pace's idle time has passed since they loaded, and builds the merged source
  * again when they changed, so a config merged to a default branch shows within an idle read. A read leaves out the
- * items of each repository whose config `load` couldn't read or that is resetting, which a Project may still list, and
+ * items of each repository whose config `load` couldn't read or that is resetting, which a shared Azure source may still list, and
  * so does each read so far it reports as landed. A write goes through the source the last read built.
  */
 export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = configuredSources): OnboardedSources {
@@ -396,6 +376,5 @@ export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = 
     create: (draft, progress) => current.create(draft, progress),
     setParentStatus: (parent, status) => current.setParentStatus(parent, status),
     abandon: (item) => current.abandon(item),
-    renamedId: (savedId) => current.renamedId?.(savedId),
   };
 }

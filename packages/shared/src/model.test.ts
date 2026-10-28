@@ -209,7 +209,6 @@ test('the desk holds Ready, Needs you, Verify and Ready to merge, in flow order,
 test('the sample has a Verify item in each merge state', () => {
   const verify = sample.items.filter((i) => i.status === 'Verify');
   assert.deepEqual(new Set(verify.map((i) => itemPr(i)?.pipeline?.mergeState)), new Set(['can merge', 'checking', 'blocked', 'conflicts']));
-  assert.ok(verify.some((i) => i.content === 'pr'), 'one is itself a pull request');
   assert.ok(verify.some((i) => itemPr(i)?.pipeline && !itemPr(i)!.pipeline!.checks), 'one has no checks');
 });
 
@@ -283,29 +282,8 @@ test('failedCheck gives a failed check, and nothing for one that passed or befor
   assert.equal(failedCheck(undefined, 'gh'), undefined);
 });
 
-test('gh blocks every GitHub read while missing or logged out, and only Project reads without the project scope', () => {
-  const fix = 'gh auth refresh -s project';
-  for (const source of ['project', 'issues'] as const) {
-    assert.equal(ghBlocksRead(undefined, source), true);
-    assert.equal(ghBlocksRead({ result: 'missing', fix: 'brew install gh' }, source), true);
-    assert.equal(ghBlocksRead({ result: 'logged-out', fix: 'gh auth login' }, source), true);
-    assert.equal(ghBlocksRead({ result: 'ok', scopes: 'unread' }, source), false);
-    assert.equal(ghBlocksRead({ result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' }, source), false);
-  }
-  assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'project'), true);
-  assert.equal(ghBlocksRead({ result: 'no-project-scope', fix }, 'issues'), false);
-  for (const source of ['sprint', 'backlog', 'azure-board'] as const) {
-    assert.equal(ghBlocksRead(undefined, source), false, 'gh never blocks an Azure DevOps read');
-    assert.equal(ghBlocksRead({ result: 'missing', fix: 'brew install gh' }, source), false);
-    assert.equal(ghBlocksRead({ result: 'logged-out', fix: 'gh auth login' }, source), false);
-  }
-  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', labels: [] }), 'project');
-  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'project', labels: [] }), 'project');
-  assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'issues', labels: [] }), 'issues');
-});
-
 test("a GitHub source reads with gh and an Azure DevOps one with az, and a list uses gh while any repository is on GitHub", () => {
-  assert.deepEqual((['project', 'issues', 'sprint', 'backlog', 'azure-board'] as const).map(providerTool), ['gh', 'gh', 'az', 'az', 'az']);
+  assert.deepEqual((['issues', 'azure-board'] as const).map(providerTool), ['gh', 'az']);
   assert.equal(usesGh([{ repo: 'contoso/web/api' }, { repo: 'maddec01/lar' }]), true);
   assert.equal(usesGh([{ repo: 'contoso/web/api' }]), false);
   assert.equal(usesGh([]), false);
@@ -433,7 +411,7 @@ test("Add item accepts only the chosen repository's custom labels, which may hol
 });
 
 test('Add item keeps Only for <repo> on an Azure repository and refuses it on a GitHub one', () => {
-  const repos = [...sample.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'sprint' as const, team: 'Web', show: 'all' as const, labels: [] }];
+  const repos = [...sample.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'azure-board' as const, team: 'Web', show: 'all' as const, labels: [] }];
   const draft = { repo: 'contoso/Fabrikam/web', kind: 'feature', title: 'Export', description: '', labels: [] };
   assert.equal(validateDraft(draft, repos).onlyFor, undefined, 'unticked, the draft is for every repository reading the source');
   assert.equal(validateDraft({ ...draft, onlyFor: true }, repos).onlyFor, true);
@@ -457,8 +435,8 @@ test('.lar-factory.json as onboarding writes it has the answers, version 1 and t
 });
 
 test('.lar-factory.json as Edit writes it keeps the version the file had', () => {
-  const file = onboardingConfigFile({ itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'API server', labels: [] }, 2);
-  assert.deepEqual(JSON.parse(file), { version: 2, role: 'API server', itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', labels: [] });
+  const file = onboardingConfigFile({ itemSource: { kind: 'issues' }, show: 'all', role: 'API server', labels: [] }, 2);
+  assert.deepEqual(JSON.parse(file), { version: 2, role: 'API server', itemSource: { kind: 'issues' }, show: 'all', labels: [] });
 });
 
 test('a skill Clash renames only to a valid name no bundled skill, no other project skill and no rename beside it has', () => {

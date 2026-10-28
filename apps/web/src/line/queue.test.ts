@@ -43,7 +43,7 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
   expect(rows().map((r) => text(r.querySelector('.queue-n')))).toEqual(['1', '2', '3']);
   expect(text(row('I_sample05').querySelector('.queue-title'))).toBe(`#129 ${sample05.title}`);
   expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('lar-server · queued 2h ago · improvement');
-  expect(text(row('I_sample21').querySelector('.queue-meta'))).toBe('Draft · queued 24h ago');
+  expect(text(row('I_sample21').querySelector('.queue-meta'))).toBe('lar-server · queued 24h ago · improvement');
 
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
@@ -53,7 +53,7 @@ test('the Queue lists Queued items in the scope as numbered rows, each with its 
 test('a row for an untagged item two repositories read names both', async () => {
   const [web, api] = ['contoso/Fabrikam/web', 'contoso/Fabrikam/api'];
   const untagged = { ...sample05, repo: web, untaggedFor: [web, api], labels: [] };
-  await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'sprint', team: 'Web', show: 'all', labels: [] }],
+  await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'azure-board', team: 'Web', show: 'all', labels: [] }],
     items: sample.items.map((i) => (i.id === sample05.id ? untagged : i)) });
   expect(text(row('I_sample05').querySelector('.queue-meta'))).toBe('web or api · queued 2h ago');
 });
@@ -82,15 +82,6 @@ test('a row opens the item dialog and stays marked while it shows', async () => 
   await settle(() => row('I_sample06').querySelector<HTMLButtonElement>('.queue-title')!.click());
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`#20 ${sample.items.find((i) => i.id === 'I_sample06')!.title}`);
   expect(row('I_sample06').className).toContain('ring-2');
-});
-
-test('while the slots are full, the row Start next starts waits for one, not a draft before it', async () => {
-  const draftFirst = [sample.items.find((i) => i.id === 'I_sample21')!, ...sample.items.filter((i) => i.id !== 'I_sample21')];
-  await mountPage({ ...withChoices, items: draftFirst });
-  expect(rows()[0]!.dataset.item).toBe('I_sample21');
-  expect(text(rows()[0]!), 'the draft can\'t start').not.toContain('next when a build slot frees');
-  expect(text(row('I_sample05'))).toContain('next when a build slot frees');
-  expect(startNext().getAttribute('data-start')).toBe('I_sample05');
 });
 
 test('the header shows the build slots; while they are full the first row waits for one, and Start still works', async () => {
@@ -137,7 +128,7 @@ test('a Queued issue that also carries Review has no Start refining or Start aft
 });
 
 test('when no queued item can start, Start next shows disabled and says why', async () => {
-  const held = { ...withChoices, items: sample.items.map((i) => (['I_sample05', 'I_sample06'].includes(i.id)
+  const held = { ...withChoices, items: sample.items.map((i) => (['I_sample05', 'I_sample06', 'I_sample21'].includes(i.id)
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };
   await mountPage(held);
   const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
@@ -170,14 +161,12 @@ test('the drag handles and Auto-start are disabled and say they are not built ye
 
 test('Start refining sits on Queued issues, one Start on every row, and Start next is filled; a queued draft asks for an issue instead', async () => {
   await mountPage();
-  expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['I_sample05', 'I_sample06']);
+  expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['I_sample05', 'I_sample06', 'I_sample21']);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-label')])
     .toEqual(['Start refining ▾', 'menu', `Start refining #129 ${sample05.title}`]);
   expect([start(), start('I_sample06')].map((b) => [b.dataset.kind, Boolean(b.querySelector('[data-slot="icon"] svg'))]), 'every row the same Start, with its icon')
     .toEqual([['start', true], ['start', true]]);
   expect(startNext().dataset.kind, "Start next is the Queue's Main action").toBe('main');
-  expect(text(row('I_sample21').querySelector('.queue-hint'))).toBe('Needs an issue to start');
-  expect(row('I_sample21').querySelector<HTMLElement>('.queue-hint')!.title).toBe('This draft needs an issue before it can start. Convert it to an issue in a repo.');
 });
 
 test("Start refining opens its menu without opening the dialog, and starts its row's item with the picked model", async () => {
@@ -208,18 +197,11 @@ test('Start next starts the first row that can start, with its model menu', asyn
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
 });
 
-test('Start next passes over a draft and an item with a live thread', async () => {
-  const live = (i: Item): Item => (i.id === 'I_sample05' ? { ...i, threads: [{ id: 't1', title: 'x', state: 'running' }] } as Item : i);
-  const draftFirst = [sample.items.find((i) => i.id === 'I_sample21')!, ...sample.items.filter((i) => i.id !== 'I_sample21').map(live)];
-  await mountPage({ ...withChoices, items: draftFirst });
-  expect(startNext().getAttribute('data-start')).toBe('I_sample06');
-});
-
 test('while an item has a running or needs-you thread, its row has Open thread in place of Start refining', async () => {
   const threads = (state: string) => [{ id: 't1', title: 'x', state }];
   const items = sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, threads: threads('running') } : i.id === 'I_sample06' ? { ...i, threads: threads('needs you') } : i)) as Item[];
   await mountPage({ ...sample, items, t3EnvironmentId: 'env-1' });
-  expect(queue().querySelector('li [data-start]')).toBeNull();
+  expect(row('I_sample05').querySelector('[data-start]')).toBeNull();
   const open = row('I_sample05').querySelector<HTMLAnchorElement>('[data-open-thread]')!;
   expect([text(open), open.getAttribute('href')]).toEqual(['Open thread', expect.stringContaining('t1')]);
   expect(row('I_sample06').querySelector('[data-open-thread]')).not.toBeNull();
@@ -276,16 +258,6 @@ test('Back to List from the dialog takes the item off the Queue', async () => {
   await answer({ error: null, board: moved('I_sample05', 'List') });
   expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample06', 'I_sample21']);
   expect(text(toast())).toMatch(/^Moved #129 .* to List\. View item$/);
-});
-
-test('the dialog gives Queued issues and drafts Back to List and Abandon, but not pull requests', async () => {
-  const pr: Item = { ...sample05, id: 'I_pr', content: 'pr', number: 300, title: 'A queued pull request' };
-  await mountPage({ ...sample, items: [...sample.items, pr] });
-  await settle(() => row('I_sample21').click());
-  expect(dialog()!.querySelector('[data-back-to-list]')!.getAttribute('aria-label')).toBe('Back to List draft Offline downloads on watchOS');
-  expect(dialog()!.querySelector('[data-abandon="I_sample21"]')).not.toBeNull();
-  await settle(() => row('I_pr').click());
-  expect(dialog()!.querySelector('[data-back-to-list], [data-abandon]')).toBeNull();
 });
 
 test('Abandon from the dialog takes the item off the Queue; a failed one is a toast', async () => {

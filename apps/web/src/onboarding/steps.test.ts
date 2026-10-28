@@ -198,9 +198,9 @@ test('the Show setting can include all available work without changing its sourc
 
 test('a reused .lar-factory.json shows its values and asks nothing', async () => {
   await openSetup(project('lar-web', { hasConfig: true,
-    config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'opted-in', role: 'Web client', labels: [] } }));
+    config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: [] } }));
   const values = text(dialog()!.querySelector('[data-reused-config]'));
-  for (const value of ['GitHub', 'GitHub Project maddec01 #3', 'Items with a status', 'Web client']) expect(values).toContain(value);
+  for (const value of ['GitHub', "maddec01/lar-web's issues", 'Items with a status', 'Web client']) expect(values).toContain(value);
   expect(text(dialog()!.querySelector('[data-slot="modal-body"]'))).toContain('You can edit them in Settings after setup.');
   expect([...dialog()!.querySelectorAll('button')].some((b) => text(b) === 'Edit'), 'the onboarding dialog has no Edit').toBe(false);
   expect(dialog()!.querySelector('[data-slot="modal-body"] input, [data-slot="modal-body"] [role="radio"]')).toBeNull();
@@ -418,7 +418,7 @@ test('the Files to update list names the Agent skills block, the three docs/agen
 
 test('on Azure DevOps the Files to update list says work items and tags, and the step names the project decoded', async () => {
   await openCleanup(project('lar-api', { repo: 'contoso/Fabrikam%20Fiber/lar-api', provider: 'Azure DevOps', hasConfig: true,
-    config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: [] } }));
+    config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: [] } }));
   const written = (file: string) => text(cleanup().querySelector(`[data-written="${file}"]`));
   expect(written('docs/agents/issue-tracker.md')).toContain('Tells agents where to track work items');
   expect(written('docs/agents/triage-labels.md')).toContain('Explains how agents use tags');
@@ -806,7 +806,7 @@ test("a reused .lar-factory.json's custom label that can't be one shows why on i
 
 test("on Azure DevOps the Labels step lists the project's tags with the status tags, offers Rename but no Create, and Next goes on", async () => {
   await openSetup(project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true,
-    config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['web'] } }));
+    config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['web'] } }));
   answerLabels(['decision: grill', 'status-list'], ['decision-grill', 'status-list']);
   await settle(() => nextButton().click());
   await settle();
@@ -918,7 +918,7 @@ test('Open pull request waits while the PR\'s changes are read', async () => {
 });
 
 test("with a reused .lar-factory.json, Cleanup goes on to the Pull request step, which lists the changes without the file and opens the PR", async () => {
-  const reused = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client', labels: [] } });
+  const reused = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] } });
   await openCleanup(reused);
   expect(text(cleanup().querySelector('[data-written=".lar-factory.json"]'))).toContain('Keeps your saved settings.');
   const previews = answerChanges(WRITTEN);

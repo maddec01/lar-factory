@@ -4,10 +4,10 @@ import { STATUS_LABELS, customLabelChoices, customLabelProblem, customTagProblem
 import { WORKFLOW_LABELS } from './workflow-labels.ts';
 
 const ALL = WORKFLOW_LABELS.map((l) => l.name);
-const states = (names: string[]) => Object.fromEntries(labelPlan(names, 'github-project').workflow.map((r) => [r.label.name, r.state]));
+const states = (names: string[]) => Object.fromEntries(labelPlan(names).workflow.map((r) => [r.label.name, r.state]));
 
 test('each workflow label is present, missing, or present under its old name with a Rename', () => {
-  const plan = labelPlan(['bug', 'Feature', 'decision: grill', 'decision-task', 'decision: task'], 'github-project');
+  const plan = labelPlan(['bug', 'Feature', 'decision: grill', 'decision-task', 'decision: task']);
   assert.deepEqual(states(['bug', 'Feature', 'decision: grill', 'decision-task', 'decision: task']), {
     bug: 'present', feature: 'present', improvement: 'missing', concept: 'missing', 'decision-grill': 'rename', 'decision-prototype': 'missing',
     'decision-research': 'missing', 'decision-task': 'present', build: 'missing', active: 'missing', blocked: 'missing',
@@ -16,31 +16,25 @@ test('each workflow label is present, missing, or present under its old name wit
 });
 
 test('an old name whose new one exists too is left alone with a note, as are labels lar-factory never made', () => {
-  const plan = labelPlan(['decision-task', 'decision: task', 'needs-triage', 'ready-for-agent', 'status-list'], 'github-project');
-  assert.deepEqual(plan.leftAlone, [{ name: 'decision: task', keptBeside: 'decision-task' }, { name: 'needs-triage' }, { name: 'ready-for-agent' }, { name: 'status-list' }]);
-  assert.deepEqual(plan.status, [], 'a GitHub Project keeps no status labels');
+  const plan = labelPlan(['decision-task', 'decision: task', 'needs-triage', 'ready-for-agent', 'status-list']);
+  assert.deepEqual(plan.leftAlone, [{ name: 'decision: task', keptBeside: 'decision-task' }, { name: 'needs-triage' }, { name: 'ready-for-agent' }]);
 });
 
 test('a repository that reads its issues lists the status labels too, and those it has are not left alone', () => {
-  const plan = labelPlan([...ALL, 'status-list', 'status-in-progress'], 'issues');
+  const plan = labelPlan([...ALL, 'status-list', 'status-in-progress']);
   assert.deepEqual(plan.status.map((r) => [r.label.name, r.state]), STATUS_LABELS.map((l) => [l.name, ['status-list', 'status-in-progress'].includes(l.name) ? 'present' : 'missing']));
   assert.deepEqual(plan.leftAlone, []);
   assert.deepEqual(STATUS_LABELS[0], { name: 'status-list', color: 'EDEDED', description: 'Status: List' });
 });
 
-test("an Azure DevOps team's sprint or backlog lists the status tags too, which a GitHub Project doesn't", () => {
-  for (const source of ['azure-sprint', 'azure-backlog', 'azure-board'] as const) assert.equal(labelPlan(ALL, source).status.length, STATUS_LABELS.length);
-  assert.deepEqual(labelPlan(ALL, 'github-project').status, []);
-});
-
 test('Next waits while any workflow label is missing or still under its old name, not for the status labels', () => {
-  assert.equal(workflowLabelsMissing(labelPlan(ALL, 'issues')), false);
-  assert.equal(workflowLabelsMissing(labelPlan(ALL.filter((n) => n !== 'blocked'), 'github-project')), true);
-  assert.equal(workflowLabelsMissing(labelPlan([...ALL.filter((n) => n !== 'decision-grill'), 'decision: grill'], 'github-project')), true);
+  assert.equal(workflowLabelsMissing(labelPlan(ALL)), false);
+  assert.equal(workflowLabelsMissing(labelPlan(ALL.filter((n) => n !== 'blocked'))), true);
+  assert.equal(workflowLabelsMissing(labelPlan([...ALL.filter((n) => n !== 'decision-grill'), 'decision: grill'])), true);
 });
 
 test('Create makes the missing labels, and those under an old name that Rename is not to move', () => {
-  const plan = labelPlan(['bug', 'decision: grill', 'decision: task', 'status-list'], 'issues');
+  const plan = labelPlan(['bug', 'decision: grill', 'decision: task', 'status-list']);
   const created = labelsToCreate(plan, ['decision: grill']).map((l) => l.name);
   assert.ok(created.includes('decision-task'));
   assert.ok(!created.includes('decision-grill'), 'Rename moves decision: grill');
@@ -49,12 +43,12 @@ test('Create makes the missing labels, and those under an old name that Rename i
 });
 
 test('the custom labels to pick from are the labels left alone, less the status labels and the old names kept beside their new ones', () => {
-  const plan = labelPlan(['bug', 'decision-task', 'decision: task', 'decision: grill', 'app: music', 'Status-Queued', 'status-list', 'web'], 'github-project');
+  const plan = labelPlan(['bug', 'decision-task', 'decision: task', 'decision: grill', 'app: music', 'Status-Queued', 'status-list', 'web']);
   assert.deepEqual(customLabelChoices(plan), ['app: music', 'web']);
 });
 
 test('the custom tags to pick from leave out the repo- tags that route Azure work items', () => {
-  const plan = labelPlan(['repo-fabrikam-api', 'Repo-Fabrikam Web', 'web'], 'azure-sprint');
+  const plan = labelPlan(['repo-fabrikam-api', 'Repo-Fabrikam Web', 'web']);
   assert.deepEqual(customLabelChoices(plan), ['web']);
 });
 

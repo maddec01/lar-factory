@@ -15,7 +15,7 @@ alone. Every 5 seconds each GitHub source asks GitHub whether anything changed,
 sending the last answer's ETag; an unchanged answer is a 304, which costs no
 quota, so an edit on github.com shows within seconds and reads only the changed
 item. An item also reads alone at once when `status.sh` or `slice.sh` names it,
-every 15 seconds while its PR's checks run, and, in a Project or an Azure
+every 15 seconds while its PR's checks run, and, in an Azure
 DevOps team, every 15 seconds while it holds active work. A rate-limited `gh` or `az` makes no calls until its limit resets. T3's threads
 refresh every 2 seconds and its stats every 30, with no `gh` or `az` call. It
 serves the board on the first free port from 4317 to 4416, which it logs;
@@ -52,7 +52,7 @@ new build or `src/` change.
   closes the menu without starting anything. A toast shows the thread's id, and its title when T3 chose
   one other than line 1; every board page marks the card Started. While the
   board runs, a double press, a retry or another tab starts no second thread.
-  A queued draft needs an issue first. Before starting, Start checks that the
+  Before starting, Start checks that the
   repository is in `repositories.json`, then reads T3 Code's live projects from its
   database (read-only) and keeps those whose folder exists, has a `.git`
   directory (so a worktree doesn't count) and has the repository as its git
@@ -60,13 +60,12 @@ new build or `src/` change.
   project, Start refuses with a hint to add the checkout in T3 Code; with two
   or more, it refuses and names their folders. The board never adds or changes
   T3 projects, and it refuses when it can't read T3's database.
-- **Back to List**, in the footer row of a Queued issue or draft card, is the
+- **Back to List**, in the footer row of a Queued issue card, is the
   reverse of Queue: it sets the item's Status back to List, and the board moves
   the card there at once. **Abandon**, on the right of the same row, works as
   it does on List rows: it asks first, then closes a GitHub issue as "not planned"
   or moves an Azure DevOps work item to Removed. Reopen it in its provider to
-  bring it back. Abandon removes a draft for good. Queued pull requests get no
-  footer row. Once a card's Start is running, may have started or has started, the row disappears and
+  bring it back. Once a card's Start is running, may have started or has started, the row disappears and
   the board refuses both actions for it; while either is running, it refuses
   Start. The board remembers Started only until it restarts.
 - **Notices**: a success (Added, Moved, Abandoned, Started, a finished update)
@@ -76,11 +75,10 @@ new build or `src/` change.
   again whatever still holds.
 - **Add item** creates an issue in a configured repository and adds it to List.
   Choose its kind and any of the repository's custom labels, the `labels` in its
-  `.lar-factory.json`. The form keeps your draft while the board refreshes. If
-  project assignment fails after the issue is created, its link and **Retry this submission** finish the same issue.
+  `.lar-factory.json`. The form keeps your draft while the board refreshes. If a confirmed issue needs another step, **Retry this submission** finishes the same issue.
 
 Creation and Queue use the same local `gh` login as reads and need permission
-to create issues and edit the lar project. Start runs the local `t3` CLI and
+to create issues and edit their labels. Start runs the local `t3` CLI and
 needs T3 Code running. If a response is lost, retry the current submission. An
 uncertain GitHub creation or a board restart asks you to check the repository
 issues before starting another item.
@@ -128,15 +126,11 @@ branch. Its fields:
 
 - `version`: the file's shape, `1`. A missing `version` counts as `1`.
 - `role`: what the repository is for, which lar-work reads. Required.
-- `itemSource`: where the repository's items come from:
-  `{ "kind": "github-project", "owner": "<owner>", "number": <n> }` for a GitHub
-  Project, or `{ "kind": "issues" }` for the repository's own issues, the GitHub default.
-  Azure DevOps setup writes `{ "kind": "azure-board", "team": "<team>" }`, which
-  combines the team's open backlog and current sprint, with each item once. It
-  keeps completed sprint work and reads the backlog alone when no sprint is current.
-  Existing `{ "kind": "azure-sprint", "team": "<team>" }` and
-  `{ "kind": "azure-backlog", "team": "<team>" }` sources keep their separate behavior.
-  Azure sources read with `az`.
+- `itemSource`: `{ "kind": "issues" }` for GitHub repository issues (the default), or
+  `{ "kind": "azure-board", "team": "<team>" }` on Azure DevOps. The Azure board
+  combines the team's open backlog and current sprint, with each item once. It keeps
+  completed sprint work and reads the backlog alone when no sprint is current.
+  Unsupported source kinds fail with a message to run onboarding again.
 - `show`: `"all"`, the default, or `"opted-in"`.
 - `labels`: an array of strings, empty by default.
 
@@ -147,13 +141,13 @@ To add lar-factory, write `repositories.json`:
 ```
 
 and merge this `.lar-factory.json` to lar-factory's default branch, which reads its
-items from the lar Project, `maddec01`'s Project number 1:
+repository issues:
 
 ```json
 {
   "version": 1,
   "role": "The factory: board, lar-work skill and process docs",
-  "itemSource": { "kind": "github-project", "owner": "maddec01", "number": 1 }
+  "itemSource": { "kind": "issues" }
 }
 ```
 

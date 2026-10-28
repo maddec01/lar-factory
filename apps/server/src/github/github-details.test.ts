@@ -35,21 +35,6 @@ test('an issue answers its body, people, milestone, sub-tickets and comments, ne
   });
 });
 
-test('a pull request answers the same fields, with no sub-tickets', async () => {
-  const gh = fakeGh({ __typename: 'PullRequest', body: 'Closes #5', ...people, milestone: null, comments: { pageInfo: { hasPreviousPage: false, startCursor: 'CUR_1' }, nodes: [comment(1)] } });
-  const details = await readGithubItemDetails(item('PR_1', 'pr'), gh.run);
-  assert.ok(!('error' in details));
-  assert.deepEqual([details.body, details.author, details.assignees, details.milestone, details.subTickets, details.comments.map((c) => c.id)], ['Closes #5', 'maddec01', ['maddec01', 'claude-bot'], undefined, [], ['IC_1']]);
-  assert.deepEqual([details.hasOlderComments, details.olderCursor], [false, null], 'no older comments, so no cursor');
-});
-
-test('a draft answers its body and creator, with no comments', async () => {
-  const gh = fakeGh({ __typename: 'DraftIssue', body: 'An idea.', creator: { login: 'maddec01' }, assignees: { nodes: [] }, createdAt: '2026-10-12T09:14:00Z' });
-  assert.deepEqual(await readGithubItemDetails(item('DI_1'), gh.run), {
-    body: 'An idea.', format: 'markdown', author: 'maddec01', assignees: [], createdAt: '2026-10-12T09:14:00Z', subTickets: [], comments: [], hasOlderComments: false, olderCursor: null,
-  });
-});
-
 test('an item with no body, author or comments answers empty details', async () => {
   const gh = fakeGh({ __typename: 'Issue', body: '', author: null, assignees: { nodes: [] }, createdAt: '2026-10-12T09:14:00Z', milestone: null,
     subIssues: { nodes: [] }, comments: { pageInfo: { hasPreviousPage: false, startCursor: null }, nodes: [] } });
@@ -85,13 +70,6 @@ test('older comments are one graphql call for the 10 before the cursor, newest f
   assert.deepEqual(gh.calls, [['api', 'graphql', '-f', `query=${OLDER_COMMENTS_QUERY}`, '-f', 'id=I_5', '-f', 'before=CUR_1']]);
   const connections = OLDER_COMMENTS_QUERY.match(/comments\([^)]*\)/g) ?? [];
   assert.ok(connections.length > 0 && connections.every((c) => c === 'comments(last: 10, before: $before)'));
-});
-
-test('the oldest page of a pull request answers no cursor', async () => {
-  const gh = fakeGh({ __typename: 'PullRequest', comments: { pageInfo: { hasPreviousPage: false, startCursor: 'CUR_0' }, nodes: [comment(1)] } });
-  const page = await readGithubOlderComments(item('PR_2', 'pr'), 'CUR_1', gh.run);
-  assert.ok(!('error' in page));
-  assert.deepEqual([page.comments.map((c) => c.id), page.olderCursor], [['IC_1'], null]);
 });
 
 test('older comments of an item GitHub no longer has or of a failed call answer the error', async () => {

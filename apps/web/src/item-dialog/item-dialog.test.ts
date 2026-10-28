@@ -107,7 +107,7 @@ test('the dialog lays out by its own width and never hides an overflow', async (
 
 test('the dialog of an untagged item two repositories read tags it with both', async () => {
   const [web, api] = ['contoso/Fabrikam/web', 'contoso/Fabrikam/api'];
-  await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'sprint', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'sprint', team: 'Web', show: 'all', labels: [] }],
+  await mountPage({ ...sample, repos: [...sample.repos, { repo: web, role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: [] }, { repo: api, role: 'api', items: 'azure-board', team: 'Web', show: 'all', labels: [] }],
     items: sample.items.map((i) => (i.id === 'I_sample05' ? { ...i, repo: web, untaggedFor: [web, api] } : i)) });
   await openItem('I_sample05');
   expect([...inDialog('[data-item-summary]')!.querySelectorAll('.repo-tag')].map(text)).toEqual(['web', 'api']);
@@ -138,8 +138,7 @@ const footerControls = () => [...footer().querySelectorAll<HTMLElement>('button,
 test.each([
   ['List', 'I_sample01', ['Abandon', 'GitHub', 'Queue']],
   ['Queued', 'I_sample05', ['Back to List', 'Abandon', 'GitHub', 'Start refining ▾']],
-  ['a Queued draft', 'I_sample21', ['Back to List', 'Abandon']],
-  ['Shaping', 'I_sample07', ['GitHub', 'Open thread']],
+    ['Shaping', 'I_sample07', ['GitHub', 'Open thread']],
   ['Needs you', 'I_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
   ['blocked Ready', 'I_sample13', ['GitHub', 'Start after #202 ▾']],
   ['In progress', 'I_sample14', ['GitHub', 'Open thread']],

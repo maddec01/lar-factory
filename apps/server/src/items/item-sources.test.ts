@@ -13,7 +13,7 @@ const item = (id: string, repo: string, status: Status = 'List'): Item => ({
 });
 
 /** The source as the one Project of a merged source, as onboardedSources builds one. */
-const merged = (source: ItemSource) => mergeSources([source], new Map());
+const merged = (source: ItemSource) => mergeSources(new Map([['maddec01/lar-server', source], ['maddec01/lar-apple', source]]));
 
 /** A source that lists `items` and records each write it is asked for. */
 function fakeSource(title: string, items: Item[], writes: string[]): ItemSource {
@@ -26,92 +26,18 @@ function fakeSource(title: string, items: Item[], writes: string[]): ItemSource 
     create: async (draft) => { writes.push(`${title} create ${draft.repo}`); return { item: null, issueUrl: null, error: null }; },
     setParentStatus: async (parent, status) => write(`${parent.repo}#${parent.number} ${status}`)(),
     abandon: async (i) => write(`abandon ${i.id}`)(),
-    renamedId: (savedId) => (savedId === `PVTI_${title}` ? `I_${title}` : undefined),
   };
 }
-
-test("a read lists every source's items under the Project's title, an item two sources list once, with the Project's copy", async () => {
-  const writes: string[] = [];
-  const project = fakeSource('lar', [item('I_1', 'maddec01/lar-server', 'In progress')], writes);
-  const issues = fakeSource('maddec01/lar-apple', [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple')], writes);
-  const read = await mergeSources([project], new Map([['maddec01/lar-apple', issues]])).read();
-  assert.equal(read.title, 'lar');
-  assert.deepEqual(read.items.map((i) => [i.id, i.status]), [['I_1', 'In progress'], ['I_2', 'List']]);
-});
-
-test("with Opted-in items, an issue shows only while it carries a status, closed or not; a Project item shows once closed", async () => {
-  const bare = (id: string, repo: string, state: Item['state'] = 'open'): Item => ({ ...item(id, repo), statuses: [], state, closedAs: state === 'closed' ? 'done' : null });
-  const closed = (id: string, repo: string, status: Status): Item => ({ ...item(id, repo, status), state: 'closed', closedAs: 'done' });
-  const project = fakeSource('lar', [bare('I_1', 'maddec01/lar-server'), bare('I_2', 'maddec01/lar-factory'), item('I_3', 'maddec01/lar-factory', 'Queued'),
-    bare('I_4', 'maddec01/lar-factory', 'closed')], []);
-  const issues = fakeSource('apple', [bare('I_5', 'maddec01/lar-apple'), item('I_6', 'maddec01/lar-apple', 'List'), bare('I_7', 'maddec01/lar-apple', 'closed'),
-    closed('I_8', 'maddec01/lar-apple', 'Verify')], []);
-  const read = await mergeSources([project], new Map([['maddec01/lar-apple', issues]]), ['maddec01/lar-apple', 'Maddec01/Lar-Factory']).read();
-  assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_3', 'I_4', 'I_6', 'I_8']);
-});
 
 test('a source with no opted-in repositories lists every item it read', async () => {
   const project = fakeSource('lar', [{ ...item('I_1', 'maddec01/lar-server'), statuses: [] }], []);
   const issues = fakeSource('apple', [{ ...item('I_2', 'maddec01/lar-apple'), statuses: [] }], []);
-  const read = await mergeSources([project], new Map([['maddec01/lar-apple', issues]])).read();
+  const read = await mergeSources(new Map([['maddec01/lar-server', project], ['maddec01/lar-apple', issues]])).read();
   assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_2']);
 });
 
-test('a write goes to the source that listed the item, or else to the source its repository names', async () => {
-  const writes: string[] = [];
-  const project = fakeSource('lar', [item('I_1', 'maddec01/lar-apple')], writes);
-  const issues = fakeSource('apple', [item('I_1', 'maddec01/lar-apple'), item('I_2', 'maddec01/lar-apple')], writes);
-  const sources = mergeSources([project], new Map([['maddec01/lar-apple', issues]]));
-  await sources.read();
-  await sources.setStatus(item('I_1', 'maddec01/lar-apple'), 'Queued');
-  await sources.addLabel(item('I_2', 'maddec01/lar-apple'), 'build');
-  await sources.abandon(item('I_9', 'maddec01/lar-server'));
-  await sources.create({ kind: 'feature', repo: 'maddec01/lar-apple', title: 'New', description: '', labels: [] }, {});
-  await sources.create({ kind: 'feature', repo: 'maddec01/lar-server', title: 'New', description: '', labels: [] }, {});
-  await sources.setParentStatus({ number: 5, title: 'Parent', url: '', repo: 'maddec01/lar-apple', state: 'open' }, 'In progress');
-  assert.deepEqual(writes, ['lar I_1 Queued', 'apple I_2 build', 'lar abandon I_9', 'apple create maddec01/lar-apple',
-    'lar create maddec01/lar-server', 'apple maddec01/lar-apple#5 In progress']);
-});
-
-test('a status refusal comes from the source that listed the item, or else the source its repository names', async () => {
-  const project = fakeSource('lar', [item('I_1', 'maddec01/lar-apple')], []);
-  const issues = fakeSource('apple', [item('I_1', 'maddec01/lar-apple'), item('I_2', 'maddec01/lar-apple')], []);
-  const sources = mergeSources([project], new Map([['maddec01/lar-apple', issues]]));
-  await sources.read();
-  assert.equal(sources.statusRefusal(item('I_1', 'maddec01/lar-apple')), 'lar refuses I_1');
-  assert.equal(sources.statusRefusal(item('I_2', 'maddec01/lar-apple')), 'apple refuses I_2');
-  assert.equal(sources.statusRefusal({ number: 5, title: 'Parent', url: '', repo: 'maddec01/lar-apple', state: 'open' }), 'apple refuses maddec01/lar-apple#5');
-  assert.equal(sources.statusRefusal({ number: 6, title: 'Parent', url: '', repo: 'maddec01/lar-server', state: 'open' }), 'lar refuses maddec01/lar-server#6');
-});
-
-test('a saved id is renamed by whichever source knows it', () => {
-  const sources = mergeSources([fakeSource('lar', [], [])], new Map([['maddec01/lar-apple', fakeSource('apple', [], [])]]));
-  assert.equal(sources.renamedId?.('PVTI_lar'), 'I_lar');
-  assert.equal(sources.renamedId?.('PVTI_apple'), 'I_apple');
-  assert.equal(sources.renamedId?.('PVTI_other'), undefined);
-});
-
-test("a read fails whole when a source fails, and another source's error starts with its repository", async () => {
-  const failing = (message: string): ItemSource => ({ ...fakeSource('x', [], []), read: async () => { throw new Error(message); } });
-  const project = fakeSource('lar', [item('I_1', 'maddec01/lar-server')], []);
-  const issues = mergeSources([project], new Map([['maddec01/lar-apple', failing('Could not resolve to a Repository')]]));
-  await assert.rejects(issues.read(), { message: 'maddec01/lar-apple: Could not resolve to a Repository' });
-  const projectFails = mergeSources([failing('gh: not logged in')], new Map([['maddec01/lar-apple', fakeSource('apple', [], [])]]));
-  await assert.rejects(projectFails.read(), { message: 'gh: not logged in' });
-});
-
-test('two Projects each write for their own repositories, and a repository no source names takes the first', async () => {
-  const writes: string[] = [];
-  const lar = fakeSource('lar', [], writes);
-  const other = fakeSource('other', [], writes);
-  const sources = mergeSources([lar, other], new Map([['maddec01/lar-server', lar], ['fabrikam/api', other]]));
-  assert.equal((await sources.read()).title, 'lar');
-  for (const repo of ['maddec01/lar-server', 'Fabrikam/API', 'maddec01/elsewhere']) await sources.create({ kind: 'feature', repo, title: 'New', description: '', labels: [] }, {});
-  assert.deepEqual(writes, ['lar create maddec01/lar-server', 'other create Fabrikam/API', 'lar create maddec01/elsewhere']);
-});
-
 test('with no source a read lists nothing and a write is refused', async () => {
-  const sources = mergeSources([], new Map());
+  const sources = mergeSources(new Map());
   assert.deepEqual(await sources.read(), { title: '', items: [] });
   assert.equal(await sources.setStatus(item('I_1', 'maddec01/lar-server'), 'Queued'), "That item's repository isn't onboarded.");
 });
@@ -166,7 +92,7 @@ test('a read leaves out the items of a resetting repository, though its Project 
 });
 
 const azure = (repo: string, team = 'Fabrikam Team', show: RepositoryConfig['show'] = 'all'): RepositoryConfig =>
-  ({ repo, version: 1, role: 'role', itemSource: { kind: 'azure-sprint', team }, show, labels: [] });
+  ({ repo, version: 1, role: 'role', itemSource: { kind: 'azure-board', team }, show, labels: [] });
 
 test("repositories reading one team's sprint share one read, and an untagged item from it is for each of them", async () => {
   const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 2, type: 'User Story', state: 'New', tags: 'repo-api' }] });
@@ -179,16 +105,9 @@ test("repositories reading one team's sprint share one read, and an untagged ite
   assert.equal(az.calls.filter((c) => c[3] === 'list-work-items').length, 2, 'one sprint read per team');
 });
 
-test("with Opted-in items, an untagged item that carries no status leaves the Lists of the opted-in repositories", async () => {
-  const bare = (id: string, untaggedFor: string[]): Item => ({ ...item(id, untaggedFor[0]!), statuses: [], untaggedFor });
-  const sprint = fakeSource('sprint', [bare('I_1', ['contoso/p/web', 'contoso/p/api']), bare('I_2', ['contoso/p/web']), { ...bare('I_3', ['contoso/p/web']), statuses: ['List'] }], []);
-  const read = await mergeSources([], new Map([['contoso/p/web', sprint], ['contoso/p/api', sprint]]), ['Contoso/P/Web']).read();
-  assert.deepEqual(read.items.map((i) => [i.id, i.repo, i.untaggedFor]), [['I_1', 'contoso/p/api', ['contoso/p/api']], ['I_3', 'contoso/p/web', ['contoso/p/web']]]);
-});
-
 test('a problem with a source that repositories share shows under each of them', async () => {
   const sprint: ItemSource = { ...fakeSource('sprint', [], []), read: async () => { throw new ReadProblem('az is logged out.', 'az login'); } };
-  const read = await mergeSources([], new Map([['contoso/p/web', sprint], ['contoso/p/api', sprint]])).read();
+  const read = await mergeSources(new Map([['contoso/p/web', sprint], ['contoso/p/api', sprint]])).read();
   assert.deepEqual(read.problems, [{ repo: 'contoso/p/web', problem: 'az is logged out.', fix: 'az login' }, { repo: 'contoso/p/api', problem: 'az is logged out.', fix: 'az login' }]);
 });
 
@@ -204,7 +123,7 @@ test('a read marks each source as started at once and as finished when its own r
   const slow = slowSource('Project maddec01/1');
   const events: string[] = [];
   const progress = { started: (name: string) => events.push(`+${name}`), finished: (name: string) => events.push(`-${name}`) };
-  const read = mergeSources([slow.source], new Map([['maddec01/lar-apple', fast.source]])).read(progress);
+  const read = mergeSources(new Map([['maddec01/lar-server', slow.source], ['maddec01/lar-apple', fast.source]])).read(progress);
   assert.deepEqual(events, ['+Project maddec01/1', '+lar-apple']);
   fast.finish();
   await new Promise((resolve) => setImmediate(resolve));
@@ -218,7 +137,7 @@ test("a source without a name is named by its repositories, and a failed read st
   const events: string[] = [];
   const progress = { started: (name: string) => events.push(`+${name}`), finished: (name: string) => events.push(`-${name}`) };
   const failing: ItemSource = { ...fakeSource('x', [], []), read: async () => { throw new Error('boom'); } };
-  const sources = mergeSources([], new Map([['contoso/p%20q/web', failing], ['contoso/p%20q/api', failing]]));
+  const sources = mergeSources(new Map([['contoso/p%20q/web', failing], ['contoso/p%20q/api', failing]]));
   await assert.rejects(sources.read(progress), /boom/);
   assert.deepEqual(events, ['+web, api', '-web, api']);
 });
@@ -228,7 +147,7 @@ test("each source's read lands while another still reads, with the items read so
   const slow = slowSource('lar', [item('I_1', 'maddec01/lar-server')]);
   const landed: ItemsRead[] = [];
   const progress = { started: () => {}, finished: () => {}, landed: (read: ItemsRead) => landed.push(read) };
-  const reading = mergeSources([slow.source], new Map([['maddec01/lar-server', slow.source], ['maddec01/lar-apple', fast.source]])).read(progress);
+  const reading = mergeSources(new Map([['maddec01/lar-server', slow.source], ['maddec01/lar-apple', fast.source]])).read(progress);
   fast.finish();
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(landed.map((read) => [read.items.map((i) => i.id), read.waiting]), [[['I_2'], ['maddec01/lar-server']]]);
@@ -246,9 +165,9 @@ test("a source whose first read failed, or that its tool blocks, isn't waiting, 
   const blocked = countedSource('lar', () => []);
   const landed: ItemsRead[] = [];
   const progress = { started: () => {}, finished: () => {}, landed: (read: ItemsRead) => landed.push(read) };
-  const sources = mergeSources([blocked], new Map([['maddec01/lar-server', blocked], ['maddec01/lar-docs', failing], ['maddec01/lar-apple', slow.source],
-    ['maddec01/lar-web', slower.source]]), [], new Map<ItemSource, ItemSourceKind>([[blocked, 'project'], [failing, 'issues'], [slow.source, 'issues'], [slower.source, 'issues']]));
-  const held = { ...pace(0), waits: (kind: string) => kind === 'project', blocked: (kind: string) => kind === 'project' };
+  const sources = mergeSources(new Map([['maddec01/lar-server', blocked], ['maddec01/lar-docs', failing], ['maddec01/lar-apple', slow.source],
+    ['maddec01/lar-web', slower.source]]), [], new Map<ItemSource, ItemSourceKind>([[blocked, 'azure-board'], [failing, 'issues'], [slow.source, 'issues'], [slower.source, 'issues']]));
+  const held = { ...pace(0), waits: (kind: string) => kind === 'azure-board', blocked: (kind: string) => kind === 'azure-board' };
   const reading = sources.read(progress, held);
   await new Promise((resolve) => setImmediate(resolve));
   slow.finish();
@@ -257,7 +176,7 @@ test("a source whose first read failed, or that its tool blocks, isn't waiting, 
   await assert.rejects(reading, /boom/);
   assert.deepEqual(landed.map((read) => read.waiting), [['maddec01/lar-web']], 'neither the failed nor the blocked source waits');
   assert.equal(blocked.reads, 0);
-  const checking = await sources.read(undefined, { ...pace(1_000), waits: (kind: string) => kind === 'project' });
+  const checking = await sources.read(undefined, { ...pace(1_000), waits: (kind: string) => kind === 'azure-board' });
   assert.deepEqual(checking.waiting, ['maddec01/lar-server'], "a source waiting for its tool's check is waiting");
 });
 
@@ -292,7 +211,7 @@ const pace = (now: number, active: (i: Item) => boolean = (i) => i.status === 'I
 test('a paced read reads a source with active work every 15 seconds and an idle one every 5 minutes', async () => {
   const busy = countedSource('busy', () => [item('I_1', 'maddec01/lar-apple', 'In progress')]);
   const idle = countedSource('idle', () => [item('I_2', 'maddec01/lar-server', 'Queued')]);
-  const sources = mergeSources([], new Map([['maddec01/lar-apple', busy], ['maddec01/lar-server', idle]]));
+  const sources = mergeSources(new Map([['maddec01/lar-apple', busy], ['maddec01/lar-server', idle]]));
   await sources.read(undefined, pace(0));
   assert.equal(sources.due(pace(14_999)), false);
   const read = await sources.read(undefined, pace(15_000));
@@ -309,7 +228,7 @@ test('a paced read reads a source with active work every 15 seconds and an idle 
 test('invalidating an item reads only the source that lists it, at once, and an unknown one reads its repository\'s source', async () => {
   const apple = countedSource('apple', () => [{ ...item('I_1', 'maddec01/lar-apple'), slices: [{ number: 9, title: 's', url: 'https://github.com/maddec01/lar-apple/issues/9', state: 'open', repo: 'maddec01/lar-apple', progress: 'active' }] }]);
   const server = countedSource('server', () => [item('I_2', 'maddec01/lar-server')]);
-  const sources = mergeSources([], new Map([['maddec01/lar-apple', apple], ['maddec01/lar-server', server]]));
+  const sources = mergeSources(new Map([['maddec01/lar-apple', apple], ['maddec01/lar-server', server]]));
   await sources.read(undefined, pace(0));
   sources.invalidate('https://github.com/maddec01/lar-apple/issues/9');
   assert.equal(sources.due(pace(1_999)), false, 'two reads of one source are at least 2 seconds apart');
@@ -328,7 +247,7 @@ test('a source whose read failed is read again, while one that read keeps its re
     if (fail) throw new Error('boom');
     return { title: 'flaky', items: [item('I_2', 'maddec01/lar-server')] };
   } };
-  const sources = mergeSources([], new Map([['maddec01/lar-apple', good], ['maddec01/lar-server', flaky]]));
+  const sources = mergeSources(new Map([['maddec01/lar-apple', good], ['maddec01/lar-server', flaky]]));
   await assert.rejects(sources.read(undefined, pace(0)), /boom/);
   fail = false;
   assert.equal(sources.due(pace(14_999)), false, 'a source that never read retries at the active pace');
@@ -359,7 +278,7 @@ test('a source that reads items alone reads only its active and asked-for items 
     some.push(items.map((i) => i.id));
     return listed.filter((i) => items.some((asked) => asked.id === i.id));
   } });
-  const sources = mergeSources([project], new Map());
+  const sources = mergeSources(new Map([['maddec01/lar-server', project]]));
   await sources.read(undefined, pace(0));
   listed = [{ ...listed[0]!, status: 'Review', statuses: ['Review'] }, listed[1]!];
   const read = await sources.read(undefined, pace(15_000));
@@ -379,7 +298,7 @@ test('a source that reads items alone reads only its active and asked-for items 
 test('a read of a few items that fails reads the whole source instead', async () => {
   const project = Object.assign(countedSource('project', () => [item('I_1', 'maddec01/lar-apple', 'In progress')]),
     { readSome: async () => { throw new Error('Could not resolve to a node'); } });
-  const sources = mergeSources([project], new Map());
+  const sources = mergeSources(new Map([['maddec01/lar-server', project]]));
   await sources.read(undefined, pace(0));
   await sources.read(undefined, pace(15_000));
   assert.equal(project.reads, 2);
@@ -395,7 +314,7 @@ test('a change check every 5 seconds reads the items changed elsewhere alone, an
     readSome: async (items: Item[]) => { some.push(items.map((i) => i.id)); return items; },
     changes: async (since: number) => { checks.push(since); return changes; },
   });
-  const sources = mergeSources([project], new Map());
+  const sources = mergeSources(new Map([['maddec01/lar-server', project]]));
   await sources.read(undefined, pace(0));
   await sources.probe(pace(4_999));
   assert.deepEqual(checks, [], 'no check before 5 seconds');
@@ -423,7 +342,7 @@ test('a source whose change check sees every edit reads only the items no check 
     seesEdits: true,
     readSome: async (items: Item[]) => { some.push(items.map((i) => i.id)); return items; },
   });
-  const sources = mergeSources([], new Map([['maddec01/lar-apple', issues]]));
+  const sources = mergeSources(new Map([['maddec01/lar-apple', issues]]));
   await sources.read(undefined, pace(0));
   await sources.read(undefined, pace(15_000));
   assert.deepEqual(some, [['I_2']]);
@@ -439,7 +358,7 @@ test('a read that fails after a change check asks again for what it read, at the
   });
   const read = issues.read;
   issues.read = async () => { if (fail) throw new Error('timeout'); return read(); };
-  const sources = mergeSources([], new Map([['maddec01/lar-apple', issues]]));
+  const sources = mergeSources(new Map([['maddec01/lar-apple', issues]]));
   await sources.read(undefined, pace(0));
   fail = true;
   await sources.probe(pace(5_000));
@@ -455,7 +374,7 @@ test('a read that fails after a change check asks again for what it read, at the
 test('a change check that fails waits a minute before it checks again', async () => {
   let checks = 0;
   const issues = Object.assign(countedSource('issues', () => []), { changes: async () => { checks++; throw new Error('HTTP 404'); } });
-  const sources = mergeSources([], new Map([['maddec01/lar-apple', issues]]));
+  const sources = mergeSources(new Map([['maddec01/lar-apple', issues]]));
   await sources.read(undefined, pace(0));
   await sources.probe(pace(5_000));
   await sources.probe(pace(6_000));
@@ -479,7 +398,7 @@ test('an item read alone keeps the map its whole read gave it, as a dossier read
 test("a read request naming an item no source lists reads only the source of the GitHub repository it names", async () => {
   const apple = countedSource('apple', () => []);
   const server = countedSource('server', () => []);
-  const sources = mergeSources([], new Map([['maddec01/lar-apple', apple], ['maddec01/lar-server', server]]));
+  const sources = mergeSources(new Map([['maddec01/lar-apple', apple], ['maddec01/lar-server', server]]));
   await sources.read(undefined, pace(0));
   sources.invalidate('https://github.com/maddec01/Lar-Apple/issues/12');
   await sources.read(undefined, pace(2_000));
@@ -501,28 +420,13 @@ test('a read of a few items keeps everything it brings, as a parent read with a 
   assert.deepEqual(read.items.map((i) => `${i.id}:${i.status}`), ['I_1:In progress', 'I_2:Review', 'I_3:List']);
 });
 
-test('a change to a blocker reads the items it blocks too, and an unknown GitHub repository reads only the Projects', async () => {
-  const blocked = { ...item('I_1', 'maddec01/lar-apple', 'Queued'), blockers: [{ number: 7, repo: 'maddec01/lar-server', state: 'open' as const }] };
-  const some: string[][] = [];
-  const project = Object.assign(countedSource('project', () => [blocked]), { readSome: async (items: Item[]) => { some.push(items.map((i) => i.id)); return items; } });
-  const issues = countedSource('issues', () => []);
-  const sources = mergeSources([project], new Map([['maddec01/lar-server', issues]]));
-  await sources.read(undefined, pace(0));
-  sources.invalidate('https://github.com/maddec01/lar-server/issues/7');
-  await sources.read(undefined, pace(2_000));
-  assert.deepEqual([some, issues.reads], [[['I_1']], 1]);
-  sources.invalidate('https://github.com/someone/elsewhere/issues/1');
-  await sources.read(undefined, pace(4_000));
-  assert.deepEqual([project.reads, issues.reads], [2, 1]);
-});
-
 test('a source whose kind waits reads nothing and checks for no changes, and reads whole once it stops waiting', async () => {
   const checks: number[] = [];
   const github = Object.assign(countedSource('github', () => [item('I_1', 'maddec01/lar-apple')]), { changes: async (since: number) => { checks.push(since); return []; } });
   const azure = countedSource('azure', () => [item('I_2', 'maddec01/lar-server')]);
-  const sources = mergeSources([], new Map([['maddec01/lar-apple', github], ['maddec01/lar-server', azure]]), [],
-    new Map([[github, 'issues'], [azure, 'sprint']]));
-  let waiting = new Set<string>(['sprint']);
+  const sources = mergeSources(new Map([['maddec01/lar-apple', github], ['maddec01/lar-server', azure]]), [],
+    new Map([[github, 'issues'], [azure, 'azure-board']]));
+  let waiting = new Set<string>(['azure-board']);
   const paced = (now: number) => ({ ...pace(now), waits: (kind: string) => waiting.has(kind) });
   assert.deepEqual((await sources.read(undefined, { ...paced(0), waits: () => true })).waiting, ['maddec01/lar-apple', 'maddec01/lar-server'],
     'a read with every source waiting reads nothing, and every repository waits');
@@ -542,7 +446,7 @@ test('a source whose kind waits reads nothing and checks for no changes, and rea
 test('repositories reading one Azure board share its backlog and sprint and route tagged items', async () => {
   const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 2, type: 'User Story', state: 'Active', tags: 'repo-api' }], backlog: [1, 2], sprint: [2] });
   const configs = [azure('contoso/Fabrikam/web'), azure('Contoso/fabrikam/api', 'fabrikam team')]
-    .map((config) => ({ ...config, itemSource: { kind: 'azure-board' as const, team: config.itemSource.kind === 'azure-sprint' ? config.itemSource.team : '' } }));
+    .map((config) => ({ ...config, itemSource: { kind: 'azure-board' as const, team: config.itemSource.kind === 'azure-board' ? config.itemSource.team : '' } }));
   const read = await configuredSources(configs, az.run).read();
   assert.deepEqual(read.items.map((i) => [i.number, i.repo, i.untaggedFor ?? null]), [
     [1, 'contoso/Fabrikam/web', ['contoso/Fabrikam/web', 'Contoso/fabrikam/api']], [2, 'Contoso/fabrikam/api', null],

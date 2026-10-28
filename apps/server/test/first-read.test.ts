@@ -1,13 +1,13 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import type { BoardData } from '@lar-factory/shared';
 import { startBoard, until } from './server-support.ts';
 
 const settled = (board: Parameters<typeof until>[0]) => until(board, (d) => d.firstRead.settled);
 
 test('the first read settles once the repositories are read, with nothing running', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
   const data = await settled(board);
   assert.ok(data.fetchedAt, 'the read finished');
   assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
@@ -19,7 +19,7 @@ test('the first read settles with zero repositories', async (t) => {
 });
 
 test('the first read settles when the read fails', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')], fail: 'read' });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')], fail: 'read' });
   const data = await settled(board);
   assert.match(data.error ?? '', /502/);
   assert.equal(data.fetchedAt, null);
@@ -40,10 +40,10 @@ test('the first read settles when gh is missing at launch', async (t) => {
 });
 
 test('a read after the first never un-settles it', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
   await settled(board);
   await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json' }, body: '{}' });
-  await board.update({ items: [projectIssue(1, 'Ready')] });
+  await board.update({ items: [boardIssue(1, 'Ready')] });
   await until(board, (d) => d.items[0]?.status === 'Ready');
   assert.equal((await board.board() as BoardData).firstRead.settled, true);
 });
@@ -54,7 +54,7 @@ test('the sample board is settled at once', async (t) => {
 });
 
 test('the page embeds the first read in its board data', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
   await settled(board);
   const page = await (await fetch(`${board.url}/`)).text();
   const inline = JSON.parse(page.match(/<script id="board-data" type="application\/json">(.*?)<\/script>/s)![1]!);
@@ -62,7 +62,7 @@ test('the page embeds the first read in its board data', async (t) => {
 });
 
 test('the stream pushes the first read as it moves from unsettled to settled, naming what runs', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')], readDelay: 400, repositories: ['maddec01/lar-server', 'maddec01/lar-apple'] });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 400, repositories: ['maddec01/lar-server', 'maddec01/lar-apple'] });
   const abort = new AbortController();
   t.onTestFinished(() => abort.abort());
   const response = await fetch(`${board.url}/api/events`, { signal: abort.signal });
@@ -93,10 +93,10 @@ test('the stream pushes the first read as it moves from unsettled to settled, na
 
 test("each repository's items show once its own read lands, while another repository's read still runs", async (t) => {
   const apple = 'maddec01/lar-apple';
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')], readDelay: 1_500,
-    repoConfigs: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } }, repoIssues: { [apple]: [projectIssue(7, 'List', apple).content] } });
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 1_500,
+    repoConfigs: { [apple]: { role: 'Apple client', itemSource: { kind: 'issues' } } }, repoIssues: { [apple]: [boardIssue(7, 'List', apple).content] } });
   const early = await until(board, (d) => d.items.length > 0);
-  assert.deepEqual(early.items.map((i) => [i.repo, i.number]), [[apple, 7]], "the Project's read still sleeps");
+  assert.deepEqual(early.items.map((i) => [i.repo, i.number]), [[apple, 7]], "the repository's read still sleeps");
   assert.equal(early.firstRead.settled, false);
   assert.deepEqual(early.firstRead.waiting, ['maddec01/lar-server', 'maddec01/lar-factory']);
   assert.equal(early.fetchedAt, null, 'the whole read has yet to land');

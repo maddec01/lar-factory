@@ -9,7 +9,7 @@ import { notEditable, openConfigUpdatePr as openUpdate, openEditPr as openEdit, 
 
 const REPO = 'maddec01/lar-web';
 const PR = 'https://github.com/maddec01/lar-web/pull/21';
-const FILE = JSON.stringify({ version: 2, role: 'Web client', itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', labels: ['app: music'] });
+const FILE = JSON.stringify({ version: 2, role: 'Web client', itemSource: { kind: 'issues' }, show: 'all', labels: ['app: music'] });
 const PR_FILE = JSON.stringify({ version: 3, role: 'Web client on the PR', show: 'opted-in', labels: ['app: video'] });
 const config = { itemSource: { kind: 'issues' }, show: 'opted-in', role: ' Web client for the API ', labels: ['app: music', 'app: video'] };
 
@@ -82,7 +82,7 @@ const writes = (calls: string[][]) => calls.filter((args) => args.includes('POST
 
 test("Edit loads the default branch's .lar-factory.json and the repository's labels", async () => {
   assert.deepEqual(await readEditConfig({ repo: REPO }, gh().run), {
-    config: { itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 }, show: 'all', role: 'Web client', labels: ['app: music'] },
+    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['app: music'] },
     labels: ['bug', 'app: music'],
   });
 });
@@ -217,9 +217,9 @@ test('Edit, its Save and the config update PR refuse a repository off the list, 
 
 const AZURE = 'contoso/Fabrikam%20Fiber/lar-api';
 const AZURE_PR = `${REPO_URL}/pullrequest/7`;
-const AZURE_FILE = JSON.stringify({ version: 2, role: 'API', itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', labels: ['app: music'] });
-const AZURE_PR_FILE = JSON.stringify({ version: 3, role: 'API on the PR', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', labels: [] });
-const azureConfig = { itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', role: ' API ', labels: ['app: music', 'app: video'] };
+const AZURE_FILE = JSON.stringify({ version: 2, role: 'API', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', labels: ['app: music'] });
+const AZURE_PR_FILE = JSON.stringify({ version: 3, role: 'API on the PR', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'opted-in', labels: [] });
+const azureConfig = { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'opted-in', role: ' API ', labels: ['app: music', 'app: video'] };
 const AZURE_LISTED = listDir([{ repo: AZURE }]);
 
 /**
@@ -236,11 +236,11 @@ const created = (calls: string[][]) => calls.filter((args) => args.slice(0, 3).j
 
 test("on Azure, Edit loads the default branch's .lar-factory.json and the project's tags through az, and an open Edit PR's branch file", async () => {
   assert.deepEqual(await readEdit({ repo: AZURE }, azRepos().run, AZURE_LISTED), {
-    config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['app: music'] },
+    config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['app: music'] },
     labels: ['app: music', 'status-list'],
   });
   assert.deepEqual(await readEdit({ repo: AZURE }, azRepos({ open: true }).run, AZURE_LISTED), {
-    config: { itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', role: 'API on the PR', labels: [] },
+    config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'opted-in', role: 'API on the PR', labels: [] },
     labels: ['app: music', 'status-list'],
     editPr: AZURE_PR,
   });
@@ -253,7 +253,7 @@ test('on Azure, Save pushes one commit with only .lar-factory.json to lar-factor
   assert.deepEqual(az.pushes.map(({ ref, oldObjectId, parents, changes }) => ({ ref, oldObjectId, parents, paths: changes.map((c) => [c.changeType, c.path]) })),
     [{ ref: 'refs/heads/lar-factory/edit-config', oldObjectId: '0'.repeat(40), parents: ['abc123'], paths: [['edit', '/.lar-factory.json']] }]);
   assert.deepEqual(pushedFile(az.pushes[0]!),
-    { version: CONFIG_VERSION, role: 'API', itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' }, show: 'opted-in', labels: ['app: music', 'app: video'] });
+    { version: CONFIG_VERSION, role: 'API', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'opted-in', labels: ['app: music', 'app: video'] });
   const [create] = created(az.calls);
   assert.deepEqual([create![create!.indexOf('--source-branch') + 1], create![create!.indexOf('--target-branch') + 1]], ['lar-factory/edit-config', 'main']);
   assert.equal(create![create!.indexOf('--transition-work-items') + 1], 'true');

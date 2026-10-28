@@ -1,7 +1,7 @@
-// Project items as GitHub's GraphQL API returns them, and the rules that turn them into the
+// Repository issues as GitHub's GraphQL API returns them, and the rules that turn them into the
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
-import { STATUSES, isBuild, isDraft, labelStatuses, sliceProgress } from './model.ts';
+import { isBuild, isDraft, labelStatuses, sliceProgress } from './model.ts';
 import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice, Status } from './model.ts';
 import { parseConceptMap } from './concept-map.ts';
 
@@ -34,7 +34,7 @@ export interface Searched {
 }
 
 interface RawContent {
-  __typename: 'Issue' | 'PullRequest' | 'DraftIssue';
+  __typename: 'Issue';
   /** The issue's, pull request's or draft's node id: the board's Item.id, and what a dossier's body is read by. */
   id: string;
   /** Read for concepts only, in a query of its own. */
@@ -48,10 +48,6 @@ interface RawContent {
   /** An issue's close reason, such as COMPLETED or NOT_PLANNED. */
   stateReason?: string | null;
   closedAt?: string | null;
-  isDraft?: boolean;
-  /** A pull request item's own. */
-  mergeStateStatus?: string;
-  statusCheckRollup?: RawLinkedPr['statusCheckRollup'];
   repository?: { nameWithOwner: string };
   labels?: RawLabelConn;
   parent?: RawIssueRef | null;
@@ -94,10 +90,9 @@ export interface RawLinkedPr {
 }
 
 export interface RawItem {
-  /** The Project item id, which only the Project adapter's writes use. */
+  /** The Raw issue id. */
   id: string;
   updatedAt: string;
-  status: { name?: string } | null;
   content: RawContent | null;
 }
 
@@ -159,19 +154,9 @@ function normalizeLinkedPr({ id: _id, statusCheckRollup, mergeStateStatus, state
 
 /** Open, or closed as done or not planned: a merged PR or an issue closed as completed (or before GitHub kept a reason) is done. */
 function closing(c: RawContent): Pick<Item, 'state' | 'closedAs'> {
-  if (c.state === 'MERGED') return { state: 'closed', closedAs: 'done' };
   if (c.state !== 'CLOSED') return { state: 'open', closedAs: null };
-  const notPlanned = c.__typename === 'PullRequest' || c.stateReason === 'NOT_PLANNED' || c.stateReason === 'DUPLICATE';
+  const notPlanned = c.stateReason === 'NOT_PLANNED' || c.stateReason === 'DUPLICATE';
   return { state: 'closed', closedAs: notPlanned ? 'not-planned' : 'done' };
-}
-
-/** Where an item source keeps an item's status: a Project's Status field, or an issue's `status-<name>` labels. */
-export type StatusSource = 'field' | 'labels';
-
-/** The statuses an item carries, in flow order. Done is never read from storage. */
-function storedStatuses(raw: RawItem, from: StatusSource): Status[] {
-  if (from === 'field') return STATUSES.filter((s) => s !== 'Done' && s === raw.status?.name);
-  return labelStatuses(rawLabels(raw));
 }
 
 /** GitHub's issue state, as the board's provider-neutral one. */
@@ -216,17 +201,17 @@ function normalizeSlices(raws: RawIssueRef[], active: ReadonlySet<string>, block
 }
 
 /** Turns one raw item into the board's Item, reading its statuses `from` its item source's store; null for items we can't see. */
-export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new Set(), builds = new Set() }: Searched = {}, from: StatusSource = 'field'): Item | null {
+export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new Set(), builds = new Set() }: Searched = {}): Item | null {
   const c = raw.content;
   if (!c) return null;
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
   const closed = closing(c);
-  const statuses = storedStatuses(raw, from);
+  const statuses = labelStatuses(rawLabels(raw));
   const item: Item = {
     id: c.id,
     status: closed.closedAs === 'done' ? 'Done' : statuses[0] ?? 'List',
     statuses,
-    content: c.__typename === 'PullRequest' ? 'pr' : 'ticket',
+    content: 'ticket',
     number: c.number ?? null,
     title: c.title,
     url: c.url ?? null,
@@ -241,23 +226,21 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
     slices: normalizeSlices(rawSlices(raw, builds), active, blocked),
   };
-  if (c.__typename === 'PullRequest') item.pipeline = { checks: normalizeChecks(c.statusCheckRollup), mergeState: normalizeMergeState(c.mergeStateStatus) };
   if (isRawConcept(raw)) item.map = parseConceptMap(c.body ?? '');
   return item;
 }
 
 /**
  * Normalizes an item source's raw items into board items. A slice lives inside its
- * build's card, so it's dropped here even when the project's auto-add put it on
- * the project. Membership in some build's slices decides, since `parent` has no labels.
+ * build's card, so it's dropped here even when the repository read lists it. Membership in some build's slices decides, since `parent` has no labels.
  * An item closed as not planned is abandoned, and dropped too.
  */
-export function normalizeItems(raws: RawItem[], searched: Searched = {}, from: StatusSource = 'field'): Item[] {
+export function normalizeItems(raws: RawItem[], searched: Searched = {}): Item[] {
   const items: Item[] = [];
   const bodies = new Map<string, string | undefined>();
   const slices = new Set<string>();
   for (const raw of raws) {
-    const item = normalizeItem(raw, searched, from);
+    const item = normalizeItem(raw, searched);
     if (!item) continue;
     items.push(item);
     bodies.set(item.id, raw.content?.body);
@@ -284,7 +267,7 @@ function parentMap(body: string | undefined, isParent: boolean): ConceptMap | un
   return map.destination || map.decisions.length || map.fog.length || map.check ? map : undefined;
 }
 
-/** The project items the line shows as dossiers, whose bodies hold their maps: every concept, and every item with a sub-issue on the board. */
+/** The issues the line shows as dossiers, whose bodies hold their maps: every concept, and every item with a sub-issue on the board. */
 export function rawDossiers(raws: RawItem[], searched: Searched = {}): RawItem[] {
   const parents = parentKeys(normalizeItems(raws, searched));
   return raws.filter((raw) => isRawConcept(raw) || parents.has(rawKey(raw)));
@@ -292,18 +275,18 @@ export function rawDossiers(raws: RawItem[], searched: Searched = {}): RawItem[]
 
 const rawKey = (raw: RawItem) => refKey(raw.content?.repository?.nameWithOwner ?? null, raw.content?.number ?? null);
 
-/** The project's own items labelled `build`, read from the project query, so the search index's lag can't miss them. */
-export const projectBuilds = (raws: RawItem[]) => new Set(raws.filter((raw) => isBuild({ labels: rawLabels(raw) })).map(rawKey));
+/** The read’s own issues labelled `build`, read from the issue query, so the search index's lag can't miss them. */
+export const readBuilds = (raws: RawItem[]) => new Set(raws.filter((raw) => isBuild({ labels: rawLabels(raw) })).map(rawKey));
 
 /** The builds' linked PRs, whose bodies hold a build's stats block: the only linked PRs whose body and merge time the board reads. */
 export const rawBuildPrs = (raws: RawItem[]): RawLinkedPr[] =>
   raws.filter((raw) => isBuild({ labels: rawLabels(raw) })).flatMap((raw) => raw.content?.closedByPullRequestsReferences?.nodes ?? []);
 
-/** The issue searches for `build` issues, one per repo holding a build's sub-issue that isn't on the project; none when none is off it. */
+/** The issue searches for `build` issues, one per repo holding a build's sub-issue that isn't in the read; none when none is off it. */
 export function buildSubIssueSearches(raws: RawItem[]): string[] {
-  const onProject = new Set(raws.map(rawKey));
+  const inRead = new Set(raws.map(rawKey));
   const repos = new Set(raws.flatMap((raw) => rawSubIssues(raw)
-    .filter((s) => !onProject.has(refKey(s.repository.nameWithOwner, s.number)))
+    .filter((s) => !inRead.has(refKey(s.repository.nameWithOwner, s.number)))
     .map((s) => s.repository.nameWithOwner)));
   return [...repos].map((repo) => `is:issue label:build repo:${repo}`);
 }

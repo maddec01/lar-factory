@@ -145,7 +145,7 @@ checks.
 
 **Item thread**:
 A T3 thread whose first message names the item, before any other issue. Its
-state is running, needs you or done.
+state is running, needs you, stopped or done.
 
 **Planner**:
 The agent a build thread starts to split its build into slices or to re-slice a

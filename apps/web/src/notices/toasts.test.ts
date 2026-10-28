@@ -1,5 +1,5 @@
 // Toasts: a success clears itself after 5 s, later while it's in use; the close button; View item;
-// shown through the copied Notifications. Ported from the toast cases of test/render.test.ts.
+// shown through the design system's Toaster. Ported from the toast cases of test/render.test.ts.
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, fetchMock, mountPage, moved, sample, settle, text, toast } from '../../test/support.ts';
@@ -99,4 +99,21 @@ test("a poll that started before the page's own write doesn't bring back older d
   expect(inList()).toBe('List3');
   await settle(() => answerPoll());
   expect(inList(), 'still Queued').toBe('List3');
+});
+
+test('a build start announces the outcome and links the thread without printing its prompt or id', async () => {
+  await mountPage();
+  await notify({ verb: 'Started', item: sample.items.find((i) => i.number === 140)!, kind: 'build', thread: {
+    threadId: 'raw-thread-id', title: 'Build owner/repo#140. Read /Users/example/private-checkout and follow the builder instructions.',
+  } });
+  expect(text(toast())).toBe('Build started for #140. Open thread');
+  expect(toast()!.querySelector('a')!.getAttribute('href')).toBe('t3code://threads/sample-environment/raw-thread-id');
+});
+
+test('notifications sit at the top of the page, away from dialog footer actions', async () => {
+  await mountPage();
+  await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
+  const viewport = $('[data-slot="toaster"]')!;
+  expect(viewport.classList.contains('top-0')).toBe(true);
+  expect(viewport.classList.contains('bottom-0')).toBe(false);
 });

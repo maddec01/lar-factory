@@ -195,7 +195,7 @@ test("Start refining opens its menu without opening the dialog, and starts its r
   const tag = row('I_sample06').querySelector('[data-start-result]')!;
   expect([text(tag), tag.getAttribute('title')]).toEqual(['Started', 'T3 thread thread-1']);
   expect(row('I_sample06').querySelector('[data-start]')).toBeNull();
-  expect(text(toast())).toBe(`Started T3 thread thread-1 for ${title}.`);
+  expect(text(toast())).toBe('Refining started for #20. Open thread');
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({ instanceId: 'claudeAgent', model: 'claude-opus-5-5' });
 });
 

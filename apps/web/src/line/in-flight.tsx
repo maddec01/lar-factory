@@ -13,7 +13,7 @@ import { StartBuild } from '../items/start-build.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { dossiersOf, inDossiers } from './dossier-parts.ts';
-import { OnYourDesk, Row, StageHeader, THREAD_TEXT, YOURS, stageOf } from './stage-track.tsx';
+import { OnYourDesk, Row, StageHeader, threadText, YOURS, stageOf } from './stage-track.tsx';
 
 /** A button that doesn't open the item underneath it, nor do clicks in the menu it opens. It wraps to its own line, inside the cell. */
 function Act({ children }: { children: ReactNode }) {
@@ -33,7 +33,7 @@ function NextAction({ item, data }: { item: Item; data: BoardData }) {
 function Side({ item, data }: { item: Item; data: BoardData }) {
   if (YOURS.includes(item.status)) return <OnYourDesk status={item.status} />;
   const blocked = item.status === 'Ready' ? openBlockers(item).length : 0;
-  return <><span className="min-w-0 truncate">{blocked ? `blocked by ${blocked}` : THREAD_TEXT[item.status]}</span><NextAction item={item} data={data} /></>;
+  return <><span className="min-w-0 truncate">{blocked ? `blocked by ${blocked}` : threadText(item)}</span><NextAction item={item} data={data} /></>;
 }
 
 /** `items` are the line's items in the main area's scope; those a dossier shows are left out. */

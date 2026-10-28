@@ -28,8 +28,8 @@ test('a dossier shows where its parent or any part is in the scope', () => {
   expect(dossiersOf([], items)).toEqual([]);
 });
 
-test('parts run decisions first, research, grill, prototype, then builds, each with its kind from its labels', () => {
-  expect(partsOf(byNumber(200), items).map((p) => [p.item.number, p.kind])).toEqual([[203, 'research'], [201, 'grill'], [202, 'prototype'], [140, 'build']]);
+test('parts follow dependency waves, then kind, with each kind from its labels', () => {
+  expect(partsOf(byNumber(200), items).map((p) => [p.item.number, p.kind])).toEqual([[203, 'research'], [202, 'prototype'], [201, 'grill'], [140, 'build']]);
   expect(partsOf(byNumber(180), items).map((p) => [p.item.number, p.kind])).toEqual([[181, 'build'], [40, 'build']]);
   expect(partKind({ ...byNumber(201), labels: ['decision-task'] }), 'a task decision is a decision').toBe('task');
   expect(DECISION_KINDS).toContain('task');
@@ -38,13 +38,13 @@ test('parts run decisions first, research, grill, prototype, then builds, each w
 });
 
 test("each part carries its blocked-by issues and its newest thread", () => {
-  const [research, grill, prototype, build] = partsOf(byNumber(200), items);
+  const [research, prototype, grill, build] = partsOf(byNumber(200), items);
   expect(grill!.waitsOn).toEqual([{ number: 203, repo: 'maddec01/lar-server', state: 'closed' }]);
   expect([research!.thread?.title, grill!.thread?.state, prototype!.thread?.state, build!.thread?.state]).toEqual(['Research: hosting cost of the relay', 'running', 'needs you', 'done']);
 });
 
 test('a part waits on its open blockers until a thread takes it on', () => {
-  const [, grill, , build] = partsOf(byNumber(200), items);
+  const [, , grill, build] = partsOf(byNumber(200), items);
   expect(openWaits(build!).map((b) => b.number)).toEqual([202]);
   expect(openWaits(grill!), 'its blocker closed').toEqual([]);
   expect(openWaits({ ...build!, item: { ...build!.item, status: 'In progress' } }), 'building, whatever it waited for').toEqual([]);
@@ -53,4 +53,15 @@ test('a part waits on its open blockers until a thread takes it on', () => {
 test('the dossiers take their parents and parts off the rest of the line', () => {
   const ids = inDossiers(dossiersOf(items, items));
   expect(items.filter((i) => ids.has(i.id)).map((i) => i.number)).toEqual([200, 201, 202, 140, 180, 203, 181, 40]);
+});
+
+test('parts follow dependency waves across repositories, with stable ties and external blockers ignored', () => {
+  const parent = byNumber(200);
+  const first = child(1, parent, { repo: 'owner/a', blockers: [] });
+  const after = child(1, parent, { repo: 'owner/b', blockers: [{ repo: 'owner/a', number: 1, state: 'open' }] });
+  const parallel = child(3, parent, { blockers: [{ repo: 'external/repo', number: 1, state: 'open' }] });
+  const last = child(4, parent, { blockers: [{ repo: 'owner/b', number: 1, state: 'closed' }] });
+  expect(partsOf(parent, [last, after, parallel, first]).map((p) => [p.item.repo, p.item.number])).toEqual([
+    [parallel.repo, 3], ['owner/a', 1], ['owner/b', 1], [last.repo, 4],
+  ]);
 });

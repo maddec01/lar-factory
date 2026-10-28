@@ -8,7 +8,7 @@
 
 import { LoaderCircle } from 'lucide-react';
 import { boardSections, failedCheck, inRepo, noneOnboarded, repoName, stillReading } from '@lar-factory/shared';
-import { Notifications } from '@lar-factory/ui/design-system/Notifications';
+import { Toaster } from '@lar-factory/ui/toasts';
 import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
 import { useScopeStore } from './board/scope-store.ts';
@@ -65,7 +65,7 @@ export function App() {
         </main>
         {/* Outside main, so the announcement sits apart from the page. */}
         <CopyStatus />
-        <Notifications />
+        <Toaster position="top-center" />
         <ItemDialog />
         <SettingsDialog />
         <AbandonDialog />

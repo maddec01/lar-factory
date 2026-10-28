@@ -18,8 +18,8 @@ test('an item\'s time comes from plain rows: its root\'s turns less waits, and a
       { id: 'other', title: 'other', deletedAt: null, root: 'other', parent: null, text: 'hello' },
     ],
     turns: [
-      { id: 't1', thread: 'root', providerThread: 'p1', startedAt: at(0), completedAt: at(10) },
-      { id: 't2', thread: 'child', providerThread: 'p2', startedAt: at(5), completedAt: at(20) },
+      { id: 't1', thread: 'root', providerThread: 'p1', status: 'completed', startedAt: at(0), completedAt: at(10) },
+      { id: 't2', thread: 'child', providerThread: 'p2', status: 'completed', startedAt: at(5), completedAt: at(20) },
     ],
     waits: [{ turn: 't1', createdAt: at(2), resolvedAt: at(4) }],
   }), Date.parse(at(60)));
@@ -31,7 +31,7 @@ test('an item\'s time comes from plain rows: its root\'s turns less waits, and a
 test('an open turn on an active provider thread runs up to now; on an idle one it stops at the thread\'s last activity', () => {
   const now = Date.parse(at(30));
   const threads = [{ id: 'root', title: 'root', deletedAt: null, root: 'root', parent: null, text: 'Build x/y#1' }];
-  const turns = [{ id: 't', thread: 'root', providerThread: 'p', startedAt: at(0), completedAt: null }];
+  const turns = [{ id: 't', thread: 'root', providerThread: 'p', status: 'running', startedAt: at(0), completedAt: null }];
   const lastMessages = [{ thread: 'root', at: at(12) }];
   assert.equal(agentTime(rows({ threads, turns, lastMessages, active: new Set(['p']) }), now)('x/y', 1)?.agentMs, 30 * MIN);
   assert.equal(agentTime(rows({ threads, turns, lastMessages }), now)('x/y', 1)?.agentMs, 12 * MIN);

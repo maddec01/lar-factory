@@ -152,21 +152,21 @@ test('picking an entry starts the item with that model, shows the thread, and re
   expect(card().querySelector('[data-start]'), 'the dialog keeps only a quiet tag').toBeNull();
   expect(footer()).toBeNull();
   expect(document.activeElement, 'focus moves to the tag').toBe(tag);
-  expect(text(toast()), 'the toast does not repeat a title that is the work message title').toBe(`Started T3 thread thread-1 for ${thread.title}.`);
-  expect(toast()!.querySelector('code.thread-id')).not.toBeNull();
+  expect(text(toast()), 'the toast does not repeat a title that is the work message title').toBe('Refining started for #129. Open thread');
+  expect(toast()!.querySelector('code')).toBeNull();
   expect(JSON.parse(localStorage.getItem(CHOICE_KEY)!)).toEqual({ instanceId: 'claudeAgent', model: 'claude-opus-5-5' });
   await openItem('I_sample06');
   await open('I_sample06');
   expect(checked(), 'the next menu highlights it').toEqual(['Opus 5.5']);
 });
 
-test('a title T3 chose differently is in the toast', async () => {
+test('a renamed thread still gets a short outcome in the toast', async () => {
   await mountItem(withChoices);
   await open();
   await press(entries()[0]!);
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05' }]]);
   await answer({ thread: { threadId: 'thread-1', title: 'Renamed' }, error: null });
-  expect(toast()!.querySelector('b')?.textContent).toBe('Renamed');
+  expect(text(toast())).toBe('Refining started for #129. Open thread');
   expect(localStorage.getItem(CHOICE_KEY), '"T3 default" stores as null').toBe('null');
 });
 

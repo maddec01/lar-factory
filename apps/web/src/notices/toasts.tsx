@@ -1,4 +1,4 @@
-// Toasts, shown through the copied Notifications: a success clears itself after 5 s, later while it's hovered or
+// Toasts, shown through the design system's Toaster: a success clears itself after 5 s, later while it's hovered or
 // has focus; a failure stays until it's closed. One toast per slot, so a new one replaces the last.
 
 import { useEffect, useRef } from 'react';

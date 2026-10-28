@@ -99,7 +99,7 @@ test("in the map, #n opens the issue in the concept's repository, and owner/repo
 test('the checklist runs Decide, then Build per repository, then Check, the done parts folded', async () => {
   await mountPage();
   expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build lar-server', 'Checkthe agents run it once every build lands']);
-  expect([...phases()[0]!.querySelectorAll('[data-part]')].map((s) => s.getAttribute('data-part'))).toEqual(['I_sample10', 'I_sample12']);
+  expect([...phases()[0]!.querySelectorAll('[data-part]')].map((s) => s.getAttribute('data-part'))).toEqual(['I_sample12', 'I_sample10']);
   const fold = button(phases()[0]!, '1 done');
   await press(fold);
   expect([fold.getAttribute('aria-expanded'), phases()[0]!.querySelectorAll('[data-part]').length]).toEqual(['true', 3]);
@@ -127,9 +127,9 @@ test('a step with no thread yet says when its thread starts', async () => {
 test('the progress rows sit on the stage track, done parts folded, each side saying what it waits on', async () => {
   await mountPage();
   expect(text(dossier().lastElementChild!.firstElementChild!.firstElementChild)).toBe('Progress · 4 parts');
-  expect(progress().map((r) => r.dataset.item)).toEqual(['I_sample10', 'I_sample12', 'I_sample13']);
+  expect(progress().map((r) => r.dataset.item)).toEqual(['I_sample12', 'I_sample10', 'I_sample13']);
   const side = (id: string) => text(row(id).lastElementChild);
-  expect([side('I_sample10'), side('I_sample12'), side('I_sample13')]).toEqual(['running', 'on your desk', 'waits on #202']);
+  expect([side('I_sample10'), side('I_sample12'), side('I_sample13')]).toEqual(['Thread running', 'on your desk', 'waits on #202']);
   expect(row('I_sample13').children[1]!.getAttribute('title'), 'a waiting part is dashed').toBe('Ready, waiting');
   await press(button(dossier(C180), '2 done'));
   expect(progress(C180).map((r) => text(r.lastElementChild))).toEqual(['PR #182 (merged)', 'PR #41 (merged)']);
@@ -297,4 +297,12 @@ test('the dossiers take the main area\'s scope', async () => {
   const { useScopeStore } = await import('../board/scope-store.ts');
   await settle(() => useScopeStore.getState().setScope('maddec01/lar-apple'));
   expect($$('[data-dossier]').map((d) => d.getAttribute('data-dossier')), '#180 through its Apple build').toEqual([C180]);
+});
+
+test('the checklist keeps cross-repository dependency order even when builds return to a repository', async () => {
+  const first = { ...sample.items.find((i) => i.id === 'I_sample24')!, state: 'open' as const, status: 'Ready' as const, blockers: [] };
+  const second = { ...sample.items.find((i) => i.id === 'I_sample25')!, state: 'open' as const, status: 'Ready' as const };
+  const last: Item = { ...first, id: 'I_last', number: 999, title: 'Finish in the server', blockers: [{ repo: second.repo!, number: second.number!, state: 'open' }] };
+  await mountPage({ ...sample, items: [...sample.items.filter((i) => ![first.id, second.id].includes(i.id)), last, second, first] });
+  expect([...dossier(C180).querySelectorAll('[data-checklist] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([first.id, second.id, last.id]);
 });

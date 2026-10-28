@@ -2,7 +2,7 @@
 // in the order they run. Each part's kind comes from its labels, what it waits on from its blocked-by issues, and its
 // thread is its newest item thread.
 
-import { blockerRef, decisionType, kindOf, openBlockers } from '@lar-factory/shared';
+import { blockerRef, decisionType, kindOf, openBlockers, refKey } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'build'] as const;
@@ -24,7 +24,7 @@ export interface DossierItems {
 }
 
 /** A thread's state, drawn with the glyph of the status it reads as. */
-export const THREAD_GLYPH: Record<ThreadState, Status> = { running: 'In progress', 'needs you': 'Needs you', done: 'Done' };
+export const THREAD_GLYPH: Record<ThreadState, Status> = { running: 'In progress', 'needs you': 'Needs you', stopped: 'Needs you', done: 'Done' };
 
 /** Past waiting: a thread has taken it on, whatever it waited for. */
 const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 'Done'];
@@ -40,11 +40,30 @@ export function partKind(item: Item): PartKind {
   return DECISION_KINDS.find((k) => k === decision) ?? 'build';
 }
 
-/** The parent's sub-issues on the board, decisions before builds, in board order within a kind. */
+/** Dependency waves shared by the checklist and Map. External blockers do not add a wave; cycles stop at a seen part. */
+export function partWaves(parts: Part[]): Map<string, number> {
+  const key = (p: Part) => refKey(p.item.repo, p.item.number);
+  const byKey = new Map(parts.map((p) => [key(p), p]));
+  const depth = new Map<string, number>();
+  const at = (p: Part, path: string[]): number => {
+    const known = depth.get(key(p));
+    if (known !== undefined) return known;
+    const before = p.waitsOn.flatMap((b) => byKey.get(refKey(b.repo, b.number)) ?? []).filter((u) => !path.includes(key(u)));
+    const d = before.length ? Math.max(...before.map((u) => at(u, [...path, key(p)]))) + 1 : 0;
+    depth.set(key(p), d);
+    return d;
+  };
+  parts.forEach((p) => at(p, []));
+  return depth;
+}
+
+/** The parent's sub-issues by dependency wave, then kind, in board order for ties. */
 export function partsOf(parent: Item, all: readonly Item[]): Part[] {
-  return all.filter((c) => childOf(c, parent))
+  const parts = all.filter((c) => childOf(c, parent))
     .map((item) => ({ item, kind: partKind(item), waitsOn: item.blockers, thread: threadsOf(item)[0] }))
     .sort((a, b) => PART_KINDS.indexOf(a.kind) - PART_KINDS.indexOf(b.kind));
+  const waves = partWaves(parts);
+  return parts.sort((a, b) => waves.get(refKey(a.item.repo, a.item.number))! - waves.get(refKey(b.item.repo, b.item.number))!);
 }
 
 /** What still holds a part back: the issues it's blocked by that are open, while no thread has taken it on. */

@@ -15,6 +15,7 @@ import { ICON, kind as buttonKind } from '../buttons/button-kinds.tsx';
 import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './item-actions.tsx';
+import { OpenThread } from './open-thread.tsx';
 import { startItem } from './start-item.ts';
 import { useStart, useStartStore } from './start-store.ts';
 import type { StartKind, StartState } from './start-store.ts';
@@ -112,6 +113,10 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
   const action = useItemAction(item.id);
   const [open, setOpen] = useState(false);
   const thread = startedThread(item, data, start, kind);
+  const observed = Array.isArray(item.threads) ? (thread ? item.threads.find((t) => t.id === thread.threadId) : item.threads[0]) : undefined;
+  if (observed?.state === 'stopped' || (thread && observed?.state === 'done')) {
+    return <span className="start-group"><span>{observed.state === 'stopped' ? 'Run stopped.' : 'Run finished.'}</span><OpenThread item={item} data={data} /></span>;
+  }
   // The toast announces a start; the tag only keeps Start from running twice.
   if (thread) return <span className="start-group"><Badge tone="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
   if (start?.phase === 'uncertain') {

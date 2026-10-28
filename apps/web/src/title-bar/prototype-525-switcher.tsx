@@ -1,14 +1,14 @@
 // THROWAWAY #525. This switcher exists only in the dedicated dev runner.
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
 import { deskChoices, titleChoices, softQueue, usePrototype525 } from './prototype-525-state.ts';
-import { PrototypeSizeSamples } from './prototype-525-title-bar.tsx';
+import { PrototypeButtonKinds } from './prototype-525-title-bar.tsx';
 
 export function PrototypeSwitcher() {
   const { variant, update, desk, choose, message, stub } = usePrototype525();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const cycle = (delta: number) => {
     const keys = Object.keys(titleChoices);
     choose('variant', keys[(keys.indexOf(variant) + delta + keys.length) % keys.length]!);
@@ -48,15 +48,8 @@ export function PrototypeSwitcher() {
       <div className="flex flex-wrap items-center gap-2">
         <span className="prototype-warning rounded-sm bg-base-900 px-2 py-1 font-semibold text-base-100">THROWAWAY #525</span>
         <div className="flex items-center gap-1">
-          <IconButton variant="header" icon={<ArrowLeft />} aria-label="Previous title bar" title="Previous title bar · Left arrow" onClick={() => cycle(-1)} />
           <span className="min-w-40 text-center font-medium" aria-live="polite">{variant} · {titleChoices[variant][0]}</span>
-          <IconButton variant="header" icon={<ArrowRight />} aria-label="Next title bar" title="Next title bar · Right arrow" onClick={() => cycle(1)} />
         </div>
-        <label className="flex items-center gap-1.5">Desk
-          <select aria-label="Desk cards" value={desk} onChange={(event) => choose('desk', event.target.value)} className="h-7 rounded-md border border-base-400 bg-base-100 px-2">
-            <option value="fixed">Fixed rows (new)</option><option value="stretched">Stretched (round two)</option>
-          </select>
-        </label>
         <label className="flex items-center gap-1.5">Update
           <select aria-label="Update state" value={update ? 'available' : 'idle'} onChange={(event) => choose('update', event.target.value)} className="h-7 rounded-md border border-base-400 bg-base-100 px-2">
             <option value="available">Available</option><option value="idle">Idle</option>
@@ -69,10 +62,10 @@ export function PrototypeSwitcher() {
         <div className="grid gap-1 border-t border-base-300 pt-2 text-base-700 sm:grid-cols-2 sm:gap-4">
           <p className="m-0"><span className="font-medium text-base-content">Title bar. </span>{titleChoices[variant][1]}</p>
           <p className="m-0"><span className="font-medium text-base-content">Desk. </span>{deskChoices[desk]}</p>
-          <p className="m-0"><span className="font-medium text-base-content">Queue. </span>{softQueue}</p>
+          <p className="m-0"><span className="font-medium text-base-content">Buttons. </span>{softQueue}</p>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <PrototypeSizeSamples />
+          <PrototypeButtonKinds />
           <Button variant="quiet" onClick={() => document.querySelector('.queue')?.scrollIntoView({ block: 'start', behavior: 'smooth' })}>Show Queue</Button>
           <span className="min-w-0 text-base-700" role="status">{message}</span>
         </div>

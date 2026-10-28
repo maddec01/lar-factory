@@ -3,10 +3,12 @@
 // written its environment id.
 
 import type { ReactNode } from 'react';
+import { MessageSquareText } from 'lucide-react';
 import { threadLink } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { LinkButton } from './link-button.tsx';
+import { prototype525 } from '../title-bar/prototype-525-state.ts';
 
 /** The `t3code://` link to the item's latest thread, or why there is none. */
 function latestThread(item: Item, data: BoardData): { link: string } | { reason: string } {
@@ -26,10 +28,13 @@ export function OpenThread({ item, data, label = 'Open thread', variant = 'prima
   item: Item; data: BoardData; label?: string; variant?: 'primary' | 'secondary'; icon?: ReactNode;
 }) {
   const thread = latestThread(item, data);
+  // THROWAWAY #525: every open action is outlined and carries its icon.
+  if (prototype525) variant = 'secondary';
+  const lead = prototype525 && !icon ? <MessageSquareText /> : undefined;
   // THROWAWAY #525: `icon` draws it as a square icon button named `label`.
   const named = icon ? { 'aria-label': label, 'data-icon-only': '' } : {};
   // Pointer events stay on while it's disabled, so its title says why.
   return 'link' in thread
-    ? <LinkButton variant={variant} data-open-thread={item.id} href={thread.link} title={icon ? label : undefined} {...named}>{icon ?? label}</LinkButton>
-    : <Button variant={variant} className="disabled:pointer-events-auto" data-open-thread={item.id} disabled title={thread.reason} {...named}>{icon ?? label}</Button>;
+    ? <LinkButton variant={variant} data-open-thread={item.id} href={thread.link} leftIcon={lead} title={icon ? label : undefined} {...named}>{icon ?? label}</LinkButton>
+    : <Button variant={variant} leftIcon={lead} className="disabled:pointer-events-auto" data-open-thread={item.id} disabled title={thread.reason} {...named}>{icon ?? label}</Button>;
 }

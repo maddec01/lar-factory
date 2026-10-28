@@ -69,22 +69,19 @@ html[data-prototype525] {
   .prototype-app-corner .prototype-update { padding-inline: --spacing(2); }
 
   .queue [data-start], .queue [data-start-after], .queue [data-open-thread] { height: --spacing(7); font-size: var(--text-xs); }
-  /* All refining starts share the same recipe, including the first eligible row. */
-  &[data-queue-treatment="soft"] .queue li :is([data-start], [data-start-after]):not(:disabled) {
+  /* Every start, wherever it is, is tinted. Only an area's one main action, Start next in the Queue, stays filled. */
+  :is([data-start], [data-start-after]):not(:disabled):not(.queue > header *) {
     color: var(--primary);
     background: color-mix(in srgb, var(--primary) 10%, var(--card));
     border-color: transparent;
     box-shadow: none;
   }
-  &[data-queue-treatment="soft"] .queue li :is([data-start], [data-start-after]):not(:disabled):hover {
+  :is([data-start], [data-start-after]):not(:disabled):not(.queue > header *):hover {
     background: color-mix(in srgb, var(--primary) 18%, var(--card));
   }
-  .queue li [data-open-thread] {
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-  .queue li [data-open-thread]:hover { background: var(--accent); }
+  :is([data-start], [data-start-after]):not(:disabled) [data-slot="icon"] { color: inherit; }
+  /* Link buttons share the 28px height. */
+  a[data-slot="button"] { height: --spacing(7); font-size: var(--text-xs); padding-inline: --spacing(2.5); gap: --spacing(1.5); }
 }
 @media (max-width: 75rem) {
   html[data-prototype525] .prototype-brand-identity { gap: --spacing(1); flex-direction: column; align-items: flex-start; }

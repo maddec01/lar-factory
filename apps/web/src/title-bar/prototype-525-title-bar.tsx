@@ -1,66 +1,40 @@
-// THROWAWAY #525, round three. A is the saved layout. D moves the app's own controls to the app name; E centres the
-// board's status. Scope, counters, List and Add item keep their existing components.
+// THROWAWAY #525, round three. E, the picked layout: the board's status centred, app controls labelled at the right.
+// Scope, counters, List and Add item keep their existing components.
 import type { ReactNode } from 'react';
-import { ArrowUpToLine, ExternalLink } from 'lucide-react';
+import { ArrowUpToLine, MessageSquareText, Play, SquarePen } from 'lucide-react';
 import { Button } from '@lar-factory/ui/design-system/Button';
-import { IconButton } from '@lar-factory/ui/design-system/IconButton';
 import { TitleBar } from '@lar-factory/ui/design-system/TitleBar';
 import { SettingsIcon } from '@lar-factory/ui/design-system/NavigationIcons';
 import { AddItem } from '../add-item/add-item.tsx';
 import { ListButton } from '../list/list-modal.tsx';
-import { SettingsButton } from '../settings/settings.tsx';
+import { useSettingsStore } from '../settings/settings-store.ts';
 import { Counters } from './counters.tsx';
 import { TrafficLights } from './window-controls.tsx';
 import { CONTROL } from './control.ts';
 import { usePrototype525 } from './prototype-525-state.ts';
 
-function T3Identity() {
-  return <span className="prototype-t3 text-xs whitespace-nowrap text-base-700">for <span className="font-medium">T3 Code</span></span>;
-}
-
-/** Shows only while an update is available, as the real pill does. `short` reads "Update", for the tighter layouts. */
-function Update({ short = false }: { short?: boolean }) {
+/** Shows only while an update is available, as the real one does: an app control, tinted while it waits for you. */
+function Update() {
   const { update, stub } = usePrototype525();
   if (!update) return null;
   return (
-    <Button variant="quiet" className={`prototype-update ${CONTROL} rounded-full`}
-      title="Update available · 0.1.525. Prototype action" aria-label="Update available"
-      leftIcon={<ArrowUpToLine />} onClick={() => stub('Download update selected')}>
-      {short ? 'Update' : 'Update available'}
-    </Button>
+    <Button variant="quiet" className={`prototype-update ${CONTROL} px-2`} title="Update available · 0.1.525. Prototype action"
+      aria-label="Update available" leftIcon={<ArrowUpToLine />} onClick={() => stub('Download update selected')}>Update</Button>
   );
 }
 
-/** A: the saved checkpoint, as round one drew it. */
-function Saved({ brand, scope, refreshed }: Parts) {
+/** Settings drawn as List is: an app control with its icon and its name, so it reads at a glance. */
+function Settings() {
   return (
-    <TitleBar brand={<div className="prototype-brand-identity flex shrink-0 items-center gap-3">{brand}<T3Identity /></div>}
-      title={<>{scope}{refreshed}</>}
-      actions={<>
-        <Counters /><ListButton /><AddItem />
-        <div className="prototype-utilities flex shrink-0 items-center gap-1 border-l border-base-300 pl-2"><Update /><SettingsButton /></div>
-      </>} />
-  );
-}
-
-/** D: the app's own controls sit with its name, on the leading edge. The divider then separates the app from the
- *  board, and the row ends on Add item, the board's primary action. */
-function AppCorner({ brand, scope, refreshed }: Parts) {
-  return (
-    <TitleBar
-      brand={<div className="prototype-app-corner flex shrink-0 items-center gap-2">
-        <span className="flex items-baseline gap-2">{brand}<T3Identity /></span>
-        <span className="flex items-center gap-1"><SettingsButton /><Update short /></span>
-      </div>}
-      title={<>{scope}{refreshed}</>}
-      actions={<><Counters /><ListButton /><AddItem /></>} />
+    <Button variant="quiet" className={`open-settings ${CONTROL} px-2`} leftIcon={<SettingsIcon />} title="Settings (⌘,)"
+      onClick={() => useSettingsStore.getState().setOpen(true)}>Settings</Button>
   );
 }
 
 /** E: where you are on the left, how the board is doing in the middle, what you can do on the right. */
 function CentredStatus({ brand, scope, refreshed }: Parts) {
   return (
-    <TitleBar brand={<div className="flex shrink-0 items-baseline gap-2">{brand}<T3Identity /></div>}
+    <TitleBar brand={brand}
       title={<>
         {scope}
         <div className="prototype-status flex items-center gap-0.5 rounded-lg border border-base-300 bg-base-200/60 pl-1.5 pr-0.5">
@@ -70,33 +44,35 @@ function CentredStatus({ brand, scope, refreshed }: Parts) {
       actions={<>
         <ListButton /><AddItem />
         <span aria-hidden="true" className="mx-1 h-5 w-px bg-base-300" />
-        <Update short /><SettingsButton />
+        <Update /><Settings />
       </>} />
   );
 }
 
 type Parts = { brand: ReactNode; scope: ReactNode; refreshed: ReactNode };
-const LAYOUTS = { A: Saved, D: AppCorner, E: CentredStatus } as const;
+
 
 export function PrototypeTitleBar({ inset, ...parts }: Parts & { inset: string }) {
   const { variant } = usePrototype525();
-  const Layout = LAYOUTS[variant];
   return (
     <div data-title-variant={variant} className="title-bar prototype-title-bar shrink-0 select-none border-b border-base-300 [-webkit-app-region:drag] [&_:is(button,a,[tabindex])]:[-webkit-app-region:no-drag]">
       <TrafficLights />
       <h1 className="sr-only" tabIndex={-1}>Lar Factory</h1>
-      <div className={inset}><Layout {...parts} /></div>
+      <div className={inset}><CentredStatus {...parts} /></div>
     </div>
   );
 }
 
-/** A small specimen beside the controls, independent from both design choices. */
-export function PrototypeSizeSamples() {
+/** The four kinds of button, each with one look everywhere in the app. */
+export function PrototypeButtonKinds() {
   const stub = usePrototype525((state) => state.stub);
-  return <div className="prototype-size-samples flex flex-wrap items-center gap-2">
-    <span className="text-xs text-base-700">28px</span>
-    <Button variant="secondary" onClick={() => stub('Ordinary button selected')}>Action</Button>
-    <IconButton variant="header" icon={<SettingsIcon />} title="28px icon action" aria-label="28px icon action" onClick={() => stub('Icon action selected')} />
-    <a data-slot="button" className="inline-flex items-center gap-1 rounded-md border border-base-400 bg-base-100 px-2 font-medium" href="#prototype-link" onClick={(event) => { event.preventDefault(); stub('Button link selected'); }}>Link <ExternalLink className="size-3.5" /></a>
+  const kinds: [string, ReactNode][] = [
+    ['Main action, one per area', <Button variant="primary" className={CONTROL} leftIcon={<SquarePen />} onClick={() => stub('Main action selected')}>Add item</Button>],
+    ['Start', <Button variant="secondary" data-start="sample" className={CONTROL} leftIcon={<Play />} onClick={() => stub('Start selected')}>Start refining</Button>],
+    ['Open', <Button variant="secondary" className={CONTROL} leftIcon={<MessageSquareText />} onClick={() => stub('Open selected')}>Open thread</Button>],
+    ['App control', <Button variant="quiet" className={CONTROL} leftIcon={<SettingsIcon />} onClick={() => stub('App control selected')}>Settings</Button>],
+  ];
+  return <div className="prototype-kinds flex flex-wrap items-end gap-4">
+    {kinds.map(([label, button]) => <span key={label} className="grid gap-1 text-[11px] text-base-700">{label}{button}</span>)}
   </div>;
 }

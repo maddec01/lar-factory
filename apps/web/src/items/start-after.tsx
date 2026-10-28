@@ -6,6 +6,8 @@
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
+import { Play } from 'lucide-react';
+import { prototype525 } from '../title-bar/prototype-525-state.ts';
 import { blockedText, carriesTwoStatuses, openBlockerRefs, openBlockers, ref, startHold, startRequest } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -70,7 +72,7 @@ function StartAfter({ item, data }: { item: Item; data: BoardData }) {
   return (
     <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
       <DropdownMenu.Trigger asChild>
-        <Button variant="secondary" className={SHRINKS} data-start-after={item.id} aria-label={`Start ${ref(item)} ${item.title} after ${after}`}
+        <Button variant="secondary" leftIcon={prototype525 && <Play />} className={SHRINKS} data-start-after={item.id} aria-label={`Start ${ref(item)} ${item.title} after ${after}`}
           title={`Starts by itself once ${waitsFor(item)}`} {...(data.capture?.enabled === false ? {} : writes)}><span className="truncate">Start after {label}</span> ▾</Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" aria-label={`Start ${ref(item)} after ${after} with`} {...opensOnChecked}>
@@ -99,13 +101,14 @@ export function StartOrAfter({ item, data, label = 'Start', variant, icon, kind 
   if (!blocked && !hold) return <StartControl item={item} data={data} label={label} variant={variant} icon={icon} kind={kind} />;
   // Pointer events stay on while it's disabled, so its title says why.
   const start = (
-    <Button variant={variant ?? (quiet ? 'secondary' : 'primary')} leftIcon={icon} className="disabled:pointer-events-auto" data-start={item.id} disabled
+    <Button variant={variant ?? (quiet ? 'secondary' : 'primary')} leftIcon={icon ?? (prototype525 && <Play />)} className="disabled:pointer-events-auto" data-start={item.id} disabled
       title={hold ?? blockedText(item) ?? undefined}>
       {label}
     </Button>
   );
   if ((hold && !data.armed?.[item.id]) || !blocked) return start;
-  if (afterOnly) return <StartAfter item={item} data={data} />;
+  // THROWAWAY #525: a blocked item shows only Start after, everywhere.
+  if (afterOnly || prototype525) return <StartAfter item={item} data={data} />;
   // With no room for both, Start after wraps under Start, then truncates.
   return <span className="inline-flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">{start}<StartAfter item={item} data={data} /></span>;
 }

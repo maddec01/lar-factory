@@ -8,6 +8,8 @@ import { useId, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
+import { Play } from 'lucide-react';
+import { prototype525 } from '../title-bar/prototype-525-state.ts';
 import { ref, highlightedChoice, repoName, startRepo, storedChoice } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
@@ -131,7 +133,7 @@ export function StartControl({ item, data, label = 'Start', variant = 'primary',
     <span className="start-group">
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
-          <Button variant={variant} leftIcon={start?.phase !== 'pending' && icon} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
+          <Button variant={variant} leftIcon={start?.phase !== 'pending' && (icon ?? (prototype525 && <Play />))} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
             {verb}{start?.phase !== 'pending' && ' ▾'}
           </Button>
         </DropdownMenu.Trigger>

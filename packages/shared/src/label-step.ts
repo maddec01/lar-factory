@@ -21,7 +21,7 @@ export interface LeftAloneLabel {
 
 export interface LabelPlan {
   workflow: LabelRow[];
-  /** The status labels, for an item source that reads status-<name> labels or tags; empty for a GitHub Project. */
+  /** The status labels or tags, shared by both providers. */
   status: LabelRow[];
   leftAlone: LeftAloneLabel[];
 }

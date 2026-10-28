@@ -218,7 +218,7 @@ export interface Item {
   status: Status;
   /** Every status the item carries on its provider, in flow order; empty when it has none. Never Done, which is never stored. */
   statuses: Status[];
-  /** A ticket is an issue or work item; a Project draft is a ticket whose `repo` and `number` are null. */
+  /** A ticket is a repository issue or an Azure work item. */
   content: 'ticket' | 'pr';
   number: number | null;
   title: string;
@@ -710,7 +710,7 @@ export function repoName(key: string, repos: readonly RepoConfig[]): string {
   return shownRepo(repos.some((r) => !sameRepo(r.repo, key) && nameOf(r.repo) === name) ? key : name);
 }
 
-/** A ticket with no repository yet, such as a Project draft. */
+/** A ticket with no repository assigned yet. */
 export const isDraft = (item: Pick<Item, 'content' | 'repo' | 'number'>): boolean =>
   item.content === 'ticket' && (item.repo === null || item.number === null);
 

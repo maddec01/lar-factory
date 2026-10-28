@@ -168,7 +168,7 @@ function normalizeIssueRef(raw: RawIssueRef): IssueRef {
 
 const rawLabels = (raw: RawItem): string[] => raw.content?.labels?.nodes.map((l) => l.name) ?? [];
 
-/** A project item labelled `concept`, whose body holds its map. */
+/** An issue labelled `concept`, whose body holds its map. */
 export const isRawConcept = (raw: RawItem) => rawLabels(raw).includes('concept');
 
 export const refKey = (repo: string | null, number: number | null) => `${repo}#${number}`;

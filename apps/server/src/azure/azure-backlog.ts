@@ -1,4 +1,4 @@
-// The Azure DevOps backlog item source: reads one team's requirement backlog through az; azure-writes.ts writes its work items.
+// Reads one team's requirement backlog for its combined Azure board.
 
 import { field, type AzureCalls, type Listing, type RawWorkItem } from './azure-items.ts';
 

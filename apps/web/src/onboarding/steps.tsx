@@ -103,7 +103,7 @@ function ProjectStep({ run }: { run: Run }) {
   );
 }
 
-/** An item source as a line, like `GitHub Project maddec01 #3`. */
+/** An item source as a line naming the repository’s issues or the Azure team’s work. */
 const sourceLine = (source: RepositoryItemSource, repo: string) => source.kind === 'azure-board' ? `${source.team}'s backlog and current sprint` : `${repo}'s issues`;
 
 /** The provider, from the origin's host, which onboarding can't change. */

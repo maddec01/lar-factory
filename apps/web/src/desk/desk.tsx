@@ -3,7 +3,8 @@
 // its next action: Open thread on every card, Start build on a Ready one, Open PR on Verify and Ready to merge. A Verify
 // card also shows that PR's pipeline: its checks and whether GitHub lets it merge.
 
-import { HINTS, carriesTwoStatuses, itemPr, repoKey, repoName, shortAgo } from '@lar-factory/shared';
+import { MessageSquareText } from 'lucide-react';
+import { HINTS, carriesTwoStatuses, itemPr, openBlockerRefs, repoKey, repoName, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, MergeState } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
@@ -15,7 +16,7 @@ import { StartAfterError } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
-import { prototype525 } from '../title-bar/prototype-525-state.ts';
+import { prototype525, usePrototype525 } from '../title-bar/prototype-525-state.ts';
 
 /**
  * Open thread, then what the status asks next. A Ready item with a thread at work gets no Start build, so Open thread
@@ -52,7 +53,70 @@ function Pipeline({ item }: { item: Item }) {
   );
 }
 
+/** THROWAWAY #525. The one line under the title: the PR's checks while there is a PR, what holds a Ready item, or the
+ *  status's hint. One line on every card, so no card grows a row the others lack. */
+function NextLine({ item }: { item: Item }) {
+  const pipeline = itemPr(item)?.pipeline;
+  if (pipeline) {
+    const { checks, mergeState } = pipeline;
+    const counts = checks ? [`${checks.passed} passed`, checks.running && `${checks.running} running`, checks.failed && `${checks.failed} failed`].filter(Boolean).join(' · ') : 'no checks';
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-xs tabular-nums text-(--muted-foreground)">
+        <span className="size-2 shrink-0 rounded-full" style={{ background: MERGE_COLOR[mergeState] }} />
+        <span className="font-medium text-(--foreground)">{mergeState}</span><span className="truncate">· {counts}</span>
+      </span>
+    );
+  }
+  const blockers = openBlockerRefs(item, true);
+  const text = item.status === 'Ready'
+    ? hasLiveThread(item) ? 'A thread is at work on it' : blockers.length ? `Waits on ${blockers.join(', ')}` : 'Ready to build'
+    : HINTS[item.status] ?? '';
+  return <span className="truncate text-xs text-(--muted-foreground)">{text}</span>;
+}
+
+/** THROWAWAY #525. One row: the status's main action on the left, Open thread as an icon in the right corner of every
+ *  card where it isn't already the main action. A held Start build shows only Start after, as a dossier's map does. */
+function FixedActions({ item, data }: { item: Item; data: BoardData }) {
+  const main = item.status === 'Ready' && !hasLiveThread(item) && !carriesTwoStatuses(item)
+    ? <StartBuild item={item} data={data} afterOnly />
+    : item.status === 'Verify' || item.status === 'Ready to merge' ? <PrLink item={item} label="Open PR" />
+    : null;
+  return (
+    <KeepClicks className="desk-actions flex min-w-0 items-center gap-2" passEmpty>
+      {main ?? <OpenThread item={item} data={data} />}
+      {main && <span className="ml-auto"><OpenThread item={item} data={data} variant="secondary" icon={<MessageSquareText />} /></span>}
+    </KeepClicks>
+  );
+}
+
+function FixedDeskCard({ item, data, now }: { item: Item; data: BoardData; now: number }) {
+  const picked = useItemDialogStore((state) => state.itemId === item.id);
+  return (
+    <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
+      className={`desk-card desk-card-fixed grid w-70 shrink-0 cursor-pointer gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
+      <button type="button" className="grid min-w-0 gap-2 text-left" title={`#${item.number ?? ''} ${item.title}`}>
+        <span className="flex h-4 min-w-0 items-center gap-2 text-xs">
+          <ItemStatusGlyph item={item} /><span className="shrink-0 font-semibold text-(--warning-foreground)">{item.status}</span>
+          <span className="truncate text-(--muted-foreground)">· {repoName(repoKey(item), data.repos)} · {shortAgo(item.updatedAt, now)}</span>
+        </span>
+        {/* Two lines tall whatever the title's length, so the rows under it start at the same height on every card. */}
+        <span className="line-clamp-2 h-10 text-sm/5 font-medium"><ItemTitle item={item} /></span>
+        <span className="flex h-4 min-w-0 items-center"><NextLine item={item} /></span>
+        <span className="pt-1"><StepTrack status={item.status} /></span>
+      </button>
+      <FixedActions item={item} data={data} />
+      {item.status === 'Ready' && <KeepClicks className="desk-start cursor-auto empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
+    </div>
+  );
+}
+
 function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: number }) {
+  const fixed = usePrototype525((state) => prototype525 && state.desk === 'fixed');
+  if (fixed) return <FixedDeskCard item={item} data={data} now={now} />;
+  return <StretchedDeskCard item={item} data={data} now={now} />;
+}
+
+function StretchedDeskCard({ item, data, now }: { item: Item; data: BoardData; now: number }) {
   const picked = useItemDialogStore((state) => state.itemId === item.id);
   const hint = HINTS[item.status];
   // The card takes the click; its summary is a button too, so the keyboard can open the dialog.

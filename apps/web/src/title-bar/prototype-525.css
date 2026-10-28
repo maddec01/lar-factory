@@ -18,50 +18,9 @@ html[data-prototype525] {
   .prototype-warning { color: var(--background); background: var(--foreground); }
   .prototype-title-bar .brand { white-space: nowrap; }
   .prototype-switcher { bottom: --spacing(3); }
-  &:has([data-title-variant="C"]) .prototype-switcher { bottom: --spacing(13); }
-
-  /* Both alternatives keep the 52px native title row intact, including its drag area. */
-  .prototype-app-rail {
-    display: flex;
-    flex-direction: column;
-    flex: 0 0 --spacing(36);
-    min-width: 0;
-    gap: --spacing(4);
-    padding: --spacing(4) --spacing(1.5);
-    border-right: 1px solid var(--border);
-    background: var(--card);
-  }
-  .prototype-app-rail .prototype-app-identity { padding-inline: --spacing(1); }
-  .prototype-app-rail .prototype-app-tools { flex-direction: column; }
-  .prototype-app-rail button { justify-content: flex-start; padding-inline: --spacing(1); gap: --spacing(1.5); }
-  .prototype-app-status {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-    height: --spacing(10);
-    gap: --spacing(2);
-    padding-inline: --spacing(4);
-    border-top: 1px solid var(--border);
-    background: var(--card);
-  }
-  .prototype-utility-update { white-space: nowrap; }
-  .prototype-app-tools button:focus-visible {
-    outline: --spacing(0.5) solid var(--ring);
-    outline-offset: --spacing(0.5);
-  }
-  .prototype-app-skip:focus {
-    position: absolute;
-    z-index: 51;
-    top: --spacing(3);
-    left: --spacing(24);
-    padding: --spacing(1) --spacing(2);
-    border-radius: var(--radius-sm);
-    background: var(--card);
-  }
 
   /* Intrinsic shared rows align contents, rather than just equalising card shells. */
-  .desk > div {
+  &[data-desk="stretched"] .desk > div {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: --spacing(70);
@@ -69,28 +28,45 @@ html[data-prototype525] {
     row-gap: --spacing(2.5);
     align-items: stretch;
   }
-  .desk-card {
+  &[data-desk="stretched"] .desk-card {
     width: auto;
     grid-row: span 6;
     grid-template-rows: subgrid;
     align-content: normal;
   }
-  .desk-card > button {
+  &[data-desk="stretched"] .desk-card > button {
     grid-row: span 5;
     grid-template-rows: subgrid;
     align-items: start;
   }
-  .desk-title {
+  &[data-desk="stretched"] .desk-title {
     display: block;
     overflow: visible;
     -webkit-line-clamp: unset;
     overflow-wrap: anywhere;
   }
-  .desk-meta { align-self: start; }
-  .desk-meta > span:first-of-type { flex-shrink: 0; }
-  .prototype-desk-actions { display: grid; grid-row: 6; align-content: start; gap: --spacing(2); }
-  .desk-actions { align-items: flex-start; align-content: start; }
+  &[data-desk="stretched"] .desk-meta { align-self: start; }
+  &[data-desk="stretched"] .desk-meta > span:first-of-type { flex-shrink: 0; }
+  &[data-desk="stretched"] .prototype-desk-actions { display: grid; grid-row: 6; align-content: start; gap: --spacing(2); }
+  &[data-desk="stretched"] .desk-actions { align-items: flex-start; align-content: start; }
   .desk-start:empty { display: none; }
+
+  /* Round three's desk card: fixed rows, one action row, Open thread as a square icon in the right corner. */
+  .desk-card-fixed [data-icon-only] { width: --spacing(7); padding: 0; }
+  .desk-card-fixed [data-icon-only] svg { width: --spacing(4); height: --spacing(4); }
+  .desk-card-fixed .desk-actions [data-slot="button"] { flex-shrink: 1; min-width: 0; }
+
+  /* E: one status strip, centred in the window while there is room for it. */
+  .prototype-status .refreshed { height: --spacing(6); }
+  .prototype-status .counters button { height: --spacing(6); min-height: --spacing(6); }
+  @container (min-width: 72rem) {
+    .prototype-status { position: absolute; left: 50%; transform: translateX(-50%); }
+  }
+  @container (max-width: 71.99rem) {
+    .prototype-status { margin-left: auto; }
+  }
+  /* D: the app's controls follow its name; the gear and Update read as part of the brand cluster. */
+  .prototype-app-corner .prototype-update { padding-inline: --spacing(2); }
 
   .queue [data-start], .queue [data-start-after], .queue [data-open-thread] { height: --spacing(7); font-size: var(--text-xs); }
   /* All refining starts share the same recipe, including the first eligible row. */
@@ -123,40 +99,6 @@ html[data-prototype525] {
   html[data-prototype525] .prototype-title-bar .brand { font-size: var(--text-base); }
   html[data-prototype525] .prototype-title-bar .brand > span:last-child { display: none; }
   html[data-prototype525] .prototype-t3 { display: none; }
-  html[data-prototype525] .prototype-app-rail {
-    flex-basis: --spacing(12);
-    align-items: center;
-    padding-inline: --spacing(1);
-  }
-  html[data-prototype525] .prototype-app-rail :is(.prototype-identity-label, .prototype-utility-label) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-  html[data-prototype525] .prototype-app-rail button {
-    position: relative;
-    justify-content: center;
-    width: --spacing(7);
-    padding: 0;
-  }
-  html[data-prototype525] .prototype-app-rail .prototype-update::after {
-    content: '';
-    position: absolute;
-    top: --spacing(0.5);
-    right: --spacing(0.5);
-    width: --spacing(1);
-    height: --spacing(1);
-    border-radius: 50%;
-    background: var(--primary);
-  }
-  html[data-prototype525] .prototype-app-status { padding-inline: --spacing(2); }
-  html[data-prototype525] .prototype-app-status .prototype-app-identity { gap: --spacing(1); }
-  html[data-prototype525] .prototype-app-status .prototype-utility-settings { width: --spacing(7); padding: 0; }
-  html[data-prototype525] .prototype-app-status .prototype-utility-settings .prototype-utility-label { display: none; }
-  html[data-prototype525] .prototype-app-skip:focus { left: --spacing(2); }
 }
 @media (max-width: 24rem) {
   html[data-prototype525] .queue > header > span:last-child { min-width: 0; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; }
@@ -165,5 +107,4 @@ html[data-prototype525] {
   html[data-prototype525] .prototype-title-bar .scope { padding-inline: --spacing(1); }
   html[data-prototype525] .prototype-title-bar .prototype-utilities { padding-left: --spacing(1); margin-left: 0; }
   html[data-prototype525] .prototype-switcher { bottom: --spacing(1); }
-  html[data-prototype525]:has([data-title-variant="C"]) .prototype-switcher { bottom: --spacing(11); }
 }

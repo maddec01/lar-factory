@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
-import { titleChoices, softQueue, usePrototype525 } from './prototype-525-state.ts';
+import { deskChoices, titleChoices, softQueue, usePrototype525 } from './prototype-525-state.ts';
 import { PrototypeSizeSamples } from './prototype-525-title-bar.tsx';
 
 export function PrototypeSwitcher() {
-  const { variant, update, choose, message, stub } = usePrototype525();
+  const { variant, update, desk, choose, message, stub } = usePrototype525();
   const [expanded, setExpanded] = useState(false);
   const cycle = (delta: number) => {
     const keys = Object.keys(titleChoices);
@@ -21,6 +21,7 @@ export function PrototypeSwitcher() {
       delete document.documentElement.dataset.queueTreatment;
     };
   }, []);
+  useEffect(() => { document.documentElement.dataset.desk = desk; }, [desk]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.target instanceof HTMLElement) || event.target.closest('input, textarea, select, button, a, [contenteditable], [role="menu"], [role="dialog"]')) return;
@@ -51,7 +52,11 @@ export function PrototypeSwitcher() {
           <span className="min-w-40 text-center font-medium" aria-live="polite">{variant} · {titleChoices[variant][0]}</span>
           <IconButton variant="header" icon={<ArrowRight />} aria-label="Next title bar" title="Next title bar · Right arrow" onClick={() => cycle(1)} />
         </div>
-        <span className="text-base-700">Soft Queue · 28px · aligned desk</span>
+        <label className="flex items-center gap-1.5">Desk
+          <select aria-label="Desk cards" value={desk} onChange={(event) => choose('desk', event.target.value)} className="h-7 rounded-md border border-base-400 bg-base-100 px-2">
+            <option value="fixed">Fixed rows (new)</option><option value="stretched">Stretched (round two)</option>
+          </select>
+        </label>
         <label className="flex items-center gap-1.5">Update
           <select aria-label="Update state" value={update ? 'available' : 'idle'} onChange={(event) => choose('update', event.target.value)} className="h-7 rounded-md border border-base-400 bg-base-100 px-2">
             <option value="available">Available</option><option value="idle">Idle</option>
@@ -63,6 +68,7 @@ export function PrototypeSwitcher() {
       {expanded && <>
         <div className="grid gap-1 border-t border-base-300 pt-2 text-base-700 sm:grid-cols-2 sm:gap-4">
           <p className="m-0"><span className="font-medium text-base-content">Title bar. </span>{titleChoices[variant][1]}</p>
+          <p className="m-0"><span className="font-medium text-base-content">Desk. </span>{deskChoices[desk]}</p>
           <p className="m-0"><span className="font-medium text-base-content">Queue. </span>{softQueue}</p>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">

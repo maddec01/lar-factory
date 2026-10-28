@@ -112,6 +112,22 @@ test('the checks report each command: its version, missing with the override and
   assert.equal(ghError, undefined);
 });
 
+test('each check is heard as it lands, so a slow one holds up no other', async (t) => {
+  const { dir, bin, shell } = await machine(t, []);
+  const script = async (name: string, body: string) => {
+    await writeFile(join(bin, name), `#!/bin/sh\n${body}\n`);
+    await chmod(join(bin, name), 0o755);
+  };
+  await script('t3', 'echo t3 v0.1.3-nightly.1');
+  await script('gh', 'echo "gh version 2.96.1 (2026-08-01)"');
+  await script('git', 'sleep 1; echo git version 2.56.0');
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
+  const heard: string[] = [];
+  await checkTools({ gh: true, az: false }, join(dir, 'no-runtime.json'), (check) => heard.push(...Object.keys(check)));
+  assert.equal(heard.length, 5);
+  assert.equal(heard.at(-1), 'git', 'the slow git lands last');
+});
+
 test('t3 is not running without T3\'s runtime file, and missing outranks it', async (t) => {
   const { dir, bin, shell } = await machine(t, []);
   await writeFile(join(bin, 't3'), '#!/bin/sh\necho t3 v0.1.3-nightly.1\n');

@@ -8,6 +8,8 @@ import { startBoard, until } from './server-support.ts';
 import { projectsDb } from './stats-db.ts';
 import type { Board } from './server-support.ts';
 import type { BoardData, ToolCheck } from '@lar-factory/shared';
+import { projectIssue } from '@lar-factory/shared/test/raw-items';
+import type { TestContext } from 'vite-plus/test';
 
 const recheck = (board: Board) => board.post({}, board.url, '/api/recheck');
 
@@ -18,8 +20,12 @@ const allOk = { gh: 'ok', t3: 'ok', git: 'ok', jq: 'ok', curl: 'ok' };
 const ghMissing = { ...allOk, gh: { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' } };
 const ghLoggedOut = { ...allOk, gh: { result: 'logged-out', version: '2.96.0', fix: 'gh auth login' } };
 
-/** The board data once the first read has finished, or failed. */
-const afterRead = (board: Board) => until(board, (d) => Boolean(d.fetchedAt || d.error));
+/** Whether t3, git, jq and curl have landed, which the page doesn't wait for. */
+const landed = (data: BoardData) => (['t3', 'git', 'jq', 'curl'] as const).every((name) => data.tools?.[name]);
+const checked = (board: Board) => until(board, landed);
+
+/** The board data once the first read has finished, or failed, and every check has landed. */
+const afterRead = (board: Board) => until(board, (d) => Boolean(d.fetchedAt || d.error) && landed(d));
 
 test('the board listens before a slow login shell answers, and its data waits for that first lookup', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'lar-slow-shell-'));
@@ -27,7 +33,7 @@ test('the board listens before a slow login shell answers, and its data waits fo
   const shell = join(dir, 'slow-shell');
   writeFileSync(shell, '#!/bin/sh\nsleep 1\nexec /bin/sh -c "$2"\n', { mode: 0o755 });
   const board = await startBoard(t, {}, false, false, { SHELL: shell, GH_PATH: '/nowhere/gh' });
-  assert.deepEqual(results((await board.board()).tools), ghMissing);
+  assert.deepEqual(results((await checked(board)).tools), ghMissing);
   const logs = board.logs();
   assert.ok(logs.indexOf('board on ') < logs.indexOf('gh was not found'), logs);
 });
@@ -38,7 +44,7 @@ test('Recheck finds a t3 that appeared after startup', async (t) => {
   const t3 = join(dir, 't3');
   const board = await startBoard(t, {}, false, false, { T3_PATH: t3 });
   const t3Missing = { ...allOk, t3: { result: 'missing', override: `T3_PATH=${t3}` } };
-  assert.deepEqual(results((await board.board()).tools), t3Missing);
+  assert.deepEqual(results((await checked(board)).tools), t3Missing);
   // The page paints its notice from the data inline in it.
   const page = await (await fetch(`${board.url}/`)).text();
   const inline = JSON.parse(page.match(/<script id="board-data" type="application\/json">(.*?)<\/script>/s)![1]!);
@@ -55,7 +61,7 @@ test('Recheck finds a t3 that appeared after startup', async (t) => {
 
 test('a logged-out gh shows its notice and reads nothing until Recheck finds it logged in', async (t) => {
   const board = await startBoard(t, { ghAuth: 'logged-out' });
-  const data = await board.board();
+  const data = await checked(board);
   assert.deepEqual(results(data.tools), ghLoggedOut);
   assert.equal(data.error, null);
   assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0);
@@ -70,7 +76,7 @@ test('a logged-out gh that logs in is found by the timed retry, which keeps the 
   const shellLog = join(dir, 'runs');
   const shellRuns = () => existsSync(shellLog) ? readFileSync(shellLog, 'utf8').trim().split('\n').length : 0;
   const board = await startBoard(t, { ghAuth: 'logged-out' }, false, false, { FAKE_SHELL_LOG: shellLog, BOARD_TOOL_RETRY_MS: '100' });
-  assert.deepEqual(results((await board.board()).tools), ghLoggedOut);
+  assert.deepEqual(results((await checked(board)).tools), ghLoggedOut);
   await board.update({});
   assert.ok((await afterRead(board)).fetchedAt, 'the board reads GitHub once a retry finds gh logged in');
   assert.deepEqual(results((await board.board()).tools), allOk);
@@ -125,7 +131,7 @@ test('scopes the board can\'t read block nothing', async (t) => {
 
 test('a missing gh names its override', async (t) => {
   const board = await startBoard(t, {}, false, false, { GH_PATH: '/nowhere/gh' });
-  assert.deepEqual(results((await board.board()).tools), ghMissing);
+  assert.deepEqual(results((await checked(board)).tools), ghMissing);
   assert.match(board.logs(), /t3 at \S+; gh was not found at GH_PATH=\/nowhere\/gh; az /);
 });
 
@@ -182,6 +188,7 @@ test('with only Azure DevOps repositories listed, gh isn\'t checked and a missin
   const probed = await startBoard(t, options, false, false, env);
   const data = await afterRead(probed);
   assert.equal(data.tools?.gh, undefined);
+  assert.deepEqual(data.toolProgress?.skipped, ['gh'], 'gh shows as left out');
   assert.equal(await ghProbes(probed), 0, 'gh isn\'t probed');
 
   const missing = await afterRead(await startBoard(t, options, false, false, { ...env, GH_PATH: '/nowhere/gh' }));
@@ -202,8 +209,12 @@ test("onboarding's Checks step asks for the az check with no listed repository o
   const az = join(dir, 'az');
   writeFileSync(az, `#!/bin/sh\n[ "$1" = version ] && echo '{"azure-cli": "2.67.0"}' && exit 0\nexit 0\n`, { mode: 0o755 });
   const board = await startBoard(t, {}, false, false, { AZ_PATH: az });
-  assert.equal((await afterRead(board)).tools?.az, undefined);
-  assert.deepEqual((await (await board.post({ az: true }, board.url, '/api/recheck')).json()).board.tools.az, { result: 'ok', version: '2.67.0' });
+  const before = await afterRead(board);
+  assert.equal(before.tools?.az, undefined);
+  assert.deepEqual(before.toolProgress?.skipped, ['az']);
+  const asked = (await (await board.post({ az: true }, board.url, '/api/recheck')).json()).board as BoardData;
+  assert.deepEqual(asked.tools?.az, { result: 'ok', version: '2.67.0' });
+  assert.deepEqual(asked.toolProgress, { checking: [], skipped: [] }, 'az, asked for, is no longer left out');
 });
 
 test('T3 Code not running has its check but doesn\'t stop the board reading GitHub, and Recheck finds it running', async (t) => {
@@ -222,5 +233,95 @@ test('T3 Code not running has its check but doesn\'t stop the board reading GitH
 test('sample mode looks no tools up', async (t) => {
   const board = await startBoard(t, {}, true);
   assert.equal((await board.board()).tools, undefined);
+  assert.equal((await board.board()).toolProgress, undefined);
   assert.equal((await recheck(board)).status, 403);
+});
+
+/** A command at `dir/name` that waits until `release` runs, then runs `body`. */
+function heldCommand(dir: string, name: string, body: string): { path: string; release: () => void } {
+  const path = join(dir, name);
+  const go = join(dir, `${name}.go`);
+  writeFileSync(path, `#!/bin/sh\nwhile [ ! -f '${go}' ]; do sleep 0.05; done\n${body}\n`, { mode: 0o755 });
+  return { path, release: () => writeFileSync(go, '') };
+}
+
+/**
+ * A home with lar-api's checkout on Azure DevOps, and an az there that logs each call, answers lar-api's
+ * .lar-factory.json as a sprint and finds no current sprint, which is a problem on lar-api alone; `version` waits for
+ * `release` when `held`.
+ */
+function azureHome(t: TestContext, held: boolean) {
+  const home = mkdtempSync(join(tmpdir(), 'lar-azure-wait-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  checkouts(home, { 'lar-api': 'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api' });
+  const log = join(home, 'az-calls');
+  const go = join(home, 'az.go');
+  const config = JSON.stringify({ path: '/.lar-factory.json', content: JSON.stringify({ role: 'API', itemSource: { kind: 'azure-sprint', team: 'Team' } }) });
+  const az = join(home, 'az');
+  writeFileSync(az, `#!/bin/sh
+echo "$*" >> '${log}'
+if [ "$1" = version ]; then
+  ${held ? `while [ ! -f '${go}' ]; do sleep 0.05; done` : ':'}
+  echo '{"azure-cli": "2.67.0"}'; exit 0
+fi
+[ "$1" = account ] || [ "$1" = extension ] && exit 0
+case "$*" in *"--resource items"*) printf '%s' '${config}'; exit 0;; boards*) echo '[]'; exit 0;; esac
+echo 'ERROR: offline' >&2; exit 1
+`, { mode: 0o755 });
+  /** The az calls that read items, not the check or the config. */
+  const itemReads = () => (existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [])
+    .filter((call) => /^(boards|devops invoke)\b/.test(call) && !call.includes('--resource items'));
+  const env = { HOME: home, AZ_PATH: az, T3_STATE_DB: projectsDb(t, [{ id: 'project-api', root: join(home, 'Developer/lar/lar-api') }]) };
+  return { home, env, itemReads, release: () => writeFileSync(go, '') };
+}
+
+const mixed = { items: [projectIssue(1, 'List', 'maddec01/lar-factory')], repositories: ['maddec01/lar-factory', 'contoso/Fabrikam/lar-api'] };
+
+test('a slow az check holds up neither the page nor the GitHub read, and the Azure DevOps read waits for it', async (t) => {
+  const azure = azureHome(t, true);
+  const board = await startBoard(t, mixed, false, false, azure.env);
+  const read = await until(board, (d) => d.fetchedAt !== null);
+  assert.deepEqual(read.items.map((i) => i.id), ['I_1'], 'the GitHub read finished');
+  assert.equal(read.tools?.az, undefined, 'az still checks');
+  assert.ok(read.toolProgress?.checking.includes('az'), 'az shows as checking');
+  assert.deepEqual(read.toolProgress?.skipped, [], 'neither provider\'s tool is left out');
+  assert.equal(read.firstRead.settled, false, 'the first read waits for the Azure DevOps source');
+  assert.deepEqual(azure.itemReads(), [], 'no Azure DevOps read before az\'s check lands');
+  azure.release();
+  const settled = await until(board, (d) => d.firstRead.settled);
+  assert.equal(settled.tools?.az?.result, 'ok');
+  assert.ok(!settled.toolProgress?.checking.includes('az'), 'az no longer checks');
+  assert.ok(azure.itemReads().length > 0, 'the Azure DevOps source reads once az\'s check lands');
+});
+
+test('a slow gh check holds up no Azure DevOps read', async (t) => {
+  const azure = azureHome(t, false);
+  const hold = join(azure.home, 'gh.go');
+  const board = await startBoard(t, { ...mixed, authHold: hold }, false, false, azure.env);
+  const deadline = Date.now() + 5_000;
+  while (!azure.itemReads().length && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.ok(azure.itemReads().length > 0, 'the Azure DevOps source reads while gh still checks');
+  assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0, 'no GitHub read before gh\'s check lands');
+  writeFileSync(hold, '');
+  const settled = await until(board, (d) => d.firstRead.settled);
+  assert.equal(settled.tools?.gh?.result, 'ok');
+  assert.deepEqual(settled.items.map((i) => i.id), ['I_1']);
+});
+
+test('a slow t3 or jq check holds up neither the page nor the read, and its notice shows once it lands', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'lar-slow-tools-'));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const t3 = heldCommand(dir, 't3', 'echo t3 v0.1.4-nightly.1');
+  const jq = heldCommand(dir, 'jq', 'echo jq-1.7.1');
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')] }, false, false,
+    { T3_PATH: t3.path, JQ_PATH: jq.path, T3_SERVER_RUNTIME: join(dir, 'no-runtime.json') });
+  const read = await until(board, (d) => d.firstRead.settled);
+  assert.ok(read.fetchedAt, 'the board reads GitHub');
+  assert.equal(read.tools?.t3, undefined);
+  assert.equal(read.tools?.jq, undefined);
+  t3.release();
+  jq.release();
+  const landed = await until(board, (d) => d.tools?.t3 !== undefined && d.tools.jq !== undefined);
+  assert.deepEqual(landed.tools?.t3, { result: 'not-running', version: '0.1.4-nightly.1' });
+  assert.equal(landed.tools?.jq?.result, 'ok');
 });

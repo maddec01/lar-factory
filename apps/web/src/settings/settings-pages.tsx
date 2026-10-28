@@ -75,12 +75,19 @@ const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
 
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
 
-/** Whether the checks ran without gh, as no listed repository is on GitHub; Settings then leaves gh out. */
-const ghSkipped = (data: BoardData): boolean => !!data.tools && !data.tools.gh;
+/** Whether the check leaves gh out, as no listed repository is on GitHub; Settings then leaves gh out. */
+const ghSkipped = (data: BoardData): boolean => !!data.toolProgress?.skipped.includes('gh');
 
-/** Why az isn't checked, once the checks ran without it; else nothing. */
+/** Why az isn't checked, once the check leaves it out; else nothing. */
 function azSkipped(data: BoardData): string {
-  return data.tools && !data.tools.az ? ' Not checked: no listed repository is on Azure DevOps.' : '';
+  return data.toolProgress?.skipped.includes('az') ? ' Not checked: no listed repository is on Azure DevOps.' : '';
+}
+
+/** `name`'s state in `data`, Checking while its check runs with no result yet. */
+function stateOf(data: BoardData, name: CheckedTool, login = false): ComponentProps<typeof ToolState> {
+  const check = data.tools?.[name];
+  if (!check && data.toolProgress?.checking.includes(name)) return { text: 'Checking', tone: 'muted' };
+  return toolState(check, login);
 }
 
 const REFRESH_OPTIONS = ['1 minute', '5 minutes', '15 minutes'];
@@ -268,9 +275,9 @@ export function pages(input: PagesInput): Page[] {
     { id: 'repos', label: 'Repositories', icon: <FolderGit2 />, description: 'The repositories the board reads, and the command line logins it reads them through.', groups: [
       { title: 'Command line tools', description: 'The board reads each provider through your own login and never stores a token.', rows: [
         ...ghSkipped(data) ? [] : [{ id: 'gh', title: 'GitHub CLI', description: toolDescription('gh, for repositories on GitHub.', data.tools?.gh),
-          control: custom(() => <ToolState {...toolState(data.tools?.gh, true)} />) }],
+          control: custom(() => <ToolState {...stateOf(data, 'gh', true)} />) }],
         { id: 'az', title: 'Azure CLI', description: toolDescription(`az with the azure-devops extension, for repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),
-          control: custom(() => <ToolState {...toolState(data.tools?.az, true)} />) },
+          control: custom(() => <ToolState {...stateOf(data, 'az', true)} />) },
       ] },
       repositoryGroup(data),
     ] },
@@ -323,10 +330,10 @@ export function pages(input: PagesInput): Page[] {
     { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, description: 'The commands the board runs, and its server.', groups: [
       { title: 'Tools', rows: [
         ...DIAGNOSED.filter(([name]) => name !== 'gh' || !ghSkipped(data)).map(([name, does]): Row => ({
-          id: `d-${name}`, title: name, description: toolDescription(does, data.tools?.[name]), control: custom(() => <ToolState {...toolState(data.tools?.[name])} />),
+          id: `d-${name}`, title: name, description: toolDescription(does, data.tools?.[name]), control: custom(() => <ToolState {...stateOf(data, name)} />),
         })),
         { id: 'd-az', title: 'az', description: toolDescription(`Reads repositories on Azure DevOps.${azSkipped(data)}`, data.tools?.az),
-          control: custom(() => <ToolState {...toolState(data.tools?.az)} />) },
+          control: custom(() => <ToolState {...stateOf(data, 'az')} />) },
         { id: 'd-server', title: 'Board server', description: `127.0.0.1:4317 · last read ${data.fetchedAt ? 'OK' : 'never'}`, control: { type: 'button', label: 'Open logs' }, reason: notBuilt('Open logs') },
       ] },
     ] },

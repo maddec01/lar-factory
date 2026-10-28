@@ -710,8 +710,8 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       const { run, projects } = get();
       const project = run && pickedProject(run, projects);
       set({ checks: { commands: { state: 'running' }, setup: WAITING } });
-      // The board checks az only while a listed repository needs it, so an Azure DevOps run asks for it.
-      const rechecked = await postAction('/api/recheck', project?.provider === 'Azure DevOps' ? { az: true } : {});
+      // The board checks gh and az only while a listed repository needs them, so a run asks for its provider's.
+      const rechecked = await postAction('/api/recheck', project?.provider === 'Azure DevOps' ? { az: true } : { gh: true });
       receive(rechecked);
       const checks = current(runId);
       if (!checks) return;

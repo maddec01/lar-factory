@@ -119,10 +119,12 @@ want_patch=$(jq -nc --rawfile body "$body" '[{op: "add", path: "/fields/System.T
     {op: "add", path: "/relations/-", value: {rel: "System.LinkTypes.Hierarchy-Reverse", url: "https://dev.azure.com/contoso/_apis/wit/workItems/42"}}]')
 if ((status == 0)) && [[ $output == https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/77 && -z $errors ]] &&
     [[ $(sed -n 1p "$log") == "az devops invoke --area wit --resource workitems --organization https://dev.azure.com/contoso --route-parameters project=Fabrikam Fiber type=Task --http-method POST --media-type application/json-patch+json --in-file "*" --api-version 7.2-preview --output json" ]] &&
-    [[ $(sed -n 2p "$log") == "$want_patch" ]] && (($(wc -l <"$log") == 2)); then
-    pass "on Azure DevOps, creates a Task under the build's work item in one call and prints its URL"
+    [[ $(sed -n 2p "$log") == "$want_patch" ]] &&
+    jq -e 'all(.[]; .path != "/fields/System.Tags")' <<<"$(sed -n 2p "$log")" >/dev/null &&
+    (($(wc -l <"$log") == 2)); then
+    pass "on Azure DevOps, creates an untagged slice Task under the build's work item in one call and prints its URL"
 else
-    fail "on Azure DevOps, creates a Task under the build's work item in one call and prints its URL: $status $output / $errors / $(cat "$log")"
+    fail "on Azure DevOps, creates an untagged slice Task under the build's work item in one call and prints its URL: $status $output / $errors / $(cat "$log")"
 fi
 
 : >"$log"

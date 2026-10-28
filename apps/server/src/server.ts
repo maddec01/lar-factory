@@ -56,7 +56,6 @@ const bundledSkills = () => fixture ? bundled.skills : withInstallState(bundled.
 
 const board = createBoardState({
   capture,
-  project: { title: '' },
   repos: [],
   refreshSeconds: settings.refreshSeconds,
   fetchedAt: null,
@@ -276,14 +275,14 @@ function isActive(item: Item, now: number, waitedOn: ReadonlySet<string>): boole
   if (item.closedAt && now - Date.parse(item.closedAt) < SETTLE_MS) return true;
   if (checksRunning(item, now)) return true;
   if (board.changing(item.id) || board.snapshot().armed?.[item.id]) return true;
-  return item.repo !== null && item.number !== null && waitedOn.has(refKey(item.repo, item.number));
+  return waitedOn.has(refKey(item.repo, item.number));
 }
 
-/** When the board first saw each PR's checks running, by its URL or its item's pipeline, for checks GitHub gives no start time. */
+/** When the board first saw each PR's checks running, by its URL, for checks GitHub gives no start time. */
 const checksSeenAt = new Map<string, number>();
 
 /** Whether the item's PR's checks run, short of SLOW_CHECKS_MS: a check stuck past it, as an EXPECTED one that never reports, stops polling. */
-const checksRunning = (item: Item, now: number) => [[`${item.id} pipeline`, item.pipeline] as const, ...item.linkedPrs.map((pr) => [pr.url, pr] as const)]
+const checksRunning = (item: Item, now: number) => item.linkedPrs.map((pr) => [pr.url, pr] as const)
   .some(([key, pr]) => {
     if (!pr?.checks?.running) return void checksSeenAt.delete(key);
     if (!checksSeenAt.has(key)) checksSeenAt.set(key, now);
@@ -495,7 +494,7 @@ async function refresh(): Promise<void> {
       // A read so far confirms no change the board made, as the source of one may not have read yet, and isn't the
       // whole read fetchedAt times.
       board.applyRead(partial.items, readRevision, withT3Reads, () => false);
-      board.update({ project: { title: partial.title }, itemSourceProblems: partial.problems ?? [] });
+      board.update({ itemSourceProblems: partial.problems ?? [] });
       moveFirstRead({ waiting: partial.waiting });
     };
     const snapshot = await items.read({ ...firstReadProgress, landed }, pace);
@@ -506,7 +505,7 @@ async function refresh(): Promise<void> {
     const recovered = error !== null && error !== settings.problem || fetchedAt === null;
     board.applyRead(snapshot.items, readRevision, withT3Reads, items.readAfresh);
     moveFirstRead({ step: 'finishing', waiting: snapshot.waiting });
-    board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: settings.problem ?? null, itemSourceProblems: snapshot.problems ?? [],
+    board.update({ fetchedAt: new Date().toISOString(), error: settings.problem ?? null, itemSourceProblems: snapshot.problems ?? [],
       t3EnvironmentId: readEnvironmentId(environmentIdFile), repositoryProjects: await repositoryProjectHints(repos) });
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;

@@ -31,7 +31,6 @@ test('each onboarded repository reads its items from the item source its .lar-fa
   assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]), [[FACTORY, 1, 'Queued'], [FACTORY, 2, 'List'], [APPLE, 7, 'Queued']]);
   assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'issues', show: 'all', labels: [], version: 1 },
     { repo: APPLE, role: 'Apple client', items: 'issues', show: 'opted-in', labels: ['app: music'], version: 1 }]);
-  assert.equal(data.project.title, FACTORY);
 });
 
 test('without a list of onboarded repositories the board is empty', async (t) => {

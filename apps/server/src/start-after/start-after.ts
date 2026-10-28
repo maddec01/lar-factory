@@ -93,7 +93,6 @@ export function createStartAfter({ board, commands, offerModelChoices, file }: S
       if (!ARMABLE.includes(item.status)) {
         return withBoard(409, { error: `Only Ready and Queued items can start after their blockers; this one is in ${item.status}.` });
       }
-      if (!item.repo || item.number === null) return withBoard(409, { error: 'This item needs an issue before it can start.' });
       if (!isOpen(item)) return withBoard(409, { error: 'Nothing blocks this item now. Start it instead.' });
       const repo = startRepo(item, picked);
       if (!repo) return withBoard(409, { error: pickRepoText(board.snapshot(), item) });

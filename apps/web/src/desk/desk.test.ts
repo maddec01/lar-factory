@@ -33,7 +33,7 @@ test('a desk card shows its status, repository and age, numbered title, next ste
   expect(rows[3]!.querySelectorAll('ol > li')).toHaveLength(10);
 });
 
-test('a desk card’s title is always two lines tall, cut short, with the whole title in its tooltip', async () => {
+test("a desk card's title is always two lines tall, cut short, with the whole title in its tooltip", async () => {
   await mountPage();
   const title = card('I_sample28').querySelector('.desk-title')!;
   expect(title.className.split(' ')).toEqual(expect.arrayContaining(['line-clamp-2', 'h-10']));
@@ -86,7 +86,7 @@ test.each<[string, BoardData, string, string, string[]]>([
   expect([nextLine(id), controls(id)]).toEqual([next, buttons]);
 });
 
-test('Open thread in a card’s corner is a square icon button named and titled Open thread', async () => {
+test("Open thread in a card's corner is a square icon button named and titled Open thread", async () => {
   await mountPage(noBlockers());
   const corner = card('I_sample13').querySelector('.desk-actions [data-open-thread]')!;
   expect([corner.getAttribute('aria-label'), corner.getAttribute('title'), corner.getAttribute('data-icon-only')]).toEqual(['Open thread', 'Open thread', '']);
@@ -97,11 +97,6 @@ test('Open thread opens the latest thread in T3, and Open PR the pull request th
   expect(card('I_sample12').querySelector('[data-open-thread]')!.getAttribute('href')).toMatch(/^t3code:\/\//);
   const pr = card('I_sample16').querySelector<HTMLAnchorElement>('[data-pr-link]')!;
   expect([pr.getAttribute('href'), pr.target]).toEqual(['https://github.com/maddec01/lar-apple/pull/32', '_blank']);
-});
-
-test('a pull request on Verify opens itself', async () => {
-  await mountPage(withItem('I_sample16', { content: 'pr', url: 'https://github.com/maddec01/lar-apple/pull/40' }));
-  expect(card('I_sample16').querySelector('[data-pr-link]')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-apple/pull/40');
 });
 
 test.each([
@@ -119,7 +114,7 @@ test('a Verify card reads the PR Open PR opens, its first linked one', async () 
   expect(nextLine('I_sample16')).toBe('can merge · 1 passed');
 });
 
-test('clicks on a card’s buttons, in the menu one opens, or in its start message open no item dialog', async () => {
+test("clicks on a card's buttons, in the menu one opens, or in its start message open no item dialog", async () => {
   await mountPage();
   await settle(() => card('I_sample12').querySelector<HTMLElement>('[data-open-thread]')!.click());
   await settle(() => card('I_sample16').querySelector<HTMLElement>('[data-pr-link]')!.click());

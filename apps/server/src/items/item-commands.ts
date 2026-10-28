@@ -3,7 +3,8 @@
 // blocks which lives in this file.
 
 import { join } from 'node:path';
-import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDraft, isOnboarding, pickRepoText, repoTag, startRepo, validateDraft, workMessage } from '@lar-factory/shared';
+import { randomUUID } from 'node:crypto';
+import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isOnboarding, pickRepoText, repoTag, startRepo, validateDraft, workMessage } from '@lar-factory/shared';
 import type { BoardData, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
@@ -29,12 +30,12 @@ export interface ItemCommands {
   /** Keeps one of the statuses an issue carrying more than one has, and drops the others: the one move such an issue allows. */
   pickStatus(itemId: string, status: unknown): Promise<Reply>;
   /**
-   * Starts a T3 thread for a Queued item that nothing open blocks, at most once per board run. An untagged Azure work
+   * Starts a T3 thread for a Queued item that nothing open blocks, once unless its recorded run stopped. An untagged Azure work
    * item is tagged first for `repo`, one of the repositories reading it, or for the only one that does.
    */
   start(itemId: string, model: unknown, repo?: unknown): Promise<Reply>;
   /**
-   * Starts a Ready build's thread in a new worktree, at most once per board run, once nothing open blocks it, as
+   * Starts a Ready build's thread in a new worktree, or retries a confirmed stopped run, once nothing open blocks it, as
    * lar-work's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
    */
   startBuild(itemId: string, model: unknown): Promise<Reply>;
@@ -85,8 +86,6 @@ type Start = StartResult & { refused?: true };
 
 const REQUEST_ID = /^[a-f0-9-]{36}$/;
 const GONE = 'That item is no longer on the board.';
-/** What the item is, for Abandon's refusal. */
-const aType = (item: Item) => (item.content === 'pr' ? 'a pull request' : isDraft(item) ? 'a draft' : 'an issue');
 
 /** Keeps `work` in `inFlight` under `key` until it settles, or for good when `keep` says so. */
 function track<T>(inFlight: Map<string, Promise<T>>, key: string, work: Promise<T>, keep: (result: T) => boolean = () => false): Promise<T> {
@@ -118,6 +117,8 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
   const starts = new Map<string, Promise<Start>>();
   /** Start builds by item id, kept like Starts, so an item started while Queued can still start its build. */
   const buildStarts = new Map<string, Promise<Start>>();
+  // Only settled starts can be retried; requests arriving during a retry share its pending result.
+  const finishedStarts = new WeakMap<Promise<Start>, string>();
   /** Status changes in flight by item id; Start and Abandon wait out a move, and a move waits out Abandon. */
   const moving = new Set<string>();
   /** Deletes in flight by item id, so a second press waits for the first. */
@@ -190,7 +191,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
   }
 
   /**
-   * Runs a start at most once per item per board run, keyed in `runs`, on the model choice the
+   * Runs a start once until its recorded thread stops, keyed in `runs`, on the model choice the
    * board offers now, and records the thread it opened in the board data's `record`. `begin`
    * refuses the item, or returns the work that starts its thread.
    */
@@ -204,13 +205,21 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       choice = found;
     }
     let pending = runs.get(itemId);
+    const item = board.find(itemId);
+    const previous = pending && finishedStarts.get(pending);
+    if (previous && Array.isArray(item?.threads) && item.threads.some((t) => t.id === previous && t.state === 'stopped')
+      && !item.threads.some((t) => t.state === 'running' || t.state === 'needs you')) {
+      runs.delete(itemId);
+      pending = undefined;
+    }
     if (!pending) {
       const item = board.find(itemId);
       if (!item) return reply(404, { error: GONE });
       const work = begin(item, choice);
       if (typeof work !== 'function') return work;
-      // Only a refusal or a failure reported before or by t3 may run again; a started or unconfirmed thread is kept.
+      // Keep a started or unconfirmed thread; only a confirmed stop or a failure reported by t3 allows retry.
       pending = track(runs, itemId, work().then((result) => {
+        if (result.thread) finishedStarts.set(pending!, result.thread.threadId);
         if (result.thread) board.update({ [record]: { ...board.snapshot()[record], [itemId]: result.thread } } satisfies Partial<BoardData>);
         board.push();
         return result;
@@ -227,7 +236,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
    */
   async function parentInProgress({ parent }: Item): Promise<null | { error: string; refused?: true } | { move: () => Promise<string | null> }> {
     if (!parent) return null;
-    const onBoard = board.snapshot().items.find((i) => i.content === 'ticket' && i.number === parent.number &&
+    const onBoard = board.snapshot().items.find((i) => i.number === parent.number &&
       i.repo?.toLowerCase() === parent.repo.toLowerCase());
     if (onBoard) {
       if (isBuild(onBoard) || onBoard.status === 'In progress') return null;
@@ -288,7 +297,6 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       const blocked = blockedReply(item);
       if (blocked) return blocked;
       const message = workMessage(item);
-      if (!message || !item.repo) return reply(409, { error: 'This item needs an issue before it can start.' });
       const repo = item.repo;
       return async () => {
         const repoProject = await projectOf(repo);
@@ -310,8 +318,9 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       const blocked = blockedReply(item);
       if (blocked) return blocked;
       const message = buildMessage(item, larWork());
-      const branch = buildBranch(item);
-      if (!message || !branch || !item.repo || item.number === null) return reply(409, { error: 'This item needs an issue before it can start.' });
+      const previous = board.snapshot().startedBuilds?.[itemId];
+      const retry = previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped');
+      const branch = `${buildBranch(item)}${retry ? `-retry-${randomUUID().slice(0, 8)}` : ''}`;
       const { repo } = item;
       return async () => {
         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
@@ -339,7 +348,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
         // A second press after Abandon finished has nothing left to do.
         if (!item && board.removed(itemId)) return withBoard(200, { error: null });
         if (!item) return withBoard(404, { error: GONE });
-        if (!canAbandon(item)) return reply(409, { error: `Only List and Queued issues and drafts can be abandoned; this one is ${aType(item)} in ${item.status}.` });
+        if (!canAbandon(item)) return reply(409, { error: `Only List and Queued items can be abandoned; this one is in ${item.status}.` });
         if (item.abandonRefusal) return reply(409, { error: item.abandonRefusal });
         const busy = busyReason(itemId, 'abandon');
         if (busy) return withBoard(409, { error: busy });

@@ -24,13 +24,13 @@ export interface T3Reads {
   priced: boolean | null;
 }
 
-/** An item's stats from `reader`; undefined for a draft, or an item no thread worked on. */
+/** An item's stats from `reader`; undefined for an item no thread worked on. */
 const statsLookup = (reader: ItemStatsReader): T3Reads['stats'] => ({ repo, number }) =>
-  (repo && number !== null ? reader(repo, number) : null) ?? undefined;
+  reader(repo, number) ?? undefined;
 
-/** An item's threads from `reader`; undefined for a draft, or an item no thread names. */
+/** An item's threads from `reader`; undefined for an item no thread names. */
 const threadsLookup = (reader: ItemThreadsReader): T3Reads['threads'] => ({ repo, number }) => {
-  const own = repo && number !== null ? reader(repo, number) : [];
+  const own = reader(repo, number);
   return own.length ? own : undefined;
 };
 

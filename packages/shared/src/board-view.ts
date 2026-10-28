@@ -1,7 +1,7 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
 // Abandon asks.
 
-import { STATUSES, inRepo, isDraft, isRecentlyDone, kindOf, onAzure, ref, repoKey, repoName, sameRepo } from './model.ts';
+import { STATUSES, inRepo, isRecentlyDone, kindOf, onAzure, ref, repoKey, repoName, sameRepo } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
 import { slug } from './format.ts';
 
@@ -19,7 +19,7 @@ export function listGroupId(repo: string): string {
 }
 
 export interface ListGroup {
-  /** The repository's `owner/name`, or Draft. */
+  /** The repository's repository key. */
   repo: string;
   name: string;
   id: string;
@@ -34,7 +34,7 @@ export interface BoardSections {
   queued: Item[];
   list: Item[];
   /** One per configured repository and any other repository a List item has, the most items in List first (ties in
-   *  configured order), then Draft; each group's items in board order. The List modal and the title bar's Scope menu
+   *  configured order); each group's items in board order. The List modal and the title bar's Scope menu
    *  both show them in this order. */
   listGroups: ListGroup[];
   /** Closed in the last 7 days, most recently closed first. */
@@ -53,10 +53,9 @@ export function boardSections(data: BoardData, now: number): BoardSections {
   const list = inStatus('List');
   const repos = data.repos.map((r) => r.repo);
   for (const i of list) if (!repos.some((r) => sameRepo(r, repoKey(i)))) repos.push(repoKey(i));
-  const draft = repoKey({ repo: null });
   const listGroups = repos
     .map((repo) => ({ repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)) }))
-    .sort((a, b) => Number(a.repo === draft) - Number(b.repo === draft) || b.items.length - a.items.length);
+    .sort((a, b) => b.items.length - a.items.length);
   const notConcept = (i: Item) => kindOf(i) !== 'concept';
   return {
     needsYou: inStatus('Ready', 'Needs you', 'Verify', 'Ready to merge').filter(notConcept),
@@ -98,10 +97,8 @@ export function prLabel(pr: LinkedPr): string {
 
 export const UNREADABLE = 'The T3 Code database could not be read';
 
-/** What Abandon asks, and how the provider keeps the issue recoverable. Draft removal stays permanent. */
+/** What Abandon asks, and how the provider keeps the issue recoverable. */
 export function abandonPrompt(item: Item): { question: string; detail: string; confirm: string; done: string } {
-  if (isDraft(item)) return { question: `Remove draft ${item.title}?`, detail: "This removes the draft from the project. It can't be undone.",
-    confirm: 'Remove draft', done: `Removed draft ${item.title}.` };
   const azure = onAzure(item.repo ?? '');
   return { question: `Abandon ${ref(item)} ${item.title}?`, confirm: 'Abandon',
     detail: azure ? 'This moves the work item to Removed in Azure DevOps. You can reactivate it in Azure DevOps.'

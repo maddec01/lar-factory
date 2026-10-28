@@ -99,7 +99,7 @@ function Step({ part, data }: { part: Part; data: BoardData }) {
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-5.5 text-[11px] text-(--muted-foreground)">
         <span>{item.status}</span>
         <AzureFields azure={item.azure} />
-        {s && <span className="tabular-nums">{duration(s.agentMs)} · {formatTokens(s.tokens)} · {s.costUsd !== undefined ? formatUsd(s.costUsd) : '–'}</span>}
+        {s && <span className="tabular-nums">{duration(s.agentMs)} · {formatTokens(s.tokens)} · {s.costUsd !== undefined ? formatUsd(s.costUsd) : 'Unavailable'}</span>}
         {item.slices.length > 0 && <span className="tabular-nums">{item.slices.filter((x) => x.progress === 'done').length}/{item.slices.length} slices</span>}
         {part.waitsOn.length > 0 && <span className="inline-flex flex-wrap items-center gap-1">{started(item) ? 'after' : 'waits on'} <WaitChips waitsOn={part.waitsOn} data={data} /></span>}
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
@@ -247,13 +247,13 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
   const isPicked = usePicked(parent);
   const items = parts.map((p) => p.item);
   const find: FindRef = (repo = parent.repo ?? '', n) => data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
-  const decisions = parts.filter((p) => p.kind !== 'build');
   const builds = parts.filter((p) => p.kind === 'build');
-  // Keep adjacent builds together without pulling a later build ahead of another repository it waits on.
+  // Group adjacent decisions or builds from one repository without changing dependency order.
   const groups: Part[][] = [];
-  builds.forEach((part) => {
+  parts.forEach((part) => {
     const previous = groups.at(-1);
-    if (previous?.[0]?.item.repo === part.item.repo) previous.push(part);
+    if (previous && (previous[0]!.kind === 'build') === (part.kind === 'build')
+      && (part.kind !== 'build' || previous[0]!.item.repo === part.item.repo)) previous.push(part);
     else groups.push([part]);
   });
   const repoHint = (group: Part[]) => {
@@ -293,7 +293,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
 
       <div className="flex items-center justify-between gap-3 px-4 pt-3">
         <ViewToggle view={view} onView={setView} />
-        <span className="text-[11px] text-(--muted-foreground)">{view === 'map' ? 'Lanes by repo; arrows show what waits on what' : 'Decide, then build per repo, then the end-to-end check'}</span>
+        <span className="text-[11px] text-(--muted-foreground)">{view === 'map' ? 'Lanes by repo; arrows show what waits on what' : 'Parts follow their dependencies, then the end-to-end check'}</span>
       </div>
       {view === 'map' ? (
         <div className="grid gap-5 p-4">
@@ -305,9 +305,11 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
           <About parent={parent} find={find} />
           <div className="grid content-start gap-3" data-checklist>
             <Heading>Parts, in order</Heading>
-            {decisions.length > 0 && <Phase title="Decide" hint={`${decisions.filter((p) => isDone(p.item)).length}/${decisions.length} answered`} parts={decisions} data={data} />}
             {groups.map((group) => (
-              <Phase key={group[0]!.item.id} title={<>Build <RepoTag repo={group[0]!.item.repo || 'Draft'} repos={data.repos} /></>} hint={repoHint(group)} parts={group} data={data} />
+              <Phase key={group[0]!.item.id}
+                title={group[0]!.kind === 'build' ? <>Build <RepoTag repo={group[0]!.item.repo!} repos={data.repos} /></> : 'Decide'}
+                hint={group[0]!.kind === 'build' ? repoHint(group) : `${group.filter((p) => isDone(p.item)).length}/${group.length} answered`}
+                parts={group} data={data} />
             ))}
             {check && <CheckPhase check={check} parent={parent} builds={builds} data={data} />}
           </div>

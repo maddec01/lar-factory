@@ -112,7 +112,7 @@ test("Edit with an Edit PR open says its values come from that PR, and Save says
   await type(input('role'), 'API server');
   await settle(() => save().click());
   await settle(() => vi.advanceTimersByTime(500));
-  expect(text(toast()!)).toContain('Added the new values to maddec01/lar-server’s Edit PR.');
+  expect(text(toast()!)).toContain("Added the new values to maddec01/lar-server's Edit PR.");
   expect(toast()!.querySelector('a')!.getAttribute('href')).toBe(PR);
 });
 
@@ -171,7 +171,7 @@ test('Edit on an Azure DevOps repository offers the team\'s sprint and backlog w
   await settle(() => $('[data-edit-dialog] [data-custom="web"] input[type="checkbox"]')!.click());
   await settle(() => save().click());
   await settle(() => vi.advanceTimersByTime(500));
-  expect(text(toast()!)).toContain('contoso/Fabrikam Fiber/lar-api’s Edit PR');
+  expect(text(toast()!)).toContain("contoso/Fabrikam Fiber/lar-api's Edit PR");
 });
 
 

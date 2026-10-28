@@ -212,18 +212,18 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 }
 
 export interface Item {
-  /** The node id of the issue, pull request or draft the item holds. */
+  /** The node id of the issue or Azure work item. */
   id: string;
   /** The status the board places it by: Done once it closed as done, else the first of `statuses` in flow order, else List. */
   status: Status;
   /** Every status the item carries on its provider, in flow order; empty when it has none. Never Done, which is never stored. */
   statuses: Status[];
   /** A ticket is a repository issue or an Azure work item. */
-  content: 'ticket' | 'pr';
-  number: number | null;
+  content: 'ticket';
+  number: number;
   title: string;
   url: string | null;
-  repo: string | null;
+  repo: string;
   /**
    * An Azure work item with no repository tag: every repository reading its item source, whose Lists all show it, and
    * one of which Start tags it for. `repo` is the first of them. Absent on every other item.
@@ -235,21 +235,17 @@ export interface Item {
   azure?: AzureWorkItem;
   /** Azure backlog priority position, retained through partial reads and UI sorting. */
   sourceOrder?: number;
-  /** A draft is open. */
   state: 'open' | 'closed';
   /** How a closed item closed: `done` when completed or merged, `not-planned` otherwise; null while open. */
   closedAs: 'done' | 'not-planned' | null;
   parent: IssueRef | null;
   /** GitHub's sub-issue counts; a build counts only its `build` sub-issues, not its slices. */
   subIssues: { total: number; completed: number };
-  /** Every issue blocking this one, open or closed; empty for drafts and PRs. */
+  /** Every issue blocking this one, open or closed. */
   blockers: Blocker[];
   updatedAt: string;
   closedAt: string | null;
-  /** Empty for a pull request item, which has its own `pipeline`. */
   linkedPrs: LinkedPr[];
-  /** A pull request item's own checks and merge state; absent on other items. */
-  pipeline?: Pipeline;
   /** A build's slices, in GitHub's sub-issue order, less those closed as not planned. They're never board items. Empty for other issues. */
   slices: Slice[];
   /** A dossier's map, parsed from its issue body: always on a concept, and on an item with sub-issues on the board when its body has map sections; absent on other items. */
@@ -408,8 +404,6 @@ export const SETTLED_FIRST_READ: FirstRead = { step: 'finishing', running: [], s
 export interface BoardData {
   /** Local write session; changes on restart so an old retry cannot recreate an issue. */
   capture?: { session: string; enabled: boolean };
-  /** The first item source's title. */
-  project: { title: string };
   repos: RepoConfig[];
   /** Each onboarded repository the latest read left off the board because its .lar-factory.json couldn't be read, and why. */
   repositoryConfigProblems?: RepositoryConfigProblem[];
@@ -574,8 +568,6 @@ export type Kind =
   | 'concept'
   | 'decision'
   | 'build'
-  | 'draft'
-  | 'pr'
   | 'issue';
 
 export function decisionType(item: Item): string | null {
@@ -591,8 +583,6 @@ export function kindOf(item: Item): Kind {
   if (has('feature')) return 'feature';
   if (has('improvement')) return 'improvement';
   if (has('build')) return 'build';
-  if (item.content === 'pr') return 'pr';
-  if (isDraft(item)) return 'draft';
   return 'issue';
 }
 
@@ -605,7 +595,6 @@ export function isBuild(item: Pick<Item, 'labels'>): boolean {
 export function kindLabel(item: Item): string {
   const kind = kindOf(item);
   if (kind === 'decision') return `decision-${decisionType(item)}`;
-  if (kind === 'pr') return 'pull request';
   return kind;
 }
 
@@ -618,15 +607,14 @@ export function checkState(checks: Checks | null): CheckState | null {
   return checks.failed ? 'failed' : 'passed';
 }
 
-/** An item's pull request, the one Open PR opens: its link and its pipeline, each null while unknown. */
+/** The linked pull request Open PR opens, with its checks and merge state. */
 interface ItemPr {
-  url: string | null;
-  pipeline: Pipeline | null;
+  url: string;
+  pipeline: Pipeline;
 }
 
-/** The item's pull request: itself when it is one, else the first PR it links; null when it links none. */
-export function itemPr(item: Pick<Item, 'content' | 'url' | 'linkedPrs' | 'pipeline'>): ItemPr | null {
-  if (item.content === 'pr') return { url: item.url, pipeline: item.pipeline ?? null };
+/** The item's first linked PR; null when it links none. */
+export function itemPr(item: Pick<Item, 'linkedPrs'>): ItemPr | null {
   const pr = item.linkedPrs[0];
   return pr ? { url: pr.url, pipeline: pr } : null;
 }
@@ -646,8 +634,8 @@ export function isRecentlyDone(item: Item, now: number): boolean {
   return Number.isFinite(at) && now - at <= DONE_WINDOW_MS;
 }
 
-/** The key an item's repository has on the board: its `owner/name`, or Draft when it has none. */
-export const repoKey = (item: Pick<Item, 'repo'>): string => item.repo ?? 'Draft';
+/** The key an item's repository has on the board. */
+export const repoKey = (item: Pick<Item, 'repo'>): string => item.repo;
 
 /** Whether two `owner/name`s, or repository keys, are the same repository: GitHub ignores case, so the board does too. */
 export const sameRepo = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
@@ -710,39 +698,32 @@ export function repoName(key: string, repos: readonly RepoConfig[]): string {
   return shownRepo(repos.some((r) => !sameRepo(r.repo, key) && nameOf(r.repo) === name) ? key : name);
 }
 
-/** A ticket with no repository assigned yet. */
-export const isDraft = (item: Pick<Item, 'content' | 'repo' | 'number'>): boolean =>
-  item.content === 'ticket' && (item.repo === null || item.number === null);
-
 export function ref(item: Item): string {
-  return item.number === null ? 'draft' : `#${item.number}`;
+  return `#${item.number}`;
 }
 
-/** Abandon closes a List or Queued issue, or removes such a draft. Pull requests stay. */
+/** Abandon closes a List or Queued issue. */
 export function canAbandon(item: Item): boolean {
-  return (item.status === 'List' || item.status === 'Queued') && item.content === 'ticket';
+  return item.status === 'List' || item.status === 'Queued';
 }
 
-/** Line 1 of the work message, which T3 titles the thread from. Null for a draft. */
-export function workTitle(item: Item): string | null {
-  if (!item.repo || item.number === null) return null;
+/** Line 1 of the work message, which T3 titles the thread from. */
+export function workTitle(item: Item): string {
   return `#${item.number} ${item.title}`;
 }
 
-/** The work message: `#<n> <title>`, then `$lar-work <owner/repo>#<n>`. Null for a draft. */
-export function workMessage(item: Item): string | null {
+/** The work message: `#<n> <title>`, then `$lar-work <owner/repo>#<n>`. */
+export function workMessage(item: Item): string {
   const title = workTitle(item);
-  return title && `${title}\n$lar-work ${item.repo}#${item.number}`;
+  return `${title}\n$lar-work ${item.repo}#${item.number}`;
 }
 
 /**
  * The branch Start build's worktree takes: `<kind>/<n>-<slug>`, the kind `fix` for a bug,
  * `feat` for a feature or improvement, else `chore`. The slug is up to five words of the
  * title, lowercase and hyphen-joined, accents dropped and anything but a-z and 0-9 left out.
- * Null for a draft.
  */
-export function buildBranch(item: Item): string | null {
-  if (!item.repo || item.number === null) return null;
+export function buildBranch(item: Item): string {
   const kind = kindOf(item);
   const prefix = kind === 'bug' ? 'fix' : kind === 'feature' || kind === 'improvement' ? 'feat' : 'chore';
   const words = item.title.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/['’]/g, '')
@@ -750,9 +731,8 @@ export function buildBranch(item: Item): string | null {
   return `${prefix}/${[item.number, ...words].join('-')}`;
 }
 
-/** Start build's message, naming the builder agent of the lar-work installed at `larWork`. Null for a draft. */
-export function buildMessage(item: Item, larWork: string): string | null {
-  if (!item.repo || item.number === null) return null;
+/** Start build's message, naming the builder agent of the lar-work installed at `larWork`. */
+export function buildMessage(item: Item, larWork: string): string {
   return `Build ${item.repo}#${item.number}. Read ${larWork}/agents/builder.md and follow it.`;
 }
 

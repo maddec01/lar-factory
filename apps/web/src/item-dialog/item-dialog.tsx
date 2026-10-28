@@ -1,14 +1,14 @@
 // The item dialog: every item, wherever it's listed, opens here over the page, as the design system's workspace-sized
 // Modal, whose body fades at its scrolled edges. Under its title it shows the item's repository, status and parent, with
 // the agent work figures beside the title. Its body has a progress bar with the slices as an overview, its hint, a meta area of
-// people, labels, dates, milestone or iteration and area and checks, then its description and comments. Sub-tickets
+// people, labels, dates, milestone or iteration and area, then its description and comments. Sub-tickets
 // and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the
 // comments. The board's fields show at
 // once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
 // item, and the one action the item's status asks for, with Back to List and Abandon at its left.
 
 import { useEffect, type ReactNode } from 'react';
-import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, ref, shortAgo, workMessage } from '@lar-factory/shared';
+import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, ref, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
@@ -34,7 +34,6 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
     case 'List': return <QueueButton item={item} data={data} />;
     case 'Queued':
       if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-      if (!workMessage(item)) return null;
       return <StartOrAfter item={item} data={data} label="Start refining" />;
     case 'Ready': return <StartBuild item={item} data={data} />;
     case 'Shaping': case 'In progress': case 'Review': return <OpenThread item={item} data={data} />;
@@ -52,7 +51,7 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
 function MoveActions({ item, data }: { item: Item; data: BoardData }) {
   const startHolds = useStartHolds(item, data);
   if (item.status === 'List') return <AbandonButton item={item} data={data} />;
-  if (item.status !== 'Queued' || item.content === 'pr' || startHolds || hasLiveThread(item)) return null;
+  if (item.status !== 'Queued' || startHolds || hasLiveThread(item)) return null;
   return <>{!carriesTwoStatuses(item) && <BackToListButton item={item} data={data} />}<AbandonButton item={item} data={data} /></>;
 }
 

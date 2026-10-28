@@ -42,14 +42,16 @@ test('outside sample mode a GitHub item reads its details from GitHub in one gra
   const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: nodes });
   await onboarded(board);
   const data = await until(board, (d) => d.items.length === 1);
-  const before = (await board.calls()).length;
+  // Background refreshes may finish while the dialog reads; count only requests for this item's node.
+  const itemCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && args[1] === 'graphql' && args.includes('id=I_12')).length;
+  const before = await itemCalls();
   const answers = [];
   for (const item of data.items) {
     const response = await details(board, `?itemId=${item.id}`);
     answers.push([response.status, ((await response.json()) as { details: ItemDetails }).details.body]);
   }
   assert.deepEqual(answers.sort(), [[200, 'The **description**.']]);
-  assert.equal((await board.calls()).length - before, 1, 'one call per open');
+  assert.equal(await itemCalls() - before, 1, 'one call per open');
 });
 
 test('an item GitHub no longer has answers 404', async (t) => {
@@ -95,8 +97,10 @@ test('outside sample mode older comments are one graphql call for the page befor
   const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: node } });
   await onboarded(board);
   const [item] = (await until(board, (d) => d.items.length === 1)).items;
-  const before = (await board.calls()).length;
+  // Background refreshes may finish while the dialog reads; count only requests for this item's node.
+  const itemCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && args[1] === 'graphql' && args.includes('id=I_12')).length;
+  const before = await itemCalls();
   const response = await olderComments(board, `?itemId=${item!.id}&before=C1`);
   assert.deepEqual([response.status, ((await response.json()) as { page: ItemCommentsPage }).page.olderCursor], [200, 'C0']);
-  assert.equal((await board.calls()).length - before, 1);
+  assert.equal(await itemCalls() - before, 1);
 });

@@ -1,7 +1,7 @@
 // Repository issues as GitHub's GraphQL API returns them, and the rules that turn them into the
 // board's items. The server reads them through gh; the page's tests build boards from them.
 
-import { isBuild, isDraft, labelStatuses, sliceProgress } from './model.ts';
+import { isBuild, labelStatuses, sliceProgress } from './model.ts';
 import type { Checks, ConceptMap, IssueRef, Item, LinkedPr, MergeState, Slice, Status } from './model.ts';
 import { parseConceptMap } from './concept-map.ts';
 
@@ -35,20 +35,20 @@ export interface Searched {
 
 interface RawContent {
   __typename: 'Issue';
-  /** The issue's, pull request's or draft's node id: the board's Item.id, and what a dossier's body is read by. */
+  /** The issue's node id: the board's Item.id, and what a dossier's body is read by. */
   id: string;
   /** Read for concepts only, in a query of its own. */
   body?: string;
   title: string;
   updatedAt: string;
-  number?: number;
-  url?: string;
-  /** OPEN or CLOSED, and MERGED for a pull request; absent on a draft. */
+  number: number;
+  url: string;
+  /** OPEN or CLOSED. */
   state?: string;
   /** An issue's close reason, such as COMPLETED or NOT_PLANNED. */
   stateReason?: string | null;
   closedAt?: string | null;
-  repository?: { nameWithOwner: string };
+  repository: { nameWithOwner: string };
   labels?: RawLabelConn;
   parent?: RawIssueRef | null;
   subIssuesSummary?: { total: number; completed: number };
@@ -90,7 +90,7 @@ export interface RawLinkedPr {
 }
 
 export interface RawItem {
-  /** The Raw issue id. */
+  /** The raw issue id. */
   id: string;
   updatedAt: string;
   content: RawContent | null;
@@ -152,7 +152,7 @@ function normalizeLinkedPr({ id: _id, statusCheckRollup, mergeStateStatus, state
   return { ...pr, state: prState, checks: normalizeChecks(statusCheckRollup), mergeState: normalizeMergeState(mergeStateStatus) };
 }
 
-/** Open, or closed as done or not planned: a merged PR or an issue closed as completed (or before GitHub kept a reason) is done. */
+/** Open, or closed as done or not planned: an issue closed as completed (or before GitHub kept a reason) is done. */
 function closing(c: RawContent): Pick<Item, 'state' | 'closedAs'> {
   if (c.state !== 'CLOSED') return { state: 'open', closedAs: null };
   const notPlanned = c.stateReason === 'NOT_PLANNED' || c.stateReason === 'DUPLICATE';
@@ -212,10 +212,10 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     status: closed.closedAs === 'done' ? 'Done' : statuses[0] ?? 'List',
     statuses,
     content: 'ticket',
-    number: c.number ?? null,
+    number: c.number,
     title: c.title,
-    url: c.url ?? null,
-    repo: c.repository?.nameWithOwner ?? null,
+    url: c.url,
+    repo: c.repository.nameWithOwner,
     labels: rawLabels(raw),
     ...closed,
     parent: c.parent ? normalizeIssueRef(c.parent) : null,
@@ -247,7 +247,7 @@ export function normalizeItems(raws: RawItem[], searched: Searched = {}): Item[]
     // A slice closed as not planned is hidden from its build, but it's still no board item.
     for (const s of rawSlices(raw, searched.builds ?? new Set())) slices.add(refKey(s.repository.nameWithOwner, s.number));
   }
-  const board = items.filter((i) => i.closedAs !== 'not-planned' && (isDraft(i) || !slices.has(refKey(i.repo, i.number))));
+  const board = items.filter((i) => i.closedAs !== 'not-planned' && !slices.has(refKey(i.repo, i.number)));
   // An item with sub-issues on the board is a dossier too, so its body's map sections show, when it has any.
   const parents = parentKeys(board);
   for (const item of board) {

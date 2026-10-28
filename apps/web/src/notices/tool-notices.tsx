@@ -81,7 +81,7 @@ function ghNotice(check: FailedCheck<GhCheck>): { title: string; body: ReactNode
     case 'logged-out':
       return { title: 'GitHub CLI is logged out.', body: <>The board reads GitHub through <code>gh</code>. Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</> };
     case 'outdated':
-      return { title: `GitHub CLI is older than ${GH_FLOOR}.`, body: <>lar-work’s scripts need the <code>--parent</code>, <code>--add-sub-issue</code> and <code>--blocked-by</code> flags
+      return { title: `GitHub CLI is older than ${GH_FLOOR}.`, body: <>lar-work's scripts need the <code>--parent</code>, <code>--add-sub-issue</code> and <code>--blocked-by</code> flags
         that gh {GH_FLOOR} added, and this gh is {check.version}. Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</> };
 
   }
@@ -124,9 +124,9 @@ export function AzBanner({ check }: { check: FailedCheck<AzCheck> }) {
 
 /** What lar-work does with each command whose check is a banner of its own. */
 const COMMAND_USES = {
-  git: 'lar-work’s agents branch, commit and push with',
-  jq: 'lar-work’s scripts read gh’s answers with',
-  curl: 'lar-work’s scripts tell the board to refresh with',
+  git: "lar-work's agents branch, commit and push with",
+  jq: "lar-work's scripts read gh's answers with",
+  curl: "lar-work's scripts tell the board to refresh with",
 } as const;
 export type Command = keyof typeof COMMAND_USES;
 

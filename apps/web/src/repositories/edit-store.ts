@@ -120,7 +120,7 @@ export const useEditStore = create<EditState>()((set, get) => {
       // The board sent back shows the Edit PR on the repository's row.
       receive(opened);
       set({ edit: null });
-      showPrToast({ slot: 'edit', what: ` Edit PR for ${shownRepo(repo)}`, prUrl: opened.prUrl, label: `${shownRepo(repo)}’s Edit PR`,
+      showPrToast({ slot: 'edit', what: ` Edit PR for ${shownRepo(repo)}`, prUrl: opened.prUrl, label: `${shownRepo(repo)}'s Edit PR`,
         ...editPr ? { before: 'Added the new values to ' } : { after: '. The board keeps the current values until it merges.' } });
     },
   };

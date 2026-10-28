@@ -54,7 +54,7 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     setStatus: (item, status) => write(item.number!, item.statuses, status),
     statusRefusal: (item) => ('statuses' in item ? twoStatuses(item) : null),
     addLabel: (item, label) => addIssueLabel(item.repo!, item.number!, label, run),
-    // The new issue gets status-list, so it shows on a repository that shows only Opted-in items.
+    // The new issue gets status-list, so it shows on a repository that shows only Items with a status.
     create: (draft, progress) => createIssue({ ...draft, labels: [...draft.labels, statusLabel('List')] }, progress, run, async () => {
       const error = await ensureLabel('List');
       if (error) throw new Error(error);

@@ -18,6 +18,7 @@ const queued = (id: number, extra: Partial<Item> = {}): Item => ({
 function commandsOn(items: Item[], failTag?: string) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
   const log: string[] = [];
+  const branches: (string | undefined)[] = [];
   const source = {
     statusRefusal: () => null,
     addLabel: async (item: Item, label: string) => {
@@ -31,11 +32,12 @@ function commandsOn(items: Item[], failTag?: string) {
   } as unknown as ItemSource;
   const commands = createItemCommands({ board, items: source, repos: () => [], offerModelChoices: () => [],
     projectOf: async (repo) => ({ projectId: repo }),
-    startThread: async (project, message) => {
+    startThread: async (project, message, _choice, worktree) => {
+      branches.push(worktree?.branch);
       log.push(`start ${project} ${message.split('\n')[1]}`);
-      return { thread: { threadId: 'thread-1', title: 't' }, error: null };
+      return { thread: { threadId: `thread-${branches.length}`, title: 't' }, error: null };
     } });
-  return { board, commands, log };
+  return { board, commands, log, branches };
 }
 
 test('Start on an untagged item tags it for the repository picked, then starts shaping in that repository', async () => {
@@ -85,4 +87,17 @@ test("Abandon on an item whose abandonRefusal says why refuses with it, and writ
   assert.deepEqual([refused.status, (refused.body as { error: string }).error], [409, refusal]);
   assert.equal((await commands.abandon('azure:contoso/8')).status, 200);
   assert.deepEqual(log, ['abandon 8']);
+});
+
+test('Start build reuses a live start, but a confirmed stopped build can start again once', async () => {
+  const item = queued(7, { status: 'Ready', statuses: ['Ready'], labels: ['build'] });
+  const { board, commands, log, branches } = commandsOn([item]);
+  await commands.startBuild(item.id, undefined);
+  await commands.startBuild(item.id, undefined);
+  assert.equal(log.length, 1, 'a repeated request reuses the original start');
+  board.update({ items: [{ ...item, threads: [{ id: 'thread-1', title: 'Build', state: 'stopped', updated: '2026-10-29T00:00:00Z' }] }] });
+  await Promise.all([commands.startBuild(item.id, undefined), commands.startBuild(item.id, undefined)]);
+  assert.equal(log.length, 2, 'concurrent retries start exactly one replacement');
+  assert.equal(branches[0], 'chore/7-item-7');
+  assert.notEqual(branches[1], branches[0], 'a replacement worktree must not reuse the stopped build branch');
 });

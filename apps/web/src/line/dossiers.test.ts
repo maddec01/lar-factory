@@ -306,3 +306,10 @@ test('the checklist keeps cross-repository dependency order even when builds ret
   await mountPage({ ...sample, items: [...sample.items.filter((i) => ![first.id, second.id].includes(i.id)), last, second, first] });
   expect([...dossier(C180).querySelectorAll('[data-checklist] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([first.id, second.id, last.id]);
 });
+
+test('the checklist keeps a build before a research decision blocked by that build', async () => {
+  const build = { ...sample.items.find((i) => i.id === 'I_sample13')!, blockers: [] };
+  const research = { ...decision([{ repo: build.repo!, number: build.number!, state: 'open' }]), labels: ['decision-research'] };
+  await mountPage({ ...sample, items: [c200, research, build] });
+  expect([...dossier().querySelectorAll('[data-checklist] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([build.id, research.id]);
+});

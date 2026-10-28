@@ -222,7 +222,7 @@ Completed work, reached when its item closes or its PR merges.
 
 **Abandon**:
 Setting aside a List or Queued item by closing it as not planned or moving it
-to Removed, so it can be reopened in its provider. A draft is removed for good.
+to Removed, so it can be reopened in its provider.
 _Avoid_: Cancel, Close (for discarded work)
 
 ### Item stats
@@ -279,7 +279,7 @@ The bar at the top of the board, in the board app and in a browser. It holds the
 _Avoid_: toolbar, top bar
 
 **List modal**:
-The modal the title bar's List button opens, showing the items in List: repositories and Draft on the left, the chosen group's items on the right.
+The modal the title bar's List button opens, showing the items in List: repositories on the left, the chosen group's items on the right.
 _Avoid_: sidebar, list panel, drawer
 
 **Provider**:

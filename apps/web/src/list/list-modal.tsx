@@ -1,11 +1,11 @@
 // The title bar's List button and the List modal it opens, on the copied Modal's paned layout. The left pane picks
-// All repositories, a repository or Draft (under No repository), each with how many of its items match the search;
+// All repositories or a repository, each with how many of its items match the search;
 // the right pane shows the chosen group's items with the search, Add item, Scope board and the sort menu. It starts on
 // the board's scope. An item opens the item dialog and Add item opens the Add item flow, each over the List modal, so
 // closing them comes back to the List as it was.
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, FileText, Inbox, SquarePen } from 'lucide-react';
+import { ChevronDown, Inbox, SquarePen } from 'lucide-react';
 import { boardSections, ref, repoKey, repoName, shortAgo, stillReading } from '@lar-factory/shared';
 import type { Item, ListGroup } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -23,8 +23,6 @@ import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { matchesSearch } from './list-search.ts';
 import { kind } from '../buttons/button-kinds.tsx';
-
-const DRAFT = repoKey({ repo: null });
 
 const SORTS = {
   updated: { label: 'Recently updated', compare: (a: Item, b: Item) => b.updatedAt.localeCompare(a.updatedAt) },
@@ -65,7 +63,7 @@ function ItemRow({ item, now, showRepo, onOpen }: { item: Item; now: number; sho
         <span className="block truncate text-sm font-medium leading-[18px] text-base-content">{item.title}</span>
         <AzureFields azure={item.azure} />
         <span className="block truncate text-xs leading-4 tabular-nums text-base-700">
-          {showRepo && repoKey(item) !== DRAFT && `${repoName(repoKey(item), repos)} · `}{ref(item)} · {shortAgo(item.updatedAt, now)}
+          {showRepo && `${repoName(repoKey(item), repos)} · `}{ref(item)} · {shortAgo(item.updatedAt, now)}
         </span>
       </span>
     </button>
@@ -117,13 +115,12 @@ function ListModal({ onClose }: { onClose: () => void }) {
   const q = query.trim().toLowerCase();
   // In boardSections' order, which counts items before the search so the rows stay put while typing.
   const groups = boardSections(data, now).listGroups.map((group): ListGroup => ({ ...group, items: group.items.filter((i) => matchesSearch(i, q)) }));
-  // A picked group that's gone, such as Draft once its last item leaves List, shows All repositories.
+  // A picked group that's gone shows All repositories.
   const picked = groups.find((group) => group.repo === pick);
   const active = picked?.repo ?? null;
   const unsorted = picked ? [...picked.items] : groups.flatMap((group) => group.items);
   const effectiveSort = sort ?? (unsorted.some((item) => item.azure) ? 'priority' : 'updated');
   const items = unsorted.sort(SORTS[effectiveSort].compare);
-  const draft = groups.find((group) => group.repo === DRAFT);
   const scoped = picked !== undefined && scope === picked.repo;
   // A repository whose items haven't landed yet isn't empty, so it shows no count.
   const reading = picked !== undefined && stillReading(data, picked.repo);
@@ -137,9 +134,8 @@ function ListModal({ onClose }: { onClose: () => void }) {
           <SidebarPane label="Repositories">
             <GroupItem label="All repositories" count={groups.reduce((n, group) => n + group.items.length, 0)} icon={<Inbox />} active={active === null} onPick={() => setPick(null)} />
             <SidebarNavigationGroup label="Repositories">
-              {groups.filter((group) => group.repo !== DRAFT).map((group) => groupItem(group, <RepoAvatar repo={group.repo} name={group.name} />))}
+              {groups.map((group) => groupItem(group, <RepoAvatar repo={group.repo} name={group.name} />))}
             </SidebarNavigationGroup>
-            {draft && <SidebarNavigationGroup label="No repository">{groupItem(draft, <FileText />)}</SidebarNavigationGroup>}
           </SidebarPane>
         }>
         <div className="flex shrink-0 flex-col gap-2 px-5 sm:px-6">

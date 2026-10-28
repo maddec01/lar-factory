@@ -5,7 +5,7 @@
 
 import type { MouseEvent } from 'react';
 import { GripVertical } from 'lucide-react';
-import { carriesTwoStatuses, isKindLabel, itemRepoNames, openBlockers, repoKey, sameRepo, startHold, shortAgo, workMessage } from '@lar-factory/shared';
+import { carriesTwoStatuses, isKindLabel, itemRepoNames, openBlockers, repoKey, sameRepo, startHold, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { kind } from '../buttons/button-kinds.tsx';
@@ -19,8 +19,7 @@ import { StartControl, StartMessage } from '../items/start-control.tsx';
 import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
 import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
 
-const DRAFT_HINT = 'This draft needs an issue before it can start. Convert it to an issue in a repo.';
-const NONE_STARTS = 'Every queued item is blocked, needs an issue or a T3 project, waits for onboarding, or has a thread at work.';
+const NONE_STARTS = 'Every queued item is blocked, needs a T3 project, waits for onboarding, or has a thread at work.';
 
 /**
  * The labels a row shows: the item's kind label and its repository's custom labels, in the item's order; GitHub
@@ -38,12 +37,11 @@ const stop = (e: MouseEvent) => e.stopPropagation();
  * Whether Start can run on the item: an issue carrying one status that nothing open blocks, in a repository done
  * onboarding that T3 has a project for, with no item thread running or waiting on you.
  */
-const canStart = (data: BoardData) => (item: Item) => Boolean(workMessage(item)) && !openBlockers(item).length
+const canStart = (data: BoardData) => (item: Item) => !openBlockers(item).length
   && !startHold(data, item.repo) && !hasLiveThread(item) && !carriesTwoStatuses(item);
 
-/** A row's action: Start refining, Open thread while the item has a live thread, or why a draft can't start. */
+/** A row's action: Start refining, Open thread while the item has a live thread, once it starts. */
 function RowAction({ item, data }: { item: Item; data: BoardData }) {
-  if (!workMessage(item)) return <span className="queue-hint shrink-0 text-[11px] text-(--muted-foreground)" title={DRAFT_HINT}>Needs an issue to start</span>;
   if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
   return <StartOrAfter item={item} data={data} label="Start refining" />;
 }

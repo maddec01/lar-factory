@@ -49,7 +49,6 @@ test('a slice is done once closed as completed, blocked or active while open wit
 
 test('kinds come from labels', () => {
   assert.equal(kindOf(item('List', ['bug', 'concept'])), 'concept');
-  assert.equal(kindOf(item('List', [], { repo: null, number: null })), 'draft');
   assert.equal(kindOf(item('List', [])), 'issue');
   assert.equal(kindOf(item('List', ['improvement', 'build'])), 'improvement', 'build only switches on slices');
   assert.equal(kindOf(item('List', ['build', 'bug'])), 'bug');
@@ -113,9 +112,6 @@ test('Done counts for 7 days after closing', () => {
 test('the work message titles the thread, then runs lar-work on the issue', () => {
   assert.equal(workMessage(item('Queued')), '#7 t\n$lar-work maddec01/lar-server#7');
   assert.equal(workTitle(item('Queued')), '#7 t');
-  const draft = item('Queued', [], { repo: null, number: null });
-  assert.equal(workMessage(draft), null);
-  assert.equal(workTitle(draft), null);
 });
 
 test('a $word in the title is kept and $lar-work still opens line 2', () => {
@@ -142,13 +138,11 @@ test('a build branch slug takes up to five words of the title, lowercase, with w
   assert.equal(branch('Café crème über naïve'), 'fix/7-cafe-creme-uber-naive');
   assert.equal(branch('日本語 title 🚀 here'), 'fix/7-title-here');
   assert.equal(branch('日本語 🚀'), 'fix/7');
-  assert.equal(buildBranch(item('Ready', [], { repo: null, number: null })), null);
 });
 
 test('the build message names the build and the builder agent of the installed lar-work', () => {
   assert.equal(buildMessage(item('Ready'), '/Users/me/.agents/skills/lar-work'),
     'Build maddec01/lar-server#7. Read /Users/me/.agents/skills/lar-work/agents/builder.md and follow it.');
-  assert.equal(buildMessage(item('Ready', [], { repo: null, number: null }), '/x'), null);
 });
 
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {
@@ -235,14 +229,10 @@ test('a short age rounds each unit down, and a future time reads 0s ago', () => 
     ['0s ago', '59s ago', '1m ago', '59m ago', '1h ago', '47h ago', '2d ago', '0s ago']);
 });
 
-test("an item's PR is the one Open PR opens: its first linked PR, or itself when it is a pull request", () => {
-  const pipeline = { checks: null, mergeState: 'blocked' as const };
+test("an item's PR is the one Open PR opens: its first linked PR", () => {
   const linked = (number: number, mergeState: 'can merge' | 'conflicts') => ({ number, url: `u${number}`, state: 'open' as const, isDraft: false, checks: null, mergeState });
   assert.deepEqual(itemPr(item('Verify', [], { linkedPrs: [linked(1, 'conflicts'), linked(2, 'can merge')] })), { url: 'u1', pipeline: linked(1, 'conflicts') });
   assert.equal(itemPr(item('Verify')), null, 'no PR, no link and no pipeline');
-  const pr = item('Verify', [], { content: 'pr', url: 'https://github.com/maddec01/lar-server/pull/7', pipeline, linkedPrs: [linked(1, 'conflicts')] });
-  assert.deepEqual(itemPr(pr), { url: 'https://github.com/maddec01/lar-server/pull/7', pipeline });
-  assert.deepEqual(itemPr({ ...pr, pipeline: undefined }), { url: 'https://github.com/maddec01/lar-server/pull/7', pipeline: null }, 'a PR whose pipeline was not read');
 });
 
 test('a running badge wins over failures until every check finishes, and turns slow after 30 minutes', () => {
@@ -258,12 +248,9 @@ test('a running badge wins over failures until every check finishes, and turns s
   assert.equal(isSlow(checks({ running: 1, total: 1 }), now), false);
 });
 
-test('canAbandon takes List and Queued issues and drafts, never pull requests or other statuses', () => {
-  const draft = { number: null, repo: null };
+test('canAbandon takes List and Queued issues, never other statuses', () => {
   for (const status of ['List', 'Queued'] as const) {
     assert.ok(canAbandon(item(status)), `${status} issue`);
-    assert.ok(canAbandon(item(status, [], draft)), `${status} draft`);
-    assert.ok(!canAbandon(item(status, [], { content: 'pr' })), `${status} pull request`);
   }
   for (const status of ['Shaping', 'In progress', 'Done'] as const) assert.ok(!canAbandon(item(status)), status);
 });
@@ -309,7 +296,7 @@ test('an item carrying more than one status moves only once one is kept, and say
   assert.equal(keepOneText(['Shaping', 'Ready', 'Review']), 'This issue carries Shaping, Ready and Review. Keep one to move it again.');
 });
 
-test('a repository goes by its name, or by owner/name when another board repository shares the name; Draft stays Draft', () => {
+test('a repository goes by its name, or by owner/name when another board repository shares the name', () => {
   const repos = [{ repo: 'maddec01/lar-server', role: 'api', labels: [] }, { repo: 'maddec01/lar', role: 'app', labels: [] }, { repo: 'fabrikam/lar', role: 'app', labels: [] }];
   assert.equal(repoName('maddec01/lar-server', repos), 'lar-server');
   assert.equal(repoName('maddec01/lar', repos), 'maddec01/lar');
@@ -321,7 +308,6 @@ test('a repository goes by its name, or by owner/name when another board reposit
   assert.equal(repoName('contoso/Fabrikam%20Fiber/lar', [...azure, { repo: 'contoso/Fabrikam%20Fiber/lar', role: 'app', labels: [] }]),
     'contoso/Fabrikam Fiber/lar', 'a shown key is decoded');
   assert.equal(repoName('contoso/Fabrikam/lar%20web', azure), 'lar web');
-  assert.equal(repoName(repoKey(item('List', [], { repo: null })), repos), 'Draft');
   assert.equal(repoKey(item('List')), 'maddec01/lar-server');
 });
 
@@ -333,24 +319,23 @@ test('a repository shows with each part of its key decoded, and is on Azure DevO
   assert.equal(onAzure('maddec01/lar'), false);
 });
 
-test('the board groups the List by repository, keyed by owner/name and named by name, then Draft', () => {
+test('the board groups the List by repository, keyed by owner/name and named by name', () => {
   const repos = [{ repo: 'maddec01/lar', role: 'app', labels: [] }, { repo: 'fabrikam/lar', role: 'app', labels: [] }];
-  const items = [item('List', [], { id: 'a', repo: 'fabrikam/lar' }), item('List', [], { id: 'b', repo: null }), item('List', [], { id: 'c', repo: 'maddec01/lar' })];
+  const items = [item('List', [], { id: 'a', repo: 'fabrikam/lar' }), item('List', [], { id: 'c', repo: 'maddec01/lar' })];
   const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
   assert.deepEqual(groups.map((g) => [g.repo, g.name, g.items.map((i) => i.id)]), [
-    ['maddec01/lar', 'maddec01/lar', ['c']], ['fabrikam/lar', 'fabrikam/lar', ['a']], ['Draft', 'Draft', ['b']],
+    ['maddec01/lar', 'maddec01/lar', ['c']], ['fabrikam/lar', 'fabrikam/lar', ['a']],
   ]);
 });
 
-test('the List groups repositories by their items in List, most first, ties in configured order, and Draft last', () => {
+test('the List groups repositories by their items in List, most first, ties in configured order', () => {
   const repos = ['o/a', 'o/b', 'o/c'].map((repo) => ({ repo, role: 'app', labels: [] }));
   const items = [
-    item('List', [], { id: 'd1', repo: null }), item('List', [], { id: 'd2', repo: null }), item('List', [], { id: 'd3', repo: null }),
     item('List', [], { id: 'c1', repo: 'o/c' }), item('List', [], { id: 'c2', repo: 'o/c' }),
     item('List', [], { id: 'b1', repo: 'o/b' }), item('Queued', [], { id: 'b2', repo: 'o/b' }), item('Queued', [], { id: 'b3', repo: 'o/b' }),
   ];
   const groups = boardSections({ ...sample, repos, items }, Date.parse('2026-10-21T10:00:00Z')).listGroups;
-  assert.deepEqual(groups.map((g) => [g.repo, g.items.length]), [['o/c', 2], ['o/b', 1], ['o/a', 0], ['Draft', 3]]);
+  assert.deepEqual(groups.map((g) => [g.repo, g.items.length]), [['o/c', 2], ['o/b', 1], ['o/a', 0]]);
 });
 
 test("an untagged Azure work item shows in the List of every repository reading its item source, and a tagged one only in its repository's", () => {
@@ -372,7 +357,6 @@ test("an untagged item two repositories read shows both as its repositories, and
   assert.equal(itemRepoNames(both, repos), 'web or api');
   assert.equal(itemRepoNames({ repo: 'contoso/p/web', untaggedFor: ['contoso/p/web'] }, repos), 'web');
   assert.equal(itemRepoNames({ repo: 'contoso/p/api' }, repos), 'api');
-  assert.equal(itemRepoNames({ repo: null }, repos), 'Draft');
 });
 
 test("a start runs in the item's repository, or in the one picked among an untagged item's, or in its only one", () => {

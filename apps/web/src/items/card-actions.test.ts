@@ -75,15 +75,15 @@ test('a failed Back to List shows as a toast naming the item, which stays until 
   expect(document.activeElement, 'back to the button that failed').toBe(button('back-to-list', 'I_sample05'));
 });
 
-test('Abandon asks first, naming the issue it deletes or the draft it removes; Cancel returns focus', async () => {
+test('Abandon asks first, naming the issue it closes or the draft it removes; Cancel returns focus', async () => {
   await mountPage();
   await openItem('I_sample01');
   await press(button('abandon', 'I_sample01'));
   const dialog = $('#abandon-dialog')!;
   expect(dialog.getAttribute('role')).toBe('alertdialog');
-  expect(text($('#abandon-dialog h2'))).toBe(`Delete #61 ${sample.items[0]!.title}?`);
-  expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe("This permanently deletes the issue from maddec01/lar-server on GitHub. It can't be undone.");
-  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Delete issue']);
+  expect(text($('#abandon-dialog h2'))).toBe(`Abandon #61 ${sample.items[0]!.title}?`);
+  expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe('This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.');
+  expect($$('#abandon-dialog [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Abandon']);
   await settle(() => vi.advanceTimersByTime(100));
   expect(document.activeElement, 'Close takes focus, not the destructive button').toBe($('#abandon-dialog [aria-label="Close"]'));
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[0]!.click());
@@ -119,7 +119,7 @@ test('Abandon opens over an overlay, nothing over the title bar drags, and a cli
   expect($('#abandon-dialog'), 'still open').not.toBeNull();
 });
 
-test('confirming Abandon holds Queue without relabelling it, and announces the deletion without a link', async () => {
+test('confirming Abandon holds Queue without relabelling it, and announces the close', async () => {
   holdPosts();
   const data: BoardData = { ...sample, capture: { enabled: true, session: 'session-1' } as BoardData['capture'] };
   await mountPage(data);
@@ -133,7 +133,7 @@ test('confirming Abandon holds Queue without relabelling it, and announces the d
 
   await answer({ error: null, board: { ...data, items: data.items.filter((i) => i.id !== 'I_sample01') } });
   expect(text($('.title-bar .list-button')), 'it leaves the List').toBe('List3');
-  expect(toast()!.querySelector('a, .view-item'), 'nothing to link to').toBeNull();
+  expect(toast()!.querySelector('a, .view-item'), 'the toast gives the result').toBeNull();
   expect(posted()).toEqual([['/api/abandon', { session: 'session-1', itemId: 'I_sample01' }]]);
 });
 

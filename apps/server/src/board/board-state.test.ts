@@ -66,3 +66,19 @@ test('a pick stays until a read shows the item with only the status picked', () 
   board.applyRead([twice], board.revision(), (items) => items);
   assert.deepEqual(board.snapshot().items[0]!.statuses, ['Shaping', 'Review'], 'confirmed, so the board trusts later reads');
 });
+
+test('a newer provider read brings back an issue reopened after Abandon', () => {
+  const board = createBoardState(empty());
+  const original = item('a', 'List');
+  board.applyRead([original], board.revision(), (items) => items);
+  const olderRead = board.revision();
+  board.remove('a');
+  const reopened = { ...original, updatedAt: '2026-10-21T10:00:00Z' };
+  board.applyRead([reopened], olderRead, (items) => items);
+  assert.deepEqual(statuses(board.snapshot()), [], 'a read already in flight cannot undo Abandon');
+  board.applyRead([reopened], board.revision(), (items) => items, () => false);
+  assert.deepEqual(statuses(board.snapshot()), [], 'a cached source cannot undo Abandon');
+  board.applyRead([reopened], board.revision(), (items) => items);
+  assert.deepEqual(statuses(board.snapshot()), ['a:List']);
+  assert.equal(board.removed('a'), false);
+});

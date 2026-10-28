@@ -6,6 +6,8 @@ export interface RunOptions {
   env?: NodeJS.ProcessEnv;
   timeout: number;
   maxBuffer?: number;
+  /** Text to send on stdin, followed by EOF. */
+  input?: string;
 }
 
 export interface RunResult {
@@ -17,13 +19,18 @@ export interface RunResult {
   detail: string;
 }
 
-export function runTool(file: string, args: string[], { env, timeout, maxBuffer }: RunOptions): Promise<RunResult> {
+export function runTool(file: string, args: string[], { env, timeout, maxBuffer, input }: RunOptions): Promise<RunResult> {
   return new Promise((resolve) => {
-    execFile(file, args, { env, timeout, ...maxBuffer && { maxBuffer } }, (err, stdout, stderr) => {
+    const child = execFile(file, args, { env, timeout, ...maxBuffer && { maxBuffer } }, (err, stdout, stderr) => {
       if (!err) return resolve({ code: 0, stdout, stderr, detail: '' });
       const code = ((err as NodeJS.ErrnoException).code as number | string | undefined) ?? null;
       const detail = (stderr || stdout || err.message).trim().split('\n').slice(0, 4).join('\n');
       resolve({ code, stdout, stderr, detail });
     });
+    if (input !== undefined) {
+      // A tool may exit before reading; its exit result still reports the failure.
+      child.stdin?.on('error', () => {});
+      child.stdin?.end(input);
+    }
   });
 }

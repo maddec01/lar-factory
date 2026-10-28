@@ -229,18 +229,18 @@ test("Add item in a repository reading its issues creates the issue with status-
   assert.deepEqual(await projectCommands(board), []);
 });
 
-test("Abandon on an item from a repository's issues deletes the issue; without admin rights it shows gh's error and keeps the item", async (t) => {
+test("Abandon on an item from a repository's issues closes it as not planned; without write access it shows gh's error and keeps the item", async (t) => {
   const deleted = await issuesBoard(t, { repoIssues: { [APPLE]: [appleIssue(8), appleIssue(9)] } });
   const response = await deleted.postSession({ itemId: 'I_8' }, '/api/abandon');
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json() as { board: BoardData }).board.items.map((i) => i.number), [9]);
-  assert.deepEqual((await deleted.calls()).filter((args) => args[1] === 'delete'), [['issue', 'delete', '8', '-R', APPLE, '--yes']]);
+  assert.deepEqual((await deleted.calls()).filter((args) => args[1] === 'close'), [['issue', 'close', '8', '-R', APPLE, '--reason', 'not planned']]);
   assert.deepEqual(await projectCommands(deleted), []);
 
-  const kept = await issuesBoard(t, { fail: 'delete' });
+  const kept = await issuesBoard(t, { fail: 'abandon' });
   const refused = await kept.postSession({ itemId: 'I_8' }, '/api/abandon');
   assert.equal(refused.status, 502);
-  assert.match((await refused.json() as { error: string }).error, /^Could not delete #8\. .*admin rights/);
+  assert.match((await refused.json() as { error: string }).error, /^Could not abandon #8\. .*write access/);
   assert.equal((await kept.board() as BoardData).items.length, 1);
 });
 

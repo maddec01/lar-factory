@@ -14,7 +14,6 @@ import { SettingsIcon } from '@lar-factory/ui/design-system/NavigationIcons';
 import { useBoardStore } from '../board/board-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
-import { ShownControl, notBuilt } from './controls.tsx';
 import { type Group, type Page, pages } from './settings-pages.tsx';
 import { useSettingsStore } from './settings-store.ts';
 
@@ -42,23 +41,23 @@ function GroupView({ group }: { group: Group }) {
         <h3 className="m-0 text-[13px] font-semibold">{group.title}</h3>
         {group.description && <p className="m-0 mt-0.5 text-xs text-(--muted-foreground)">{group.description}</p>}
       </div>
-      <div className="divide-y divide-(--border) overflow-hidden rounded-xl border border-(--border) bg-(--card)">
+      {(group.rows.length > 0 || group.footer) && <div className="divide-y divide-(--border) overflow-hidden rounded-xl border border-(--border) bg-(--card)">
         {group.rows.map((row) => (
           <div key={row.id} className="settings-row grid gap-2 px-4 py-3" data-row={row.id}>
             <div className="flex items-center gap-x-6 gap-y-2">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] font-medium">{row.title}</div>
-                {row.description && <div className="text-xs text-(--muted-foreground)">{row.description}</div>}
+                {row.control.type !== 'unavailable' && row.description && <div className="text-xs text-(--muted-foreground)">{row.description}</div>}
               </div>
               {row.control.type === 'custom'
                 ? row.control.render()
-                : <ShownControl control={row.control} label={row.title} reason={row.reason ?? notBuilt(row.title)} />}
+                : <span className="text-xs text-(--muted-foreground)">Not available yet</span>}
             </div>
             {row.below}
           </div>
         ))}
         {group.footer && <div className="bg-(--muted) px-4 py-2">{group.footer}</div>}
-      </div>
+      </div>}
       {group.note}
     </section>
   );
@@ -89,7 +88,7 @@ function SettingsModal() {
     return () => removeEventListener('keydown', onKey);
   }, []);
   const q = query.trim().toLowerCase();
-  const matches = (p: Page) => !q || p.label.toLowerCase().includes(q) || p.groups.some((g) => g.rows.some((r) => r.title.toLowerCase().includes(q)));
+  const matches = (p: Page) => !q || p.label.toLowerCase().includes(q) || p.groups.some((g) => g.title.toLowerCase().includes(q) || g.rows.some((r) => r.title.toLowerCase().includes(q)));
   const nav = NAV.map((group) => ({ label: group.label, pages: group.ids.map((id) => byId.get(id)).filter((p): p is Page => !!p && matches(p)) }));
   const open = byId.get(section) ?? all[0]!;
   // A search that leaves out the open section shows the first section it keeps, without choosing it, so clearing the

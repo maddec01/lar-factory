@@ -295,8 +295,8 @@ test('Abandon from the dialog takes the item off the Queue; a failed one is a to
   await settle(() => row('I_sample06').click());
   await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="I_sample06"]')!);
   await settle(() => $$<HTMLButtonElement>('#abandon-dialog [data-slot="modal-footer"] button')[1]!.click());
-  await answer({ error: 'Could not delete #20.' }, 502);
-  expect(text(toast())).toMatch(/^Couldn't abandon #20 .*\. Could not delete #20\.$/);
+  await answer({ error: 'Could not abandon #20.' }, 502);
+  expect(text(toast())).toMatch(/^Couldn't abandon #20 .*\. Could not abandon #20\.$/);
   expect(rows().map((r) => r.dataset.item)).toContain('I_sample06');
 
   await press(dialog()!.querySelector<HTMLButtonElement>('[data-abandon="I_sample06"]')!);

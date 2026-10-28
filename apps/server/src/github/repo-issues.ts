@@ -4,7 +4,7 @@
 import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { DONE_REFUSED, type ItemSource } from '../items/item-source.ts';
-import { addIssueLabel, changedSince, createIssue, createStatusLabel, deleteIssue, fetchIssues, fetchRepoIssues, getIfChanged, issueLabels, message, setStatusLabel } from './github.ts';
+import { addIssueLabel, changedSince, createIssue, createStatusLabel, abandonIssue, fetchIssues, fetchRepoIssues, getIfChanged, issueLabels, message, setStatusLabel } from './github.ts';
 
 /** How many of the latest updated issues and PRs a change check lists; when all of them changed, the whole source reads. */
 const CHANGES_PAGE = 30;
@@ -69,6 +69,6 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
         return `Could not set ${status}. ${message(err)}`;
       }
     },
-    abandon: (item) => deleteIssue(item, run),
+    abandon: (item) => abandonIssue(item, run),
   };
 }

@@ -31,3 +31,10 @@ test('the env and buffer limit reach the tool', async () => {
   assert.equal((await runTool(process.execPath, node('process.stdout.write("x".repeat(100))'), { timeout: 5_000, maxBuffer: 10 })).code,
     'ERR_CHILD_PROCESS_STDIO_MAXBUFFER');
 });
+
+test('a tool receives JSON on stdin and sees the end of input', async () => {
+  const result = await runTool(process.execPath, node('process.stdin.setEncoding("utf8"); process.stdin.on("data", (data) => process.stdout.write(data))'),
+    { timeout: 5_000, input: '{"sha":null,"content":"quoted \\"text\\""}' });
+  assert.equal(result.code, 0);
+  assert.equal(result.stdout, '{"sha":null,"content":"quoted \\"text\\""}');
+});

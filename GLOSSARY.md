@@ -221,8 +221,8 @@ or hand checks, awaiting the user's merge.
 Completed work, reached when its item closes or its PR merges.
 
 **Abandon**:
-Discarding a List or Queued item for good. The issue is deleted, or the draft
-is removed from the board.
+Setting aside a List or Queued item by closing it as not planned or moving it
+to Removed, so it can be reopened in its provider. A draft is removed for good.
 _Avoid_: Cancel, Close (for discarded work)
 
 ### Item stats

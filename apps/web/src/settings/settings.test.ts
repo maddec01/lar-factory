@@ -1,7 +1,7 @@
 // Settings: the modal with its section list in groups, each section's title and description over its rows, the
 // Claude profiles with their switches and what a change did, the bundled skills with their last updates and install
 // states, the update channel, version, the update pill's state and step, and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
-// the profiles and updates show disabled.
+// the profiles and updates explain that they need the board app.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
@@ -41,8 +41,6 @@ async function type(input: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
   await settle(() => input.dispatchEvent(new Event('input', { bubbles: true })));
 }
-/** A row's select: lar-server's, a combobox showing its value. */
-const select = (id: string) => row(id).querySelector<HTMLButtonElement>('[role="combobox"]')!;
 
 /** Mounts the page with `data`, opens Settings and shows `label`'s section. */
 async function open(label = 'Skills', data: BoardData = sample): Promise<void> {
@@ -78,8 +76,9 @@ test('choosing a section shows its title, description and controls on the right'
   expect(section('Notifications').getAttribute('aria-current')).toBe('page');
   expect(section('General').getAttribute('aria-current')).toBeNull();
   expect($$('.settings-group h3').map(text)).toEqual(['Tell me when', 'Delivery']);
-  expect(switches().map((s) => s.getAttribute('aria-label')).slice(0, 2)).toEqual(['An item needs me', 'A build is ready to verify']);
-  expect(select('quiet').textContent).toBe('Follow Focus');
+  expect(switches()).toHaveLength(0);
+  expect(text(row('quiet'))).toContain('Not available yet');
+  expect(text(body())).not.toContain('Follow Focus');
 });
 
 test('search keeps the sections whose name or a row matches, and / focuses it', async () => {
@@ -140,7 +139,7 @@ test('the modal takes clicks over the title bar in the board app, rather than dr
 
 test.each([[15, '15 seconds'], [60, '1 minute'], [300, '5 minutes'], [120, '2 minutes']])('Refresh every shows the board\'s %i s as %s', async (seconds, label) => {
   await open('General', { ...sample, refreshSeconds: seconds });
-  expect(select('refresh').textContent).toBe(label);
+  expect(text(row('refresh'))).toContain(label);
 });
 
 test('a repository colour named owner/name shows it once; one named by its name shows owner/name under it', async () => {
@@ -155,13 +154,21 @@ test('Refresh every says the board reads each repository\'s items and .lar-facto
   expect(text(row('confirm-abandon'))).toContain('Abandon closes a GitHub issue as not planned, or moves an Azure DevOps work item to Removed.');
 });
 
-test('a row that isn\'t built yet shows the prototype\'s value, disabled, and says so', async () => {
+test('unfinished settings show availability inline without controls or fictional values', async () => {
   await open('General');
-  expect([select('refresh').textContent, select('refresh').disabled]).toEqual(['45 seconds', true]);
-  expect(row('refresh').querySelector('.shown-control')!.getAttribute('title')).toBe('Refresh every isn\'t built yet');
-  expect(row('login').querySelector<HTMLButtonElement>('[role="switch"]')!.disabled).toBe(true);
-  expect($$<HTMLButtonElement>('.settings-body [role="radio"]').every((b) => b.disabled)).toBe(true);
-  expect($$<HTMLButtonElement>('.settings-body button').every((b) => b.disabled)).toBe(true);
+  expect(text(row('refresh'))).toContain('45 seconds');
+  for (const id of ['login', 'done-window', 'in-flight', 'auto-start']) {
+    expect(text(row(id))).toContain('Not available yet');
+    expect(row(id).querySelector('button, input, select')).toBeNull();
+  }
+  expect(text(body())).not.toContain('Start holds back when the factory is full');
+  await settle(() => section('Appearance').click());
+  expect(text(row('scheme'))).toContain('Not available yet');
+  expect(text(row('font-size'))).not.toContain('13');
+  expect($$('.settings-body [role="radio"], .settings-body [role="switch"], .settings-body input')).toHaveLength(0);
+  await settle(() => section('T3 Code').click());
+  expect(text(body())).not.toContain('Connected');
+  expect(text(row('base'))).toContain('Not available yet');
 });
 
 /** Each Settings group's title with its rows' ids. */
@@ -372,14 +379,15 @@ test('Diagnostics shows a missing git, jq or curl with its fix', async () => {
   expect(text(row('d-jq'))).toContain('Nothing runnable at JQ_PATH=/nowhere/jq. Fix: brew install jq');
 });
 
-test('in a browser the profiles and updates show disabled, since only the board app has them', async () => {
+test('a browser explains app-only features without fictional profiles or update values', async () => {
   await open('Skills');
-  expect(switches().slice(0, 3).map((s) => [s.getAttribute('aria-label'), ticked(s), s.disabled])).toEqual([
-    ['~/.claude', true, true], ['~/.claude-personal', true, true], ['~/.claude-work', false, true]]);
-  expect(row('profile-~/.claude').querySelector('.shown-control')!.getAttribute('title')).toBe('Only the board app links skills into Claude profiles');
+  expect(switches()).toHaveLength(0);
+  expect(text(body())).toContain('Only the board app links skills into Claude profiles.');
+  expect(text(body())).not.toContain('~/.claude-personal');
   await settle(() => section('Updates').click());
-  expect($$<HTMLButtonElement>('.settings-body [role="radio"]').map((r) => r.disabled)).toEqual([true, true]);
-  expect(row('version').querySelector('.shown-control')!.getAttribute('title')).toBe('Only the board app updates itself');
+  expect(text(body())).toContain('Only the board app updates itself.');
+  expect(text(body())).not.toMatch(/Nightly|0\.1\.0|3 minutes ago/);
+  expect($$('.settings-body button')).toHaveLength(0);
 });
 
 test('Skills credits each bundled skill and checklist, with a link to its source, in a browser too', async () => {
@@ -813,4 +821,19 @@ describe('updates', () => {
     expect($('.update-button')).toBeNull();
     expect(checked()).toBe('nightly');
   });
+});
+
+test('Archive explains its availability without fictional items or a Restore promise', async () => {
+  await open('Archive');
+  expect(text(modal())).toContain('The board does not list abandoned items yet.');
+  expect(text(modal())).toContain('Reopen issues on GitHub or reactivate work items in Azure DevOps.');
+  expect(text(modal())).not.toMatch(/#88|#41|Restore|last 30 days/);
+  expect($$('.settings-body button')).toHaveLength(0);
+});
+
+test('Diagnostics names the address serving this board', async () => {
+  vi.stubGlobal('location', new URL('http://127.0.0.1:4388'));
+  await open('Diagnostics');
+  expect(text(row('d-server'))).toContain('http://127.0.0.1:4388');
+  expect(text(row('d-server'))).not.toContain('4317');
 });

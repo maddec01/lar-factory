@@ -106,8 +106,19 @@ test('a work item at the 100-tag limit gets no new tag, with the fix', async () 
   assert.deepEqual(az.patches, []);
 });
 
+test('a write reads the work item with one batch read and PATCHes it through az rest at 7.1, testing its rev', async () => {
+  const { az, source, item } = await board(4);
+  const before = az.calls.length;
+  assert.equal(await source.addLabel(item, 'build'), null);
+  const [read, patch] = az.calls.slice(before);
+  assert.equal(read![read!.indexOf('--resource') + 1], 'workitemsbatch');
+  assert.deepEqual(patch!.slice(0, 3), ['rest', '--method', 'patch']);
+  assert.equal(patch![patch!.indexOf('--url') + 1], 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_apis/wit/workitems/4?api-version=7.1');
+  assert.deepEqual(az.patches[0]!.ops[0], { op: 'test', path: '/rev', value: 1 });
+});
+
 test('no right to create tags shows its message and fix', async () => {
-  const { source, item } = await board(4, (args) => (args.includes('PATCH')
+  const { source, item } = await board(4, (args) => (args[0] === 'rest'
     ? new Error('az devops invoke failed: ERROR: TF401289: The current user does not have permissions to create tags.') : undefined));
   const fix = 'You have no right to create tags in Fabrikam Fiber. Ask a project administrator to allow you Create tag definition, then try again.';
   assert.equal(await source.addLabel(item, 'build'), `Could not add the build tag. ${fix}`);
@@ -115,8 +126,8 @@ test('no right to create tags shows its message and fix', async () => {
 });
 
 test('a logged-out az shows its fix, and any other az error shows as it is', async () => {
-  const loggedOut = await board(4, (args) => (args.includes('PATCH') ? new Error('Please run az login to set up an account.') : undefined));
+  const loggedOut = await board(4, (args) => (args[0] === 'rest' ? new Error('Please run az login to set up an account.') : undefined));
   assert.equal(await loggedOut.source.setStatus(loggedOut.item, 'Review'), 'Could not set Review. az is logged out. Run az login, then try again.');
-  const changed = await board(4, (args) => (args.includes('PATCH') ? new Error('az devops invoke failed: TF26071: changed since you opened it') : undefined));
+  const changed = await board(4, (args) => (args[0] === 'rest' ? new Error('az devops invoke failed: TF26071: changed since you opened it') : undefined));
   assert.equal(await changed.source.abandon(changed.item), 'Could not abandon work item 4. az devops invoke failed: TF26071: changed since you opened it');
 });

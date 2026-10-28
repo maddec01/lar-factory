@@ -4,8 +4,8 @@
 import { decodePart } from '@lar-factory/shared';
 import { az, orgFlags, withFile, type Az } from './azure-items.ts';
 
-/** The Tags API is a preview one. */
-const TAGS_API_VERSION = '7.1-preview.1';
+/** The Tags API's released version: az devops invoke reads `--api-version` as a number, so it can't pass `7.1-preview.1`. */
+const TAGS_API_VERSION = '7.1';
 
 /** `az devops invoke` on the tags of the project of `repo`, organization/project/repository. */
 function tags<T>(run: Az, repo: string, route: string[], more: string[] = []): Promise<T> {

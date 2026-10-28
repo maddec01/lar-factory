@@ -20,8 +20,13 @@ import { azureWrites } from './azure-writes.ts';
 /** Runs az with these arguments and resolves with its output, or throws its error. */
 export type Az = (args: string[]) => Promise<string>;
 
-/** The REST API version every `az devops invoke` call passes, as invoke's own default is 5.0. */
+/**
+ * The REST API version every `az devops invoke` call passes, as invoke's own default is 5.0. invoke reads it as a
+ * number, so a preview call passes `7.2-preview` and az adds the server's resource version: `7.2-preview.1` fails as 7.2.1.
+ */
 export const API_VERSION = '7.1';
+/** The Entra resource of Azure DevOps, which az rest gets its token for. */
+const DEVOPS_RESOURCE = '499b84ac-1321-427f-aa17-267ca6975798';
 /** The flags every az call ends with: the organization, no organization read from the checkout, and JSON output. */
 export const orgFlags = (organization: string): string[] => ['--org', `https://dev.azure.com/${organization}`, '--detect', 'false', '--output', 'json'];
 /** The most ids one workitemsbatch call reads. */
@@ -67,11 +72,21 @@ export async function az(args: string[]): Promise<string> {
   const result = await runTool(command.file, args, { env: command.env, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
   if (result.code !== 0) {
     await azCooldown.failed(result.stderr || result.detail);
+    // az rest prints Azure DevOps' error as JSON: its message is the part worth showing.
+    if (args[0] === 'rest') throw new Error(`az rest failed: ${/"message":"((?:[^"\\]|\\.)*)"/.exec(result.detail)?.[1] ?? result.detail}`);
     throw new Error(`az ${args.slice(0, 3).join(' ')} failed: ${result.detail}`);
   }
   azCooldown.succeeded();
   return result.stdout;
 }
+
+/**
+ * The `az rest` arguments that PATCH the work item `id` in `project` of `organization` with the JSON patch in `file`.
+ * az devops invoke can't: of wit/workitems' two routes, ${type} to create and {id}, it always takes the first.
+ */
+const workItemPatch = (organization: string, project: string, id: number, file: string): string[] => ['rest', '--method', 'patch',
+  '--resource', DEVOPS_RESOURCE, '--url', `https://dev.azure.com/${organization}/${encodeURIComponent(project)}/_apis/wit/workitems/${id}?api-version=${API_VERSION}`,
+  '--headers', 'Content-Type=application/json-patch+json', '--body', `@${file}`, '--output', 'json'];
 
 /** A logged-out az or a missing azure-devops extension as the ReadProblem that names its fix; any other error as it is. */
 export function problemOf(err: unknown): unknown {
@@ -95,6 +110,7 @@ export async function withFile<T>(body: unknown, use: (file: string) => Promise<
 
 export interface RawWorkItem {
   id: number;
+  rev?: number;
   fields: Record<string, unknown>;
   relations?: { rel: string; url: string }[] | null;
 }
@@ -169,10 +185,11 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
   // The repository's name keeps its origin URL's encoding; az takes the project's name itself.
   const project = decodePart(encoded);
   const org = orgFlags(organization);
-  const call = async <T>(args: string[]): Promise<T> => {
-    try { return JSON.parse(await run([...args, ...org])) as T; }
+  const parsed = async <T>(args: string[]): Promise<T> => {
+    try { return JSON.parse(await run(args)) as T; }
     catch (err) { throw problemOf(err); }
   };
+  const call = <T>(args: string[]) => parsed<T>([...args, ...org]);
   const boards = <T>(args: string[]) => call<T>(['boards', 'iteration', 'team', ...args, '--team', team, '--project', project]);
   const invoke = <T>(area: string, resource: string, route: string[], more: string[] = [], version = API_VERSION) =>
     call<T>(['devops', 'invoke', '--area', area, '--resource', resource, '--route-parameters', `project=${project}`, ...route, ...more, '--api-version', version]);
@@ -312,7 +329,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
       const [listed, levels] = await Promise.all([workItems(ids), backlogOf()]);
       return (await itemsOf({ title: '', items: listed, completed: showsCompleted }, levels)).items;
     },
-    ...azureWrites(project, invoke, statesOf),
+    ...azureWrites(project, workItems, (id, file) => parsed(workItemPatch(organization, project, id, file)), statesOf),
     // A new work item is in its type's first state, Proposed, so it shows open in List.
     create: azureCreate(project, invoke, async () => (await backlogOf()).requirementBacklog.defaultWorkItemType.name, (raw, draft) => ({
       id: itemId(raw.id), status: 'List', statuses: ['List'], content: 'ticket', number: raw.id, title: field(raw, 'System.Title'),

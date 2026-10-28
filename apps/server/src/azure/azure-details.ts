@@ -1,5 +1,6 @@
 // A work item's description and comments, which the item dialog reads when it opens. The board-wide read in
-// azure-items.ts leaves them out and stays on API_VERSION.
+// azure-items.ts leaves them out and stays on API_VERSION. az devops invoke can't pass a preview's resource version,
+// as in 7.1-preview.4: it reads the version as a number. Given 7.1-preview, az adds the server's latest one.
 
 import { decodePart, onAzure } from '@lar-factory/shared';
 import type { IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails, TextFormat } from '@lar-factory/shared';
@@ -7,10 +8,10 @@ import type { Refused } from '../config/edit-config.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { API_VERSION, az, field, linked, orgFlags, problemOf, withFile, workItemUrl, type Az, type RawWorkItem } from './azure-items.ts';
 
-/** The first API version that returns a work item's `multilineFieldsFormat`. */
-const DETAIL_API_VERSION = '7.2-preview.3';
-/** The comments API, which is preview-only. */
-const COMMENTS_API_VERSION = '7.1-preview.4';
+/** The work items batch read that returns a work item's `multilineFieldsFormat`, which az sends as 7.2-preview.1. */
+const DETAIL_API_VERSION = '7.2-preview';
+/** The comments API, which is preview-only; az sends it as 7.1-preview.4, the first whose comments say their format. */
+const COMMENTS_API_VERSION = '7.1-preview';
 /** Comments read per open; older ones are paged by their continuation token. */
 const COMMENT_LIMIT = 10;
 
@@ -94,15 +95,19 @@ async function subTicketsOf(call: Call, repo: string, workItem: RawWorkItem): Pr
 
 /**
  * Reads one work item's details, or says why it can't: the item's repository is not on Azure DevOps, or the `az` error.
- * The work item is read at DETAIL_API_VERSION with its links, and its last COMMENT_LIMIT comments at COMMENTS_API_VERSION, newest first.
+ * The work item is a batch read at DETAIL_API_VERSION with its links, as az devops invoke can't reach wit/workitems' {id}
+ * route, and its last COMMENT_LIMIT comments are read at COMMENTS_API_VERSION, newest first.
  * Its child work items are one more batch read, with a states read per child type.
  * `run` stands in for az in tests.
  */
 export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDetails | Refused> => inArea(item, run, async (call, repo) => {
-  const [workItem, read] = await Promise.all([
-    call<RawWorkItem & { multilineFieldsFormat?: Record<string, string> }>('workitems', [`id=${item.number}`], DETAIL_API_VERSION, ['--query-parameters', '$expand=relations']),
-    readComments(call, item),
-  ]);
+  // Both read at once, but a work item the batch leaves out answers 404 before the comments read fails for it.
+  const comments = readComments(call, item);
+  comments.catch(() => {});
+  const { value: [workItem] } = await withFile({ ids: [item.number], $expand: 'Relations', errorPolicy: 'Omit' }, (file) =>
+    call<{ value: ((RawWorkItem & { multilineFieldsFormat?: Record<string, string> }) | null)[] }>('workitemsbatch', [], DETAIL_API_VERSION, ['--http-method', 'POST', '--in-file', file]));
+  if (!workItem) return { status: 404, error: `Work item ${item.number} does not exist, or you have no right to read it.` };
+  const read = await comments;
   const body = typeof workItem.fields['System.Description'] === 'string' ? workItem.fields['System.Description'] : '';
   const text = (name: string) => (typeof workItem.fields[name] === 'string' ? workItem.fields[name] : undefined);
   const olderCursor = read.continuationToken || null;

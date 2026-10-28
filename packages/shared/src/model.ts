@@ -954,12 +954,15 @@ export interface OnboardingPicks {
  * One change onboarding's PR makes against the default branch: the `## Agent skills` block in its file, a file written
  * whole, a Clash's lines swapped at its line, or a file or folder (its path ending in `/`) deleted or renamed.
  */
-export type OnboardingPrChange =
+export type OnboardingPrChange = (
   | { kind: 'agent-skills'; path: string }
   | { kind: 'write'; path: string; created: boolean }
   | { kind: 'edit'; path: string; line: number; reason: string }
   | { kind: 'delete'; path: string }
-  | { kind: 'rename'; path: string; to: string };
+  | { kind: 'rename'; path: string; to: string }) & {
+    /** Current and proposed file contents. Null means the file does not exist yet. */
+    preview?: { before: string | null; after: string };
+  };
 
 /** Where a run of onboarding's Clash agent stands: running with the agent's latest message, done with its Clashes, or ended without them and why. */
 export type ClashRunState =

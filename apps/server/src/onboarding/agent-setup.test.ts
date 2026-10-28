@@ -4,7 +4,7 @@ import { AGENT_DOC_PATHS, AGENT_SKILLS_BLOCK, agentSetupWrites, withoutAgentSkil
 
 const DOCS = ['docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md'];
 
-const written = (files: Record<string, string>) => new Map(agentSetupWrites(files).map(({ path, content }) => [path, content]));
+const written = (files: Record<string, string>) => new Map(agentSetupWrites(files, 'GitHub').map(({ path, content }) => [path, content]));
 
 test('a block already in AGENTS.md is replaced where it is, keeping the sections around it, even with a CLAUDE.md', () => {
   const agents = '# lar-web\n\nRead the README.\n\n## Agent skills\n\n### Issue tracker\nLinear. See `docs/agents/issue-tracker.md`.\n\n'
@@ -34,7 +34,7 @@ test('with neither file, AGENTS.md is created holding the block', () => {
 });
 
 test('the three docs/agents/ files are written whole, replacing what the repository has', () => {
-  const writes = agentSetupWrites({ 'AGENTS.md': '', 'docs/agents/issue-tracker.md': '# Issue tracker: GitHub\n\n## Wayfinding operations\n' });
+  const writes = agentSetupWrites({ 'AGENTS.md': '', 'docs/agents/issue-tracker.md': '# Issue tracker: GitHub\n\n## Wayfinding operations\n' }, 'GitHub');
   assert.deepEqual(writes.map(({ path }) => path), ['AGENTS.md', ...DOCS]);
   for (const { path, content } of writes.slice(1)) {
     assert.ok(content.startsWith('# ') && content.endsWith('\n'), path);

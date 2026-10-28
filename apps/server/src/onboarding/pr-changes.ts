@@ -3,7 +3,7 @@
 // at the line the Clash names on that head, so an edit whose lines moved fails rather than landing in the wrong place.
 
 import { posix } from 'node:path';
-import { skillRenameProblem, type OnboardingPicks, type OnboardingPrChange } from '@lar-factory/shared';
+import { skillRenameProblem, type Provider, type OnboardingPicks, type OnboardingPrChange } from '@lar-factory/shared';
 import type { CommitTree, TreeEntry } from '../github/github.ts';
 import { agentSetupWrites } from './agent-setup.ts';
 import { isInstructionFile, isLineEdit, opencodeInstructions, overlaps, removesWhatIsThere } from './clash-edits.ts';
@@ -54,7 +54,7 @@ export async function linkTarget(tree: CommitTree, read: (sha: string) => Promis
  * is no project skill named like one of the `bundled` skills, or a rename to a name the Cleanup step refuses.
  */
 export async function planPrChanges(tree: CommitTree, read: (sha: string) => Promise<string>, config: string | null,
-  picks: OnboardingPicks, bundled: readonly string[]): Promise<PrPlan | { problem: string }> {
+  picks: OnboardingPicks, bundled: readonly string[], provider: Provider): Promise<PrPlan | { problem: string }> {
   const texts = new Map<string, string>();
   /** Each renamed file's path, by its new path, whose blob it keeps unless `texts` has its new text. */
   const moved = new Map<string, string>();
@@ -102,7 +102,7 @@ export async function planPrChanges(tree: CommitTree, read: (sha: string) => Pro
     if (content !== undefined) instructions[path] = content;
   }
   const written = new Set<string>();
-  for (const write of agentSetupWrites(instructions)) {
+  for (const write of agentSetupWrites(instructions, provider)) {
     const path = real[write.path] ?? write.path;
     // CLAUDE.md linked to AGENTS.md gets the same block as AGENTS.md, so it is written once.
     if (written.has(path)) continue;

@@ -665,10 +665,26 @@ function PrChangeList() {
   }
   return (
     <ul data-pr-changes className="m-0 grid list-none gap-1 rounded-lg border p-3 text-sm">
-      {changes.changes.map(changeRow).map((row, i) => (
-        <li key={i} data-change={row.path} className="flex items-start gap-2"><FileText className="mt-0.5 size-3.5 shrink-0 text-base-700" />
-          <PathAndWhat path={row.path} what={row.what} /></li>
-      ))}
+      {changes.changes.map((change, i) => {
+        const row = changeRow(change);
+        return (
+          <li key={i} data-change={row.path} className="flex items-start gap-2"><FileText className="mt-0.5 size-3.5 shrink-0 text-base-700" />
+            <div className="min-w-0 flex-1">
+              <PathAndWhat path={row.path} what={row.what} />
+              {change.preview && <details className="mt-2">
+                <summary className="cursor-pointer text-xs text-base-700">View contents</summary>
+                <div className="mt-2 grid gap-2">
+                  {change.preview.before === null ? <p className="m-0 text-xs text-base-700">New file</p> : <>
+                    <p className="m-0 text-xs font-medium">Current contents</p>
+                    <pre className="m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-base-200 p-3 font-mono text-xs">{change.preview.before}</pre>
+                  </>}
+                  <p className="m-0 text-xs font-medium">Proposed contents</p>
+                  <pre className="m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-base-200 p-3 font-mono text-xs">{change.preview.after}</pre>
+                </div>
+              </details>}
+            </div></li>
+        );
+      })}
     </ul>
   );
 }

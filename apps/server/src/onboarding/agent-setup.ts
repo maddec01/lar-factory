@@ -2,6 +2,8 @@
 // files it points at. The bundled to-tickets and code-review Copies read them to find the tracker and labels, so they
 // replace Matt Pocock's setup wherever it is. They live here as text, so the bundled server ships them.
 
+import type { Provider } from '@lar-factory/shared';
+
 /** A file the onboarding PR writes whole. */
 export interface FileWrite {
   path: string;
@@ -69,13 +71,106 @@ Create a GitHub issue in this repository with \`gh issue create\`.
 Run \`gh issue view <number> --comments\`.
 `;
 
-const TRIAGE_LABELS = `# Triage labels
+const AZURE_ISSUE_TRACKER = `# Issue tracker: Azure DevOps
+
+Track work in Azure Boards work items.
+Lar Factory's board moves them through their Status.
+Use the local \`az\` login with the azure-devops extension.
+Read \`lar-work/issue-tracker.md\`'s Azure DevOps section before changing work items.
+
+## Repository and project
+
+Take the organization, project and repository from the git origin.
+Decode the project name, including spaces.
+A work item URL ends in \`/_workitems/edit/<id>\`.
+The lar-work scripts accept the repository's origin URL or \`<org>/<project>/<repo>\`.
+
+\`\`\`sh
+org=https://dev.azure.com/<org>
+project="<project>"
+azure_repo=<org>/<project>/<repo>
+\`\`\`
+
+Pass \`--organization "$org"\` to every Azure command.
+
+## Read and create work items
+
+Read a work item:
+
+\`\`\`sh
+az boards work-item show --id "$id" --expand all --organization "$org"
+\`\`\`
+
+Create a top-level work item with the team's requirement type.
+Use User Story, Product Backlog Item, Issue or Requirement as the process names it.
+
+\`\`\`sh
+id=$(az boards work-item create --type "<requirement type>" --title "<title>" \\
+  --project "$project" --organization "$org" --query id -o tsv)
+\`\`\`
+
+Tag it \`repo-<repo>\` and its kind.
+Use lar-work's Azure instructions to write Markdown descriptions and comments.
+
+## Tags and relationships
+
+Kinds and workflow labels are tags in \`System.Tags\`.
+Read all tags before updating them because each write replaces the whole string.
+See \`docs/agents/triage-labels.md\`.
+Find work items with a tag:
+
+\`\`\`sh
+az boards query --organization "$org" --project "$project" \\
+  --wiql "SELECT [System.Id] FROM WorkItems WHERE [System.Tags] CONTAINS 'active'"
+\`\`\`
+
+Create a child Task with lar-work's \`scripts/slice.sh\`:
+
+\`\`\`sh
+child_url=$(bash <lar-work>/scripts/slice.sh "$azure_repo" "$parent_url" "<title>" /path/to/brief.md)
+\`\`\`
+
+Attach an existing child or mark its blocker:
+
+\`\`\`sh
+az boards work-item relation add --id "$child" --relation-type parent --target-id "$parent" --organization "$org"
+az boards work-item relation add --id "$child" --relation-type predecessor --target-id "$blocker" --organization "$org"
+\`\`\`
+
+Verify links with a read before retrying a write.
+
+## Status and concepts
+
+Move an item with lar-work's \`scripts/status.sh <work-item-url> "<Status>"\`.
+It keeps one \`status-<name>\` tag, such as \`status-needs-you\`.
+It moves Azure State when the Status category changes.
+A Completed-category State makes an item Done.
+Close work that will not proceed in its type's Removed-category State.
+Read lar-work's Azure instructions to find the process's State names.
+
+Tag broad work \`concept\`.
+Its decisions and builds are child Tasks with \`decision-*\` or \`build\` tags.
+A build becomes one PR in Azure Repos.
+Its slices are child Tasks.
+
+## When a skill says "publish to the issue tracker"
+
+Create an Azure Boards work item with the command above.
+
+## When a skill says "fetch the relevant ticket"
+
+Read the work item with the command above.
+`;
+
+function triageLabels(provider: Provider): string {
+  const azure = provider === 'Azure DevOps';
+  return `# Triage labels
 
 Lar Factory keeps an item's state in its Status (see \`docs/agents/issue-tracker.md\`),
-so a label says what an item is, never where it stands. Every repository has
-these workflow labels:
+so a ${azure ? 'tag' : 'label'} says what an item is.
+${azure ? 'Azure DevOps stores workflow labels as tags in `System.Tags`.\nTags need no setup.' : 'Every repository has these workflow labels:'}
 
-| Label | Meaning |
+| ${azure ? 'Tag' : 'Label'} | Meaning |
 | --- | --- |
 | \`bug\` | Something broken |
 | \`feature\` | New behaviour |
@@ -85,12 +180,12 @@ these workflow labels:
 | \`decision-prototype\` | Concept decision settled by a prototype |
 | \`decision-research\` | Concept decision settled by research |
 | \`decision-task\` | Concept decision settled by a small task |
-| \`build\` | Issue that becomes one PR |
+| \`build\` | ${azure ? 'Work item' : 'Issue'} that becomes one PR |
 | \`active\` | Slice an implementer is working on now |
 | \`blocked\` | Slice an implementer couldn't finish, waiting for a re-slice |
 
 An item's kind is one of \`bug\`, \`feature\`, \`improvement\` or \`concept\`. The
-\`labels\` in \`.lar-factory.json\` list the repository's custom labels, which mark
+\`labels\` in \`.lar-factory.json\` list the repository's custom ${azure ? 'tags' : 'labels'}, which mark
 the part of the product an item touches.
 
 ## Matt Pocock's triage roles
@@ -101,14 +196,15 @@ Skills such as \`triage\` and \`to-tickets\` name triage roles. Each maps to thi
 | --- | --- |
 | \`needs-triage\` | Status List |
 | \`needs-info\` | Status Needs you, with a comment that says what is missing |
-| \`ready-for-agent\` | Unused: threads start from the board, so the item keeps its Status and gets no label |
+| \`ready-for-agent\` | Unused: threads start from the board, so the item keeps its Status and gets no ${azure ? 'tag' : 'label'} |
 | \`ready-for-human\` | Status Needs you |
-| \`wontfix\` | Close the issue as not planned: \`gh issue close <number> --reason "not planned"\` |
+| \`wontfix\` | ${azure ? "Close the work item in its type's Removed-category State. See lar-work's Azure instructions." : 'Close the issue as not planned: `gh issue close <number> --reason "not planned"`'} |
 | \`bug\` | \`bug\` |
 | \`enhancement\` | \`feature\` or \`improvement\`: \`feature\` for new behaviour, \`improvement\` for better existing behaviour |
 
 Where a skill says to apply a state role, set the Status it maps to.
-`;
+${azure ? '\nRead all of `System.Tags` before changing tags. Each write replaces the whole string.\nUse the `retag` function in lar-work/issue-tracker.md to preserve other tags.\nLet `scripts/status.sh` own the `status-*` tags.\n' : ''}`;
+}
 
 const DOMAIN = `# Domain docs
 
@@ -146,7 +242,7 @@ against it.
 
 const DOCS: FileWrite[] = [
   { path: 'docs/agents/issue-tracker.md', content: ISSUE_TRACKER },
-  { path: 'docs/agents/triage-labels.md', content: TRIAGE_LABELS },
+  { path: 'docs/agents/triage-labels.md', content: triageLabels('GitHub') },
   { path: 'docs/agents/domain.md', content: DOMAIN },
 ];
 
@@ -171,11 +267,11 @@ function splitAtBlock(markdown: string): { before: string[]; after: string[] | n
 }
 
 /** `markdown` with its `## Agent skills` section replaced by the factory's block; or null when it has no such section. */
-function replaceBlock(markdown: string): string | null {
+function replaceBlock(markdown: string, block: string): string | null {
   const split = splitAtBlock(markdown);
   if (!split) return null;
   const before = split.before.join('\n');
-  return `${before ? `${before}\n` : ''}${AGENT_SKILLS_BLOCK}${split.after ? `\n${split.after.join('\n')}` : ''}`;
+  return `${before ? `${before}\n` : ''}${block}${split.after ? `\n${split.after.join('\n')}` : ''}`;
 }
 
 /** `markdown` without its `## Agent skills` section, every other byte as it was; or null when it has no such section. */
@@ -190,13 +286,22 @@ export function withoutAgentSkills(markdown: string): string | null {
  * none, the block goes at the end of `CLAUDE.md` if the repository has one, else of `AGENTS.md`, created when missing.
  * The three docs/agents/ files follow, whole.
  */
-export function agentSetupWrites(files: Readonly<Record<string, string>>): FileWrite[] {
+export function agentSetupWrites(files: Readonly<Record<string, string>>, provider: Provider): FileWrite[] {
+  const block = provider === 'Azure DevOps'
+    ? AGENT_SKILLS_BLOCK.replace('GitHub issues in this repository', 'Azure Boards work items for this repository')
+      .replace("Lar Factory's workflow labels", "Lar Factory's workflow tags")
+    : AGENT_SKILLS_BLOCK;
+  const docs = provider === 'Azure DevOps' ? [
+    { path: 'docs/agents/issue-tracker.md', content: AZURE_ISSUE_TRACKER },
+    { path: 'docs/agents/triage-labels.md', content: triageLabels(provider) },
+    { path: 'docs/agents/domain.md', content: DOMAIN },
+  ] : DOCS;
   const replaced = ['CLAUDE.md', 'AGENTS.md'].flatMap((path) => {
-    const content = files[path] === undefined ? null : replaceBlock(files[path]);
+    const content = files[path] === undefined ? null : replaceBlock(files[path], block);
     return content === null ? [] : [{ path, content }];
   });
-  if (replaced.length) return [...replaced, ...DOCS];
+  if (replaced.length) return [...replaced, ...docs];
   const path = files['CLAUDE.md'] === undefined ? 'AGENTS.md' : 'CLAUDE.md';
   const existing = (files[path] ?? '').trimEnd();
-  return [{ path, content: existing ? `${existing}\n\n${AGENT_SKILLS_BLOCK}` : AGENT_SKILLS_BLOCK }, ...DOCS];
+  return [{ path, content: existing ? `${existing}\n\n${block}` : block }, ...docs];
 }

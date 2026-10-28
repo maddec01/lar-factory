@@ -19,7 +19,7 @@ function branch(files: Record<string, string>, links: string[] = []) {
 
 const plan = (files: Record<string, string>, picks: Partial<OnboardingPicks> = {}, config: string | null = CONFIG, links: string[] = []) => {
   const { tree, read } = branch(files, links);
-  return planPrChanges(tree, read, config, { clashes: [], skills: {}, ...picks }, BUNDLED);
+  return planPrChanges(tree, read, config, { clashes: [], skills: {}, ...picks }, BUNDLED, 'GitHub');
 };
 
 const byPath = (entries: TreeEntry[]) => new Map(entries.map(({ path, ...rest }) => [path, rest]));

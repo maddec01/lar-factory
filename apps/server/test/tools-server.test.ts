@@ -128,6 +128,7 @@ test('a login without the project scope reads no Project until Recheck finds the
   assert.deepEqual(data.tools?.gh, { result: 'no-project-scope', version: '2.96.0', fix: 'gh auth refresh -s project' });
   assert.equal(data.error, null);
   assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0);
+  await until(board, (data) => data.toolProgress?.checking.length === 0);
   assert.match(board.logs(), /gh can't read Projects/);
   await board.update({});
   assert.deepEqual(results((await (await recheck(board)).json()).board.tools), allOk);

@@ -914,6 +914,27 @@ test("the Pull request step lists the PR's changes with a new .lar-factory.json:
   expect(prStep().querySelector('[data-pr-changes] .text-success'), 'a change is no success').toBeNull();
 });
 
+test('the PR preview shows current and proposed contents before opening the PR and escapes repository text', async () => {
+  const before = '# Our Azure guide\nKeep our team query.\n<img src=x onerror=alert(1)>';
+  const after = '# Issue tracker: Azure DevOps\naz boards work-item show --id "$id" --expand all --organization "$org"';
+  await openPrStep([
+    { kind: 'write', path: 'docs/agents/issue-tracker.md', created: false, preview: { before, after } },
+    { kind: 'agent-skills', path: 'AGENTS.md', preview: { before: null, after: '## Agent skills\nAzure Boards work items.' } },
+  ]);
+  const rows = prStep().querySelectorAll('[data-pr-changes] li');
+  const details = rows[0]!.querySelector('details');
+  expect(details).not.toBeNull();
+  expect(text(details!.querySelector('summary'))).toBe('View contents');
+  expect([...details!.querySelectorAll('pre')].map((pre) => pre.textContent)).toEqual([before, after]);
+  expect(text(details)).toContain('Current contents');
+  expect(text(details)).toContain('Proposed contents');
+  expect(details!.querySelector('img')).toBeNull();
+  expect(text(rows[1])).toContain('New file');
+  expect(button(prStep(), 'Open the PR')!.disabled).toBe(false);
+  const { useWizardStore } = await import('./wizard-store.ts');
+  expect(useWizardStore.getState().run?.prUrl).toBeNull();
+});
+
 test('Open the PR waits while the PR\'s changes are read', async () => {
   await openCleanup(project('lar-web'));
   const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;

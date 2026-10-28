@@ -48,7 +48,9 @@ function describe(change: OnboardingPrChange): string {
 }
 
 const prBody = (changes: OnboardingPrChange[]) =>
-  `This PR:\n\n${changes.map((change) => `- ${describe(change)}`).join('\n')}\n\nOnboarding finishes on the board once this PR merges.`;
+  `This PR:\n\n${changes.map((change) => `- ${describe(change)}`).join('\n')}\n\nOnboarding replaces the agent guides with the factory's provider-specific setup. `
+  + 'The board shows current and proposed contents before you open this PR.\n\n'
+  + 'Onboarding finishes on the board once this PR merges.';
 
 /**
  * How far opening a repository's PR with one set of answers got, so Retry goes on from the gh or az call that failed;
@@ -115,8 +117,17 @@ async function plan(repo: string, head: string, config: string | null, picks: On
   try { bundled = bundledSkillNames(); }
   catch (err) { return { status: 500, error: `Can't read the app's bundled skills: ${message(err)}` }; }
   const { commitTree, readBlob } = host(repo);
-  const planned = await planPrChanges(await commitTree(repo, head, run), (sha) => readBlob(repo, sha, run), config, picks, bundled);
-  return 'problem' in planned ? { status: 409, error: planned.problem } : planned;
+  const tree = await commitTree(repo, head, run);
+  const planned = await planPrChanges(tree, (sha) => readBlob(repo, sha, run), config, picks, bundled, onAzure(repo) ? 'Azure DevOps' : 'GitHub');
+  if ('problem' in planned) return { status: 409, error: planned.problem };
+  for (const change of planned.changes) {
+    if (change.kind !== 'agent-skills' && change.kind !== 'write') continue;
+    const entry = planned.entries.find((entry) => entry.path === change.path);
+    if (!entry || !('content' in entry)) continue;
+    const blob = tree.files.get(change.path);
+    change.preview = { before: blob ? await readBlob(repo, blob.sha, run) : null, after: entry.content };
+  }
+  return planned;
 }
 
 const ANSWERS = "Send the repository, its .lar-factory.json's values or null to reuse its own, and the Cleanup step's picks.";

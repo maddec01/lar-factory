@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readRepositoryList, saveOnboarding, savePrClosed } from '../config/repository-config.ts';
-import { WORKFLOW_LABELS } from '@lar-factory/shared';
+import { WORKFLOW_LABELS, type OnboardingPrChange } from '@lar-factory/shared';
 import { REPO_URL, fakeAzRepos } from '../azure/fake-az.ts';
 import {
   createPrOpener, followOnboardingPrs, followResetPrs, previewOnboardingPr, reopenOnboardingPr, resetRepository,
@@ -207,11 +207,13 @@ test('Retry with other picks after the commit was made starts again from the def
 
 test('the preview lists the changes the PR would make against the default branch, writing nothing', async () => {
   const { calls, run } = gh();
-  assert.deepEqual(await previewOnboardingPr({ repo: 'maddec01/lar-web', config, picks: { clashes: [pushRule], skills: {} } }, run), { changes: [
+  const preview = await previewOnboardingPr({ repo: 'maddec01/lar-web', config, picks: { clashes: [pushRule], skills: {} } }, run);
+  assert.ok('changes' in preview);
+  assert.deepEqual(preview.changes.map(({ preview, ...change }) => change), [
     { kind: 'agent-skills', path: 'AGENTS.md' }, { kind: 'write', path: 'docs/agents/issue-tracker.md', created: true },
     { kind: 'write', path: 'docs/agents/triage-labels.md', created: true }, { kind: 'write', path: 'docs/agents/domain.md', created: true },
     { kind: 'write', path: '.lar-factory.json', created: true }, { kind: 'edit', path: 'AGENTS.md', line: 3, reason: pushRule.reason },
-  ] });
+  ]);
   assert.deepEqual(writes(calls), []);
   assert.deepEqual(await previewOnboardingPr({ repo: 'maddec01/lar-web', config, picks }, gh({ 'repos/maddec01/lar-web': 'gh api failed: HTTP 502' }).run),
     { status: 502, error: "Can't read maddec01/lar-web's default branch: gh api failed: HTTP 502" });
@@ -538,12 +540,52 @@ test('on Azure Repos, a completed PR finishes onboarding, an abandoned one is ma
   assert.equal(az.prs[1]!.status, 'active');
 });
 
-test('on Azure Repos, the preview lists the changes the GitHub path lists for the same files, reading them through az', async () => {
+test('Azure onboarding previews and commits provider-specific agent setup from the repository provider', async (t) => {
   const az = fakeAzRepos({ files: { '/AGENTS.md': RULES } });
-  const preview = await previewOnboardingPr({ repo: AZURE, config, picks: { clashes: [pushRule], skills: {} } }, az.run);
-  assert.deepEqual(preview, await previewOnboardingPr({ repo: 'maddec01/lar-web', config, picks: { clashes: [pushRule], skills: {} } }, gh().run));
-  assert.ok(az.calls.some((args) => args.includes('blobs')), 'the edit reads AGENTS.md\'s text');
+  // The provider comes from the repository, even when the answers still name GitHub issues.
+  const preview = await previewOnboardingPr({ repo: AZURE, config, picks }, az.run);
+  assert.ok('changes' in preview);
+  const dir = await dataDir(t, [{ repo: AZURE, onboarding: progress }]);
+  await createPrOpener(dir, az.run)({ repo: AZURE, progress, config, picks });
+  const content = (path: string) => az.pushes[0]!.changes.find((change) => change.path === path)!.content!;
+  const tracker = content('/docs/agents/issue-tracker.md');
+  assert.match(tracker, /Azure Boards work items/);
+  assert.ok(tracker.includes('az boards work-item show --id "$id" --expand all --organization "$org"'));
+  assert.ok(tracker.includes(String.raw`id=$(az boards work-item create --type "<requirement type>" --title "<title>" \
+  --project "$project" --organization "$org" --query id -o tsv)`));
+  assert.match(content('/docs/agents/triage-labels.md'), /System.Tags/);
+  assert.match(content('/AGENTS.md'), /Azure Boards work items/);
+  for (const path of ['/AGENTS.md', '/docs/agents/issue-tracker.md', '/docs/agents/triage-labels.md', '/docs/agents/domain.md']) {
+    assert.doesNotMatch(content(path), /GitHub|\bgh |[\u2013\u2014\u2018\u2019\u201c\u201d]/);
+    assert.equal(preview.changes.find((change) => `/${change.path}` === path)?.preview?.after, content(path));
+  }
+  assert.ok(az.calls.some((args) => args.includes('blobs')), 'the preview reads AGENTS.md');
   assert.ok(az.calls.filter((args) => args[1] === 'invoke').every((args) => args.includes('--api-version')));
+  const body = az.calls.flat().find((arg) => arg.startsWith('--description='))!;
+  assert.match(body, /Onboarding replaces the agent guides/);
+  assert.match(body, /The board shows current and proposed contents before you open this PR/);
+});
+
+test('the preview shows current and proposed agent setup contents before opening a PR', async () => {
+  const oldTracker = '# Azure work items\n\nKeep our team query.\n';
+  const oldTags = '# Tags\n\nKeep our team tags.\n';
+  const oldDomain = '# Domain\n\nUse the billing glossary.\n';
+  const az = fakeAzRepos({ files: {
+    '/AGENTS.md': RULES, '/docs/agents/issue-tracker.md': oldTracker,
+    '/docs/agents/triage-labels.md': oldTags, '/docs/agents/domain.md': oldDomain,
+  } });
+  const result = await previewOnboardingPr({ repo: AZURE, config: { ...azureConfig, labels: [] }, picks }, az.run);
+  assert.ok('changes' in result);
+  for (const [path, before] of [['AGENTS.md', RULES], ['docs/agents/issue-tracker.md', oldTracker],
+    ['docs/agents/triage-labels.md', oldTags], ['docs/agents/domain.md', oldDomain], ['.lar-factory.json', null]]) {
+    const change: OnboardingPrChange | undefined = result.changes.find((candidate) => candidate.path === path);
+    assert.ok(change && (change.kind === 'write' || change.kind === 'agent-skills'));
+    assert.ok('preview' in change && change.preview, `${path} has a content preview`);
+    assert.equal(change.preview.before, before);
+    assert.ok(change.preview.after.length > 0);
+  }
+  assert.equal(az.pushes.length, 0);
+  assert.equal(az.prs.length, 0);
 });
 
 test('on Azure Repos, the PR opener checks no workflow label', async (t) => {

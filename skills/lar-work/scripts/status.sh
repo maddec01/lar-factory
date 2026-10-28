@@ -141,9 +141,11 @@ set_tag() {
         [{op: "test", path: "/rev", value: $rev},
          {op: "replace", path: "/fields/System.Tags", value: ([$tags[] | select(. != $current)] + [$tag] | join("; "))}]
         + if $state == "" then [] else [{op: "replace", path: "/fields/System.State", value: $state}] end' >"$az_patch"
-    if ! az devops invoke --area wit --resource workitems --organization "$az_org" --route-parameters "id=$az_id" \
-        --http-method PATCH --media-type application/json-patch+json --in-file "$az_patch" \
-        --api-version 7.1 --output none 2>"$az_err"; then
+    # az devops invoke always takes wit/workitems' ${type} route over its {id} one, so the PATCH goes through az rest,
+    # with a token for Azure DevOps (499b84ac-...).
+    if ! az rest --method patch --resource 499b84ac-1321-427f-aa17-267ca6975798 \
+        --url "$az_org/$(jq -rn --arg name "$(percent_decode "$az_project")" '$name | @uri')/_apis/wit/workitems/$az_id?api-version=7.1" \
+        --headers Content-Type=application/json-patch+json --body "@$az_patch" --output none 2>"$az_err"; then
         az_failure "Could not write $url" "$(cat "$az_err")" >&2
         exit 1
     fi

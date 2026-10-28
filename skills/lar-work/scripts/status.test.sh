@@ -104,7 +104,8 @@ PY
 # ("a; b", none when empty), and fails with FAKE_AZ_ERROR when set. The states
 # read answers the Agile User Story's states, New (Proposed), Active
 # (InProgress), Resolved, Closed (Completed) and Removed, or FAKE_AZ_STATES when
-# set. The PATCH logs "az-patch <args>" and then its JSON patch on one line.
+# set. The az rest PATCH logs "az-patch" and then its JSON patch on one line, or
+# fails with FAKE_AZ_PATCH_ERROR when set.
 cat >"$bin/az" <<'AZ'
 #!/bin/bash
 case "$*" in
@@ -115,9 +116,10 @@ case "$*" in
 "devops invoke --area wit --resource workitemtypestates --organization https://dev.azure.com/contoso --route-parameters project=Fabrikam Fiber type=User Story --api-version 7.1 --output json")
     agile='{"count": 5, "value": [{"name": "New", "category": "Proposed"}, {"name": "Active", "category": "InProgress"}, {"name": "Resolved", "category": "Resolved"}, {"name": "Closed", "category": "Completed"}, {"name": "Removed", "category": "Removed"}]}'
     echo "${FAKE_AZ_STATES:-$agile}" ;;
-"devops invoke --area wit --resource workitems --organization https://dev.azure.com/contoso --route-parameters id=42 --http-method PATCH --media-type application/json-patch+json --in-file "*" --api-version 7.1 --output none")
+"rest --method patch --resource 499b84ac-1321-427f-aa17-267ca6975798 --url https://dev.azure.com/contoso/Fabrikam%20Fiber/_apis/wit/workitems/42?api-version=7.1 --headers Content-Type=application/json-patch+json --body @"*" --output none")
+    if [[ -n ${FAKE_AZ_PATCH_ERROR:-} ]]; then echo "$FAKE_AZ_PATCH_ERROR" >&2; exit 1; fi
     echo "az-patch" >>"$FAKE_GH_LOG"
-    args="$*" file=${args#*--in-file }
+    args="$*" file=${args#*--body @}
     jq -c . "${file%% *}" >>"$FAKE_GH_LOG" ;;
 *)
     echo "fake az: unexpected $*" >&2
@@ -519,6 +521,14 @@ if ((status != 0)) && [[ -z $writes && $errors == "az is logged out. Run az logi
     pass "with az logged out, says to run az login"
 else
     fail "with az logged out, says to run az login: $status $output / $errors / $writes"
+fi
+
+FAKE_AZ_STATE=Active FAKE_AZ_TAGS="status-verify" FAKE_AZ_PATCH_ERROR='ERROR: Precondition Failed({"$id":"1","innerException":null,"message":"VS403351: Test Operation for path /rev failed, value 5 was not equal to test value 4.","errorCode":0})' \
+    set_status "$work_item" Review
+if ((status != 0)) && [[ $errors == "Could not write $work_item. VS403351: Test Operation for path /rev failed, value 5 was not equal to test value 4." ]]; then
+    pass "a PATCH Azure refuses shows Azure's message, not az rest's JSON"
+else
+    fail "a PATCH Azure refuses shows Azure's message, not az rest's JSON: $status $output / $errors / $writes"
 fi
 
 FAKE_AZ_ERROR="ERROR: 'boards' is misspelled or not recognized by the system." set_status "$work_item" Review

@@ -58,6 +58,9 @@ az_failure() {
         echo "az has no azure-devops extension. Run az extension add --name azure-devops, then rerun."
     elif [[ $2 == *"az login"* ]]; then
         echo "az is logged out. Run az login, then rerun."
+    elif [[ $2 =~ \"message\":\"([^\"]*)\" ]]; then
+        # az rest prints Azure DevOps' error as JSON: its message is the part worth showing.
+        echo "$1. ${BASH_REMATCH[1]}"
     else
         echo "$1. $2"
     fi

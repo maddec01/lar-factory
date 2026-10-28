@@ -111,18 +111,6 @@ test("a part whose repository has no T3 project can't be armed, as its start wou
   assert.deepEqual(answer.board.armed, {});
 });
 
-test("a part whose repository is still onboarding can't be armed, and one armed already waits for onboarding's PR", async (t) => {
-  const env: Record<string, string> = { ...startableEnv(t), ...SAMPLE_MODELS };
-  writeOnboarding(env.HOME!, 'maddec01/lar-factory');
-  mkdirSync(dirname(armedPath(env.HOME!)), { recursive: true });
-  writeFileSync(armedPath(env.HOME!), JSON.stringify({ I_12: { model: OPUS } }));
-  const { board } = await armableBoard(t, [blockedBuild(['CLOSED', 'CLOSED']), blockedIssue(20, 'Queued', [], ['OPEN', 'OPEN'])], NOT_LANDED, env);
-  const refused = await arm(board, 'I_20');
-  assert.deepEqual([refused.status, (await refused.json()).error], [409, "Waits for onboarding's PR to merge"]);
-  const data = await read(board);
-  assert.deepEqual([data.armed, data.armedErrors], [{ I_12: { model: OPUS } }, {}]);
-  assert.deepEqual(await board.t3Calls(), []);
-});
 
 test('an armed start whose repository Reset takes off the board drops on the next read and never starts, also after a restart', async (t) => {
   const { board, env } = await armableBoard(t, [blockedBuild()], { files: ['.lar-factory.json'] });

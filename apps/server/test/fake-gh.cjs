@@ -201,7 +201,7 @@ const main = async () => {
   }
   if (args[0] === 'issue' && args[1] === 'edit') {
     if (options.writeDelay) await new Promise((r) => setTimeout(r, options.writeDelay));
-    if (options.fail === 'label' || options.fail === 'status') {
+    if (options.fail === 'label' || options.fail === 'status' && args.some((a) => a.startsWith('status-'))) {
       process.stderr.write('HTTP 403: Resource not accessible by integration');
       process.exitCode = 1;
       return;

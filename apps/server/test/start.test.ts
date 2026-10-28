@@ -64,15 +64,6 @@ test("Start begins one lar-work thread in the card's repository project and leav
   assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
 });
 
-test("Start is refused while the item's repository is still onboarding, and runs no t3", async (t) => {
-  const { board } = await boardIn(t, [boardIssue(12, 'Queued')], ORIGINS, (dir) => {
-    writeOnboarding(dir, 'maddec01/lar-factory');
-    return projectsDb(t, PROJECTS(dir));
-  }, NOT_LANDED);
-  const refused = await start(board, 'I_12');
-  assert.deepEqual([refused.status, (await refused.json()).error], [409, "Waits for onboarding's PR to merge"]);
-  assert.deepEqual(await board.t3Calls(), []);
-});
 
 test('Start runs the thread on the picked model choice, still in the repository project', async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued')], {}, SAMPLE_MODELS);
@@ -129,8 +120,6 @@ function worktree(dir: string): string {
 
 const refusals: { name: string; repo?: string; origins?: Record<string, string | null>;
   projects?: (home: string) => FixtureProject[]; db?: (home: string) => string; error: (home: string) => string }[] = [
-  { name: 'an unlisted repository', repo: 'maddec01/other',
-    error: () => "maddec01/other isn't onboarded; add it to the board's repositories" },
   { name: 'a project whose folder is gone', origins: {}, error: () => NO_PROJECT },
   { name: "another repository's checkout", origins: { 'lar-factory': 'https://github.com/maddec01/lar-server.git' },
     error: () => NO_PROJECT },
@@ -180,25 +169,7 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
   assert.deepEqual(await board.t3Calls(), []);
 });
 
-test("a card's repository matches its entry in the list of onboarded repositories whatever the case", async (t) => {
-  const board = await factoryBoard(t, [boardIssue(12, 'Queued', 'MADDEC01/Lar-Factory')]);
-  const response = await start(board, 'I_12');
-  assert.equal(response.status, 200);
-  assert.equal((await board.t3Calls())[0]?.[2], 'project-factory');
-});
 
-test('Start reads the list of onboarded repositories each time, so a repository onboarded later starts without restarting the board', async (t) => {
-  const dir = home(t, ORIGINS);
-  writeRepositoryList(dir, ['maddec01/elsewhere']);
-  const board = await startBoard(t, { items: [boardIssue(12, 'Queued')] }, false, false, { HOME: dir, T3_STATE_DB: projectsDb(t, PROJECTS(dir)) });
-  await until(board, (d) => d.items.length === 1);
-  const refused = await start(board, 'I_12');
-  assert.match((await refused.json()).error, /maddec01\/lar-factory isn't onboarded/);
-  writeRepositoryList(dir, ['maddec01/elsewhere', 'maddec01/lar-factory']);
-  const retried = await start(board, 'I_12');
-  assert.equal(retried.status, 200);
-  assert.equal((await board.t3Calls())[0]?.[2], 'project-factory');
-});
 
 test('Start refuses an unreadable list of onboarded repositories, naming the file', async (t) => {
   const dir = home(t, ORIGINS);

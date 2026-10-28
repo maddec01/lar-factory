@@ -38,13 +38,13 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
   const concept = boardIssue(1, 'Shaping', 'maddec01/lar-server', ['concept']);
   const feature = boardIssue(2, 'List', 'maddec01/lar-server', ['feature']);
   const coupled = boardIssue(3, 'In progress', 'maddec01/lar-server', ['feature']);
-  const part = boardIssue(4, 'Ready', 'maddec01/lar-apple', ['build']);
+  const part = boardIssue(4, 'Ready', 'maddec01/lar-server', ['build']);
   Object.assign(concept.content!, { id: 'I_1', body });
   Object.assign(feature.content!, { id: 'I_2', body, blockedBy: { nodes: [{ number: 1, state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } }] } });
   Object.assign(coupled.content!, { id: 'I_3', body });
   Object.assign(part.content!, { id: 'I_4', body,
     parent: { number: 3, title: 'Issue 3', url: 'https://github.com/maddec01/lar-server/issues/3', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-server' } } });
-  const board = await startBoard(t, { items: [concept, feature, coupled, part] });
+  const board = await startBoard(t, { repositories: ['maddec01/lar-server'], items: [concept, feature, coupled, part] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const [map, plain, parent, child] = (await board.board()).items;
   const read = { destination: 'There.', decisions: [], fog: [], check: { title: 'Try it', steps: ['Step'] } };
@@ -60,7 +60,7 @@ test("a dossier's map and every item's blockers reach the page; only the bodies 
 });
 
 test('a read request starts a read of GitHub at once', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await askRead(board)).status, 202);
@@ -68,7 +68,7 @@ test('a read request starts a read of GitHub at once', async (t) => {
 });
 
 test('requests during a read queue one more read after it, never two at once', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 300 });
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')], readDelay: 300 });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await askRead(board)).status, 202);
@@ -82,7 +82,7 @@ test('requests during a read queue one more read after it, never two at once', a
 
 test('an interval read during a read is skipped, not queued', async (t) => {
   // Reads take a tick and a half, so the second tick lands during the first interval read.
-  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 1500 }, false, true, { FAST_REFRESH_MS: '1000' });
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')], readDelay: 1500 }, false, true, { FAST_REFRESH_MS: '1000' });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   await waitFor(async () => await reads(board) === before + 1, 'the first interval read');
@@ -92,7 +92,7 @@ test('an interval read during a read is skipped, not queued', async (t) => {
 });
 
 test('a read request without JSON, from another origin or to another host reads nothing', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'List')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const before = await reads(board);
   assert.equal((await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url }, body: '{}' })).status, 415);
@@ -104,14 +104,14 @@ test('a read request without JSON, from another origin or to another host reads 
 });
 
 test('the sample board answers a read request and reads nothing', async (t) => {
-  const board = await startBoard(t, {}, true);
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory'],}, true);
   assert.equal((await askRead(board)).status, 200);
   await new Promise((r) => setTimeout(r, 200));
   assert.equal((await board.calls()).length, 0);
 });
 
 test("a read request naming an item reads that item alone, without loading the configs again", async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(1, 'Queued')] });
+  const board = await startBoard(t, { repositories: ['maddec01/lar-factory'], items: [boardIssue(1, 'Queued')] });
   await waitFor(async () => (await board.board()).fetchedAt !== null, 'the first read');
   const [item] = (await board.board()).items;
   const configReads = async () => (await board.calls()).filter((args) => args.some((a) => a.endsWith('/.lar-factory.json'))).length;

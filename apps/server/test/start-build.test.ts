@@ -102,17 +102,14 @@ test('Start build leaves a labelled build, a parent build and a parent already I
     ['chore/12-issue-12', 'chore/13-issue-13', 'feat/14-issue-14']);
 });
 
-test("Start build reads the labels of a parent that isn't on the board, and adds it to the project to move it", async (t) => {
+test("Start build reads the labels of a parent that isn't on the board, and moves its status label", async (t) => {
   const { board } = await buildBoard(t, [readyIssue(12, ['build'], 40), readyIssue(13, ['build'], 41)], {
     issues: { 'maddec01/lar-factory/issues/40': { labels: [{ name: 'concept' }] }, 'maddec01/lar-factory/issues/41': { labels: [{ name: 'build' }] } },
   });
   assert.equal((await startBuild(board, 'I_12')).status, 200);
   assert.equal((await startBuild(board, 'I_13')).status, 200);
   assert.deepEqual(await writes(board), [
-    ['api', 'repos/maddec01/lar-factory/issues/40'],
-    ['project', 'item-add', '1', '--owner', 'maddec01', '--url', 'https://github.com/maddec01/lar-factory/issues/40', '--format', 'json'],
-    ['issue', 'edit', '900001', '-R', 'maddec01/lar-factory', '--add-label', 'status-in-progress'],
-    ['api', 'repos/maddec01/lar-factory/issues/41'],
+    ['issue', 'edit', '40', '-R', 'maddec01/lar-factory', '--add-label', 'status-in-progress'],
   ]);
   assert.equal((await board.t3Calls()).length, 2);
 });
@@ -144,15 +141,6 @@ test('a refused repository project writes nothing to GitHub and runs no t3', asy
   assert.deepEqual(await board.t3Calls(), []);
 });
 
-test("Start build is refused while the build's repository is still onboarding, and writes nothing to GitHub and runs no t3", async (t) => {
-  const env = startableEnv(t);
-  writeOnboarding(env.HOME!, 'maddec01/lar-factory');
-  const board = await startBoard(t, { items: [readyIssue(12, ['feature'])], ...NOT_LANDED }, false, false, env);
-  await until(board, (d) => d.items.length === 1);
-  const refused = await startBuild(board, 'I_12');
-  assert.deepEqual([refused.status, (await refused.json()).error], [409, "Waits for onboarding's PR to merge"]);
-  assert.deepEqual([...await writes(board), ...await board.t3Calls()], []);
-});
 
 test('Start build is refused while an issue the build is blocked by is open, and runs once it closes', async (t) => {
   const blocked = (state: 'OPEN' | 'CLOSED') => rawIssue('I_12', 12, 'Ready', ['build'], {

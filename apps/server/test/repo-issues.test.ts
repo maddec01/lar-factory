@@ -234,7 +234,7 @@ test("Start build moves a parent from a repository's issues to In progress by it
   } as object, startableEnv(t));
   for (const id of ['I_12', 'I_13']) assert.equal((await board.postSession({ itemId: id }, '/api/start-build')).status, 200);
   assert.deepEqual((await labelEdits(board)).filter((args) => args[2] !== '12' && args[2] !== '13'), [
-    ['issue', 'edit', '8', '-R', APPLE, '--add-label', 'status-in-progress'],
+    ['issue', 'edit', '8', '-R', APPLE, '--add-label', 'status-in-progress', '--remove-label', 'status-list'],
     ['issue', 'edit', '20', '-R', APPLE, '--add-label', 'status-in-progress', '--remove-label', 'status-ready'],
   ]);
   assert.deepEqual(await projectCommands(board), []);

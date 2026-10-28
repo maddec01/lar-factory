@@ -158,7 +158,7 @@ test('a listed repository on Azure DevOps gets an az check, which Recheck reruns
   checkouts(home, { 'lar-api': 'git@ssh.dev.azure.com:v3/contoso/Fabrikam/lar-api' });
   const az = join(home, 'az');
   const fakeAz = (account: number) => {
-    writeFileSync(az, `#!/bin/sh\n[ "$1" = --version ] && echo 'azure-cli 2.67.0' && exit 0\n[ "$1" = account ] && exit ${account}\nexit 0\n`);
+    writeFileSync(az, `#!/bin/sh\n[ "$1" = version ] && echo '{"azure-cli": "2.67.0"}' && exit 0\n[ "$1" = account ] && exit ${account}\nexit 0\n`);
     chmodSync(az, 0o755);
   };
   fakeAz(1);
@@ -175,7 +175,7 @@ test("onboarding's Checks step asks for the az check with no listed repository o
   const dir = mkdtempSync(join(tmpdir(), 'lar-azure-onboarding-'));
   t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
   const az = join(dir, 'az');
-  writeFileSync(az, `#!/bin/sh\n[ "$1" = --version ] && echo 'azure-cli 2.67.0' && exit 0\nexit 0\n`, { mode: 0o755 });
+  writeFileSync(az, `#!/bin/sh\n[ "$1" = version ] && echo '{"azure-cli": "2.67.0"}' && exit 0\nexit 0\n`, { mode: 0o755 });
   const board = await startBoard(t, {}, false, false, { AZ_PATH: az });
   assert.equal((await afterRead(board)).tools?.az, undefined);
   assert.deepEqual((await (await board.post({ az: true }, board.url, '/api/recheck')).json()).board.tools.az, { result: 'ok', version: '2.67.0' });

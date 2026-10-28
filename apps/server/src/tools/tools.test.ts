@@ -175,11 +175,16 @@ test('a missing or logged-out gh still blocks reading', async (t) => {
   assert.deepEqual((await probeGh()).check, { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' });
 });
 
-/** Probes an az whose `account show` and `extension show` exit with these codes. */
-async function probeAzWith(t: TestContext, account: number, extension: number) {
+const AZ_VERSION = `echo '{"azure-cli": "2.67.0", "azure-cli-core": "2.67.0", "extensions": {"azure-devops": "1.0.1"}}'`;
+
+/**
+ * Probes an az that runs `version` as given, and whose `account show` and `extension show` exit with these codes.
+ * `--version`, which looks up the latest az over the network, exits 9.
+ */
+async function probeAzWith(t: TestContext, account: number, extension: number, version = AZ_VERSION) {
   const { bin, shell } = await machine(t, []);
   await writeFile(join(bin, 'az'), `#!/bin/sh
-[ "$1" = --version ] && printf 'azure-cli                         2.67.0\\n\\ncore                              2.67.0\\n' && exit 0
+[ "$*" = version ] && { ${version}; exit; }
 [ "$1 $2" = "account show" ] && { [ ${account} = 0 ] && echo '{}' || echo "Please run 'az login' to setup account." >&2; exit ${account}; }
 [ "$*" = "extension show --name azure-devops" ] && exit ${extension}
 exit 9
@@ -196,6 +201,12 @@ test('an az signed in with the azure-devops extension passes, with its version',
 test('az names its fix: az login when signed out, else az extension add without the extension', async (t) => {
   assert.deepEqual(await probeAzWith(t, 1, 1), { result: 'logged-out', version: '2.67.0', fix: 'az login' });
   assert.deepEqual(await probeAzWith(t, 0, 1), { result: 'no-extension', version: '2.67.0', fix: 'az extension add --name azure-devops' });
+});
+
+test('an az that fails to print its version still has its sign-in and extension checked, without a version', async (t) => {
+  assert.deepEqual(await probeAzWith(t, 0, 0, 'exit 1'), { result: 'ok' });
+  assert.deepEqual(await probeAzWith(t, 1, 0, 'echo not json'), { result: 'logged-out', fix: 'az login' });
+  assert.deepEqual(await probeAzWith(t, 0, 1, `echo '{"extensions": {}}'`), { result: 'no-extension', fix: 'az extension add --name azure-devops' });
 });
 
 test('a missing az has brew install azure-cli as its fix', async (t) => {

@@ -265,7 +265,7 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
   const items = [{ ...parent, content: { ...parent.content, closedByPullRequestsReferences: prs } },
     { ...build, content: { ...build.content, closedByPullRequestsReferences: { nodes: [prs.nodes[0]] } } }];
   const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
-  const read = await readItems(board);
+  const read = await readLiveStats(board);
   assert.deepEqual(read.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
   assert.equal((read.find((i) => i.number === 12)?.stats as { frozen?: boolean } | undefined)?.frozen, true);
   await new Promise((r) => setTimeout(r, 300));

@@ -267,7 +267,7 @@ The installable desktop app that runs the board and updates itself from Releases
 _Avoid_: Electron app, desktop board, dashboard
 
 **Loading screen**:
-The screen the board app and the board page show until the first read settles, at launch and after a board server restart. It shows the lar Factory lockup, whose L draws itself, over one line naming the current step, then fades into the board.
+The screen the board app and the board page show until the first read settles or a repository's items land, at launch and after a board server restart. The board then fills in as each other repository's read lands. It shows the lar Factory lockup, whose L draws itself, over one line naming the current step, then fades into the board.
 _Avoid_: splash, spinner, starting page
 
 **First read**:

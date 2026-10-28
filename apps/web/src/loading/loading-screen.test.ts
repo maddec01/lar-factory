@@ -93,6 +93,16 @@ test.each([
   expect(screen()).toBeNull();
 });
 
+test("the screen leaves once a repository's items land, though another repository still reads", async () => {
+  await mountPage(unsettled(firstRead('items', ['lar-server', 'lar-apple'])));
+  await advance(DRAW_MS);
+  expect(leaving()).toBe(false);
+  await push(unsettled({ ...firstRead('items', ['lar-server']), waiting: ['maddec01/lar-server'] }));
+  expect(leaving()).toBe(true);
+  await advance(EXIT_MS);
+  expect(screen()).toBeNull();
+});
+
 test('a page opened with ?loading=drawn starts with the mark drawn and leaves at once when the read has settled', async () => {
   await mountPage(settled(), '', '?loading=drawn');
   expect(screen()!.classList.contains('is-drawn')).toBe(true);

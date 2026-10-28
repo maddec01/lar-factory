@@ -97,6 +97,22 @@ test('under All repositories a row names its repository, except a Draft', async 
   expect(meta('I_sample04')).toMatch(/^draft · /);
 });
 
+test('a repository whose items have not landed yet says it is reading, not that its List is empty', async () => {
+  const reading = { ...sample, items: sample.items.filter((i) => i.repo !== 'maddec01/lar-apple'),
+    firstRead: { step: 'items' as const, running: ['lar-apple'], waiting: ['maddec01/lar-apple'], settled: false } };
+  await mountPage(reading);
+  await open();
+  await settle(() => group('lar-apple').click());
+  expect(text($('[data-list-modal] .empty'))).toBe('Reading lar-apple…');
+  expect(counts().find(([name]) => name === 'lar-apple'), 'no count in the left pane').toEqual(['lar-apple', '']);
+  const header = () => text($('[data-list-modal] button.scope-board')!.parentElement);
+  expect(header(), 'no count in the header').toBe('lar-appleScope boardRecently updated');
+  await push({ ...sample, firstRead: { step: 'finishing', running: [], settled: true } });
+  expect(rows()).toEqual(['I_sample03']);
+  expect(counts().find(([name]) => name === 'lar-apple')).toEqual(['lar-apple', '1']);
+  expect(header()).toBe('lar-apple1Scope boardRecently updated');
+});
+
 test('the search filters the right pane and the counts on the left follow it', async () => {
   await mountPage();
   await open();

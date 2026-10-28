@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, FileText, Inbox, SquarePen } from 'lucide-react';
-import { boardSections, ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
+import { boardSections, ref, repoKey, repoName, shortAgo, stillReading } from '@lar-factory/shared';
 import type { Item, ListGroup } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
@@ -34,12 +34,13 @@ const SORTS = {
 type Sort = keyof typeof SORTS;
 const isSort = (value: string): value is Sort => value in SORTS;
 
-function GroupItem({ label, count, icon, active, onPick }: { label: string; count: number; icon: React.ReactNode; active: boolean; onPick: () => void }) {
+/** A group in the left pane; one with no `count`, as a repository still reading, shows none. */
+function GroupItem({ label, count, icon, active, onPick }: { label: string; count?: number; icon: React.ReactNode; active: boolean; onPick: () => void }) {
   return (
     <SidebarNavigationItem active={active} onClick={onPick}>
       {icon}
       <span className="name min-w-0 flex-1 truncate text-left">{label}</span>
-      <span className="count text-xs tabular-nums text-base-700">{count}</span>
+      {count !== undefined && <span className="count text-xs tabular-nums text-base-700">{count}</span>}
     </SidebarNavigationItem>
   );
 }
@@ -120,8 +121,10 @@ function ListModal({ onClose }: { onClose: () => void }) {
   const items = (picked ? picked.items : groups.flatMap((group) => group.items)).sort(SORTS[sort].compare);
   const draft = groups.find((group) => group.repo === DRAFT);
   const scoped = picked !== undefined && scope === picked.repo;
+  // A repository whose items haven't landed yet isn't empty, so it shows no count.
+  const reading = picked !== undefined && stillReading(data, picked.repo);
   const groupItem = ({ repo, name, items: hits }: ListGroup, icon: React.ReactNode) => (
-    <GroupItem key={repo} label={name} count={hits.length} icon={icon} active={active === repo} onPick={() => setPick(repo)} />
+    <GroupItem key={repo} label={name} count={stillReading(data, repo) ? undefined : hits.length} icon={icon} active={active === repo} onPick={() => setPick(repo)} />
   );
   return (
     <Modal onClose={onClose}>
@@ -142,7 +145,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-semibold text-base-content">{picked ? picked.name : 'All repositories'}</span>
-            <Badge>{items.length}</Badge>
+            {!reading && <Badge>{items.length}</Badge>}
             {picked && (
               <Button variant="quiet" className="scope-board" aria-pressed={scoped} selected={scoped} onClick={() => setScope(scoped ? null : picked.repo)}>
                 {scoped ? 'Board scoped' : 'Scope board'}
@@ -153,7 +156,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
         </div>
         <Modal.Body>
           {items.map((item) => <ItemRow key={item.id} item={item} now={now} showRepo={!picked} onOpen={() => useItemDialogStore.getState().open(item.id)} />)}
-          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q ? 'Nothing here matches.' : 'Nothing in List.'}</p>}
+          {!items.length && <p className="empty m-0 p-4 text-sm text-base-700">{q ? 'Nothing here matches.' : reading ? `Reading ${picked!.name}…` : 'Nothing in List.'}</p>}
         </Modal.Body>
       </Modal.Content>
     </Modal>

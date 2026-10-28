@@ -647,6 +647,10 @@ export const repoKey = (item: Pick<Item, 'repo'>): string => item.repo ?? 'Draft
 /** Whether two `owner/name`s, or repository keys, are the same repository: GitHub ignores case, so the board does too. */
 export const sameRepo = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
+/** Whether the first read hasn't landed the repository's items yet, as its source still reads or waits for its tool's check. */
+export const stillReading = (data: Pick<BoardData, 'firstRead'>, repo: string): boolean =>
+  data.firstRead.waiting?.some((waiting) => sameRepo(waiting, repo)) === true;
+
 /** Whether the item shows in the repository's List and Scope: it's the item's repository, or one of its untagged repositories. */
 export const inRepo = (item: Pick<Item, 'repo' | 'untaggedFor'>, repo: string): boolean =>
   sameRepo(repoKey(item), repo) || Boolean(item.untaggedFor?.some((r) => sameRepo(r, repo)));

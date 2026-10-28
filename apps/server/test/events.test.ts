@@ -53,9 +53,12 @@ test('the stream sends the board at once with the same headers as other endpoint
 });
 
 test('the stream pushes each read of GitHub as soon as it finishes', async (t) => {
-  const board = await startBoard(t, { items: [projectIssue(1, 'List')] });
+  // A source reads at most every 2 s however often a read is asked for, which the fast clock shortens, so the asked
+  // read runs at once instead of on a later tick.
+  const board = await startBoard(t, { items: [projectIssue(1, 'List')] }, false, true);
   const stream = await openStream(t, board);
-  await stream.next((d) => statusOf(d, 'I_1') === 'List');
+  // A repository's items show as its read lands, before the first read ends, so wait for that read to end.
+  await stream.next((d) => d.firstRead.settled && statusOf(d, 'I_1') === 'List');
   await board.update({ items: [projectIssue(1, 'Ready')] });
   assert.equal((await askRead(board)).status, 202);
   await stream.next((d) => statusOf(d, 'I_1') === 'Ready');

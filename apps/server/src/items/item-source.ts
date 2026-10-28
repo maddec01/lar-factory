@@ -9,9 +9,10 @@ export interface ItemsRead {
   items: Item[];
   /** Each repository whose items the read left off, and why; absent when none. */
   problems?: ItemSourceProblem[];
-  /** Set when a merged read has sources and none of them has read yet, as each waits for its tool. */
-  unread?: true;
-  /** The repositories whose source a merged read hasn't read yet, as it still reads or waits for its tool; absent when none. */
+  /**
+   * The repositories whose source a merged read hasn't read yet, as it still reads or waits for its tool's check;
+   * absent when none. A source whose first read failed, or that its tool blocks, isn't waiting.
+   */
   waiting?: string[];
 }
 
@@ -40,13 +41,14 @@ export class ReadProblem extends Error {
  * every `idleMs`, ACTIVE_READ_MS and IDLE_READ_MS when absent, and every source is idle while `slow` holds, as when a
  * provider's quota runs low. A source whose change check sees every edit keeps only the items `polled` says at
  * `activeMs`, as no check sees a PR's checks finish. A source of a kind `waits` names reads nothing, as while its
- * provider's tool is still checking or blocks it.
+ * provider's tool is still checking or blocks it; one `blocked` names, as by a logged-out gh, isn't waiting to read.
  */
 export interface ReadPace {
   now: number;
   active(item: Item): boolean;
   polled(item: Item): boolean;
   waits?(kind: ItemSourceKind): boolean;
+  blocked?(kind: ItemSourceKind): boolean;
   activeMs?: number;
   idleMs?: number;
   slow?: boolean;

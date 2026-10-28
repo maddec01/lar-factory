@@ -1,6 +1,6 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import type { Item, Status } from '@lar-factory/shared';
+import type { Item, ItemSourceKind, Status } from '@lar-factory/shared';
 import { ReadProblem, type ItemSource, type ItemsRead } from './item-source.ts';
 import type { RepositoryConfig } from '../config/repository-config.ts';
 import { fakeAz } from '../azure/fake-az.ts';
@@ -237,6 +237,28 @@ test("each source's read lands while another still reads, with the items read so
   assert.equal(landed.length, 1, 'the last read to land is the read itself');
   assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_2']);
   assert.equal(read.waiting, undefined);
+});
+
+test("a source whose first read failed, or that its tool blocks, isn't waiting, as neither is about to read", async () => {
+  const failing: ItemSource = { ...fakeSource('lar-docs', [], []), read: async () => { throw new Error('boom'); } };
+  const slow = slowSource('lar-apple', [item('I_2', 'maddec01/lar-apple')]);
+  const slower = slowSource('lar-web');
+  const blocked = countedSource('lar', () => []);
+  const landed: ItemsRead[] = [];
+  const progress = { started: () => {}, finished: () => {}, landed: (read: ItemsRead) => landed.push(read) };
+  const sources = mergeSources([blocked], new Map([['maddec01/lar-server', blocked], ['maddec01/lar-docs', failing], ['maddec01/lar-apple', slow.source],
+    ['maddec01/lar-web', slower.source]]), [], new Map<ItemSource, ItemSourceKind>([[blocked, 'project'], [failing, 'issues'], [slow.source, 'issues'], [slower.source, 'issues']]));
+  const held = { ...pace(0), waits: (kind: string) => kind === 'project', blocked: (kind: string) => kind === 'project' };
+  const reading = sources.read(progress, held);
+  await new Promise((resolve) => setImmediate(resolve));
+  slow.finish();
+  await new Promise((resolve) => setImmediate(resolve));
+  slower.finish();
+  await assert.rejects(reading, /boom/);
+  assert.deepEqual(landed.map((read) => read.waiting), [['maddec01/lar-web']], 'neither the failed nor the blocked source waits');
+  assert.equal(blocked.reads, 0);
+  const checking = await sources.read(undefined, { ...pace(1_000), waits: (kind: string) => kind === 'project' });
+  assert.deepEqual(checking.waiting, ['maddec01/lar-server'], "a source waiting for its tool's check is waiting");
 });
 
 test('the onboarded sources pass on what has landed, leaving out the repositories they leave out', async () => {
@@ -502,10 +524,10 @@ test('a source whose kind waits reads nothing and checks for no changes, and rea
     new Map([[github, 'issues'], [azure, 'sprint']]));
   let waiting = new Set<string>(['sprint']);
   const paced = (now: number) => ({ ...pace(now), waits: (kind: string) => waiting.has(kind) });
-  assert.equal((await sources.read(undefined, { ...paced(0), waits: () => true })).unread, true, 'a read with every source waiting reads nothing');
+  assert.deepEqual((await sources.read(undefined, { ...paced(0), waits: () => true })).waiting, ['maddec01/lar-apple', 'maddec01/lar-server'],
+    'a read with every source waiting reads nothing, and every repository waits');
   const read = await sources.read(undefined, paced(0));
   assert.deepEqual(read.items.map((i) => i.id), ['I_1']);
-  assert.equal(read.unread, undefined);
   assert.deepEqual(read.waiting, ['maddec01/lar-server'], 'the waiting source\'s repository is still waiting');
   assert.deepEqual([github.reads, azure.reads], [1, 0]);
   waiting = new Set(['issues']);

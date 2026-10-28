@@ -383,6 +383,12 @@ export interface FirstRead {
   step: FirstReadStep;
   /** The item sources still being read, named by their repositories or Project; each drops off as its read finishes. */
   running: string[];
+  /**
+   * The onboarded repositories whose items haven't landed yet, by owner/name, as their source still reads or waits for
+   * its tool, once another repository's have; absent before any have and when none waits. The board shows the landed
+   * repositories' items meanwhile.
+   */
+  waiting?: string[];
   /** Whether the read finished, failed, or gh blocked it. A settled first read stays settled until the server restarts. */
   settled: boolean;
 }

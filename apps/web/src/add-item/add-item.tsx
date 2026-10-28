@@ -22,6 +22,7 @@ import type { DraftValues, ResultMessage } from './add-item-store.ts';
 import { useBoardStore } from '../board/board-store.ts';
 import { AddingARepository } from '../notices/adding-a-repository.tsx';
 import { CONTROL } from '../title-bar/control.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 /** The repo's custom labels, or tags on Azure DevOps, as toggles, none when it has none; `picked` start ticked. */
 function CustomLabels({ repo, picked }: { repo: RepoConfig; picked: readonly string[] }) {
@@ -127,8 +128,8 @@ function AddItemForm() {
         <Result message={message} />
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="secondary" id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>New item</Button>
-        <Button type="submit" id="item-submit"
+        <Button {...kind('other')} id="item-new" hidden={phase !== 'uncertain'} onClick={reset}>New item</Button>
+        <Button {...kind('main')} type="submit" id="item-submit"
           disabled={phase === 'pending' || phase === 'uncertain' || data.capture?.enabled === false || !data.repos.length}>
           {phase === 'pending' ? 'Adding…' : phase === 'retry' ? 'Retry this submission' : 'Add to List'}
         </Button>

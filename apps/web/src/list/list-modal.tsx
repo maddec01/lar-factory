@@ -23,6 +23,7 @@ import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { CONTROL } from '../title-bar/control.ts';
 import { matchesSearch } from './list-search.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 const DRAFT = repoKey({ repo: null });
 
@@ -73,7 +74,7 @@ function SortMenu({ sort, onSort }: { sort: Sort; onSort: (sort: Sort) => void }
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger asChild>
-        <Button variant="quiet" className="sort ml-auto" rightIcon={<ChevronDown />}>{SORTS[sort].label}</Button>
+        <Button {...kind('other')} className="sort ml-auto" rightIcon={<ChevronDown />}>{SORTS[sort].label}</Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="end">
         <DropdownMenu.RadioGroup value={sort} onValueChange={(value) => isSort(value) && onSort(value)}>
@@ -138,13 +139,13 @@ function ListModal({ onClose }: { onClose: () => void }) {
         <div className="flex shrink-0 flex-col gap-2 px-5 sm:px-6">
           <div className="flex items-center gap-2">
             <Input ref={searchField} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search List" aria-label="Search List items" />
-            <Button variant="secondary" className="add-item shrink-0" leftIcon={<SquarePen />} onClick={() => useAddItemStore.getState().setOpen(true)}>Add item</Button>
+            <Button {...kind('main')} leftIcon={<SquarePen />} className="add-item shrink-0" onClick={() => useAddItemStore.getState().setOpen(true)}>Add item</Button>
           </div>
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-semibold text-base-content">{picked ? picked.name : 'All repositories'}</span>
             <Badge>{items.length}</Badge>
             {picked && (
-              <Button variant="quiet" className="scope-board" aria-pressed={scoped} selected={scoped} onClick={() => setScope(scoped ? null : picked.repo)}>
+              <Button {...kind('other')} className="scope-board" aria-pressed={scoped} selected={scoped} onClick={() => setScope(scoped ? null : picked.repo)}>
                 {scoped ? 'Board scoped' : 'Scope board'}
               </Button>
             )}

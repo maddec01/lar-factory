@@ -8,6 +8,7 @@ import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { NoticeCard } from '@lar-factory/ui/design-system/NoticeCard';
 import { useBoardStore } from '../board/board-store.ts';
 import { stoppedAt, useWizardStore } from './wizard-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 export function OnboardingCards() {
   const onboarding = useBoardStore((state) => state.data.onboarding);
@@ -20,7 +21,7 @@ export function OnboardingCards() {
         return (
           <div key={repo} data-onboarding-card={repo}>
             <NoticeCard tone="warning" icon={<FolderGit2 />} title={shownRepo(repo)} badge={<Badge tone="warning">Onboarding</Badge>}
-              description={`${where[0]!.toUpperCase()}${where.slice(1)}`} actions={<Button onClick={() => resume(repo)} data-resume>Resume</Button>} />
+              description={`${where[0]!.toUpperCase()}${where.slice(1)}`} actions={<Button {...kind('other')} onClick={() => resume(repo)} data-resume>Resume</Button>} />
           </div>
         );
       })}

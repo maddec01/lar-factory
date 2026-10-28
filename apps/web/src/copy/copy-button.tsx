@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { useCopyStore } from './copy-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 async function writeClipboard(text: string): Promise<void> {
   try {
@@ -34,7 +35,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
     setCopied(Date.now());
     announce();
   };
-  return <Button variant="secondary" aria-label={label} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>;
+  return <Button {...kind('other')} aria-label={label} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>;
 }
 
 export function CopyStatus() {

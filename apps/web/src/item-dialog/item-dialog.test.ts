@@ -137,8 +137,8 @@ const footerControls = () => [...footer().querySelectorAll<HTMLElement>('button,
 
 test.each([
   ['List', 'I_sample01', ['Abandon', 'GitHub', 'Queue']],
-  ['Queued', 'I_sample05', ['← Back to List', 'Abandon', 'GitHub', 'Start refining ▾']],
-  ['a Queued draft', 'I_sample21', ['← Back to List', 'Abandon']],
+  ['Queued', 'I_sample05', ['Back to List', 'Abandon', 'GitHub', 'Start refining ▾']],
+  ['a Queued draft', 'I_sample21', ['Back to List', 'Abandon']],
   ['Shaping', 'I_sample07', ['GitHub', 'Open thread']],
   ['Needs you', 'I_sample11', ['GitHub', 'Answer in T3 (disabled: No T3 thread has worked on this yet)']],
   ['blocked Ready', 'I_sample13', ['GitHub', 'Start after #202 ▾']],
@@ -185,7 +185,7 @@ test('a Queued item blocked by an open issue has only Start after in the footer'
   await mountPage({ ...sample, items: sample.items.map((i) => (i.id === 'I_sample05'
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) });
   await openItem('I_sample05');
-  expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', 'Start after #202 ▾']);
+  expect(footerControls()).toEqual(['Back to List', 'Abandon', 'GitHub', 'Start after #202 ▾']);
 });
 
 /** The sample with `itemId`'s threads replaced. */
@@ -218,7 +218,7 @@ test.each([
 test("a Queued item has Start refining disabled in the footer until onboarding's PR merges while its repository is still onboarding", async () => {
   await mountPage({ ...sample, onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'pr', done: ['project'], answers: { projectId: 'p1' } } }] });
   await openItem('I_sample05');
-  expect(footerControls()).toEqual(['← Back to List', 'Abandon', 'GitHub', "Start refining (disabled: Waits for onboarding's PR to merge)"]);
+  expect(footerControls()).toEqual(['Back to List', 'Abandon', 'GitHub', "Start refining (disabled: Waits for onboarding's PR to merge)"]);
 });
 
 test.each([['running'], ['needs you']] as const)('a Queued item with a %s thread offers Open thread instead of Start refining, and neither Back to List nor Abandon', async (state) => {
@@ -412,7 +412,7 @@ test('Back to List in the dialog shows the item in List, says so, and moves focu
   await mountPage();
   await openItem('I_sample05');
   await press(button('back-to-list', 'I_sample05'));
-  expect(text(button('back-to-list', 'I_sample05'))).toBe('← Moving to List…');
+  expect(text(button('back-to-list', 'I_sample05'))).toBe('Moving to List…');
   expect(posted()).toEqual([['/api/back-to-list', { itemId: 'I_sample05' }]]);
   await answer({ error: null, board: moved('I_sample05', 'List') });
   expect(text(toast())).toMatch(/^Moved #129 .* to List\. View item$/);

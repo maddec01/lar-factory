@@ -2,7 +2,7 @@
 // The empty board, an offer and Resume open it; closing it drops the run until a T3 project is picked, or an offered run until Next or a change, then keeps it to resume.
 
 import { useEffect, useRef } from 'react';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import { shownRepo } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
@@ -11,6 +11,7 @@ import { Progress } from '@lar-factory/ui/progress';
 import { useBoardStore } from '../board/board-store.ts';
 import { StepBody } from './steps.tsx';
 import { type Run, type StepId, STEPS, onboarded, pickedProject, prClosed, stepReady, stepTitle, useWizardStore } from './wizard-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
 
 const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
@@ -32,14 +33,14 @@ function Nav({ run }: { run: Run }) {
   const data = useBoardStore((s) => s.data);
   const ready = stepReady(run, projects, checks, data.tools, clashes, agent, labels);
   if (run.prUrl) {
-    return onboarded(run, data) ? <Button leftIcon={<Check />} onClick={close}>Go to the board</Button>
-      : <Button variant="secondary" onClick={close}>{prClosed(run, data) ? 'Close' : 'Close and wait'}</Button>;
+    return onboarded(run, data) ? <Button {...kind('main')} leftIcon={<Check />} onClick={close}>Go to the board</Button>
+      : <Button {...kind('other')} onClick={close}>{prClosed(run, data) ? 'Close' : 'Close and wait'}</Button>;
   }
-  if (run.step === 'pr') return <Button variant="secondary" leftIcon={<ArrowLeft />} onClick={back}>Back</Button>;
+  if (run.step === 'pr') return <Button {...kind('other')} onClick={back}>Back</Button>;
   return (
     <>
-      {indexOf(run) > 0 && <Button variant="secondary" leftIcon={<ArrowLeft />} onClick={back}>Back</Button>}
-      <Button disabled={!ready} rightIcon={<ArrowRight />} onClick={next}>Next</Button>
+      {indexOf(run) > 0 && <Button {...kind('other')} onClick={back}>Back</Button>}
+      <Button {...kind('main')} disabled={!ready} rightIcon={<ArrowRight />} onClick={next}>Next</Button>
     </>
   );
 }

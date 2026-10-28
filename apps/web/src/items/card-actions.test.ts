@@ -49,7 +49,7 @@ test('Back to List shows only its own pending state', async () => {
   await openItem('I_sample05');
   const back = button('back-to-list', 'I_sample05');
   await press(back);
-  expect([text(back), back.getAttribute('aria-label')!.split(' ').slice(0, 2).join(' '), back.getAttribute('aria-disabled')]).toEqual(['← Moving to List…', 'Moving #129', 'true']);
+  expect([text(back), back.getAttribute('aria-label')!.split(' ').slice(0, 2).join(' '), back.getAttribute('aria-disabled')]).toEqual(['Moving to List…', 'Moving #129', 'true']);
   expect(text(button('abandon', 'I_sample05')), 'Abandon is not relabelled').toBe('Abandon');
   expect(text(button('start', 'I_sample05')), 'Start is not relabelled').toBe('Start refining ▾');
 });
@@ -65,7 +65,7 @@ test('a failed Back to List shows as a toast naming the item, which stays until 
   expect(text(toast())).toMatch(/^Couldn't move #129 .* to List\. Could not set List\. GitHub is down\.$/);
   expect(toast()!.querySelector('a.title'), 'it links the item').not.toBeNull();
   expect($('[data-item-dialog] .action-error'), 'the dialog shows no inline error').toBeNull();
-  expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('← Back to List');
+  expect(text(button('back-to-list', 'I_sample05')), 'the footer goes back to its links').toBe('Back to List');
   await settle(() => vi.advanceTimersByTime(60_000));
   expect(toast(), 'a failure stays').not.toBeNull();
   const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;

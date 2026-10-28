@@ -1,11 +1,13 @@
 // A link drawn as the design system's Button, for an action that opens a page: GitHub, a pull request or a T3
-// thread. The copied Button renders only a <button>, so these classes repeat its base and its primary and secondary
-// recipes from packages/ui/src/design-system/actions/Button.tsx; keep them in step when that Copy changes.
+// thread. The copied Button renders only a <button>, so these classes repeat its base, less its height, which the
+// button kind sets, and its primary and secondary recipes from packages/ui/src/design-system/actions/Button.tsx; keep
+// them in step when that Copy changes.
 
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
+import { kind as kindOf } from '../buttons/button-kinds.tsx';
 
 const base =
-  'relative isolate inline-flex h-9 items-center justify-center gap-2 rounded-md border px-[11px] text-sm font-medium whitespace-nowrap transition-[background-color,box-shadow,scale,color] duration-150 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary focus-visible:outline-none sm:h-8 [&_[data-slot=icon]>svg]:size-4';
+  'relative isolate inline-flex items-center justify-center gap-2 rounded-md border px-[11px] text-sm font-medium whitespace-nowrap transition-[background-color,box-shadow,scale,color] duration-150 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary focus-visible:outline-none [&_[data-slot=icon]>svg]:size-4';
 
 const recipes = {
   primary:
@@ -16,13 +18,15 @@ const recipes = {
 
 export type LinkButtonProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'className'> & {
   href: string;
-  variant?: keyof typeof recipes;
+  /** The button kinds a link can be: a Main action, an Open or an Other. */
+  kind: 'main' | 'open' | 'other';
   leftIcon?: ReactNode;
 };
 
-export function LinkButton({ variant = 'primary', leftIcon, children, ...props }: LinkButtonProps) {
+export function LinkButton({ kind, leftIcon, children, ...props }: LinkButtonProps) {
+  const { variant, ...mark } = kindOf(kind);
   return (
-    <a {...props} data-slot="button" className={`${base} ${recipes[variant]}`}>
+    <a {...props} {...mark} data-slot="button" className={`${base} ${recipes[variant]}`}>
       {leftIcon && <span data-slot="icon">{leftIcon}</span>}
       {children}
     </a>

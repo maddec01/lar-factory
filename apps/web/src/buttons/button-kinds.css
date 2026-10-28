@@ -1,0 +1,15 @@
+/* The button kinds (button-kinds.tsx), over the copied Button's recipes and LinkButton's. Unlayered, so these win over
+   the Copy's Tailwind utilities, which sit in a layer. */
+
+/* Every kind is 28 px tall, with 12 px text. */
+[data-kind] { height: --spacing(7); font-size: var(--text-xs); }
+
+/* Start: the primary colour, tinted on the card, with no border or shadow; its icon takes the text colour. */
+[data-kind="start"] {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  border-color: transparent;
+  box-shadow: none;
+}
+[data-kind="start"]:not(:disabled, [aria-disabled="true"]):hover, [data-kind="start"][data-state="open"] { background: color-mix(in srgb, var(--primary) 18%, var(--card)); }
+[data-kind="start"] [data-slot="icon"] { color: inherit; }

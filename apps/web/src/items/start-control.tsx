@@ -6,12 +6,12 @@
 
 import { useId, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
-import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { ref, highlightedChoice, repoName, startRepo, storedChoice } from '@lar-factory/shared';
 import type { BoardData, Item, ModelChoice } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
+import { ICON, kind as buttonKind } from '../buttons/button-kinds.tsx';
 import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
 import { useItemAction } from './action-store.ts';
 import { writeState } from './item-actions.tsx';
@@ -104,9 +104,9 @@ export const opensOnChecked = {
   },
 };
 
-/** Start, or the tag that took its place; the item dialog names it `label`, and the Queue outlines its later rows'. */
-export function StartControl({ item, data, label = 'Start', variant = 'primary', icon, kind = 'refine' }: {
-  item: Item; data: BoardData; label?: string; variant?: 'primary' | 'secondary'; icon?: ReactNode; kind?: StartKind;
+/** Start, a Start button named `label`, or the tag that took its place; `main` makes it its area's Main action. */
+export function StartControl({ item, data, label = 'Start', main, kind = 'refine' }: {
+  item: Item; data: BoardData; label?: string; main?: boolean; kind?: StartKind;
 }) {
   const start = useStart(item.id, kind);
   const action = useItemAction(item.id);
@@ -131,7 +131,7 @@ export function StartControl({ item, data, label = 'Start', variant = 'primary',
     <span className="start-group">
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
-          <Button variant={variant} leftIcon={start?.phase !== 'pending' && icon} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
+          <Button {...buttonKind(main ? 'main' : 'start')} leftIcon={start?.phase !== 'pending' && !main && ICON.play} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>
             {verb}{start?.phase !== 'pending' && ' ▾'}
           </Button>
         </DropdownMenu.Trigger>

@@ -28,7 +28,7 @@ function Actions({ item, data }: { item: Item; data: BoardData }) {
   return (
     // A click beside the buttons opens the item dialog, as anywhere else on the card.
     <KeepClicks className="desk-actions flex min-w-0 flex-wrap gap-2" passEmpty>
-      <OpenThread item={item} data={data} variant={next ? 'secondary' : 'primary'} />{next}
+      <OpenThread item={item} data={data} />{next}
     </KeepClicks>
   );
 }

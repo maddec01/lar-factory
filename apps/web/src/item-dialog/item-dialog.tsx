@@ -8,7 +8,7 @@
 // item, and the one action the item's status asks for, with Back to List and Abandon at its left.
 
 import { useEffect, type ReactNode } from 'react';
-import { ExternalLink, Play } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, ref, shortAgo, workMessage } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
@@ -36,8 +36,8 @@ function StatusAction({ item, data }: { item: Item; data: BoardData }) {
     case 'Queued':
       if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
       if (!workMessage(item)) return null;
-      return <StartOrAfter item={item} data={data} label="Start refining" icon={<Play />} />;
-    case 'Ready': return <StartBuild item={item} data={data} icon={<Play />} />;
+      return <StartOrAfter item={item} data={data} label="Start refining" />;
+    case 'Ready': return <StartBuild item={item} data={data} />;
     case 'Shaping': case 'In progress': case 'Review': return <OpenThread item={item} data={data} />;
     case 'Needs you': return <OpenThread item={item} data={data} label="Answer in T3" />;
     case 'Verify': return <PrLink item={item} label="Verify build" />;
@@ -109,7 +109,7 @@ function ItemDialogContent({ item, data, now }: { item: Item; data: BoardData; n
       </Modal.Body>
       <Modal.Footer leading={<span className="inline-flex items-center gap-3 text-xs"><MoveActions item={item} data={data} /></span>}>
         <span className="inline-flex items-center gap-1.5">
-          {item.url && <LinkButton variant="secondary" leftIcon={<ExternalLink />} href={item.url} target="_blank" rel="noopener">{item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}</LinkButton>}
+          {item.url && <LinkButton kind="other" leftIcon={<ExternalLink />} href={item.url} target="_blank" rel="noopener">{item.repo && onAzure(item.repo) ? 'Azure DevOps' : 'GitHub'}</LinkButton>}
           <StatusAction item={item} data={data} />
         </span>
       </Modal.Footer>

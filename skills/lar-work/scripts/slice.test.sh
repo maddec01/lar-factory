@@ -70,9 +70,15 @@ jq -c . "${file%% *}" >>"$FAKE_GH_LOG"
 echo "WARNING: an az warning on stderr" >&2
 echo '{"id": 77, "rev": 1, "fields": {"System.WorkItemType": "Task"}}'
 EOF
-chmod +x "$bin/gh" "$bin/sleep" "$bin/az"
+# A fake curl that logs "curl <args>", for the read request to the board.
+cat >"$bin/curl" <<'EOF'
+#!/bin/bash
+echo "curl $*" >>"$FAKE_GH_LOG"
+EOF
+chmod +x "$bin/gh" "$bin/sleep" "$bin/az" "$bin/curl"
 items="$bin/items"
-export FAKE_GH_LOG="$log" FAKE_GH_ITEMS="$items" PATH="$bin:$PATH"
+# slice.sh reads board records from this home, never the real one.
+export FAKE_GH_LOG="$log" FAKE_GH_ITEMS="$items" PATH="$bin:$PATH" HOME="$bin/home"
 
 body="$bin/body.md"
 echo "What to build" >"$body"
@@ -218,6 +224,16 @@ if ((status != 0)) && [[ -z $output && $errors == *"the parent is the build's wo
 else
     fail "on an Azure repository, a parent that isn't a work item URL stops before any call: $status $output / $errors / $(cat "$log")"
 fi
+
+# A made slice asks the board on LAR_BOARD_PORT to read its build's source.
+export LAR_BOARD_PORT=4999
+FAKE_ITEMS=issues run ""
+if ((status == 0)) && grep -qF '"url":"https://github.com/maddec01/lar-factory/issues/133"' "$log" && grep -q '127.0.0.1:4999/api/read' "$log"; then
+    pass "a made slice asks the board to read its build's source"
+else
+    fail "a made slice asks the board to read its build's source: $status $output / $errors / $(cat "$log")"
+fi
+unset LAR_BOARD_PORT
 
 rm -rf "$bin"
 ((failures == 0)) || { echo "$failures failed"; exit 1; }

@@ -13,8 +13,7 @@
 # item to the first Proposed-category state. One JSON patch writes both, and fails
 # if the item changed since it was read.
 # Done is never stored: closing the issue, or completing the work item, makes it Done.
-# Then asks each running local board to read GitHub now: the one on LAR_BOARD_PORT when
-# that is set, else every board recorded in ~/Library/Application Support/Lar Factory/boards.
+# Then asks each running local board to read the item's source now, as boards.sh says.
 set -euo pipefail
 
 usage="usage: status.sh <owner/repo#n | url | Azure work item url> <Status>"
@@ -27,6 +26,8 @@ else
     url=$ref
 fi
 
+# shellcheck source-path=SCRIPTDIR source=boards.sh
+source "$(dirname "$0")/boards.sh"
 # shellcheck source-path=SCRIPTDIR source=azure.sh
 source "$(dirname "$0")/azure.sh"
 if [[ $status == Done ]]; then
@@ -168,24 +169,4 @@ else
 fi
 echo "$url → $status"
 
-# The status is set; the boards' answers, or no board at all, change nothing.
-read_board() {
-    curl --silent --output /dev/null --max-time 1 --request POST --header 'Content-Type: application/json' \
-        --header "Origin: http://127.0.0.1:$1" --data '{}' "http://127.0.0.1:$1/api/read" || true
-}
-if [[ ${LAR_BOARD_PORT:-} =~ ^[0-9]+$ ]]; then
-    read_board "$LAR_BOARD_PORT"
-    exit 0
-fi
-# Each live board records its port in <pid>.json. A record whose process is gone,
-# or whose port no longer answers /healthz, is left over from a board that died.
-for record in "$HOME/Library/Application Support/Lar Factory/boards/"*.json; do
-    [[ -f $record ]] || continue
-    pid=$(basename "$record" .json)
-    port=$(jq -r '.port' "$record" 2>/dev/null || true)
-    [[ $pid =~ ^[0-9]+$ && $port =~ ^[0-9]+$ ]] || continue
-    kill -0 "$pid" 2>/dev/null || continue
-    if curl --silent --fail --output /dev/null --max-time 1 "http://127.0.0.1:$port/healthz"; then
-        read_board "$port"
-    fi
-done
+ask_boards_to_read "$url"

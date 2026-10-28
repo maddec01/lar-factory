@@ -169,10 +169,10 @@ request=$(cat "$bin/request" 2>/dev/null || true)
 if same_as_today && (($(curls) == 1)) && [[ $(first_write) == edit* ]] &&
     [[ $request == "POST /api/read HTTP/1.1"* ]] && grep -qi "^Host: 127.0.0.1:$port" <<<"$request" &&
     grep -qi "^Origin: http://127.0.0.1:$port" <<<"$request" && grep -qi '^Content-Type: application/json' <<<"$request" &&
-    grep -q -- '--max-time 1' "$log"; then
-    pass "after setting the status, asks the board for a read once with JSON and its Origin"
+    grep -q -- '--max-time 1' "$log" && grep -qF -- "\\\"url\\\":\\\"$url\\\"" "$log"; then
+    pass "after setting the status, asks the board for a read of the item once with JSON and its Origin"
 else
-    fail "after setting the status, asks the board for a read once with JSON and its Origin: $status $output / $errors / $(cat "$log") / $request"
+    fail "after setting the status, asks the board for a read of the item once with JSON and its Origin: $status $output / $errors / $(cat "$log") / $request"
 fi
 
 # With no records and no LAR_BOARD_PORT there is no board to ask.

@@ -26,6 +26,8 @@ import { EditDialog } from './repositories/edit-dialog.tsx';
 import { ResetDialog } from './repositories/reset-dialog.tsx';
 import { SettingsDialog } from './settings/settings.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
+import { prototype525 } from './title-bar/prototype-525-state.ts';
+import { PrototypeSwitcher } from './title-bar/prototype-525-switcher.tsx';
 
 function Content() {
   const { data, now } = useBoardStore();
@@ -67,6 +69,7 @@ export function App() {
         <EditDialog />
         <ResetDialog />
         <LoadingScreen />
+        {prototype525 && <PrototypeSwitcher />}
       </div>
     </TooltipProvider>
   );

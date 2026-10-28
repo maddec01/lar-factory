@@ -1,0 +1,71 @@
+/* THROWAWAY #525. Board-owned sizing overrides; no copied design-system file changes. */
+html[data-prototype525] {
+  /* Ordinary Button recipes get a common height. Row, avatar and status recipes retain their own sizing. */
+  :is([data-slot="button"], button.h-9):not(.h-auto):not(.h-4):not(.settings-nav button):not([role="switch"]),
+  :is([data-slot="icon-button"], button.size-8, button.size-7) {
+    height: --spacing(7);
+    min-height: --spacing(7);
+    font-size: var(--text-xs);
+  }
+  :is([data-slot="icon-button"], button.size-8, button.size-7) { width: --spacing(7); padding: 0; }
+  :is([data-slot="icon-button"], button.size-8, button.size-7) [data-slot="icon"] { width: --spacing(4); height: --spacing(4); }
+  /* Keep the scrollable board reachable under the floating prototype controls. */
+  main > .overflow-y-auto { padding-bottom: --spacing(40); }
+  .prototype-title-bar { container-type: inline-size; }
+  .prototype-update { color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+  .prototype-update:hover { background: color-mix(in srgb, var(--primary) 18%, transparent); }
+  .prototype-utilities { margin-left: --spacing(1); }
+  .prototype-warning { color: var(--background); background: var(--foreground); }
+  .prototype-title-bar .brand { white-space: nowrap; }
+  .prototype-board-strip .refreshed { height: --spacing(7); }
+
+  .queue [data-start], .queue [data-start-after], .queue [data-open-thread] { height: --spacing(7); font-size: var(--text-xs); }
+  /* All refining starts share the same recipe, including the first eligible row. */
+  &[data-queue-treatment="soft"] .queue li :is([data-start], [data-start-after]):not(:disabled) {
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 10%, var(--card));
+    border-color: transparent;
+    box-shadow: none;
+  }
+  &[data-queue-treatment="soft"] .queue li :is([data-start], [data-start-after]):not(:disabled):hover {
+    background: color-mix(in srgb, var(--primary) 18%, var(--card));
+  }
+  &[data-queue-treatment="soft"] .queue li [data-open-thread],
+  &[data-queue-treatment="quiet"] .queue li :is([data-start], [data-start-after], [data-open-thread]) {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  &[data-queue-treatment="quiet"] .queue li :is([data-start], [data-start-after]):not(:disabled) { color: var(--primary); }
+  &[data-queue-treatment="quiet"] .queue li :is([data-start], [data-start-after], [data-open-thread]):not(:disabled):hover,
+  &[data-queue-treatment="soft"] .queue li [data-open-thread]:hover { background: var(--accent); }
+  &[data-queue-treatment="quiet"] .queue header [data-start] {
+    color: var(--foreground);
+    background: var(--card);
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+@media (max-width: 75rem) {
+  html[data-prototype525] .prototype-brand-identity { gap: --spacing(1); flex-direction: column; align-items: flex-start; }
+  html[data-prototype525] .prototype-t3 { font-size: var(--text-2xs, 0.625rem); line-height: 1; }
+  html[data-prototype525] .prototype-update { width: --spacing(7); padding: 0; }
+  html[data-prototype525] .prototype-update > span:not([data-slot="icon"]) { display: none; }
+}
+@media (max-width: 48rem) {
+  html[data-prototype525] .prototype-title-bar { padding-left: 0; }
+  html[data-prototype525] .prototype-title-bar > .pl-\[74px\] { padding-left: 0; }
+  html[data-prototype525] .prototype-title-bar .traffic-lights { display: none; }
+  html[data-prototype525] .prototype-title-bar .brand { font-size: var(--text-base); }
+  html[data-prototype525] .prototype-title-bar .brand > span:last-child { display: none; }
+  html[data-prototype525] .prototype-t3 { display: none; }
+  html[data-prototype525] [data-title-variant="C"] .prototype-t3 { display: inline; }
+}
+@media (max-width: 24rem) {
+  html[data-prototype525] .queue > header > span:last-child { min-width: 0; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+  html[data-prototype525] .prototype-title-bar header { padding-inline: --spacing(2); gap: --spacing(0.5); }
+  html[data-prototype525] .prototype-title-bar .counters { display: none; }
+  html[data-prototype525] .prototype-title-bar .scope { padding-inline: --spacing(1); }
+  html[data-prototype525] .prototype-title-bar .prototype-utilities { padding-left: --spacing(1); margin-left: 0; }
+  html[data-prototype525] .prototype-switcher { bottom: --spacing(1); }
+}

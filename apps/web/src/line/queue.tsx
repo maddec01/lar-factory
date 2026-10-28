@@ -17,6 +17,7 @@ import { StartOrAfter } from '../items/start-after.tsx';
 import { StartControl, StartMessage } from '../items/start-control.tsx';
 import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
 import { dossiersOf, partsInDossiers } from './dossier-parts.ts';
+import { prototype525 } from '../title-bar/prototype-525-state.ts';
 
 const DRAFT_HINT = 'This draft needs an issue before it can start. Convert it to an issue in a repo.';
 const NONE_STARTS = 'Every queued item is blocked, needs an issue or a T3 project, waits for onboarding, or has a thread at work.';
@@ -43,8 +44,8 @@ const canStart = (data: BoardData) => (item: Item) => Boolean(workMessage(item))
 /** A row's action: Start refining, Open thread while the item has a live thread, or why a draft can't start. */
 function RowAction({ item, data, first }: { item: Item; data: BoardData; first: boolean }) {
   if (!workMessage(item)) return <span className="queue-hint shrink-0 text-[11px] text-(--muted-foreground)" title={DRAFT_HINT}>Needs an issue to start</span>;
-  if (hasLiveThread(item)) return <OpenThread item={item} data={data} />;
-  return <StartOrAfter item={item} data={data} label="Start refining" variant={first ? 'primary' : 'secondary'} />;
+  if (hasLiveThread(item)) return <OpenThread item={item} data={data} variant={prototype525 ? 'secondary' : 'primary'} />;
+  return <StartOrAfter item={item} data={data} label="Start refining" variant={!prototype525 && first ? 'primary' : 'secondary'} />;
 }
 
 /** `first` marks the row Start next starts, whose Start is the primary one. */

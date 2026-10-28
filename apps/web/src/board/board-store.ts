@@ -2,6 +2,7 @@
 // reach the server, if it can't. It starts from the data the server put in the page.
 
 import { create } from 'zustand';
+import { prototypeBoard } from '../title-bar/prototype-525-state.ts';
 import type { BoardData } from '@lar-factory/shared';
 
 interface BoardState {
@@ -19,11 +20,11 @@ interface BoardState {
 }
 
 export const useBoardStore = create<BoardState>()((set) => ({
-  data: JSON.parse(document.getElementById('board-data')?.textContent ?? 'null') as BoardData,
+  data: prototypeBoard(JSON.parse(document.getElementById('board-data')?.textContent ?? 'null') as BoardData),
   now: Date.now(),
   clientError: null,
   writes: 0,
-  receive: (data) => set({ data, now: Date.now(), clientError: null }),
+  receive: (data) => set({ data: prototypeBoard(data), now: Date.now(), clientError: null }),
   fail: (message) => set({ now: Date.now(), clientError: message }),
   tick: () => set({ now: Date.now() }),
   beginWrite: () => set((state) => ({ writes: state.writes + 1 })),

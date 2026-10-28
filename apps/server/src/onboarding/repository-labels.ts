@@ -37,7 +37,7 @@ export async function readRepositoryLabels(input: Record<string, unknown>, run?:
  * .lar-factory.json's, that it lacks, with GitHub's colour, less any customLabelProblem refuses, which the step shows
  * on its row; answers with the labels it has then.
  */
-export async function createRepositoryLabels(input: Record<string, unknown>, run?: Run): Answer {
+export async function createRepositoryLabels(input: Record<string, unknown>, run?: Run, progress?: (labels: string[]) => void): Answer {
   const { repo, itemSource, renaming, custom = [] } = input;
   if (!isRepo(repo) || !isItemSource(itemSource) || !strings(renaming) || !strings(custom)) {
     return { status: 400, error: 'Choose a repository and the labels to create or rename.' };
@@ -47,8 +47,13 @@ export async function createRepositoryLabels(input: Record<string, unknown>, run
   if ('error' in before) return before;
   const labels = [...labelsToCreate(labelPlan(before.labels), renaming),
     ...missingCustomLabels(before.labels, custom.map((c) => c.trim())).map((name) => ({ name }))];
+  const created = [...before.labels];
   for (const label of labels) {
-    try { await createLabel(repo, label, run); }
+    try {
+      await createLabel(repo, label, run);
+      created.push(label.name);
+      progress?.([...created]);
+    }
     catch (err) { return { status: 502, error: `Couldn't create ${label.name} in ${repo}: ${message(err)}` }; }
   }
   return read(repo, run);

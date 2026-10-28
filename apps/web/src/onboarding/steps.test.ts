@@ -152,7 +152,7 @@ test('the GitHub setup reads issues without a source choice and asks what to sho
   expect(input('project-owner')).toBeNull();
   expect(input('project-number')).toBeNull();
   expect(text(dialog()!.querySelector('[data-item-source]'))).toContain("This repository's GitHub issues.");
-  expect(suggested()).toEqual(['opted-in']);
+  expect(suggested()).toEqual(['all']);
   expect(nextButton().disabled).toBe(true);
   await type(input('role')!, 'Web client');
   expect(nextButton().disabled).toBe(false);
@@ -192,7 +192,7 @@ test('the Show setting can include all available work without changing its sourc
   await settle(() => choice('all').querySelector<HTMLElement>('[role="radio"]')!.click());
   await type(input('role')!, 'Web client');
   expect(choice('all').querySelector('[role="radio"]')!.getAttribute('aria-checked')).toBe('true');
-  expect(suggested()).toEqual(['opted-in']);
+  expect(suggested()).toEqual(['all']);
   expect(nextButton().disabled).toBe(false);
 });
 
@@ -218,20 +218,23 @@ test("a .lar-factory.json that can't be reused shows its problem with Retry, and
 const AZURE = project('lar-api', { repo: 'contoso/Fabrikam%20Fiber/lar-api', provider: 'Azure DevOps' });
 const choices = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-choice]')].map((c) => c.dataset.choice);
 
-test('Azure setup combines backlog and sprint and suggests an editable team name', async () => {
+test('Azure setup offers team choices and requires one before Next', async () => {
   await openSetup(AZURE);
   expect(text(field('provider'))).toContain('Azure DevOps');
   expect(choices()).toEqual(['all', 'opted-in']);
   expect(text(dialog()!.querySelector('[data-item-source]'))).toContain('backlog and current sprint');
-  expect(suggested()).toEqual(['opted-in']);
-  expect(input('team')!.value).toBe('Fabrikam Fiber Team');
+  expect(suggested()).toEqual(['all']);
+  expect(field('team')!.querySelector<HTMLSelectElement>('select')!.value).toBe('');
   await type(input('role')!, 'API server');
-  await type(input('team')!, ' ');
   expect(nextButton().disabled).toBe(true);
-  expect(text(field('team')!.querySelector('[data-problem]'))).toBe('Enter the team name to continue with Next.');
-  await type(input('team')!, 'Fabrikam Team');
+  await chooseTeam('Fabrikam Team');
   expect(nextButton().disabled).toBe(false);
 });
+
+async function chooseTeam(name: string): Promise<void> {
+  const select = field('team')!.querySelector<HTMLSelectElement>('select')!;
+  await settle(() => { select.value = name; select.dispatchEvent(new Event('change', { bubbles: true })); });
+}
 
 test('a GitHub origin offers no Azure DevOps item source or Team field', async () => {
   await openSetup(project('lar-web'));
@@ -299,7 +302,7 @@ test('the Checks step lists the command checks, then the setup checks, each with
 
 test("an Azure DevOps repository's Checks step lists az's check in place of gh's, and the az push check", async () => {
   await openSetup(AZURE);
-  await type(input('team')!, 'Fabrikam Team');
+  await chooseTeam('Fabrikam Team');
   await type(input('role')!, 'API server');
   answerChecks({ push: { passed: false, problem: "az's login can't push to contoso/Fabrikam%20Fiber/lar-api.", fix: 'Get Contribute, or log az in as an account that has it:', command: 'az login' } },
     toolChecks({ az: { result: 'no-extension', fix: 'az extension add --name azure-devops' } }));
@@ -971,7 +974,7 @@ test("Retry after the fixed checks' read failed reads them again, then lists the
 
 test("an Azure DevOps repository's PR adds the team's item source, made on Azure DevOps, and names the PR as Azure Repos does", async () => {
   await openSetup(AZURE);
-  await type(input('team')!, 'Fabrikam Team');
+  await chooseTeam('Fabrikam Team');
   await type(input('role')!, 'API server');
   answerChecks({}, toolChecks({ az: { result: 'ok' } }));
   await openChecks();
@@ -985,7 +988,7 @@ test("an Azure DevOps repository's PR adds the team's item source, made on Azure
   await settle();
   expect(text(prStep())).toContain('Your local files stay as they are.');
   expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'API server',
-    itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'opted-in', labels: [] });
+    itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', labels: [] });
   const prUrl = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api/pullrequest/100';
   const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr' ? new Response(JSON.stringify({ prUrl, error: null,
@@ -1000,7 +1003,7 @@ test('the Pull request step shows the branch and the .lar-factory.json it writes
   await openPrStep(WRITTEN, ['app: music']);
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Pull request');
   expect(text(prStep())).toContain('Review these changes, then open a pull request to save them.');
-  expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: music'] });
+  expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'all', labels: ['app: music'] });
   answerPr({ prUrl: PR });
   await settle(() => button(prStep(), 'Open pull request')!.click());
   await settle();
@@ -1187,4 +1190,15 @@ test('Start over opens a new PR and waits for its merge', async () => {
   await settle();
   expect(prStep().querySelector(`a[href="${NEXT}"]`)).not.toBeNull();
   expect(text(prStep())).toContain('ready for you to review and merge');
+});
+
+test('Labels puts the missing count and Create before its collapsed full list', async () => {
+  await openLabels([]);
+  const body = dialog()!.querySelector('[data-slot="modal-body"]')!;
+  const create = panelButton('[data-create-labels]');
+  const details = body.querySelector('details')!;
+  expect(details).not.toBeNull();
+  expect(details.open).toBe(false);
+  expect(create.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(text(body.querySelector('[role="status"]'))).toContain('missing');
 });

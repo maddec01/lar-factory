@@ -9,8 +9,8 @@ export type SetupAction = 'Next' | 'Save';
 /** A change to the answers, as a setup field gives it; picking a show setting is what sets `showPicked`. */
 export type SetupChange = Partial<Omit<SetupAnswers, 'showPicked'>>;
 
-/** New repositories initially show only items carrying a status. */
-export const suggestedShow = (): ShowSetting => 'opted-in';
+/** All available work shows by default on either hosting service. */
+export const suggestedShow = (): ShowSetting => 'all';
 
 /** Whether an item source is an Azure DevOps team's, so it is named by its team. */
 export const byTeam = (itemSource: SetupAnswers['itemSource']): itemSource is 'azure-board' =>
@@ -27,7 +27,7 @@ export function answerSetup(setup: SetupAnswers, change: SetupChange): SetupAnsw
 /** The answers Next or Save needs: a role, and the team on Azure DevOps. */
 export function setupProblems(setup: SetupAnswers, action: SetupAction = 'Next'): Partial<Record<'team' | 'role', string>> {
   return {
-    ...byTeam(setup.itemSource) && !setup.team?.trim() && { team: `Enter the team name to continue with ${action}.` },
+    ...byTeam(setup.itemSource) && !setup.team?.trim() && { team: `Choose a team to continue with ${action}.` },
     ...!setup.role.trim() && { role: `Describe what this repository does to continue with ${action}.` },
   };
 }

@@ -73,6 +73,10 @@ function WizardModal({ run }: { run: Run }) {
     const moved = run.step !== shown.current;
     shown.current = run.step;
     // Opening, a new step, or a button such as Retry that went away with this render, puts focus on the step's heading, not the page.
+    if (moved) {
+      const body = dialog.current?.querySelector<HTMLElement>('[data-slot="modal-body"]');
+      if (body) body.scrollTop = 0;
+    }
     if (moved || document.activeElement === document.body) stepHeading(dialog.current)?.focus();
   });
   const data = useBoardStore((s) => s.data);

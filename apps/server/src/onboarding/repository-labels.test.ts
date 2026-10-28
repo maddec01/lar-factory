@@ -184,3 +184,13 @@ test('on Azure DevOps nothing creates a tag, and no workflow tag holds the PR ba
   assert.equal(await workflowLabelsProblem(AZURE, az.run), null);
   assert.deepEqual(az.calls, []);
 });
+
+test('Create reports each successful label before the batch finishes', async () => {
+  const gh = fakeGh([]);
+  const updates: string[][] = [];
+  const result = await createRepositoryLabels({ repo: REPO, itemSource: { kind: 'issues' }, renaming: [] }, gh.run, (labels) => updates.push([...labels]));
+  assert.ok(updates.length > 10);
+  assert.equal(updates[0]!.length, 1);
+  assert.equal(updates[1]!.length, 2);
+  assert.deepEqual(updates.at(-1), 'labels' in result ? result.labels : []);
+});

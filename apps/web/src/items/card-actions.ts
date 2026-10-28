@@ -18,10 +18,29 @@ export interface ActionResult {
 }
 
 /** Posts an item action and returns the server's answer, or a message when the server can't be reached. */
-export async function postAction<T extends object = object>(path: string, body: object): Promise<ActionResult & Partial<T>> {
+export async function postAction<T extends object = object>(path: string, body: object, progress?: (value: Partial<T>) => void): Promise<ActionResult & Partial<T>> {
   useBoardStore.getState().beginWrite();
   try {
-    const response = await fetch(path, { method: 'POST', headers: writeHeaders(), body: JSON.stringify(body) });
+    const response = await fetch(path, { method: 'POST', headers: { ...writeHeaders(), ...progress && { Accept: 'application/x-ndjson' } }, body: JSON.stringify(body) });
+    if (response.headers.get('content-type')?.startsWith('application/x-ndjson') && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = '';
+      try {
+        while (true) {
+          const chunk = await reader.read();
+          pending += decoder.decode(chunk.value, { stream: !chunk.done });
+          let newline;
+          while ((newline = pending.indexOf('\n')) >= 0) {
+            const event = JSON.parse(pending.slice(0, newline)) as { progress?: Partial<T>; result?: ActionResult & Partial<T> };
+            pending = pending.slice(newline + 1);
+            if (event.progress) progress?.(event.progress);
+            if (event.result) return event.result;
+          }
+          if (chunk.done) throw new Error('Incomplete progress response');
+        }
+      } finally { reader.releaseLock(); }
+    }
     const result = await response.json() as Partial<ActionResult & T>;
     return { ...result, error: result.error ?? (response.ok ? null : `Request failed (HTTP ${response.status}).`) };
   } catch {

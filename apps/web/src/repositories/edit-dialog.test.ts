@@ -21,6 +21,7 @@ function serve(load: Answer = { body: { config: CONFIG, labels: LABELS, error: n
   board: BoardData = sample) {
   const sent: Record<string, object[]> = {};
   fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
+    if (url === '/api/onboarding/teams') return new Response(JSON.stringify({ teams: ['Fabrikam Team', 'API Team'] }));
     const pending = url === '/api/repositories/config' ? load : url === '/api/repositories/config/pr' ? pr : null;
     if (!pending) return new Response(JSON.stringify(board));
     (sent[url] ??= []).push(JSON.parse(String(init?.body)));
@@ -165,7 +166,7 @@ test('Edit on an Azure DevOps repository offers the team\'s sprint and backlog w
   expect($('[data-edit-dialog] [data-custom="repo-lar-api"]'), 'a repo- tag routes items; it is no custom tag').toBeNull();
   expect(text($('[data-edit-dialog] [data-item-source]'))).toContain("The team's backlog and current sprint");
   expect($('[data-edit-dialog] [data-choice="issues"]')).toBeNull();
-  expect(input('team').value).toBe('Fabrikam Team');
+  expect($<HTMLSelectElement>('[data-edit-dialog] [data-field="team"] select')!.value).toBe('Fabrikam Team');
   expect(text($('[data-edit-dialog] [data-custom-labels] h4'))).toBe('Custom tags');
   expect(text(dialog()!.querySelector('#edit-description'))).not.toMatch(/creates the custom labels/);
   await settle(() => $('[data-edit-dialog] [data-custom="web"] input[type="checkbox"]')!.click());
@@ -182,7 +183,8 @@ test('Edit can change the team on a combined Azure board without offering a sour
   const sent = serve({ body: { config, labels: LABELS, error: null } }, undefined, board);
   await openEdit(repo, board);
   expect($('[data-choice="azure-board"]')).toBeNull();
-  await type(input('team'), 'API Team');
+  const team = $<HTMLSelectElement>('[data-edit-dialog] [data-field="team"] select')!;
+  await settle(() => { team.value = 'API Team'; team.dispatchEvent(new Event('change', { bubbles: true })); });
   await settle(() => save().click());
   expect(sent['/api/repositories/config/pr']).toEqual([{ repo, config: { ...config, itemSource: { kind: 'azure-board', team: 'API Team' } } }]);
 });

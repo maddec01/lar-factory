@@ -3,7 +3,7 @@
 // item source can be read; and that the login, gh's or on Azure DevOps az's, can push to the repository. A failed check
 // names its fix.
 
-import { SETUP_CHECKS, decodePart, onAzure, sameRepo, shownRepo, type RepositoryItemSource, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
+import { SETUP_CHECKS, decodePart, onAzure, sameRepo, shownRepo, type RepositoryItemSource, type SetupCheckId, type SetupCheckResult, type ShowSetting } from '@lar-factory/shared';
 import { az, type Az } from '../azure/azure-items.ts';
 import { azureBoard } from '../azure/azure-board.ts';
 import { canPush as azureCanPush } from '../azure/azure-repos.ts';
@@ -16,7 +16,7 @@ import { type Checkout, azureRepo, checkouts, githubRepo, onAzureDevOps } from '
 export interface SetupCheckReads {
   checkouts(): Promise<Checkout[]>;
   /** How many items the item source has for the board; throws why it can't be read. */
-  countItems(source: RepositoryItemSource, repo: string): Promise<number>;
+  countItems(source: RepositoryItemSource, repo: string): Promise<Record<ShowSetting, number>>;
   canPush(repo: string): Promise<boolean>;
 }
 
@@ -25,7 +25,8 @@ export function setupCheckReads(run: Az = az): SetupCheckReads {
   return {
     checkouts: () => checkouts(process.env),
     countItems: async (source, repo) => {
-      return source.kind === 'azure-board' ? (await azureBoard([repo], source.team, run).read()).items.length : (await fetchRepoIssues(repo)).length;
+      const items = source.kind === 'azure-board' ? (await azureBoard([repo], source.team, run).read()).items : await fetchRepoIssues(repo);
+      return { all: items.length, 'opted-in': items.filter((item) => item.statuses.length > 0).length };
     },
     canPush: (repo) => (onAzure(repo) ? azureCanPush(repo, run) : canPush(repo)),
   };
@@ -74,8 +75,8 @@ function sourceFix(repo: string, source: RepositoryItemSource): string {
 async function checkSource(repo: string, source: RepositoryItemSource, reads: SetupCheckReads): Promise<SetupCheckResult> {
   const named = sourceName(repo, source);
   try {
-    const count = await reads.countItems(source, repo);
-    return { passed: true, detail: `Found ${count} items in ${named}.` };
+    const counts = await reads.countItems(source, repo);
+    return { passed: true, detail: `Found ${counts.all} items in ${named}.`, counts };
   } catch (err) {
     // A logged-out az or a missing azure-devops extension names the command that fixes it.
     if (err instanceof ReadProblem && err.fix) return failed(`Can't read ${named}: ${err.message}`, 'Run this command, then retry.', err.fix);

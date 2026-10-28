@@ -2,8 +2,8 @@
 // takes its values and calls back with the user's changes. Choice, Field and Group lay out every question onboarding
 // asks, one to a row with its label and one line of help.
 
-import { useId, useState, type ReactNode } from 'react';
-import { customLabelProblem, customTagProblem, shownRepo, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { customLabelProblem, customTagProblem, shownRepo, writeHeaders, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
@@ -13,6 +13,7 @@ import { Input } from '@lar-factory/ui/design-system/Input';
 import { RadioGroup, RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
 import { setupProblems, suggestedShow, type SetupAction, type SetupChange } from './setup-answers.ts';
+import { NativeSelect } from '@lar-factory/ui/native-select';
 import { kind } from '../buttons/button-kinds.tsx';
 
 /** One choice of a radio group: its title, then a line of detail. */
@@ -71,10 +72,9 @@ const azureProject = (repo: string): string => shownRepo(repo).split('/')[1] ?? 
  * the suggested one marked, and Repository role. A text answer's problem names `action`, the button that waits for it,
  * and is muted help until its field is edited or left. `disabled` locks the choices, which a disabled fieldset doesn't reach.
  */
-export function SetupFields({ repo, azure = false, setup, action = 'Next', disabled, onAnswer }: {
-  repo: string; azure?: boolean; setup: SetupAnswers; action?: SetupAction; disabled?: boolean; onAnswer: (change: SetupChange) => void;
+export function SetupFields({ repo, azure = false, setup, action = 'Next', disabled, onAnswer, counts }: {
+  repo: string; azure?: boolean; setup: SetupAnswers; action?: SetupAction; disabled?: boolean; onAnswer: (change: SetupChange) => void; counts?: Record<ShowSetting, number>;
 }) {
-  const suggested = suggestedShow();
   const problems = setupProblems(setup, action);
   const [touched, setTouched] = useState<ReadonlySet<TextAnswer>>(new Set());
   const touch = (key: TextAnswer) => { if (!touched.has(key)) setTouched(new Set([...touched, key])); };
@@ -83,6 +83,21 @@ export function SetupFields({ repo, azure = false, setup, action = 'Next', disab
     field: { problem: problems[key], invalid: touched.has(key) },
     control: { value: setup[key] ?? '', onBlur: () => touch(key), onChange: (e: { target: { value: string } }) => { touch(key); onAnswer({ [key]: e.target.value }); } },
   });
+  const [teams, setTeams] = useState<{ names?: string[]; error?: string }>({});
+  const [teamRead, setTeamRead] = useState(0);
+  useEffect(() => {
+    if (setup.itemSource !== 'azure-board') return;
+    let current = true;
+    setTeams({});
+    void fetch('/api/onboarding/teams', { method: 'POST', headers: writeHeaders(), body: JSON.stringify({ repo }) })
+      .then((response) => response.json() as Promise<{ teams?: string[]; error?: string }>)
+      .then((answer) => { if (current) setTeams(answer.teams ? { names: answer.teams } : { error: answer.error ?? 'No teams returned.' }); })
+      .catch(() => { if (current) setTeams({ error: "Can't reach the board. Retry when it is available." }); });
+    return () => { current = false; };
+  }, [repo, setup.itemSource, teamRead]);
+  useEffect(() => {
+    if (!setup.team && teams.names?.length === 1) onAnswer({ team: teams.names[0] });
+  }, [teams, setup.team, onAnswer]);
   const team = textAnswer('team');
   const role = textAnswer('role');
   return (<>
@@ -91,24 +106,43 @@ export function SetupFields({ repo, azure = false, setup, action = 'Next', disab
       <p className="m-0 text-xs text-base-700">{azure ? "The team's backlog and current sprint. Each item appears once." : "This repository's GitHub issues."}</p>
     </div>
     {setup.itemSource === 'azure-board' && (
-      <Field name="team" label="Team" hint={`The team that owns this work in ${azureProject(repo)}.`} {...team.field}>
-        {(described) => <Input placeholder={`${azureProject(repo)} Team`} {...team.control} {...described} />}
+      <Field name="team" label="Team" hint={`Choose the team whose work you want to see in ${azureProject(repo)}.`} {...team.field}>
+        {(described) => <NativeSelect {...team.control} {...described} disabled={disabled || !teams.names}>
+          <option value="">{teams.names ? 'Choose a team' : 'Loading teams...'}</option>
+          {setup.team && !teams.names?.includes(setup.team) && <option value={setup.team}>{setup.team}</option>}
+          {teams.names?.map((name) => <option key={name} value={name}>{name}</option>)}
+        </NativeSelect>}
       </Field>
     )}
+    {setup.itemSource === 'azure-board' && (teams.error || teams.names?.length === 0) && (
+      <Alert tone="danger" title="Could not load teams" action={<Button {...kind('other')} onClick={() => setTeamRead((n) => n + 1)}>Retry</Button>}>
+        {teams.error ?? 'This project has no teams. Add a team in Azure DevOps, then retry.'}
+      </Alert>
+    )}
+    <ShowChoices setup={setup} azure={azure} disabled={disabled} onAnswer={onAnswer} counts={counts} />
+    <Field name="role" label="What this repository does" hint="Describe its purpose so agents know where to work." {...role.field}>
+      {(described) => <Input placeholder="Web client that talks to the API server" {...role.control} {...described} />}
+    </Field>
+  </>);
+}
+
+/** The same Show choices in setup and beside the completed source check's counts. */
+export function ShowChoices({ setup, azure, disabled, onAnswer, counts }: {
+  setup: SetupAnswers; azure?: boolean; disabled?: boolean; onAnswer: (change: SetupChange) => void; counts?: Record<ShowSetting, number>;
+}) {
+  const suggested = suggestedShow();
+  return (
     <Group legend="Show" hint="Choose which work appears on the board.">
       <RadioGroup value={setup.show} onValueChange={(v) => onAnswer({ show: v as ShowSetting })} className="gap-2">
         {(['all', 'opted-in'] as const).map((show) => (
-          <Choice key={show} value={show} disabled={disabled} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge tone="accent">Suggested</Badge>}</span>}>
+          <Choice key={show} value={show} disabled={disabled} title={<span className="flex flex-wrap items-center gap-2">{SHOW_TITLES[show]}{counts && <span>{counts[show]} {counts[show] === 1 ? 'item' : 'items'}</span>}{suggested === show && <Badge tone="accent">Suggested</Badge>}</span>}>
             {show === 'all' ? 'Show all available work. Items without a status appear in List.'
               : `Show work with a board status. To include an item, give it ${azure ? 'the status-list tag in Azure DevOps' : 'the status-list label in GitHub'}.`}
           </Choice>
         ))}
       </RadioGroup>
     </Group>
-    <Field name="role" label="What this repository does" hint="Describe its purpose so agents know where to work." {...role.field}>
-      {(described) => <Input placeholder="Web client that talks to the API server" {...role.control} {...described} />}
-    </Field>
-  </>);
+  );
 }
 
 /** The custom label picker's values: the labels it offers, those picked, the new label's field, and an add that runs or failed. */

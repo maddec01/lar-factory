@@ -9,8 +9,8 @@ import { STATUS_LABELS, WORKFLOW_LABELS, type BoardData, type BundledSkill, type
 const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
 });
-/** The setup step's answers before any is given: repository issues, with Opted-in items suggested. */
-const SETUP: SetupAnswers = { itemSource: 'issues', team: '', show: 'opted-in', showPicked: false, role: '' };
+/** The setup step's answers before any is given: repository issues, with All items suggested. */
+const SETUP: SetupAnswers = { itemSource: 'issues', team: '', show: 'all', showPicked: false, role: '' };
 const PROJECTS = [project('lar-web'), project('lar-server', { onBoard: true }), project('notes', { repo: null, provider: null, hasConfig: null })];
 
 /** The store, fresh, with T3's projects answered by `reply`; each onboarding it keeps is kept. */
@@ -137,9 +137,9 @@ test('the suggested show setting follows the item source until one is picked', a
   const { wizard } = await onSetup();
   const setup = () => wizard.getState().run!.setup!;
   wizard.getState().answer({ itemSource: 'issues' });
-  expect(setup()).toMatchObject({ itemSource: 'issues', show: 'opted-in', showPicked: false });
+  expect(setup()).toMatchObject({ itemSource: 'issues', show: 'all', showPicked: false });
   wizard.getState().answer({ itemSource: 'issues' });
-  expect(setup().show).toBe('opted-in');
+  expect(setup().show).toBe('all');
   wizard.getState().answer({ show: 'opted-in' });
   wizard.getState().answer({ itemSource: 'issues' });
   wizard.getState().answer({ itemSource: 'issues' });
@@ -171,9 +171,9 @@ test(".lar-factory.json's values pass the step with no answers; a file that can'
 
 const AZURE = project('lar-web', { repo: 'contoso/Fabrikam/lar-web', provider: 'Azure DevOps' });
 
-test('Azure setup defaults to the combined board and a team name based on the project', async () => {
+test('Azure setup defaults to the combined board without guessing a team', async () => {
   const { wizard } = await onSetup([AZURE]);
-  expect(wizard.getState().run!.setup).toEqual({ itemSource: 'azure-board', team: 'Fabrikam Team', show: 'opted-in', showPicked: false, role: '' });
+  expect(wizard.getState().run!.setup).toEqual({ itemSource: 'azure-board', team: '', show: 'all', showPicked: false, role: '' });
 });
 
 test("Next waits for an Azure DevOps sprint's or backlog's team, and the item source names it", async () => {
@@ -505,7 +505,7 @@ test('Resume on the Checks step runs the checks again once it has read the proje
 });
 
 const PR = 'https://github.com/maddec01/lar-web/pull/14';
-const SETUP_DONE = { ...SETUP, itemSource: 'issues' as const, show: 'opted-in' as const, role: 'Web client' };
+const SETUP_DONE = { ...SETUP, itemSource: 'issues' as const, show: 'all' as const, role: 'Web client' };
 /** lar-web still onboarding, kept on the Pull request step with its PR. */
 const ON_PR = { repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'labels', 'checks', 'cleanup'],
   answers: { projectId: 'lar-web', provider: 'GitHub' as const, setup: SETUP_DONE, cleanup: { ticks: {}, skills: {} } }, prUrl: PR } };
@@ -530,7 +530,7 @@ test('passing Cleanup with a new file moves to the Pull request step, and Open p
   await settle(() => wizard.getState().openPr());
   expect(prPosts()).toEqual([{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'labels', 'checks', 'cleanup'],
     answers: { projectId: 'lar-web', provider: 'GitHub', setup: SETUP_DONE, cleanup: { ticks: {}, skills: {} } } },
-    config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: [] }, picks: { clashes: [], skills: {} } }]);
+    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] }, picks: { clashes: [], skills: {} } }]);
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR, savedAs: 'maddec01/lar-web' });
   expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error: null });
 });
@@ -652,7 +652,7 @@ const previewPosts = () => (fetchMock.mock.calls as unknown as [string, RequestI
 test("reaching the Pull request step lists the PR's changes, previewed with .lar-factory.json's values and the Cleanup step's picks", async () => {
   const wizard = await pickedPr();
   const picks = { clashes: [CONTEXT, SCRATCH, AGENT_CLASH], skills: RENAMED };
-  expect(previewPosts()).toEqual([{ repo: 'maddec01/lar-web', config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: [] }, picks }]);
+  expect(previewPosts()).toEqual([{ repo: 'maddec01/lar-web', config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] }, picks }]);
   expect(wizard.getState().changes).toEqual({ state: 'read', changes: CHANGES });
   await settle(() => wizard.getState().openPr());
   expect(prPosts()).toMatchObject([{ config: { role: 'Web client' }, picks }]);
@@ -978,4 +978,35 @@ test("a typed label that is a workflow label sends nothing, and one gh refuses k
   expect(wizard.getState().run!.customLabels).toEqual([]);
   wizard.getState().typeCustomLabel('web2');
   expect(wizard.getState().labels!.error).toBeNull();
+});
+
+test('label creation streams progress and updates rows before the batch finishes', async () => {
+  const wizard = await labelsStore([project('lar-web')], []);
+  await toLabels(wizard, 'lar-web');
+  const served = fetchMock.getMockImplementation()!;
+  let stream!: ReadableStreamDefaultController<Uint8Array>;
+  fetchMock.mockImplementation(async (url: string) => url === '/api/onboarding/labels/create'
+    ? new Response(new ReadableStream<Uint8Array>({ start(controller) { stream = controller; } }), { headers: { 'Content-Type': 'application/x-ndjson' } }) : served(url));
+  let creating!: Promise<void>;
+  await settle(() => { creating = wizard.getState().createLabels(); });
+  await settle(() => stream.enqueue(new TextEncoder().encode('{"progress":{"labels":["bug"]}}\n')));
+  expect(wizard.getState().labels!.read).toEqual({ state: 'loaded', names: ['bug'] });
+  expect(wizard.getState().labels!.progress).toMatchObject({ created: 1 });
+  expect(wizard.getState().labels!.busy).toBe('create');
+  await settle(() => { stream.enqueue(new TextEncoder().encode(JSON.stringify({ result: { labels: EVERY_LABEL, error: null } }) + '\n')); stream.close(); });
+  await creating;
+  expect(wizard.getState().labels!.busy).toBeNull();
+  expect(wizard.getState().labels!.read).toEqual({ state: 'loaded', names: EVERY_LABEL });
+});
+
+test('changing the Azure team discards counts from the previous team', async () => {
+  const wizard = await checkingStore([AZURE], { source: { passed: true, detail: 'Found 23 items.', counts: { all: 23, 'opted-in': 0 } } }, toolChecks({ az: { result: 'ok' } }));
+  await settle(() => wizard.getState().start());
+  wizard.getState().pick(AZURE.id);
+  wizard.getState().next();
+  wizard.getState().answer({ team: 'App', role: 'API' });
+  await settle(() => wizard.getState().runChecks());
+  expect(wizard.getState().checks!.setup.source.state).toBe('done');
+  wizard.getState().answer({ team: 'Controls' });
+  expect(wizard.getState().checks).toBeNull();
 });

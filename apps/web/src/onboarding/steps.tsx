@@ -26,7 +26,7 @@ import { CopyButton } from '../copy/copy-button.tsx';
 import { LinkButton } from '../items/link-button.tsx';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
-import { Choice, CustomLabelPicker, CustomLabelsTitle, Field, customLabelsHelp, Group, SHOW_TITLES, SetupFields } from './setup-fields.tsx';
+import { Choice, CustomLabelPicker, CustomLabelsTitle, Field, customLabelsHelp, Group, SHOW_TITLES, SetupFields, ShowChoices } from './setup-fields.tsx';
 import {
   commandChecks, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, customLabelsToCreate, itemSourceOf, labelsPlan, latestRun,
   nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, skillProblem, skillsDir, ticked, typedLabelProblem, unpickable, useWizardStore,
@@ -134,7 +134,7 @@ function ReusedConfig({ project, config }: { project: ProjectChoice; config: Non
 }
 
 function SetupStep({ run }: { run: Run }) {
-  const { projects, answer } = useWizardStore();
+  const { projects, answer, checks } = useWizardStore();
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
   if (!project?.repo) return <p className="m-0 text-sm text-base-700">This project is no longer in T3 Code. Go back and choose another.</p>;
@@ -146,7 +146,7 @@ function SetupStep({ run }: { run: Run }) {
         <Problem title="Could not use saved settings">{project.configProblem} Fix .lar-factory.json on {shownRepo(project.repo)}'s default branch, then retry.</Problem>
       ) : !asksSetup(project) ? (
         <Problem title="Could not check saved settings">Check access to {shownRepo(project.repo)}, then retry.</Problem>
-      ) : run.setup && <SetupFields repo={project.repo} azure={project.provider === 'Azure DevOps'} setup={run.setup} onAnswer={answer} />}
+      ) : run.setup && <SetupFields repo={project.repo} azure={project.provider === 'Azure DevOps'} setup={run.setup} onAnswer={answer} counts={checks?.setup.source.state === 'done' && checks.setup.source.result.passed ? checks.setup.source.result.counts : undefined} />}
     </div>
   );
 }
@@ -190,7 +190,7 @@ function LeftAlone({ labels, azure }: { labels: LeftAloneLabel[]; azure: boolean
   if (!labels.length) return null;
   return (
     <div data-left-alone className="grid gap-1">
-      <h4 className="m-0 text-xs font-medium text-base-700">Other labels</h4>
+      <h4 className="m-0 text-xs font-medium text-base-700">{azure ? 'Other tags' : 'Other labels'}</h4>
       <ul className="m-0 grid list-none gap-1 p-0 text-sm">
         {labels.map((l) => (
           <li key={l.name} data-left={l.name} className="min-w-0 break-all"><code className="font-mono">{l.name}</code>
@@ -234,7 +234,7 @@ function CustomLabels({ run, project, plan, labels }: { run: Run; project: Proje
               );
             })}
           </ul>
-        ) : <p className="m-0 text-sm text-base-700">No custom labels are saved.</p>}
+        ) : <p className="m-0 text-sm text-base-700">No custom {azure ? 'tags' : 'labels'} are saved.</p>}
       </div>
     );
   }
@@ -276,10 +276,11 @@ function LabelsStep({ run }: { run: Run }) {
       <p className="m-0 text-xs text-base-700">{azure
         ? `Tags group work in Azure DevOps. New tags appear when first used. Renaming a tag keeps it on existing work.`
         : `Labels group issues in GitHub. Create the missing labels before continuing. Renaming a label keeps it on existing issues.`}</p>
-      <LabelList title={`Work ${nouns}`} rows={plan.workflow} labels={labels} azure={azure} />
-      {plan.status.length > 0 && <LabelList title={`Status ${nouns}`} note={azure ? STATUS_TAGS_NOTE : STATUS_LABELS_NOTE} rows={plan.status} labels={labels} azure={azure} />}
-      {(creates > 0 || renames > 0) && <div className="flex gap-2">
-        {creates > 0 && <Button {...kind('other')} data-create-labels disabled={!!labels.busy} loading={labels.busy === 'create'} onClick={() => void createLabels()}>
+      <p className="m-0 text-sm" role="status" aria-live="polite">{labels.busy === 'create' && labels.progress
+        ? `Created ${labels.progress.created} of ${labels.progress.total}.`
+        : azure ? 'Tags appear when you first use them. You can continue.' : creates || renames ? `${creates} missing labels. ${renames ? `${renames} to rename.` : ''}` : 'All required labels are ready.'}</p>
+      {(creates > 0 || renames > 0 || labels.busy === 'create') && <div className="flex gap-2">
+        {(creates > 0 || labels.busy === 'create') && <Button {...kind('other')} data-create-labels disabled={!!labels.busy} loading={labels.busy === 'create'} onClick={() => void createLabels()}>
           {labels.busy === 'create' ? 'Creating...' : `Create ${creates} missing`}</Button>}
         {renames > 0 && <Button {...kind('other')} data-rename-labels disabled={!!labels.busy} loading={labels.busy === 'rename'} onClick={() => void renameLabels()}>
           {labels.busy === 'rename' ? 'Renaming...' : `Rename ${renames}`}</Button>}
@@ -287,8 +288,18 @@ function LabelsStep({ run }: { run: Run }) {
       {labels.error && labels.error.action !== 'custom' && (
         <Alert tone="danger" title={labels.error.action === 'create' ? `Can't create the ${nouns}` : `Can't rename the ${nouns}`} action={<Button {...kind('other')} disabled={!!labels.busy} onClick={() => void retry()}>Retry</Button>}>{labels.error.message}</Alert>
       )}
-      <CustomLabels run={run} project={project} plan={plan} labels={labels} />
-      <LeftAlone labels={plan.leftAlone.filter((l) => !labels.created.includes(l.name) && !chosen.has(l.name.toLowerCase()))} azure={azure} />
+      <details className="grid gap-3" data-label-details>
+        <summary className="cursor-pointer text-sm font-medium">View all {nouns}</summary>
+        <div className="grid gap-4 pt-3">
+          <LabelList title={`Work ${nouns}`} rows={plan.workflow} labels={labels} azure={azure} />
+          {plan.status.length > 0 && <LabelList title={`Status ${nouns}`} note={azure ? STATUS_TAGS_NOTE : STATUS_LABELS_NOTE} rows={plan.status} labels={labels} azure={azure} />}
+          <LeftAlone labels={plan.leftAlone.filter((l) => !labels.created.includes(l.name) && !chosen.has(l.name.toLowerCase()))} azure={azure} />
+        </div>
+      </details>
+      <details>
+        <summary className="cursor-pointer text-sm font-medium">Choose custom {nouns} (optional)</summary>
+        <div className="pt-3"><CustomLabels run={run} project={project} plan={plan} labels={labels} /></div>
+      </details>
     </div>
   );
 }
@@ -328,7 +339,7 @@ function CheckList({ title, rows }: { title: string; rows: CheckRow[] }) {
             <div className="flex items-center gap-2.5 text-sm">
               <StatusIcon status={row.status} />
               <span className="font-medium">{row.title}</span>
-              <span className="ml-auto text-xs text-base-700">{row.status === 'passed' && row.detail || STATUS_TEXT[row.status]}</span>
+              <span className="ml-auto text-xs text-base-700">{row.detail || STATUS_TEXT[row.status]}</span>
             </div>
             {row.status === 'failed' && (
               <Alert tone="danger" title={row.problem} action={row.retry && <Button {...kind('other')} onClick={row.retry}>Retry</Button>}><span>{row.fix}</span>
@@ -349,7 +360,7 @@ const setupTitle = (id: SetupCheckId, provider: ProjectChoice['provider']) => id
   : id === 'source' ? 'Read work' : `Permission to push changes`;
 
 function ChecksStep({ run }: { run: Run }) {
-  const { projects, checks, runChecks, retryCheck } = useWizardStore();
+  const { projects, checks, runChecks, retryCheck, answer } = useWizardStore();
   const tools = useBoardStore((s) => s.data.tools);
   if (projects.state !== 'loaded') return <ProjectsPending />;
   const project = pickedProject(run, projects);
@@ -366,7 +377,7 @@ function ChecksStep({ run }: { run: Run }) {
   const setup = SETUP_CHECKS.map((id): CheckRow => {
     const check = checks.setup[id];
     const title = setupTitle(id, project.provider);
-    if (check.state !== 'done') return { id, title, status: check.state };
+    if (check.state !== 'done') return { id, title, status: check.state, detail: id === 'source' && check.state === 'running' ? project.provider === 'Azure DevOps' ? 'Reading the team backlog and sprint. This can take a minute.' : 'Reading GitHub work. This can take a minute.' : undefined };
     const { result } = check;
     return result.passed ? { id, title, status: 'passed', detail: result.detail }
       : { id, title, status: 'failed', problem: result.problem, fix: result.fix, command: result.command, retry: () => void retryCheck(id) };
@@ -383,6 +394,9 @@ function ChecksStep({ run }: { run: Run }) {
       )}
       <CheckList title="Tools" rows={commands} />
       <CheckList title="Repository access" rows={setup} />
+      {checks.setup.source.state === 'done' && checks.setup.source.result.passed && checks.setup.source.result.counts && !project.config && run.setup && (
+        <ShowChoices setup={run.setup} azure={project.provider === 'Azure DevOps'} counts={checks.setup.source.result.counts} onAnswer={answer} />
+      )}
     </div>
   );
 }

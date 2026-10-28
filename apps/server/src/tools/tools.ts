@@ -221,18 +221,29 @@ export async function probeGh(): Promise<GhProbe> {
   return failed(status, ['auth', 'status'], version);
 }
 
+/** az's own version from `az version`'s JSON, under `azure-cli`; none when az printed something else. */
+function azVersionOf(stdout: string): string | undefined {
+  try {
+    const version: unknown = (JSON.parse(stdout) as Record<string, unknown> | null)?.['azure-cli'];
+    return typeof version === 'string' ? version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * Probes az: `az --version`, then `az account show` and `az extension show --name azure-devops`, 10 s each,
- * as az is slow to start. A signed-out az names `az login`, which comes before a missing extension.
+ * Probes az: `az version`, then `az account show` and `az extension show --name azure-devops`, 10 s each,
+ * as az is slow to start. Never `az --version`, which looks up the latest az over the network on every run.
+ * A signed-out az names `az login`, which comes before a missing extension.
  */
 export async function probeAz(): Promise<AzCheck> {
   const command = toolCommand('az');
   if (!command) return missingWithFix('az');
   const run = (args: string[]) => runTool(command.file, args, { env: command.env, timeout: 10_000 });
-  const versionRun = await run(['--version']);
+  const versionRun = await run(['version']);
   // A string code is a spawn error: az went away or can't run since the lookup.
   if (typeof versionRun.code === 'string') return missingWithFix('az');
-  const version = versionRun.code === 0 ? versionOf(versionRun.stdout) : undefined;
+  const version = versionRun.code === 0 ? azVersionOf(versionRun.stdout) : undefined;
   const [account, extension] = await Promise.all([run(['account', 'show']), run(['extension', 'show', '--name', 'azure-devops'])]);
   if (account.code !== 0) return { result: 'logged-out', ...(version && { version }), fix: 'az login' };
   if (extension.code !== 0) return { result: 'no-extension', ...(version && { version }), fix: 'az extension add --name azure-devops' };

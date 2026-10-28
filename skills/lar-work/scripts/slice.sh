@@ -35,11 +35,12 @@ if azure_work_item "$parent"; then
         {op: "add", path: "/fields/System.Description", value: $body},
         {op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown"},
         {op: "add", path: "/relations/-", value: {rel: "System.LinkTypes.Hierarchy-Reverse", url: $parent}}]' >"$patch"
-    # The create endpoint is .../workitems/$<type>; az fills in the type.
+    # The create endpoint is .../workitems/$<type>; az fills in the type. az reads the version as a number, so it
+    # can't pass 7.2-preview.3, the first that takes a markdown description; given 7.2-preview, az adds the .3.
     if ! created=$(az devops invoke --area wit --resource workitems --organization "$az_org" \
         --route-parameters "project=$(percent_decode "$az_project")" type=Task \
         --http-method POST --media-type application/json-patch+json --in-file "$patch" \
-        --api-version 7.2-preview.3 --output json 2>"$err"); then
+        --api-version 7.2-preview --output json 2>"$err"); then
         echo "slice.sh: $(az_failure "could not create the slice under $parent" "$(cat "$err")")" >&2
         exit 1
     fi

@@ -241,6 +241,8 @@ export interface Item {
   parent: IssueRef | null;
   /** GitHub's sub-issue counts; a build counts only its `build` sub-issues, not its slices. */
   subIssues: { total: number; completed: number };
+  /** The team's current sprint and its direct children in that sprint; absent when no sprint is current. */
+  currentSprint?: { name: string; childNumbers: number[] };
   /** Every issue blocking this one, open or closed. */
   blockers: Blocker[];
   updatedAt: string;

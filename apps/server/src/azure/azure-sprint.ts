@@ -11,5 +11,5 @@ export async function readSprint(team: string, { boards, workItems, backlogIds }
   const listed = await boards<{ workItemRelations: { target: { id: number } }[] }>(['list-work-items', '--id', iteration.id]);
   const order = await backlogIds();
   const items = await workItems([...new Set(listed.workItemRelations.map((r) => r.target.id))]);
-  return { title: `${team} ${iteration.name}`, items, order, childIds: items.map((raw) => raw.id), completed: true };
+  return { title: `${team} ${iteration.name}`, items, order, childIds: items.map((raw) => raw.id), currentSprint: { name: iteration.name, childIds: items.map((raw) => raw.id) }, completed: true };
 }

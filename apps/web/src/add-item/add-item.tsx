@@ -42,7 +42,7 @@ function OnlyFor({ repo, name, ticked }: { repo: RepoConfig; name: string; ticke
   return (
     <div className="form-field">
       <Checkbox name="onlyFor" value="true" label={`Only for ${name}`} defaultChecked={ticked} aria-describedby="item-only-for-hint" />
-      <p className="form-hint" id="item-only-for-hint">Unticked, it shows in the List of every repository that reads the team's {repo.items}.</p>
+      <p className="form-hint" id="item-only-for-hint">Unticked, it appears for every repository that reads the {repo.team} team's backlog and current sprint.</p>
     </div>
   );
 }

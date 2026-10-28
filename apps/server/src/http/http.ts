@@ -194,7 +194,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
   const WRITES: Record<string, Write> = {
     '/api/items': {
       what: 'item details', disabled: 'Adding items is disabled in sample mode.',
-      restarted: () => ({ uncertain: true, error: 'The board restarted. Check the repository issues before starting a new item.' }),
+      restarted: () => ({ uncertain: true, error: 'The board restarted. Check your items in GitHub or Azure DevOps before starting a new item.' }),
       run: (input) => commands.capture(input),
     },
     '/api/queue': {

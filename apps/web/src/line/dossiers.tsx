@@ -196,7 +196,7 @@ function PartSide({ part, data }: { part: Part; data: BoardData }) {
 /** What the dossier is for, from its map: its destination, decisions so far, open questions and end-to-end check. */
 function About({ parent, find }: { parent: Item; find: FindRef }) {
   const { map } = parent;
-  if (!map) return <div className="grid content-start gap-5"><p className="m-0 text-(--muted-foreground)">No map yet: the parts come from GitHub's sub-issues.</p></div>;
+  if (!map) return <div className="grid content-start gap-5"><p className="m-0 text-(--muted-foreground)">No map yet. The parts come from the item's children.</p></div>;
   return (
     <div className="grid content-start gap-5" data-about>
       <section className="grid gap-1.5"><Heading>Destination</Heading><p className="m-0 leading-relaxed">{map.destination}</p></section>

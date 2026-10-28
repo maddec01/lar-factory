@@ -285,6 +285,7 @@ test('on an Azure repository, Only for <repo> starts unticked, and ticked, the d
   expect($$('input[type="checkbox"]').some((each) => each.closest('label')!.textContent!.startsWith('Only for')), 'a GitHub repository has no such box').toBe(false);
   await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam/web');
   expect(checkedOf(box('Only for web'))).toBe('false');
+  expect($('#item-only-for-hint')!.textContent).toBe("Unticked, it appears for every repository that reads the Web team's backlog and current sprint.");
   await fillDraft();
   respond({ error: 'Could not create the work item.', item: null, issueUrl: null }, 502);
   await settle(() => submit().click());

@@ -218,5 +218,49 @@ test('Azure native fields and extra description sections remain visible when rel
   expect(meta()).toContain('AssigneesAAna Silva');
   expect(text(description())).toContain('Reproduce the bug.Acceptance CriteriaFixed');
   expect(description()!.querySelector('strong')!.textContent).toBe('Fixed');
-  expect(sidebar()).toContain('Could not load sub-tickets: Timed out');
+  expect(sidebar()).toContain('Could not load linked work items: Timed out');
+});
+
+test('Azure attachments, Related work and blockers show named links even without children or pull requests', async () => {
+  const held = holdReads();
+  const [data, id] = azureItem();
+  data.items[0]!.linkedPrs = [];
+  data.items[0]!.subIssues = { total: 0, completed: 0 };
+  await mountPage(data);
+  await openItem(id);
+  const ref = { number: 6711, title: 'Get credentials', url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/6711', repo: 'contoso/Fabrikam/web', state: 'open' };
+  await reply(held, id, new Response(JSON.stringify({ details: {
+    body: '', format: 'markdown', author: null, assignees: [], createdAt: null, subTickets: [], comments: [], hasOlderComments: false, olderCursor: null,
+    attachments: [{ name: 'OAuth implementation.pdf', url: 'https://dev.azure.com/contoso/_apis/wit/attachments/doc-id' }],
+    related: [{ ...ref, number: 6563, title: 'Integrate provider', url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/6563' }], blockers: [ref],
+  } })));
+  expect(sidebar()).toContain('Attachments');
+  expect(sidebar()).toContain('Related work');
+  expect(sidebar()).toContain('Blocked by');
+  expect($$('[data-item-dialog] aside a').map((a) => [text(a), a.getAttribute('href')])).toEqual([
+    ['OAuth implementation.pdf', 'https://dev.azure.com/contoso/_apis/wit/attachments/doc-id'],
+    ['#6711 Get credentials', ref.url],
+    ['#6563 Integrate provider', 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/6563'],
+  ]);
+});
+
+test('current sprint progress and children come first, with other children behind a closed toggle', async () => {
+  const held = holdReads();
+  const [data, id] = azureItem();
+  data.items[0]!.currentSprint = { name: 'Sprint 60', childNumbers: [12, 13] };
+  await mountPage(data);
+  await openItem(id);
+  const child = (number: number, state = 'open') => ({ number, title: `Task ${number}`, url: `https://dev.azure.com/contoso/Fabrikam/_workitems/edit/${number}`, repo: 'contoso/Fabrikam/web', state });
+  await reply(held, id, new Response(JSON.stringify({ details: {
+    body: '', format: 'markdown', author: null, assignees: [], createdAt: null, subTickets: [child(11, 'closed'), child(12), child(13, 'closed')], comments: [], hasOlderComments: false, olderCursor: null,
+  } })));
+  expect(sidebar()).toContain('This sprint: 1 of 2 done');
+  expect(sidebar()).toContain('Sprint 60');
+  expect($$('[data-item-dialog] aside li a').map(text)).toEqual(['#12 Task 12', '#13 Task 13', '#11 Task 11']);
+  const history = inDialog<HTMLDetailsElement>('aside details')!;
+  expect(history.open).toBe(false);
+  expect(text(history.querySelector('summary'))).toBe('Other children (1)');
+  expect(text(history)).toContain('#11 Task 11');
+  await settle(() => history.querySelector('summary')!.click());
+  expect(history.open).toBe(true);
 });

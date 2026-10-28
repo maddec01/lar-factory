@@ -24,6 +24,8 @@ test('the new work item carries its title, its markdown description and its kind
   const az = fakeAz({ items: [] });
   const result = await azureBoard([REPO], TEAM, az.run).create({ ...DRAFT, labels: ['area: api'] }, {});
   assert.deepEqual(az.created[0]!.ops, [
+    { op: 'add', path: '/fields/System.AreaPath', value: 'Fabrikam Fiber\\Fabrikam Team' },
+    { op: 'add', path: '/fields/System.IterationPath', value: 'Fabrikam Fiber' },
     { op: 'add', path: '/fields/System.Title', value: 'Export the report' },
     { op: 'add', path: '/fields/System.Description', value: 'As **CSV**.' },
     { op: 'add', path: '/multilineFieldsFormat/System.Description', value: 'Markdown' },
@@ -66,7 +68,7 @@ test('a retry after a created work item returns it without creating another', as
 });
 
 test('a try that failed before creating, or that az refused while logged out, creates the work item on retry', async () => {
-  for (const failure of ['backlogconfiguration', 'POST']) {
+  for (const failure of ['backlogconfiguration', 'teamfieldvalues', 'teamsettings', 'POST']) {
     let fail = true;
     const az = fakeAz({ items: [], fail: (args) => (fail && args.join(' ').includes(failure)
       ? new Error('Before you can run Azure DevOps commands, you need to run the login command (az login)') : undefined) });
@@ -87,4 +89,32 @@ test('a work item whose new tags need a right the user lacks names the fix', asy
   const result = await azureBoard([REPO], TEAM, az.run).create(DRAFT, {});
   assert.match(result.error!, /^Could not create the work item\. You have no right to create tags in Fabrikam Fiber\./);
   assert.equal(result.uncertain, undefined);
+});
+
+
+test('Add item uses the team default area and backlog iteration and survives a full read outside the sprint', async () => {
+  const az = fakeAz({ items: [], sprint: [],
+    areas: [{ value: 'Fabrikam Fiber\\Other', includeChildren: false }, { value: 'Fabrikam Fiber\\App', includeChildren: false }],
+    defaultArea: 'Fabrikam Fiber\\App', backlogIteration: '\\Backlog' });
+  const source = azureBoard([REPO], TEAM, az.run);
+  const created = await source.create(DRAFT, {});
+  assert.equal(created.error, null);
+  assert.ok(az.calls.find((args) => args.includes('teamfieldvalues'))?.includes('team=Fabrikam Team'));
+  assert.ok(az.calls.find((args) => args.includes('teamsettings'))?.includes('team=Fabrikam Team'));
+  assert.deepEqual(az.created[0]!.ops.filter((op) => /AreaPath|IterationPath/.test(op.path)), [
+    { op: 'add', path: '/fields/System.AreaPath', value: 'Fabrikam Fiber\\App' },
+    { op: 'add', path: '/fields/System.IterationPath', value: 'Fabrikam Fiber\\Backlog' },
+  ]);
+  assert.deepEqual((await source.read()).items.map((i) => i.id), [created.item!.id]);
+});
+
+test('missing team placement refuses creation before any work item is submitted', async () => {
+  const az = fakeAz({ items: [], defaultArea: '' });
+  const progress: CreationProgress = {};
+  const result = await azureBoard([REPO], TEAM, az.run).create(DRAFT, progress);
+  assert.match(result.error!, /default area and backlog iteration/);
+  assert.equal(result.uncertain, undefined);
+  assert.equal(progress.creationUncertain, undefined);
+  assert.deepEqual(az.created, []);
+  assert.ok(!az.calls.some((args) => args.includes('POST')));
 });

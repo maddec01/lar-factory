@@ -5,7 +5,7 @@
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
-import { clock, day, type BoardData, type BundledSkill, type OnboardingProgress, type ProfilesResult, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
+import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ProfilesResult, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { dialog, project, serve } from '../onboarding/onboarding-support.ts';
 import { INSTALL_RECHECK_MS } from './settings-store.ts';
@@ -176,7 +176,7 @@ test('Repositories shows the command line tools\' logins and each repository wit
   expect(text(row('gh').querySelector('.tool-state')), 'nothing is checked before the first check').toBe('● Not checked');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).not.toContain('no listed repository');
-  await push({ ...sample, repos, tools: toolChecks() });
+  await push({ ...sample, repos, tools: toolChecks(), toolProgress: { checking: [], skipped: ['az'] } });
   expect(text(row('gh').querySelector('.tool-state'))).toBe('● Signed in');
   expect(text(row('az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
@@ -259,7 +259,7 @@ const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];
 test('Diagnostics shows every command Not checked before the first check, then OK, and az not checked', async () => {
   await open('Diagnostics');
   expect([...DIAGNOSED, 'd-az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(Array(6).fill('● Not checked'));
-  await push({ ...sample, tools: toolChecks() });
+  await push({ ...sample, tools: toolChecks(), toolProgress: { checking: [], skipped: ['az'] } });
   expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● OK', '● OK', '● OK', '● OK', '● OK']);
   expect(text(row('d-az').querySelector('.tool-state'))).toBe('● Not checked');
   expect(text(row('d-az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
@@ -280,10 +280,25 @@ test('the Command line tools rows show signed out, missing or the problem found,
 
 test('Settings hides gh once the checks ran without it, as no listed repository is on GitHub', async () => {
   const { gh: _, ...withoutGh } = toolChecks({ az: { result: 'ok', version: '2.67.0' } });
-  await open('Repositories', { ...sample, tools: withoutGh });
+  await open('Repositories', { ...sample, tools: withoutGh, toolProgress: { checking: [], skipped: ['gh'] } });
   expect(groups()[0]).toEqual(['Command line tools', ['az']]);
   await settle(() => section('Diagnostics').click());
   expect($('.settings-row[data-row="d-gh"]')).toBeNull();
+  expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');
+});
+
+test('Settings shows gh and az Checking while their checks run, though other checks landed, and never as left out', async () => {
+  const landed = { git: toolChecks().git };
+  const data = { ...sample, tools: landed, toolProgress: { checking: ['gh', 't3', 'jq', 'curl', 'az'] as CheckedTool[], skipped: [] } };
+  await open('Repositories', data);
+  expect(groups()[0]).toEqual(['Command line tools', ['gh', 'az']]);
+  expect(['gh', 'az'].map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● Checking', '● Checking']);
+  expect(text(row('az'))).not.toContain('no listed repository');
+  await settle(() => section('Diagnostics').click());
+  expect([...DIAGNOSED, 'd-az'].map((id) => text(row(id).querySelector('.tool-state'))))
+    .toEqual(['● Checking', '● Checking', '● OK', '● Checking', '● Checking', '● Checking']);
+  expect(text(row('d-az'))).not.toContain('no listed repository');
+  await push({ ...data, tools: { ...landed, az: { result: 'ok', version: '2.67.0' } }, toolProgress: { ...data.toolProgress, checking: ['gh', 't3', 'jq', 'curl'] } });
   expect(text(row('d-az').querySelector('.tool-state'))).toBe('● 2.67.0');
 });
 

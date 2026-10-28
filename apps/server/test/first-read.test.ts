@@ -85,6 +85,8 @@ test('the stream pushes the first read as it moves from unsettled to settled, na
   assert.ok(seen.some((f) => f.step === 'items' && f.running.length > 0), `a push names the reads running: ${JSON.stringify(seen)}`);
   const first = seen.findIndex((f) => f.settled);
   assert.ok(seen.slice(first).every((f) => f.settled), 'a push after the settled one never un-settles it');
-  assert.deepEqual(seen.slice(0, first).map((f) => f.step).filter((step, at, steps) => steps.indexOf(step) === at), ['repositories', 'items', 'finishing']);
+  // The configs may load before the first provider check lands, which the stream waits for, so it can miss the first step.
+  const steps = seen.slice(0, first).map((f) => f.step).filter((step, at, all) => all.indexOf(step) === at);
+  assert.deepEqual(steps, ['repositories', 'items', 'finishing'].slice(-steps.length));
   assert.deepEqual(seen[first], { step: 'finishing', running: [], settled: true });
 });

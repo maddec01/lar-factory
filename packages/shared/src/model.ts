@@ -424,6 +424,12 @@ export interface BoardData {
   armedErrors?: Record<string, string>;
   /** Every command check from the latest lookup. Absent before the first check and in sample mode. */
   tools?: ToolChecks;
+  /**
+   * The tool check's progress: the commands it is still checking, and the providers' tools it leaves out, as no listed
+   * repository needs them. A command not yet known to be needed counts as checking. Absent before the first check and in
+   * sample mode.
+   */
+  toolProgress?: ToolProgress;
   /** T3 Code's environment id, which thread links need; absent when T3 hasn't written one. */
   t3EnvironmentId?: string;
   /**
@@ -495,10 +501,17 @@ export type AzCheck =
 export const GH_FLOOR = '2.94.0';
 
 /**
- * Every check from one lookup; `gh` is absent when no listed repository is on GitHub, and `az` when none is on Azure
- * DevOps, as then it isn't checked. `fix` is the command that fixes a failed check.
+ * Every check from one lookup, each as it lands; a check is absent before its first result, `gh` too when no listed
+ * repository is on GitHub, and `az` when none is on Azure DevOps, as then it isn't checked. `fix` is the command that
+ * fixes a failed check.
  */
-export interface ToolChecks { gh?: GhCheck; t3: T3Check; git: CommandCheck; jq: CommandCheck; curl: CommandCheck; az?: AzCheck }
+export interface ToolChecks { gh?: GhCheck; t3?: T3Check; git?: CommandCheck; jq?: CommandCheck; curl?: CommandCheck; az?: AzCheck }
+
+/** A provider's tool, which the board checks only while a listed repository needs it. */
+export type ProviderTool = 'gh' | 'az';
+
+/** Which commands the running check still checks, and which providers' tools it leaves out. */
+export interface ToolProgress { checking: CheckedTool[]; skipped: ProviderTool[] }
 
 /** Any command's check. */
 export type ToolCheck = NonNullable<ToolChecks[CheckedTool]>;
@@ -520,13 +533,23 @@ export function itemSource(repo: RepoConfig): ItemSource {
   return repo.items ?? 'project';
 }
 
+/** The provider's tool a source reads with: az for an Azure DevOps sprint or backlog, gh for a GitHub Project or issues. */
+export function providerTool(source: ItemSource): ProviderTool {
+  return source === 'sprint' || source === 'backlog' ? 'az' : 'gh';
+}
+
+/** Whether any of the repositories is on GitHub, so the board reads it with gh. */
+export function usesGh(repos: readonly { repo: string }[]): boolean {
+  return repos.some((r) => !onAzure(r.repo));
+}
+
 /**
  * Whether gh's check stops the board reading a repository whose items come from `source`: for a GitHub source, before
  * gh's check, while gh is missing or logged out, and for a Project while the login has no `project` scope. gh never
  * stops an Azure DevOps read.
  */
 export function ghBlocksRead(check: GhCheck | undefined, source: ItemSource): boolean {
-  if (source === 'sprint' || source === 'backlog') return false;
+  if (providerTool(source) === 'az') return false;
   if (!check || check.result === 'missing' || check.result === 'logged-out') return true;
   return check.result === 'no-project-scope' && source === 'project';
 }

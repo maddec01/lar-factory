@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, keepOneText, kindLabel, kindOf, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -302,6 +302,13 @@ test('gh blocks every GitHub read while missing or logged out, and only Project 
   assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', labels: [] }), 'project');
   assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'project', labels: [] }), 'project');
   assert.equal(itemSource({ repo: 'maddec01/lar', role: 'app', items: 'issues', labels: [] }), 'issues');
+});
+
+test("a GitHub source reads with gh and an Azure DevOps one with az, and a list uses gh while any repository is on GitHub", () => {
+  assert.deepEqual((['project', 'issues', 'sprint', 'backlog'] as const).map(providerTool), ['gh', 'gh', 'az', 'az']);
+  assert.equal(usesGh([{ repo: 'contoso/web/api' }, { repo: 'maddec01/lar' }]), true);
+  assert.equal(usesGh([{ repo: 'contoso/web/api' }]), false);
+  assert.equal(usesGh([]), false);
 });
 
 test("a status's label is status- and its name in lowercase with hyphens for spaces", () => {

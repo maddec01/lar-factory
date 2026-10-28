@@ -260,11 +260,17 @@ async function checkT3(runtime: string): Promise<T3Check> {
 /**
  * Checks every command the board needs from the last lookup, together, and gh and az only when `needs` names them, as
  * only a repository on GitHub needs gh and only one on Azure DevOps needs az. t3 also needs T3 Code running, which
- * T3's runtime file at `t3Runtime` tells. `ghError` is the gh probe's error for the Stale banner.
+ * T3's runtime file at `t3Runtime` tells. `landed` hears each check as it lands, so a slow one holds up no other.
+ * `ghError` is the gh probe's error for the Stale banner.
  */
-export async function checkTools(needs: { gh: boolean; az: boolean }, t3Runtime = serverRuntimePath()): Promise<{ tools: ToolChecks; ghError?: string }> {
-  const [gh, az, t3, git, jq, curl] = await Promise.all([needs.gh ? probeGh() : undefined, needs.az ? probeAz() : undefined, checkT3(t3Runtime),
-    checkCommand('git'), checkCommand('jq'), checkCommand('curl')]);
+export async function checkTools(needs: { gh: boolean; az: boolean }, t3Runtime = serverRuntimePath(),
+  landed: (check: Partial<ToolChecks>) => void = () => {}): Promise<{ tools: ToolChecks; ghError?: string }> {
+  const heard = <T>(check: Promise<T>, of: (found: T) => Partial<ToolChecks>) => check.then((found) => { landed(of(found)); return found; });
+  const [gh, az, t3, git, jq, curl] = await Promise.all([
+    needs.gh ? heard(probeGh(), (found) => ({ gh: found.check })) : undefined,
+    needs.az ? heard(probeAz(), (found) => ({ az: found })) : undefined,
+    heard(checkT3(t3Runtime), (t3) => ({ t3 })), heard(checkCommand('git'), (git) => ({ git })),
+    heard(checkCommand('jq'), (jq) => ({ jq })), heard(checkCommand('curl'), (curl) => ({ curl }))]);
   const tools: ToolChecks = { t3, git, jq, curl, ...(gh && { gh: gh.check }), ...(az && { az }) };
   return { tools, ...(gh?.error && { ghError: gh.error }) };
 }

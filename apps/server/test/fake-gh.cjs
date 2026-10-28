@@ -31,6 +31,8 @@ const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued
 const main = async () => {
   if (args[0] === '--version') return void process.stdout.write(`gh version ${options.ghVersion ?? '2.96.0'} (2026-09-01)\n`);
   if (args[0] === 'auth' && args[1] === 'status') {
+    // options.authHold names a file the check waits for, as a slow gh.
+    while (options.authHold && !fs.existsSync(options.authHold)) await new Promise((r) => setTimeout(r, 50));
     if (options.ghAuth === 'logged-out') process.stderr.write('You are not logged into any GitHub hosts. To log in, run: gh auth login\n');
     else if (options.ghAuth === 'failed') process.stderr.write('error connecting to api.github.com\n');
     else {

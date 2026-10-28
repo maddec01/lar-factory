@@ -537,3 +537,16 @@ test('a source whose kind waits reads nothing and checks for no changes, and rea
   assert.deepEqual((await sources.read(undefined, paced(5_000))).items.map((i) => i.id), ['I_1', 'I_2'], 'a waiting source lists its last read');
   assert.deepEqual([github.reads, azure.reads], [1, 1]);
 });
+
+
+test('repositories reading one Azure board share its backlog and sprint and route tagged items', async () => {
+  const az = fakeAz({ items: [{ id: 1, type: 'User Story', state: 'New' }, { id: 2, type: 'User Story', state: 'Active', tags: 'repo-api' }], backlog: [1, 2], sprint: [2] });
+  const configs = [azure('contoso/Fabrikam/web'), azure('Contoso/fabrikam/api', 'fabrikam team')]
+    .map((config) => ({ ...config, itemSource: { kind: 'azure-board' as const, team: config.itemSource.kind === 'azure-sprint' ? config.itemSource.team : '' } }));
+  const read = await configuredSources(configs, az.run).read();
+  assert.deepEqual(read.items.map((i) => [i.number, i.repo, i.untaggedFor ?? null]), [
+    [1, 'contoso/Fabrikam/web', ['contoso/Fabrikam/web', 'Contoso/fabrikam/api']], [2, 'Contoso/fabrikam/api', null],
+  ]);
+  assert.equal(az.calls.filter((c) => c[3] === 'list-work-items').length, 1);
+  assert.equal(az.calls.filter((c) => c.includes('backlogId=Microsoft.RequirementCategory')).length, 1);
+});

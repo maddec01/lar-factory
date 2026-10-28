@@ -43,7 +43,7 @@ export function validateDraft(input: unknown, repos: RepoConfig[]): ItemDraft {
     value.labels.some((l: unknown) => typeof l !== 'string' || !allowed.includes(l))) {
     throw new Error("Choose only the selected repository's custom labels.");
   }
-  const azure = repo.items === 'sprint' || repo.items === 'backlog';
+  const azure = repo.items === 'sprint' || repo.items === 'backlog' || repo.items === 'azure-board';
   if (value.onlyFor !== undefined && value.onlyFor !== false && (value.onlyFor !== true || !azure)) {
     throw new Error('Only an item on Azure DevOps can be only for its repository.');
   }

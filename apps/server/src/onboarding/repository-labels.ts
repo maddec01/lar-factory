@@ -23,7 +23,7 @@ async function read(repo: string, run?: Run): Answer {
 }
 
 /** The refusal of a create on Azure DevOps, whose tags the board writes on the work items that need them. */
-const NO_TAG_CREATE = { status: 400, error: 'Azure DevOps has no tag to create: the board writes each tag the first time a work item needs it.' };
+const NO_TAG_CREATE = { status: 400, error: 'Azure DevOps tags appear when first used. Continue without creating them.' };
 
 /** Lists the body's repository's labels. */
 export async function readRepositoryLabels(input: Record<string, unknown>, run?: Run): Answer {
@@ -40,7 +40,7 @@ export async function readRepositoryLabels(input: Record<string, unknown>, run?:
 export async function createRepositoryLabels(input: Record<string, unknown>, run?: Run): Answer {
   const { repo, itemSource, renaming, custom = [] } = input;
   if (!isRepo(repo) || !isItemSource(itemSource) || !strings(renaming) || !strings(custom)) {
-    return { status: 400, error: 'Send the repository, its item source, the old labels Rename moves and any custom labels to create.' };
+    return { status: 400, error: 'Choose a repository and the labels to create or rename.' };
   }
   if (onAzure(repo)) return NO_TAG_CREATE;
   const before = await read(repo, run);
@@ -63,7 +63,7 @@ export async function workflowLabelsProblem(repo: string, run?: Run): Promise<{ 
   const labels = await read(repo, run);
   if ('error' in labels) return labels;
   return workflowLabelsMissing(labelPlan(labels.labels, 'github-project'))
-    ? { status: 409, error: `${repo} still lacks a workflow label. Go back to the Labels step and create or rename it.` } : null;
+    ? { status: 409, error: `${repo} is missing a required label. Go back to Labels to create or rename it.` } : null;
 }
 
 /**
@@ -81,8 +81,8 @@ export async function renameRepositoryLabels(input: Record<string, unknown>, run
     const row = plan.workflow.find((r) => r.state === 'rename' && r.oldName.toLowerCase() === name.toLowerCase());
     if (row?.state === 'rename') { renames.push({ from: row.oldName, to: row.label.name }); continue; }
     const beside = plan.leftAlone.find((l) => l.name.toLowerCase() === name.toLowerCase())?.keptBeside;
-    if (beside) return { status: 409, error: `${shownRepo(repo)} has ${beside} already, so ${name} can't be renamed to it.` };
-    return { status: 400, error: `${name} is no old workflow label the repository has.` };
+    if (beside) return { status: 409, error: `${beside} already exists in ${shownRepo(repo)}. Move items to it before removing ${name}.` };
+    return { status: 400, error: `${name} is not a label that can be renamed here.` };
   }
   for (const { from, to } of renames) {
     try { await (onAzure(repo) ? renameTag : renameLabel)(repo, from, to, run); }

@@ -60,13 +60,13 @@ test('a CLAUDE.md that links to AGENTS.md gets the Agent skills block written in
   assert.ok(!('problem' in nested));
   assert.deepEqual(byPath(nested.entries).get('docs/AGENTS.md'), { mode: '100644', content: block });
   assert.deepEqual(await plan({ 'CLAUDE.md': '../AGENTS.md' }, {}, CONFIG, ['CLAUDE.md']),
-    { problem: "CLAUDE.md links to a file that isn't on the default branch, so the Agent skills block has nowhere to go." });
+    { problem: 'CLAUDE.md links to a missing file. Fix the link on the default branch before continuing.' });
 });
 
 test('a CLAUDE.md or AGENTS.md that links to a file no agent reads as instructions is refused, so the block never lands there', async () => {
   const workflow = '.github/workflows/ci.yml';
   assert.deepEqual(await plan({ 'AGENTS.md': workflow, [workflow]: 'on: push\n' }, {}, CONFIG, ['AGENTS.md']), { problem: 'AGENTS.md links to '
-    + ".github/workflows/ci.yml, which is no instruction file, so the Agent skills block can't go there. Make it a file, or a link to an instruction file, on the default branch, then come back." });
+    + ".github/workflows/ci.yml, which is not an agent instruction file. Point it to an instruction file on the default branch before continuing." });
   assert.match((await plan({ 'CLAUDE.md': 'notes.txt', 'notes.txt': 'lar-web\n' }, {}, CONFIG, ['CLAUDE.md']) as { problem: string }).problem, /CLAUDE\.md links to notes\.txt/);
   assert.match((await plan({ 'CLAUDE.md': '.github/notes.md', '.github/notes.md': '# lar-web\n' }, {}, CONFIG, ['CLAUDE.md']) as { problem: string }).problem,
     /CLAUDE\.md links to \.github\/notes\.md/);
@@ -101,24 +101,24 @@ test('two edits in one file each apply at the line they name on the default bran
 
 test("an edit whose removed lines no longer match its line fails with the file and line, and plans nothing", async () => {
   assert.deepEqual(await plan({ 'AGENTS.md': '# lar-web\n\n- Push to main once reviewed.\n' }, { clashes: [pushRule] }),
-    { problem: "AGENTS.md line 3 doesn't have the lines its edit removes. Untick it on Cleanup, or Look again there." });
+    { problem: 'The text at line 3 in AGENTS.md has changed. Uncheck this change in Cleanup or check instructions again.' });
   assert.deepEqual(await plan({ 'AGENTS.md': '# lar-web\n' }, { clashes: [pushRule] }),
-    { problem: "AGENTS.md line 3 doesn't have the lines its edit removes. Untick it on Cleanup, or Look again there." });
+    { problem: 'The text at line 3 in AGENTS.md has changed. Uncheck this change in Cleanup or check instructions again.' });
   assert.deepEqual(await plan({ 'README.md': '' }, { clashes: [pushRule] }),
-    { problem: 'AGENTS.md is not on the default branch any more. Untick it on Cleanup, or Look again there.' });
+    { problem: 'AGENTS.md no longer exists on the default branch. Uncheck this change in Cleanup or check instructions again.' });
 });
 
-test("an edit of a file the Clash agent doesn't read, or one that touches another edit's lines, is refused", async () => {
+test('an edit of a file the Instruction check doesn\'t read, or one that touches another edit\'s lines, is refused', async () => {
   const workflow: Clash = { ...pushRule, file: '.github/workflows/ci.yml', line: 1, edit: { kind: 'lines', remove: ['on: push'], add: ['on: pull_request_target'] } };
   assert.deepEqual(await plan({ '.github/workflows/ci.yml': 'on: push\n' }, { clashes: [workflow] }),
-    { problem: ".github/workflows/ci.yml is no instruction file the Clash agent reads, so the PR won't edit it." });
+    { problem: '.github/workflows/ci.yml is not an agent instruction file. The pull request cannot edit it.' });
   const named = await plan({ 'opencode.json': '{ "instructions": ["docs/rules.md"] }', 'docs/rules.md': 'on: push\n' },
     { clashes: [{ ...workflow, file: 'docs/rules.md' }] });
   assert.ok(!('problem' in named));
   const agents = '# lar-web\n\n- Push to main when done.\n- Run the tests.\n';
   const wider: Clash = { ...pushRule, id: 'wider', edit: { kind: 'lines', remove: ['- Push to main when done.', '- Run the tests.'], add: [] } };
   assert.deepEqual(await plan({ 'AGENTS.md': agents }, { clashes: [pushRule, wider] }),
-    { problem: "AGENTS.md line 3's edit touches the lines of another edit in the file. Untick it on Cleanup, or Look again there." });
+    { problem: 'Two changes overlap at line 3 in AGENTS.md. Uncheck this change in Cleanup or check instructions again.' });
 });
 
 test("CONTEXT.md's rename moves its blob, and .scratch/'s delete removes each file in it", async () => {
@@ -161,18 +161,18 @@ test('a skill deleted removes its folder; a pick for a path the branch lacks, or
   assert.deepEqual(byPath(deleted.entries).get('.agents/skills/tdd/SKILL.md'), { mode: '100644', sha: null });
   assert.deepEqual(deleted.changes.at(-1), { kind: 'delete', path: '.agents/skills/tdd/' });
   assert.deepEqual(await plan(files, { skills: { '.pi/skills/tdd/': { kind: 'delete' } } }),
-    { problem: '.pi/skills/tdd/ is no project skill named like a bundled skill on the default branch. Go Back to Cleanup, which checks the default branch again.' });
+    { problem: '.pi/skills/tdd/ no longer needs renaming or removal. Go back to Cleanup to check again.' });
   assert.deepEqual(await plan(files, { skills: { '.agents/skills/ours/': { kind: 'delete' } } }),
-    { problem: '.agents/skills/ours/ is no project skill named like a bundled skill on the default branch. Go Back to Cleanup, which checks the default branch again.' });
+    { problem: '.agents/skills/ours/ no longer needs renaming or removal. Go back to Cleanup to check again.' });
   assert.deepEqual(await plan(files, { skills: { '.agents/skills/tdd/': { kind: 'rename', name: 'ours' } } }),
-    { problem: "Can't rename .agents/skills/tdd/: Another project skill is named ours." });
+    { problem: 'Can\'t rename .agents/skills/tdd/: A local skill already uses ours.' });
   assert.deepEqual(await plan(files, { skills: { '.agents/skills/tdd/': { kind: 'rename', name: 'code-review' } } }),
-    { problem: "Can't rename .agents/skills/tdd/: code-review is a bundled skill’s name too." });
+    { problem: 'Can\'t rename .agents/skills/tdd/: code-review is already a bundled skill.' });
   for (const path of ['.agents/skills/../', '.agents/skills/./', 'skills/tdd/', '.github/workflows/']) {
-    assert.match((await plan(files, { skills: { [path]: { kind: 'delete' } } }) as { problem: string }).problem, /is no project skill/, path);
+    assert.match((await plan(files, { skills: { [path]: { kind: 'delete' } } }) as { problem: string }).problem, /no longer needs renaming or removal/, path);
   }
   assert.deepEqual(await plan({ ...files, '.agents/skills/tdd/README.md': 'x', '.agents/skills/web-tdd/README.md': 'x' }, { skills: { '.agents/skills/tdd/': { kind: 'rename', name: 'web-tdd' } } }),
-    { problem: "Can't rename .agents/skills/tdd/ to .agents/skills/web-tdd/, since the default branch has .agents/skills/web-tdd/README.md." });
+    { problem: 'Cannot rename .agents/skills/tdd/ to .agents/skills/web-tdd/. .agents/skills/web-tdd/README.md already exists on the default branch.' });
 });
 
 test('two skills in one skills folder renamed to the same name fail, rather than both moving into one folder', async () => {
@@ -180,6 +180,6 @@ test('two skills in one skills folder renamed to the same name fail, rather than
     '.claude/skills/tdd/SKILL.md': '---\nname: tdd\n---\n' };
   const rename = { kind: 'rename', name: 'web-skill' } as const;
   assert.deepEqual(await plan(files, { skills: { '.agents/skills/tdd/': rename, '.agents/skills/code-review/': rename } }),
-    { problem: "Can't rename .agents/skills/tdd/: Another skill in its folder is renamed web-skill too." });
+    { problem: 'Can\'t rename .agents/skills/tdd/: Another skill will use web-skill in this folder.' });
   assert.ok(!('problem' in await plan(files, { skills: { '.agents/skills/tdd/': rename, '.claude/skills/tdd/': rename } })));
 });

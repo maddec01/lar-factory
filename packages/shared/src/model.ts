@@ -327,11 +327,11 @@ export interface RepoConfig {
   repo: string;
   /** Repository role: what this repository is to the others. */
   role: string;
-  /** Its item source: the GitHub Project its .lar-factory.json names, the repository's issues, or an Azure DevOps team's current sprint or backlog. */
+  /** Its item source: the GitHub Project its .lar-factory.json names, the repository's issues, or an Azure DevOps team's current sprint, backlog or combined board. */
   items?: ItemSourceKind;
   /** The GitHub Project its item source names, by owner and number; absent for the other item sources. */
   project?: { owner: string; number: number };
-  /** The Azure DevOps team whose current sprint or backlog its item source is; absent for the other item sources. */
+  /** The Azure DevOps team whose current sprint, backlog or combined board its item source is; absent for the other item sources. */
   team?: string;
   /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
   show?: ShowSetting;
@@ -348,7 +348,7 @@ export interface RepoConfig {
   configUpdate?: number;
 }
 
-export const ITEM_SOURCE_KINDS = ['project', 'issues', 'sprint', 'backlog'] as const;
+export const ITEM_SOURCE_KINDS = ['project', 'issues', 'sprint', 'backlog', 'azure-board'] as const;
 
 export type ItemSourceKind = (typeof ITEM_SOURCE_KINDS)[number];
 
@@ -542,7 +542,7 @@ export function failedCheck<N extends CheckedTool>(tools: ToolChecks | undefined
   return check && check.result !== 'ok' ? check as FailedCheck<NonNullable<ToolChecks[N]>> : undefined;
 }
 
-/** Where a repository's items come from: its GitHub Project, its issues, or an Azure DevOps team's current sprint or backlog. */
+/** Where a repository's items come from: its GitHub Project, its issues, or an Azure DevOps team's current sprint, backlog or combined board. */
 export type ItemSource = ItemSourceKind;
 
 /** Where a repository's items come from: the GitHub Project, unless its config says its issues. */
@@ -552,7 +552,7 @@ export function itemSource(repo: RepoConfig): ItemSource {
 
 /** The provider's tool a source reads with: az for an Azure DevOps sprint or backlog, gh for a GitHub Project or issues. */
 export function providerTool(source: ItemSource): ProviderTool {
-  return source === 'sprint' || source === 'backlog' ? 'az' : 'gh';
+  return source === 'sprint' || source === 'backlog' || source === 'azure-board' ? 'az' : 'gh';
 }
 
 /** Whether any of the repositories is on GitHub, so the board reads it with gh. */
@@ -776,10 +776,10 @@ export type Provider = (typeof PROVIDERS)[number];
 
 /**
  * Where a repository's items come from: a GitHub Project, which other repositories may name too, its own issues, or an
- * Azure DevOps team's current sprint or backlog in the repository's project.
+ * Azure DevOps team's current sprint, backlog or combined board in the repository's project.
  */
 export type RepositoryItemSource = { kind: 'github-project'; owner: string; number: number } | { kind: 'issues' }
-  | { kind: 'azure-sprint'; team: string } | { kind: 'azure-backlog'; team: string };
+  | { kind: 'azure-sprint'; team: string } | { kind: 'azure-backlog'; team: string } | { kind: 'azure-board'; team: string };
 
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
 export interface RepositoryConfigAnswers {
@@ -808,7 +808,7 @@ export interface SetupAnswers {
   itemSource: RepositoryItemSource['kind'];
   projectOwner: string;
   projectNumber: string;
-  /** The Azure DevOps team whose sprint or backlog is the item source; absent in answers saved before the team was asked. */
+  /** The Azure DevOps team whose sprint, backlog or combined board is the item source; absent in answers saved before the team was asked. */
   team?: string;
   show: ShowSetting;
   /** Whether the show setting was picked, so a new item source no longer changes it to the one suggested. */
@@ -846,10 +846,10 @@ export const isSkillName = (name: string) => SKILL_NAME.test(name);
  */
 export function skillRenameProblem(name: string, bundled: readonly string[], projectSkills: readonly string[],
   renamedBeside: readonly string[]): string | null {
-  if (!isSkillName(name)) return 'Next needs a new name: lowercase letters, digits and single hyphens, like web-code-review.';
-  if (bundled.some((other) => other.toLowerCase() === name)) return `${name} is a bundled skill’s name too.`;
-  if (projectSkills.some((other) => other.toLowerCase() === name)) return `Another project skill is named ${name}.`;
-  if (renamedBeside.includes(name)) return `Another skill in its folder is renamed ${name} too.`;
+  if (!isSkillName(name)) return 'Use lowercase letters, numbers and single hyphens, such as web-code-review.';
+  if (bundled.some((other) => other.toLowerCase() === name)) return `${name} is already a bundled skill.`;
+  if (projectSkills.some((other) => other.toLowerCase() === name)) return `A local skill already uses ${name}.`;
+  if (renamedBeside.includes(name)) return `Another skill will use ${name} in this folder.`;
   return null;
 }
 

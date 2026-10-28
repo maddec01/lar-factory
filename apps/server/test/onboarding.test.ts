@@ -147,7 +147,7 @@ test('an onboarding setup check answers with its result', async (t) => {
   const push = await check({ check: 'push' });
   assert.deepEqual([push.status, (await push.json() as { result: { passed: boolean } }).result.passed], [200, false]);
   const unknown = await check({ check: 'labels' });
-  assert.deepEqual([unknown.status, await unknown.json()], [400, { error: 'Send the check to run, the repository, its T3 project and its item source.' }]);
+  assert.deepEqual([unknown.status, await unknown.json()], [400, { error: 'Choose a repository and complete its settings before running checks.' }]);
 });
 
 test("onboarding's fixed checks answer with the default branch's Clashes, or gh's problem", async (t) => {
@@ -197,7 +197,7 @@ test('an onboarding whose repository lacks a workflow label opens no PR, with a 
   t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
   writeList(home, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
   const board = await startBoard(t, { repoLabels: { 'maddec01/lar-web': ['bug', 'decision: grill'] } } as object, false, false, { HOME: home });
-  const refused = { error: 'maddec01/lar-web still lacks a workflow label. Go back to the Labels step and create or rename it.' };
+  const refused = { error: 'maddec01/lar-web is missing a required label. Go back to Labels to create or rename it.' };
   for (const sent of [config, null]) {
     const response = await board.post({ repo: 'maddec01/lar-web', progress, config: sent, picks: { clashes: [], skills: {} } }, board.url, '/api/onboarding/pr');
     assert.deepEqual([response.status, await response.json()], [409, refused], JSON.stringify(sent));

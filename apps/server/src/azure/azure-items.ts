@@ -190,7 +190,7 @@ export interface Listing {
   /** The backlog priority order; sprint-only items follow it. */
   order?: readonly number[];
   /** Whether a Completed requirement-level item shows, as Done. */
-  completed: boolean;
+  completed: boolean | ReadonlySet<number>;
 }
 
 /**
@@ -258,7 +258,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
   }
 
   /** Whether the last listing showed Completed requirement-level items, so an item read alone shows as that listing would. */
-  let showsCompleted = true;
+  let showsCompleted: Listing['completed'] = true;
   let childIds: readonly number[] | undefined;
   let order = new Map<number, number>();
   /** Requirement-level board items with Task counts, predecessors and PRs. */
@@ -289,7 +289,7 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     const placed = new Map<number, NonNullable<Placement>>();
     const childrenOf = new Map<number, RawWorkItem[]>();
     for (const raw of listed) {
-      if (!requirements.has(type(raw)) || !shown(raw) || (!completed && done(raw))) continue;
+      if (!requirements.has(type(raw)) || !shown(raw) || (!(typeof completed === 'boolean' ? completed : completed.has(raw.id)) && done(raw))) continue;
       const where = placement(tagsOf(raw), repos);
       if (!where) continue;
       placed.set(raw.id, where);

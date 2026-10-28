@@ -5,6 +5,7 @@ import { decodePart, itemSource, refKey, shownRepo, type Item, type ItemSourceKi
 import type { OnboardedConfigs, RepositoryConfig } from '../config/repository-config.ts';
 import { githubProject } from '../github/github-project.ts';
 import { repoIssues } from '../github/repo-issues.ts';
+import { azureBoard } from '../azure/azure-board.ts';
 import { azureBacklog } from '../azure/azure-backlog.ts';
 import { az, type Az } from '../azure/azure-items.ts';
 import { azureSprint } from '../azure/azure-sprint.ts';
@@ -26,6 +27,7 @@ const unlisted: ItemSource = {
 export function repoView({ repo, role, itemSource, show, labels }: RepositoryConfig): RepoConfig {
   if (itemSource.kind === 'issues') return { repo, role, items: 'issues', show, labels };
   if (itemSource.kind === 'azure-sprint') return { repo, role, items: 'sprint', team: itemSource.team, show, labels };
+  if (itemSource.kind === 'azure-board') return { repo, role, items: 'azure-board', team: itemSource.team, show, labels };
   if (itemSource.kind === 'azure-backlog') return { repo, role, items: 'backlog', team: itemSource.team, show, labels };
   return { repo, role, items: 'project', project: { owner: itemSource.owner, number: itemSource.number }, show, labels };
 }
@@ -42,19 +44,19 @@ export function configuredSources(configs: readonly RepositoryConfig[], run: Az 
   const teamKey = (repo: string, kind: string, team: string) => [kind, ...repo.split('/').slice(0, 2).map(decodePart), team].join('/').toLowerCase();
   const teams = new Map<string, string[]>();
   for (const { repo, itemSource } of configs) {
-    if (itemSource.kind !== 'azure-sprint' && itemSource.kind !== 'azure-backlog') continue;
+    if (itemSource.kind !== 'azure-sprint' && itemSource.kind !== 'azure-backlog' && itemSource.kind !== 'azure-board') continue;
     const key = teamKey(repo, itemSource.kind, itemSource.team);
     teams.set(key, [...teams.get(key) ?? [], repo]);
   }
   const azure = new Map<string, ItemSource>();
-  const teamSource = (repo: string, kind: 'azure-sprint' | 'azure-backlog', team: string) => {
+  const teamSource = (repo: string, kind: 'azure-sprint' | 'azure-backlog' | 'azure-board', team: string) => {
     const key = teamKey(repo, kind, team);
-    if (!azure.has(key)) azure.set(key, (kind === 'azure-sprint' ? azureSprint : azureBacklog)(teams.get(key)!, team, run));
+    if (!azure.has(key)) azure.set(key, (kind === 'azure-sprint' ? azureSprint : kind === 'azure-board' ? azureBoard : azureBacklog)(teams.get(key)!, team, run));
     return azure.get(key)!;
   };
   const byRepo = new Map(configs.map(({ repo, itemSource }): [string, ItemSource] => {
     if (itemSource.kind === 'issues') return [repo, repoIssues(repo)];
-    if (itemSource.kind === 'azure-sprint' || itemSource.kind === 'azure-backlog') return [repo, teamSource(repo, itemSource.kind, itemSource.team)];
+    if (itemSource.kind === 'azure-sprint' || itemSource.kind === 'azure-backlog' || itemSource.kind === 'azure-board') return [repo, teamSource(repo, itemSource.kind, itemSource.team)];
     const key = `${itemSource.owner.toLowerCase()}/${itemSource.number}`;
     if (!projects.has(key)) projects.set(key, githubProject(itemSource));
     return [repo, projects.get(key)!];

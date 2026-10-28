@@ -20,7 +20,7 @@ export function OnboardingCards() {
         const where = stoppedAt(progress);
         return (
           <div key={repo} data-onboarding-card={repo}>
-            <NoticeCard tone="warning" icon={<FolderGit2 />} title={shownRepo(repo)} badge={<Badge tone="warning">Onboarding</Badge>}
+            <NoticeCard tone="warning" icon={<FolderGit2 />} title={shownRepo(repo)} badge={<Badge tone="warning">Setting up</Badge>}
               description={`${where[0]!.toUpperCase()}${where.slice(1)}`} actions={<Button {...kind('other')} onClick={() => resume(repo)} data-resume>Resume</Button>} />
           </div>
         );

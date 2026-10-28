@@ -215,7 +215,7 @@ test('each onboarded repository has Edit and Reset, and Add repository opens the
   add.focus();
   await settle(() => add.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('T3 project');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repository');
   expect(dialog()!.contains(document.activeElement), 'the onboarding dialog holds focus').toBe(true);
   expect(text(modal()!.querySelector('[data-slot="modal-header"] h2')), 'Settings stays under it').toBe('Repositories');
   await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
@@ -248,17 +248,17 @@ test('a repository still onboarding is listed with its provider, the answers it 
   serve(data, [project('lar-web', { onBoard: true })]);
   await open('Repositories', data);
   expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-maddec01/lar-notes']]);
-  expect(text(row('repo-maddec01/lar-web')), 'answers the step has not passed yet').toBe('maddec01/lar-webGitHub · Onboarding, stopped at Provider and item sourceResumeReset');
+  expect(text(row('repo-maddec01/lar-web')), 'answers the step has not passed yet').toBe('maddec01/lar-webGitHub · Onboarding, stopped at Board settingsResumeReset');
   expect(text(row('repo-maddec01/lar-notes'))).toBe('maddec01/lar-notesGitHub · Issues · Opted-in items · Onboarding, stopped at ChecksResumeReset');
   const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-notes', provider: 'GitHub' as const, setup }, prUrl: 'https://github.com/maddec01/lar-notes/pull/2' };
   const onProject = { ...pr, answers: { ...pr.answers, setup: { ...setup, itemSource: 'github-project' as const, projectNumber: '3', show: 'all' as const } } };
   await push({ ...data, onboarding: [{ repo: 'maddec01/lar-web', progress: onProject }, { repo: 'maddec01/lar-notes', progress: { ...pr, prClosed: true } }] });
-  expect(text(row('repo-maddec01/lar-web'))).toContain('GitHub · GitHub Project maddec01 #3 · All items · Onboarding, waiting for its PR to merge');
-  expect(text(row('repo-maddec01/lar-notes'))).toContain('Onboarding, its PR closed without merging');
+  expect(text(row('repo-maddec01/lar-web'))).toContain('GitHub · GitHub Project maddec01 #3 · All items · Onboarding, waiting for you to merge its pull request');
+  expect(text(row('repo-maddec01/lar-notes'))).toContain('Onboarding, its pull request closed without merging');
   await push(data);
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Provider and item source');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Board settings');
 });
 
 const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];

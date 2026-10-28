@@ -12,7 +12,7 @@ import { Field as LabelledField } from '@lar-factory/ui/design-system/Field';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { RadioGroup, RadioGroupItem } from '@lar-factory/ui/design-system/RadioGroup';
 import { Fieldset, FieldsetLegend } from '@lar-factory/ui/fieldset';
-import { byTeam, setupProblems, suggestedShow, type SetupAction, type SetupChange } from './setup-answers.ts';
+import { setupProblems, suggestedShow, type SetupAction, type SetupChange } from './setup-answers.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
 /** One choice of a radio group: its title, then a line of detail. */
@@ -59,7 +59,7 @@ export function Group({ legend, hint, children }: { legend: string; hint?: React
   );
 }
 
-export const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opted-in': 'Opted-in items' };
+export const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opted-in': 'Items with a status' };
 
 type TextAnswer = keyof ReturnType<typeof setupProblems>;
 
@@ -67,7 +67,7 @@ type TextAnswer = keyof ReturnType<typeof setupProblems>;
 const azureProject = (repo: string): string => shownRepo(repo).split('/')[1] ?? '';
 
 /**
- * The setup fields for `repo`: item source, with a Team field for an Azure DevOps one when `azure`, show setting with
+ * The setup fields for `repo`: its saved source, an editable Team for an Azure board, and the show setting with
  * the suggested one marked, and Repository role. A text answer's problem names `action`, the button that waits for it,
  * and is muted help until its field is edited or left. `disabled` locks the choices, which a disabled fieldset doesn't reach.
  */
@@ -83,46 +83,33 @@ export function SetupFields({ repo, azure = false, setup, action = 'Next', disab
     field: { problem: problems[key], invalid: touched.has(key) },
     control: { value: setup[key] ?? '', onBlur: () => touch(key), onChange: (e: { target: { value: string } }) => { touch(key); onAnswer({ [key]: e.target.value }); } },
   });
-  const owner = textAnswer('projectOwner');
-  const number = textAnswer('projectNumber');
   const team = textAnswer('team');
   const role = textAnswer('role');
   return (<>
-    <Group legend="Item source" hint="Where the board finds this repository’s items. It lists the items that can show.">
-      <RadioGroup value={setup.itemSource} onValueChange={(v) => onAnswer({ itemSource: v as SetupAnswers['itemSource'] })} className="gap-2">
-        {azure ? (<>
-          <Choice value="azure-sprint" title="The team’s current sprint" disabled={disabled}>The requirement-level work items in the team’s current iteration, with their Tasks.</Choice>
-          <Choice value="azure-backlog" title="The team’s backlog" disabled={disabled}>The open requirement-level work items under the team’s area paths, in any sprint.</Choice>
-        </>) : (<>
-          <Choice value="github-project" title="A GitHub Project" disabled={disabled}>A Project named by its owner and number, which other repositories may name too.</Choice>
-          <Choice value="issues" title="The repository’s issues" disabled={disabled}>{shownRepo(repo)}’s own issues, with no extra fields.</Choice>
-        </>)}
-      </RadioGroup>
-    </Group>
-    {byTeam(setup.itemSource) && (
-      <Field name="team" label="Team" hint={`The Azure DevOps team in ${azureProject(repo)} whose ${setup.itemSource === 'azure-sprint' ? 'sprint' : 'backlog'} the board reads.`} {...team.field}>
-        {(described) => <Input placeholder={`e.g. ${azureProject(repo)} Team`} {...team.control} {...described} />}
+    <div data-item-source className="grid gap-1.5">
+      <span className="text-sm font-medium">Work to read</span>
+      <p className="m-0 text-xs text-base-700">{setup.itemSource === 'github-project'
+        ? `GitHub Project ${setup.projectOwner} #${setup.projectNumber}. This saved source stays the same.`
+        : setup.itemSource === 'azure-sprint' ? `${setup.team}'s current sprint. This saved source stays the same.`
+        : setup.itemSource === 'azure-backlog' ? `${setup.team}'s backlog. This saved source stays the same.`
+        : azure ? "The team's backlog and current sprint. Each item appears once." : "This repository's GitHub issues."}</p>
+    </div>
+    {setup.itemSource === 'azure-board' && (
+      <Field name="team" label="Team" hint={`The team that owns this work in ${azureProject(repo)}.`} {...team.field}>
+        {(described) => <Input placeholder={`${azureProject(repo)} Team`} {...team.control} {...described} />}
       </Field>
     )}
-    {setup.itemSource === 'github-project' && (<>
-      <Field name="project-owner" label="Project owner" hint="The GitHub user or organization that owns the Project." {...owner.field}>
-        {(described) => <Input className="font-mono" {...owner.control} {...described} />}
-      </Field>
-      <Field name="project-number" label="Project number" hint="The number in the Project’s URL, after /projects/." {...number.field}>
-        {(described) => <Input className="font-mono" inputMode="numeric" placeholder="3" {...number.control} {...described} />}
-      </Field>
-    </>)}
-    <Group legend="Show" hint="Which of the item source’s items show on the board.">
+    <Group legend="Show" hint="Choose which work appears on the board.">
       <RadioGroup value={setup.show} onValueChange={(v) => onAnswer({ show: v as ShowSetting })} className="gap-2">
         {(['all', 'opted-in'] as const).map((show) => (
           <Choice key={show} value={show} disabled={disabled} title={<span className="flex items-center gap-2">{SHOW_TITLES[show]}{suggested === show && <Badge tone="accent">Suggested</Badge>}</span>}>
-            {show === 'all' ? 'Every open item from the item source; an item with no status counts as List.'
-              : `Only items that carry a status show; someone opts an item in by giving it ${setup.itemSource === 'github-project' ? 'the List Status' : azure ? 'the status-list tag' : 'the status-list label'}.`}
+            {show === 'all' ? 'Show all available work. Items without a status appear in List.'
+              : `Show work with a board status. To include an item, give it ${setup.itemSource === 'github-project' ? 'the List status in GitHub' : azure ? 'the status-list tag in Azure DevOps' : 'the status-list label in GitHub'}.`}
           </Choice>
         ))}
       </RadioGroup>
     </Group>
-    <Field name="role" label="Repository role" hint="What this repository is to the others." {...role.field}>
+    <Field name="role" label="What this repository does" hint="Describe its purpose so agents know where to work." {...role.field}>
       {(described) => <Input placeholder="Web client that talks to the API server" {...role.control} {...described} />}
     </Field>
   </>);
@@ -152,10 +139,10 @@ export interface CustomLabelHandlers {
 
 /** What custom labels, or on Azure DevOps custom tags, are for. */
 export const customLabelsHelp = (noun: 'label' | 'tag') =>
-  `Custom ${noun}s mark which part of the product an item touches, such as app: music. Add item offers them, and the queue shows them on each item.`;
+  `Use ${noun}s to group work, such as app: music.`;
 
 export function CustomLabelsTitle({ noun = 'label' }: { noun?: 'label' | 'tag' }) {
-  return <h4 className="m-0 text-xs font-medium uppercase tracking-wide text-base-700">Custom {noun}s</h4>;
+  return <h4 className="m-0 text-xs font-medium text-base-700">Custom {noun}s</h4>;
 }
 
 /**
@@ -171,8 +158,8 @@ export function CustomLabelPicker({ repo, azure = false, offered, picked, typed,
   const add = () => { if (!disabled) onAdd(); };
   return (
     <div data-custom-labels className="grid gap-2">
-      <div className="grid gap-1"><CustomLabelsTitle noun={noun} /><p className="m-0 text-xs text-base-700">{customLabelsHelp(noun)} Pick the ones {shownRepo(repo)} uses, or add a new one.{azure
-        && ' The board writes a new one the first time a work item needs it.'}</p></div>
+      <div className="grid gap-1"><CustomLabelsTitle noun={noun} /><p className="m-0 text-xs text-base-700">{customLabelsHelp(noun)} Choose the ones to offer when adding work to {shownRepo(repo)}.{azure
+        && ' New tags appear when you first use them.'}</p></div>
       {choices.length > 0 && (
         <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0">
           {choices.map((name) => (
@@ -186,12 +173,12 @@ export function CustomLabelPicker({ repo, azure = false, offered, picked, typed,
         </ul>
       )}
       <span className="flex gap-2">
-        <Input data-new-custom className="font-mono" placeholder="app: music" aria-label={`New custom ${noun}`} value={typed} disabled={adding}
+        <Input data-new-custom className="font-mono" placeholder="app: music" aria-label={`New ${noun}`} value={typed} disabled={adding}
           onChange={(e) => onType(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-        <Button {...kind('other')} data-add-custom disabled={disabled} loading={adding} onClick={add}>{adding ? 'Adding…' : 'Add'}</Button>
+        <Button {...kind('other')} data-add-custom disabled={disabled} loading={adding} onClick={add}>{adding ? 'Adding...' : 'Add'}</Button>
       </span>
       {problem && <p className="m-0 text-xs text-(--lar-danger-text)">{problem}</p>}
-      {error && <Alert tone="danger" title={`Can’t create ${error.name}`}>{error.message}</Alert>}
+      {error && <Alert tone="danger" title={`Could not add ${error.name}`}>{error.message}</Alert>}
     </div>
   );
 }

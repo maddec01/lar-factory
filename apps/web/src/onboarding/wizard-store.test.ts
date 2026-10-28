@@ -10,7 +10,7 @@ const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoic
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
 });
 /** The setup step's answers before any is given: a GitHub Project of the repository's owner, with All items suggested. */
-const SETUP: SetupAnswers = { itemSource: 'github-project', projectOwner: 'maddec01', projectNumber: '', team: '', show: 'all', showPicked: false, role: '' };
+const SETUP: SetupAnswers = { itemSource: 'issues', projectOwner: 'maddec01', projectNumber: '', team: '', show: 'opted-in', showPicked: false, role: '' };
 const PROJECTS = [project('lar-web'), project('lar-server', { onBoard: true }), project('notes', { repo: null, provider: null, hasConfig: null })];
 
 /** The store, fresh, with T3's projects answered by `reply`; each onboarding it keeps is kept. */
@@ -20,9 +20,9 @@ async function store(reply: () => Response = () => new Response(JSON.stringify({
   return useWizardStore;
 }
 
-test('the steps are the T3 project, Provider and item source, Labels, Checks, Cleanup, then Pull request', async () => {
+test('the steps are the T3 project, Board settings, Labels, Checks, Cleanup, then Pull request', async () => {
   const { STEPS } = await import('./wizard-store.ts');
-  expect(STEPS.map((s) => s.label)).toEqual(['T3 project', 'Provider and item source', 'Labels', 'Checks', 'Cleanup', 'Pull request']);
+  expect(STEPS.map((s) => s.label)).toEqual(['Repository', 'Board settings', 'Labels', 'Checks', 'Cleanup', 'Pull request']);
 });
 
 test("starting a run opens it on the T3 project step and reads T3's projects", async () => {
@@ -97,8 +97,8 @@ test('a project whose repository is onboarding already says to use its Resume', 
   const { unpickable } = await import('./wizard-store.ts');
   const run = { step: 'project' as const, done: [], projectId: null, repo: null, provider: null, savedAs: null, setup: null, customLabels: [], cleanup: null, prUrl: null };
   const data = { onboarding: [{ repo: 'maddec01/lar-server', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-server' } } }] };
-  expect(unpickable(project('lar-server', { onBoard: true }), run, data)).toBe('It’s onboarding already: close this and press its Resume.');
-  expect(unpickable(project('lar-server', { onBoard: true }), run, { onboarding: [] })).toBe('Its repository is on the board already.');
+  expect(unpickable(project('lar-server', { onBoard: true }), run, data)).toBe('Setup is already in progress. Close this window and choose Resume.');
+  expect(unpickable(project('lar-server', { onBoard: true }), run, { onboarding: [] })).toBe('This repository is already on the board.');
 });
 
 test('closing before a project is picked drops the run and keeps nothing', async () => {
@@ -146,20 +146,14 @@ test('the suggested show setting follows the item source until one is picked', a
   expect(setup()).toMatchObject({ itemSource: 'github-project', show: 'opted-in', showPicked: true });
 });
 
-test("Next needs a role, and for a GitHub Project an owner's login and a number", async () => {
+test('GitHub setup needs only a repository description', async () => {
   const { wizard, ready } = await onSetup();
   wizard.getState().answer({ role: '  ' });
-  expect(ready(), 'a blank role').toBe(false);
+  expect(ready()).toBe(false);
   wizard.getState().answer({ role: 'Web client' });
-  expect(ready(), 'no Project number').toBe(false);
-  for (const [projectOwner, projectNumber] of [['maddec01', '0'], ['maddec01', '3.5'], ['-maddec01', '3'], ['', '3']]) {
-    wizard.getState().answer({ projectOwner, projectNumber });
-    expect(ready(), `${projectOwner} #${projectNumber}`).toBe(false);
-  }
-  wizard.getState().answer({ projectOwner: 'maddec01', projectNumber: '3' });
   expect(ready()).toBe(true);
-  wizard.getState().answer({ itemSource: 'issues', projectNumber: '' });
-  expect(ready(), "the repository's issues need no Project").toBe(true);
+  const { itemSourceOf } = await import('./wizard-store.ts');
+  expect(itemSourceOf(wizard.getState().run!, project('lar-web'))).toEqual({ kind: 'issues' });
   wizard.getState().next();
   expect(wizard.getState().run).toMatchObject({ step: 'labels', done: ['project', 'setup'] });
 });
@@ -168,7 +162,7 @@ test(".lar-factory.json's values pass the step with no answers; a file that can'
   const config = { itemSource: { kind: 'issues' as const }, show: 'opted-in' as const, role: 'Web client', labels: [] };
   expect((await onSetup([project('lar-web', { hasConfig: true, config })])).ready()).toBe(true);
   for (const parts of [{ provider: 'Azure DevOps' as const, repo: 'contoso/Fabrikam/lar-web', hasConfig: null },
-    { hasConfig: true, configProblem: '.lar-factory.json isn’t valid JSON.' }, { hasConfig: null }]) {
+    { hasConfig: true, configProblem: '.lar-factory.json isn\'t valid JSON.' }, { hasConfig: null }]) {
     const { wizard, ready } = await onSetup([project('lar-web', parts)]);
     wizard.getState().answer({ itemSource: 'issues', role: 'Web client' });
     expect(ready(), JSON.stringify(parts)).toBe(false);
@@ -177,14 +171,9 @@ test(".lar-factory.json's values pass the step with no answers; a file that can'
 
 const AZURE = project('lar-web', { repo: 'contoso/Fabrikam/lar-web', provider: 'Azure DevOps' });
 
-test("an Azure DevOps origin starts on the team's current sprint with All items suggested, and the backlog suggests Opted-in items", async () => {
+test('Azure setup defaults to the combined board and a team name based on the project', async () => {
   const { wizard } = await onSetup([AZURE]);
-  const setup = () => wizard.getState().run!.setup!;
-  expect(setup()).toEqual({ itemSource: 'azure-sprint', projectOwner: '', projectNumber: '', team: '', show: 'all', showPicked: false, role: '' });
-  wizard.getState().answer({ itemSource: 'azure-backlog' });
-  expect(setup()).toMatchObject({ itemSource: 'azure-backlog', show: 'opted-in' });
-  wizard.getState().answer({ itemSource: 'azure-sprint' });
-  expect(setup().show).toBe('all');
+  expect(wizard.getState().run!.setup).toEqual({ itemSource: 'azure-board', projectOwner: '', projectNumber: '', team: 'Fabrikam Team', show: 'opted-in', showPicked: false, role: '' });
 });
 
 test("Next waits for an Azure DevOps sprint's or backlog's team, and the item source names it", async () => {
@@ -196,7 +185,7 @@ test("Next waits for an Azure DevOps sprint's or backlog's team, and the item so
   expect(source()).toBeNull();
   wizard.getState().answer({ team: ' Fabrikam Team ' });
   expect(ready()).toBe(true);
-  expect(source()).toEqual({ kind: 'azure-sprint', team: 'Fabrikam Team' });
+  expect(source()).toEqual({ kind: 'azure-board', team: 'Fabrikam Team' });
   wizard.getState().answer({ itemSource: 'azure-backlog' });
   expect(source()).toEqual({ kind: 'azure-backlog', team: 'Fabrikam Team' });
 });
@@ -260,7 +249,7 @@ async function creatingStore(created: () => Response) {
 
 const added = project('lar-apple', { folder: '/Users/me/Developer/lar-apple' });
 
-test('Create a new T3 project adds the folder, then picks the new project', async () => {
+test('Add a folder to T3 Code adds the folder, then picks the new project', async () => {
   const wizard = await creatingStore(() => new Response(JSON.stringify({ projects: [...PROJECTS, added], projectId: 'lar-apple', error: null })));
   wizard.getState().pick('lar-web');
   wizard.getState().chooseNew();
@@ -293,7 +282,7 @@ test("a new project that can't be picked stays on the form with the reason", asy
   await settle(() => wizard.getState().createProject());
   expect(wizard.getState().run).toMatchObject({ projectId: null });
   expect(wizard.getState().creating).toEqual({ folder: '/Users/me/notes-2', adding: false,
-    error: "T3 Code added the project, but it can't be picked: Its folder is no main checkout with a GitHub or Azure DevOps origin." });
+    error: 'T3 Code added the project, but it can\'t be picked: Choose a repository folder connected to GitHub or Azure DevOps.' });
 });
 
 const PASS: SetupCheckResult = { passed: true, detail: 'fine' };
@@ -306,7 +295,7 @@ const NONE: FixedClashes = { clashes: [], skillClashes: [], projectSkills: [] };
 
 const OPUS = { instanceId: 'claudeAgent', model: 'claude-opus-4-7' };
 /** A Clash agent run that ended with no Clash. */
-const DONE: ClashRun = { state: 'done', clashes: [], title: 'Look for Clashes in maddec01/lar-web (run 1)', threadId: 'thread-1', model: OPUS, startedAt: '2026-10-21T09:50:00Z' };
+const DONE: ClashRun = { state: 'done', clashes: [], title: 'Check instructions in maddec01/lar-web (run 1)', threadId: 'thread-1', model: OPUS, startedAt: '2026-10-21T09:50:00Z' };
 
 /**
  * The store, fresh, with `projects` as T3's, the commands rechecked as `tools`, each setup check answered from `results`
@@ -402,11 +391,11 @@ test("an Azure DevOps run asks the board for az's check, which holds Next in pla
   const posts = (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/recheck' || url === '/api/onboarding/checks')
     .map(([, init]) => JSON.parse(String(init.body)) as object);
   expect(posts[0]).toEqual({ az: true });
-  expect(posts[1]).toMatchObject({ check: 'checkout', repo: 'contoso/Fabrikam/lar-api', itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' } });
-  const sprint = { kind: 'azure-sprint' as const, team: 'Fabrikam Team' };
+  expect(posts[1]).toMatchObject({ check: 'checkout', repo: 'contoso/Fabrikam/lar-api', itemSource: { kind: 'azure-board', team: 'Fabrikam Team' } });
+  const sprint = { kind: 'azure-board' as const, team: 'Fabrikam Team' };
   expect(commandChecks(sprint)).toEqual(['az', 't3', 'git', 'jq', 'curl']);
   expect(checksPassed(wizard.getState().checks, loggedOut, sprint), 'az is logged out').toBe(false);
-  expect(checksPassed(wizard.getState().checks, toolChecks({ gh: { result: 'missing', fix: 'brew install gh' }, az: { result: 'ok' } }), sprint), 'gh isn’t needed').toBe(true);
+  expect(checksPassed(wizard.getState().checks, toolChecks({ gh: { result: 'missing', fix: 'brew install gh' }, az: { result: 'ok' } }), sprint), 'gh isn\'t needed').toBe(true);
 });
 
 const bundled = (name: string): BundledSkill => ({ name, author: 'Lar', licence: 'MIT', source: `https://github.com/maddec01/lar-factory/tree/main/skills/${name}` });
@@ -462,12 +451,12 @@ test('a project skill named like a bundled skill holds Next until Delete it, or 
   await toCleanup(wizard, 'lar-web');
   const problem = () => skillProblem(SKILL, wizard.getState().run!.cleanup, read(wizard.getState().clashes));
   const ready = () => stepReady(wizard.getState().run!, wizard.getState().projects, wizard.getState().checks, toolChecks(), wizard.getState().clashes, wizard.getState().agent);
-  expect([problem(), ready()]).toEqual(['Next needs Delete it in the PR, or Rename it.', false]);
+  expect([problem(), ready()]).toEqual(['Choose whether to remove or rename this skill.', false]);
   for (const [name, why] of [
-    ['', 'Next needs a new name: lowercase letters, digits and single hyphens, like web-code-review.'],
-    ['Web Review', 'Next needs a new name: lowercase letters, digits and single hyphens, like web-code-review.'],
-    ['tdd', 'tdd is a bundled skill’s name too.'],
-    ['web-deploy', 'Another project skill is named web-deploy.'],
+    ['', 'Use lowercase letters, numbers and single hyphens, such as web-code-review.'],
+    ['Web Review', 'Use lowercase letters, numbers and single hyphens, such as web-code-review.'],
+    ['tdd', 'tdd is already a bundled skill.'],
+    ['web-deploy', 'A local skill already uses web-deploy.'],
   ]) {
     wizard.getState().pickSkill(SKILL.path, { kind: 'rename', name: name! });
     expect([problem(), ready()], name).toEqual([why, false]);
@@ -486,7 +475,7 @@ test('two skill Clashes in one folder renamed to the same name hold Next', async
   await toCleanup(wizard, 'lar-web');
   for (const skill of [SKILL, tdd, mirrored]) wizard.getState().pickSkill(skill.path, { kind: 'rename', name: 'web-skill' });
   const problems = () => [SKILL, tdd, mirrored].map((skill) => skillProblem(skill, wizard.getState().run!.cleanup, read(wizard.getState().clashes)));
-  expect(problems()).toEqual(['Another skill in its folder is renamed web-skill too.', 'Another skill in its folder is renamed web-skill too.', null]);
+  expect(problems()).toEqual(['Another skill will use web-skill in this folder.', 'Another skill will use web-skill in this folder.', null]);
 });
 
 test("fixed checks the board can't run hold Next with its problem, and Retry runs them again", async () => {
@@ -546,7 +535,7 @@ async function onPr(opened: object = { prUrl: PR, board: { ...sample, onboarding
 const prPosts = () => (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/onboarding/pr')
   .map(([, init]) => JSON.parse(String(init.body)) as object);
 
-test("passing Cleanup with a new file moves to the Pull request step, and Open the PR sends the run's progress and .lar-factory.json's values", async () => {
+test('passing Cleanup with a new file moves to the Pull request step, and Open pull request sends the run\'s progress and .lar-factory.json\'s values', async () => {
   const { wizard } = await onPr();
   expect(wizard.getState().run!.step).toBe('pr');
   await settle(() => wizard.getState().openPr());
@@ -580,7 +569,7 @@ test('closing with the PR open keeps it, and Resume reopens the step with its PR
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: PR });
 });
 
-test('once the board finishes the onboarding its PR merged, the run is onboarded and closing keeps nothing', async () => {
+test('once the board finishes the onboarding its PR merged, the run is ready and closing keeps nothing', async () => {
   const { wizard, useBoardStore } = await onPr();
   const { onboarded } = await import('./wizard-store.ts');
   await settle(() => wizard.getState().openPr());
@@ -607,7 +596,7 @@ async function closedPr(reopened: object = { board: { ...sample, onboarding: [ON
   return { wizard, useBoardStore, prClosed };
 }
 
-test('Reopen PR asks the board to reopen the closed PR, which then waits for its merge again', async () => {
+test('Reopen pull request asks the board to reopen the closed PR, which then waits for its merge again', async () => {
   const { wizard, useBoardStore, prClosed } = await closedPr();
   await settle(() => wizard.getState().reopenPr());
   const posts = (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(([url]) => url === '/api/onboarding/pr/reopen');
@@ -617,7 +606,7 @@ test('Reopen PR asks the board to reopen the closed PR, which then waits for its
   expect(wizard.getState().pr).toEqual({ opening: false, reopening: false, checking: false, checkedAt: null, error: null });
 });
 
-test("a Reopen PR the board refuses keeps the PR closed with gh's message", async () => {
+test('a Reopen pull request the board refuses keeps the PR closed with gh\'s message', async () => {
   const error = "Can't reopen maddec01/lar-web's onboarding PR: gh pr reopen failed: HTTP 403";
   const { wizard, useBoardStore, prClosed } = await closedPr({ error });
   await settle(() => wizard.getState().reopenPr());
@@ -637,7 +626,7 @@ test('Start over drops the closed PR and opens a new one, sending no PR with the
   expect(wizard.getState().run).toMatchObject({ step: 'pr', prUrl: NEXT });
 });
 
-test('Reopen PR and Start over do nothing while the PR is open', async () => {
+test('Reopen pull request and Start over do nothing while the PR is open', async () => {
   const { wizard } = await onPr();
   await settle(() => wizard.getState().openPr());
   fetchMock.mockClear();
@@ -707,8 +696,8 @@ test('changing a tick after a failed open, then Retry, opens the PR with the new
 });
 
 test("a preview the board refuses keeps its problem, and Retry previews again", async () => {
-  const wizard = await pickedPr(undefined, undefined, { error: 'CONTEXT.md is not on the default branch any more.' });
-  expect(wizard.getState().changes).toEqual({ state: 'failed', error: 'CONTEXT.md is not on the default branch any more.' });
+  const wizard = await pickedPr(undefined, undefined, { error: 'CONTEXT.md no longer exists on the default branch.' });
+  expect(wizard.getState().changes).toEqual({ state: 'failed', error: 'CONTEXT.md no longer exists on the default branch.' });
   const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr/changes' ? json({ changes: CHANGES, error: null }) : served(url, init));
   await settle(() => wizard.getState().previewPr());
@@ -719,7 +708,7 @@ test('a preview with the picked project gone from T3 Code fails with why, rather
   const wizard = await pickedPr();
   wizard.setState({ projects: { state: 'loaded', projects: [] } });
   await settle(() => wizard.getState().previewPr());
-  expect(wizard.getState().changes).toEqual({ state: 'failed', error: 'T3 Code no longer has the picked project. Go Back and pick one.' });
+  expect(wizard.getState().changes).toEqual({ state: 'failed', error: 'This project is no longer in T3 Code. Go back and choose another.' });
 });
 
 test('Resume on the Pull request step with no PR reads the Clashes again, previews and opens the PR with the kept picks', async () => {
@@ -753,7 +742,7 @@ function agentBoard(runs: ClashRun[] = []) {
     }
     const body = JSON.parse(String(init.body)) as { model: ClashRun['model'] };
     requests.push(body);
-    runs.push({ state: 'running', progress: null, title: `Look for Clashes in maddec01/lar-web (run ${runs.length + 1})`, threadId: null, model: body.model, startedAt: '2026-10-21T10:00:00Z' });
+    runs.push({ state: 'running', progress: null, title: `Check instructions in maddec01/lar-web (run ${runs.length + 1})`, threadId: null, model: body.model, startedAt: '2026-10-21T10:00:00Z' });
     return json({ runs, error: null });
   });
   const end = (state: ClashRunState) => { const last = runs.at(-1)!; runs[runs.length - 1] = { ...state, title: last.title, threadId: `thread-${runs.length}`, model: last.model, startedAt: last.startedAt }; };
@@ -764,7 +753,7 @@ function agentBoard(runs: ClashRun[] = []) {
 const AGENT_CLASH: Clash = { id: 'agent-1', file: 'AGENTS.md', line: 12, reason: 'It says to push to main.', edit: { kind: 'lines', remove: ['Push to main.'], add: ['Open a PR.'] }, ticked: true };
 const GETS = '/api/onboarding/clash-runs?repo=maddec01%2Flar-web';
 
-test('Look for Clashes starts a run on the picked model, reads it every few seconds while it runs, and Next waits until it is done', async () => {
+test('Check instructions starts a run on the picked model, reads it every few seconds while it runs, and Next waits until it is done', async () => {
   const wizard = await checkingStore([project('lar-web')]);
   const { AGENT_POLL_MS, latestRun, stepReady, ticked } = await import('./wizard-store.ts');
   const agent = agentBoard();
@@ -814,7 +803,7 @@ test.each([
   wizard.getState().tick('context', false);
 
   await settle(() => wizard.getState().lookForClashes(OPUS));
-  expect(wizard.getState().agent.runs!.map((r) => r.title)).toEqual(['Look for Clashes in maddec01/lar-web (run 1)', 'Look for Clashes in maddec01/lar-web (run 2)']);
+  expect(wizard.getState().agent.runs!.map((r) => r.title)).toEqual(['Check instructions in maddec01/lar-web (run 1)', 'Check instructions in maddec01/lar-web (run 2)']);
   expect(wizard.getState().run!.cleanup!.ticks, "the new run's agent-1 is another Clash").toEqual({ context: false });
   agent.end({ state: 'done', clashes: [] });
   await settle(() => wizard.getState().readClashRuns());
@@ -825,7 +814,7 @@ test('closing during a run stops reading it, and Resume shows its progress, then
   const wizard = await checkingStore([project('lar-web', { onBoard: true })]);
   const { AGENT_POLL_MS, latestRun } = await import('./wizard-store.ts');
   const { useBoardStore } = await import('../board/board-store.ts');
-  const agent = agentBoard([{ state: 'running', progress: 'Reading CLAUDE.md', title: 'Look for Clashes in maddec01/lar-web (run 1)', threadId: 'thread-1', model: OPUS, startedAt: '2026-10-21T09:58:00Z' }]);
+  const agent = agentBoard([{ state: 'running', progress: 'Reading CLAUDE.md', title: 'Check instructions in maddec01/lar-web (run 1)', threadId: 'thread-1', model: OPUS, startedAt: '2026-10-21T09:58:00Z' }]);
   const progress = { step: 'cleanup', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web', setup: { ...SETUP, itemSource: 'issues' as const, role: 'Web client' }, cleanup: { ticks: {}, skills: {} } } };
   useBoardStore.getState().receive({ ...sample, bundledSkills: BUNDLED, onboarding: [{ repo: 'maddec01/lar-web', progress }] });
   await settle(() => wizard.getState().resume('maddec01/lar-web'));
@@ -869,7 +858,7 @@ async function toLabels(wizard: Awaited<ReturnType<typeof labelsStore>>, name: s
 const labelPosts = () => (fetchMock.mock.calls as unknown as [string, RequestInit?][])
   .filter(([url]) => url.startsWith('/api/onboarding/labels')).map(([url, init]) => [url, JSON.parse(String(init!.body))]);
 
-test('reaching Labels reads the repository’s labels, and Next waits while a workflow label is missing', async () => {
+test('reaching Labels reads the repository\'s labels, and Next waits while a workflow label is missing', async () => {
   const wizard = await labelsStore([project('lar-web')], ['bug', 'decision: grill']);
   const { stepReady } = await import('./wizard-store.ts');
   await toLabels(wizard, 'lar-web');
@@ -960,7 +949,7 @@ test('Resume on the Labels step reads the labels again once it has read the proj
   expect(wizard.getState().run!.step).toBe('labels');
 });
 
-test('a picked custom label is kept with the run’s answers, Resume brings it back, and the PR’s .lar-factory.json has it', async () => {
+test('a picked custom label is kept with the run\'s answers, Resume brings it back, and the PR\'s .lar-factory.json has it', async () => {
   const wizard = await labelsStore([project('lar-web')], [...EVERY_LABEL, 'app: music', 'web']);
   const { configOf } = await import('./wizard-store.ts');
   await toLabels(wizard, 'lar-web');

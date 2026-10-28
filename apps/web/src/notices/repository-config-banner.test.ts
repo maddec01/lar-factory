@@ -13,9 +13,9 @@ test("each repository whose .lar-factory.json can't be read gets a banner naming
   const banners = () => $$('.banners .banner');
   expect(banners().map(bannerText)).toEqual([
     ['maddec01/lar-apple is off the board.', 'No .lar-factory.json on its default branch. '
-      + 'See Adding a repository in apps/server/README.md. The board reads it again on each refresh.'],
+      + 'Read how to add a repository. The board reads it again on each refresh.'],
     ['maddec01/lar-server is off the board.', '.lar-factory.json field show must be "all" or "opted-in". '
-      + 'See Adding a repository in apps/server/README.md. The board reads it again on each refresh.'],
+      + 'Read how to add a repository. The board reads it again on each refresh.'],
   ]);
   expect(banners()[0]!.querySelector('a')!.getAttribute('href')).toBe('https://github.com/maddec01/lar-factory/blob/main/apps/server/README.md#adding-a-repository');
   expect(banners()[0]!.dataset.tone).toBe('warning');

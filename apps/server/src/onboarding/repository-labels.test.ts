@@ -96,11 +96,11 @@ test('Rename moves each picked old name to its new one with gh label edit', asyn
 test('Rename refuses an old name whose new one exists, and a name that is no old workflow label', async () => {
   const both = fakeGh(['decision: grill', 'decision-grill']);
   assert.deepEqual(await renameRepositoryLabels({ repo: REPO, names: ['decision: grill'] }, both.run),
-    { status: 409, error: `${REPO} has decision-grill already, so decision: grill can't be renamed to it.` });
+    { status: 409, error: `decision-grill already exists in ${REPO}. Move items to it before removing decision: grill.` });
   assert.ok(!both.calls.some((c) => c[1] === 'edit'));
   const other = fakeGh(['needs-triage']);
   assert.deepEqual(await renameRepositoryLabels({ repo: REPO, names: ['needs-triage'] }, other.run),
-    { status: 400, error: 'needs-triage is no old workflow label the repository has.' });
+    { status: 400, error: 'needs-triage is not a label that can be renamed here.' });
   assert.ok(!other.calls.some((c) => c[1] === 'edit'));
 });
 
@@ -123,9 +123,9 @@ test('a custom label the repository has already is created no second time', asyn
 
 test("a custom label that is a workflow or status label is refused, and one gh refuses answers with gh's message", async () => {
   const gh = fakeGh([]);
-  assert.deepEqual(await createCustomLabel({ repo: REPO, name: 'build' }, gh.run), { status: 400, error: 'build is a workflow label.' });
-  assert.deepEqual(await createCustomLabel({ repo: REPO, name: 'status-list' }, gh.run), { status: 400, error: 'status-list is a status label.' });
-  assert.deepEqual(await createCustomLabel({ repo: REPO, name: '--repo=other/repo' }, gh.run), { status: 400, error: 'A label’s name can’t start with -.' });
+  assert.deepEqual(await createCustomLabel({ repo: REPO, name: 'build' }, gh.run), { status: 400, error: 'build is reserved for tracking work.' });
+  assert.deepEqual(await createCustomLabel({ repo: REPO, name: 'status-list' }, gh.run), { status: 400, error: 'status-list is reserved for board status.' });
+  assert.deepEqual(await createCustomLabel({ repo: REPO, name: '--repo=other/repo' }, gh.run), { status: 400, error: 'Do not start the label name with a hyphen.' });
   assert.deepEqual(gh.calls, []);
   assert.deepEqual(await createCustomLabel({ repo: REPO, name: 'web' }, fakeGh([], { create: 'HTTP 403' }).run),
     { status: 502, error: `Couldn't create web in ${REPO}: gh label create failed: HTTP 403` });
@@ -144,7 +144,7 @@ test('a body without its repository, item source or old names is refused', async
 
 test("a GitHub repository still lacking a workflow label holds onboarding's PR back", async () => {
   assert.deepEqual(await workflowLabelsProblem(REPO, fakeGh(ALL.slice(1)).run),
-    { status: 409, error: `${REPO} still lacks a workflow label. Go back to the Labels step and create or rename it.` });
+    { status: 409, error: `${REPO} is missing a required label. Go back to Labels to create or rename it.` });
   assert.equal(await workflowLabelsProblem(REPO, fakeGh(ALL).run), null);
 });
 

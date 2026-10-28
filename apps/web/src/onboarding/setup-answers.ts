@@ -17,8 +17,8 @@ export const suggestedShow = (itemSource: SetupAnswers['itemSource']): ShowSetti
   itemSource === 'github-project' || itemSource === 'azure-sprint' ? 'all' : 'opted-in';
 
 /** Whether an item source is an Azure DevOps team's, so it is named by its team. */
-export const byTeam = (itemSource: SetupAnswers['itemSource']): itemSource is 'azure-sprint' | 'azure-backlog' =>
-  itemSource === 'azure-sprint' || itemSource === 'azure-backlog';
+export const byTeam = (itemSource: SetupAnswers['itemSource']): itemSource is 'azure-sprint' | 'azure-backlog' | 'azure-board' =>
+  itemSource === 'azure-sprint' || itemSource === 'azure-backlog' || itemSource === 'azure-board';
 
 /** The answers with `change` given: a picked show setting stays, and until one is picked a new item source takes its suggested one. */
 export function answerSetup(setup: SetupAnswers, change: SetupChange): SetupAnswers {
@@ -38,10 +38,10 @@ const GITHUB_LOGIN = /^[A-Za-z0-9](-?[A-Za-z0-9])*$/;
 export function setupProblems(setup: SetupAnswers, action: SetupAction = 'Next'): Partial<Record<'projectOwner' | 'projectNumber' | 'team' | 'role', string>> {
   const project = setup.itemSource === 'github-project';
   return {
-    ...project && !GITHUB_LOGIN.test(setup.projectOwner) && { projectOwner: `${action} needs a GitHub login: letters, digits and single hyphens, not at either end.` },
-    ...project && !/^[1-9]\d*$/.test(setup.projectNumber) && { projectNumber: `${action} needs the number, a positive whole number like 3.` },
-    ...byTeam(setup.itemSource) && !setup.team?.trim() && { team: `${action} needs the team’s name.` },
-    ...!setup.role.trim() && { role: `${action} needs the repository’s role.` },
+    ...project && !GITHUB_LOGIN.test(setup.projectOwner) && { projectOwner: `Enter a GitHub username or organization name to continue with ${action}.` },
+    ...project && !/^[1-9]\d*$/.test(setup.projectNumber) && { projectNumber: `Enter a project number greater than zero to continue with ${action}.` },
+    ...byTeam(setup.itemSource) && !setup.team?.trim() && { team: `Enter the team name to continue with ${action}.` },
+    ...!setup.role.trim() && { role: `Describe what this repository does to continue with ${action}.` },
   };
 }
 

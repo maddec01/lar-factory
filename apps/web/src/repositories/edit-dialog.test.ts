@@ -62,8 +62,10 @@ test("Edit opens with the default branch's item source, Project, show setting, r
   expect(sent['/api/repositories/config']).toEqual([{ repo: REPO }]);
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Edit ${REPO}`);
   expect(text(document.getElementById(dialog()!.getAttribute('aria-labelledby')!)), 'the title names the dialog').toBe(`Edit ${REPO}`);
-  expect(checked('[data-choice="github-project"] [role="radio"]')).toBe('true');
-  expect([input('project-owner').value, input('project-number').value, input('role').value]).toEqual(['maddec01', '3', 'Backend API server']);
+  expect(text($('[data-edit-dialog] [data-item-source]'))).toContain('GitHub Project maddec01 #3');
+  expect($('[data-edit-dialog] [data-choice="github-project"]')).toBeNull();
+  expect(input('role').value).toBe('Backend API server');
+  expect(input('project-owner')).toBeNull();
   expect(checked('[data-choice="all"] [role="radio"]')).toBe('true');
   expect($$('[data-edit-dialog] [data-custom]').map((li) => [li.getAttribute('data-custom'), checkedOf(li.querySelector('input[type="checkbox"]')!)]))
     .toEqual([['area: server', 'true'], ['area: web', 'false']]);
@@ -72,7 +74,7 @@ test("Edit opens with the default branch's item source, Project, show setting, r
   await type(input('role'), 'API server');
   expect(dialog()!.querySelector('[data-no-changes]')).toBeNull();
   await type(input('role'), 'Backend API server');
-  expect(text(dialog()!.querySelector('[data-no-changes]')), 'back to the file’s values').toBe('No changes yet');
+  expect(text(dialog()!.querySelector('[data-no-changes]')), 'back to the file\'s values').toBe('No changes yet');
 });
 
 test('a field problem holds Save as it holds Next in onboarding', async () => {
@@ -80,25 +82,21 @@ test('a field problem holds Save as it holds Next in onboarding', async () => {
   await openEdit();
   await type(input('role'), ' ');
   expect(save().disabled).toBe(true);
-  expect(text($('[data-edit-dialog] [data-field="role"] [data-problem]'))).toBe('Save needs the repository’s role.');
+  expect(text($('[data-edit-dialog] [data-field="role"] [data-problem]'))).toBe('Describe what this repository does to continue with Save.');
   await type(input('role'), 'API server');
-  await type(input('project-number'), 'x');
-  expect(save().disabled).toBe(true);
-  await type(input('project-number'), '4');
   expect(save().disabled).toBe(false);
 });
 
 test('Save sends the answers with the labels picked and typed, then closes, says where the PR is and shows it on the row', async () => {
   const sent = serve(undefined, { body: { prUrl: PR, error: null, board: { ...sample, repos: sample.repos.map((r) => r.repo === REPO ? { ...r, editPr: PR } : r) } } });
   await openEdit();
-  await settle(() => $('[data-edit-dialog] [data-choice="issues"] [role="radio"]')!.click());
   await settle(() => $('[data-edit-dialog] [data-custom="area: web"] input[type="checkbox"]')!.click());
   await type($<HTMLInputElement>('[data-edit-dialog] [data-new-custom]')!, 'area: docs');
   await settle(() => $<HTMLButtonElement>('[data-edit-dialog] [data-add-custom]')!.click());
   expect(sent['/api/onboarding/labels/custom'], 'Add creates nothing until Save').toBeUndefined();
   await settle(() => save().click());
   expect(sent['/api/repositories/config/pr']).toEqual([{ repo: REPO, config: {
-    itemSource: { kind: 'issues' }, show: 'all', role: 'Backend API server', labels: ['area: server', 'area: web', 'area: docs'] } }]);
+    itemSource: CONFIG.itemSource, show: 'all', role: 'Backend API server', labels: ['area: server', 'area: web', 'area: docs'] } }]);
   await settle(() => vi.advanceTimersByTime(500));
   expect(dialog()).toBeNull();
   expect(toast()!.querySelector('a')!.getAttribute('href')).toBe(PR);
@@ -127,9 +125,9 @@ test('while Save runs, the fields, choices, custom labels and Cancel are disable
   const cancel = [...dialog()!.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b) === 'Cancel')!;
   expect([input('role').matches(':disabled'), $<HTMLInputElement>('[data-edit-dialog] [data-new-custom]')!.matches(':disabled'), cancel.disabled])
     .toEqual([true, true, true]);
-  await press($('[data-edit-dialog] [data-choice="issues"] [role="radio"]')!, ' ');
+  await press($('[data-edit-dialog] [data-choice="opted-in"] [role="radio"]')!, ' ');
   await press($('[data-edit-dialog] [data-custom="area: web"] input[type="checkbox"]')!, ' ');
-  expect([checked('[data-choice="github-project"] [role="radio"]'), checked('[data-custom="area: web"] input[type="checkbox"]')], 'the answers Save sends stay').toEqual(['true', 'false']);
+  expect([checked('[data-choice="all"] [role="radio"]'), checked('[data-custom="area: web"] input[type="checkbox"]')], 'the answers Save sends stay').toEqual(['true', 'false']);
   await settle(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   await settle(() => vi.advanceTimersByTime(500));
   expect(dialog()).not.toBeNull();
@@ -157,7 +155,7 @@ test("a load that fails shows the server's problem, and Retry reads again", asyn
   expect(sent['/api/repositories/config']).toHaveLength(2);
 });
 
-test('Edit on an Azure DevOps repository offers the team’s sprint and backlog with its Team, and custom tags, which Save doesn’t create', async () => {
+test('Edit on an Azure DevOps repository offers the team\'s sprint and backlog with its Team, and custom tags, which Save doesn\'t create', async () => {
   const azure = 'contoso/Fabrikam%20Fiber/lar-api';
   const board: BoardData = { ...sample, repos: [...sample.repos, { ...sample.repos[0]!, repo: azure, role: 'API', labels: [] }] };
   serve({ body: { config: { itemSource: { kind: 'azure-sprint', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['app: music'] },
@@ -165,13 +163,39 @@ test('Edit on an Azure DevOps repository offers the team’s sprint and backlog 
   await openEdit(azure, board);
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Edit contoso/Fabrikam Fiber/lar-api');
   expect($('[data-edit-dialog] [data-custom="repo-lar-api"]'), 'a repo- tag routes items; it is no custom tag').toBeNull();
-  expect(checked('[data-choice="azure-sprint"] [role="radio"]')).toBe('true');
+  expect(text($('[data-edit-dialog] [data-item-source]'))).toContain("Fabrikam Team's current sprint");
   expect($('[data-edit-dialog] [data-choice="github-project"]')).toBeNull();
-  expect(input('team').value).toBe('Fabrikam Team');
+  expect(input('team')).toBeNull();
   expect(text($('[data-edit-dialog] [data-custom-labels] h4'))).toBe('Custom tags');
   expect(text(dialog()!.querySelector('#edit-description'))).not.toMatch(/creates the custom labels/);
   await settle(() => $('[data-edit-dialog] [data-custom="web"] input[type="checkbox"]')!.click());
   await settle(() => save().click());
   await settle(() => vi.advanceTimersByTime(500));
   expect(text(toast()!)).toContain('contoso/Fabrikam Fiber/lar-api’s Edit PR');
+});
+
+
+test('Edit keeps an existing backlog source while saving other settings', async () => {
+  const config = { ...CONFIG, itemSource: { kind: 'azure-backlog', team: 'Fabrikam Team' } };
+  const repo = 'contoso/Fabrikam/api';
+  const board: BoardData = { ...sample, repos: [{ repo, role: 'API', items: 'backlog', team: 'Fabrikam Team', labels: [] }] };
+  const sent = serve({ body: { config, labels: LABELS, error: null } }, undefined, board);
+  await openEdit(repo, board);
+  expect(input('team')).toBeNull();
+  expect(text(dialog()!.querySelector('[data-item-source]'))).toContain("Fabrikam Team's backlog");
+  await type(input('role'), 'Updated API');
+  await settle(() => save().click());
+  expect(sent['/api/repositories/config/pr']).toEqual([{ repo, config: { ...config, role: 'Updated API' } }]);
+});
+
+test('Edit can change the team on a combined Azure board without offering a source choice', async () => {
+  const config = { ...CONFIG, itemSource: { kind: 'azure-board', team: 'Fabrikam Team' } };
+  const repo = 'contoso/Fabrikam/api';
+  const board: BoardData = { ...sample, repos: [{ repo, role: 'API', items: 'azure-board', team: 'Fabrikam Team', labels: [] }] };
+  const sent = serve({ body: { config, labels: LABELS, error: null } }, undefined, board);
+  await openEdit(repo, board);
+  expect($('[data-choice="azure-sprint"]')).toBeNull();
+  await type(input('team'), 'API Team');
+  await settle(() => save().click());
+  expect(sent['/api/repositories/config/pr']).toEqual([{ repo, config: { ...config, itemSource: { kind: 'azure-board', team: 'API Team' } } }]);
 });

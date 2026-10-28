@@ -38,7 +38,7 @@ function CustomLabels({ repo, picked }: { repo: RepoConfig; picked: readonly str
 
 /** Only for <repo> on an Azure repository: unticked, the new work item shows in every List that reads its item source. */
 function OnlyFor({ repo, name, ticked }: { repo: RepoConfig; name: string; ticked: boolean }) {
-  if (repo.items !== 'sprint' && repo.items !== 'backlog') return null;
+  if (repo.items !== 'sprint' && repo.items !== 'backlog' && repo.items !== 'azure-board') return null;
   return (
     <div className="form-field">
       <Checkbox name="onlyFor" value="true" label={`Only for ${name}`} defaultChecked={ticked} aria-describedby="item-only-for-hint" />

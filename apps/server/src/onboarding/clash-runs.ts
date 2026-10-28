@@ -137,10 +137,10 @@ async function checkEdits(clashes: Clash[], read: (path: string) => Promise<stri
   return Promise.all(clashes.map(async (clash) => {
     if (!isLineEdit(clash)) return clash;
     const content = await text(clash.file);
-    const wontApply = content === null ? `${clash.file} isn't on the default branch, so there's nothing to edit.`
-      : await linked(clash.file) ? `${clash.file} is a link, so this edit has no lines of its own to change.`
-      : !removesWhatIsThere(content, clash) ? `Line ${clash.line} of ${clash.file} on the default branch doesn't have the lines this edit removes.`
-      : edits.some((other) => other !== clash && overlaps(clash, other)) ? `It edits the same lines of ${clash.file} as another Clash, so neither can go in the PR.`
+    const wontApply = content === null ? `${clash.file} no longer exists on the default branch.`
+      : await linked(clash.file) ? `${clash.file} links to another file. Edit that file instead.`
+      : !removesWhatIsThere(content, clash) ? `The text at line ${clash.line} in ${clash.file} has changed.`
+      : edits.some((other) => other !== clash && overlaps(clash, other)) ? `Two changes overlap in ${clash.file}. Check instructions again before continuing.`
       : null;
     return wontApply ? { ...clash, ticked: false, wontApply } : clash;
   }));
@@ -154,13 +154,11 @@ async function endState(ended: WaitedRun, read: (path: string) => Promise<string
       const clashes = parseClashReply(ended.reply, (path) => isInstructionFile(path, named));
       if (clashes) return { state: 'done', clashes: await checkEdits(clashes, read, isLink) };
       const start = ended.reply.trim().slice(0, 200);
-      return { state: 'failed', why: `The agent's reply isn't the JSON the board asked for. It began: ${start || '(empty)'}` };
+      return { state: 'failed', why: `The agent returned an unreadable reply. Try the check again. The reply began with ${start || '(empty)'}.` };
     }
     case 'failed': return { state: 'failed', why: ended.why };
-    case 'waiting': return { state: 'waiting', why: 'The agent is waiting for an answer in T3 Code, most likely to approve a command. '
-      + 'Answer it in the thread, or set the T3 project\'s runtime mode to full access in T3 Code and Retry. Full access lets the agent '
-      + "run any command without asking while it reads this repository's files, so pick it only if you trust what those files say." };
-    case 'timed-out': return { state: 'timed-out', why: 'The run took longer than 15 minutes, so the board stopped waiting. The thread may still be running in T3 Code.' };
+    case 'waiting': return { state: 'waiting', why: 'The agent needs an answer in T3 Code. Open its thread and respond, then retry the check.' };
+    case 'timed-out': return { state: 'timed-out', why: 'The check took more than 15 minutes. Open its thread in T3 Code to see whether it is still running.' };
   }
 }
 

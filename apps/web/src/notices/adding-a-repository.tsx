@@ -3,7 +3,7 @@
 
 const README = 'https://github.com/maddec01/lar-factory/blob/main/apps/server/README.md#adding-a-repository';
 
-/** "See Adding a repository in apps/server/README.md.", linking to it. */
+/** A short link to the repository setup instructions. */
 export function AddingARepository() {
-  return <>See <a href={README} target="_blank" rel="noopener">Adding a repository</a> in apps/server/README.md.</>;
+  return <>Read <a href={README} target="_blank" rel="noopener">how to add a repository</a>.</>;
 }

@@ -13,9 +13,9 @@ test('the empty board offers to onboard a T3 project whose repository has .lar-f
   serve(offered(empty), []);
   await mountPage(offered(empty));
   expect($('[data-empty-state]')).not.toBeNull();
-  expect(text(offer())).toContain('lar-web already has a Repository config');
-  expect(text(offer())).toContain('maddec01/lar-web has .lar-factory.json on its default branch.');
-  expect(text(offer()!.querySelector('button'))).toBe('Onboard lar-web');
+  expect(text(offer())).toContain('lar-web has saved board settings');
+  expect(text(offer())).toContain('maddec01/lar-web keeps its settings in .lar-factory.json.');
+  expect(text(offer()!.querySelector('button'))).toBe('Add lar-web');
 });
 
 test('a board with repositories shows the offer above them, and none without offers', async () => {

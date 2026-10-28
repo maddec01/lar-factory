@@ -67,19 +67,19 @@ export async function planPrChanges(tree: CommitTree, read: (sha: string) => Pro
 
   const edits = picks.clashes.filter(isLineEdit);
   const named = opencodeInstructions(await text('opencode.json'));
-  const fix = 'Untick it on Cleanup, or Look again there.';
+  const fix = 'Uncheck this change in Cleanup or check instructions again.';
   for (const clash of edits) {
-    if (!isInstructionFile(clash.file, named)) return { problem: `${clash.file} is no instruction file the Clash agent reads, so the PR won't edit it.` };
+    if (!isInstructionFile(clash.file, named)) return { problem: `${clash.file} is not an agent instruction file. The pull request cannot edit it.` };
     if (edits.some((other) => other !== clash && overlaps(clash, other))) {
-      return { problem: `${clash.file} line ${clash.line}'s edit touches the lines of another edit in the file. ${fix}` };
+      return { problem: `Two changes overlap at line ${clash.line} in ${clash.file}. ${fix}` };
     }
   }
   // Bottom up, so an edit never shifts the lines another in its file names.
   for (const clash of [...edits].sort((a, b) => b.line - a.line)) {
     const content = await text(clash.file);
-    if (content === undefined) return { problem: `${clash.file} is not on the default branch any more. ${fix}` };
-    if (tree.files.get(clash.file)?.mode === LINK) return { problem: `${clash.file} is a link, so its edit has no lines of its own to change. ${fix}` };
-    if (!removesWhatIsThere(content, clash)) return { problem: `${clash.file} line ${clash.line} doesn't have the lines its edit removes. ${fix}` };
+    if (content === undefined) return { problem: `${clash.file} no longer exists on the default branch. ${fix}` };
+    if (tree.files.get(clash.file)?.mode === LINK) return { problem: `${clash.file} links to another file. Edit that file instead. ${fix}` };
+    if (!removesWhatIsThere(content, clash)) return { problem: `The text at line ${clash.line} in ${clash.file} has changed. ${fix}` };
     const lines = content.split('\n');
     lines.splice(clash.line - 1, clash.edit.remove.length, ...clash.edit.add);
     texts.set(clash.file, lines.join('\n'));
@@ -90,12 +90,12 @@ export async function planPrChanges(tree: CommitTree, read: (sha: string) => Pro
   const real: Record<string, string> = {};
   for (const path of ['CLAUDE.md', 'AGENTS.md']) {
     const resolved = await linkTarget(tree, read, path);
-    if (resolved === null) return { problem: `${path} links to a file that isn't on the default branch, so the Agent skills block has nowhere to go.` };
+    if (resolved === null) return { problem: `${path} links to a missing file. Fix the link on the default branch before continuing.` };
     // A link can lead anywhere in the repository, such as a workflow, which the block must not go in. It may lead to an
     // instruction file, or to any Markdown file outside `.github/`, such as `docs/ai-guidelines.md`: `'**'` names every
     // file, and isInstructionFile takes a named file only when it is Markdown outside `.github/`.
     if (!isInstructionFile(resolved, ['**'])) {
-      return { problem: `${path} links to ${resolved}, which is no instruction file, so the Agent skills block can't go there. Make it a file, or a link to an instruction file, on the default branch, then come back.` };
+      return { problem: `${path} links to ${resolved}, which is not an agent instruction file. Point it to an instruction file on the default branch before continuing.` };
     }
     real[path] = resolved;
     const content = await text(resolved);
@@ -120,7 +120,7 @@ export async function planPrChanges(tree: CommitTree, read: (sha: string) => Pro
   for (const [path, pick] of Object.entries(picks.skills)) {
     const skill = skills.find((s) => s.path === path);
     if (!skill || !bundled.some((name) => name.toLowerCase() === skill.name.toLowerCase())) {
-      return { problem: `${path} is no project skill named like a bundled skill on the default branch. Go Back to Cleanup, which checks the default branch again.` };
+      return { problem: `${path} no longer needs renaming or removal. Go back to Cleanup to check again.` };
     }
     const renamedBeside = Object.entries(picks.skills).flatMap(([other, picked]) =>
       other !== path && skillsDir(other) === skillsDir(path) && picked.kind === 'rename' ? [picked.name] : []);
@@ -144,7 +144,7 @@ export async function planPrChanges(tree: CommitTree, read: (sha: string) => Pro
       texts.delete(file);
       if (to === null) continue;
       const target = path.endsWith('/') ? `${to}${file.slice(path.length)}` : to;
-      if (tree.files.has(target) || texts.has(target)) return { problem: `Can't rename ${path} to ${to}, since the default branch has ${target}.` };
+      if (tree.files.has(target) || texts.has(target)) return { problem: `Cannot rename ${path} to ${to}. ${target} already exists on the default branch.` };
       moved.set(target, file);
       if (content !== undefined) texts.set(target, content);
     }

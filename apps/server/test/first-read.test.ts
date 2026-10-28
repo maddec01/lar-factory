@@ -28,7 +28,7 @@ test('the first read settles when the read fails', async (t) => {
 test('the first read settles when gh is logged out at launch, though the read never starts', async (t) => {
   const board = await startBoard(t, { ghAuth: 'logged-out' });
   const data = await settled(board);
-  assert.equal(data.tools?.gh.result, 'logged-out');
+  assert.equal(data.tools?.gh?.result, 'logged-out');
   assert.equal(data.fetchedAt, null);
   assert.equal((await board.calls()).filter((args) => args[1] === 'graphql').length, 0);
 });
@@ -36,7 +36,7 @@ test('the first read settles when gh is logged out at launch, though the read ne
 test('the first read settles when gh is missing at launch', async (t) => {
   const board = await startBoard(t, {}, false, false, { GH_PATH: '/nowhere/gh' });
   const data = await settled(board);
-  assert.equal(data.tools?.gh.result, 'missing');
+  assert.equal(data.tools?.gh?.result, 'missing');
 });
 
 test('a read after the first never un-settles it', async (t) => {

@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, refKey, type BoardData, type FirstRead, type Item, type ItemSource, type GhCheck, type ModelGroup, type Status, type ToolChecks } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource, onAzure, refKey, type BoardData, type FirstRead, type Item, type ItemSource, type ModelGroup, type Status, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
@@ -338,7 +338,7 @@ function logTools(): void {
  * reads, while t3 is missing or T3 Code isn't running. An old gh, a missing git, jq or curl and az wait for Recheck.
  */
 function retriesTools(checks: ToolChecks): boolean {
-  return ['missing', 'logged-out', 'no-project-scope'].includes(checks.gh.result) || checks.t3.result !== 'ok';
+  return ['missing', 'logged-out', 'no-project-scope'].includes(checks.gh?.result ?? 'ok') || checks.t3.result !== 'ok';
 }
 
 /** Shows the checks, whose failures have notices, and looks again in TOOL_RETRY_MS while retriesTools says so. */
@@ -350,28 +350,30 @@ function showToolChecks(checks: ToolChecks): void {
 }
 
 /**
- * Looks every tool up again and checks each command, az only while a listed repository is on Azure DevOps or `az`
- * asks for it, then reads GitHub if gh works now and didn't before.
+ * Looks every tool up again and checks each command, gh only while a listed repository is on GitHub or `asked.gh` asks
+ * for it, and az only while one is on Azure DevOps or `asked.az` asks for it, then reads if gh no longer stops it.
  * Startup and Recheck reread the login shell PATH; the timed retry passes false to keep the last one.
  * A check asked for during a running one waits for it, then runs.
  */
-async function recheckTools(rereadLoginPath = true, az = false): Promise<void> {
+async function recheckTools(rereadLoginPath = true, asked: { gh?: boolean; az?: boolean } = {}): Promise<void> {
   while (checkingTools) await checkingTools;
   // Recheck asks each repository for its .lar-factory.json again; the timed retry keeps the answers.
   if (rereadLoginPath) configChecks.clear();
   const { tools: before } = board.snapshot();
-  const ghBlocked = ghStopsRead(before?.gh);
+  const ghBlocked = ghStopsRead(before);
   checkingTools = (async () => {
-    const [, withAz] = await Promise.all([lookUpTools(process.env, rereadLoginPath), anyOnAzureDevOps(onboarded())]);
-    const { tools: checks, ghError } = await checkTools(withAz || az);
+    const listed = onboarded();
+    const [, withAz] = await Promise.all([lookUpTools(process.env, rereadLoginPath), anyOnAzureDevOps(listed)]);
+    const withGh = listed.some((r) => !onAzure(r.repo));
+    const { tools: checks, ghError } = await checkTools({ gh: withGh || asked.gh === true, az: withAz || asked.az === true });
     showToolChecks(checks);
     if (ghError) log(`gh probe failed: ${ghError}`);
   })().finally(() => { checkingTools = null; });
   await checkingTools;
   // A gh that still blocks the read after a check means the first read never starts.
-  if (ghStopsRead(board.snapshot().tools?.gh)) settleFirstRead();
+  if (ghStopsRead(board.snapshot().tools)) settleFirstRead();
   board.push();
-  if (ghBlocked && !ghStopsRead(board.snapshot().tools?.gh)) readSoon();
+  if (ghBlocked && !ghStopsRead(board.snapshot().tools)) readSoon();
 }
 
 /** The onboarded repositories as the list is now; none while it can't be read, which the read reports. */
@@ -381,10 +383,14 @@ function onboarded(): OnboardedRepository[] {
 }
 
 /**
- * Whether gh's check stops the read: it blocks every repository the board lists. With none, nothing reads a Project,
- * so only a missing or logged-out gh stops it.
+ * Whether the checks in `checks` stop the read: before the first check, or when gh's check blocks every repository the
+ * board lists. With none, nothing reads a Project, so only a missing or logged-out gh stops it. A gh that wasn't
+ * checked, as no listed repository was on GitHub, stops nothing.
  */
-function ghStopsRead(check: GhCheck | undefined): boolean {
+function ghStopsRead(checks: ToolChecks | undefined): boolean {
+  if (!checks) return true;
+  const check = checks.gh;
+  if (!check) return false;
   const repos = items.repos();
   const sources: ItemSource[] = repos.length ? repos.map(itemSource) : ['issues'];
   return sources.every((source) => ghBlocksRead(check, source));
@@ -398,7 +404,7 @@ async function refresh(): Promise<void> {
   if (refreshing) return;
   // Before the first tool check there's no gh to read with; that check starts the first read.
   // A gh that blocks the read has its own notice and retries; reading would only fail.
-  if (ghStopsRead(board.snapshot().tools?.gh)) {
+  if (ghStopsRead(board.snapshot().tools)) {
     // Without a check yet it is only too early to read; the check settles the first read if gh blocks it.
     if (board.snapshot().tools) settleFirstRead();
     return;
@@ -426,10 +432,14 @@ async function refresh(): Promise<void> {
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;
   } catch (err) {
-    // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale; a cooling gh calls nothing.
-    const gh = ghCooldown.until() ? { check: board.snapshot().tools!.gh } : await probeGh();
-    if (gh.check.result !== 'ok') showToolChecks({ ...board.snapshot().tools!, gh: gh.check });
-    const error = ghStopsRead(gh.check) ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
+    // While a listed repository is on GitHub, probe gh, so a gh that went missing or logged out shows its notice instead
+    // of Stale; a cooling gh calls nothing. An Azure DevOps source names its own az problems.
+    const checks = board.snapshot().tools!;
+    const ghInUse = items.repos().some((r) => !onAzure(r.repo));
+    const gh = !ghInUse || ghCooldown.until() ? { check: checks.gh } : await probeGh();
+    if (gh.check && gh.check.result !== 'ok') showToolChecks({ ...checks, gh: gh.check });
+    const ghError = 'error' in gh ? gh.error : undefined;
+    const error = ghStopsRead({ ...checks, ...gh.check && { gh: gh.check } }) ? null : ghError ?? (err instanceof Error ? err.message : String(err));
     board.update({ error });
     if (error) log(`refresh failed, serving data from ${board.snapshot().fetchedAt ?? 'never'}: ${error}`);
   } finally {
@@ -490,7 +500,7 @@ const startAfter = createStartAfter({ board, commands, offerModelChoices, file: 
   renamedId: items.renamedId });
 const { server, endStreams } = createBoardServer({
   board, commands, startAfter, page, appSecret: process.env.BOARD_APP_SECRET || null, sample: !!fixture,
-  recheck: (options) => recheckTools(true, options?.az), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null), readSoon, ready: () => firstToolCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null), readSoon, ready: () => firstToolCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input),

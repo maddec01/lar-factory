@@ -25,7 +25,7 @@ export interface HttpDeps {
   /** Sample mode serves a fixed file: it writes nothing and runs no tools. */
   sample: boolean;
   /** Looks the tools up again, az too when `az` asks for it, as onboarding an Azure DevOps repository does. */
-  recheck(options?: { az?: boolean }): Promise<void>;
+  recheck(options?: { gh?: boolean; az?: boolean }): Promise<void>;
   /** Reads one item's details and older comments for the item dialog. */
   itemDetails: ItemDetailsReader;
   /**
@@ -359,7 +359,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       what: 'the recheck request',
       async run(input) {
         if (sample) return { status: 403, body: { error: 'Sample mode looks no tools up.' } };
-        await recheck({ az: input.az === true });
+        await recheck({ gh: input.gh === true, az: input.az === true });
         return { status: 200, body: withBoard({ error: null }) };
       },
     },

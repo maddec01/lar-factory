@@ -494,8 +494,11 @@ export type AzCheck =
 /** The oldest gh lar-work's scripts run with: 2.94.0 added `--parent`, `--add-sub-issue` and `--blocked-by`. */
 export const GH_FLOOR = '2.94.0';
 
-/** Every check from one lookup; `az` is absent when no listed repository is on Azure DevOps, as then it isn't checked. `fix` is the command that fixes a failed check. */
-export interface ToolChecks { gh: GhCheck; t3: T3Check; git: CommandCheck; jq: CommandCheck; curl: CommandCheck; az?: AzCheck }
+/**
+ * Every check from one lookup; `gh` is absent when no listed repository is on GitHub, and `az` when none is on Azure
+ * DevOps, as then it isn't checked. `fix` is the command that fixes a failed check.
+ */
+export interface ToolChecks { gh?: GhCheck; t3: T3Check; git: CommandCheck; jq: CommandCheck; curl: CommandCheck; az?: AzCheck }
 
 /** Any command's check. */
 export type ToolCheck = NonNullable<ToolChecks[CheckedTool]>;
@@ -518,10 +521,12 @@ export function itemSource(repo: RepoConfig): ItemSource {
 }
 
 /**
- * Whether gh's check stops the board reading a repository whose items come from `source`: before the first
- * check, while gh is missing or logged out, and for a Project while the login has no `project` scope.
+ * Whether gh's check stops the board reading a repository whose items come from `source`: for a GitHub source, before
+ * gh's check, while gh is missing or logged out, and for a Project while the login has no `project` scope. gh never
+ * stops an Azure DevOps read.
  */
 export function ghBlocksRead(check: GhCheck | undefined, source: ItemSource): boolean {
+  if (source === 'sprint' || source === 'backlog') return false;
   if (!check || check.result === 'missing' || check.result === 'logged-out') return true;
   return check.result === 'no-project-scope' && source === 'project';
 }

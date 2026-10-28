@@ -101,7 +101,7 @@ test('the checks report each command: its version, missing with the override and
   await script('curl', 'exit 2');
   await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, JQ_PATH: join(dir, 'nowhere/jq') });
   await writeFile(join(dir, 'server-runtime.json'), JSON.stringify({ version: 1, pid: process.pid, port: 3773 }));
-  const { tools, ghError } = await checkTools(false, join(dir, 'server-runtime.json'));
+  const { tools, ghError } = await checkTools({ gh: true, az: false }, join(dir, 'server-runtime.json'));
   assert.deepEqual(tools, {
     t3: { result: 'ok', version: '0.1.3-nightly.1' },
     gh: { result: 'logged-out', version: '2.96.1', fix: 'gh auth login' },
@@ -117,9 +117,9 @@ test('t3 is not running without T3\'s runtime file, and missing outranks it', as
   await writeFile(join(bin, 't3'), '#!/bin/sh\necho t3 v0.1.3-nightly.1\n');
   await chmod(join(bin, 't3'), 0o755);
   await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell });
-  assert.deepEqual((await checkTools(false, join(dir, 'no-runtime.json'))).tools.t3, { result: 'not-running', version: '0.1.3-nightly.1' });
+  assert.deepEqual((await checkTools({ gh: false, az: false }, join(dir, 'no-runtime.json'))).tools.t3, { result: 'not-running', version: '0.1.3-nightly.1' });
   await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, T3_PATH: '/nowhere/t3' });
-  assert.deepEqual((await checkTools(false, join(dir, 'no-runtime.json'))).tools.t3, { result: 'missing', override: 'T3_PATH=/nowhere/t3' });
+  assert.deepEqual((await checkTools({ gh: false, az: false }, join(dir, 'no-runtime.json'))).tools.t3, { result: 'missing', override: 'T3_PATH=/nowhere/t3' });
 });
 
 /** `gh auth status` for a classic token with these scopes, or with no scopes line when null. */
@@ -215,11 +215,13 @@ test('a missing az has brew install azure-cli as its fix', async (t) => {
   assert.deepEqual(await probeAz(), { result: 'missing', override: 'AZ_PATH=/nowhere/az', fix: 'brew install azure-cli' });
 });
 
-test('the checks probe az only when asked to', async (t) => {
+test('the checks probe gh and az only when asked to', async (t) => {
   const { shell } = await machine(t, []);
-  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, AZ_PATH: '/nowhere/az' });
-  assert.equal('az' in (await checkTools(false)).tools, false);
-  assert.equal((await checkTools(true)).tools.az?.result, 'missing');
+  await lookUpTools({ PATH: '/usr/bin:/bin', SHELL: shell, GH_PATH: '/nowhere/gh', AZ_PATH: '/nowhere/az' });
+  const neither = (await checkTools({ gh: false, az: false })).tools;
+  assert.deepEqual(['gh' in neither, 'az' in neither], [false, false]);
+  const both = (await checkTools({ gh: true, az: true })).tools;
+  assert.deepEqual([both.gh?.result, both.az?.result], ['missing', 'missing']);
 });
 
 test('the login shell PATH goes before the inherited one, then the Homebrew folders, without duplicates', () => {

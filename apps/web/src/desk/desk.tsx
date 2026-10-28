@@ -15,6 +15,7 @@ import { StartAfterError } from '../items/start-after.tsx';
 import { StartBuild } from '../items/start-build.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
+import { prototype525 } from '../title-bar/prototype-525-state.ts';
 
 /**
  * Open thread, then what the status asks next. A Ready item with a thread at work gets no Start build, so Open thread
@@ -59,17 +60,21 @@ function DeskCard({ item, data, now }: { item: Item; data: BoardData; now: numbe
     <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
       className={`desk-card grid w-70 shrink-0 cursor-pointer content-start gap-2.5 rounded-xl border border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] bg-(--card) p-3.5 shadow-[inset_3px_0_0_var(--warning)] hover:bg-(--accent) ${picked ? 'ring-2 ring-(--primary) ring-offset-1 ring-offset-(--background)' : ''}`}>
       <button type="button" className="grid gap-2.5 text-left">
-        <span className="flex items-center gap-2 text-xs">
+        <span className="desk-meta flex items-center gap-2 text-xs">
           <ItemStatusGlyph item={item} /><span className="font-semibold text-(--warning-foreground)">{item.status}</span>
           <span className="truncate text-(--muted-foreground)">· {repoName(repoKey(item), data.repos)} · {shortAgo(item.updatedAt, now)}</span>
         </span>
-        <span className="line-clamp-2 font-medium leading-snug"><ItemTitle item={item} /></span>
-        {hint && <span className="text-xs text-(--muted-foreground)">{hint}</span>}
-        {item.status === 'Verify' && <Pipeline item={item} />}
+        <span className="desk-title line-clamp-2 font-medium leading-snug"><ItemTitle item={item} /></span>
+        {(hint || prototype525) && <span className="desk-hint text-xs text-(--muted-foreground)">{hint}</span>}
+        {prototype525
+          ? <span className="prototype-desk-pipeline">{item.status === 'Verify' && <Pipeline item={item} />}</span>
+          : item.status === 'Verify' && <Pipeline item={item} />}
         <StepTrack status={item.status} />
       </button>
-      <Actions item={item} data={data} />
-      {item.status === 'Ready' && <KeepClicks className="desk-start cursor-auto empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
+      <div className={prototype525 ? 'prototype-desk-actions' : 'contents'}>
+        <Actions item={item} data={data} />
+        {item.status === 'Ready' && <KeepClicks className="desk-start cursor-auto empty:hidden"><StartMessage item={item} kind="build" /><StartAfterError item={item} data={data} /></KeepClicks>}
+      </div>
     </div>
   );
 }

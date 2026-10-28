@@ -63,7 +63,7 @@ try {
     }],
   });
   await dev.listen();
-  console.log(`\nTHROWAWAY #525: http://127.0.0.1:${webPort}/?variant=A&queue=outline&update=available\nCtrl+C stops both servers. No issues or threads change.\n`);
+  console.log(`\nTHROWAWAY #525: http://127.0.0.1:${webPort}/?variant=A&queue=soft&update=available\nCtrl+C stops both servers. No issues or threads change.\n`);
   await once(sample, 'exit');
 } finally {
   await stop();

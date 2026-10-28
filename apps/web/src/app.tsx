@@ -28,6 +28,7 @@ import { SettingsDialog } from './settings/settings.tsx';
 import { TitleBar } from './title-bar/title-bar.tsx';
 import { prototype525 } from './title-bar/prototype-525-state.ts';
 import { PrototypeSwitcher } from './title-bar/prototype-525-switcher.tsx';
+import { PrototypeWorkArea } from './title-bar/prototype-525-title-bar.tsx';
 
 function Content() {
   const { data, now } = useBoardStore();
@@ -57,7 +58,9 @@ export function App() {
       <div className="fixed inset-0 flex flex-col bg-(--background) text-(--foreground)">
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TitleBar />
-          {missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
+          {prototype525
+            ? <PrototypeWorkArea>{missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}</PrototypeWorkArea>
+            : missing ? <T3Missing check={missing} /> : empty ? <EmptyState /> : <Content />}
         </main>
         {/* Outside main, so the announcement sits apart from the page. */}
         <CopyStatus />

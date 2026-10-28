@@ -1,9 +1,8 @@
 // THROWAWAY #525. App utilities move; scope, counters, List and Add item keep their existing components.
 import type { ReactNode } from 'react';
-import { ArrowUpToLine, ChevronDown, Check, ExternalLink } from 'lucide-react';
+import { ArrowUpToLine, Check, ExternalLink, SquareTerminal } from 'lucide-react';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
-import { DropdownMenu } from '@lar-factory/ui/design-system/DropdownMenu';
 import { TitleBar } from '@lar-factory/ui/design-system/TitleBar';
 import { SettingsIcon } from '@lar-factory/ui/design-system/NavigationIcons';
 import { AddItem } from '../add-item/add-item.tsx';
@@ -19,14 +18,15 @@ function T3Identity() {
   return <span className="prototype-t3 text-xs whitespace-nowrap text-base-700">for <span className="font-medium">T3 Code</span></span>;
 }
 
-function Update() {
+function Update({ persistent = false }: { persistent?: boolean }) {
   const { update, stub } = usePrototype525();
-  if (!update) return null;
+  if (!update && !persistent) return null;
   return (
-    <Button variant="quiet" className={`prototype-update ${CONTROL}`}
-      title="Update available · 0.1.525. Prototype action" aria-label="Update available"
-      leftIcon={<ArrowUpToLine />} onClick={() => stub('Download update selected')}>
-      <span>Update available</span>
+    <Button variant="quiet" className={`${update ? 'prototype-update' : ''} ${persistent ? 'prototype-utility-update' : ''} ${CONTROL}`}
+      title={update ? 'Update available · 0.1.525. Prototype action' : 'Up to date. Check again. Prototype action'}
+      aria-label={update ? 'Update available' : 'Up to date. Check for updates'}
+      leftIcon={update ? <ArrowUpToLine /> : <Check />} onClick={() => stub(update ? 'Download update selected' : 'Check for updates selected')}>
+      <span className={persistent ? 'prototype-utility-label' : undefined}>{update ? 'Update available' : 'Up to date'}</span>
     </Button>
   );
 }
@@ -39,26 +39,29 @@ function BoardActions() {
   return <><Counters /><ListButton /><AddItem /></>;
 }
 
-function AppMenu() {
-  const { update, stub } = usePrototype525();
+/** App identity and housekeeping share a home in B and C, outside the board's scope. */
+function AppUtilities({ rail = false }: { rail?: boolean }) {
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenu.Trigger asChild>
-        <Button variant="quiet" className={`${CONTROL} prototype-app-menu gap-1 px-1.5`} aria-label={`App menu${update ? ', update available' : ''}`} rightIcon={<ChevronDown />}>
-          <span>App</span>{update && <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />}
-        </Button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="start">
-        <DropdownMenu.Label>lar Factory · for T3 Code</DropdownMenu.Label>
-        <DropdownMenu.Item onSelect={() => stub('Open T3 Code selected')}><ExternalLink className="size-4" />Open T3 Code</DropdownMenu.Item>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item onSelect={() => stub(update ? 'Download update selected' : 'Check for updates selected')}>
-          {update ? <ArrowUpToLine className="size-4" /> : <Check className="size-4" />}{update ? 'Update available' : 'Up to date · Check again'}
-        </DropdownMenu.Item>
-        <DropdownMenu.Item onSelect={() => useSettingsStore.getState().setOpen(true)}><SettingsIcon />Settings</DropdownMenu.Item>
-      </DropdownMenu.Content>
-    </DropdownMenu>
+    <aside id="prototype-app-utilities" tabIndex={rail ? undefined : -1} className={rail ? 'prototype-app-rail' : 'prototype-app-status'} aria-label="App utilities">
+      <span className="prototype-app-identity flex items-center gap-2 whitespace-nowrap text-xs text-base-700" title="lar Factory for T3 Code">
+        <SquareTerminal className="size-4 shrink-0" aria-hidden="true" />
+        <span className="prototype-identity-label">for <span className="font-medium">T3 Code</span></span>
+      </span>
+      <div className="prototype-app-tools flex gap-1">
+        <Update persistent />
+        <Button variant="quiet" className={`prototype-utility-settings ${CONTROL}`} leftIcon={<SettingsIcon />} aria-label="Settings" title="Settings"
+          onClick={() => useSettingsStore.getState().setOpen(true)}><span className="prototype-utility-label">Settings</span></Button>
+      </div>
+    </aside>
   );
+}
+
+/** The rail spends width; the status bar spends height. A's existing title layout stays intact. */
+export function PrototypeWorkArea({ children }: { children: ReactNode }) {
+  const variant = usePrototype525((state) => state.variant);
+  if (variant === 'B') return <div className="prototype-work-area flex min-h-0 min-w-0 flex-1"><AppUtilities rail />{children}</div>;
+  if (variant === 'C') return <>{children}<AppUtilities /></>;
+  return <>{children}</>;
 }
 
 type Props = { brand: ReactNode; scope: ReactNode; refreshed: ReactNode; inset: string };
@@ -69,23 +72,18 @@ export function PrototypeTitleBar({ brand, scope, refreshed, inset }: Props) {
     <div data-title-variant={variant} className="title-bar prototype-title-bar shrink-0 select-none border-b border-base-300 [-webkit-app-region:drag] [&_:is(button,a,[tabindex])]:[-webkit-app-region:no-drag]">
       <TrafficLights />
       <h1 className="sr-only" tabIndex={-1}>Lar Factory</h1>
+      {variant === 'C' && <a href="#prototype-app-utilities" className="prototype-app-skip sr-only focus:not-sr-only">App utilities</a>}
       {variant === 'A' && <div className={inset}>
         <TitleBar brand={<div className="prototype-brand-identity flex shrink-0 items-center gap-3">{brand}<T3Identity /></div>}
           title={<>{scope}{refreshed}</>} actions={<><BoardActions /><Utilities /></>} />
       </div>}
       {variant === 'B' && <div className={inset}>
-        <TitleBar brand={<div className="flex shrink-0 items-center gap-1">{brand}<AppMenu /></div>}
+        <TitleBar brand={brand}
           title={<>{scope}{refreshed}</>} actions={<BoardActions />} />
       </div>}
-      {variant === 'C' && <>
-        <div className={inset}>
-          <TitleBar brand={brand} title={<T3Identity />} actions={<div className="flex items-center gap-1"><Update /><SettingsButton /></div>} />
-        </div>
-        <div className="prototype-board-strip @container flex h-11 min-w-0 items-center gap-1 border-t border-base-300 px-4">
-          <div className="flex min-w-0 flex-1 items-center gap-1">{scope}{refreshed}</div>
-          <div className="flex shrink-0 items-center gap-1.5"><BoardActions /></div>
-        </div>
-      </>}
+      {variant === 'C' && <div className={inset}>
+        <TitleBar brand={brand} title={<>{scope}{refreshed}</>} actions={<BoardActions />} />
+      </div>}
     </div>
   );
 }

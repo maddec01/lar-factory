@@ -1,42 +1,36 @@
-// THROWAWAY #525. Three title bars and three independently selectable Queue treatments on /.
+// THROWAWAY #525. Three app-utility placements on /. Soft Queue styling is settled.
 import { create } from 'zustand';
 import type { BoardData, Item } from '@lar-factory/shared';
 
 export const prototype525 = import.meta.env.DEV && import.meta.env.VITE_PROTOTYPE_525 === '1';
 export const titleChoices = {
   A: ['Brand + utilities', 'T3 Code sits with the brand. Update and Settings sit apart from board actions.'],
-  B: ['App menu', 'T3 Code, Update and Settings share the brand menu. An update marker stays visible.'],
-  C: ['Separate app strip', 'Brand and app utilities get their own row. Scope, counters and board actions sit below.'],
+  B: ['App utility rail', 'App utilities stay in a left rail. Board work keeps the title bar; the rail costs 144px of width, or 48px when compact.'],
+  C: ['Bottom status bar', 'App utilities stay below the work area. Update availability remains visible; the status bar costs 40px of height.'],
 } as const;
-export const queueChoices = {
-  outline: ['Outlined rows', 'Filled Start next, outlined row actions. Every Start refining is equal.'],
-  soft: ['Soft starts', 'Filled Start next, tinted row starts, quiet Open thread.'],
-  quiet: ['Quiet rows', 'Outlined Start next, text row actions. Emphasis stays on the item titles.'],
-} as const;
+export const softQueue = 'Filled Start next, tinted row starts, quiet Open thread. Chosen for every layout.';
 type Variant = keyof typeof titleChoices;
-type QueueChoice = keyof typeof queueChoices;
 const params = new URLSearchParams(location.search);
 const title = params.get('variant') ?? 'A';
-const queue = params.get('queue') ?? 'outline';
 export const usePrototype525 = create<{
-  variant: Variant; queue: QueueChoice; update: boolean; message: string;
-  choose: (key: 'variant' | 'queue' | 'update', value: string) => void;
+  variant: Variant; update: boolean; message: string;
+  choose: (key: 'variant' | 'update', value: string) => void;
   stub: (message: string) => void;
 }>()((set) => ({
   variant: Object.hasOwn(titleChoices, title) ? title as Variant : 'A',
-  queue: Object.hasOwn(queueChoices, queue) ? queue as QueueChoice : 'outline',
   update: params.get('update') !== 'idle',
   message: 'Sample data. Mutations and external links are stubbed.',
   choose: (key, value) => {
     const url = new URL(location.href);
     url.searchParams.set(key, value);
+    url.searchParams.set('queue', 'soft');
     history.replaceState(null, '', url);
-    set(key === 'update' ? { update: value !== 'idle' } : key === 'variant' ? { variant: value as Variant } : { queue: value as QueueChoice });
+    set(key === 'update' ? { update: value !== 'idle' } : { variant: value as Variant });
   },
   stub: (message) => set({ message: `${message}. Prototype only; nothing changed.` }),
 }));
 
-/** Keep the sample board's relative ages, and add two Queue cases that its fixture doesn't carry. */
+/** Keep relative ages and realistic variation in both Queue and desk. All extra cases are sample-only. */
 export function prototypeBoard(data: BoardData): BoardData {
   if (!prototype525) return data;
   const now = Date.now();
@@ -48,5 +42,9 @@ export function prototypeBoard(data: BoardData): BoardData {
     blockers: [{ repo: seed.repo!, number: seed.number!, state: 'open' }] };
   const live: Item = { ...seed, id: 'prototype-525-thread', number: 527, title: 'Keep the playback position across devices',
     threads: [{ id: 'prototype-thread', title: 'Refining playback position', state: 'running', updated: new Date(now).toISOString() }] };
-  return { ...data, error: null, fetchedAt: new Date(now).toISOString(), items: [...items, blocked, live] };
+  const ready = items.find((item) => item.status === 'Ready')!;
+  const held: Item = { ...ready, id: 'prototype-525-ready-blocked', number: 528,
+    title: 'Restore playback after the media server reconnects without losing the selected audio track',
+    parent: null, threads: [], blockers: [{ repo: ready.repo!, number: 149, state: 'open' }] };
+  return { ...data, error: null, fetchedAt: new Date(now).toISOString(), items: [...items, blocked, live, held] };
 }

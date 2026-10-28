@@ -1,4 +1,4 @@
-> Historical setup plan. The board now reads GitHub repository issues with status labels, or an Azure team’s backlog and current sprint together. The Project setup and reads below are retired.
+> Historical setup plan. Item tracking below reflects the current GitHub issue source; Azure repositories read their team's backlog and current sprint together.
 
 # Lar Factory plan
 
@@ -17,8 +17,8 @@ Owner tags: **Claude** means an agent does it. **You** means only you can do it.
 - Nobody pushes to `main`, including you and agents. Agents push as your
   GitHub account, so a bypass for you is a bypass for them.
 - You cut releases by hand. Release notes come from PR titles.
-- GitHub Issues hold the work, one repo per platform. One GitHub Project
-  ("lar") spans every repo and is the board.
+- GitHub issues hold the work, one repo per platform. Lar Factory's local board
+  reads those repositories together.
 - Nothing starts until you move it to Queued. You start queued items with
   `/lar-work <issue>` in a new T3 thread. Automatic pickup with a limit comes later.
 - The `lar-work` skill sizes an item up and picks one of three routes: clear,
@@ -33,7 +33,7 @@ Owner tags: **Claude** means an agent does it. **You** means only you can do it.
 
 ## Before starting (You)
 
-1. Done 2026-10-20: `gh` has the `project` scope.
+1. Sign in locally with `gh auth login`.
 2. Done 2026-10-20: T3 Remote Control is connected.
 3. Export your current notes list (the ideas, bugs and findings) to a text or
    Markdown file, or paste it into a thread. Claude turns it into issues in
@@ -62,7 +62,7 @@ update `main`. Merge commits are titled "Merge pull request #n from …".
      rebase", and "agents may push branches and open PRs, never `main`" in
      place of "never commit or push";
    - `docs/agents/issue-tracker.md` and `triage-labels.md`: replace the triage
-     labels with the Project's Status column and the new labels (phase 3).
+     labels with status labels and the new workflow labels (phase 3).
 3. **You.** Merge that PR.
 4. **Claude, you approve.** Update the "Main verification" ruleset: allow only
    the merge method `rebase`, add the conventional-commit check to the required
@@ -222,26 +222,19 @@ No releases for lar-apple until TestFlight is set up.
 
 ## Phase 3: the board
 
-20. **Claude.** Create the "lar" Project (needs step 1 of "Before starting"):
-    - Status column: List, Queued, Shaping, Needs you, Ready, In progress,
-      Review, Verify, Ready to merge, Done;
-    - views: Board, one per platform (filtered by repository), Concepts
-      (parent issues with sub-issue progress, grouped by parent);
-    - built-in workflows: auto-add issues from lar-server and lar-apple, and
-      move to Done when an issue closes or its PR merges. GitHub limits how many
-      auto-add workflows a free account gets; if it's one, `lar-work` adds
-      items itself.
+20. **Claude.** Onboard each repository with its issue source. Status lives in
+    one `status-<name>` label per issue; closing an issue makes it Done.
 21. **Claude.** Create the same labels in every repo: `bug`, `feature`,
     `improvement`, `concept`, `decision-grill`, `decision-prototype`,
     `decision-research`, `decision-task`, `build`.
 22. **Claude.** Turn your exported notes into issues in the right repos, all in
-    List. Anything that doesn't fit one repo becomes a draft item in the
-    Project. **You** check the result.
+    List. Work spanning repositories becomes a concept issue in the repository
+    that owns it. **You** check the result.
 23. **Claude, then You.** Prototype three board layouts filled with your real
     issues. You pick one.
 24. **Claude.** Build the board app in `lar-factory/board` (TypeScript, like
     `lar-server/web`):
-    - a local server that reads the Project through `gh` every 30 to 60
+    - a local server that reads repository issues through `gh` every 30 to 60
       seconds and caches it;
     - the fixed template from step 23, using T3's theme colours, with sections
       Needs you, In flight, Concepts, Queued, and List counts per platform;

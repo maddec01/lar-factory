@@ -1,4 +1,4 @@
-// The repository issues item source: reads and writes one repository's issues through github.ts, with no Project.
+// The repository issues item source: reads and writes one repository's issues through github.ts.
 // An issue keeps its status as a status-<name> label, and each move swaps the old label for the new one.
 
 import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';

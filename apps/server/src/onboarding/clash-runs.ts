@@ -83,7 +83,7 @@ Lar Factory, a set of agent skills and a board, is about to take over the work i
 
 The factory works like this:
 - Agents push branches and open PRs, and the user merges every PR. A rule to push or merge to ${branch} directly clashes.
-- Work is tracked in the repository's GitHub issues or GitHub Project, as \`docs/agents/issue-tracker.md\` describes. A rule to track work anywhere else, such as Linear, Jira or a local \`.scratch/\` folder, clashes.
+- Work is tracked in the repository's GitHub issues or Azure Boards work items, as \`docs/agents/issue-tracker.md\` describes. A rule to track work anywhere else, such as Linear, Jira or a local \`.scratch/\` folder, clashes.
 - A change passes its checks before review. A rule to skip tests or checks clashes.
 - Agents follow the factory's installed skills. A rule to ignore them, or to run \`/setup-matt-pocock-skills\`, clashes.
 

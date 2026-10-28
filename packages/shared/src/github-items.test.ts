@@ -5,14 +5,14 @@ import type { RawIssueRef, RawItem, RawLinkedPr } from './github-items.ts';
 import type { Item } from './model.ts';
 import { rawIssue, sliceRef } from '../test/raw-items.ts';
 
-/** A project issue in progress with the given sub-issues, counted in its summary. */
+/** An issue in progress with the given sub-issues, counted in its summary. */
 const withSubIssues = (id: string, number: number, labels: string[], subIssues: RawIssueRef[] = []): RawItem =>
   rawIssue(id, number, 'In progress', labels, { subIssuesSummary: { total: subIssues.length, completed: 0 }, subIssues: { nodes: subIssues } });
 
 /** A sub-issue in another repo. */
 const refIn = (repo: string, number: number, state: 'OPEN' | 'CLOSED'): RawIssueRef => ({ ...sliceRef(number, state), repository: { nameWithOwner: repo } });
 
-/** Project issue 900 with the given labels and sub-issues. It is none of the sub-issues, so the searches look for all of them. */
+/** Issue 900 with the given labels and sub-issues. It is none of the sub-issues, so the searches look for all of them. */
 const issue900 = (labels: string[], subIssues: RawIssueRef[]) => withSubIssues('I_x', 900, labels, subIssues);
 
 /** The status an item shows by, and every status it carries. */
@@ -45,7 +45,7 @@ test('normalizes an issue item from the GraphQL response', () => {
     },
   };
   const item = normalizeItem(raw);
-  assert.equal(item?.id, 'I_61', "an item's id is its content's node id, not the Project item id");
+  assert.equal(item?.id, 'I_61', "an item's id is the issue's node id");
   assert.equal(item?.status, 'Needs you');
   assert.equal(item?.updatedAt, '2026-10-21T08:10:00Z');
   assert.deepEqual(item?.parent, { number: 60, title: 'P', url: 'u', repo: 'maddec01/lar-server', state: 'closed' });
@@ -74,7 +74,7 @@ test("a concept's body becomes its map, and no other item keeps the body", () =>
   assert.ok(!('map' in feature!) && !('body' in feature!));
 });
 
-/** Project issue `number`, a sub-issue of issue `parent`, in the same repo. */
+/** Issue `number`, a sub-issue of issue `parent`, in the same repo. */
 const childOf = (number: number, parent: number) =>
   rawIssue(`I_${number}`, number, 'Ready', ['build'], { parent: { ...sliceRef(parent, 'OPEN'), title: `Issue ${parent}` } });
 
@@ -233,7 +233,7 @@ test("build sub-issues come from one search per repo of the builds' sub-issues, 
   assert.deepEqual(buildSubIssueSearches([issue900(['build'], [])]), [], 'no sub-issue, no search');
   const onProject = rawIssue('I_1', 1, 'In progress', ['build'], { repository: { nameWithOwner: 'maddec01/lar-server' } });
   assert.deepEqual(buildSubIssueSearches([issue900(['build'], [refIn('maddec01/lar-server', 1, 'OPEN')]), onProject]), [],
-    'a sub-issue on the project is judged by its own labels, so it needs no search');
+    'a sub-issue on the board is judged by its own labels, so it needs no search');
 });
 
 test("an issue from a repository's issues takes its statuses from its status labels, and shows by the first in flow order", () => {

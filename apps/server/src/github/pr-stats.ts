@@ -119,7 +119,7 @@ export interface PrBodyEdit {
  * new bodies. A build's PR carries the build's stats; other items linked to it, such
  * as a parent the PR also closes, write nothing. Builds without stats, and PRs whose
  * body wasn't read, are left alone; a PR is edited once even if two builds link it.
- * Only PRs in a repo with items on the project are edited: an issue can be closed by
+ * Only PRs in a repo with items on the board are edited: an issue can be closed by
  * a PR in a repo the board doesn't follow.
  */
 export function prStatsEdits(items: readonly Item[]): PrBodyEdit[] {

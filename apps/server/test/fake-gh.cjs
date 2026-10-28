@@ -13,7 +13,7 @@ for (const { content } of options.items ?? []) {
 }
 delete options.items;
 const output = (value) => process.stdout.write(JSON.stringify(value));
-/** An issue's or Project item's content as the board query reads it: no body, and its linked PRs by id without body or merge time. */
+/** An issue as the board query reads it: no body, and its linked PRs by id without body or merge time. */
 const read = (content) => ({ ...content, body: undefined, ...(content.closedByPullRequestsReferences && { closedByPullRequestsReferences: {
   nodes: content.closedByPullRequestsReferences.nodes.map(({ body, mergedAt, ...pr }) => ({ ...pr, id: pr.id ?? pr.url })) } }) });
 /** A closed issue as the light queries read it: its close, its labels, and its parent's id and labels. */
@@ -49,16 +49,12 @@ const main = async () => {
     while (options.authHold && !fs.existsSync(options.authHold)) await new Promise((r) => setTimeout(r, 50));
     if (options.ghAuth === 'logged-out') process.stderr.write('You are not logged into any GitHub hosts. To log in, run: gh auth login\n');
     else if (options.ghAuth === 'failed') process.stderr.write('error connecting to api.github.com\n');
-    else {
-      // ghScopes null prints no scopes line, as for GH_TOKEN.
-      const scopes = options.ghScopes === undefined ? "'project', 'repo'" : options.ghScopes;
-      return void process.stdout.write(`github.com\n  ✓ Logged in to github.com account maddec01\n${scopes === null ? '' : `  - Token scopes: ${scopes}\n`}`);
-    }
+    else return void process.stdout.write('github.com\n  ✓ Logged in to github.com account maddec01\n');
     process.exitCode = 1;
     return;
   }
   // A repository's .lar-factory.json from its default branch: options.repoConfigs holds each one's, by owner/name,
-  // null for none (a 404), false for a read that fails; any other repository reads the lar Project.
+  // null for none (a 404), false for a read that fails; any other repository reads its issues.
   const configPath = args[0] === 'api' && !args.includes('PUT') && /^repos\/([\w.-]+\/[\w.-]+)\/contents\/\.lar-factory\.json$/.exec(args[1]);
   if (configPath) {
     const repo = configPath[1];
@@ -185,7 +181,7 @@ const main = async () => {
       const id = args.find((a) => a.startsWith('id='))?.slice('id='.length);
       return output({ data: { node: options.details?.[id] ?? null } });
     }
-    // Dossier bodies by node id; the project read below leaves bodies out, as the real query does.
+    // Dossier bodies by node id; repository issue reads leave bodies out, as the real query does.
     if (args.some((a) => a.includes('nodes(ids:'))) {
       const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
       const contents = Object.values(options.repoIssues ?? {}).flat();
@@ -206,7 +202,7 @@ const main = async () => {
       process.exitCode = 1;
       return;
     }
-    // Later reads see the labels added and removed, like GitHub, on the Project's items and the repositories' issues.
+    // Later reads see the labels added and removed on the repositories' issues, like GitHub.
     const contents = (options.repoIssues?.[args[4]] ?? []);
     const content = contents.find((c) => c?.number === Number(args[2]) && c.repository?.nameWithOwner === args[4]);
     const values = (flag) => args.filter((_, i) => args[i - 1] === flag);
@@ -249,7 +245,7 @@ const main = async () => {
     fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
     return;
   }
-  // An issue read: options.issues holds the labels of issues off the project.
+  // An issue read: options.issues can override its labels.
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+\/issues\/\d+$/.test(args[1])) {
     const [, owner, repo, , number] = args[1].split('/');
     const content = options.repoIssues?.[`${owner}/${repo}`]?.find((issue) => issue.number === Number(number));

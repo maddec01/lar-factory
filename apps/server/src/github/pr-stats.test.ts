@@ -76,14 +76,14 @@ test('an edit\'s block applies again to a newer body, and a body already current
   assert.equal(updatedBody(`${edited}\r\n\r\n${block.replaceAll('\n', '\r\n')}`, block), null);
 });
 
-test('PRs in a repo with no items on the project are left alone; any repo with items gets its blocks', () => {
+test('PRs in a repo with no items on the board are left alone; any repo with items gets its blocks', () => {
   const elsewhere = { ...pr(7, 'open', 'Body'), url: 'https://github.com/someone/other/pull/7' };
   const prefix = { ...pr(8, 'open', 'Body'), url: 'https://github.com/maddec01/lar-factory-fork/pull/8' };
   const app = { ...pr(10, 'open', 'Body'), url: 'https://github.com/maddec01/lar-app/pull/10' };
   assert.deepEqual(edits([item([elsewhere, prefix, pr(9, 'open', 'Body')]), item([app], stats, ['build'], 'maddec01/lar-app')]).map((e) => e.url),
     [pr(9, 'open', '').url, app.url]);
   assert.deepEqual(edits([item([app]), item([], null, [], 'maddec01/lar-app')]).map((e) => e.url), [app.url],
-    'an item without stats still puts its repo on the project');
+    'an item without stats still puts its repo on the board');
 });
 
 test('only builds write a PR\'s block: a parent that isn\'t a build, linked to the same PR, writes nothing', () => {

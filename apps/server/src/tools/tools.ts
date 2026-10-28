@@ -173,7 +173,7 @@ function olderThanFloor(version: string | undefined): boolean {
 
 const GH_UPGRADE = 'brew upgrade gh';
 
-/** What a logged-in gh's version and scopes say: a missing project scope first, as it blocks reading, noting a gh also too old. */
+/** Whether a logged-in gh's version needs an upgrade. */
 function loggedInCheck(version: string | undefined): GhCheck {
   const outdated = olderThanFloor(version);
   if (outdated) return { result: 'outdated', version: version!, fix: GH_UPGRADE };
@@ -181,8 +181,8 @@ function loggedInCheck(version: string | undefined): GhCheck {
 }
 
 /**
- * Probes gh as T3 Code does: `gh --version`, then `gh auth status`, 5 s each, reading the version and the
- * token's scopes. A timeout, or an auth status failure that isn't a logout, returns gh's error for the Stale banner.
+ * Probes gh as T3 Code does: `gh --version`, then `gh auth status`, 5 s each. A timeout, or an auth status
+ * failure that isn't a logout, returns gh's error for the Stale banner.
  */
 export async function probeGh(): Promise<GhProbe> {
   const command = toolCommand('gh');

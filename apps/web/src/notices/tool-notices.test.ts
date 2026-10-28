@@ -1,4 +1,4 @@
-// The notices for a missing t3, a gh that's missing, logged out, too old or without the project scope, or a missing git, jq or curl, and their Recheck.
+// The notices for a missing t3, a gh that's missing, logged out, or too old, or a missing git, jq or curl, and their Recheck.
 // Ported from the tool notice cases of test/render.test.ts and its saved copies.
 
 import { expect, test } from 'vite-plus/test';

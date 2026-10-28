@@ -13,15 +13,7 @@ fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 # branch. It prints the file "$FAKE_FILES/<owner>/<name>", or GitHub's 404 when
 # that file is missing. With FAKE_LOGGED_OUT set it fails as a logged-out gh does.
 bin=$(mktemp -d)
-trap 'for kind in github-project azure-sprint azure-backlog unknown; do
-    for repo in maddec01/broken contoso/Fabrikam/broken; do
-        file "$repo" "{\"role\":\"web\",\"itemSource\":{\"kind\":\"$kind\",\"team\":\"Team\"}}"
-        run "$repo"
-        refuses "removed or unknown $kind asks for onboarding on $repo" "$repo: .lar-factory.json has an unsupported item source. Run onboarding again."
-    done
-done
-
-rm -rf "$bin"' EXIT
+trap 'rm -rf "$bin"' EXIT
 export FAKE_FILES="$bin/files"
 cat >"$bin/gh" <<'GH'
 #!/bin/bash

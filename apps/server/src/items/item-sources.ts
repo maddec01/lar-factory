@@ -8,7 +8,7 @@ import { repoIssues } from '../github/repo-issues.ts';
 import { azureBacklog } from '../azure/azure-backlog.ts';
 import { az, type Az } from '../azure/azure-items.ts';
 import { azureSprint } from '../azure/azure-sprint.ts';
-import { ReadProblem, type ItemSource, type ItemsRead, type ReadProgress } from './item-source.ts';
+import { ReadProblem, type ItemSource, type ItemsRead, type ReadPace, type ReadProgress } from './item-source.ts';
 
 /** Who writes for a repository no source names, on a board that reads no Project. */
 const NOT_ONBOARDED = "That item's repository isn't onboarded.";
@@ -36,7 +36,7 @@ export function repoView({ repo, role, itemSource, show, labels }: RepositoryCon
  * same Azure DevOps team's sprint or backlog, which then sorts the team's work items among them by their repo- tags.
  * `run` stands in for az in tests.
  */
-export function configuredSources(configs: readonly RepositoryConfig[], run: Az = az): ItemSource {
+export function configuredSources(configs: readonly RepositoryConfig[], run: Az = az): MergedSource {
   const projects = new Map<string, ItemSource>();
   // Azure DevOps names ignore case.
   const teamKey = (repo: string, kind: string, team: string) => [kind, ...repo.split('/').slice(0, 2).map(decodePart), team].join('/').toLowerCase();
@@ -63,6 +63,31 @@ export function configuredSources(configs: readonly RepositoryConfig[], run: Az 
   return mergeSources([...projects.values()], byRepo, optedIn);
 }
 
+/** How often a source holding active work reads, and how often an idle one does: its safety read for edits made elsewhere. */
+export const ACTIVE_READ_MS = 15_000;
+const IDLE_READ_MS = 5 * 60_000;
+/** The shortest gap between two reads of one source, however often status.sh or the board asks for one. */
+const MIN_GAP_MS = 2_000;
+/** The shortest gap at the pace. */
+const minGap = (pace: ReadPace) => Math.min(MIN_GAP_MS, pace.activeMs ?? ACTIVE_READ_MS);
+
+/** A merged item source that reads each source at its own pace. */
+export interface MergedSource extends ItemSource {
+  /** Whether a read at `pace` would read any source. */
+  due(pace: ReadPace): boolean;
+  /**
+   * Makes the source that lists the item at `url`, as an item, slice or linked PR, due on the next read; every source
+   * when none lists it, or when `url` is undefined.
+   */
+  invalidate(url?: string): void;
+  /** Whether the last read read the item's source afresh, rather than listing it from an earlier read. */
+  readAfresh(item: Item): boolean;
+}
+
+/** Whether the item, one of its slices or one of its linked PRs is at `url`. */
+const listsUrl = (item: Item, url: string) =>
+  item.url === url || item.slices.some((s) => s.url === url) || item.linkedPrs.some((pr) => pr.url === url);
+
 /**
  * Merges the Projects and the other sources, each standing for the repositories `byRepo` gives it. A read lists every
  * source's items under the first source's title, the first Project's when there is one; an item two sources list shows
@@ -73,8 +98,9 @@ export function configuredSources(configs: readonly RepositoryConfig[], run: Az 
  * only that source's items instead, and the read names the problem under each of its repositories. A read leaves out
  * each item from a repository in `optedIn` that carries no status, except a closed item a Project lists: being in a
  * Project opts it in. An untagged item that carries no status leaves the opted-in repositories of its `untaggedFor`.
+ * A read given a pace reads only the sources due at it, and lists the others from their last good read.
  */
-export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = []): ItemSource {
+export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMap<string, ItemSource>, optedIn: readonly string[] = []): MergedSource {
   const sourceByRepo = new Map([...byRepo].map(([repo, source]) => [repo.toLowerCase(), source]));
   const optIn = new Set(optedIn.map((repo) => repo.toLowerCase()));
   const optedOut = (repo: string | null) => optIn.has(repo?.toLowerCase() ?? '');
@@ -107,13 +133,76 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       throw new Error(`${repos.join(', ')}: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
     });
   };
+  /** Each source's last good read, when its last whole read and its last read of any kind started, good or not. */
+  const lastRead = new Map<ItemSource, ItemsRead>();
+  const wholeAt = new Map<ItemSource, number>();
+  const startedAt = new Map<ItemSource, number>();
+  /** The sources asked to read whole, and the items asked for by Item.id, since their last read started. */
+  const askedWhole = new Set<ItemSource>();
+  const askedItems = new Set<string>();
+  /** The sources the last read read whole, and the items it read alone. */
+  let afresh = new Set<ItemSource>();
+  let afreshItems = new Set<string>();
+  /**
+   * What a read at `pace` reads of the source: all of it before its first good read, when asked to, and every idle
+   * interval; else its active and asked-for items alone, through readSome, or all of it when it has none; else nothing.
+   */
+  const planOf = (source: ItemSource, pace: ReadPace): 'whole' | Item[] | null => {
+    const started = startedAt.get(source);
+    if (started === undefined) return 'whole';
+    const since = pace.now - started;
+    const activeMs = pace.activeMs ?? ACTIVE_READ_MS;
+    // A source that never read retries at the active pace, not on every tick.
+    if (!lastRead.has(source)) return since >= activeMs ? 'whole' : null;
+    if (askedWhole.has(source) && since >= minGap(pace)) return 'whole';
+    if (pace.now - wholeAt.get(source)! >= (pace.idleMs ?? IDLE_READ_MS)) return 'whole';
+    const listed = lastRead.get(source)!.items;
+    const asked = listed.filter((item) => askedItems.has(item.id));
+    const active = pace.slow ? [] : listed.filter(pace.active);
+    if (!(asked.length && since >= minGap(pace)) && !(active.length && since >= activeMs)) return null;
+    return source.readSome ? [...new Set([...asked, ...active])] : 'whole';
+  };
+  /** Reads the plan's items alone, keeping the rest of the source's last read; a failed read of a few reads it all. */
+  const readPlanned = async (source: ItemSource, plan: 'whole' | Item[], progress?: ReadProgress): Promise<ItemsRead> => {
+    if (plan === 'whole') return readOf(source, progress);
+    const last = lastRead.get(source)!;
+    let fresh: Item[];
+    try { fresh = await source.readSome!(plan); }
+    catch { return readOf(source, progress); }
+    const byId = new Map(fresh.map((item) => [item.id, item]));
+    // An item the provider no longer lists, as when it was deleted, leaves; a planned item is never added twice.
+    const planned = new Set(plan.map((item) => item.id));
+    return { ...last, items: last.items.flatMap((item) => (planned.has(item.id) ? byId.get(item.id) ?? [] : [item])) };
+  };
   /** The source that listed each item, by Item.id, in the last read. */
   let listedBy = new Map<string, ItemSource>();
   const forRepo = (repo: string | null) => (repo && sourceByRepo.get(repo.toLowerCase())) || projects[0] || unlisted;
   const sourceOf = (item: Item) => listedBy.get(item.id) ?? forRepo(item.repo);
   return {
-    async read(progress) {
-      const reads = await Promise.all(sources.map((source) => readOf(source, progress)));
+    async read(progress, pace) {
+      const plans = sources.flatMap((source) => {
+        const plan = pace ? planOf(source, pace) : 'whole';
+        return plan ? [{ source, plan }] : [];
+      });
+      const now = pace?.now ?? Date.now();
+      for (const { source, plan } of plans) {
+        startedAt.set(source, now);
+        if (plan === 'whole') {
+          wholeAt.set(source, now);
+          askedWhole.delete(source);
+          for (const item of lastRead.get(source)?.items ?? []) askedItems.delete(item.id);
+        } else for (const item of plan) askedItems.delete(item.id);
+      }
+      // A source that read keeps its read though another failed, so the next read needn't read it again.
+      const settled = await Promise.allSettled(plans.map(({ source, plan }) => readPlanned(source, plan, progress)));
+      settled.forEach((read, index) => {
+        if (read.status === 'fulfilled') lastRead.set(plans[index]!.source, read.value);
+      });
+      const failed = settled.find((read) => read.status === 'rejected');
+      if (failed) throw failed.reason;
+      afresh = new Set(plans.filter(({ plan }) => plan === 'whole').map(({ source }) => source));
+      afreshItems = new Set(plans.flatMap(({ plan }) => (plan === 'whole' ? [] : plan.map((item) => item.id))));
+      const reads = sources.map((source) => lastRead.get(source) ?? { title: '', items: [] });
       const listed = new Map<string, ItemSource>();
       const items = reads.flatMap((read, index) => read.items.filter((item) => {
         if (listed.has(item.id)) return false;
@@ -124,6 +213,13 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
       const problems = reads.flatMap((read) => read.problems ?? []);
       return { title: reads[0]?.title ?? '', items: items.flatMap((item) => shown(item, listed.get(item.id)!) ?? []), ...problems.length > 0 && { problems } };
     },
+    due: (pace) => sources.some((source) => planOf(source, pace) !== null),
+    invalidate(url) {
+      const listing = url === undefined ? [] : sources.flatMap((source) => lastRead.get(source)?.items.filter((item) => listsUrl(item, url)) ?? []);
+      if (listing.length) for (const item of listing) askedItems.add(item.id);
+      else for (const source of sources) askedWhole.add(source);
+    },
+    readAfresh: (item) => afresh.has(sourceOf(item)) || afreshItems.has(item.id),
     setStatus: (item, status) => sourceOf(item).setStatus(item, status),
     statusRefusal: (item) => ('id' in item ? sourceOf(item) : forRepo(item.repo)).statusRefusal(item),
     addLabel: (item, label) => sourceOf(item).addLabel(item, label),
@@ -135,32 +231,51 @@ export function mergeSources(projects: readonly ItemSource[], byRepo: ReadonlyMa
 }
 
 /** The onboarded repositories' item source, with the repositories it last read. */
-export interface OnboardedSources extends ItemSource {
+export interface OnboardedSources extends MergedSource {
   /** The repositories as the last read found them, none before it. */
   repos(): RepoConfig[];
+  /** Makes the next read load the configs again, and read every source. */
+  reload(): void;
 }
 
 /**
- * The item source the onboarded repositories name as `load` reads their configs now: each read loads them first and
- * builds the merged source again when they changed, so a config merged to a default branch shows on the next read. A
- * read leaves out the items of each repository whose config `load` couldn't read or that is resetting, which a Project
- * may still list. A write goes through the source the last read built.
+ * The item source the onboarded repositories name as `load` reads their configs: a read loads them first when it has
+ * no pace, before the first read, when reload asked for it or once the pace's idle time has passed since they loaded, and builds the merged source
+ * again when they changed, so a config merged to a default branch shows within an idle read. A read leaves out the
+ * items of each repository whose config `load` couldn't read or that is resetting, which a Project may still list. A
+ * write goes through the source the last read built.
  */
 export function onboardedSources(load: () => Promise<OnboardedConfigs>, build = configuredSources): OnboardedSources {
   let configs: RepositoryConfig[] = [];
   let current = build(configs);
   let key = JSON.stringify(configs);
+  let leftOff = new Set<string>();
+  let loadedAt: number | null = null;
+  let reloadAsked = false;
+  const loadDue = (pace?: ReadPace) => !pace || loadedAt === null
+    || pace.now - loadedAt >= (reloadAsked ? minGap(pace) : pace.idleMs ?? IDLE_READ_MS);
   return {
-    async read(progress) {
-      const loaded = await load();
-      configs = loaded.configs;
-      if (JSON.stringify(configs) !== key) {
-        current = build(configs);
-        key = JSON.stringify(configs);
+    async read(progress, pace) {
+      if (loadDue(pace)) {
+        loadedAt = pace?.now ?? Date.now();
+        reloadAsked = false;
+        const loaded = await load();
+        configs = loaded.configs;
+        if (JSON.stringify(configs) !== key) {
+          current = build(configs);
+          key = JSON.stringify(configs);
+        }
+        leftOff = new Set([...loaded.problems.map((p) => p.repo), ...loaded.resetting].map((repo) => repo.toLowerCase()));
       }
-      const leftOff = new Set([...loaded.problems.map((p) => p.repo), ...loaded.resetting].map((repo) => repo.toLowerCase()));
-      const read = await current.read(progress);
+      const read = await current.read(progress, pace);
       return { ...read, items: read.items.filter((item) => !leftOff.has(item.repo?.toLowerCase() ?? '')) };
+    },
+    due: (pace) => loadDue(pace) || current.due(pace),
+    invalidate: (url) => current.invalidate(url),
+    readAfresh: (item) => current.readAfresh(item),
+    reload() {
+      reloadAsked = true;
+      current.invalidate();
     },
     repos: () => configs.map(repoView),
     setStatus: (item, status) => current.setStatus(item, status),

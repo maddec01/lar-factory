@@ -28,8 +28,11 @@ export interface HttpDeps {
   recheck(options?: { az?: boolean }): Promise<void>;
   /** Reads one item's details and older comments for the item dialog. */
   itemDetails: ItemDetailsReader;
-  /** Reads GitHub now, or once more after the running read. */
-  readSoon(): void;
+  /**
+   * Reads the source listing the item at `url` now, or once more after the running read; with no url, loads the
+   * repositories' configs again and reads every source.
+   */
+  readSoon(url?: string): void;
   /** The startup tool check; requests other than /healthz and assets wait for it. */
   ready(): Promise<void> | undefined;
   /** T3's projects as onboarding's T3 project step offers them; throws when they can't be read. */
@@ -397,11 +400,15 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     json(res, 200, {});
   }
 
-  /** Starts a read of GitHub for status.sh, so a moved item reaches the board before the next interval read. */
+  /**
+   * Starts a read for status.sh and slice.sh, so a moved item reaches the board before its next timed read: of the
+   * source listing the `url` it sends, else of everything.
+   */
   async function readRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    if (!await readJson(req, res, 'the read request')) return;
+    const body = await readJson(req, res, 'the read request');
+    if (!body) return;
     if (sample) return json(res, 200, {});
-    readSoon();
+    readSoon(typeof body.url === 'string' ? body.url : undefined);
     json(res, 202, {});
   }
 

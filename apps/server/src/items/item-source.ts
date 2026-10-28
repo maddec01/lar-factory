@@ -29,6 +29,19 @@ export class ReadProblem extends Error {
   }
 }
 
+/**
+ * How fast a merged read keeps each source: a source holding an item `active` says is due every `activeMs`, any other
+ * every `idleMs`, ACTIVE_READ_MS and IDLE_READ_MS when absent, and every source is idle while `slow` holds, as when a
+ * provider's quota runs low.
+ */
+export interface ReadPace {
+  now: number;
+  active(item: Item): boolean;
+  activeMs?: number;
+  idleMs?: number;
+  slow?: boolean;
+}
+
 /** The error every item source gives a Done write: Done is never stored, and an item is Done once it closes. */
 export const DONE_REFUSED = 'Could not set Done. The board never stores Done. Close the item to make it Done.';
 
@@ -36,8 +49,16 @@ export const DONE_REFUSED = 'Could not set Done. The board never stores Done. Cl
 export interface ItemSource {
   /** What a read reports for this source; absent for a source its repositories name, as the merged source then does. */
   name?: string;
-  /** Reads the source's items, reporting to `progress` for each source it reads on its way, if it merges several. */
-  read(progress?: ReadProgress): Promise<ItemsRead>;
+  /**
+   * Reads the source's items, reporting to `progress` for each source it reads on its way, if it merges several. A
+   * merged source given `pace` reads only the sources due at its pace, and lists the others' items from their last read.
+   */
+  read(progress?: ReadProgress, pace?: ReadPace): Promise<ItemsRead>;
+  /**
+   * Reads these items alone afresh, as the source lists them, with their slices, PRs and checks; an item the source
+   * no longer lists is left out. Absent on a source that reads only whole.
+   */
+  readSome?(items: Item[]): Promise<Item[]>;
   /** Sets the item's status, dropping every other status it carries. Callers check `statusRefusal` first. */
   setStatus(item: Item, status: Status): Promise<string | null>;
   /** Why a status write on an item, or on a parent that isn't on the board, would be refused before it runs; null when it may run. */

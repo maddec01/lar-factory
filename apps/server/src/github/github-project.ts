@@ -2,7 +2,7 @@
 
 import { DONE_REFUSED, type ItemSource } from '../items/item-source.ts';
 import type { GithubProjectRef, ProjectCreationProgress } from './github.ts';
-import { abandonItem, addIssueLabel, addProjectItem, fetchProject, setIssueStatus, setItemStatus } from './github.ts';
+import { abandonItem, addIssueLabel, addProjectItem, fetchProject, fetchProjectItems, setIssueStatus, setItemStatus } from './github.ts';
 
 export function githubProject(project: GithubProjectRef): ItemSource {
   // Each item's Project item id by its Item.id, from the last read and from Add item since. Nothing outside this file sees one.
@@ -13,6 +13,12 @@ export function githubProject(project: GithubProjectRef): ItemSource {
       const { projectItemIds: read, ...items } = await fetchProject(project.owner, project.number);
       projectItemIds = read;
       return items;
+    },
+    async readSome(items) {
+      const ids = items.flatMap((item) => projectItemIds.get(item.id) ?? []);
+      const { items: read, projectItemIds: found } = await fetchProjectItems(ids);
+      for (const [id, projectItemId] of found) projectItemIds.set(id, projectItemId);
+      return read;
     },
     async setStatus(item, status) {
       if (status === 'Done') return DONE_REFUSED;

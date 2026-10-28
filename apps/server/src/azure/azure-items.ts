@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { STATUSES, decodePart, labelStatuses, repoTag, statusLabel } from '@lar-factory/shared';
 import type { Blocker, IssueRef, Item, LinkedPr } from '@lar-factory/shared';
 import { ReadProblem, type ItemSource } from '../items/item-source.ts';
+import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
 import { azureCreate } from './azure-create.ts';
@@ -56,11 +57,19 @@ async function limited<T, R>(values: readonly T[], limit: number, each: (value: 
   return answers;
 }
 
+/** az's cooldown: az hides Azure DevOps' Retry-After, so a throttled call backs off for a minute, then longer. */
+const azCooldown = createCooldown('az');
+
 export async function az(args: string[]): Promise<string> {
   const command = toolCommand('az');
   if (!command) throw new ReadProblem(`${missingTool('az')}.`, 'brew install azure-cli');
+  azCooldown.check();
   const result = await runTool(command.file, args, { env: command.env, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
-  if (result.code !== 0) throw new Error(`az ${args.slice(0, 3).join(' ')} failed: ${result.detail}`);
+  if (result.code !== 0) {
+    await azCooldown.failed(result.stderr || result.detail);
+    throw new Error(`az ${args.slice(0, 3).join(' ')} failed: ${result.detail}`);
+  }
+  azCooldown.succeeded();
   return result.stdout;
 }
 

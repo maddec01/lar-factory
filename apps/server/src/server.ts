@@ -1,22 +1,22 @@
-// The board server: refreshes the project through `gh` every refreshSeconds,
-// keeps the last good copy in memory, serves it on 127.0.0.1 and pushes each
-// change to open pages over /api/events.
+// The board server: reads each item source through `gh` or `az` at its own pace, every 15 s while it holds active work
+// and every 5 min while idle, refreshes T3's threads and stats every 2 s without either, keeps the last good copy in
+// memory, serves it on 127.0.0.1 and pushes each change to open pages over /api/events.
 
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GH_FLOOR, SETTLED_FIRST_READ, ghBlocksRead, itemSource, type BoardData, type FirstRead, type Item, type ItemSource, type GhCheck, type ModelGroup, type ToolChecks } from '@lar-factory/shared';
+import { GH_FLOOR, SETTLED_FIRST_READ, ghBlocksRead, itemSource, refKey, type BoardData, type FirstRead, type Item, type ItemSource, type GhCheck, type ModelGroup, type Status, type ToolChecks } from '@lar-factory/shared';
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
 import { onTheBoard, readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
-import { editPrBody, readPrBody } from './github/github.ts';
+import { editPrBody, ghCooldown, ghQuotaLow, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
-import { onboardedSources, repoView } from './items/item-sources.ts';
-import type { ReadProgress } from './items/item-source.ts';
+import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
+import type { ReadPace, ReadProgress } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
 import { createClashRuns } from './onboarding/clash-runs.ts';
@@ -131,6 +131,9 @@ let refreshing = false;
 /** Set when a read is asked for during a running one, so exactly one more starts after it. */
 let readAgain = false;
 let syncingPrStats = false;
+/** When the board last wrote each PR's stats block, by PR URL. */
+const prStatsSyncedAt = new Map<string, number>();
+const PR_STATS_MS = 5 * 60_000;
 /** The running tool check, so Recheck and the retry never run two at once. */
 let checkingTools: Promise<void> | null = null;
 /** The startup tool check, which runs once the board listens; requests other than /healthz and assets wait for it. */
@@ -183,11 +186,81 @@ const modelsUnavailable = flipLog(`only T3 default offered: no models read from 
  * latest merged linked PR's block once no linked PR is open, else read afresh from the database and transcripts;
  * threads are read afresh. The board keeps working without either.
  */
-function withT3Reads(items: Item[]): Item[] {
-  const { stats, threads, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, Date.now());
-  statsUnavailable(unreadable);
-  if (priced !== null) pricingUnavailable(!priced);
-  return items.map((item) => ({ ...item, stats: mergedStats(item) ?? stats(item), threads: threads(item) }));
+function withT3Reads(items: Item[], withStats = true): Item[] {
+  const now = Date.now();
+  const { stats, threads, statsUnavailable: unreadable, priced } = loadT3Reads(statsSources, now, withStats);
+  if (withStats) {
+    statsReadAt = now;
+    statsUnavailable(unreadable);
+    if (priced !== null) pricingUnavailable(!priced);
+  }
+  return items.map((item) => {
+    const shown = { ...item, stats: withStats ? mergedStats(item) ?? stats(item) : item.stats, threads: threads(item) };
+    // A slice's implementer thread names the slice, so a build is running while a thread runs for it or any slice.
+    const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
+    if (running(shown.threads) || item.slices.some((slice) => running(threads(slice)))) lastRunning.set(item.id, now);
+    return shown;
+  });
+}
+
+/** Tests read every source this often, whatever its work; unset, sources read at their pace. */
+const TEST_READ_MS = Number(process.env.BOARD_READ_MS) || 0;
+/** How often the board reads T3's database for threads, and for stats, which cost several times more; neither calls gh or az. */
+const LOCAL_REFRESH_MS = 2_000;
+const LOCAL_STATS_MS = 30_000;
+let statsReadAt = -Infinity;
+/** How long an item stays active after its thread stops running or it closes, so a source reads what the agent wrote last. */
+const SETTLE_MS = 5 * 60_000;
+/** The statuses an agent works in, which keep an item active while T3 can't say whether its thread runs. */
+const AGENT_STATUSES = new Set<Status>(['Shaping', 'In progress', 'Review']);
+/** When each item last had a running thread of its own or of one of its slices, by Item.id. */
+const lastRunning = new Map<string, number>();
+
+/**
+ * Whether an item keeps its source on the fast cadence: its thread runs or ran in the last SETTLE_MS, it sits in an
+ * agent's status while T3 can't say, it closed in the last SETTLE_MS, its PR's checks run, the board shows a change to
+ * it GitHub hasn't reported, or an armed start waits on it or for it.
+ */
+function isActive(item: Item, now: number, waitedOn: ReadonlySet<string>): boolean {
+  const shown = board.find(item.id) ?? item;
+  if (now - (lastRunning.get(item.id) ?? -Infinity) < SETTLE_MS) return true;
+  if (item.state === 'open' && AGENT_STATUSES.has(item.status) && !Array.isArray(shown.threads)) return true;
+  if (item.closedAt && now - Date.parse(item.closedAt) < SETTLE_MS) return true;
+  if ([item.pipeline, ...item.linkedPrs].some((pr) => pr?.checks?.running)) return true;
+  if (board.changing(item.id) || board.snapshot().armed?.[item.id]) return true;
+  return item.repo !== null && item.number !== null && waitedOn.has(refKey(item.repo, item.number));
+}
+
+/** The pace reads run at now: slow while gh's quota runs low. */
+function readPace(): ReadPace {
+  const now = Date.now();
+  const armed = board.snapshot().armed ?? {};
+  const waitedOn = new Set(board.snapshot().items.filter((i) => armed[i.id]).flatMap((i) => i.blockers.map((b) => refKey(b.repo, b.number))));
+  return { now, slow: quotaLow, activeMs: TEST_READ_MS || ACTIVE_READ_MS, idleMs: TEST_READ_MS || settings.refreshSeconds * 1000,
+    active: (item) => isActive(item, now, waitedOn) };
+}
+
+/** Whether gh's quota ran low at its last check, made at most every QUOTA_CHECK_MS. */
+let quotaLow = false;
+let quotaCheckedAt = -Infinity;
+const QUOTA_CHECK_MS = 5 * 60_000;
+async function checkQuota(): Promise<void> {
+  if (Date.now() - quotaCheckedAt < QUOTA_CHECK_MS) return;
+  quotaCheckedAt = Date.now();
+  const low = await ghQuotaLow().catch(() => quotaLow);
+  if (low !== quotaLow) log(low ? "gh's quota is low: every source reads at the idle pace" : "gh's quota recovered");
+  quotaLow = low;
+}
+
+/** Shows T3's threads, and every LOCAL_STATS_MS its stats, as they are now on the items as last read, pushing only when they changed. */
+function refreshLocal(): void {
+  if (refreshing) return;
+  const before = board.snapshot().items;
+  const after = withT3Reads(before, Date.now() - statsReadAt >= LOCAL_STATS_MS);
+  const t3Of = (items: Item[]) => JSON.stringify(items.map((i) => [i.stats, i.threads]));
+  if (t3Of(after) === t3Of(before)) return;
+  board.update({ items: after });
+  board.push();
 }
 
 /**
@@ -199,7 +272,11 @@ async function syncPrStats(items: Item[]): Promise<void> {
   if (syncingPrStats) return;
   syncingPrStats = true;
   try {
+    const now = Date.now();
     for (const edit of prStatsEdits(items)) {
+      // Stats grow while a build runs; each PR's block is written at most every PR_STATS_MS, not on every read.
+      if (now - (prStatsSyncedAt.get(edit.url) ?? -Infinity) < PR_STATS_MS) continue;
+      prStatsSyncedAt.set(edit.url, now);
       try {
         // The board read the body a while ago; apply the block to the body as it is now, so no one's edit is lost.
         const body = updatedBody(await readPrBody(edit.url), edit.block);
@@ -300,7 +377,10 @@ function ghStopsRead(check: GhCheck | undefined): boolean {
   return sources.every((source) => ghBlocksRead(check, source));
 }
 
-/** Reads GitHub now; while a read runs this one is skipped, so two reads never run together. */
+/**
+ * Reads the sources due at the pace now; while a read runs this one is skipped, so two reads never run together, and
+ * a tick with no source due reads nothing.
+ */
 async function refresh(): Promise<void> {
   if (refreshing) return;
   // Before the first tool check there's no gh to read with; that check starts the first read.
@@ -314,14 +394,17 @@ async function refresh(): Promise<void> {
   readAgain = false;
   let read = false;
   const readRevision = board.revision();
-  offerModelChoices();
-  // The app installs after the board server starts, so each read picks up the latest install's state.
-  board.update({ bundledSkills: bundledSkills() });
   try {
-    const snapshot = await items.read(firstReadProgress);
+    await checkQuota();
+    const pace = readPace();
+    if (!items.due(pace)) return;
+    offerModelChoices();
+    // The app installs after the board server starts, so each read picks up the latest install's state.
+    board.update({ bundledSkills: bundledSkills() });
+    const snapshot = await items.read(firstReadProgress, pace);
     const { error, fetchedAt } = board.snapshot();
     const recovered = error !== null && error !== settings.problem || fetchedAt === null;
-    board.applyRead(snapshot.items, readRevision, withT3Reads);
+    board.applyRead(snapshot.items, readRevision, withT3Reads, items.readAfresh);
     const repos = items.repos();
     moveFirstRead({ step: 'finishing' });
     board.update({ project: { title: snapshot.title }, fetchedAt: new Date().toISOString(), error: settings.problem ?? null, itemSourceProblems: snapshot.problems ?? [],
@@ -329,8 +412,8 @@ async function refresh(): Promise<void> {
     if (recovered) log(`read ${snapshot.items.length} items from ${repos.length} repositories`);
     read = true;
   } catch (err) {
-    // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale.
-    const gh = await probeGh();
+    // Probe gh, so a gh that went missing or logged out shows its notice instead of Stale; a cooling gh calls nothing.
+    const gh = ghCooldown.until() ? { check: board.snapshot().tools!.gh } : await probeGh();
     if (gh.check.result !== 'ok') showToolChecks({ ...board.snapshot().tools!, gh: gh.check });
     const error = ghStopsRead(gh.check) ? null : gh.error ?? (err instanceof Error ? err.message : String(err));
     board.update({ error });
@@ -359,8 +442,13 @@ async function offerOnboarding(): Promise<void> {
   }
 }
 
-/** Reads GitHub now, or once more after the running read, so a change made during that read is read too. */
-function readSoon(): void {
+/**
+ * Reads the source listing the item at `url` now, or every source after loading the configs again when there is none;
+ * or once more after the running read, so a change made during that read is read too.
+ */
+function readSoon(url?: string): void {
+  if (url === undefined) items.reload();
+  else items.invalidate(url);
   if (refreshing) readAgain = true;
   else void refresh();
 }
@@ -409,7 +497,7 @@ const ports = pinned ? [Number(pinned)] : BOARD_PORTS;
 const port = await listenOnFreePort(server, HOST, ports) ?? await exitWith(ports.length === 1
   ? `port ${ports[0]} is taken; stop what holds it or choose another BOARD_PORT`
   : `ports ${ports[0]} to ${ports.at(-1)} are all taken; stop a board or set BOARD_PORT`);
-log(`board on http://${HOST}:${port}, refreshing every ${settings.refreshSeconds} s`);
+log(`board on http://${HOST}:${port}, reading active work every ${ACTIVE_READ_MS / 1000} s and the rest every ${settings.refreshSeconds} s`);
 reportListening(port);
 // status.sh finds live boards by their records; a sample board isn't one to refresh.
 if (!fixture) process.on('exit', recordBoard(port));
@@ -425,13 +513,18 @@ if (fixture) {
   offerModelChoices();
   log(`serving ${fixture} instead of GitHub`);
 }
+// Each tick only checks whether a source is due; refresh reads nothing when none is.
 const timer = setInterval(() => {
   if (!fixture) void refresh();
-}, settings.refreshSeconds * 1000);
+}, 1_000);
+const localTimer = setInterval(() => {
+  if (!fixture) refreshLocal();
+}, LOCAL_REFRESH_MS);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     clearInterval(timer);
+    clearInterval(localTimer);
     clearTimeout(toolRetry);
     endStreams();
     server.close(() => process.exit(0));

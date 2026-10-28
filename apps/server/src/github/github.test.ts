@@ -13,7 +13,7 @@ test('the board query reads the blocked-by issues, no issue bodies, and linked P
 });
 
 test('the board query reads a pull request item\'s own checks and merge state', () => {
-  const pr = /\.\.\. on PullRequest \{([\s\S]*)\n {12}\}/.exec(ITEMS_QUERY)?.[1] ?? '';
+  const pr = /\.\.\. on PullRequest \{([\s\S]*)\n {4}\}/.exec(ITEMS_QUERY)?.[1] ?? '';
   assert.match(pr, /\bmergeStateStatus\b/);
   assert.match(pr, /statusCheckRollup \{\s+contexts\(first: \d+\) \{\s+checkRunCountsByState/);
 });

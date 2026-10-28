@@ -13,8 +13,11 @@ export interface BoardState {
   /**
    * Takes in the items a read started at `since` got from GitHub, keeping each change
    * this board made until GitHub reports it and dropping the items this board deleted.
+   * Only a read that `afresh` says read a change's source counts toward giving up on it.
    */
-  applyRead(items: Item[], since: number, enrich: (items: Item[]) => Item[]): void;
+  applyRead(items: Item[], since: number, enrich: (items: Item[]) => Item[], afresh?: (item: Item) => boolean): void;
+  /** Whether the board shows a change to the item that GitHub hasn't reported yet. */
+  changing(itemId: string): boolean;
   /** Shows a change at once and keeps it through refreshes until GitHub reports it. */
   showChanged(item: Item): void;
   /** Drops an item this board deleted, for good: GitHub can still list it for a while. */
@@ -48,10 +51,10 @@ export function createBoardState(initial: BoardData): BoardState {
     snapshot: () => state,
     update: (fields) => void Object.assign(state, fields),
     revision: () => revision,
-    applyRead(items, since, enrich) {
+    applyRead(items, since, enrich, afresh = () => true) {
       for (const [id, recent] of recentItems) {
-        if (since < recent.revision) continue;
-        // Give GitHub three successful reads to expose the change, then trust what it reports.
+        if (since < recent.revision || !afresh(recent.item)) continue;
+        // Give GitHub three reads of the item's source to expose the change, then trust what it reports.
         const reported = items.some((i) => i.id === id && i.status === recent.item.status && sameStatuses(i, recent.item));
         if (reported || ++recent.unconfirmedReads >= 3) recentItems.delete(id);
       }
@@ -69,6 +72,7 @@ export function createBoardState(initial: BoardData): BoardState {
       state.items = state.items.filter((i) => i.id !== itemId);
       push();
     },
+    changing: (itemId) => recentItems.has(itemId),
     removed: (itemId) => abandoned.has(itemId),
     find: (itemId) => state.items.find((i) => i.id === itemId),
     push,

@@ -39,14 +39,16 @@ const every = <T>(value: T) => (): T => value;
 /**
  * Opens T3's database once for the item stats and the item threads, which read the same thread rows. Stats read
  * more than the rows, so they can be unavailable while the threads are read, e.g. after T3 changes its schema.
+ * Without `withStats` it reads the threads alone, which costs a fraction of the stats, and every item has no stats.
  */
-export function loadT3Reads(sources: StatsSources, now: number): T3Reads {
+export function loadT3Reads(sources: StatsSources, now: number, withStats = true): T3Reads {
   if (!existsSync(sources.db)) return { stats: every(undefined), threads: every(undefined), statsUnavailable: false, priced: null };
   const unavailable = { stats: every('unavailable' as const), statsUnavailable: true, priced: null };
   try {
     return readT3Db(sources.db, (db) => {
       const rows = threadRows(db);
       const threads = threadsLookup(itemThreads(rows));
+      if (!withStats) return { stats: every(undefined), threads, statsUnavailable: false, priced: null };
       let stats: ItemStatsReader;
       try { stats = itemStats(db, rows, sources, now); }
       catch { return { ...unavailable, threads }; }

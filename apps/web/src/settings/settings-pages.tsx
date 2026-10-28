@@ -80,7 +80,7 @@ function azSkipped(data: BoardData): string {
   return data.tools && !data.tools.az ? ' Not checked: no listed repository is on Azure DevOps.' : '';
 }
 
-const REFRESH_OPTIONS = ['15 seconds', '30 seconds', '45 seconds', '1 minute', '5 minutes'];
+const REFRESH_OPTIONS = ['1 minute', '5 minutes', '15 minutes'];
 
 /** The board's refresh interval as the select names it, offered too when it isn't one of the select's own. */
 function refreshEvery(seconds: number): Control {
@@ -227,7 +227,7 @@ export function pages(input: PagesInput): Page[] {
   return [
     { id: 'general', label: 'General', icon: <Settings2 />, description: 'How the board refreshes, what Start may do on its own, and how the app sits on your Mac.', groups: [
       { title: 'Board', rows: [
-        { id: 'refresh', title: 'Refresh every', description: "How often the board reads each repository's items and .lar-factory.json, through gh on GitHub and az on Azure DevOps.", control: refreshEvery(data.refreshSeconds) },
+        { id: 'refresh', title: 'Refresh every', description: "How often the board reads items with no active work, and each repository's .lar-factory.json, through gh on GitHub and az on Azure DevOps. Active work reads every 15 seconds.", control: refreshEvery(data.refreshSeconds) },
         { id: 'done-window', title: 'Done shows', description: 'Items closed within this window stay on the board.', control: { type: 'select', options: ['3 days', '7 days', '14 days', '30 days'], value: '7 days' } },
         { id: 'open-in', title: 'Open an item in', control: { type: 'radio', options: ['GitHub', 'T3 thread', 'Ask'], value: 'T3 thread' } },
         { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon closes a GitHub issue as not planned, or moves an Azure DevOps work item to Removed.', control: { type: 'switch', value: true } },

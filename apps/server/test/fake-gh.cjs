@@ -3,8 +3,14 @@
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
-fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
 const output = (value) => process.stdout.write(JSON.stringify(value));
+// GitHub's rate_limit costs no quota, so it stays out of the calls the tests count. options.remaining sets what is left.
+if (args[0] === 'api' && args[1] === 'rate_limit') {
+  const remaining = options.remaining ?? 5000;
+  output({ resources: { core: { limit: 5000, remaining, reset: 1 }, graphql: { limit: 5000, remaining, reset: 1 } } });
+  process.exit(0);
+}
+fs.appendFileSync(process.env.FAKE_GH_STATE + '.calls', JSON.stringify(args) + '\n');
 const WORKFLOW_LABELS = ['bug', 'feature', 'improvement', 'concept', 'decision-grill', 'decision-prototype', 'decision-research', 'decision-task',
   'build', 'active', 'blocked'];
 const OPTIONS = [{ id: 'LIST_1', name: 'List' }, { id: 'QUEUED_1', name: 'Queued' }, { id: 'IN_PROGRESS_1', name: 'In progress' }];
@@ -115,6 +121,13 @@ const main = async () => {
     if (args.some((a) => a.includes('node(id:'))) {
       const id = args.find((a) => a.startsWith('id='))?.slice('id='.length);
       return output({ data: { node: options.details?.[id] ?? null } });
+    }
+    // Project items by their Project item ids, for a read of a few items; an id no item has resolves to null.
+    if (args.some((a) => a.includes('on ProjectV2Item {'))) {
+      const ids = args.filter((a) => a.startsWith('ids[]=')).map((a) => a.slice('ids[]='.length));
+      const nodes = ids.map((id) => (options.items ?? []).find((i) => i.id === id) ?? null)
+        .map((item) => item && { ...item, content: item.content && { ...item.content, body: undefined } });
+      return output({ data: { nodes } });
     }
     // Dossier bodies by node id; the project read below leaves bodies out, as the real query does.
     if (args.some((a) => a.includes('nodes(ids:'))) {

@@ -4,7 +4,7 @@
 import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { DONE_REFUSED, type ItemSource } from '../items/item-source.ts';
-import { addIssueLabel, createIssue, createStatusLabel, deleteIssue, fetchRepoIssues, issueLabels, message, setStatusLabel } from './github.ts';
+import { addIssueLabel, createIssue, createStatusLabel, deleteIssue, fetchIssues, fetchRepoIssues, issueLabels, message, setStatusLabel } from './github.ts';
 
 /** Why an open issue carrying more than one status label can't move, or null when it carries at most one. */
 const twoStatuses = (issue: { statuses: readonly Status[]; state: 'open' | 'closed' }): string | null =>
@@ -27,6 +27,7 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
   }
   return {
     read: async () => ({ title: repo, items: await fetchRepoIssues(repo) }),
+    readSome: (items) => fetchIssues(items.map((item) => item.id)),
     setStatus: (item, status) => write(item.number!, item.statuses, status),
     statusRefusal: (item) => ('statuses' in item ? twoStatuses(item) : null),
     addLabel: (item, label) => addIssueLabel(item.repo!, item.number!, label, run),

@@ -202,19 +202,19 @@ test("an item source is a GitHub Project, the repository's issues or an Azure De
   }
 });
 
-test('the settings file sets the refresh interval; a missing file or field takes 45 seconds', async (t) => {
+test('the settings file sets the refresh interval; a missing file or field takes 300 seconds', async (t) => {
   assert.deepEqual(readBoardSettings(await dataDir(t, { 'settings.json': '{ "refreshSeconds": 30 }' })), { refreshSeconds: 30 });
-  assert.deepEqual(readBoardSettings(await dataDir(t, { 'settings.json': '{}' })), { refreshSeconds: 45 });
-  assert.deepEqual(readBoardSettings(await dataDir(t)), { refreshSeconds: 45 });
+  assert.deepEqual(readBoardSettings(await dataDir(t, { 'settings.json': '{}' })), { refreshSeconds: 300 });
+  assert.deepEqual(readBoardSettings(await dataDir(t)), { refreshSeconds: 300 });
 });
 
 test("a settings file that isn't JSON, or whose refresh interval isn't a positive number, takes the default, naming its path and the problem", async (t) => {
   const broken = await dataDir(t, { 'settings.json': '{ broken' });
-  assert.deepEqual(readBoardSettings(broken), { refreshSeconds: 45, problem: `${join(broken, 'settings.json')} isn't valid JSON.` });
+  assert.deepEqual(readBoardSettings(broken), { refreshSeconds: 300, problem: `${join(broken, 'settings.json')} isn't valid JSON.` });
   for (const text of ['[]', '{ "refreshSeconds": "30" }', '{ "refreshSeconds": 0 }']) {
     const dir = await dataDir(t, { 'settings.json': text });
     assert.deepEqual(readBoardSettings(dir),
-      { refreshSeconds: 45, problem: `${join(dir, 'settings.json')}: expected an object with a positive refreshSeconds, like {"refreshSeconds": 45}.` }, text);
+      { refreshSeconds: 300, problem: `${join(dir, 'settings.json')}: expected an object with a positive refreshSeconds, like {"refreshSeconds": 300}.` }, text);
   }
 });
 

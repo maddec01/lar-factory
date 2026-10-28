@@ -1,5 +1,5 @@
 // What the item dialog shows from an item's details: the description and comments in its main column, the people,
-// labels, dates, milestone or iteration and area and a pull request's checks in the meta area under its title, and the
+// labels, dates, milestone or iteration and area in the meta area under its title, and the
 // sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows its error in the
 // description's place; the board's own fields never wait.
 
@@ -10,7 +10,7 @@ import type { Item, ItemComment, ItemDetails } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { RichText } from '@lar-factory/ui/rich-text';
-import { AzureFields, AgentWork, AgentWorkNote, ChecksBadge } from '../items/item-parts.tsx';
+import { AzureFields, AgentWork, AgentWorkNote } from '../items/item-parts.tsx';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { useOlderComments } from './use-older-comments.ts';
 import type { DetailsEntry } from './details-cache.ts';
@@ -125,7 +125,6 @@ export function ItemMeta({ item, read, now }: { item: Item; read: ItemDetailsRea
         : <FromDetails read={read} label="Milestone" show={(d) => d.milestone} />}
       <FromDetails read={read} label="Created" show={(d) => d.createdAt && <When iso={d.createdAt} now={now} />} />
       <Fact label="Updated"><When iso={item.updatedAt} now={now} /></Fact>
-      {item.pipeline && <ChecksBadge checks={item.pipeline.checks} counts />}
       <AgentWorkNote item={item} />
       <AgentWork item={item} className="@min-[40rem]:hidden" />
     </div>

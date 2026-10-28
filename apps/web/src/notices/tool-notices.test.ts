@@ -68,7 +68,7 @@ test('a missing or logged-out gh shows its own notice, and other read failures s
 
 test('a gh older than 2.94.0 shows its banner with brew upgrade gh, and the board still shows', async () => {
   await mountPage(withTools({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }));
-  expect($$('.banners .banner').map(bannerText)).toEqual([['GitHub CLI is older than 2.94.0.', 'lar-work’s scripts need the --parent, '
+  expect($$('.banners .banner').map(bannerText)).toEqual([['GitHub CLI is older than 2.94.0.', "lar-work's scripts need the --parent, "
     + '--add-sub-issue and --blocked-by flags that gh 2.94.0 added, and this gh is 2.93.1. Run brew upgrade gh Copy in a terminal, '
     + 'then press Recheck. Recheck']]);
   expect($('.desk')).not.toBeNull();
@@ -132,16 +132,16 @@ test('a Recheck note answers only the tool problems it found, and goes once they
 test('a missing git, jq or curl shows a banner with its install command and Recheck, and the board still shows', async () => {
   await mountPage(withTools({ jq: { result: 'missing', fix: 'brew install jq' } }));
   const banners = () => $$('.banners .banner');
-  expect(banners().map(bannerText)).toEqual([['jq not found.', 'lar-work’s scripts read gh’s answers with jq. Install it with brew install jq Copy, '
+  expect(banners().map(bannerText)).toEqual([['jq not found.', "lar-work's scripts read gh's answers with jq. Install it with brew install jq Copy, "
     + 'then press Recheck. Recheck']]);
   expect(banners()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install jq');
   expect($('.desk')).not.toBeNull();
 
   await push(withTools({ git: { result: 'missing', override: 'GIT_PATH=/nowhere/git', fix: 'brew install git' }, curl: { result: 'missing', fix: 'brew install curl' } }));
   expect(banners().map((b) => bannerText(b)[0])).toEqual(['git not found.', 'curl not found.']);
-  expect(bannerText(banners()[0]!)[1]).toBe('lar-work’s agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. '
+  expect(bannerText(banners()[0]!)[1]).toBe("lar-work's agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. "
     + 'Point GIT_PATH at git, or unset it and install it with brew install git Copy, then press Recheck. Recheck');
-  expect(bannerText(banners()[1]!)[1]).toContain('lar-work’s scripts tell the board to refresh with curl. Install it with brew install curl Copy');
+  expect(bannerText(banners()[1]!)[1]).toContain("lar-work's scripts tell the board to refresh with curl. Install it with brew install curl Copy");
 });
 
 test('an az that fails its check shows a banner with its fix, and the board still shows', async () => {

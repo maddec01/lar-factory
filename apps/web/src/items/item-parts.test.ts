@@ -7,5 +7,4 @@ test("a repository takes its board colour whatever the case of its owner/name, a
   const repos = [{ repo: 'maddec01/lar-server', role: 'api', labels: [] }, { repo: 'Maddec01/lar-factory', role: 'factory', labels: [] }];
   expect(repoTone('maddec01/lar-factory', repos)).toBe('repo-tone-1');
   expect(repoTone('someone/elsewhere', repos)).toBe('repo-tone-none');
-  expect(repoTone('Draft', repos)).toBe('repo-tone-none');
 });

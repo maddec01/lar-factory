@@ -69,7 +69,7 @@ test('Abandon only removes List and Queued items', async (t) => {
   await until(board, (d) => d.items.length === 1);
   const refused = await abandon(board, 'I_12');
   assert.equal(refused.status, 409);
-  assert.equal((await refused.json()).error, 'Only List and Queued issues and drafts can be abandoned; this one is an issue in Shaping.');
+  assert.equal((await refused.json()).error, 'Only List and Queued items can be abandoned; this one is in Shaping.');
   assert.equal((await abandon(board, 'I_missing')).status, 404);
   assert.equal((await board.post({ itemId: 'I_12' }, board.url, '/api/abandon')).status, 409, 'needs this board session');
   assert.deepEqual(await writes(board), []);

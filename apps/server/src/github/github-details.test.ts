@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ITEM_DETAILS_QUERY, OLDER_COMMENTS_QUERY, readGithubItemDetails, readGithubOlderComments } from './github-details.ts';
 import type { Item } from '@lar-factory/shared';
 
-const item = (id: string, content: Item['content'] = 'ticket'): Item => ({ id, content } as Item);
+const item = (id: string): Item => ({ id } as Item);
 
 /** A fake gh whose one GraphQL answer is `node`; `calls` holds each call's arguments. */
 function fakeGh(node: unknown) {
@@ -74,7 +74,6 @@ test('older comments are one graphql call for the 10 before the cursor, newest f
 
 test('older comments of an item GitHub no longer has or of a failed call answer the error', async () => {
   assert.deepEqual(await readGithubOlderComments(item('I_gone'), 'CUR_1', fakeGh(null).run), { status: 404, error: 'GitHub has no such item.' });
-  assert.deepEqual(await readGithubOlderComments(item('I_6'), 'CUR_1', fakeGh({ __typename: 'DraftIssue' }).run), { status: 404, error: 'GitHub has no such item.' }, 'a draft has no comments to page');
   const failing = async () => { throw new Error('gh api graphql failed: HTTP 403'); };
   assert.deepEqual(await readGithubOlderComments(item('I_7'), 'CUR_1', failing), { status: 502, error: 'gh api graphql failed: HTTP 403' });
 });

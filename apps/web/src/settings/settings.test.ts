@@ -56,7 +56,7 @@ test('Settings opens from the title bar, in a browser too, as a modal over the b
   await settle(() => settingsButton()!.click());
   expect(modal()!.getAttribute('role')).toBe('dialog');
   expect($$('.settings-nav [role="group"]').map((g) => [g.getAttribute('aria-label'), [...g.querySelectorAll('button')].map(text)])).toEqual([
-    ['Board', ['General', 'Appearance', 'Notifications', 'Keybindings']],
+    ['Board', ['General', 'Appearance', 'Notifications', 'Keyboard shortcuts']],
     ['Connections', ['Repositories', 'T3 Code', 'Skills']],
     ['App', ['Updates', 'Archive', 'Diagnostics']],
   ]);
@@ -157,6 +157,7 @@ test('Refresh every says the board reads each repository\'s items and .lar-facto
 test('unfinished settings show availability inline without controls or fictional values', async () => {
   await open('General');
   expect(text(row('refresh'))).toContain('45 seconds');
+  expect(text(row('in-flight'))).toContain('Concurrent builds');
   for (const id of ['login', 'done-window', 'in-flight', 'auto-start']) {
     expect(text(row(id))).toContain('Not available yet');
     expect(row(id).querySelector('button, input, select')).toBeNull();
@@ -175,7 +176,7 @@ test('unfinished settings show availability inline without controls or fictional
 const groups = () => $$('.settings-group').map((g) => [text(g.querySelector('h3')), [...g.querySelectorAll('.settings-row')].map((r) => r.getAttribute('data-row'))]);
 
 test('Repositories shows the command line tools\' logins and each repository with its provider, item source and show setting', async () => {
-  const repos = [{ ...sample.repos[0]!, project: { owner: 'maddec01', number: 3 } }, { ...sample.repos[1]!, items: 'issues' as const, show: 'opted-in' as const },
+  const repos = [sample.repos[0]!, { ...sample.repos[1]!, items: 'issues' as const, show: 'opted-in' as const },
     { repo: 'contoso/Fabrikam/lar-api', role: 'API', items: 'azure-board' as const, team: 'Fabrikam Team', labels: [] },
     { repo: 'contoso/Fabrikam/lar-web', role: 'Web', items: 'azure-board' as const, team: 'Web Team', labels: [] }];
   await open('Repositories', { ...sample, repos });
@@ -189,7 +190,7 @@ test('Repositories shows the command line tools\' logins and each repository wit
   expect(text(row('az'))).toContain('Not checked: no listed repository is on Azure DevOps.');
   expect(repos.map((r) => text(row(`repo-${r.repo}`)))).toEqual([
     `${repos[0]!.repo}GitHub · Issues · All itemsEditReset`,
-    `${repos[1]!.repo}GitHub · Issues · Opted-in itemsEditReset`,
+    `${repos[1]!.repo}GitHub · Issues · Items with a statusEditReset`,
     'contoso/Fabrikam/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint · All itemsEditReset',
     'contoso/Fabrikam/lar-webAzure DevOps · Web Team\'s backlog and current sprint · All itemsEditReset',
   ]);
@@ -224,7 +225,7 @@ test('each onboarded repository has Edit and Reset, and Add repository opens the
   expect(document.activeElement, 'focus goes back to Add repository').toBe(add);
 });
 
-test('an Azure DevOps repository still onboarding names its team’s sprint or backlog', async () => {
+test("an Azure DevOps repository still onboarding names its team's sprint or backlog", async () => {
   const setup = { team: 'Fabrikam Team', show: 'all' as const, showPicked: true, role: 'API' };
   const progress = (itemSource: 'azure-board' | 'azure-board'): OnboardingProgress =>
     ({ step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-api', provider: 'Azure DevOps', setup: { ...setup, itemSource } } });
@@ -249,7 +250,7 @@ test('a repository still onboarding is listed with its provider, the answers it 
   await open('Repositories', data);
   expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-maddec01/lar-notes']]);
   expect(text(row('repo-maddec01/lar-web')), 'answers the step has not passed yet').toBe('maddec01/lar-webGitHub · Onboarding, stopped at Board settingsResumeReset');
-  expect(text(row('repo-maddec01/lar-notes'))).toBe('maddec01/lar-notesGitHub · Issues · Opted-in items · Onboarding, stopped at ChecksResumeReset');
+  expect(text(row('repo-maddec01/lar-notes'))).toBe('maddec01/lar-notesGitHub · Issues · Items with a status · Onboarding, stopped at ChecksResumeReset');
   const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-notes', provider: 'GitHub' as const, setup }, prUrl: 'https://github.com/maddec01/lar-notes/pull/2' };
   const allItems = { ...pr, answers: { ...pr.answers, setup: { ...setup, itemSource: 'issues' as const, show: 'all' as const } } };
   await push({ ...data, onboarding: [{ repo: 'maddec01/lar-web', progress: allItems }, { repo: 'maddec01/lar-notes', progress: { ...pr, prClosed: true } }] });
@@ -321,7 +322,7 @@ test('Diagnostics shows the version each command printed', async () => {
   await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'ok', version: '2.102.0' }, t3: { result: 'ok', version: '0.1.3-nightly.1' },
     git: { result: 'ok', version: '2.56.0' }, jq: { result: 'ok', version: '1.7.1' } }) });
   expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● 2.102.0', '● 0.1.3-nightly.1', '● 2.56.0', '● 1.7.1', '● OK']);
-  expect(text(row('d-jq'))).toContain('lar-work’s scripts read gh’s answers with it.');
+  expect(text(row('d-jq'))).toContain("lar-work's scripts read gh's answers with it.");
 });
 
 test('Diagnostics shows what the lookup found wrong with gh and t3', async () => {
@@ -389,7 +390,7 @@ const states = (...names: string[]) => names.map((name) => {
   return state && [text(state), state.closest('[title]')?.getAttribute('title') ?? null];
 });
 
-test('Skills shows each skill’s install state: matching, restored with its time, or blocked', async () => {
+test("Skills shows each skill's install state: matching, restored with its time, or blocked", async () => {
   await open('Skills', { ...sample, bundledSkills: [
     { ...larWork, status: { state: 'matching' } }, { ...tdd, status: { state: 'restored', restoredAt } }, { ...tdd, name: 'grill', status: { state: 'blocked', paths: [{ place: 'agents', path: '/home/.agents/skills/grill' }] } },
   ] });
@@ -400,7 +401,7 @@ test('Skills shows each skill’s install state: matching, restored with its tim
   ]);
 });
 
-test('a blocked skill’s row says which paths block it, where each leaves it missing and to move them away', async () => {
+test("a blocked skill's row says which paths block it, where each leaves it missing and to move them away", async () => {
   const paths: BlockingPath[] = [
     { place: 'agents', path: '/home/.agents/skills/grill' }, { place: 'profile', profile: '.claude', path: '/home/.claude/skills/grill' },
     { place: 'antigravity', path: '/home/.gemini/config/skills/grill' },
@@ -432,14 +433,14 @@ test('without a manifest, as on the Sample board, the rows show no state', async
   expect(states('lar-work', 'tdd')).toEqual([null, null]);
 });
 
-test('Skills shows a Copy’s Date as its last update, in a browser too', async () => {
+test("Skills shows a Copy's Date as its last update, in a browser too", async () => {
   await open('Skills', { ...sample, bundledSkills: [larWork, tdd] });
   expect([text(row('bundled-lar-work').querySelector('.text-xs')), text(row('bundled-tdd').querySelector('.text-xs'))]).toEqual([
     'Lar · MIT', 'Matt Pocock · MIT · updated 19 Oct']);
   expect(row('bundled-tdd').querySelector('.text-xs .whitespace-nowrap')?.textContent, 'the date stays on one line').toBe('updated 19 Oct');
 });
 
-test('in the board app, a Lar skill’s last update is the app’s version', async () => {
+test("in the board app, a Lar skill's last update is the app's version", async () => {
   stubApp({ listProfiles: vi.fn(async () => listed), getUpdateState: vi.fn(async () => ({ ...updatesOff, currentVersion: '0.2.0' })) });
   await open('Skills', { ...sample, bundledSkills: [larWork] });
   expect(text(row('bundled-lar-work').querySelector('.text-xs'))).toBe('Lar · MIT · updated in Lar Factory 0.2.0');
@@ -457,11 +458,11 @@ test('Skills has no Skill sync group', async () => {
   expect(groups().map(([title]) => title)).toEqual(['Claude profiles', 'Bundled skills']);
 });
 
-test('Skills says so in one row when it couldn’t read the bundled skills', async () => {
+test("Skills says so in one row when it couldn't read the bundled skills", async () => {
   await open('Skills', { ...sample, bundledSkills: [] });
   const group = $$('.settings-group').find((g) => text(g.querySelector('h3')) === 'Bundled skills')!;
   expect([...group.querySelectorAll<HTMLElement>('.settings-row')].map((r) => [r.dataset.row, text(r.querySelector('.font-medium'))])).toEqual(
-    [['bundled-unread', 'Couldn’t read the bundled skills']]);
+    [['bundled-unread', "Couldn't read the bundled skills"]]);
   expect(group.querySelector('a, button, input')).toBeNull();
 });
 

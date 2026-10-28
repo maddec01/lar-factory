@@ -113,17 +113,21 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
   const action = useItemAction(item.id);
   const [open, setOpen] = useState(false);
   const thread = startedThread(item, data, start, kind);
-  const observed = Array.isArray(item.threads) ? (thread ? item.threads.find((t) => t.id === thread.threadId) : item.threads[0]) : undefined;
-  if (observed?.state === 'stopped' || (thread && observed?.state === 'done')) {
-    return <span className="start-group"><span>{observed.state === 'stopped' ? 'Run stopped.' : 'Run finished.'}</span><OpenThread item={item} data={data} /></span>;
+  const threads = Array.isArray(item.threads) ? item.threads : [];
+  // An unrecorded shaping thread can explain refining, but never a build that hasn't started.
+  const observed = thread ? threads.find((t) => t.id === thread.threadId)
+    : kind === 'refine' ? threads.find((t) => t.id !== data.startedBuilds?.[item.id]?.threadId) : undefined;
+  const stopped = observed?.state === 'stopped';
+  if (thread && observed?.state === 'done') {
+    return <span className="start-group"><span className="basis-full">Run finished.</span><OpenThread item={item} data={data} threadId={observed.id} /></span>;
   }
   // The toast announces a start; the tag only keeps Start from running twice.
-  if (thread) return <span className="start-group"><Badge tone="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
+  if (thread && !stopped) return <span className="start-group"><Badge tone="success" className="started-tag" tabIndex={-1} data-start-result={item.id} title={`T3 thread ${thread.threadId}`}>Started</Badge></span>;
   if (start?.phase === 'uncertain') {
     // Once its message is closed, a tag still says why Start is gone.
     return <span className="start-group">{!start.message && <Badge tone="warning" className="started-tag unsure" tabIndex={-1} data-start-result={item.id} title="Check T3 before starting it again">May have started</Badge>}</span>;
   }
-  const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : label;
+  const verb = start?.phase === 'pending' ? 'Starting…' : start?.phase === 'error' ? 'Retry start' : stopped ? 'Start again' : label;
   // Sample mode keeps Start's menu open-able, so the model choices can be seen; its entries start nothing.
   const state = data.capture?.enabled === false ? {} : start?.phase === 'pending' ? { 'aria-disabled': true as const } : writeState(data, action);
   const held = Boolean(state['aria-disabled']);
@@ -134,6 +138,7 @@ export function StartControl({ item, data, label = 'Start', main, kind = 'refine
   };
   return (
     <span className="start-group">
+      {stopped && <><span className="basis-full">Run stopped.</span><OpenThread item={item} data={data} threadId={observed.id} /></>}
       <DropdownMenu open={open && !held} onOpenChange={(next) => setOpen(next && !held)} modal={false}>
         <DropdownMenu.Trigger asChild>
           <Button {...buttonKind(main ? 'main' : 'start')} leftIcon={start?.phase !== 'pending' && !main && ICON.play} data-start={item.id} aria-label={`${verb} ${ref(item)} ${item.title}`} {...state}>

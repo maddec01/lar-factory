@@ -15,7 +15,7 @@ const NOWHERE = {
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const REPO = 'maddec01/lar-factory';
 /** Issue `number` in lar-factory, as the board item the lookups take. */
-const item = (number: number | null) => ({ repo: REPO, number });
+const item = (number: number) => ({ repo: REPO, number });
 /** A lookup's result once it's read, failing the test when there was none or it was unavailable. */
 function found<T>(value: T | 'unavailable' | undefined): T {
   assert.ok(value !== undefined && value !== 'unavailable', `expected a read, got ${value}`);
@@ -36,7 +36,6 @@ test('one read of the database gives each item its stats and threads, and undefi
   assert.equal(found(reads.stats(item(1))).agentMs, 10 * 60_000);
   assert.deepEqual(found(reads.threads(item(1))).map((th) => [th.id, th.state]), [['a', 'done']]);
   assert.deepEqual([reads.stats(item(2)), reads.threads(item(2))], [undefined, undefined]);
-  assert.deepEqual([reads.stats({ repo: null, number: null }), reads.threads(item(null))], [undefined, undefined], 'a draft names no issue');
   assert.deepEqual([reads.statsUnavailable, reads.priced], [false, false], 'no rate table, so nothing is priced');
 });
 

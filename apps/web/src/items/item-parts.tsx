@@ -11,7 +11,7 @@ import { STATUS_COLOR } from './status-glyph.tsx';
 const REPO_TONES = 8;
 
 /** A repository's colour class: the palette entry for its place among the board's repositories, or the muted
- *  colour for Draft and a repository the board doesn't list. `repo` is an `owner/name` or Draft. */
+ *  colour for a repository the board doesn't list. `repo` is a repository key. */
 export function repoTone(repo: string, repos: readonly RepoConfig[]): string {
   const at = repos.findIndex((r) => sameRepo(r.repo, repo));
   return at < 0 ? 'repo-tone-none' : `repo-tone-${at % REPO_TONES}`;
@@ -98,7 +98,7 @@ export function SliceList({ item }: { item: Item }) {
 const CHECKS_COLOR = { failed: 'var(--error)', running: 'var(--warning)', passed: 'var(--st-done)' } as const;
 
 /** A pull request's checks as a coloured dot and their state, with the passed count when `counts`; nothing when it has none. */
-export function ChecksBadge({ checks, counts }: { checks: Checks | null; counts?: boolean }) {
+function ChecksBadge({ checks, counts }: { checks: Checks | null; counts?: boolean }) {
   const state = checkState(checks);
   if (!checks || !state) return null;
   return (

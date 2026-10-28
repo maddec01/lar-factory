@@ -318,5 +318,5 @@ test('on an Azure repository, Add item says work item, and an uncertain creation
   respond({ item: null, issueUrl: null, error: 'az did not answer.', uncertain: true });
   await settle(() => submit().click());
   expect(result().querySelector('a')!.href).toBe('https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems');
-  expect(result().querySelector('a')!.textContent).toBe('Check the project’s work items');
+  expect(result().querySelector('a')!.textContent).toBe("Check the project's work items");
 });

@@ -1,4 +1,4 @@
-// The List modal: the title bar's List button opens it, the left pane picks All, a repository or Draft, the right
+// The List modal: the title bar's List button opens it, the left pane picks All, a repository, the right
 // pane shows that group's items with search, Add item, Scope board and the sort menu.
 
 import { afterEach, beforeEach, expect, test, vi } from 'vite-plus/test';
@@ -49,7 +49,7 @@ test('choosing a repository in the left pane shows only its items on the right',
   expect(rows()).toHaveLength(4);
 });
 
-test('the left pane lists All, each repository with its count, then Draft under No repository', async () => {
+test('the left pane lists All, each repository with its count', async () => {
   await mountPage();
   await open();
   expect(counts()).toEqual([['All repositories', '4'], ['lar-server', '3'], ['lar-apple', '1']]);
@@ -77,7 +77,7 @@ test('the List modal starts on the board\'s scope', async () => {
   expect(rows()).toEqual(['I_sample03']);
 });
 
-test('under All repositories a row names its repository, except a Draft', async () => {
+test('under All repositories a row names its repository', async () => {
   await mountPage();
   await open();
   const meta = (id: string) => text($(`[data-list-modal] button[data-item="${id}"] span span:last-child`));

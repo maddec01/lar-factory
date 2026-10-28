@@ -9,9 +9,9 @@ import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { LinkButton } from './link-button.tsx';
 
 /** The `t3code://` link to the item's latest thread, or why there is none. */
-function latestThread(item: Item, data: BoardData): { link: string } | { reason: string } {
+function latestThread(item: Item, data: BoardData, threadId?: string): { link: string } | { reason: string } {
   if (item.threads === 'unavailable') return { reason: 'The T3 Code database could not be read' };
-  const latest = item.threads?.[0];
+  const latest = threadId ? item.threads?.find((t) => t.id === threadId) : item.threads?.[0];
   if (!latest) return { reason: 'No T3 thread has worked on this yet' };
   if (!data.t3EnvironmentId) return { reason: "T3 Code hasn't written its environment id" };
   return { link: threadLink(data.t3EnvironmentId, latest.id) };
@@ -22,11 +22,11 @@ export const hasLiveThread = (item: Item): boolean =>
   Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running' || t.state === 'needs you');
 
 /**
- * Opens the latest thread in T3 Code: the board app hands the link to T3, a browser asks to open it. `iconOnly` draws
+ * Opens the latest thread, or the phase's recorded `threadId`, in T3 Code: the board app hands the link to T3, a browser asks to open it. `iconOnly` draws
  * it as a square icon button, its label in its tooltip, as a desk card's corner does.
  */
-export function OpenThread({ item, data, label = 'Open thread', iconOnly = false }: { item: Item; data: BoardData; label?: string; iconOnly?: boolean }) {
-  const thread = latestThread(item, data);
+export function OpenThread({ item, data, label = 'Open thread', iconOnly = false, threadId }: { item: Item; data: BoardData; label?: string; iconOnly?: boolean; threadId?: string }) {
+  const thread = latestThread(item, data, threadId);
   // A square Open, the thread icon alone, named by its label.
   const named = iconOnly ? { 'aria-label': label, 'data-icon-only': '' } : {};
   const shown = iconOnly ? null : label;

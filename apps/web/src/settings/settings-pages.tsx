@@ -61,9 +61,9 @@ export function toolState(check: ToolCheck | undefined, login = false): Componen
 const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
   ['gh', 'Reads GitHub repository issues and linked pull requests.'],
   ['t3', 'Starts the lar-work threads in T3 Code.'],
-  ['git', 'lar-work’s agents branch, commit and push with it.'],
-  ['jq', 'lar-work’s scripts read gh’s answers with it.'],
-  ['curl', 'lar-work’s scripts tell the board to refresh with it.'],
+  ['git', "lar-work's agents branch, commit and push with it."],
+  ['jq', "lar-work's scripts read gh's answers with it."],
+  ['curl', "lar-work's scripts tell the board to refresh with it."],
 ];
 
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
@@ -94,7 +94,7 @@ const ITEM_SOURCES = { issues: 'Issues', 'azure-board': 'Backlog and current spr
 const sourceName = (kind: keyof typeof ITEM_SOURCES, team?: string) =>
   kind === 'azure-board' && team ? `${team}'s backlog and current sprint` : ITEM_SOURCES[kind];
 
-const SHOWN = { all: 'All items', 'opted-in': 'Opted-in items' } as const;
+const SHOWN = { all: 'All items', 'opted-in': 'Items with a status' } as const;
 
 /**
  * A repository still onboarding: its provider, its item source and show setting once it has passed the step that asks
@@ -130,7 +130,7 @@ function repositoryGroup(data: BoardData): Group {
       <Button {...kind('other')} onClick={() => useResetStore.getState().open(repo)}>Reset</Button>
     </span>),
   }));
-  return { title: 'Repositories', description: 'Each repository’s Repository config lives in its own .lar-factory.json; this Mac keeps only the list.',
+  return { title: 'Repositories', description: "Each repository's Repository config lives in its own .lar-factory.json; this Mac keeps only the list.",
     rows: [...onboarded, ...onboarding],
     footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add repository</Button> };
 }
@@ -190,7 +190,7 @@ function bundledGroup({ data, version }: PagesInput): Group {
       <InstallState status={skill.status} />
       <a className="inline-flex items-center gap-1 text-xs font-medium text-(--foreground) underline-offset-2 hover:underline [&_svg]:size-3.5" aria-label={`${skill.name} source`} href={skill.source} target="_blank" rel="noopener"><ExternalLink /> Source</a>
     </span>),
-  })) : [{ id: 'bundled-unread', title: 'Couldn’t read the bundled skills', description: 'The board server couldn’t read the app’s bundle, so it can’t credit them here.', control: custom(() => null) }];
+  })) : [{ id: 'bundled-unread', title: "Couldn't read the bundled skills", description: "The board server couldn't read the app's bundle, so it can't credit them here.", control: custom(() => null) }];
   return { title: 'Bundled skills', description: 'The skills and checklists the app installs, and who wrote them.', rows };
 }
 
@@ -214,7 +214,7 @@ export function pages(input: PagesInput): Page[] {
         { id: 'confirm-abandon', title: 'Confirm before Abandon', description: 'Abandon closes a GitHub issue as not planned, or moves an Azure DevOps work item to Removed.', control: custom(() => <span className="text-xs text-(--muted-foreground)">Always ask</span>) },
       ] },
       { title: 'Flow limits', rows: [
-        { id: 'in-flight', title: 'In-flight limit', control: { type: 'unavailable' } },
+        { id: 'in-flight', title: 'Concurrent builds', control: { type: 'unavailable' } },
         { id: 'needs-you-pause', title: 'Pause Start when Needs you is above', control: { type: 'unavailable' } },
         { id: 'auto-start', title: 'Start the next Queued item when a slot frees', control: { type: 'unavailable' } },
       ] },
@@ -226,7 +226,7 @@ export function pages(input: PagesInput): Page[] {
         { id: 'dock-side', title: 'Dock beside T3 Code', control: { type: 'unavailable' } },
       ] },
     ] },
-    { id: 'appearance', label: 'Appearance', icon: <Palette />, description: 'The board’s theme, density and what each item shows.', groups: [
+    { id: 'appearance', label: 'Appearance', icon: <Palette />, description: "The board's theme, density and what each item shows.", groups: [
       { title: 'Theme', rows: [
         { id: 'scheme', title: 'Color scheme', control: { type: 'unavailable' } },
         { id: 'follow-t3', title: "Follow T3 Code's theme", control: { type: 'unavailable' } },
@@ -283,15 +283,15 @@ export function pages(input: PagesInput): Page[] {
         { id: 'sound', title: 'Sound', control: { type: 'unavailable' } },
       ] },
     ] },
-    { id: 'keybindings', label: 'Keybindings', icon: <Keyboard />, description: 'The board’s keyboard shortcuts.', groups: [
-      { title: 'Keybindings', description: 'Keyboard shortcut settings are not available yet.', rows: [] },
+    { id: 'keybindings', label: 'Keyboard shortcuts', icon: <Keyboard />, description: "The board's keyboard shortcuts.", groups: [
+      { title: 'Keyboard shortcuts', description: 'Keyboard shortcut settings are not available yet.', rows: [] },
     ] },
     { id: 'updates', label: 'Updates', icon: <RefreshCw />, description: 'Which Releases Lar Factory offers, and when it installs them.', groups: [
       { title: 'Updates', rows: updateRows(input), ...(input.app && { note: <UpdatesNote /> }) },
     ] },
     { id: 'archive', label: 'Archive', icon: <Archive />, description: 'Abandoned items stay in their provider.', groups: [
       { title: 'Abandoned items', description: 'The board does not list abandoned items yet.', rows: [],
-        note: <p className="m-0 text-xs text-(--muted-foreground)">Reopen issues on GitHub or reactivate work items in Azure DevOps. Removed drafts cannot be restored.</p> },
+        note: <p className="m-0 text-xs text-(--muted-foreground)">Reopen issues on GitHub or reactivate work items in Azure DevOps.</p> },
     ] },
     { id: 'diagnostics', label: 'Diagnostics', icon: <Stethoscope />, description: 'The commands the board runs, and its server.', groups: [
       { title: 'Tools', rows: [

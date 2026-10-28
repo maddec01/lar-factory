@@ -61,7 +61,7 @@ test('normalizes an issue item from the GraphQL response', () => {
   assert.equal(item?.linkedPrs[0]?.body, 'PR body', 'the stats block is kept from the body the board query reads');
 });
 
-test('an item blocked by nothing has no blockers, and a draft has none either', () => {
+test('an item blocked by nothing has no blockers', () => {
   assert.deepEqual(normalizeItem(rawIssue('I_4', 4, 'List', ['feature']))?.blockers, []);
 });
 
@@ -126,7 +126,7 @@ test("a linked PR's check rollup becomes counts over all checks and the earliest
   const counts = (pairs: Record<string, number>) => Object.entries(pairs).map(([state, count]) => ({ state, count }));
   const pr = (statusCheckRollup: RawLinkedPr['statusCheckRollup']) => normalizeItem({
     id: 'I_4', updatedAt: '2026-10-21T08:00:00Z',
-    content: { __typename: 'Issue', id: 'I_4', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
+    content: { ...rawIssue('I_4', 4, 'List', []).content!,
       closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false,
         statusCheckRollup }] } },
   })?.linkedPrs[0];
@@ -162,16 +162,13 @@ test("GitHub's merge state statuses map to can merge, checking, conflicts and bl
     'an unknown status, even an object member, is checking');
 });
 
-test("a linked PR carries its merge state, and a pull request item its own checks and merge state", () => {
-  const rollup = { contexts: { checkRunCountsByState: [{ state: 'SUCCESS', count: 2 }], statusContextCountsByState: [], nodes: [] } };
+test("a linked PR carries its merge state", () => {
   const issue = normalizeItem({
     id: 'I_6', updatedAt: '2026-10-21T08:00:00Z',
-    content: { __typename: 'Issue', id: 'I_6', title: 'T', updatedAt: '2026-10-21T08:00:00Z',
+    content: { ...rawIssue('I_6', 6, 'List', []).content!,
       closedByPullRequestsReferences: { nodes: [{ number: 9, url: 'p', state: 'OPEN', isDraft: false, mergeStateStatus: 'DIRTY' }] } },
   });
   assert.equal(issue?.linkedPrs[0]?.mergeState, 'conflicts');
-  assert.equal(issue?.pipeline, undefined, 'an issue has no pipeline of its own');
-
 });
 
 test("a build's slices come from the board query, open and closed, in GitHub's order; other kinds keep none", () => {

@@ -120,9 +120,9 @@ test('the Agent column shows agent time over tokens and cost, or a dash before a
   const agent = (id: string) => cells(id)[2]!;
   expect([...agent('I_sample14').children].map(text)).toEqual(['3h 20m', '12.4M · $41.20']);
   expect(agent('I_sample14').title).toBe('Agent time · tokens · cost');
-  expect(text(agent('I_sample15').lastElementChild), 'nothing priced').toBe('980 · –');
+  expect(text(agent('I_sample15').lastElementChild), 'nothing priced').toBe('980 · Unavailable');
   expect(agent('I_sample16').title).toBe('As it stood at merge');
-  expect([text(agent('I_sample13')), text(agent('I_sample07'))]).toEqual(['–', '–']);
+  expect([text(agent('I_sample13')), text(agent('I_sample07'))]).toEqual(['Unavailable', 'Unavailable']);
 });
 
 test('a row opens the item dialog and stays marked while it shows', async () => {
@@ -409,7 +409,7 @@ test('a stopped build replaces its remembered Started tag with recovery, also in
   const started = { threadId: 'stopped-build', title: 'Build maddec01/lar-server#140' };
   await answer({ thread: started, error: null });
   const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive(withItem('I_sample13', { threads: [thread('stopped-build', 'stopped')] }, {
+  await settle(() => useBoardStore.getState().receive(withItem('I_sample13', { threads: [thread('newer-shaping', 'stopped'), thread('stopped-build', 'stopped')] }, {
     ...data, startedBuilds: { I_sample13: started },
   })));
   expect(text(side('I_sample13'))).toContain('Run stopped.');
@@ -418,5 +418,25 @@ test('a stopped build replaces its remembered Started tag with recovery, also in
   await press(row('I_sample13'));
   expect(text(dialog()!.querySelector('[data-slot="modal-footer"]'))).toContain('Run stopped.');
   expect(dialog()!.querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/stopped-build');
-  expect(posted()).toHaveLength(1);
+  const again = side('I_sample13').querySelector<HTMLButtonElement>('[data-start]')!;
+  expect(text(again)).toBe('Start again ▾');
+  expect(text(dialog()!.querySelector('[data-start]'))).toBe('Start again ▾');
+  await pressMenu(again);
+  await press(entries()[0]!);
+  expect(posted()).toHaveLength(2);
+  expect(text(startBuild())).toBe('Starting…');
+  await answer({ thread: { threadId: 'new-build', title: 'Build again' }, error: null,
+    board: { ...data, startedBuilds: { I_sample13: { threadId: 'new-build', title: 'Build again' } } } });
+  expect(text(side('I_sample13').querySelector('[data-start-result]'))).toBe('Started');
+});
+
+test.each([false, true])('a Ready item keeps Start build after shaping stops (recorded: %s)', async (recorded) => {
+  const shaping = thread('stopped-shaping', 'stopped');
+  await mountPage(withItem('I_sample13', { threads: [shaping] }, {
+    ...unblocked(), started: recorded ? { I_sample13: { threadId: shaping.id, title: shaping.title } } : {},
+  }));
+  expect(text(startBuild())).toBe('Start build ▾');
+  expect(text(side('I_sample13'))).not.toContain('Run stopped.');
+  await press(row('I_sample13'));
+  expect(text(dialog()!.querySelector('[data-slot="modal-footer"]'))).toContain('Start build ▾');
 });

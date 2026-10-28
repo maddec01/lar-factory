@@ -1,7 +1,4 @@
 {
-  "project": {
-    "title": "lar"
-  },
   "repos": [
     {
       "repo": "maddec01/lar-server",

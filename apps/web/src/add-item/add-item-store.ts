@@ -46,7 +46,7 @@ export const itemNoun = (repo: string | undefined): string => repo && onAzure(re
 function itemsLink(repo: string): Pick<ResultMessage, 'url' | 'label'> {
   if (!onAzure(repo)) return { url: `https://github.com/${repo}/issues`, label: 'Check repository issues' };
   const [organization, project] = repo.split('/');
-  return { url: `https://dev.azure.com/${organization}/${project}/_workitems`, label: 'Check the project’s work items' };
+  return { url: `https://dev.azure.com/${organization}/${project}/_workitems`, label: "Check the project's work items" };
 }
 
 const idle = (): ResultMessage => ({

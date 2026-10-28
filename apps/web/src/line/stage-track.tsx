@@ -53,11 +53,11 @@ export const statsOf = (item: Item): ItemStats | null => (item.stats && item.sta
 
 /** Agent time over tokens and cost; a dash before any thread has worked on it. */
 export function AgentCell({ s }: { s: ItemStats | null }) {
-  if (!s) return <span className={`${AGENT} text-right text-[11px] text-(--muted-foreground)`}>–</span>;
+  if (!s) return <span className={`${AGENT} text-right text-[11px] text-(--muted-foreground)`}>Unavailable</span>;
   return (
     <span className={`${AGENT} text-right text-[11px] leading-tight tabular-nums text-(--muted-foreground)`} title={s.frozen ? 'As it stood at merge' : 'Agent time · tokens · cost'}>
       <span className="font-medium text-(--foreground)">{duration(s.agentMs)}</span>
-      <span>{formatTokens(s.tokens)} · {s.costUsd !== undefined ? formatUsd(s.costUsd) : '–'}</span>
+      <span>{formatTokens(s.tokens)} · {s.costUsd !== undefined ? formatUsd(s.costUsd) : 'Unavailable'}</span>
     </span>
   );
 }

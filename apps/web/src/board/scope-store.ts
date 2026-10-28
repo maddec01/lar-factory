@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 
 interface ScopeState {
-  /** The repository the main area shows, as `owner/name` or Draft, or `null` for all repositories. */
+  /** The repository the main area shows, as a repository key, or `null` for all repositories. */
   scope: string | null;
   setScope: (scope: string | null) => void;
 }

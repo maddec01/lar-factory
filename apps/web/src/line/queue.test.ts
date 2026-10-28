@@ -132,7 +132,7 @@ test('when no queued item can start, Start next shows disabled and says why', as
     ? { ...i, blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'open' as const }] } : i)) };
   await mountPage(held);
   const next = [...queue().querySelectorAll<HTMLButtonElement>('header button')].find((b) => text(b) === 'Start next')!;
-  expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs an issue or a T3 project, waits for onboarding, or has a thread at work.']);
+  expect([next.disabled, next.title]).toEqual([true, 'Every queued item is blocked, needs a T3 project, waits for onboarding, or has a thread at work.']);
   expect(next.className, 'pointer events stay on, so the title shows').toContain('disabled:pointer-events-auto');
   expect(next.dataset.kind, 'a Main action while disabled too').toBe('main');
   expect(text(queue()), 'no row waits for a slot').not.toContain('next when a build slot frees');
@@ -159,7 +159,7 @@ test('the drag handles and Auto-start are disabled and say they are not built ye
     .toEqual(['Auto-start', true, 'false', "Auto-start isn't built yet: it will start the next item whenever a build slot frees"]);
 });
 
-test('Start refining sits on Queued issues, one Start on every row, and Start next is filled; a queued draft asks for an issue instead', async () => {
+test('Start refining sits on Queued issues, one Start on every row, and Start next is filled', async () => {
   await mountPage();
   expect($$('.queue li [data-start]').map((b) => b.getAttribute('data-start'))).toEqual(['I_sample05', 'I_sample06', 'I_sample21']);
   expect([text(start()), start().getAttribute('aria-haspopup'), start().getAttribute('aria-label')])

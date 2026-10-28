@@ -39,7 +39,7 @@ export interface HttpDeps {
   projectChoices(): Promise<ProjectChoice[]>;
   readProjectTeams(input: Record<string, unknown>): Promise<{ teams: string[] } | Refused>;
   /** Stores where a closed onboarding stopped, returning the repositories still onboarding, or why it can't. */
-  keepOnboarding(input: Record<string, unknown>): { onboarding: OnboardingRepository[] } | Refused;
+  keepOnboarding(input: Record<string, unknown>): Promise<{ onboarding: OnboardingRepository[] } | Refused>;
   /** Adds the body's folder as a T3 project, returning T3's projects and the new one's id, or why it can't. */
   createProject(input: Record<string, unknown>): Promise<{ projects: ProjectChoice[]; projectId: string } | Refused>;
   /** Runs one of onboarding's setup checks on the body's repository, T3 project and item source, or says why it can't. */
@@ -243,7 +243,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     '/api/onboarding/repositories': {
       what: 'the onboarding to keep', disabled: 'Sample mode onboards no repository.',
       async run(input) {
-        const kept = keepOnboarding(input);
+        const kept = await keepOnboarding(input);
         if ('error' in kept) return { status: kept.status, body: { error: kept.error } };
         board.update({ onboarding: kept.onboarding });
         board.push();

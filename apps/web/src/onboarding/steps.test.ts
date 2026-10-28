@@ -207,12 +207,12 @@ test('a reused .lar-factory.json shows its values and asks nothing', async () =>
   expect(nextButton().disabled).toBe(false);
 });
 
-test("a .lar-factory.json that can't be reused shows its problem with Retry, and Next waits", async () => {
+test('a settings file that cannot be reused can be replaced through fresh setup', async () => {
   await openSetup(project('lar-web', { hasConfig: true, configProblem: '.lar-factory.json field role is missing or not a string.' }));
-  const alert = dialog()!.querySelector('[data-slot="modal-body"] [role="alert"]')!;
-  expect(text(alert)).toContain('.lar-factory.json field role is missing or not a string.');
-  expect(text(alert.querySelector('button')).trim()).toBe('Retry');
+  expect(text(dialog()!.querySelector('[data-slot="modal-body"]'))).toContain("Its settings file can't be used. Run onboarding to replace it.");
   expect(nextButton().disabled).toBe(true);
+  await type(input('role')!, 'Web client');
+  expect(nextButton().disabled).toBe(false);
 });
 
 const AZURE = project('lar-api', { repo: 'contoso/Fabrikam%20Fiber/lar-api', provider: 'Azure DevOps' });
@@ -1201,4 +1201,12 @@ test('Labels puts the missing count and Create before its collapsed full list', 
   expect(details.open).toBe(false);
   expect(create.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(text(body.querySelector('[role="status"]'))).toContain('missing');
+});
+
+test('unusable saved settings offer fresh fields instead of a dead end', async () => {
+  await openSetup(project('lar-web', { hasConfig: true, configProblem: '.lar-factory.json has an unsupported item source. Run onboarding again.' }));
+  expect(text(dialog())).toContain("Its settings file can't be used. Run onboarding to replace it.");
+  expect(input('role')).not.toBeNull();
+  await type(input('role')!, 'New API');
+  expect(nextButton().disabled).toBe(false);
 });

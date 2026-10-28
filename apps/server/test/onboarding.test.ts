@@ -375,3 +375,20 @@ test('label creation streams successful updates through the guarded HTTP route',
   assert.ok(events[0].progress.labels.length > 0);
   assert.equal(events.at(-1).result.error, null);
 });
+
+test('a listed repository with an unsupported config remains offered for fresh onboarding', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'lar-recovery-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
+  checkouts(home, { 'lar-web': 'git@github.com:maddec01/lar-web.git' });
+  const db = projectsDb(t, [{ id: 'lar-web', root: `${home}/Developer/lar/lar-web` }]);
+  const board = await startBoard(t, { repositories: ['maddec01/lar-web', 'maddec01/lar-factory'], repoConfigs: {
+    'maddec01/lar-web': { role: 'Web', itemSource: { kind: 'github-project', owner: 'maddec01', number: 3 } },
+  } }, false, false, { HOME: home, T3_STATE_DB: db });
+  const data = await until(board, (data) => !!data.onboardingOffers?.some((offer) => offer.repo === 'maddec01/lar-web'));
+  assert.ok(data.repos.some((repo) => repo.repo === 'maddec01/lar-factory'));
+  assert.ok(data.onboardingOffers?.[0]?.configProblem);
+  const response = await board.post({ repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } } }, board.url, '/api/onboarding/repositories');
+  assert.equal(response.status, 200);
+  const kept = await response.json() as { board: BoardData };
+  assert.equal(kept.board.onboarding?.[0]?.repo, 'maddec01/lar-web');
+});

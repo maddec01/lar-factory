@@ -22,6 +22,7 @@ import { prHost as host } from '../config/pr-host.ts';
 import { boardDataDir } from '../port/board-record.ts';
 import { bundledSkillNames } from '../skills/bundled-skills.ts';
 import { planPrChanges, type PrPlan } from './pr-changes.ts';
+import { keepOnboarding } from './keep-onboarding.ts';
 import { openResetPr } from './reset-pr.ts';
 import { workflowLabelsProblem } from './repository-labels.ts';
 
@@ -39,7 +40,7 @@ function describe(change: OnboardingPrChange): string {
   switch (change.kind) {
     case 'agent-skills': return `Writes lar Factory's \`## Agent skills\` block in \`${change.path}\`.`;
     case 'write': return change.path === '.lar-factory.json'
-      ? 'Adds `.lar-factory.json`, the Repository config lar Factory reads for this repository.'
+      ? `${change.created ? 'Adds' : 'Replaces'} \`.lar-factory.json\`, the Repository config lar Factory reads for this repository.`
       : `${change.created ? 'Adds' : 'Replaces'} \`${change.path}\`.`;
     case 'edit': return `Edits \`${change.path}\` at line ${change.line}: ${change.reason}`;
     case 'delete': return `Deletes \`${change.path}\`.`;
@@ -176,6 +177,8 @@ export function createPrOpener(dir = boardDataDir(), run?: Run) {
         }
         opening.plan = planned;
       }
+      const keptProgress = await keepOnboarding({ repo, progress, replaces }, dir, run);
+      if ('error' in keptProgress) return keptProgress;
       if (!azure) {
         opening.tree ??= await createTree(repo, opening.plan.base, opening.plan.entries, run);
         opening.commit ??= await createCommit(repo, TITLE, opening.tree, opening.head.sha, run);

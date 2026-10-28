@@ -27,6 +27,7 @@ import { LinkButton } from '../items/link-button.tsx';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { toolDescription, toolState } from '../settings/settings-pages.tsx';
 import { Choice, CustomLabelPicker, CustomLabelsTitle, Field, customLabelsHelp, Group, SHOW_TITLES, SetupFields, ShowChoices } from './setup-fields.tsx';
+import { REPLACE_SETTINGS_HELP } from './setup-answers.ts';
 import {
   commandChecks, type Clashes, type Creating, type Labels, type Run, type StepId, asksSetup, commandPasses, configOf, customLabelsToCreate, itemSourceOf, labelsPlan, latestRun,
   nextModel, onboarded, pickedProject, picksOf, prClosed, renaming, skillProblem, skillsDir, ticked, typedLabelProblem, unpickable, useWizardStore,
@@ -34,6 +35,7 @@ import {
 
 /** Whether the project's repository has .lar-factory.json. */
 function ConfigBadge({ project }: { project: ProjectChoice }) {
+  if (project.configProblem) return <Badge tone="warning">Needs setup</Badge>;
   if (project.hasConfig) return <Badge tone="info">Saved settings</Badge>;
   if (project.hasConfig === false) return <Badge>New setup</Badge>;
   return !!project.provider && <Badge>Could not check settings</Badge>;
@@ -92,7 +94,7 @@ function ProjectStep({ run }: { run: Run }) {
               {p.provider && <Badge>{p.provider}</Badge>}
               <ConfigBadge project={p} />
               {p.onBoard && <Badge>{kept ? 'onboarding' : 'on the board'}</Badge>}</span>}>
-              <span className="font-mono">{p.folder}</span>{p.repo ? ` · ${shownRepo(p.repo)}` : ` · ${reason}`}{p.repo && kept && reason && ` · ${reason}`}
+              <span className="font-mono">{p.folder}</span>{p.repo ? ` · ${shownRepo(p.repo)}` : ` · ${reason}`}{p.repo && kept && reason && ` · ${reason}`}{p.configProblem && <span className="block">{REPLACE_SETTINGS_HELP}</span>}
             </Choice>
           );
         })}
@@ -142,11 +144,12 @@ function SetupStep({ run }: { run: Run }) {
   return (
     <div className="grid gap-6">
       <ProviderRow project={project} />
-      {project.configProblem ? (
-        <Problem title="Could not use saved settings">{project.configProblem} Fix .lar-factory.json on {shownRepo(project.repo)}'s default branch, then retry.</Problem>
-      ) : !asksSetup(project) ? (
+      {!asksSetup(project) ? (
         <Problem title="Could not check saved settings">Check access to {shownRepo(project.repo)}, then retry.</Problem>
-      ) : run.setup && <SetupFields repo={project.repo} azure={project.provider === 'Azure DevOps'} setup={run.setup} onAnswer={answer} counts={checks?.setup.source.state === 'done' && checks.setup.source.result.passed ? checks.setup.source.result.counts : undefined} />}
+      ) : run.setup && <>
+        {project.configProblem && <p className="m-0 text-sm text-base-700">{REPLACE_SETTINGS_HELP}</p>}
+        <SetupFields repo={project.repo} azure={project.provider === 'Azure DevOps'} setup={run.setup} onAnswer={answer} counts={checks?.setup.source.state === 'done' && checks.setup.source.result.passed ? checks.setup.source.result.counts : undefined} />
+      </>}
     </div>
   );
 }

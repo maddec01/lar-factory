@@ -1,7 +1,8 @@
 // The banner for each onboarded repository whose .lar-factory.json the board couldn't read.
 
+import { serve, project } from '../onboarding/onboarding-support.ts';
 import { expect, test } from 'vite-plus/test';
-import { $$, bannerText, mountPage, push, sample } from '../../test/support.ts';
+import { $, $$, bannerText, mountPage, push, sample, settle, text } from '../../test/support.ts';
 
 const problems = [
   { repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' },
@@ -22,4 +23,17 @@ test("each repository whose .lar-factory.json can't be read gets a banner naming
 
   await push({ ...sample, repositoryConfigProblems: [] });
   expect(banners()).toEqual([]);
+});
+
+test('an unusable settings file offers fresh onboarding directly from its banner', async () => {
+  const offer = { projectId: 'broken', name: 'broken', repo: 'maddec01/broken', provider: 'GitHub' as const, configProblem: 'unsupported source' };
+  const data = { ...sample, repositoryConfigProblems: [{ repo: offer.repo, problem: offer.configProblem }], onboardingOffers: [offer] };
+  serve(data, [project('broken', { hasConfig: true, configProblem: offer.configProblem })]);
+  await mountPage(data);
+  const banner = $$('.banners .banner').find((entry) => text(entry).includes('maddec01/broken'))!;
+  expect(text(banner)).toContain("Its settings file can't be used. Run onboarding to replace it.");
+  await settle(() => banner.querySelector<HTMLButtonElement>('button')!.click());
+  expect($('[data-onboarding-dialog]')).not.toBeNull();
+  const { useWizardStore } = await import('../onboarding/wizard-store.ts');
+  expect(useWizardStore.getState().run!.projectId).toBe('broken');
 });

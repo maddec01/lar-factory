@@ -7,6 +7,7 @@ import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { useBoardStore } from '../board/board-store.ts';
 import { useWizardStore } from './wizard-store.ts';
+import { REPLACE_SETTINGS_HELP } from './setup-answers.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
 export function OnboardingOffers() {
@@ -21,9 +22,9 @@ export function OnboardingOffers() {
         action={<Button {...kind('other')} aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(!expanded)}>{expanded ? 'Hide repositories' : 'Show repositories'}</Button>} />}
       <div id={listId} className="grid gap-2">
         {(offers.length === 1 || expanded) && offers.map((offer) => (
-          <Alert key={offer.repo} tone="info" role="note" data-onboarding-offer={offer.repo} title={`${offer.name} has saved board settings`}
-            action={<Button {...kind('other')} onClick={() => start(offer)}>Add {offer.name}</Button>}>
-            {shownRepo(offer.repo)} keeps its settings in <code>.lar-factory.json</code>. Setup will reuse them.
+          <Alert key={offer.repo} tone="info" role="note" data-onboarding-offer={offer.repo} title={offer.configProblem ? `${offer.name} needs setup` : `${offer.name} has saved board settings`}
+            action={<Button {...kind('other')} onClick={() => start(offer)}>{offer.configProblem ? 'Set up' : 'Add'} {offer.name}</Button>}>
+            {offer.configProblem ? REPLACE_SETTINGS_HELP : <>{shownRepo(offer.repo)} keeps its settings in <code>.lar-factory.json</code>. Setup will reuse them.</>}
           </Alert>
         ))}
       </div>

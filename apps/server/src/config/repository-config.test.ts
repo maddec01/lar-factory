@@ -311,3 +311,17 @@ test('malformed configs still name their problem', async () => {
     await assert.rejects(readRepositoryConfig(`maddec01/${repo}`, gh), { message: `maddec01/${repo}: ${problem}` });
   }
 });
+
+test('removed-source onboarding entries do not break healthy repositories or later saves', async (t) => {
+  const entries = ['github-project', 'azure-sprint', 'azure-backlog'].map((itemSource, index) => ({ repo: `maddec01/old-${index}`,
+    onboarding: { ...progress(), answers: { projectId: 'old', setup: { ...setup, itemSource } } } }));
+  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ note: 'keep', repositories: [
+    { repo: 'maddec01/healthy', note: 'keep' }, ...entries, { repo: 'maddec01/current', onboarding: progress() },
+  ] }) });
+  assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/healthy' }, { repo: 'maddec01/current', onboarding: progress() }]);
+  saveOnboarding({ repo: 'maddec01/new', progress: progress() }, null, dir);
+  const saved = JSON.parse(await readFile(join(dir, 'repositories.json'), 'utf8'));
+  assert.equal(saved.note, 'keep');
+  assert.deepEqual(saved.repositories.map((entry: { repo: string }) => entry.repo), ['maddec01/healthy', 'maddec01/current', 'maddec01/new']);
+  assert.equal(saved.repositories[0].note, 'keep');
+});

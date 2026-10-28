@@ -879,6 +879,8 @@ export interface OnboardingOffer {
   name: string;
   repo: string;
   provider: Provider;
+  /** Why setup must replace the saved settings instead of reusing them. */
+  configProblem?: string;
 }
 
 /** A T3 project onboarding can offer, with what the T3 project step shows about its repository. */
@@ -896,7 +898,7 @@ export interface ProjectChoice {
   config?: RepositoryConfigAnswers;
   /** Why the `.lar-factory.json` it has can't be reused, in place of `config`. */
   configProblem?: string;
-  /** Whether the repository is on this Mac's list already. */
+  /** Whether the repository is already on the board or is onboarding/resetting. Unusable settings can start fresh. */
   onBoard: boolean;
 }
 

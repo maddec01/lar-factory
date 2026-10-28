@@ -50,3 +50,11 @@ test('several offers share one compact notice until the user expands it', async 
   await settle(() => toggle.click());
   expect($$('[data-onboarding-offer]')).toHaveLength(0);
 });
+
+test('an offer with unusable settings explains that onboarding replaces them', async () => {
+  const data = { ...empty, onboardingOffers: [{ projectId: 'old', name: 'old', repo: 'maddec01/old', provider: 'GitHub' as const, configProblem: 'unsupported source' }] };
+  serve(data, [project('old', { hasConfig: true, configProblem: 'unsupported source' })]);
+  await mountPage(data);
+  expect(text($('[data-onboarding-offer="maddec01/old"]'))).toContain("Its settings file can't be used. Run onboarding to replace it.");
+  expect(text($('[data-onboarding-offer="maddec01/old"]'))).not.toContain('Setup will reuse');
+});

@@ -108,7 +108,14 @@ function readListFile(file: string): { raw: Record<string, unknown> & { reposito
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || !Array.isArray(raw.repositories)) {
     throw new Error(`${file}: expected an object with a repositories array, like {"repositories": [{"repo": "owner/name"}]}.`);
   }
-  const list = raw.repositories.map((entry: unknown, index): OnboardedRepository => {
+  // An old source cannot be resumed. Remove that entry alone, keeping raw and checked entries aligned for later writes.
+  const repositories = raw.repositories.filter((entry: unknown) => {
+    const onboarding = isRecord(entry) && entry.onboarding;
+    const answers = isRecord(onboarding) && onboarding.answers;
+    const setup = isRecord(answers) && answers.setup;
+    return !isRecord(setup) || typeof setup.itemSource !== 'string' || !['github-project', 'azure-sprint', 'azure-backlog'].includes(setup.itemSource);
+  });
+  const list = repositories.map((entry: unknown, index): OnboardedRepository => {
     const repo = (entry as { repo?: unknown } | null)?.repo;
     if (typeof entry !== 'object' || typeof repo !== 'string' || !REPO.test(repo)) {
       throw new Error(`${file}: repositories[${index}] needs a repo of the form owner/name.`);
@@ -123,7 +130,7 @@ function readListFile(file: string): { raw: Record<string, unknown> & { reposito
     if (!isProgress(onboarding)) throw new Error(`${file}: repositories[${index}] has an onboarding without its step, done steps and T3 project, or with answers it can't use.`);
     return { repo, onboarding };
   });
-  return { raw: raw as { repositories: Record<string, unknown>[] }, list };
+  return { raw: { ...raw, repositories: repositories as Record<string, unknown>[] }, list };
 }
 
 /**
@@ -139,17 +146,18 @@ export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] 
  * onboarding entry of `replaces`, the repository it was saved under before it picked another T3 project. Keeps every
  * other entry as the file has it, and returns the list. Only the board marks a PR closed or keeping its
  * .lar-factory.json, so the progress's own marks are dropped and the saved ones kept while the PR is the same;
- * `reusesConfig` marks the PR the board opened. Throws for a repository that is onboarded already.
+ * `reusesConfig` marks the PR the board opened. `replaceUnusableConfig` allows restarting only the named repository,
+ * after the caller has checked its saved settings. Otherwise throws for a repository that is onboarded already.
  */
 export function saveOnboarding({ repo, progress }: OnboardingRepository, replaces: string | null, dir = boardDataDir(),
-  { reusesConfig = false } = {}): OnboardedRepository[] {
+  { reusesConfig = false, replaceUnusableConfig = false } = {}): OnboardedRepository[] {
   const { prClosed: _, reusesConfig: __, ...sent } = progress;
   const saved = onboardingOf(repo, dir);
   const samePr = saved?.prUrl !== undefined && saved.prUrl === sent.prUrl;
   return saveEntry({ repo, onboarding: {
     ...sent, ...samePr && saved.prClosed && { prClosed: true },
     ...(reusesConfig || samePr && saved.reusesConfig) && { reusesConfig: true },
-  } }, replaces, dir);
+  } }, replaces, dir, replaceUnusableConfig);
 }
 
 /** Marks whether the repository's onboarding PR closed without merging, as the board found it on GitHub, and returns the list. */
@@ -171,12 +179,13 @@ export function saveOnboarded(repo: string, replaces: string | null, dir = board
 }
 
 /** Writes `entry` over its repository's entry and drops the one of `replaces`, as saveOnboarding and saveOnboarded say. */
-function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: string): OnboardedRepository[] {
+function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: string, replaceUnusableConfig = false): OnboardedRepository[] {
   const { repo } = entry;
   if (!REPO.test(repo)) throw new Error(`${repo} isn't a repository of the form owner/name.`);
   const file = join(dir, 'repositories.json');
   const { raw, list } = readListFile(file);
-  const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces)));
+  const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces))
+    && !(replaceUnusableConfig && sameRepo(e.repo, repo) && !e.resetting));
   if (onboarded) throw new Error(`${onboarded.repo} is onboarded already.`);
   const at = list.findIndex((e) => sameRepo(e.repo, repo));
   const dropped = (e: OnboardedRepository) => sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces);

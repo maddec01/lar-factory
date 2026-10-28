@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { STATUSES, decodePart, labelStatuses, repoTag, statusLabel } from '@lar-factory/shared';
 import type { Blocker, IssueRef, Item, LinkedPr } from '@lar-factory/shared';
-import { ReadProblem, type ItemSource } from '../items/item-source.ts';
+import { ReadProblem, type ItemSource, type ItemsRead } from '../items/item-source.ts';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
 import { missingTool, toolCommand } from '../tools/tools.ts';
@@ -213,91 +213,104 @@ export function azureItems(repos: readonly string[], team: string, list: (calls:
     return new Map(read.flatMap((pr) => (pr ? [[pr.pullRequestId, linkedPr(pr)] as const] : [])));
   }
 
+  /** Whether the last listing showed Completed requirement-level items, so an item read alone shows as that listing would. */
+  let showsCompleted = true;
+  /** The board's items from a listing, with their Tasks, predecessors and PRs. */
+  async function itemsOf({ title, items: listed, completed }: Listing, levels: BacklogConfiguration): Promise<ItemsRead> {
+    const type = (raw: RawWorkItem) => field(raw, 'System.WorkItemType');
+    const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
+    const tasks = new Set(levels.taskBacklog.workItemTypes.map((t) => t.name));
+    /** The ids the work items link by `rel` that `known` lacks, each once. */
+    const unread = (raws: readonly RawWorkItem[], rel: string, known: readonly RawWorkItem[]) => {
+      const ids = new Set(known.map((raw) => raw.id));
+      return [...new Set(raws.flatMap((raw) => linked(raw, rel)))].filter((id) => !ids.has(id));
+    };
+    // A requirement-level item's Tasks come through its child links, so a sprint shows one in another iteration too.
+    const parents = listed.filter((raw) => requirements.has(type(raw)));
+    const withTasks = [...listed, ...await workItems(unread(parents, 'System.LinkTypes.Hierarchy-Forward', listed))];
+    const all = [...withTasks, ...await workItems(unread(withTasks, 'System.LinkTypes.Dependency-Reverse', withTasks))];
+    const byId = new Map(all.map((raw) => [raw.id, raw]));
+    const byType = await categories([...new Set(all.map(type))]);
+    const category = (raw: RawWorkItem) => byType.get(type(raw))?.get(field(raw, 'System.State'));
+    // Abandon moves a work item to its type's Removed-category state, which Basic's Issue lacks.
+    const abandonRefusal = (raw: RawWorkItem) => ([...byType.get(type(raw))?.values() ?? []].includes('Removed') ? {}
+      : { abandonRefusal: `${type(raw)} has no Removed state in ${project}, so the board can't abandon it. Close or delete it in Azure DevOps.` });
+
+    const done = (raw: RawWorkItem) => category(raw) === 'Completed';
+    const shown = (raw: RawWorkItem) => category(raw) !== 'Removed';
+    // Each shown requirement-level item and its shown Tasks, placed in one pass before any item is built: the item by
+    // its tags, and each Task by its own, or with its parent when it has no repo- tag. A hidden item hides its Tasks.
+    const placed = new Map<number, NonNullable<Placement>>();
+    const childrenOf = new Map<number, RawWorkItem[]>();
+    for (const raw of listed) {
+      if (!requirements.has(type(raw)) || !shown(raw) || (!completed && done(raw))) continue;
+      const where = placement(tagsOf(raw), repos);
+      if (!where) continue;
+      placed.set(raw.id, where);
+      childrenOf.set(raw.id, withTasks.filter((child) => tasks.has(type(child)) && shown(child) && Number(child.fields['System.Parent']) === raw.id)
+        .filter((child) => {
+          const tags = tagsOf(child);
+          const own = tags.some(isRepoTag) ? placement(tags, repos) : where;
+          if (own) placed.set(child.id, own);
+          return own !== null;
+        }));
+    }
+    const top = listed.filter((raw) => childrenOf.has(raw.id));
+    // An item outside the listing, such as a predecessor, goes by its own tags.
+    const repoOf = (raw: RawWorkItem | undefined) => (raw && (placed.get(raw.id) ?? placement(tagsOf(raw), repos))?.repo) || repos[0]!;
+    const ref = (raw: RawWorkItem): IssueRef => ({ number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), repo: repoOf(raw), state: done(raw) ? 'closed' : 'open' });
+    const blocker = (id: number): Blocker => {
+      const raw = byId.get(id);
+      // A Removed predecessor no longer holds anything up; one the board can't read is taken as open.
+      const closed = raw !== undefined && (done(raw) || category(raw) === 'Removed');
+      return { number: id, repo: repoOf(raw), state: closed ? 'closed' : 'open' };
+    };
+    const item = (raw: RawWorkItem, parent: RawWorkItem | null, children: RawWorkItem[]): Item => {
+      const tags = tagsOf(raw);
+      const statuses = labelStatuses(tags);
+      const closed = done(raw);
+      return {
+        id: itemId(raw.id),
+        status: closed ? 'Done' : statuses[0] ?? 'List',
+        statuses,
+        content: 'ticket',
+        number: raw.id,
+        title: field(raw, 'System.Title'),
+        url: url(raw.id),
+        ...placed.get(raw.id)!,
+        ...abandonRefusal(raw),
+        labels: labelsOf(raw),
+        state: closed ? 'closed' : 'open',
+        closedAs: closed ? 'done' : null,
+        parent: parent && ref(parent),
+        subIssues: { total: children.length, completed: children.filter(done).length },
+        blockers: linked(raw, 'System.LinkTypes.Dependency-Reverse').map(blocker),
+        updatedAt: field(raw, 'System.ChangedDate'),
+        closedAt: closed ? field(raw, 'Microsoft.VSTS.Common.ClosedDate') || field(raw, 'System.ChangedDate') : null,
+        linkedPrs: prIds(raw).flatMap((id) => shownPrs.get(id) ?? []),
+        slices: [],
+      };
+    };
+    const shownPrs = await prsOf([...top, ...top.flatMap((raw) => childrenOf.get(raw.id)!)]);
+    const items = top.flatMap((raw) => {
+      const children = childrenOf.get(raw.id)!;
+      return [item(raw, null, children), ...children.map((child) => item(child, raw, []))];
+    });
+    return { title, items };
+  }
+
   return {
     async read() {
       const backlog = backlogOf();
-      const [{ title, items: listed, completed }, levels] = await Promise.all([
-        list({ organization, project, boards, invoke, workItems, backlog }), backlog]);
-      const type = (raw: RawWorkItem) => field(raw, 'System.WorkItemType');
-      const requirements = new Set(levels.requirementBacklog.workItemTypes.map((t) => t.name));
-      const tasks = new Set(levels.taskBacklog.workItemTypes.map((t) => t.name));
-      /** The ids the work items link by `rel` that `known` lacks, each once. */
-      const unread = (raws: readonly RawWorkItem[], rel: string, known: readonly RawWorkItem[]) => {
-        const ids = new Set(known.map((raw) => raw.id));
-        return [...new Set(raws.flatMap((raw) => linked(raw, rel)))].filter((id) => !ids.has(id));
-      };
-      // A requirement-level item's Tasks come through its child links, so a sprint shows one in another iteration too.
-      const parents = listed.filter((raw) => requirements.has(type(raw)));
-      const withTasks = [...listed, ...await workItems(unread(parents, 'System.LinkTypes.Hierarchy-Forward', listed))];
-      const all = [...withTasks, ...await workItems(unread(withTasks, 'System.LinkTypes.Dependency-Reverse', withTasks))];
-      const byId = new Map(all.map((raw) => [raw.id, raw]));
-      const byType = await categories([...new Set(all.map(type))]);
-      const category = (raw: RawWorkItem) => byType.get(type(raw))?.get(field(raw, 'System.State'));
-      // Abandon moves a work item to its type's Removed-category state, which Basic's Issue lacks.
-      const abandonRefusal = (raw: RawWorkItem) => ([...byType.get(type(raw))?.values() ?? []].includes('Removed') ? {}
-        : { abandonRefusal: `${type(raw)} has no Removed state in ${project}, so the board can't abandon it. Close or delete it in Azure DevOps.` });
-
-      const done = (raw: RawWorkItem) => category(raw) === 'Completed';
-      const shown = (raw: RawWorkItem) => category(raw) !== 'Removed';
-      // Each shown requirement-level item and its shown Tasks, placed in one pass before any item is built: the item by
-      // its tags, and each Task by its own, or with its parent when it has no repo- tag. A hidden item hides its Tasks.
-      const placed = new Map<number, NonNullable<Placement>>();
-      const childrenOf = new Map<number, RawWorkItem[]>();
-      for (const raw of listed) {
-        if (!requirements.has(type(raw)) || !shown(raw) || (!completed && done(raw))) continue;
-        const where = placement(tagsOf(raw), repos);
-        if (!where) continue;
-        placed.set(raw.id, where);
-        childrenOf.set(raw.id, withTasks.filter((child) => tasks.has(type(child)) && shown(child) && Number(child.fields['System.Parent']) === raw.id)
-          .filter((child) => {
-            const tags = tagsOf(child);
-            const own = tags.some(isRepoTag) ? placement(tags, repos) : where;
-            if (own) placed.set(child.id, own);
-            return own !== null;
-          }));
-      }
-      const top = listed.filter((raw) => childrenOf.has(raw.id));
-      // An item outside the listing, such as a predecessor, goes by its own tags.
-      const repoOf = (raw: RawWorkItem | undefined) => (raw && (placed.get(raw.id) ?? placement(tagsOf(raw), repos))?.repo) || repos[0]!;
-      const ref = (raw: RawWorkItem): IssueRef => ({ number: raw.id, title: field(raw, 'System.Title'), url: url(raw.id), repo: repoOf(raw), state: done(raw) ? 'closed' : 'open' });
-      const blocker = (id: number): Blocker => {
-        const raw = byId.get(id);
-        // A Removed predecessor no longer holds anything up; one the board can't read is taken as open.
-        const closed = raw !== undefined && (done(raw) || category(raw) === 'Removed');
-        return { number: id, repo: repoOf(raw), state: closed ? 'closed' : 'open' };
-      };
-      const item = (raw: RawWorkItem, parent: RawWorkItem | null, children: RawWorkItem[]): Item => {
-        const tags = tagsOf(raw);
-        const statuses = labelStatuses(tags);
-        const closed = done(raw);
-        return {
-          id: itemId(raw.id),
-          status: closed ? 'Done' : statuses[0] ?? 'List',
-          statuses,
-          content: 'ticket',
-          number: raw.id,
-          title: field(raw, 'System.Title'),
-          url: url(raw.id),
-          ...placed.get(raw.id)!,
-          ...abandonRefusal(raw),
-          labels: labelsOf(raw),
-          state: closed ? 'closed' : 'open',
-          closedAs: closed ? 'done' : null,
-          parent: parent && ref(parent),
-          subIssues: { total: children.length, completed: children.filter(done).length },
-          blockers: linked(raw, 'System.LinkTypes.Dependency-Reverse').map(blocker),
-          updatedAt: field(raw, 'System.ChangedDate'),
-          closedAt: closed ? field(raw, 'Microsoft.VSTS.Common.ClosedDate') || field(raw, 'System.ChangedDate') : null,
-          linkedPrs: prIds(raw).flatMap((id) => shownPrs.get(id) ?? []),
-          slices: [],
-        };
-      };
-      const shownPrs = await prsOf([...top, ...top.flatMap((raw) => childrenOf.get(raw.id)!)]);
-      const items = top.flatMap((raw) => {
-        const children = childrenOf.get(raw.id)!;
-        return [item(raw, null, children), ...children.map((child) => item(child, raw, []))];
-      });
-      return { title, items };
+      const [listing, levels] = await Promise.all([list({ organization, project, boards, invoke, workItems, backlog }), backlog]);
+      showsCompleted = listing.completed;
+      return itemsOf(listing, levels);
+    },
+    // A Task comes with its parent, so a Task asked for reads its parent, and the read places it as a whole read does.
+    async readSome(items) {
+      const ids = [...new Set(items.map((item) => item.parent?.number ?? item.number!))];
+      const [listed, levels] = await Promise.all([workItems(ids), backlogOf()]);
+      return (await itemsOf({ title: '', items: listed, completed: showsCompleted }, levels)).items;
     },
     ...azureWrites(project, invoke, statesOf),
     // A new work item is in its type's first state, Proposed, so it shows open in List.

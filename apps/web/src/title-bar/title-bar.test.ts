@@ -245,7 +245,7 @@ test('the tooltip gives the exact time and when reads happen', async () => {
   await mountPage(fresh(11_000));
   const read = clock(new Date(NOW - 11_000).toISOString(), undefined);
   expect(read).toMatch(/^\d\d:\d\d$/);
-  expect(await tooltip()).toEqual([`Updated 12s ago · ${read}`, 'Reads active work every 15s, the rest every 45s']);
+  expect(await tooltip()).toEqual([`Updated 12s ago · ${read}`, 'Checks GitHub for changes every 5s, reads everything every 45s']);
 });
 
 test('the tooltip names a failed read by its first line', async () => {
@@ -256,7 +256,7 @@ test('the tooltip names a failed read by its first line', async () => {
 
 test('before the first read the tooltip says so', async () => {
   await mountPage({ ...sample, fetchedAt: null, error: null });
-  expect(await tooltip()).toEqual(['Not read yet', 'Reads active work every 15s, the rest every 45s']);
+  expect(await tooltip()).toEqual(['Not read yet', 'Checks GitHub for changes every 5s, reads everything every 45s']);
   await push({ ...sample, fetchedAt: null, error: 'boom\nmore' });
   expect(await tooltip()).toEqual(['Not read yet', 'Last read failed: boom']);
 });

@@ -2,11 +2,13 @@
 
 import { DONE_REFUSED, type ItemSource } from '../items/item-source.ts';
 import type { GithubProjectRef, ProjectCreationProgress } from './github.ts';
-import { abandonItem, addIssueLabel, addProjectItem, fetchProject, fetchProjectItems, setIssueStatus, setItemStatus } from './github.ts';
+import { abandonItem, addIssueLabel, addProjectItem, changedSince, fetchProject, fetchProjectItems, getIfChanged, setIssueStatus, setItemStatus } from './github.ts';
 
 export function githubProject(project: GithubProjectRef): ItemSource {
   // Each item's Project item id by its Item.id, from the last read and from Add item since. Nothing outside this file sees one.
   let projectItemIds = new Map<string, string>();
+  // The last change check's ETag, so the next one is a free 304 while nothing changed.
+  let etag: string | undefined;
   return {
     name: `Project ${project.owner}/${project.number}`,
     async read() {
@@ -19,6 +21,14 @@ export function githubProject(project: GithubProjectRef): ItemSource {
       const { items: read, projectItemIds: found } = await fetchProjectItems(ids);
       for (const [id, projectItemId] of found) projectItemIds.set(id, projectItemId);
       return read;
+    },
+    // A Project's updated_at moves when its items' fields do, but it can't say which item, so a change reads it whole.
+    // An edit to an issue's own content, such as its title, shows at the idle read.
+    async changes(since) {
+      const answer = await getIfChanged<{ updated_at: string }>(`users/${project.owner}/projectsV2/${project.number}`, etag);
+      if (!answer) return [];
+      etag = answer.etag;
+      return changedSince(answer.body.updated_at, since) ? null : [];
     },
     async setStatus(item, status) {
       if (status === 'Done') return DONE_REFUSED;

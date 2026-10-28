@@ -114,8 +114,9 @@ while GitHub catches up; GitHub remains authoritative.
 _Avoid_: Source of truth (for the overlay)
 
 **Active work**:
-An item whose provider data an agent, a check or the board is changing now, so its item source reads every 15 seconds
-instead of every five minutes. See ADR 0028.
+An item whose provider data an agent, a check or the board is changing now. In a Project or an Azure DevOps team, which
+have no change check that sees every edit, it reads alone every 15 seconds; a repository's issues read only what their
+change check finds changed. See ADR 0028.
 _Avoid_: Busy item, hot item
 
 ### Threads and roles

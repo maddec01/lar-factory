@@ -138,3 +138,23 @@ test('Add item gives the new issue status-list, creating the label first', async
     [['api', `repos/${REPO}/labels/status-list`], ['label', 'create', 'status-list'], ['api', '--method', 'POST']]);
   assert.deepEqual(gh.calls[2]!.filter((a) => a.startsWith('labels[]')), ['labels[]=bug', 'labels[]=os: ios', 'labels[]=status-list']);
 });
+
+test("a change check lists the issues and PRs updated since, and can't tell once every one it lists changed", async () => {
+  const updated = (number: number, at: string, pr = false) => ({ html_url: `https://github.com/${REPO}/${pr ? 'pull' : 'issues'}/${number}`, updated_at: at, closed_at: null });
+  let page = [updated(9, '2026-10-21T08:10:00Z', true), updated(7, '2026-10-21T08:09:45Z'), updated(5, '2026-10-21T08:00:00Z')];
+  const gh = fakeGh((args) => `HTTP/2.0 200 OK\r\nEtag: W/"${args.length}"\r\n\r\n${JSON.stringify(page)}`);
+  const issues = repoIssues(REPO, gh.run);
+  assert.deepEqual(await issues.changes!(Date.parse('2026-10-21T08:10:00Z')), [`https://github.com/${REPO}/pull/9`, `https://github.com/${REPO}/issues/7`],
+    'it looks 30 seconds further back, for a clock behind GitHub');
+  assert.deepEqual(gh.calls[0], ['api', '-i', `repos/${REPO}/issues?state=all&sort=updated&direction=desc&per_page=30`]);
+  page = Array.from({ length: 30 }, (_, i) => updated(i + 1, '2026-10-21T09:00:00Z'));
+  assert.equal(await issues.changes!(Date.parse('2026-10-21T08:30:00Z')), null);
+  assert.deepEqual(gh.calls[1]!.slice(2, 4), ['-H', 'If-None-Match: W/"3"'], 'the next check sends the last ETag');
+});
+
+test('a change check leaves out an edit to an issue that closed before it, as a comment on an old one', async () => {
+  const page = [{ html_url: `https://github.com/${REPO}/issues/3`, updated_at: '2026-10-21T08:10:00Z', closed_at: '2026-09-01T00:00:00Z' },
+    { html_url: `https://github.com/${REPO}/issues/4`, updated_at: '2026-10-21T08:10:00Z', closed_at: '2026-10-21T08:10:00Z' }];
+  const issues = repoIssues(REPO, fakeGh(() => `HTTP/2.0 200 OK\r\n\r\n${JSON.stringify(page)}`).run);
+  assert.deepEqual(await issues.changes!(Date.parse('2026-10-21T08:10:00Z')), [`https://github.com/${REPO}/issues/4`]);
+});

@@ -186,6 +186,34 @@ export async function graphql<T>(query: string, vars: Record<string, string | nu
   return JSON.parse(await run(args)) as T;
 }
 
+/** How far before its `since` a change check looks, so a clock behind GitHub's misses no change. */
+const CLOCK_SKEW_MS = 30_000;
+/** Whether something updated at `at`, as GitHub dates it, changed since `since`, in ms since the epoch. */
+export const changedSince = (at: string, since: number) => Date.parse(at) >= since - CLOCK_SKEW_MS;
+
+/** A REST answer and the ETag to ask for it again with. */
+export interface Tagged<T> {
+  etag: string | undefined;
+  body: T;
+}
+
+/**
+ * The JSON at a REST path, or null when it's unchanged since the answer `etag` tagged. GitHub answers an unchanged path
+ * with a 304, which costs no quota, so a change check can ask every few seconds.
+ */
+export async function getIfChanged<T>(path: string, etag: string | undefined, run: (args: string[]) => Promise<string> = gh): Promise<Tagged<T> | null> {
+  let out: string;
+  try {
+    out = await run(['api', '-i', ...(etag ? ['-H', `If-None-Match: ${etag}`] : []), path]);
+  } catch (err) {
+    if (/\b304\b/.test(message(err))) return null;
+    throw err;
+  }
+  const split = /\r?\n\r?\n/.exec(out);
+  const head = split ? out.slice(0, split.index) : '';
+  return { etag: /^etag:\s*(.+?)\s*$/im.exec(head)?.[1], body: JSON.parse(split ? out.slice(split.index + split[0].length) : out) as T };
+}
+
 /** A GitHub Project, by its owner and number, as a repository's .lar-factory.json names it. */
 export interface GithubProjectRef {
   owner: string;
@@ -276,7 +304,7 @@ export async function fetchProject(owner: string, number: number): Promise<Proje
   return { title, items: await boardItems(raws), projectItemIds };
 }
 
-/** The nodes with these ids, PAGE_SIZE ids a call; an id that no longer resolves is left out. */
+/** The nodes with these ids, PAGE_SIZE ids a call; an id that no longer resolves fails the call, as gh does on any GraphQL error. */
 async function fetchNodes<T extends object>(query: string, ids: readonly string[]): Promise<T[]> {
   const found: T[] = [];
   for (let start = 0; start < ids.length; start += PAGE_SIZE) {

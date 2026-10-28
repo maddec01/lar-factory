@@ -92,7 +92,7 @@ function RefreshDetails({ data, now }: { data: BoardData; now: number }) {
     <span className="flex flex-col gap-0.5">
       <span data-line>{data.fetchedAt ? `Updated ${shortAgo(data.fetchedAt, now)} · ${clock(data.fetchedAt, undefined)}` : 'Not read yet'}</span>
       <span data-line className="text-base-700">
-        {data.error ? `Last read failed: ${data.error.split('\n')[0]}` : `Reads active work every 15s, the rest every ${data.refreshSeconds}s`}
+        {data.error ? `Last read failed: ${data.error.split('\n')[0]}` : `Checks GitHub for changes every 5s, reads everything every ${data.refreshSeconds}s`}
       </span>
     </span>
   );

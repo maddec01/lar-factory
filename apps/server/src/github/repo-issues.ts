@@ -4,7 +4,10 @@
 import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
 import type { Status } from '@lar-factory/shared';
 import { DONE_REFUSED, type ItemSource } from '../items/item-source.ts';
-import { addIssueLabel, createIssue, createStatusLabel, deleteIssue, fetchIssues, fetchRepoIssues, issueLabels, message, setStatusLabel } from './github.ts';
+import { addIssueLabel, changedSince, createIssue, createStatusLabel, deleteIssue, fetchIssues, fetchRepoIssues, getIfChanged, issueLabels, message, setStatusLabel } from './github.ts';
+
+/** How many of the latest updated issues and PRs a change check lists; when all of them changed, the whole source reads. */
+const CHANGES_PAGE = 30;
 
 /** Why an open issue carrying more than one status label can't move, or null when it carries at most one. */
 const twoStatuses = (issue: { statuses: readonly Status[]; state: 'open' | 'closed' }): string | null =>
@@ -20,6 +23,8 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
     if (!error) known.add(status);
     return error;
   }
+  // The last change check's ETag, so the next one is a free 304 while nothing changed.
+  let etag: string | undefined;
   /** Adds the status's label and removes every other status label the issue carries. */
   async function write(number: number, carried: readonly Status[], status: Status): Promise<string | null> {
     if (status === 'Done') return DONE_REFUSED;
@@ -28,6 +33,18 @@ export function repoIssues(repo: string, run?: (args: string[]) => Promise<strin
   return {
     read: async () => ({ title: repo, items: await fetchRepoIssues(repo) }),
     readSome: (items) => fetchIssues(items.map((item) => item.id)),
+    // Labels, closes and sub-issues each move an issue's updated_at, and pushes a PR's, so the check sees every edit to an item.
+    seesEdits: true,
+    async changes(since) {
+      const answer = await getIfChanged<{ html_url: string; updated_at: string; closed_at: string | null }[]>(
+        `repos/${repo}/issues?state=all&sort=updated&direction=desc&per_page=${CHANGES_PAGE}`, etag, run);
+      if (!answer) return [];
+      etag = answer.etag;
+      if (answer.body.length === CHANGES_PAGE && answer.body.every((issue) => changedSince(issue.updated_at, since))) return null;
+      // An edit to an issue that closed before the check, such as a comment on an old one, changes nothing the board shows.
+      return answer.body.filter((issue) => changedSince(issue.updated_at, since) && (!issue.closed_at || changedSince(issue.closed_at, since)))
+        .map((issue) => issue.html_url);
+    },
     setStatus: (item, status) => write(item.number!, item.statuses, status),
     statusRefusal: (item) => ('statuses' in item ? twoStatuses(item) : null),
     addLabel: (item, label) => addIssueLabel(item.repo!, item.number!, label, run),

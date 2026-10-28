@@ -125,3 +125,18 @@ test("an item whose type has no Removed state, such as Basic's Issue, carries wh
   assert.equal(issue!.abandonRefusal, "Issue has no Removed state in Fabrikam Fiber, so the board can't abandon it. Close or delete it in Azure DevOps.");
   assert.equal(task!.abandonRefusal, undefined);
 });
+
+test('an item read alone reads its work item and its Tasks, with no sprint listing, and a Task asked for reads its parent', async () => {
+  const items: WorkItem[] = [
+    { id: 1, type: 'User Story', state: 'New', tags: 'repo-web' },
+    { id: 11, type: 'Task', state: 'New', parent: 1 },
+    { id: 2, type: 'User Story', state: 'New', tags: 'repo-web' },
+  ];
+  const az = fakeAz({ items });
+  const sprint = azureSprint([WEB, API], TEAM, az.run);
+  const read = await sprint.read();
+  az.calls.length = 0;
+  const some = await sprint.readSome!([read.items.find((i) => i.number === 11)!]);
+  assert.deepEqual(placed(some), [[1, WEB, null], [11, WEB, null]]);
+  assert.equal(az.calls.some((args) => args.includes('iteration') || args.includes('wiql')), false, 'no listing call');
+});

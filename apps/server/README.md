@@ -10,9 +10,13 @@
 A local board for the lar project. It reads the onboarded repositories through your
 `gh` login (see [Adding a repository](#adding-a-repository)), each item source at
 its own pace ([ADR 0028](../../docs/adr/0028-each-item-source-reads-at-the-pace-of-its-work.md)):
-every 15 seconds while it holds active work, every `refreshSeconds` (5 minutes)
-otherwise, and at once when `status.sh` or `slice.sh` names one of its items. A
-rate-limited `gh` or `az` makes no calls until its limit resets. T3's threads
+whole every `refreshSeconds` (5 minutes, at least 1), and its changed items
+alone. Every 5 seconds each GitHub source asks GitHub whether anything changed,
+sending the last answer's ETag; an unchanged answer is a 304, which costs no
+quota, so an edit on github.com shows within seconds and reads only the changed
+item. An item also reads alone at once when `status.sh` or `slice.sh` names it,
+every 15 seconds while its PR's checks run, and, in a Project or an Azure
+DevOps team, every 15 seconds while it holds active work. A rate-limited `gh` or `az` makes no calls until its limit resets. T3's threads
 refresh every 2 seconds and its stats every 30, with no `gh` or `az` call. It
 serves the board on the first free port from 4317 to 4416, which it logs;
 `BOARD_PORT` pins the port. The board app's board usually gets 4317.

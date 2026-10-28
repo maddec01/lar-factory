@@ -117,7 +117,7 @@ test("a refresh finds build sub-issues, active and blocked slices with issue sea
   assert.deepEqual(built?.slices.map((s) => [s.number, s.progress]), [[15, 'active'], [16, 'blocked']]);
 });
 
-test('a build sub-issue on the project stays a board item while the issue search still misses its new label', async (t) => {
+test('a build sub-issue on the board stays a board item while the issue search still misses its new label', async (t) => {
   const repository = { nameWithOwner: 'maddec01/lar-factory' };
   const ref = { number: 12, title: 'Issue 12', url: 'https://github.com/maddec01/lar-factory/issues/12', state: 'OPEN', stateReason: null, repository };
   const parent = rawBuild(13, 'In progress');

@@ -59,7 +59,7 @@ export function toolState(check: ToolCheck | undefined, login = false): Componen
 
 /** The commands Diagnostics › Tools lists, with what each does; az follows, as it goes unchecked while no listed repository needs it. */
 const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
-  ['gh', 'Reads the GitHub Project and its issues.'],
+  ['gh', 'Reads GitHub repository issues and linked pull requests.'],
   ['t3', 'Starts the lar-work threads in T3 Code.'],
   ['git', 'lar-work’s agents branch, commit and push with it.'],
   ['jq', 'lar-work’s scripts read gh’s answers with it.'],

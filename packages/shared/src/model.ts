@@ -250,7 +250,7 @@ export interface Item {
   linkedPrs: LinkedPr[];
   /** A pull request item's own checks and merge state; absent on other items. */
   pipeline?: Pipeline;
-  /** A build's slices, in GitHub's sub-issue order, less those closed as not planned. The project may auto-add them, but they're never board items. Empty for other issues. */
+  /** A build's slices, in GitHub's sub-issue order, less those closed as not planned. They're never board items. Empty for other issues. */
   slices: Slice[];
   /** A dossier's map, parsed from its issue body: always on a concept, and on an item with sub-issues on the board when its body has map sections; absent on other items. */
   map?: ConceptMap;
@@ -798,7 +798,7 @@ export const onboardingConfigFile = ({ role, itemSource, show, labels }: Reposit
  */
 export interface SetupAnswers {
   itemSource: RepositoryItemSource['kind'];
-  /** The Azure DevOps team whose sprint, backlog or combined board is the item source; absent in answers saved before the team was asked. */
+  /** The Azure DevOps team whose backlog and current sprint the board reads. */
   team?: string;
   show: ShowSetting;
   /** Whether the show setting was picked, so a new item source no longer changes it to the one suggested. */

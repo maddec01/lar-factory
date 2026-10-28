@@ -1,5 +1,5 @@
 // The notices for a failed command check: a missing t3 replaces the main area; T3 Code not running shows a
-// banner, as does a gh that's missing, logged out, too old or without the project scope, a missing git, jq or
+// banner, as does a gh that's missing, logged out, or too old, a missing git, jq or
 // curl and an az that fails its check.
 
 import type { ReactNode } from 'react';

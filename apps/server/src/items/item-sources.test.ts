@@ -12,7 +12,7 @@ const item = (id: string, repo: string, status: Status = 'List'): Item => ({
   updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [],
 });
 
-/** The source as the one Project of a merged source, as onboardedSources builds one. */
+/** One shared source serving two onboarded repositories. */
 const merged = (source: ItemSource) => mergeSources(new Map([['maddec01/lar-server', source], ['maddec01/lar-apple', source]]));
 
 /** A source that lists `items` and records each write it is asked for. */
@@ -77,14 +77,14 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
   assert.equal(sources.repos().length, 1);
 });
 
-test("a read leaves out the items of a repository whose config couldn't be read, though its Project lists them", async () => {
+test("a read leaves out the items of a repository whose config couldn't be read, though a shared source lists them", async () => {
   const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple'), item('I_3', 'maddec01/LAR-APPLE')];
   const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')],
     problems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }], resetting: [] }), () => merged(fakeSource('lar', listed, [])));
   assert.deepEqual((await sources.read()).items.map((i) => i.id), ['I_1']);
 });
 
-test('a read leaves out the items of a resetting repository, though its Project lists them', async () => {
+test('a read leaves out the items of a resetting repository, though a shared source lists them', async () => {
   const listed = [item('I_1', 'maddec01/lar-server'), item('I_2', 'maddec01/lar-apple'), item('I_3', 'maddec01/LAR-APPLE')];
   const sources = onboardedSources(async () => ({ configs: [config('maddec01/lar-server')], problems: [], resetting: ['maddec01/lar-apple'] }),
     () => merged(fakeSource('lar', listed, [])));
@@ -120,17 +120,17 @@ function slowSource(name: string, items: Item[] = []): { source: ItemSource; fin
 
 test('a read marks each source as started at once and as finished when its own read ends, without waiting for the others', async () => {
   const fast = slowSource('lar-apple');
-  const slow = slowSource('Project maddec01/1');
+  const slow = slowSource('lar-server');
   const events: string[] = [];
   const progress = { started: (name: string) => events.push(`+${name}`), finished: (name: string) => events.push(`-${name}`) };
   const read = mergeSources(new Map([['maddec01/lar-server', slow.source], ['maddec01/lar-apple', fast.source]])).read(progress);
-  assert.deepEqual(events, ['+Project maddec01/1', '+lar-apple']);
+  assert.deepEqual(events, ['+lar-server', '+lar-apple']);
   fast.finish();
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(events.slice(2), ['-lar-apple'], 'the fast read reports before the slow one ends');
   slow.finish();
   await read;
-  assert.deepEqual(events.slice(3), ['-Project maddec01/1']);
+  assert.deepEqual(events.slice(3), ['-lar-server']);
 });
 
 test("a source without a name is named by its repositories, and a failed read still finishes", async () => {

@@ -9,7 +9,7 @@ import { STATUS_LABELS, WORKFLOW_LABELS, type BoardData, type BundledSkill, type
 const project = (name: string, parts: Partial<ProjectChoice> = {}): ProjectChoice => ({
   id: name, name, folder: `/Users/me/Developer/${name}`, repo: `maddec01/${name}`, provider: 'GitHub', hasConfig: false, onBoard: false, ...parts,
 });
-/** The setup step's answers before any is given: a GitHub Project of the repository's owner, with All items suggested. */
+/** The setup step's answers before any is given: repository issues, with Opted-in items suggested. */
 const SETUP: SetupAnswers = { itemSource: 'issues', team: '', show: 'opted-in', showPicked: false, role: '' };
 const PROJECTS = [project('lar-web'), project('lar-server', { onBoard: true }), project('notes', { repo: null, provider: null, hasConfig: null })];
 

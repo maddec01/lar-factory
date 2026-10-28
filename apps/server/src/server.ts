@@ -382,7 +382,7 @@ function logTools(): void {
 }
 
 /**
- * Whether the board looks again by itself: while gh is missing, logged out or without the project scope, which stop
+ * Whether the board looks again by itself: while gh is missing or logged out, which stops
  * reads, while t3 is missing or T3 Code isn't running, once its check landed. An old gh, a missing git, jq or curl and az wait for Recheck.
  */
 function retriesTools(checks: ToolChecks): boolean {
@@ -456,7 +456,7 @@ function onboarded(): OnboardedRepository[] {
 
 /**
  * Whether the checks in `checks` stop the read: before the first check, or when gh's check blocks every repository the
- * board lists. With none, nothing reads a Project, so only a missing or logged-out gh stops it. A gh that wasn't
+ * board lists. With none, only a missing or logged-out gh stops it. A gh that wasn't
  * checked, as no listed repository was on GitHub, stops nothing.
  */
 function ghStopsRead(checks: ToolChecks | undefined): boolean {

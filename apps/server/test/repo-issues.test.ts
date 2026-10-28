@@ -13,7 +13,7 @@ const daysAgo = (days: number) => new Date(Date.now() - days * DAY).toISOString(
 /** A lar-apple issue as the repository issues query returns it. */
 const appleIssue = (number: number, extra: object = {}) => ({ ...boardIssue(number, 'List', APPLE).content!, ...extra });
 
-/** lar-apple's .lar-factory.json naming its issues, for the fake gh; the other repositories read the lar Project. */
+/** lar-apple's .lar-factory.json naming its issues, for the fake gh. */
 const repoConfigs = { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } };
 
 /** A lar-apple issue closed as completed `days` ago. */
@@ -122,7 +122,7 @@ test("open and kept closed issues normalize together: a closed dossier keeps its
   assert.deepEqual(data.items.find((i) => i.number === 50)!.slices.map((s) => s.number), [51]);
 });
 
-/** A board reading lar-apple's issues, with the Project's items and options for the fake gh. */
+/** A board reading lar-apple's issues, with items and options for the fake gh. */
 async function issuesBoard(t: TestContext, options: { items?: object[]; repoIssues?: object; fail?: string } = {}, env: Record<string, string> = {}) {
   const items = options.items ?? [];
   const repoIssues = options.repoIssues ?? { [APPLE]: [appleIssue(8)] };
@@ -135,7 +135,7 @@ const projectCommands = async (board: Board) => (await board.calls()).filter((ar
 
 const labelEdits = async (board: Board) => (await board.calls()).filter((args) => args[0] === 'label' || (args[0] === 'issue' && args[1] === 'edit'));
 
-test("Queue on an item from a repository's issues creates the missing label, swaps it in and reaches no Project", async (t) => {
+test("Queue on an item from a repository's issues creates the missing label, swaps it in", async (t) => {
   const board = await issuesBoard(t, { repoIssues: { [APPLE]: [appleIssue(8, { labels: { nodes: [{ name: 'status-list' }] } })] } });
   const response = await board.post({ itemId: 'I_8' }, board.url, '/api/queue');
   assert.equal(response.status, 200);

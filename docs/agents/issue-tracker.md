@@ -23,8 +23,7 @@ mention creates neither.
 ## Status
 
 Each item has one Status: List, Queued, Shaping, Needs you, Ready, In progress,
-Review, Verify, Ready to merge or Done. The `itemSource` in `.lar-factory.json`
-says where it lives: as one
+Review, Verify, Ready to merge or Done. It lives as one
 `status-<name>` label on the issue, such as `status-needs-you`. Move an item
 with the `lar-work` skill's `scripts/status.sh <issue-url> "<Status>"`. Closing
 an issue makes it Done. State lives in Status alone, so assignees and other

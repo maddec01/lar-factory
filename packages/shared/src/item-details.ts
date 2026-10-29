@@ -6,6 +6,18 @@ import type { IssueRef } from './model.ts';
 /** How a body or comment is written: GitHub's are markdown, an Azure DevOps field is markdown or HTML. */
 export type TextFormat = 'markdown' | 'html';
 
+/** The Azure DevOps fields a description is read from: Repro Steps when System.Description is empty. */
+export type AzureBodyField = 'System.Description' | 'Microsoft.VSTS.TCM.ReproSteps';
+
+/** A description to save, as markdown, on the item the board holds under `itemId`. */
+export interface DescriptionSave {
+  itemId: string;
+  body: string;
+  /** On Azure DevOps, the `bodyField` and `revision` its details gave; absent on GitHub. */
+  bodyField?: AzureBodyField;
+  revision?: number;
+}
+
 export interface ItemComment {
   id: string;
   author: string;
@@ -18,6 +30,10 @@ export interface ItemDetails {
   /** The description; empty when there is none. */
   body: string;
   format: TextFormat;
+  /** On Azure DevOps, the field the description was read from, which a save writes back; absent on GitHub. */
+  bodyField?: AzureBodyField;
+  /** On Azure DevOps, the work item's revision as read; a save fails if someone changed it since. Absent on GitHub. */
+  revision?: number;
   /** Additional type-specific description fields, each with its own format. */
   sections?: { title: string; body: string; format: TextFormat }[];
   /** The person who opened it; null when the provider doesn't say. */

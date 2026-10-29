@@ -13,7 +13,7 @@ const comment = (id: number, extra: Partial<FakeComment> = {}): FakeComment => (
 test('a markdown description answers with its people, dates, iteration and area', async () => {
   const az = fakeAz({ items: [workItem({ description: '## Export\n\nAs **CSV**.', descriptionFormat: 'Markdown' })] });
   assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
-    body: '## Export\n\nAs **CSV**.', format: 'markdown', author: 'Ana Silva', assignees: ['Rui Costa'], createdAt: '2026-10-12T09:14:00Z',
+    body: '## Export\n\nAs **CSV**.', format: 'markdown', bodyField: 'System.Description', revision: 1, author: 'Ana Silva', assignees: ['Rui Costa'], createdAt: '2026-10-12T09:14:00Z',
     iteration: 'Fabrikam Fiber\\Sprint 12', area: 'Fabrikam Fiber\\Fabrikam Team', subTickets: [], comments: [], hasOlderComments: false, olderCursor: null,
   });
 });
@@ -64,7 +64,7 @@ test('more than 10 comments answer the newest 10 and the token of the older ones
 test('a work item with no description, people or comments answers empty details', async () => {
   const az = fakeAz({ items: [{ id: 5, type: 'Task', state: 'New' }] });
   assert.deepEqual(await readAzureItemDetails(item(5), az.run), {
-    body: '', format: 'markdown', author: null, assignees: [], createdAt: null, area: 'Fabrikam Fiber\\Fabrikam Team', subTickets: [], comments: [], hasOlderComments: false, olderCursor: null,
+    body: '', format: 'markdown', bodyField: 'System.Description', revision: 1, author: null, assignees: [], createdAt: null, area: 'Fabrikam Fiber\\Fabrikam Team', subTickets: [], comments: [], hasOlderComments: false, olderCursor: null,
   });
 });
 
@@ -155,10 +155,18 @@ test('an empty Bug description falls back to Repro Steps, keeping Acceptance Cri
   const az = fakeAz({ items: [workItem({ type: 'Bug', description: '<div><br></div>', reproSteps: '<p>Open the broken screen.</p>', acceptanceCriteria: 'The screen opens.', systemInfo: '<div>macOS</div>' })] });
   const details = await readAzureItemDetails(item(5), az.run);
   assert.ok(!('error' in details));
-  assert.deepEqual([details.body, details.format], ['<p>Open the broken screen.</p>', 'html']);
+  assert.deepEqual([details.body, details.format, details.bodyField], ['<p>Open the broken screen.</p>', 'html', 'Microsoft.VSTS.TCM.ReproSteps']);
   assert.deepEqual(details.sections, [{ title: 'Acceptance Criteria', body: 'The screen opens.', format: 'markdown' }, { title: 'System Info', body: '<div>macOS</div>', format: 'html' }]);
 });
 
+test('an empty description is read from System.Description, except on a Bug, whose description is its Repro Steps', async () => {
+  for (const [type, bodyField] of [['Task', 'System.Description'], ['User Story', 'System.Description'], ['Bug', 'Microsoft.VSTS.TCM.ReproSteps']]) {
+    const az = fakeAz({ items: [workItem({ type })] });
+    const details = await readAzureItemDetails(item(5), az.run);
+    assert.ok(!('error' in details));
+    assert.equal(details.bodyField, bodyField, type);
+  }
+});
 
 test('details keep named Azure attachments, Related work and predecessors alongside children', async () => {
   const url = 'https://dev.azure.com/contoso/_apis/wit/attachments/document-id';

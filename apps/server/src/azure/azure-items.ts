@@ -91,8 +91,8 @@ export async function azureGet<T>(url: string, run: Az = az): Promise<T> {
  * The `az rest` arguments that PATCH the work item `id` in `project` of `organization` with the JSON patch in `file`.
  * az devops invoke can't: of wit/workitems' two routes, ${type} to create and {id}, it always takes the first.
  */
-const workItemPatch = (organization: string, project: string, id: number, file: string): string[] => ['rest', '--method', 'patch',
-  '--resource', DEVOPS_RESOURCE, '--url', `https://dev.azure.com/${organization}/${encodeURIComponent(project)}/_apis/wit/workitems/${id}?api-version=${API_VERSION}`,
+export const workItemPatch = (organization: string, project: string, id: number, file: string, version = API_VERSION): string[] => ['rest', '--method', 'patch',
+  '--resource', DEVOPS_RESOURCE, '--url', `https://dev.azure.com/${organization}/${encodeURIComponent(project)}/_apis/wit/workitems/${id}?api-version=${version}`,
   '--headers', 'Content-Type=application/json-patch+json', '--body', `@${file}`, '--output', 'json'];
 
 /** A logged-out az or a missing azure-devops extension as the ReadProblem that names its fix; any other error as it is. */

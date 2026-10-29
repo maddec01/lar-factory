@@ -1,11 +1,13 @@
 // Writes to Azure DevOps work items through az, as status.sh writes them. A move swaps the work item's status-<name> tag
 // in System.Tags and moves State only across state categories, a label is a tag, and Abandon moves State to the type's
 // Removed-category state. Each write is one JSON patch that fails if the work item changed since the board read it.
+// A description save writes the field the item dialog read, as markdown, failing if the work item changed since the dialog read it.
 
-import { carriesTwoStatuses, keepOneText, labelStatuses, statusLabel } from '@lar-factory/shared';
-import type { Status } from '@lar-factory/shared';
+import { carriesTwoStatuses, decodePart, keepOneText, labelStatuses, onAzure, statusLabel } from '@lar-factory/shared';
+import type { AzureBodyField, Item, Status } from '@lar-factory/shared';
+import type { Refused } from '../config/edit-config.ts';
 import { DONE_REFUSED, ReadProblem, type ItemSource } from '../items/item-source.ts';
-import { field, isRepoTag, tagsOf, withFile, type AzureCalls, type RawWorkItem } from './azure-items.ts';
+import { az, field, isRepoTag, problemOf, tagsOf, withFile, workItemPatch, type Az, type AzureCalls, type RawWorkItem } from './azure-items.ts';
 
 /** The most tags Azure DevOps lets one work item hold. */
 const TAG_LIMIT = 100;
@@ -25,6 +27,41 @@ export function writeFailure(what: string, project: string, err: unknown): strin
 }
 
 type Operation = { op: 'test' | 'replace'; path: string; value: unknown };
+
+/** The REST API version of a description save, the first that takes a markdown field; az rest sends it as is. */
+const DESCRIPTION_API_VERSION = '7.2-preview.3';
+/** A failed /rev test: Azure DevOps answers TF26071, or HTTP 412 Precondition Failed. */
+const CHANGED = /TF26071|\b412\b|changed by someone else/i;
+/** No right to edit work items in the work item's area: TF237111. */
+const NO_EDIT_RIGHT = /TF237111|permissions? to save work items/i;
+
+/**
+ * Saves `body` as the markdown of the work item's `bodyField`, the field its details read, testing that its rev is still
+ * `revision`. Returns null, or the refusal: 409 when someone changed it since, 403 without the right to edit it.
+ * `run` stands in for az in tests.
+ */
+export async function saveAzureDescription(item: Item, { body, bodyField, revision }: { body: string; bodyField: AzureBodyField; revision: number },
+  run: Az = az): Promise<Refused | null> {
+  if (!item.repo || !onAzure(item.repo) || item.number === null) return { status: 404, error: 'That item is not an Azure DevOps work item.' };
+  const [organization, encoded] = item.repo.split('/') as [string, string];
+  const project = decodePart(encoded);
+  const id = item.number;
+  const ops: Operation[] = [
+    { op: 'test', path: '/rev', value: revision },
+    { op: 'replace', path: `/fields/${bodyField}`, value: body },
+    { op: 'replace', path: `/multilineFieldsFormat/${bodyField}`, value: 'Markdown' },
+  ];
+  const what = 'Could not save the description.';
+  try {
+    await withFile(ops, (file) => run(workItemPatch(organization, project, id, file, DESCRIPTION_API_VERSION)).catch((err: unknown) => { throw problemOf(err); }));
+    return null;
+  } catch (err) {
+    const text = err instanceof Error ? err.message : String(err);
+    if (CHANGED.test(text)) return { status: 409, error: `${what} Someone else changed work item ${id} since you opened it. Copy your text, close the item and open it again to edit the latest version.` };
+    if (NO_EDIT_RIGHT.test(text)) return { status: 403, error: `${what} You have no right to edit work item ${id} in ${project}. Ask a project administrator for Edit work items in this node.` };
+    return { status: 502, error: writeFailure(what, project, err) };
+  }
+}
 
 /**
  * The writes of an Azure item source on `project`, through its batch `workItems` read, its `patchWorkItem` of a work item

@@ -195,6 +195,19 @@ const main = async () => {
     process.exitCode = 1;
     return;
   }
+  // A description save writes the body file to the issue's details node, so a later details read answers it.
+  if (args[0] === 'issue' && args[1] === 'edit' && args.includes('--body-file')) {
+    if (options.fail === 'body') {
+      process.stderr.write('HTTP 403: Resource not accessible by integration');
+      process.exitCode = 1;
+      return;
+    }
+    const content = (options.repoIssues?.[args[4]] ?? []).find((c) => c?.number === Number(args[2]));
+    const node = content && options.details?.[content.id];
+    if (node) node.body = fs.readFileSync(args[args.indexOf('--body-file') + 1], 'utf8');
+    fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(options));
+    return;
+  }
   if (args[0] === 'issue' && args[1] === 'edit') {
     if (options.writeDelay) await new Promise((r) => setTimeout(r, options.writeDelay));
     if (options.fail === 'label' || options.fail === 'status' && args.some((a) => a.startsWith('status-'))) {

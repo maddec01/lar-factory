@@ -1,8 +1,22 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { startBoard } from './server-support.ts';
+
+test('a slow startup failure keeps its diagnostic until the child closes', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'lar-slow-start-'));
+  t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  await mkdir(join(dir, 'src'));
+  // Deliberately outlast the old 100 x 25 ms startup poll. The assertion waits for exit, not a sleep.
+  await writeFile(join(dir, 'src/server.ts'), `setTimeout(() => {
+    process.stderr.write('delayed startup diagnostic\\n', () => process.exit(1));
+  }, 3_000);`);
+  await assert.rejects(startBoard(t, {}, true, false, {}, dir), /delayed startup diagnostic/);
+});
 
 const alive = (pid: number) => {
   try { process.kill(pid, 0); return true; } catch { return false; }

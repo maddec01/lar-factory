@@ -94,7 +94,11 @@ test('a failed start disarms the part and shows its error on it, until it is arm
   assert.deepEqual(armedFile(env.HOME!), {});
   await board.update({ items: [blockedBuild()], t3: { fail: 'down' } });
   await read(board);
-  assert.equal((await (await arm(board, 'I_12')).json()).board.armedErrors.I_12, undefined);
+  // An older read can advance fetchedAt before the requested read lands. Rearm only once its blocker is open.
+  await until(board, (d) => d.items.find((i) => i.id === 'I_12')?.blockers.some((b) => b.number === 6 && b.state === 'open') === true);
+  const rearmed = await arm(board, 'I_12');
+  assert.equal(rearmed.status, 200);
+  assert.equal((await rearmed.json()).board.armedErrors.I_12, undefined);
 });
 
 test("a part whose repository has no T3 project can't be armed, as its start would fail", async (t) => {
@@ -117,7 +121,8 @@ test('an armed start whose repository Reset takes off the board drops on the nex
   assert.equal((await arm(board, 'I_12', OPUS)).status, 200);
   assert.equal((await board.post({ repo: 'maddec01/lar-factory' }, board.url, '/api/repositories/reset')).status, 200);
   await board.update({ items: [blockedBuild(['CLOSED', 'CLOSED'])] });
-  const data = await read(board);
+  await read(board);
+  const data = await until(board, (d) => d.items.length === 0 && Object.keys(d.armed ?? {}).length === 0);
   assert.deepEqual([data.items, data.armed], [[], {}]);
   assert.deepEqual(armedFile(env.HOME!), {});
   await board.stop();

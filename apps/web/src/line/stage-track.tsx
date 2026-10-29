@@ -97,19 +97,28 @@ export function StageHeader({ label, side }: { label: ReactNode; side: ReactNode
   );
 }
 
-/** A build's slices at a glance: the bar across the title column, the count, and the slices that are moving or stuck. */
+/**
+ * A build's slices at a glance: the bar across the title column, the count, and the first stuck slice, or with none
+ * stuck the first moving one, plus how many more are stuck or moving. Hovering names them all.
+ */
 function SliceSummary({ item, open, onToggle }: { item: Item; open: boolean; onToggle: () => void }) {
   const done = item.slices.filter((s) => s.progress === 'done').length;
   const active = item.slices.filter((s) => s.progress === 'active');
   const blocked = item.slices.filter((s) => s.progress === 'blocked');
   const named = [...blocked.map((s) => ({ s, tone: 'text-(--st-review)', word: 'blocked' })), ...active.map((s) => ({ s, tone: 'text-(--st-now)', word: 'active' }))];
+  const first = named[0];
   return (
     <span className="grid gap-1">
       <SliceBar item={item} />
       <button type="button" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }} className="flex min-w-0 items-center gap-1 text-left text-[11px] text-(--muted-foreground) hover:text-(--foreground)">
         {open ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
         <span className="shrink-0 font-medium tabular-nums text-(--foreground)">{done}/{item.slices.length} slices</span>
-        {named.length > 0 && <span className="min-w-0 truncate">· {named.map(({ s, tone, word }, n) => <span key={s.number}>{n > 0 && ', '}<span className={tone}>{word}</span> #{s.number} {s.title}</span>)}</span>}
+        {first && (
+          <span className="flex min-w-0 gap-1" title={named.map(({ s, word }) => `${word} #${s.number} ${s.title}`).join('\n')}>
+            <span className="min-w-0 truncate">· <span className={first.tone}>{first.word}</span> #{first.s.number} {first.s.title}</span>
+            {named.length > 1 && <span className="shrink-0 tabular-nums">{` +${named.length - 1} more`}</span>}
+          </span>
+        )}
       </button>
     </span>
   );
@@ -133,7 +142,7 @@ export function Row({ item, data, now, side, waiting, nested, children }: {
           {nested && <span className="mb-auto ml-1 h-3 w-2.5 shrink-0 rounded-bl border-b border-l border-(--input)" />}
           <span className={`${repoTone(repo, data.repos)} mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
           <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-1">
-            <span className="truncate text-[13px]"><ItemTitle item={item} /></span>
+            <span className="line-clamp-2 text-[13px]"><ItemTitle item={item} /></span>
             <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-(--muted-foreground)">
               <TwoStatusesMark item={item} className="size-3" />
               <span className="truncate">{item.status} · {repoName(repo, data.repos)} · {shortAgo(item.updatedAt, now)}</span>

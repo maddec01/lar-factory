@@ -2,6 +2,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, checkedOf, fetchMock, mountPage, push, sample, settle, text } from '../../test/support.ts';
+import { pastePlain, selectEnd, typeInto } from '../../test/editor.ts';
 import type { BoardData } from '@lar-factory/shared';
 
 const withFactory: BoardData = { ...sample, repos: [
@@ -14,6 +15,12 @@ const submit = () => field<HTMLButtonElement>('item-submit');
 const result = () => field('item-result');
 const labels = () => $$<HTMLInputElement>('input[name="labels"]').map((input) => input.value);
 const box = (label: string) => $$('input[type="checkbox"]').find((each) => each.closest('label')!.textContent === label)!;
+/** A label's toggle chip, by the label's full name. */
+const chip = (label: string) => $<HTMLInputElement>(`input[name="labels"][value="${label}"]`)!;
+const editorArea = () => $('#add-item-dialog [contenteditable]')!;
+/** Each Label group's heading and its options' text. */
+const groups = () => $$('.custom-labels [role="group"]').map((group) => [group.getAttribute('aria-label'),
+  [...group.querySelectorAll('label')].map((option) => option.textContent)]);
 
 async function open(data: BoardData = withFactory): Promise<void> {
   await mountPage(data);
@@ -36,7 +43,7 @@ async function enter(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElem
 async function fillDraft(): Promise<void> {
   await enter(field<HTMLSelectElement>('item-kind'), 'bug');
   await enter(field('item-title'), 'Playback stalls');
-  await enter(field<HTMLTextAreaElement>('item-description'), 'After a seek.');
+  await typeInto(editorArea(), 'After a seek.');
 }
 
 const respond = (body: object, status = 200) => fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify(body), { status }));
@@ -48,34 +55,137 @@ test('Add item opens a dialog with the configured repositories, kinds, and the s
   const popup = dialog()!;
   expect(popup.getAttribute('role')).toBe('dialog');
   expect(document.getElementById(popup.getAttribute('aria-labelledby')!)!.textContent).toBe('Add item');
-  expect(document.activeElement, 'focus starts on the repo select').toBe(field('item-repo'));
+  expect(document.activeElement, 'focus starts on the title').toBe(field('item-title'));
   expect($$<HTMLOptionElement>('#item-repo option').map((o) => [o.value, o.textContent])).toEqual([
     ['maddec01/lar-server', 'lar-server'], ['maddec01/lar-apple', 'lar-apple'], ['maddec01/lar-factory', 'lar-factory'],
     ['maddec01/lar-empty', 'lar-empty']]);
   expect($$<HTMLOptionElement>('#item-kind option').map((o) => o.value)).toEqual(['', 'bug', 'feature', 'improvement']);
-  expect($('label[for="item-title"]')!.textContent).toBe('Title (required)');
+  expect(field('item-title').getAttribute('aria-label')).toBe('Title');
   expect(field('item-title').required).toBe(true);
-  expect($('label[for="item-description"]')!.textContent).toBe('Description (optional)');
+  expect(editorArea().getAttribute('aria-label')).toBe('Description');
   expect([result().getAttribute('role'), result().dataset.slot, result().dataset.tone]).toEqual(['status', 'alert', 'warning']);
   expect(popup.textContent).toContain('Create an issue in lar-server and add it to List.');
+  expect(popup.textContent, 'one line describes it').not.toContain('Capture work for a repository.');
 
   expect(labels()).toEqual(['area: server', 'area: web']);
-  expect($('.custom-labels')!.textContent).toBe('Labelsarea: serverarea: web');
+  expect($('.custom-labels legend')!.textContent).toBe('Labels');
+  expect(groups()).toEqual([['area', ['server', 'web']]]);
 });
 
-test('Repository, Kind, Title and Description each take their label from the copied Field, so the labels match', async () => {
+test('the side panel heads Repository and Kind in small uppercase labels, beside the title and the editor', async () => {
   await open();
-  const labels = $$<HTMLLabelElement>('#item-fields [data-slot="field"] label');
-  expect(labels.map((l) => [l.htmlFor, l.textContent])).toEqual([
-    ['item-repo', 'Repository'], ['item-kind', 'Kind'], ['item-title', 'Title (required)'], ['item-description', 'Description (optional)']]);
-  expect(new Set(labels.map((l) => l.className)).size, 'one look for every label').toBe(1);
+  const panel = $('#add-item-dialog aside[aria-label="Details"]')!;
+  const labels = [...panel.querySelectorAll<HTMLLabelElement>(':scope > div > label')];
+  expect(labels.map((l) => [l.htmlFor, l.textContent])).toEqual([['item-repo', 'Repository'], ['item-kind', 'Kind']]);
+  expect(labels.every((l) => l.classList.contains('uppercase'))).toBe(true);
   expect(field('item-repo').tagName).toBe('SELECT');
   expect(field('item-kind').tagName).toBe('SELECT');
+  expect(panel.contains(field('item-title')) || panel.contains(editorArea()), 'the title and editor sit left of it').toBe(false);
+});
+
+test('labels show by Label group, unprefixed ones last under Other, and a ticked option creates the item with its full label', async () => {
+  await open({ ...withFactory, repos: [{ ...withFactory.repos[0]!, labels: ['app: music', 'UI', 'app: video', 'os: ios'] }] });
+  expect(groups()).toEqual([['app', ['music', 'video']], ['os', ['ios']], ['Other', ['UI']]]);
+  expect($$('.custom-labels [role="group"] > span').map((heading) => heading.textContent)).toEqual(['app', 'os', 'Other']);
+  await settle(() => chip('app: music').click());
+  expect(checkedOf(chip('app: music'))).toBe('true');
+  await fillDraft();
+  respond({ item: null, issueUrl: null, error: null }, 500);
+  await settle(() => submit().click());
+  expect((posted().draft as Record<string, unknown>).labels).toEqual(['app: music']);
+});
+
+test('labels with no prefix sit under Other even when no label has one', async () => {
+  await open({ ...withFactory, repos: [{ ...withFactory.repos[0]!, labels: ['UI', 'docs'] }] });
+  expect($$('.custom-labels [role="group"] > span').map((heading) => heading.textContent)).toEqual(['Other']);
+});
+
+test('Clear unticks every label and the draft keeps that', async () => {
+  await open();
+  const clear = () => $$<HTMLButtonElement>('.custom-labels button').find((b) => b.textContent === 'Clear');
+  expect(clear(), 'nothing to clear').toBeUndefined();
+  await settle(() => chip('area: web').click());
+  await settle(() => chip('area: server').click());
+  await settle(() => clear()!.click());
+  expect([chip('area: web'), chip('area: server')].map(checkedOf)).toEqual(['false', 'false']);
+  expect(clear()).toBeUndefined();
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => addButton().click());
+  expect(checkedOf(chip('area: web')), 'the kept draft has no labels').toBe('false');
+});
+
+test.each([['- a\nb', '- a\n- b'], ['1. a\nb', '1. a\n2. b'], ['# h', '# h']])('typing %j in the description creates the item with %j', async (typed, body) => {
+  await open();
+  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await enter(field('item-title'), 'Playback stalls');
+  await typeInto(editorArea(), typed);
+  respond({ item: null, issueUrl: null, error: null }, 500);
+  await settle(() => submit().click());
+  expect((posted().draft as Record<string, unknown>).description).toBe(body);
+});
+
+test('a description typed in Add item survives closing and reopening it', async () => {
+  await open();
+  await typeInto(editorArea(), '- a\nb');
+  await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+  await settle(() => vi.advanceTimersByTime(50));
+  expect(dialog()).toBeNull();
+  await settle(() => addButton().click());
+  expect([...editorArea().querySelectorAll('ul > li')].map((li) => li.textContent)).toEqual(['a', 'b']);
+  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await enter(field('item-title'), 'Playback stalls');
+  respond({ item: null, issueUrl: null, error: null }, 500);
+  await settle(() => submit().click());
+  expect((posted().draft as Record<string, unknown>).description).toBe('- a\n- b');
+});
+
+test('a description added to over several openings creates the item with all of it', async () => {
+  await open();
+  const reopen = async () => {
+    await settle(() => $<HTMLButtonElement>('#add-item-dialog button[aria-label="Close"]')!.click());
+    await settle(() => vi.advanceTimersByTime(50));
+    await settle(() => addButton().click());
+  };
+  await typeInto(editorArea(), 'x');
+  await reopen();
+  await selectEnd(editorArea());
+  await typeInto(editorArea(), 'y');
+  await reopen();
+  await selectEnd(editorArea());
+  await typeInto(editorArea(), 'z');
+  await enter(field<HTMLSelectElement>('item-kind'), 'bug');
+  await enter(field('item-title'), 'Playback stalls');
+  respond({ item: null, issueUrl: null, error: null }, 500);
+  await settle(() => submit().click());
+  expect((posted().draft as Record<string, unknown>).description).toBe('xyz');
+});
+
+test('pasted Markdown shows formatted in the description', async () => {
+  await open();
+  await pastePlain(editorArea(), '## Steps\n\n1. Play\n2. Quit');
+  expect(editorArea().querySelector('h2')!.textContent).toBe('Steps');
+  expect(editorArea().querySelectorAll('ol > li').length).toBe(2);
+});
+
+test('the expand button and Ctrl+Shift+E grow the dialog to the window and back, even while typing in the editor', async () => {
+  await open();
+  const expand = () => $<HTMLButtonElement>('#add-item-dialog button[data-expand]')!;
+  expect([expand().getAttribute('aria-label'), expand().getAttribute('aria-keyshortcuts')]).toEqual(['Expand', 'Control+Shift+E']);
+  await settle(() => expand().click());
+  expect(dialog()!.style.width).toBe('calc(100vw - 2rem)');
+  expect(dialog()!.style.height).toBe('calc(100dvh - 2rem)');
+  expect(expand().getAttribute('aria-label')).toBe('Restore size');
+  editorArea().focus();
+  await settle(() => editorArea().dispatchEvent(new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true, bubbles: true })));
+  expect(dialog()!.style.width, 'restored').toBe('');
+  await settle(() => editorArea().dispatchEvent(new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true, bubbles: true })));
+  expect(dialog()!.style.width).toBe('calc(100vw - 2rem)');
+  expect(dialog(), 'the shortcut leaves the dialog open').not.toBeNull();
 });
 
 test('changing the repo shows its custom labels, unchecked, and a repo with none or an empty list shows no toggles', async () => {
   await open();
-  await settle(() => box('area: web').click());
+  await settle(() => chip('area: web').click());
   await enter(field<HTMLSelectElement>('item-kind'), 'bug');
   await enter(field<HTMLSelectElement>('item-repo'), 'maddec01/lar-apple');
   expect(field<HTMLSelectElement>('item-repo').value).toBe('maddec01/lar-apple');
@@ -106,8 +216,8 @@ test('ticking a box counts as editing and clears the message', async () => {
   await open();
   await settle(() => submit().click());
   expect(result().textContent).toBe('Choose bug, feature or improvement.');
-  await settle(() => box('area: web').click());
-  expect(checkedOf(box('area: web'))).toBe('true');
+  await settle(() => chip('area: web').click());
+  expect(checkedOf(chip('area: web'))).toBe('true');
   expect(result().textContent).toBe('');
 });
 
@@ -125,7 +235,7 @@ test('a repo picked while a message shows is the one posted', async () => {
 
 test('submitting posts the draft, shows it sending, then closes and announces the new item', async () => {
   await open();
-  await settle(() => box('area: web').click());
+  await settle(() => chip('area: web').click());
   await fillDraft();
   let finish!: (response: Response) => void;
   fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => (finish = resolve)));
@@ -138,9 +248,10 @@ test('submitting posts the draft, shows it sending, then closes and announces th
   expect(submit().textContent).toBe('Adding…');
   expect(submit().disabled).toBe(true);
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
-  expect(box('area: server').matches(':disabled'), 'the boxes lock with the fields').toBe(true);
-  await settle(() => box('area: server').click());
-  expect(checkedOf(box('area: server'))).toBe('false');
+  expect(editorArea().getAttribute('contenteditable'), 'the description locks with them').toBe('false');
+  expect(chip('area: server').matches(':disabled'), 'the boxes lock with the fields').toBe(true);
+  await settle(() => chip('area: server').click());
+  expect(checkedOf(chip('area: server'))).toBe('false');
   expect($('#add-item-form')!.getAttribute('aria-busy')).toBe('true');
   expect(result().textContent).toBe('Creating the issue and adding it to List…');
 
@@ -165,9 +276,9 @@ test('a created issue the server could not add offers a retry of the same reques
   expect(result().textContent).toBe('Issue created. Could not add it to List. Retry to finish this issue.View created issue');
   expect(submit().textContent).toBe('Retry this submission');
   expect(field<HTMLFieldSetElement>('item-fields').disabled).toBe(true);
-  expect(box('area: server').matches(':disabled'), 'the boxes lock with the fields').toBe(true);
-  await settle(() => box('area: server').click());
-  expect(checkedOf(box('area: server'))).toBe('false');
+  expect(chip('area: server').matches(':disabled'), 'the boxes lock with the fields').toBe(true);
+  await settle(() => chip('area: server').click());
+  expect(checkedOf(chip('area: server'))).toBe('false');
 
   respond({ item: null, issueUrl: null, error: 'Still failing.' }, 502);
   await settle(() => submit().click());
@@ -224,8 +335,6 @@ test('with no repository onboarded, adding is disabled and says where to add one
   expect(dialog()!.textContent).toContain('Create an issue and add it to List.');
   expect(hint()!.textContent).toBe('No repository is onboarded. Read how to add a repository.');
   expect(field('item-repo').getAttribute('aria-describedby')).toBe('item-repo-hint');
-  addStylesheet();
-  expect(getComputedStyle(field('item-kind').closest('.form-field')!).alignContent, 'the hint grows its row without stretching Kind').toBe('start');
   for (const data of [{ ...empty, error: 'gh: HTTP 502' }, { ...empty, fetchedAt: null },
     { ...empty, repositoryConfigProblems: [{ repo: 'maddec01/lar-apple', problem: 'no .lar-factory.json on its default branch.' }] }]) {
     await push(data);
@@ -305,7 +414,8 @@ test('on an Azure repository, the custom tags are headed Tags', async () => {
     repos: [...withFactory.repos, { repo: 'contoso/Fabrikam/web', role: 'app', items: 'azure-board', team: 'Web', show: 'all', labels: ['area: web'] }] };
   await open(azure);
   await enter(field<HTMLSelectElement>('item-repo'), 'contoso/Fabrikam/web');
-  expect($('.custom-labels')!.textContent).toBe('Tagsarea: web');
+  expect($('.custom-labels legend')!.textContent).toBe('Tags');
+  expect(groups()).toEqual([['area', ['web']]]);
 });
 
 test('on an Azure repository, Add item says work item, and an uncertain creation points at the project\'s work items', async () => {

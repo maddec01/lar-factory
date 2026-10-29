@@ -1,7 +1,8 @@
 // Label groups: a repository's custom labels grouped by the text before ": ", the way Add item shows them.
 
-export interface LabelOption { label: string; text: string }
-export interface LabelGroup { heading: string; options: LabelOption[] }
+interface LabelOption { label: string; text: string }
+/** `prefix` is null for the unprefixed labels, which a prefix "Other" would otherwise share a heading with. */
+export interface LabelGroup { heading: string; prefix: string | null; options: LabelOption[] }
 
 const SEPARATOR = ': ';
 
@@ -17,5 +18,6 @@ export function labelGroups(labels: readonly string[]): LabelGroup[] {
       groups.set(heading, [...(groups.get(heading) ?? []), { label, text: label.slice(at + SEPARATOR.length) }]);
     }
   }
-  return [...[...groups].map(([heading, options]) => ({ heading, options })), ...(other.length ? [{ heading: 'Other', options: other }] : [])];
+  return [...[...groups].map(([heading, options]) => ({ heading, prefix: heading, options })),
+    ...(other.length ? [{ heading: 'Other', prefix: null, options: other }] : [])];
 }

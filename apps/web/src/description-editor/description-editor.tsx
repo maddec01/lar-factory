@@ -9,7 +9,6 @@ import { LinkNode } from '@lexical/link';
 import { ListItemNode, ListNode } from '@lexical/list';
 import { $convertFromMarkdownString, $convertToMarkdownString, $generateNodesFromMarkdownString, TRANSFORMERS } from '@lexical/markdown';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
-import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -50,10 +49,10 @@ function MarkdownPastePlugin() {
   return null;
 }
 
-/** Reports the starting text as the editor writes it back, so a caller can tell an edit from Markdown's round trip. */
-function BaselinePlugin({ onBaseline }: { onBaseline: (markdown: string) => void }) {
+/** Locks the text, as a disabled field does. */
+function EditablePlugin({ editable }: { editable: boolean }) {
   const [editor] = useLexicalComposerContext();
-  useEffect(() => editor.getEditorState().read(() => onBaseline($convertToMarkdownString(TRANSFORMERS))), [editor, onBaseline]);
+  useEffect(() => editor.setEditable(editable), [editor, editable]);
   return null;
 }
 
@@ -65,11 +64,10 @@ interface DescriptionEditorProps {
   placeholder: string;
   /** Grows the editor into its parent's height; otherwise it grows with its text up to a cap. */
   fill?: boolean;
-  autoFocus?: boolean;
-  onBaseline?: (markdown: string) => void;
+  disabled?: boolean;
 }
 
-export function DescriptionEditor({ value, onChange, label, placeholder, fill = false, autoFocus = false, onBaseline }: DescriptionEditorProps) {
+export function DescriptionEditor({ value, onChange, label, placeholder, fill = false, disabled = false }: DescriptionEditorProps) {
   const onEdit = useCallback((state: EditorState) => state.read(() => onChange($convertToMarkdownString(TRANSFORMERS))), [onChange]);
   return (
     <LexicalComposer initialConfig={{
@@ -87,14 +85,13 @@ export function DescriptionEditor({ value, onChange, label, placeholder, fill = 
             ErrorBoundary={LexicalErrorBoundary} />
         </div>
       </div>
-      {autoFocus && <AutoFocusPlugin defaultSelection="rootEnd" />}
       <HistoryPlugin />
       <ListPlugin />
       <LinkPlugin />
       <TabIndentationPlugin />
       <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
       <MarkdownPastePlugin />
-      {onBaseline && <BaselinePlugin onBaseline={onBaseline} />}
+      <EditablePlugin editable={!disabled} />
       <OnChangePlugin ignoreSelectionChange onChange={onEdit} />
     </LexicalComposer>
   );

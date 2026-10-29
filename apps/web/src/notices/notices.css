@@ -13,3 +13,32 @@
 .dismiss { float: right; margin: --spacing(-0.75) --spacing(-1.5) 0 --spacing(2); }
 .action-error .dismiss { float: none; margin: --spacing(-1) 0 --spacing(-1) --spacing(0.5); vertical-align: middle; }
 .view-item { margin-left: --spacing(1); }
+
+/* Variant B's corner placement, with oldest entries above the newest and room to scroll through them all. */
+.notification-stack {
+  right: calc(var(--spacing) * 4);
+  bottom: calc(var(--spacing) * 16);
+  z-index: 100; /* Above the loading screen, which covers the board at 60. */
+  flex-direction: column;
+  width: min(calc(var(--spacing) * 104), calc(100vw - var(--spacing) * 8));
+  max-width: none;
+  max-height: min(60vh, calc(100dvh - var(--spacing) * 20));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+.notification-stack:empty { pointer-events: none; }
+.notification-stack [data-slot="toast"] { flex-shrink: 0; overflow-wrap: anywhere; }
+.notification-stack [data-slot="content"] { min-width: 0; }
+
+/* Keep native severity tints above the copied theme's unlayered neutral toast styles. */
+.notification-stack [data-slot="toast"][data-toast-color="warning"] {
+  @apply bg-warning/10 text-(--warning-foreground) border-warning/20;
+}
+.notification-stack [data-slot="toast"][data-toast-color="success"] {
+  @apply bg-success/10 text-(--success-foreground) border-success/20;
+}
+.notification-stack [data-slot="toast"][data-toast-color="danger"] {
+  @apply bg-danger/10 text-(--error-foreground) border-danger/20;
+}

@@ -6,7 +6,7 @@ import type { MouseEvent, ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
 import { CloseIcon } from '@lar-factory/ui/design-system/NavigationIcons';
-import { toast as toasts } from '@lar-factory/ui/toasts';
+import { toast as toasts, Toaster } from '@lar-factory/ui/toasts';
 import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 
 /** How long a success toast stays. */
@@ -15,6 +15,25 @@ const TOAST_MS = 5_000;
 const RECHECK_MS = 1_000;
 /** Where focus goes when a closed toast had it and names nowhere of its own. */
 const FALLBACK_FOCUS = '.add-item';
+
+/** Keeps a new entry visible without taking focus or scrolling when an older entry changes. */
+function scrollToNewest(viewport: HTMLDivElement | null) {
+  if (!viewport) return;
+  viewport.scrollTop = viewport.scrollHeight;
+  const observer = new MutationObserver((changes) => {
+    const newest = viewport.lastElementChild;
+    if (newest && changes.some(({ addedNodes }) => Array.from(addedNodes).includes(newest))) {
+      viewport.scrollTop = viewport.scrollHeight;
+    }
+  });
+  observer.observe(viewport, { childList: true });
+  return () => observer.disconnect();
+}
+
+/** One viewport on every screen. Ninna-ui portals it outside the board, which is inert during loading. */
+export function NotificationStack() {
+  return <Toaster ref={scrollToNewest} position="bottom-right" max={Infinity} className="notification-stack" offset="calc(var(--spacing) * 1)" />;
+}
 
 export interface Toast {
   /** One toast per slot: a new one replaces the last. */

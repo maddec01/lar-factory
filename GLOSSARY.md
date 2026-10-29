@@ -321,7 +321,7 @@ A concept, or an item with sub-issues, shown whole on the line: its destination,
 _Avoid_: concept card
 
 **Item dialog**:
-The board page's read-only view of one item, with what its provider shows: description, comments, people, labels, dates, relations and linked PRs.
+The board page's view of one item, with what its provider shows: description, comments, people, labels, dates, relations and linked PRs. Its description is the one thing the user can edit there.
 _Avoid_: detail modal, issue view, ticket view
 
 **Refining**:

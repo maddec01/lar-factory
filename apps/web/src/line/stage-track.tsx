@@ -25,7 +25,7 @@ export const stageOf = (s: Status) => STAGES.findIndex((st) => st.statuses.inclu
  * Below the line's @2xl width, as at the app's 840 px minimum, the Agent column drops and the track narrows, so the
  * titles keep room to read.
  */
-export const GRID = 'grid grid-cols-[minmax(0,1fr)_11rem_8rem] items-center gap-x-4 px-3 @2xl:grid-cols-[minmax(0,1fr)_13rem_6rem_8rem] @3xl:grid-cols-[minmax(0,1fr)_18rem_7rem_11rem]';
+const GRID = 'grid grid-cols-[minmax(0,1fr)_11rem_8rem] items-center gap-x-4 px-3 @2xl:grid-cols-[minmax(0,1fr)_13rem_6rem_8rem] @3xl:grid-cols-[minmax(0,1fr)_18rem_7rem_11rem]';
 /** The Agent column's cells, hidden while the grid leaves it out. */
 const AGENT = 'hidden @2xl:grid';
 export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');

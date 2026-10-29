@@ -65,6 +65,10 @@ test("a row shows the item's kind label and its repository's custom labels, colo
 });
 
 test("a dossier's parts are left out and show in the dossier; a Queued parent stays, and an item whose parent isn't on the board stays", async () => {
+  for (const id of ['I_sample05', 'I_sample09']) {
+    localStorage.setItem(`lar-board:dossier-open:${id}`, '1');
+    localStorage.setItem(`lar-board:dossier-view:${id}`, 'list');
+  }
   await mountPage({ ...sample, items: [...sample.items, decision('I_d200', 200), decision('I_d129', 129), decision('I_d999', 999)] });
   expect(rows().map((r) => r.dataset.item)).toEqual(['I_sample05', 'I_sample06', 'I_sample21', 'I_d999']);
   expect($('[data-dossier="I_sample05"] [data-part="I_d129"]'), "#129's sub-issue, in its dossier").not.toBeNull();

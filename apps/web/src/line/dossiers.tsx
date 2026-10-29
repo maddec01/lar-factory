@@ -1,13 +1,17 @@
-// The line's dossiers: each open concept, and each open item with sub-issues on the board, shown whole. A dossier's
-// header has its parts done, repositories, T3 threads and agent total; then its map (destination, decisions so far,
-// open questions and end-to-end check) beside its parts as a checklist, or the parts drawn as a map of what waits on
-// what; then each part's row on the stage track, its done parts folded away.
+// The line's dossiers: each open concept, and each open item with sub-issues on the board. A dossier starts collapsed
+// to its two header lines: its kind, title and chips (parts that need you, open decisions, blocked slices, fog), then
+// its part bar, parts done, what's next and repositories in columns that line up across every dossier. Opened, it
+// lists what keeps the work moving (parts that need you, parts to verify or merge, open decisions, blocked slices,
+// waiting parts, parts ready to start and the map's fog), then its Work map or its parts list, then each part's row
+// on the stage track, its done parts folded away. The browser remembers which dossiers are open and which view each
+// shows.
 
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
-import { Check, ChevronDown, ChevronRight, CircleHelp, FlaskConical, GitPullRequest, ListChecks, Map as MapIcon } from 'lucide-react';
-import { carriesTwoStatuses, duration, formatTokens, formatUsd, itemTotal, kindOf, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
+import { Ban, Check, ChevronDown, ChevronRight, CircleHelp, FlaskConical, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
+import { duration, formatTokens, formatUsd, itemTotal, kindOf, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Blocker, EndToEndCheck, Item, ItemThread } from '@lar-factory/shared';
+import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { ICON, kind } from '../buttons/button-kinds.tsx';
 import { useBoardStore } from '../board/board-store.ts';
@@ -16,11 +20,11 @@ import { AzureFields, ItemTitle, RepoTag, SliceBar } from '../items/item-parts.t
 import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
-import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
-import { THREAD_GLYPH, dossiersOf, isDone, openWaits, threadsOf } from './dossier-parts.ts';
+import { ItemStatusGlyph, STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
+import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
-import { PartStart } from './part-start.tsx';
-import { AgentCell, GRID, OnYourDesk, Row, StageHeader, threadText, Track, YOURS, picked, statsOf } from './stage-track.tsx';
+import { PartStart, startable } from './part-start.tsx';
+import { AgentCell, OnYourDesk, Row, StageHeader, stageOf, threadText, Track, YOURS, picked, statsOf } from './stage-track.tsx';
 import { WorkMap } from './work-map.tsx';
 
 const NOT_BUILT = "isn't built yet: no workflow runs an end-to-end check";
@@ -176,19 +180,102 @@ function CheckPhase({ check, parent, builds, data }: { check: EndToEndCheck; par
   );
 }
 
-function Heading({ children }: { children: ReactNode }) {
-  return <h3 className="m-0 text-[11px] font-medium uppercase tracking-wide text-(--muted-foreground)">{children}</h3>;
-}
-
 type View = 'list' | 'map';
 
-/** Checklist or map: one dossier's way of drawing its parts. */
+/** A dossier setting this browser remembers across reloads, stored as a string under `lar-board:dossier-<name>:<id>`. */
+interface Stored<T> {
+  name: string;
+  /** The setting from what was stored, or from null before anything is. */
+  read: (stored: string | null) => T;
+  write: (value: T) => string;
+}
+
+/** Open or collapsed, stored as '1' or '0'; a dossier starts collapsed. */
+const OPEN: Stored<boolean> = { name: 'open', read: (s) => s === '1', write: (on) => (on ? '1' : '0') };
+/** Work map or parts list; a dossier starts on its Work map. */
+const VIEW: Stored<View> = { name: 'view', read: (s) => (s === 'list' ? 'list' : 'map'), write: (v) => v };
+
+function useStored<T>({ name, read, write }: Stored<T>, parent: Item): [T, (v: T) => void] {
+  const key = `lar-board:dossier-${name}:${parent.id}`;
+  const [value, setValue] = useState(() => read(localStorage.getItem(key)));
+  return [value, (v) => {
+    localStorage.setItem(key, write(v));
+    setValue(v);
+  }];
+}
+
+/** Work map or parts list: one dossier's way of drawing its parts. */
 function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void }) {
   const one = (v: View, icon: ReactNode, label: string) => (
     <button type="button" onClick={() => onView(v)} aria-pressed={view === v}
       className={`inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs ${view === v ? 'bg-(--card) font-medium text-(--foreground) shadow-xs' : 'text-(--muted-foreground) hover:text-(--foreground)'}`}>{icon}{label}</button>
   );
-  return <div className="inline-flex rounded-lg bg-(--muted) p-0.5">{one('list', <ListChecks className="size-3.5" />, 'Checklist')}{one('map', <MapIcon className="size-3.5" />, 'Map')}</div>;
+  return <div className="inline-flex rounded-lg bg-(--muted) p-0.5">{one('map', <MapIcon className="size-3.5" />, 'Work map')}{one('list', <ListChecks className="size-3.5" />, 'Parts list')}</div>;
+}
+
+/** A part as a link to its item dialog: its status and its title, up to two lines. */
+function PartLink({ part }: { part: Part }) {
+  return (
+    <button type="button" onClick={() => open(part.item)} title={`${ref(part.item)} ${part.item.title}`}
+      className="flex min-w-0 items-start gap-1.5 rounded text-left text-[13px] hover:underline">
+      <span className="mt-0.5 inline-flex"><ItemStatusGlyph item={part.item} className="size-3.5" /></span>
+      <span className="line-clamp-2"><ItemTitle item={part.item} /></span>
+    </button>
+  );
+}
+
+/** One entry of an attention row, with what it waits on or its next action at the right. */
+function Entry({ main, side }: { main: ReactNode; side?: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-0.5 rounded-md px-1.5 py-1 hover:bg-(--soft)">
+      <span className="min-w-0 flex-1 basis-64">{main}</span>
+      {side && <span className="ml-auto shrink-0 text-[11px] text-(--muted-foreground)">{side}</span>}
+    </div>
+  );
+}
+
+/** What keeps the work moving, as labelled rows, each shown only with entries: parts in Needs you, parts in Verify or
+ *  Ready to merge, open decisions, blocked slices, parts waiting on others, parts ready to start and the map's fog. */
+function Attention({ parent, parts, data, find }: { parent: Item; parts: Part[]; data: BoardData; find: FindRef }) {
+  const ahead = parts.filter((p) => !isDone(p.item));
+  const blocked = ahead.flatMap((part) => part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice })));
+  const rows = [
+    { key: 'you', label: 'Needs you', tone: 'text-(--warning-foreground)',
+      entries: ahead.filter((p) => p.item.status === 'Needs you').map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={<OpenThread item={p.item} data={data} />} />) },
+    { key: 'verify', label: 'To verify or merge', tone: 'text-(--warning-foreground)',
+      entries: ahead.filter((p) => p.item.status === 'Verify' || p.item.status === 'Ready to merge').map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={p.item.status} />) },
+    { key: 'decisions', label: 'Open decisions', tone: 'text-(--primary)',
+      entries: ahead.filter((p) => DECISION_KINDS.includes(p.kind)).map((p) => <Entry key={p.item.id} main={<PartLink part={p} />} side={`${p.kind} · ${p.item.status}`} />) },
+    { key: 'blocked', label: 'Blocked slices', tone: 'text-(--st-review)',
+      entries: blocked.map(({ part, slice }) => (
+        <Entry key={`${slice.repo}#${slice.number}`}
+          main={<span className="flex min-w-0 items-start gap-1.5 text-[13px]"><Ban className="mt-0.5 size-3.5 shrink-0 text-(--st-review)" /><span className="line-clamp-2"><span className="tabular-nums text-(--muted-foreground)">#{slice.number}</span> {slice.title}</span></span>}
+          side={<>slice of <button type="button" onClick={() => open(part.item)} title={part.item.title} className="rounded px-0.5 font-medium tabular-nums text-(--primary) hover:bg-(--accent)">{ref(part.item)}</button> · waits on a re-slice</>} />
+      )) },
+    { key: 'waiting', label: 'Waiting', tone: 'text-(--muted-foreground)',
+      entries: ahead.filter((p) => openWaits(p).length && p.item.status !== 'Needs you').map((p) => (
+        <Entry key={p.item.id} main={<PartLink part={p} />} side={<span className="inline-flex items-center gap-1">waits on <WaitChips waitsOn={openWaits(p)} data={data} /></span>} />
+      )) },
+    { key: 'ready', label: 'Ready to start', tone: 'text-(--st-now)',
+      entries: ahead.filter(startable).map((p) => (
+        <Entry key={p.item.id} main={<PartLink part={p} />} side={<span onClick={stop}><PartStart part={p} data={data} label="Start" /></span>} />
+      )) },
+    { key: 'fog', label: 'Fog', tone: 'text-(--st-amber)',
+      entries: (parent.map?.fog ?? []).map((q) => (
+        <Entry key={q} main={<span className="flex items-start gap-1.5 text-[13px]"><CircleHelp className="mt-0.5 size-3.5 shrink-0 text-(--st-amber)" /><span><Refs text={q} find={find} /></span></span>} />
+      )) },
+  ].filter((r) => r.entries.length);
+  if (!rows.length) return null;
+  return (
+    <dl className="m-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-4 gap-y-2 px-4 pt-3" data-attention>
+      {rows.map((r) => (
+        <div key={r.key} className="contents" data-attention-row={r.key}>
+          <dt className={`pt-1 text-[11px] font-medium uppercase tracking-wide ${r.tone}`}>{r.label} <span className="tabular-nums">{r.entries.length}</span></dt>
+          <dd className="m-0 grid gap-0.5">{r.entries}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 /** The progress row's side: where a part waits on you, what it waits on, its PR, or what its thread is doing. */
@@ -202,58 +289,83 @@ function PartSide({ part, data }: { part: Part; data: BoardData }) {
   return <span>{threadText(item)}</span>;
 }
 
-/** What the dossier is for, from its map: its destination, decisions so far, open questions and end-to-end check. */
-function About({ parent, find }: { parent: Item; find: FindRef }) {
-  const { map } = parent;
-  if (!map) return <div className="grid content-start gap-5"><p className="m-0 text-(--muted-foreground)">No map yet. The parts come from the item's children.</p></div>;
-  return (
-    <div className="grid content-start gap-5" data-about>
-      <section className="grid gap-1.5"><Heading>Destination</Heading><p className="m-0 leading-relaxed">{map.destination || 'No destination recorded.'}</p></section>
-      <section className="grid gap-1.5">
-        <Heading>Decisions so far <span className="tabular-nums">{map.decisions.length}</span></Heading>
-        <ul className="m-0 grid list-none gap-1.5 p-0">
-          {map.decisions.map((d) => <li key={d} className="flex gap-2"><Check className="mt-0.5 size-3.5 shrink-0 text-(--st-done)" /><span><Refs text={d} find={find} /></span></li>)}
-        </ul>
-      </section>
-      <section className="grid gap-1.5">
-        <Heading>Open questions <span className="tabular-nums">{map.fog.length}</span></Heading>
-        {map.fog.length ? (
-          <ul className="m-0 grid list-none gap-1.5 p-0">
-            {map.fog.map((q) => <li key={q} className="flex gap-2"><CircleHelp className="mt-0.5 size-3.5 shrink-0 text-(--st-amber)" /><span><Refs text={q} find={find} /></span></li>)}
-          </ul>
-        ) : <p className="m-0 text-(--muted-foreground)">No open questions recorded.</p>}
-      </section>
-      {map.check && (
-        <section className="grid gap-1.5 rounded-lg border border-(--border) p-3" data-check>
-          <Heading>End-to-end check</Heading>
-          <span className="flex items-center gap-2 font-medium"><StatusGlyph status="Queued" /><span className="min-w-0 flex-1">{map.check.title}</span><span className="text-[11px] font-normal text-(--muted-foreground)">waiting</span></span>
-          <ol className="m-0 grid gap-0.5 pl-9 text-[12px] text-(--muted-foreground)">{map.check.steps.map((s) => <li key={s}>{s}</li>)}</ol>
-        </section>
-      )}
-    </div>
-  );
-}
-
 /** The header's side: the part that waits on you, else the first part that can start, else that nothing waits on you. */
 function HeaderSide({ parts, data, missing }: { parts: Part[]; data: BoardData; missing: number }) {
   const yours = parts.find((p) => YOURS.includes(p.item.status));
-  const startable = parts.find((p) => p.item.status === 'Ready' && !openWaits(p).length && !carriesTwoStatuses(p.item));
+  const first = parts.find((p) => !isDone(p.item) && startable(p));
+  const note = (text: string) => <span className="truncate" title={text}>{text}</span>;
   if (yours) {
     return (
-      <button type="button" onClick={(e) => { e.stopPropagation(); open(yours.item); }} className="inline-flex items-center gap-1 rounded px-1 text-(--warning-foreground) hover:bg-(--accent)">
-        <StatusGlyph status={yours.item.status} className="size-3" />{ref(yours.item)} waits on you
+      <button type="button" onClick={(e) => { e.stopPropagation(); open(yours.item); }} title={`${ref(yours.item)} ${yours.item.title}`}
+        className="flex min-w-0 items-center gap-1 rounded px-1 text-(--warning-foreground) hover:bg-(--accent)">
+        <StatusGlyph status={yours.item.status} className="size-3 shrink-0" /><span className="truncate">{ref(yours.item)} waits on you</span>
       </button>
     );
   }
-  if (startable) return <span className="shrink-0" onClick={stop}><PartStart part={startable} data={data} build={`Start ${ref(startable.item)}`} /></span>;
-  if (missing) return <span>Some parts are outside the board</span>;
-  return <span>Nothing waits on you</span>;
+  if (first) return <span className="min-w-0" onClick={stop}><PartStart part={first} data={data} label={`Start ${ref(first.item)}`} /></span>;
+  return note(missing ? 'Some parts are outside the board' : 'Nothing waits on you');
 }
 
-/** A concept or coupled parent, in full: what it's for and its parts as a checklist or a map, then their rows. */
+/** Line 1's thread counts and Azure fields: they give up their room before the title does, ending in an ellipsis.
+ *  Below `lg` they may shrink to nothing, so a narrow line's title keeps its room; their tooltips keep the text. */
+const META = 'min-w-0 lg:min-w-10 shrink-[1000] truncate';
+
+/** Line 2's columns, the same fixed widths in every dossier: part bar, parts done, what's next, and repositories,
+ *  which drop below 1024 px. "What's next" takes the rest, so it shrinks first. */
+const LINE2 = 'grid grid-cols-[18rem_5.5rem_minmax(0,1fr)] items-center gap-x-4 lg:grid-cols-[18rem_5.5rem_minmax(0,1fr)_9rem]';
+
+/** Every part as a segment in its status colour, done first, so the bar fills left to right; a dashed one per part the board doesn't read. */
+function PartBar({ parts, count }: { parts: Part[]; count: number }) {
+  const order = [...parts].sort((a, b) => Number(isDone(b.item)) - Number(isDone(a.item)) || stageOf(b.item.status) - stageOf(a.item.status));
+  return (
+    <ol className="m-0 flex min-w-0 list-none gap-[2px] p-0" data-part-bar>
+      {order.map(({ item }) => (
+        <li key={item.id} title={`${ref(item)} ${item.title}: ${item.status}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${item.status === 'In progress' ? 'status-pulse' : ''}`}
+          style={{ background: isDone(item) ? 'var(--st-done)' : item.status === 'Queued' || item.status === 'List' ? 'var(--soft)' : STATUS_COLOR[item.status] }} />
+      ))}
+      {Array.from({ length: Math.max(0, count - parts.length) }, (_, n) => <li key={n} className="h-1.5 min-w-[3px] flex-1 rounded-full border border-dashed border-(--input)" />)}
+    </ol>
+  );
+}
+
+/** The dossier's T3 threads, then how many run and how many wait for the user's reply, each left out at zero,
+ *  so the threads' wording never contradicts the "need you" chip, which counts parts. */
+function threadCounts(threads: ReturnType<typeof threadsOf>): string {
+  const running = threads.filter((t) => t.state === 'running').length;
+  const waiting = threads.filter((t) => t.state === 'needs you').length;
+  return [plural(threads.length, 'T3 thread'), running && `${running} running`, waiting && `${waiting} awaiting your reply`].filter(Boolean).join(' · ');
+}
+
+/** A count chip, hidden at zero. */
+function Chip({ n, word, tone, icon }: { n: number; word: string; tone: 'warning' | 'danger' | 'neutral' | 'accent'; icon: ReactNode }) {
+  if (!n) return null;
+  return <Badge tone={tone} className="whitespace-nowrap tabular-nums" data-chip>{icon}{n} {word}</Badge>;
+}
+
+/** What needs the user's eye: parts in Needs you, open decisions, blocked slices and the map's remaining fog. */
+function Chips({ parent, parts }: { parent: Item; parts: Part[] }) {
+  const ahead = parts.filter((p) => !isDone(p.item));
+  const decisions = ahead.filter((p) => DECISION_KINDS.includes(p.kind)).length;
+  return <>
+    <Chip n={ahead.filter((p) => p.item.status === 'Needs you').length} word="need you" tone="warning" icon={<StatusGlyph status="Needs you" className="size-3" />} />
+    <Chip n={decisions} word={decisions === 1 ? 'decision' : 'decisions'} tone="accent" icon={<MessagesSquare />} />
+    <Chip n={ahead.flatMap((p) => p.item.slices).filter((x) => x.progress === 'blocked').length} word="blocked" tone="danger" icon={<Ban />} />
+    <Chip n={parent.map?.fog.length ?? 0} word="fog" tone="neutral" icon={<CircleHelp />} />
+  </>;
+}
+
+/** A concept or coupled parent, in full: what keeps it moving, its parts as a Work map or a list, then their rows. */
 function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; data: BoardData; now: number }) {
-  const [view, setView] = useState<View>('list');
+  const [view, setView] = useStored(VIEW, parent);
+  const [on, setOpen] = useStored(OPEN, parent);
   const [showDone, setShowDone] = useState(false);
+  // Letting go of a drag that selected text in the header leaves the dossier as it was; a key press on the chevron
+  // (a click with no detail) or a selection elsewhere on the page still toggles it.
+  const toggle = (e: MouseEvent<HTMLDivElement>) => {
+    const selection = window.getSelection();
+    if (e.detail > 0 && selection && !selection.isCollapsed && e.currentTarget.contains(selection.anchorNode)) return;
+    setOpen(!on);
+  };
   const isPicked = usePicked(parent);
   const items = parts.map((p) => p.item);
   const find: FindRef = (repo = parent.repo ?? '', n) => data.items.find((i) => i.number === n && i.repo?.toLowerCase() === repo.toLowerCase());
@@ -287,40 +399,53 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
 
   return (
     <article className="overflow-hidden rounded-xl border border-(--border) bg-(--card)" data-dossier={parent.id}>
-      <div onClick={() => open(parent)} data-item={parent.id} className={`${GRID} cursor-pointer border-b border-(--border) py-3 hover:bg-(--accent) ${picked(isPicked)}`}>
-        <span className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-left">
-          <span className="flex items-center gap-2 text-[11px] text-(--muted-foreground)">
-            <span className="rounded border border-(--input) px-1.5 font-medium text-(--foreground)">{kindOf(parent) === 'concept' ? 'Concept' : 'Coupled work'}</span>
-            <span className="truncate">{parent.status} · {completed}/{count} parts done · {names.join(' + ')}</span>
+      {/* Only the title opens the item; anywhere else on the two lines but the chips opens or closes the dossier. */}
+      <div onClick={toggle} data-item={parent.id} data-open={on} className={`grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 px-2 py-2 hover:bg-(--accent) ${on ? 'border-b border-(--border)' : ''} ${picked(isPicked)}`}>
+        <button type="button" aria-expanded={on} aria-label={on ? 'Collapse' : 'Expand'}
+          className="grid size-6 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground)">
+          {on ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        </button>
+        <span className="flex min-w-0 items-start justify-between gap-x-2 pt-0.5" data-line="1">
+          {/* One row: the threads and Azure fields shrink first, down to an ellipsis, so the title keeps its room. */}
+          <span className="flex min-w-0 flex-1 items-baseline gap-x-2">
+            {/* The badge and title stay together, so a long title wraps beside the badge instead of below it. */}
+            <span className="flex min-w-0 items-start gap-x-2">
+              <Badge tone="neutral" className="shrink-0">{kindOf(parent) === 'concept' ? 'Concept' : 'Coupled work'}</Badge>
+              <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} data-title
+                className="min-w-0 rounded text-left text-[14px] font-medium tracking-tight hover:underline"><ItemTitle item={parent} /></button>
+            </span>
+            <span className={`${META} text-[11px] text-(--muted-foreground)`} title={threadCounts(threads)} data-threads>
+              {threadCounts(threads)}
+            </span>
+            <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
           </span>
-          <span className="truncate text-base font-medium tracking-tight"><ItemTitle item={parent} /></span>
-          <AzureFields azure={parent.azure} />
-          <span className="truncate text-[11px] text-(--muted-foreground)">
-            {plural(threads.length, 'T3 thread')} · {threads.filter((t) => t.state === 'running').length} running · {threads.filter((t) => t.state === 'needs you').length} need you
-          </span>
+          <span onClick={(e) => e.stopPropagation()} className="flex shrink-0 gap-1" data-chips><Chips parent={parent} parts={parts} /></span>
         </span>
-        <Track status={parent.status} />
-        <AgentCell s={total && total !== 'unavailable' ? total : null} />
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 text-[11px] text-(--muted-foreground)"><HeaderSide parts={parts} data={data} missing={missing} /></div>
+        <span className="row-span-2 grid w-[11rem] grid-cols-[minmax(0,1fr)] items-center gap-x-4 @2xl:w-[19rem] @2xl:grid-cols-[minmax(0,1fr)_6rem]" data-figures>
+          <Track status={parent.status} />
+          <AgentCell s={total && total !== 'unavailable' ? total : null} />
+        </span>
+        <span className={`col-start-2 ${LINE2} text-[11px] text-(--muted-foreground)`} data-line="2">
+          <PartBar parts={parts} count={count} />
+          <span className="tabular-nums">{completed}/{count} parts</span>
+          <span className="flex min-w-0 items-center" data-next><HeaderSide parts={parts} data={data} missing={missing} /></span>
+          <span className="hidden truncate text-right lg:block" title={names.join(' + ')} data-repos>{names.join(' + ')}</span>
+        </span>
       </div>
 
-      {missing > 0 && <p className="m-0 px-4 pt-3 text-xs text-(--muted-foreground)" data-unread-parts>
-        {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
-      </p>}
-      <div className="flex items-center justify-between gap-3 px-4 pt-3">
-        <ViewToggle view={view} onView={setView} />
-        <span className="text-[11px] text-(--muted-foreground)">{view === 'map' ? 'Lanes by repo; arrows show what waits on what' : 'Parts follow their dependencies, then the end-to-end check'}</span>
-      </div>
-      {view === 'map' ? (
-        <div className="grid gap-5 p-4">
-          <WorkMap parts={parts} check={check} data={data} now={now} />
-          <About parent={parent} find={find} />
+      {on && <>
+        {missing > 0 && <p className="m-0 px-4 pt-3 text-xs text-(--muted-foreground)" data-unread-parts>
+          {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
+        </p>}
+        <Attention parent={parent} parts={parts} data={data} find={find} />
+        <div className="flex items-center justify-between gap-3 px-4 pt-3">
+          <ViewToggle view={view} onView={setView} />
+          <span className="text-[11px] text-(--muted-foreground)">{view === 'map' ? 'Lanes by repo; arrows show what waits on what' : 'Parts follow their dependencies, then the end-to-end check'}</span>
         </div>
-      ) : (
-        <div className="grid gap-6 p-4 @3xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-          <About parent={parent} find={find} />
-          <div className="grid content-start gap-3" data-checklist>
-            <Heading>Parts, in order</Heading>
+        {view === 'map' ? (
+          <div className="p-4"><WorkMap parts={parts} check={check} data={data} now={now} /></div>
+        ) : (
+          <div className="grid content-start gap-3 p-4 @3xl:grid-cols-2" data-checklist>
             {groups.map((group) => (
               <Phase key={group[0]!.item.id}
                 title={group[0]!.kind === 'build' ? <>Build <RepoTag repo={group[0]!.item.repo!} repos={data.repos} /></> : 'Decide'}
@@ -329,24 +454,24 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
             ))}
             {check && <CheckPhase check={check} parent={parent} builds={builds} data={data} />}
           </div>
-        </div>
-      )}
-
-      <div className="border-t border-(--border)">
-        <StageHeader label={`Progress · ${count} parts`} side="Waits on · PR" />
-        {rows.map((p) => (
-          <Row key={p.item.id} item={p.item} data={data} now={now} nested waiting={openWaits(p).length > 0} side={<PartSide part={p} data={data} />}>
-            {(p.item.status === 'Ready' || p.item.status === 'Queued') && (
-              <div className="px-3 pb-2 pl-12 empty:hidden" onClick={stop}><StartMessage item={p.item} kind={p.item.status === 'Ready' ? 'build' : 'refine'} /><StartAfterError item={p.item} data={data} /></div>
-            )}
-          </Row>
-        ))}
-        {done > 0 && (
-          <button type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-(--muted-foreground) hover:bg-(--accent)">
-            <Check className="ml-6 size-3.5 text-(--st-done)" /><span className="flex-1">{showDone ? `Hide ${done} done` : `${done} done`}</span>{showDone ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-          </button>
         )}
-      </div>
+
+        <div className="border-t border-(--border)">
+          <StageHeader label={`Progress · ${count} parts`} side="Waits on · PR" />
+          {rows.map((p) => (
+            <Row key={p.item.id} item={p.item} data={data} now={now} nested waiting={openWaits(p).length > 0} side={<PartSide part={p} data={data} />}>
+              {(p.item.status === 'Ready' || p.item.status === 'Queued') && (
+                <div className="px-3 pb-2 pl-12 empty:hidden" onClick={stop}><StartMessage item={p.item} kind={p.item.status === 'Ready' ? 'build' : 'refine'} /><StartAfterError item={p.item} data={data} /></div>
+              )}
+            </Row>
+          ))}
+          {done > 0 && (
+            <button type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-(--muted-foreground) hover:bg-(--accent)">
+              <Check className="ml-6 size-3.5 text-(--st-done)" /><span className="flex-1">{showDone ? `Hide ${done} done` : `${done} done`}</span>{showDone ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            </button>
+          )}
+        </div>
+      </>}
     </article>
   );
 }

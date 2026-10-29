@@ -322,6 +322,7 @@ test('Reset of an onboarded repository opens its reset PR and takes it off the b
   assert.equal(response.status, 200);
   const { board: data, prUrl } = await response.json() as { board: BoardData; prUrl: string };
   assert.equal(prUrl, PR);
+  assert.deepEqual(data.resetting, [{ repo: 'maddec01/lar-web', prUrl: PR }]);
   assert.deepEqual([data.repos.map((r) => r.repo), data.items.map((i) => i.number)], [['maddec01/lar-factory'], [1]]);
   assert.deepEqual((await board.calls()).filter((args) => args[0] === 'pr' && args[1] === 'create').map((args) => args[args.indexOf('--head') + 1]), ['lar-factory/reset']);
   assert.deepEqual(JSON.parse(readFileSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'), 'utf8')).repositories,
@@ -329,6 +330,7 @@ test('Reset of an onboarded repository opens its reset PR and takes it off the b
   await board.stop();
   const restarted = await startBoard(t, options, false, false, { HOME: home });
   const read = await until(restarted, (d) => d.fetchedAt !== null);
+  assert.deepEqual(read.resetting, [{ repo: 'maddec01/lar-web', prUrl: PR }]);
   assert.deepEqual([read.repos.map((r) => r.repo), read.items.map((i) => i.number), read.onboarding, read.repositoryConfigProblems],
     [['maddec01/lar-factory'], [1], [], []]);
   assert.ok(!(await restarted.calls()).some((args) => readsRepositoryConfig(args) && args[1]!.includes('lar-web')));

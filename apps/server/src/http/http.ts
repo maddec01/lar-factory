@@ -319,10 +319,11 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
           changeRow(input.repo as string, ({ editPr: _, ...r }) => r);
           return { status: reset.status, body: withBoard({ error: reset.error }) };
         }
-        // A reset repository leaves the board at once, with its items; the read then sees it resetting.
+        // Hide its items at once, keeping the reset PR in Settings until the read sees it merge or close.
         const gone = (repo: string | null) => repo !== null && sameRepo(repo, input.repo as string);
-        const { repos, items } = board.snapshot();
-        board.update({ onboarding: reset.onboarding, repos: repos.filter((r) => !gone(r.repo)), items: items.filter((i) => !gone(i.repo)) });
+        const { repos, items, resetting = [] } = board.snapshot();
+        board.update({ onboarding: reset.onboarding, repos: repos.filter((r) => !gone(r.repo)), items: items.filter((i) => !gone(i.repo)),
+          resetting: [...resetting.filter((r) => !gone(r.repo)), ...reset.prUrl ? [{ repo: input.repo as string, prUrl: reset.prUrl }] : []] });
         board.push();
         readSoon();
         return { status: 200, body: withBoard({ ...reset.prUrl && { prUrl: reset.prUrl }, error: null }) };

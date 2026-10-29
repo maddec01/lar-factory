@@ -10,7 +10,7 @@ import { GH_FLOOR, SETTLED_FIRST_READ, SLOW_CHECKS_MS, ghBlocksRead, itemSource,
 import { createBoardState } from './board/board-state.ts';
 import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './config/config-update.ts';
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
-import { onTheBoard, readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
+import { onTheBoard, readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, stillResetting, type OnboardedRepository } from './config/repository-config.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, readPrBody } from './github/github.ts';
 import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
@@ -76,7 +76,7 @@ const items = onboardedSources(async () => {
   try { list = readRepositoryList(); }
   catch (err) {
     // A list the board can't read onboards nothing, so no repository or notice of the last good read stays beside its error.
-    board.update({ repos: [], repositoryConfigProblems: [], onboarding: [] });
+    board.update({ repos: [], repositoryConfigProblems: [], onboarding: [], resetting: [] });
     throw err;
   }
   // An onboarding whose PR merged, or whose .lar-factory.json landed another way, finishes here, so a merge made while
@@ -115,7 +115,7 @@ const items = onboardedSources(async () => {
       return { ...repoView(config), version: config.version, ...editPrs.has(config.repo) && { editPr: editPrs.get(config.repo) },
         ...configUpdate !== undefined && { configUpdate } };
     }),
-    repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list, followProblems),
+    repositoryConfigProblems: read.problems, onboarding: stillOnboarding(list, followProblems), resetting: stillResetting(list),
   });
   moveFirstRead({ step: 'items' });
   return read;
@@ -631,8 +631,11 @@ reportListening(port);
 if (!fixture) process.on('exit', recordBoard(port));
 // Sample mode runs no tools, so it looks none up. The lookup starts the first read, each source once its tool checks.
 if (!fixture) firstGhCheck = new Promise((resolve, reject) => void recheckTools(true, {}, resolve).catch(reject));
-// The repositories still onboarding show before the first read, which waits for the tool lookup.
-if (!fixture) board.update({ onboarding: stillOnboarding(onboarded()) });
+// Onboarding and reset progress show before the first read, which waits for the tool lookup.
+if (!fixture) {
+  const list = onboarded();
+  board.update({ onboarding: stillOnboarding(list), resetting: stillResetting(list) });
+}
 
 // BOARD_DATA_FILE serves a fixed JSON file instead of reading GitHub (for
 // trying the layout, e.g. with packages/shared/test/sample.json).

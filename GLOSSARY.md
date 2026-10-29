@@ -135,7 +135,8 @@ _Avoid_: owner, author
 
 **Shaping thread**:
 The conversation in the issue's repository project that resolves an issue's open
-decisions and produces a passing brief, then stops at Ready.
+decisions and produces a passing brief, then stops at Ready. Its build thread
+archives it once the build starts, unless it is running or needs you.
 
 **Decision thread**:
 A top-level thread, started from the board, running `/lar-work` on one `decision-*` sub-issue of a map,

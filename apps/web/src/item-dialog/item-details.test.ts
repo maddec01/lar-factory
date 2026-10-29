@@ -108,7 +108,7 @@ test('an Azure DevOps work item shows its iteration and area in place of a miles
 test('an item with no description and no comments shows an empty state for each, not an error', async () => {
   await mountPage();
   await openItem('I_sample01');
-  expect(text(description())).toBe('DescriptionNo description.');
+  expect(text(description())).toBe('DescriptionEditNo description.');
   expect(text(comments())).toBe('CommentsNo comments.');
   expect(inDialog('[role="alert"]')).toBeNull();
 });

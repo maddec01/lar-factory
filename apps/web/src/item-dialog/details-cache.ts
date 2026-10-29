@@ -41,6 +41,10 @@ export function createDetailsCache(cached: (itemId: string) => boolean = () => t
       entries.set(itemId, entry);
       if (entries.size > bound) entries.delete(entries.keys().next().value!);
     },
+    /** Forgets the item's entry, as one a description save has made stale, so the next open reads its details again. */
+    drop(itemId: string): void {
+      entries.delete(itemId);
+    },
   };
 }
 

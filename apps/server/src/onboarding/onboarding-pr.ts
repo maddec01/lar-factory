@@ -304,7 +304,14 @@ export async function followOnboardingPrs(list: OnboardedRepository[], dir = boa
       // A PR that keeps the repository's own file finishes only by merging.
       const found = !onboarding.reusesConfig && await findRepositoryConfig(repo, run);
       if (found && !('problem' in found)) {
-        if (state === 'OPEN') await closePr(onboarding.prUrl, LANDED, run);
+        if (state === 'OPEN') {
+          try { await closePr(onboarding.prUrl, LANDED, run); }
+          catch (err) {
+            // The config can land after the state read because this PR just merged.
+            const latest = await prState(onboarding.prUrl, run).catch(() => null);
+            if (latest !== 'MERGED') throw err;
+          }
+        }
         saveOnboarded(repo, null, dir);
         finished(repo);
       } else if ((state === 'CLOSED') !== !!onboarding.prClosed) {

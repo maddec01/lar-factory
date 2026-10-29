@@ -245,12 +245,14 @@ test('opened before the repositories arrive, the dialog picks the first one once
 });
 
 test('the dialog opens as the copied Modal, and nothing over the title bar drags', async () => {
+  const warnings = vi.spyOn(console, 'warn');
   await open();
   const { noDrag } = addStylesheet();
   const popup = dialog()!;
   expect(popup.dataset.slot).toBe('modal-content');
   expect(popup.getAttribute('aria-describedby'), 'its description names it').toBe('add-item-description');
   expect([popup, $('[data-slot="modal-overlay"]')!].map(noDrag)).toEqual([true, true]);
+  expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual([]);
 });
 
 test('Close returns focus to Add item, and reopening keeps a draft but not a finished item', async () => {

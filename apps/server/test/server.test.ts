@@ -177,7 +177,7 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   const made = await edits();
   assert.equal(made.length, 1, 'later refreshes see the block is current and leave the PR alone');
   assert.equal(made[0]![3], 'repos/maddec01/lar-factory/pulls/40', 'merged PRs and items without stats are left alone');
-  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /lar-stats -->');
+  assert.equal(made[0]![5], 'body=PR 40\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":0} -->\n<!-- /lar-stats -->');
 
   const failing = await startBoard(t, { items, fail: 'pr-edit' }, false, false, { T3_STATE_DB: db });
   assert.equal((await readItems(failing)).length, 2, 'a failed edit leaves the board working');
@@ -187,7 +187,7 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
   assert.deepEqual((await sample.calls()).filter((args) => args[2] === 'PATCH'), []);
 });
 
-test('a merged item shows the figures in its merged PR\'s block, not live ones, and live ones without a block', async (t) => {
+test('a merged item retains its PR figures and adds fresh stats without lowering known work', async (t) => {
   const turns = [{ id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }];
   const db = statsDb(t, [{ id: 'a', messages: ['Build maddec01/lar-factory#12'], turns },
     { id: 'b', messages: ['Build maddec01/lar-factory#13'], turns: [{ ...turns[0]!, id: 'u' }] }]);
@@ -202,11 +202,12 @@ test('a merged item shows the figures in its merged PR\'s block, not live ones, 
     false, true, { T3_STATE_DB: db });
   const items = await readLiveStats(board);
   const frozen = { agentMs: 135 * 60_000, tokens: 12_400_000, costUsd: 41, frozen: true };
-  assert.deepEqual(items.find((i) => i.number === 12)?.stats, frozen, 'the block wins over live stats');
+  assert.deepEqual(items.find((i) => i.number === 12)?.stats, { ...frozen, wallMs: 30 * 60_000 }, 'retain known figures and add the fresh wall time');
   assert.deepEqual(items.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 }, 'no block: live stats');
   assert.deepEqual(items.find((i) => i.number === 14)?.stats, frozen, 'no live stats at all');
   await new Promise((r) => setTimeout(r, 300));
-  assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH'), [], 'merged PRs are never edited');
+  assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH').map((args) => args[3]),
+    ['repos/maddec01/lar-factory/pulls/40'], 'only the PR with fresher stats gets a final block');
 });
 
 test('an item with a merged and an open linked PR shows live stats, and the open PR\'s block tracks them', async (t) => {
@@ -227,7 +228,7 @@ test('an item with a merged and an open linked PR shows live stats, and the open
   for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
   const [edit] = await edits();
   assert.equal(edit?.[3], 'repos/maddec01/lar-factory/pulls/41');
-  assert.equal(edit?.[5], 'body=PR 41\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /lar-stats -->');
+  assert.equal(edit?.[5], 'body=PR 41\n\n<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":0} -->\n<!-- /lar-stats -->');
 });
 
 test('an issue that isn\'t a build shows live figures and writes no block, even linked to a build\'s PRs', async (t) => {
@@ -248,7 +249,8 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
   assert.deepEqual(read.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
   assert.equal((read.find((i) => i.number === 12)?.stats as { frozen?: boolean } | undefined)?.frozen, true);
   await new Promise((r) => setTimeout(r, 300));
-  assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH'), []);
+  assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH').map((args) => args[3]),
+    ['repos/maddec01/lar-factory/pulls/40'], 'only the build refreshes its final wall time');
 });
 
 test("only a build's linked PRs have their body and merge time read, once each, and an item that isn't a build's never", async (t) => {
@@ -303,7 +305,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
   const db = statsDb(t, [{ id: 'build', messages: ['Build maddec01/lar-factory#12'], turns: [
     { id: 't', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' },
   ] }]);
-  const block = '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- /lar-stats -->';
+  const block = '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 30m · wall 30m · 0\n<!-- lar-stats-data {"agentMs":1800000,"wallMs":1800000,"tokens":0} -->\n<!-- /lar-stats -->';
   const url = (number: number) => `https://github.com/maddec01/lar-factory/pull/${number}`;
   const pr = (number: number, body: string) => ({ number, url: url(number), state: 'OPEN', isDraft: false, body });
   const raw = rawBuild(12, 'Review');

@@ -29,7 +29,7 @@ export const THREAD_GLYPH: Record<ThreadState, Status> = { running: 'In progress
 /** Past waiting: a thread has taken it on, whatever it waited for. */
 const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 'Done'];
 
-export const started = (item: Item) => STARTED.includes(item.status);
+const started = (item: Item) => STARTED.includes(item.status);
 export const isDone = (item: Item) => item.status === 'Done' || item.state === 'closed';
 const childOf = (child: Item, parent: Item) => child.parent?.number === parent.number && child.parent.repo === parent.repo;
 export const threadsOf = (item: Item): ItemThread[] => (Array.isArray(item.threads) ? item.threads : []);

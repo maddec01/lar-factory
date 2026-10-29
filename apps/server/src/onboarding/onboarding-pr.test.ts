@@ -355,6 +355,23 @@ test("a file that can't be used, or a PR that can't be closed, leaves the onboar
   assert.deepEqual(problems, ['maddec01/lar-web: gh pr close failed: HTTP 403']);
 });
 
+test('onboarding finishes when its PR merges between the state read and closing it', async (t) => {
+  const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } }]);
+  const states = { [PR]: 'OPEN' };
+  const gh = github(states, { 'maddec01/lar-web': { role: 'Web client' } });
+  const run = gh.run;
+  gh.run = async (args) => {
+    if (args[1] === 'close') {
+      states[PR] = 'MERGED';
+      throw new Error("can't be closed because it was already merged");
+    }
+    return run(args);
+  };
+  const finished: string[] = [];
+  assert.deepEqual(await follow(dir, gh, undefined, (repo) => finished.push(repo)), [{ repo: 'maddec01/lar-web' }]);
+  assert.deepEqual(finished, ['maddec01/lar-web']);
+});
+
 test('a PR closed before merging is marked closed, and the mark goes once it is open again; a file that lands then still finishes', async (t) => {
   const kept = { ...progress, step: 'pr', prUrl: PR };
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: kept }]);

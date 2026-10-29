@@ -155,7 +155,7 @@ export function AddItem() {
     {open && (
       <Modal onClose={() => setOpen(false)}>
         {/* ninna-ui's Modal drops the description from aria-describedby, so the description names itself. */}
-        <Modal.Content id="add-item-dialog" title="Add item" aria-describedby="add-item-description">
+        <Modal.Content id="add-item-dialog" title="Add item" description="Capture work for a repository." aria-describedby="add-item-description">
           {/* A new draft remounts the form, which clears its fields. */}
           <AddItemForm key={draft} />
         </Modal.Content>

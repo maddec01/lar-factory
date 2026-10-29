@@ -2,7 +2,7 @@ import { test, type TestContext } from 'vite-plus/test';
 import { createServer } from 'node:net';
 import { get } from 'node:http';
 import assert from 'node:assert/strict';
-import { freePort, onboarded, readsRepositoryConfig, startBoard, until } from './server-support.ts';
+import { onboarded, readsRepositoryConfig, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
 import { assistant, claudeHome, statsDb, t3Settings } from './stats-db.ts';
@@ -149,7 +149,7 @@ test('each refresh attaches item threads and T3\'s environment id, and leaves th
   writeFileSync(environment, 'env-1\n');
   const board = await startBoard(t, { items: [boardIssue(12, 'In progress'), boardIssue(13, 'Review')] }, false, false,
     { T3_STATE_DB: db, T3_ENVIRONMENT_ID: environment });
-  const data = await until(board, (d) => d.items.length > 0);
+  const data = await until(board, (d) => d.items.length > 0 && d.firstRead?.settled === true);
   assert.equal(data.t3EnvironmentId, 'env-1');
   assert.deepEqual(data.items.find((i) => i.number === 12)?.threads,
     [{ id: 'build', title: 'Build: owner accounts', state: 'running', updated: '2026-10-20T09:00:00.000Z' }]);
@@ -205,7 +205,7 @@ test('a merged item retains its PR figures and adds fresh stats without lowering
   assert.deepEqual(items.find((i) => i.number === 12)?.stats, { ...frozen, wallMs: 30 * 60_000 }, 'retain known figures and add the fresh wall time');
   assert.deepEqual(items.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 }, 'no block: live stats');
   assert.deepEqual(items.find((i) => i.number === 14)?.stats, frozen, 'no live stats at all');
-  await new Promise((r) => setTimeout(r, 300));
+  await until(board, (d) => d.items.find((i) => i.number === 12)?.linkedPrs.some((pr) => pr.body?.includes('<!-- lar-stats-data ')) === true);
   assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH').map((args) => args[3]),
     ['repos/maddec01/lar-factory/pulls/40'], 'only the PR with fresher stats gets a final block');
 });
@@ -248,7 +248,7 @@ test('an issue that isn\'t a build shows live figures and writes no block, even 
   const read = await readLiveStats(board);
   assert.deepEqual(read.find((i) => i.number === 13)?.stats, { agentMs: 30 * 60_000, wallMs: 30 * 60_000, tokens: 0 });
   assert.equal((read.find((i) => i.number === 12)?.stats as { frozen?: boolean } | undefined)?.frozen, true);
-  await new Promise((r) => setTimeout(r, 300));
+  await until(board, (d) => d.items.find((i) => i.number === 12)?.linkedPrs.some((pr) => pr.body?.includes('<!-- lar-stats-data ')) === true);
   assert.deepEqual((await board.calls()).filter((args) => args[2] === 'PATCH').map((args) => args[3]),
     ['repos/maddec01/lar-factory/pulls/40'], 'only the build refreshes its final wall time');
 });
@@ -355,13 +355,14 @@ test('PR edits run beside the refreshes without holding them up, and never two s
 });
 
 /** Holds `port` for the test; a port something else already holds is taken all the same. */
-async function hold(t: TestContext, port: number): Promise<void> {
+async function hold(t: TestContext, port: number): Promise<number> {
   const server = createServer();
-  await new Promise<void>((resolve) => {
-    server.once('error', () => resolve());
-    server.listen(port, '127.0.0.1', resolve);
+  const bound = await new Promise<number>((resolve, reject) => {
+    server.once('error', (error: NodeJS.ErrnoException) => error.code === 'EADDRINUSE' && port !== 0 ? resolve(port) : reject(error));
+    server.listen(port, '127.0.0.1', () => resolve((server.address() as { port: number }).port));
   });
   t.onTestFinished(() => new Promise<void>((resolve) => server.listening ? server.close(() => resolve()) : resolve()));
+  return bound;
 }
 
 test('without BOARD_PORT the board skips a taken 4317, binds the next free port and logs it', async (t) => {
@@ -384,8 +385,7 @@ test('a BOARD_PORT that isn\'t a port exits with a log line, not a stack trace',
 });
 
 test('BOARD_PORT on a taken port exits with a log line', async (t) => {
-  const port = await freePort();
-  await hold(t, port);
+  const port = await hold(t, 0);
   await assert.rejects(startBoard(t, {}, true, false, { BOARD_PORT: String(port) }), new RegExp(`port ${port} is taken`));
 });
 

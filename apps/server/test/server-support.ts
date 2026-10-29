@@ -134,44 +134,71 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const post = (body: unknown, origin = url, path = '/api/items') => fetch(`${url}${path}`, { method: 'POST',
     headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   let url = '';
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (child.exitCode !== null) throw new Error(logs);
-    // The board logs the address it bound.
-    url = logs.match(/board on (http:\/\/127\.0\.0\.1:\d+)/)?.[1] ?? '';
-    if (url) try {
-      const response = await fetch(`${url}/api/board`);
-      if (response.ok) return {
-        url,
-        pid: child.pid!,
-        stop,
-        update: (value: object) => writeFile(stateFile, JSON.stringify(value)),
-        calls: () => readCalls(stateFile + '.calls'),
-        t3Calls: () => readCalls(stateFile + '.t3calls'),
-        logs: () => logs,
-        /** How many skill checks the board has asked for. */
-        skillChecks: () => skillChecks,
-        board,
-        post,
-        /** Posts the body with the session the board serves now, as the page does. */
-        postSession: async (body: object, path: string, origin = url) =>
-          post({ session: (await board() as BoardData).capture!.session, ...body }, origin, path),
-      };
-    } catch { /* Wait for the subprocess to listen. */ }
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error(`Board did not start: ${logs}`);
+  // The listening line follows bind. On failure, close follows the last diagnostic on stdout/stderr.
+  // Let the caller's test deadline bound this wait, rather than racing a loaded child against a polling budget.
+  url = await new Promise<string>((resolve, reject) => {
+    const cleanup = () => {
+      child.stdout!.off('data', ready);
+      child.stderr!.off('data', ready);
+      child.off('close', closed);
+      child.off('error', failed);
+    };
+    const ready = () => {
+      const address = logs.match(/board on (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
+      if (address) { cleanup(); resolve(address); }
+    };
+    const closed = () => { cleanup(); reject(new Error(logs || 'Board closed before listening')); };
+    const failed = (error: Error) => { cleanup(); reject(error); };
+    child.stdout!.on('data', ready);
+    child.stderr!.on('data', ready);
+    child.once('close', closed);
+    child.once('error', failed);
+  });
+  const response = await fetch(`${url}/api/board`);
+  if (!response.ok) throw new Error(`Board answered ${response.status}: ${logs}`);
+  return {
+    url,
+    pid: child.pid!,
+    stop,
+    update: (value: object) => writeFile(stateFile, JSON.stringify(value)),
+    calls: () => readCalls(stateFile + '.calls'),
+    t3Calls: () => readCalls(stateFile + '.t3calls'),
+    logs: () => logs,
+    /** How many skill checks the board has asked for. */
+    skillChecks: () => skillChecks,
+    board,
+    post,
+    /** Posts the body with the session the board serves now, as the page does. */
+    postSession: async (body: object, path: string, origin = url) =>
+      post({ session: (await board() as BoardData).capture!.session, ...body }, origin, path),
+  };
 }
 
 export type Board = Awaited<ReturnType<typeof startBoard>>;
 
-/** Polls the board data until `check` passes, and returns that data. */
+/** Waits for the current or next pushed board that passes `check`, within the caller's test deadline. */
 export async function until(board: Board, check: (data: BoardData) => boolean): Promise<BoardData> {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const data = await board.board() as BoardData;
-    if (check(data)) return data;
-    await new Promise((r) => setTimeout(r, 25));
+  const response = await fetch(`${board.url}/api/events`);
+  if (!response.ok || !response.body) throw new Error(`Can't read board events: ${response.status}`);
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffered = '';
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) throw new Error('The board closed before reaching the expected state');
+      buffered += value;
+      const events = buffered.split('\n\n');
+      buffered = events.pop()!;
+      for (const event of events) {
+        const json = event.split('\n').filter((line) => line.startsWith('data: ')).map((line) => line.slice(6)).join('\n');
+        if (!json) continue;
+        const data = JSON.parse(json) as BoardData;
+        if (check(data)) return data;
+      }
+    }
+  } finally {
+    await reader.cancel();
   }
-  throw new Error('The board never reached the expected state');
 }
 
 /** Waits for the board to load its repositories' configs, which Add item checks a draft's repository against. */

@@ -60,3 +60,10 @@ test('headings match whatever their case, and lists take - or * bullets', () => 
 test('an end-to-end check with steps but no title line has an empty title', () => {
   assert.deepEqual(parseConceptMap('## End-to-end check\n1. Only a step\n\n<details>\n').check, { title: '', steps: ['Only a step'] });
 });
+
+test('a bullet that only says none is no fog and no decision', () => {
+  for (const none of ['none', 'None.', '_none_', '*None*', 'NONE!', '`none`']) {
+    assert.deepEqual(parseConceptMap(`## Decisions so far\n- ${none}\n\n## Fog\n- ${none}\n`), { destination: '', decisions: [], fog: [] });
+  }
+  assert.deepEqual(parseConceptMap('## Fog\n- None of the apps poll yet\n').fog, ['None of the apps poll yet']);
+});

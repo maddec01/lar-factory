@@ -4,11 +4,13 @@
 // Round 2: A1/A2 are A with a two-line collapsed Dossier (line 1 title and chips, line 2 a fixed column grid so every
 // Dossier's part bar, count, next and repos sit at the same x). A1 puts the chips at the end of line 1, A2 right after
 // the title. A1 is the default when `?variant=` is missing; `?variant=current` shows today's line.
+// Round 3 (A1 only): line 2 gains the agent figures column, and In flight rows (`FlightA1`) use the same two lines and
+// columns as the Dossier, so the slice bar sits under the part bar.
 
 import { useEffect, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { kindOf, openBlockers, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
+import { itemTotal, kindOf, openBlockers, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { useBoardStore } from '../board/board-store.ts';
@@ -19,7 +21,7 @@ import { STATUS_COLOR, ItemStatusGlyph, StatusGlyph } from '../items/status-glyp
 import { DECISION_KINDS, dossiersOf, inDossiers, isDone, openWaits } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
-import { OnYourDesk, YOURS, stageOf, threadText } from './stage-track.tsx';
+import { AgentCell, OnYourDesk, YOURS, stageOf, threadText } from './stage-track.tsx';
 import { WorkMap } from './work-map.tsx';
 
 const VARIANTS = { a1: 'Two lines, chips at the end', a2: 'Two lines, chips by the title', a: 'Dense strip', b: 'Two-column card', c: 'Stage lanes' } as const;
@@ -338,12 +340,22 @@ function FlightA({ item, data }: { item: Item; data: BoardData }) {
 
 /** Line 2's columns, the same fixed widths in every Dossier: part bar, part count, what's next, repos. */
 const LINE2 = 'grid-cols-[18rem_5.5rem_minmax(0,1fr)_9rem]';
+/** Round 3: A1's line 2 adds the agent figures (time, tokens, cost) between what's next and repos. In flight rows use it too. */
+const LINE2_A1 = 'grid-cols-[18rem_5.5rem_minmax(0,1fr)_7rem_9rem]';
+/** Line 1's lead and line 2's indent, shared by A1's Dossiers and In flight rows so their columns sit at the same x. */
+const HEAD_A1 = 'grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1.5 px-2 py-2';
+
+/** The agent figures, from the same helpers as today's line: a Dossier's total (parent plus parts), else the item's own. */
+const figuresOf = (item: Item, data: BoardData, total?: boolean) => {
+  const s = total ? itemTotal(item, data.items) ?? item.stats : item.stats;
+  return s && s !== 'unavailable' ? s : null;
+};
 
 function DossierA2Lines({ m, data, now, chips }: { m: Moving; data: BoardData; now: number; chips: 'end' | 'title' }) {
   const [on, toggle] = useOpen(m.parent.id);
   return (
     <article className="rounded-xl border border-(--border) bg-(--card)" data-dossier={m.parent.id}>
-      <div onClick={() => open(m.parent)} className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1.5 rounded-xl px-2 py-2 hover:bg-(--accent)">
+      <div onClick={() => open(m.parent)} className={`${chips === 'end' ? HEAD_A1 : 'grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1.5 px-2 py-2'} cursor-pointer rounded-xl hover:bg-(--accent)`}>
         <Toggle on={on} onToggle={toggle} />
         <span className={`flex min-w-0 gap-x-2 gap-y-1 pt-0.5 ${chips === 'end' ? 'items-start justify-between' : 'flex-wrap items-center'}`}>
           <span className={`flex min-w-0 items-start gap-2 ${chips === 'end' ? 'flex-1' : ''}`}>
@@ -352,10 +364,11 @@ function DossierA2Lines({ m, data, now, chips }: { m: Moving; data: BoardData; n
           </span>
           <span className={`flex gap-1 ${chips === 'end' ? 'shrink-0' : 'flex-wrap'}`}><Counts m={m} /></span>
         </span>
-        <span className={`col-start-2 grid ${LINE2} items-center gap-x-4`}>
+        <span className={`col-start-2 grid ${chips === 'end' ? LINE2_A1 : LINE2} items-center gap-x-4`} data-line2>
           <PartsBar m={m} />
           <span className="text-[11px] tabular-nums text-(--muted-foreground)">{m.done}/{m.count} parts</span>
           <Next m={m} data={data} compact />
+          {chips === 'end' && <AgentCell s={figuresOf(m.parent, data, true)} />}
           <span className="truncate text-right text-[11px] text-(--muted-foreground)" title={repos(m, data)}>{repos(m, data)}</span>
         </span>
       </div>
@@ -366,6 +379,42 @@ function DossierA2Lines({ m, data, now, chips }: { m: Moving; data: BoardData; n
         </div>
       )}
     </article>
+  );
+}
+
+/** Round 3: an In flight row read as an A1 Dossier. Line 1: status glyph (in the chevron's place), title and muted meta,
+ * the side action at the end (where the chips sit). Line 2: A1's columns: slice bar, slice count, slice note, figures, repo. */
+function FlightA1({ item, data }: { item: Item; data: BoardData }) {
+  const done = item.slices.filter((s) => s.progress === 'done').length;
+  const note = sliceNote(item);
+  const blocked = openBlockers(item).length;
+  const repo = repoName(repoKey(item), data.repos);
+  return (
+    <div onClick={() => open(item)} className={`${HEAD_A1} cursor-pointer border-b border-(--border) last:border-b-0 hover:bg-(--accent)`}>
+      <span className="grid size-6 place-items-center"><ItemStatusGlyph item={item} /></span>
+      <span className="flex min-w-0 items-start justify-between gap-x-2 pt-0.5">
+        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="line-clamp-2 text-[13px] font-medium" title={item.title}><ItemTitle item={item} /></span>
+          <span className="inline-flex flex-wrap items-center gap-x-1.5 text-[11px] text-(--muted-foreground)">
+            <span>{item.status} · {threadText(item)}</span>
+            {item.linkedPrs[0] && <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(item.linkedPrs[0])}</span>}
+            {blocked > 0 && <Badge tone="danger">blocked by {blocked}</Badge>}
+          </span>
+        </span>
+        <span className="shrink-0 text-[11px] text-(--muted-foreground)"><FlightSide item={item} data={data} /></span>
+      </span>
+      <span className={`col-start-2 grid ${LINE2_A1} items-center gap-x-4`} data-line2>
+        {item.slices.length ? <SliceBar item={item} thick /> : <span />}
+        <span className="text-[11px] tabular-nums text-(--muted-foreground)">{item.slices.length ? `${done}/${item.slices.length} slices` : ''}</span>
+        <span className="min-w-0 truncate text-[12px]" title={note.map(({ s, word }) => `${word} #${s.number} ${s.title}`).join('\n')}>
+          {note[0] && <><span className={`font-medium ${sliceTone(note[0].s)}`}>{note[0].word}</span> {note[0].s.title}{note.length > 1 && <span className="text-(--muted-foreground)"> +{note.length - 1} more</span>}</>}
+        </span>
+        <AgentCell s={figuresOf(item, data)} />
+        <span className="flex min-w-0 items-center justify-end gap-1.5 text-[11px] text-(--muted-foreground)" title={repo}>
+          <span className={`${repoTone(repoKey(item), data.repos)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} /><span className="truncate">{repo}</span>
+        </span>
+      </span>
+    </div>
   );
 }
 
@@ -531,7 +580,7 @@ function FlightC({ item, data }: { item: Item; data: BoardData }) {
 // ---------- the line's prototype sections, and the switcher ----------
 
 const DOSSIER = { a1: DossierA1, a2: DossierA2, a: DossierA, b: DossierB, c: DossierC };
-const FLIGHT = { a1: FlightA, a2: FlightA, a: FlightA, b: FlightB, c: FlightC };
+const FLIGHT = { a1: FlightA1, a2: FlightA, a: FlightA, b: FlightB, c: FlightC };
 
 export function PrototypeDossiers({ items, variant }: { items: Item[]; variant: keyof typeof VARIANTS }) {
   const { data, now } = useBoardStore();

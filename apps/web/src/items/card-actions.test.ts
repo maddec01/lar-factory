@@ -76,10 +76,12 @@ test('a failed Back to List shows as a toast naming the item, which stays until 
 });
 
 test('Abandon asks first, naming the issue it closes for its repository; Cancel returns focus', async () => {
+  const warnings = vi.spyOn(console, 'warn');
   await mountPage();
   await openItem('I_sample01');
   await press(button('abandon', 'I_sample01'));
   const dialog = $('#abandon-dialog')!;
+  expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual([]);
   expect(dialog.getAttribute('role')).toBe('alertdialog');
   expect(text($('#abandon-dialog h2'))).toBe(`Abandon #61 ${sample.items[0]!.title}?`);
   expect(text(document.getElementById(dialog.getAttribute('aria-describedby')!))).toBe('This closes the issue as "not planned" on GitHub. You can reopen it on GitHub.');

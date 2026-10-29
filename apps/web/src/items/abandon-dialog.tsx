@@ -20,7 +20,7 @@ export function AbandonDialog() {
   return (
     <Modal onClose={close}>
       {/* ninna-ui's Modal drops the description from aria-describedby, so the detail names itself. */}
-      <Modal.Content id="abandon-dialog" role="alertdialog" title={prompt.question} aria-describedby="abandon-detail" closeOnOverlayClick={false}>
+      <Modal.Content id="abandon-dialog" role="alertdialog" title={prompt.question} description="Set this item aside." aria-describedby="abandon-detail" closeOnOverlayClick={false}>
         <Modal.Body><Text id="abandon-detail" tone="muted">{prompt.detail}</Text></Modal.Body>
         <Modal.Footer>
           <Button {...kind('other')} onClick={close}>Cancel</Button>

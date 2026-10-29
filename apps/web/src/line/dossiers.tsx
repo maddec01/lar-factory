@@ -17,7 +17,7 @@ import { OpenThread } from '../items/open-thread.tsx';
 import { StartAfterError } from '../items/start-after.tsx';
 import { StartMessage } from '../items/start-control.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
-import { THREAD_GLYPH, dossiersOf, isDone, openWaits, started, threadsOf } from './dossier-parts.ts';
+import { THREAD_GLYPH, dossiersOf, isDone, openWaits, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { PartStart } from './part-start.tsx';
 import { AgentCell, GRID, OnYourDesk, Row, StageHeader, threadText, Track, YOURS, picked, statsOf } from './stage-track.tsx';
@@ -52,10 +52,19 @@ function WaitChips({ waitsOn, data }: { waitsOn: Blocker[]; data: BoardData }) {
     return (
       <button key={`${b.repo}#${b.number}`} type="button" disabled={!it} onClick={(e) => { e.stopPropagation(); if (it) open(it); }} title={it ? `${it.title}: ${it.status}` : `${b.repo}#${b.number}`}
         className={`inline-flex items-center gap-1 rounded border px-1 tabular-nums hover:bg-(--accent) ${done ? 'border-(--border) text-(--muted-foreground)' : 'border-[color-mix(in_srgb,var(--warning)_45%,var(--border))] text-(--warning-foreground)'}`}>
-        {done ? <Check className="size-3 text-(--st-done)" /> : it && <StatusGlyph status={it.status} className="size-3" />}#{b.number}
+        {done ? <Check className="size-3 text-(--st-done)" /> : it && <StatusGlyph status={it.status} className="size-3" />}#{b.number}{done && ' (done)'}
       </button>
     );
   });
+}
+
+/** Blocking wording names open prerequisites alone; past prerequisites remain visible as history. */
+function Prerequisites({ all, waits, data }: { all: Blocker[]; waits: Blocker[]; data: BoardData }) {
+  const after = all.filter((b) => !waits.includes(b));
+  return <>
+    {waits.length > 0 && <span className="inline-flex flex-wrap items-center gap-1">waits on <WaitChips waitsOn={waits} data={data} /></span>}
+    {after.length > 0 && <span className="inline-flex flex-wrap items-center gap-1">after <WaitChips waitsOn={after} data={data} /></span>}
+  </>;
 }
 
 /** A part's thread, its title and state; before it has one, what its start waits on. */
@@ -101,7 +110,7 @@ function Step({ part, data }: { part: Part; data: BoardData }) {
         <AzureFields azure={item.azure} />
         {s && <span className="tabular-nums">{duration(s.agentMs)} · {formatTokens(s.tokens)} · {s.costUsd !== undefined ? formatUsd(s.costUsd) : 'Unavailable'}</span>}
         {item.slices.length > 0 && <span className="tabular-nums">{item.slices.filter((x) => x.progress === 'done').length}/{item.slices.length} slices</span>}
-        {part.waitsOn.length > 0 && <span className="inline-flex flex-wrap items-center gap-1">{started(item) ? 'after' : 'waits on'} <WaitChips waitsOn={part.waitsOn} data={data} /></span>}
+        <Prerequisites all={part.waitsOn} waits={waits} data={data} />
         {item.linkedPrs.map((pr) => <span key={pr.number} className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(pr)}</span>)}
       </span>
       {item.slices.length > 0 && <span className="pl-5.5"><SliceBar item={item} /></span>}
@@ -157,7 +166,7 @@ function CheckPhase({ check, parent, builds, data }: { check: EndToEndCheck; par
         </span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 pl-5.5 text-[11px] text-(--muted-foreground)">
           <span>waiting</span>
-          {builds.length > 0 && <span className="inline-flex flex-wrap items-center gap-1">waits on <WaitChips waitsOn={waitsOn} data={data} /></span>}
+          <Prerequisites all={waitsOn} waits={waitsOn.filter((b) => b.state === 'open')} data={data} />
         </span>
         <span className="pl-5.5 text-[11px] text-(--muted-foreground) empty:hidden">
           <ThreadLine thread={threadsOf(parent)[0]} waits={waitsOn.filter((w) => w.state === 'open').map((w) => `#${w.number}`)} />
@@ -226,7 +235,7 @@ function About({ parent, find }: { parent: Item; find: FindRef }) {
 }
 
 /** The header's side: the part that waits on you, else the first part that can start, else that nothing waits on you. */
-function HeaderSide({ parts, data }: { parts: Part[]; data: BoardData }) {
+function HeaderSide({ parts, data, missing }: { parts: Part[]; data: BoardData; missing: number }) {
   const yours = parts.find((p) => YOURS.includes(p.item.status));
   const startable = parts.find((p) => p.item.status === 'Ready' && !openWaits(p).length && !carriesTwoStatuses(p.item));
   if (yours) {
@@ -237,6 +246,7 @@ function HeaderSide({ parts, data }: { parts: Part[]; data: BoardData }) {
     );
   }
   if (startable) return <span className="shrink-0" onClick={stop}><PartStart part={startable} data={data} build={`Start ${ref(startable.item)}`} /></span>;
+  if (missing) return <span>Some parts are outside the board</span>;
   return <span>Nothing waits on you</span>;
 }
 
@@ -267,6 +277,9 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
   };
   const names = [...new Set(items.map((i) => repoName(repoKey(i), data.repos)))];
   const done = items.filter(isDone).length;
+  const count = Math.max(parent.subIssues.total, items.length);
+  const missing = count - items.length;
+  const completed = Math.max(parent.subIssues.completed, done);
   const threads = [parent, ...items].flatMap(threadsOf);
   const total = itemTotal(parent, data.items) ?? parent.stats;
   const rows = parts.filter((p) => showDone || !isDone(p.item));
@@ -278,7 +291,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
         <span className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 text-left">
           <span className="flex items-center gap-2 text-[11px] text-(--muted-foreground)">
             <span className="rounded border border-(--input) px-1.5 font-medium text-(--foreground)">{kindOf(parent) === 'concept' ? 'Concept' : 'Coupled work'}</span>
-            <span className="truncate">{parent.status} · {done}/{items.length} parts done · {names.join(' + ')}</span>
+            <span className="truncate">{parent.status} · {completed}/{count} parts done · {names.join(' + ')}</span>
           </span>
           <span className="truncate text-base font-medium tracking-tight"><ItemTitle item={parent} /></span>
           <AzureFields azure={parent.azure} />
@@ -288,9 +301,12 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
         </span>
         <Track status={parent.status} />
         <AgentCell s={total && total !== 'unavailable' ? total : null} />
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 text-[11px] text-(--muted-foreground)"><HeaderSide parts={parts} data={data} /></div>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 text-[11px] text-(--muted-foreground)"><HeaderSide parts={parts} data={data} missing={missing} /></div>
       </div>
 
+      {missing > 0 && <p className="m-0 px-4 pt-3 text-xs text-(--muted-foreground)" data-unread-parts>
+        {plural(missing, 'part')} the board doesn't read. A repository may no longer be on the board.
+      </p>}
       <div className="flex items-center justify-between gap-3 px-4 pt-3">
         <ViewToggle view={view} onView={setView} />
         <span className="text-[11px] text-(--muted-foreground)">{view === 'map' ? 'Lanes by repo; arrows show what waits on what' : 'Parts follow their dependencies, then the end-to-end check'}</span>
@@ -317,7 +333,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
       )}
 
       <div className="border-t border-(--border)">
-        <StageHeader label={`Progress · ${items.length} parts`} side="Waits on · PR" />
+        <StageHeader label={`Progress · ${count} parts`} side="Waits on · PR" />
         {rows.map((p) => (
           <Row key={p.item.id} item={p.item} data={data} now={now} nested waiting={openWaits(p).length > 0} side={<PartSide part={p} data={data} />}>
             {(p.item.status === 'Ready' || p.item.status === 'Queued') && (

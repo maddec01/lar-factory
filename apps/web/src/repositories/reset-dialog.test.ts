@@ -39,9 +39,11 @@ async function openReset(data: BoardData, repo = REPO): Promise<void> {
 }
 
 test('Reset of an onboarding waiting for its PR says it closes the PR, then closes it and drops the row and the card', async () => {
+  const warnings = vi.spyOn(console, 'warn');
   const data: BoardData = { ...sample, onboarding: [{ repo: REPO, progress: waiting }] };
   const sent = serve(data);
   await openReset(data);
+  expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual([]);
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Reset ${REPO}?`);
   expect(text(dialog()!.querySelector('#reset-detail'))).toBe(
     `Reset closes ${REPO}'s onboarding PR, maddec01/lar-web#14, and drops its onboarding from this Mac's list, with its Resume. It opens no PR, and leaves alone the T3 project and the repository's labels.`);

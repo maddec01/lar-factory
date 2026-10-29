@@ -55,7 +55,7 @@ test('the header shows the kind, status, parts done and repositories, the title,
   await mountPage();
   const [title, track, agent, side] = header();
   expect([...title!.children].map(text)).toEqual([
-    'ConceptShaping · 1/4 parts done · lar-server', '#200 lar cloud: website sign-in and relay', '4 T3 threads · 1 running · 1 need you',
+    'ConceptShaping · 2/6 parts done · lar-server', '#200 lar cloud: website sign-in and relay', '4 T3 threads · 1 running · 1 need you',
   ]);
   expect(title!.className.split(' '), 'one column as wide as the cell, so the lines truncate at 840 px, not overflow').toContain('grid-cols-[minmax(0,1fr)]');
   expect(track!.getAttribute('title')).toBe('Shaping');
@@ -71,6 +71,17 @@ test('the header opens the dossier\'s item, and its "waits on you" opens that pa
   expect(dialogTitle()).toBe('#202 Sign-in screen');
   await press(dossier().firstElementChild!);
   expect(dialogTitle()).toBe('#200 lar cloud: website sign-in and relay');
+});
+
+test('a concept keeps the provider counts when Reset hides an unfinished part', async () => {
+  const data = withItem(C180, { subIssues: { total: 2, completed: 1 } });
+  await mountPage({ ...data, repos: data.repos.filter((r) => r.repo !== 'maddec01/lar-apple'),
+    items: data.items.filter((i) => i.repo !== 'maddec01/lar-apple') });
+  expect(text(header(C180)[0]!.firstElementChild)).toContain('1/2 parts done');
+  expect(text(dossier(C180))).toContain("1 part the board doesn't read");
+  expect(text(header(C180)[3])).not.toContain('Nothing waits on you');
+  await press(button(dossier(C180), 'Map'));
+  expect(text(dossier(C180))).toContain("1 part the board doesn't read");
 });
 
 test("the map shows the destination, decisions so far and open questions, each #n opening its item", async () => {
@@ -109,12 +120,12 @@ test('the checklist runs Decide, then Build per repository, then Check, the done
 test('each step shows its kind, what it waits on, its figures and its own thread', async () => {
   await mountPage();
   const lines = (id: string) => [...step(id).children].map(text);
-  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?grillOpen thread', 'Shaping28m · 1.87M · $2.71waits on #203', 'T3 · Grill: relay broker only or full TURN· running']);
+  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?grillOpen thread', 'Shaping28m · 1.87M · $2.71after #203 (done)', 'T3 · Grill: relay broker only or full TURN· running']);
   expect(lines('I_sample12')).toEqual(['#202 Sign-in screenprototypeon your desk', 'Needs you41m · 2.95M · $4.35', 'T3 · Prototype: sign-in screen· needs you']);
   expect(lines('I_sample13')).toEqual(['#140 Owner accountsbuildStart after #202 ▾', 'Ready1/3 sliceswaits on #202', '', 'T3 · Shape: owner accounts· done']);
   const chip = button(step('I_sample13'), '#202');
   expect(chip.className, 'an open blocker').toContain('text-(--warning-foreground)');
-  expect(button(step('I_sample10'), '#203').querySelector('.lucide-check'), 'a closed one is ticked').not.toBeNull();
+  expect(button(step('I_sample10'), '#203 (done)').querySelector('.lucide-check'), 'a closed one is ticked').not.toBeNull();
   await press(chip);
   expect(dialogTitle()).toBe('#202 Sign-in screen');
 });
@@ -124,9 +135,25 @@ test('a step with no thread yet says when its thread starts', async () => {
   expect(text(step('I_sample13').lastElementChild)).toBe('Thread starts when #202 is done');
 });
 
+test('a Ready part with completed prerequisites offers Start build without blocking wording', async () => {
+  await mountPage(unblocked());
+  const part = step('I_sample13');
+  expect(text(part)).toContain('Start build');
+  expect(text(part)).not.toContain('waits on');
+  expect(text(part)).toContain('after #202 (done)');
+});
+
+test('a part with mixed prerequisites only says it waits on the open ones', async () => {
+  await mountPage(withItem('I_sample13', { blockers: [
+    { number: 202, repo: 'maddec01/lar-server', state: 'open' },
+    { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
+  ] }));
+  expect(text(step('I_sample13'))).toContain('waits on #202after #203 (done)');
+});
+
 test('the progress rows sit on the stage track, done parts folded, each side saying what it waits on', async () => {
   await mountPage();
-  expect(text(dossier().lastElementChild!.firstElementChild!.firstElementChild)).toBe('Progress · 4 parts');
+  expect(text(dossier().lastElementChild!.firstElementChild!.firstElementChild)).toBe('Progress · 6 parts');
   expect(progress().map((r) => r.dataset.item)).toEqual(['I_sample12', 'I_sample10', 'I_sample13']);
   const side = (id: string) => text(row(id).lastElementChild);
   expect([side('I_sample10'), side('I_sample12'), side('I_sample13')]).toEqual(['Thread running', 'on your desk', 'waits on #202']);
@@ -285,7 +312,7 @@ test('an item with sub-issues on the board is coupled work; with no map, it says
   });
   await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });
   const d = dossier('I_100');
-  expect(text(header('I_100')[0]!.firstElementChild)).toBe('Coupled workIn progress · 0/1 parts done · lar-factory');
+  expect(text(header('I_100')[0]!.firstElementChild)).toBe('Coupled workIn progress · 0/2 parts done · lar-factory');
   expect(text(d.querySelector('[data-checklist]')!.previousElementSibling)).toBe("No map yet. The parts come from the item's children.");
   expect(progress('I_100').map((r) => r.dataset.item), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
   expect(phases('I_100').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build lar-factory']);

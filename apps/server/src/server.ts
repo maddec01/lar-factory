@@ -12,7 +12,7 @@ import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './con
 import { openConfigUpdatePr, openEditPr, readEditConfig, readEditPrs } from './config/edit-config.ts';
 import { onTheBoard, readBoardSettings, readOnboardedConfigs, readRepositoryList, stillOnboarding, type OnboardedRepository } from './config/repository-config.ts';
 import { editPrBody, ghCooldown, ghQuotaLow, readPrBody } from './github/github.ts';
-import { mergedStats, prStatsEdits, updatedBody } from './github/pr-stats.ts';
+import { mergedStats, prStatsEdits, retainStats, updatedBody } from './github/pr-stats.ts';
 import { createBoardServer } from './http/http.ts';
 import { createItemCommands } from './items/item-commands.ts';
 import { ACTIVE_READ_MS, onboardedSources, repoView } from './items/item-sources.ts';
@@ -243,8 +243,11 @@ function withT3Reads(items: Item[], withStats = true): Item[] {
     statsUnavailable(unreadable);
     if (priced !== null) pricingUnavailable(!priced);
   }
+  const previousStats = new Map(board.snapshot().items.map((item) => [item.id, item.stats]));
   return items.map((item) => {
-    const shown = { ...item, stats: withStats ? mergedStats(item) ?? (fresh ? stats(item) : item.stats) : item.stats, threads: threads(item) };
+    const known = retainStats(previousStats.get(item.id), item.stats);
+    const live = fresh ? stats(item) : item.stats;
+    const shown = { ...item, stats: withStats ? mergedStats({ ...item, stats: known }, live) ?? retainStats(known, live) : item.stats, threads: threads(item) };
     // A slice's implementer thread names the slice, so a build is running while a thread runs for it or any slice.
     const running = (found: ReturnType<typeof threads>) => Array.isArray(found) && found.some((t) => t.state === 'running');
     if (running(shown.threads) || item.slices.some((slice) => running(threads(slice)))) lastRunning.set(item.id, now);
@@ -318,11 +321,15 @@ async function checkQuota(): Promise<void> {
 function refreshLocal(): void {
   if (refreshing) return;
   const before = board.snapshot().items;
-  const after = withT3Reads(before, Date.now() - statsReadAt >= LOCAL_STATS_MS);
+  let after = withT3Reads(before, Date.now() - statsReadAt >= LOCAL_STATS_MS);
+  const running = (item: Item) => Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running');
+  // A run can finish between stats reads. Read its final turn before writing the settled PR block.
+  if (after.some((item, index) => running(before[index]!) && !running(item))) after = withT3Reads(after);
   const t3Of = (items: Item[]) => JSON.stringify(items.map((i) => [i.stats, i.threads]));
   if (t3Of(after) === t3Of(before)) return;
   board.update({ items: after });
   board.push();
+  void syncPrStats(after);
 }
 
 /**
@@ -331,13 +338,13 @@ function refreshLocal(): void {
  * never two at once: a refresh while one runs starts none.
  */
 async function syncPrStats(items: Item[]): Promise<void> {
-  if (syncingPrStats) return;
+  if (syncingPrStats || !transcriptsRead) return;
   syncingPrStats = true;
   try {
     const now = Date.now();
     for (const edit of prStatsEdits(items)) {
       // Stats grow while a build runs; each PR's block is written at most every PR_STATS_MS, not on every read.
-      if (now - (prStatsSyncedAt.get(edit.url) ?? -Infinity) < PR_STATS_MS) continue;
+      if (!edit.final && now - (prStatsSyncedAt.get(edit.url) ?? -Infinity) < PR_STATS_MS) continue;
       prStatsSyncedAt.set(edit.url, now);
       try {
         // The board read the body a while ago; apply the block to the body as it is now, so no one's edit is lost.

@@ -36,7 +36,7 @@ export function EditDialog() {
   return (
     <Modal loading={saving} onClose={close}>
       {/* ninna-ui's Modal drops the description from aria-describedby, so the description names itself. */}
-      <Modal.Content data-edit-dialog title={`Edit ${shownRepo(edit.repo)}`} aria-describedby="edit-description">
+      <Modal.Content data-edit-dialog title={`Edit ${shownRepo(edit.repo)}`} description="Change how the board reads this repository." aria-describedby="edit-description">
         <Text id="edit-description" tone="muted" className="shrink-0 px-5 pb-4 text-xs sm:px-6">
           {onAzure(edit.repo) ? 'Save opens' : `Save creates the custom labels ${shownRepo(edit.repo)} lacks and opens`} a PR on its .lar-factory.json, its Repository config. The board keeps the default branch's values until the PR merges.
         </Text>

@@ -66,7 +66,7 @@ export function ResetDialog() {
     <Modal loading={reset.resetting} onClose={close}>
       {/* ninna-ui's Modal drops the description from aria-describedby, so the detail names itself. */}
       <Modal.Content data-reset-dialog role="alertdialog" title={`Reset ${shownRepo(reset.repo)}?`} aria-describedby="reset-detail"
-        closeOnOverlayClick={false} focusFirstField={false}>
+        description="Review what Reset changes." closeOnOverlayClick={false} focusFirstField={false}>
         <Modal.Body>
           <div className="grid gap-3">
             <Text as="div" id="reset-detail" tone="muted" className="grid gap-2">

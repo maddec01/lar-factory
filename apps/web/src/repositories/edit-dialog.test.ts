@@ -58,8 +58,10 @@ async function openEdit(repo = REPO, board: BoardData = sample): Promise<void> {
 }
 
 test("Edit opens with the default branch's item source, show setting, role and custom labels, and the labels the repository has", async () => {
+  const warnings = vi.spyOn(console, 'warn');
   const sent = serve();
   await openEdit();
+  expect(warnings.mock.calls.filter((args) => args.some((arg) => /Missing.*Description/.test(String(arg))))).toEqual([]);
   expect(sent['/api/repositories/config']).toEqual([{ repo: REPO }]);
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Edit ${REPO}`);
   expect(text(document.getElementById(dialog()!.getAttribute('aria-labelledby')!)), 'the title names the dialog').toBe(`Edit ${REPO}`);

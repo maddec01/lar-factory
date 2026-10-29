@@ -3,7 +3,7 @@
 // as in 7.1-preview.4: it reads the version as a number. Given 7.1-preview, az adds the server's latest one.
 
 import { decodePart, onAzure } from '@lar-factory/shared';
-import type { IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails, TextFormat } from '@lar-factory/shared';
+import type { AzureBodyField, IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails, TextFormat } from '@lar-factory/shared';
 import type { Refused } from '../config/edit-config.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { API_VERSION, az, azureWorkItem, field, linked, orgFlags, problemOf, withFile, workItemUrl, type Az, type RawWorkItem } from './azure-items.ts';
@@ -119,7 +119,9 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
   const text = (name: string) => (typeof workItem.fields[name] === 'string' ? workItem.fields[name] : undefined);
   const hasContent = (value: string) => Boolean(value.replace(/<[^>]*>|&nbsp;|&#160;/g, '').trim()) || /<(?:img|video|iframe)\b/i.test(value);
   const description = text('System.Description') ?? '';
-  const bodyField = hasContent(description) ? 'System.Description' : 'Microsoft.VSTS.TCM.ReproSteps';
+  // A Bug's form shows Repro Steps as its description, so a Bug with no System.Description saves there too.
+  const bodyField: AzureBodyField = hasContent(description) || (!hasContent(text('Microsoft.VSTS.TCM.ReproSteps') ?? '') && field(workItem, 'System.WorkItemType') !== 'Bug')
+    ? 'System.Description' : 'Microsoft.VSTS.TCM.ReproSteps';
   const body = text(bodyField) ?? '';
   const descriptionFields = [
     ['Microsoft.VSTS.TCM.ReproSteps', 'Repro Steps'],
@@ -146,6 +148,8 @@ export const readAzureItemDetails = (item: Item, run: Az = az): Promise<ItemDeta
   return {
     body,
     format: formatOf(workItem.multilineFieldsFormat?.[bodyField], body),
+    bodyField,
+    ...workItem.rev !== undefined && { revision: workItem.rev },
     ...sections.length > 0 && { sections },
     author: nameOf(workItem.fields['System.CreatedBy']),
     assignees: assignee ? [assignee] : [],

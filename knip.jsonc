@@ -10,6 +10,10 @@
       // electron-builder runs sign-macos.ts as its sign hook, and the tests spawn fake-board.mjs.
       // Knip's Vitest plugin finds vite.config.ts and the tests.
       "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/fake-board.mjs"]
+    },
+    "apps/web": {
+      // PROTOTYPE #496, throwaway: prototype-496.html's script, which Vite+ serves in dev only.
+      "entry": ["src/prototype-496/main.tsx"]
     }
   },
   // ensure-electron-runtime.mjs, copied unchanged from T3 Code, runs macOS's `file`;

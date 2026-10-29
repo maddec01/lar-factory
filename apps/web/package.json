@@ -7,7 +7,8 @@
   "scripts": {
     "build": "vp build",
     "test": "vp test run",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "prototype:496": "vp dev --host 127.0.0.1 --port ${PORT:-5496} --strictPort"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
@@ -22,6 +23,14 @@
   "dependencies": {
     "@lar-factory/shared": "workspace:*",
     "@lar-factory/ui": "workspace:*",
+    "@lexical/code": "0.52.0",
+    "@lexical/html": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/markdown": "0.52.0",
+    "@lexical/react": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
+    "lexical": "0.52.0",
     "lucide-react": "^1.61.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

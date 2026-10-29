@@ -9,7 +9,7 @@ import { PrototypeDossiers, PrototypeInFlight, PrototypeSwitcher, variantOf } fr
 import { Queue } from './queue.tsx';
 
 export function Line({ items }: { items: Item[] }) {
-  // PROTOTYPE #472: `?variant=a|b|c` swaps the dossiers and in-flight rows.
+  // PROTOTYPE #472: `?variant=a1|a2|a|b|c|current` swaps the dossiers and in-flight rows; a1 by default.
   const [variant, setVariant] = useState(variantOf);
   return (
     <section className="line grid gap-3" aria-labelledby="line-h">

@@ -1,6 +1,9 @@
 // PROTOTYPE for #472 "Redesign items in the line": three looks for the Dossier (collapsed and open) and the In flight
 // row, switched by `?variant=a|b|c` (`current` shows today's line). Throwaway: lives on prototype/472-line-redesign.
 // Without `?variant=` the line is today's. A: dense strip, B: two-column card, C: stage lanes with attention tabs.
+// Round 2: A1/A2 are A with a two-line collapsed Dossier (line 1 title and chips, line 2 a fixed column grid so every
+// Dossier's part bar, count, next and repos sit at the same x). A1 puts the chips at the end of line 1, A2 right after
+// the title. A1 is the default when `?variant=` is missing; `?variant=current` shows today's line.
 
 import { useEffect, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
@@ -19,11 +22,11 @@ import { PartStart } from './part-start.tsx';
 import { OnYourDesk, YOURS, stageOf, threadText } from './stage-track.tsx';
 import { WorkMap } from './work-map.tsx';
 
-const VARIANTS = { a: 'Dense strip', b: 'Two-column card', c: 'Stage lanes' } as const;
+const VARIANTS = { a1: 'Two lines, chips at the end', a2: 'Two lines, chips by the title', a: 'Dense strip', b: 'Two-column card', c: 'Stage lanes' } as const;
 type Variant = keyof typeof VARIANTS | 'current';
 export const variantOf = (): Variant => {
   const v = new URLSearchParams(location.search).get('variant');
-  return v && v in VARIANTS ? (v as Variant) : 'current';
+  return v === 'current' ? 'current' : v && v in VARIANTS ? (v as Variant) : 'a1';
 };
 
 // ---------- shared reading of a dossier ----------
@@ -331,6 +334,44 @@ function FlightA({ item, data }: { item: Item; data: BoardData }) {
   );
 }
 
+// ---------- Variants A1/A2: A with a two-line collapsed Dossier ----------
+
+/** Line 2's columns, the same fixed widths in every Dossier: part bar, part count, what's next, repos. */
+const LINE2 = 'grid-cols-[18rem_5.5rem_minmax(0,1fr)_9rem]';
+
+function DossierA2Lines({ m, data, now, chips }: { m: Moving; data: BoardData; now: number; chips: 'end' | 'title' }) {
+  const [on, toggle] = useOpen(m.parent.id);
+  return (
+    <article className="rounded-xl border border-(--border) bg-(--card)" data-dossier={m.parent.id}>
+      <div onClick={() => open(m.parent)} className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1.5 rounded-xl px-2 py-2 hover:bg-(--accent)">
+        <Toggle on={on} onToggle={toggle} />
+        <span className={`flex min-w-0 gap-x-2 gap-y-1 pt-0.5 ${chips === 'end' ? 'items-start justify-between' : 'flex-wrap items-center'}`}>
+          <span className={`flex min-w-0 items-start gap-2 ${chips === 'end' ? 'flex-1' : ''}`}>
+            <Badge tone="neutral" className="mt-px shrink-0">{kindLabel(m.parent)}</Badge>
+            <span className="text-[14px] font-medium" title={m.parent.title}><ItemTitle item={m.parent} /></span>
+          </span>
+          <span className={`flex gap-1 ${chips === 'end' ? 'shrink-0' : 'flex-wrap'}`}><Counts m={m} /></span>
+        </span>
+        <span className={`col-start-2 grid ${LINE2} items-center gap-x-4`}>
+          <PartsBar m={m} />
+          <span className="text-[11px] tabular-nums text-(--muted-foreground)">{m.done}/{m.count} parts</span>
+          <Next m={m} data={data} compact />
+          <span className="truncate text-right text-[11px] text-(--muted-foreground)" title={repos(m, data)}>{repos(m, data)}</span>
+        </span>
+      </div>
+      {on && (
+        <div className="grid gap-4 border-t border-(--border) px-4 py-3">
+          <Attention m={m} data={data} layout="rows" />
+          <PartsView m={m} data={data} now={now} columns />
+        </div>
+      )}
+    </article>
+  );
+}
+
+const DossierA1 = (p: { m: Moving; data: BoardData; now: number }) => <DossierA2Lines {...p} chips="end" />;
+const DossierA2 = (p: { m: Moving; data: BoardData; now: number }) => <DossierA2Lines {...p} chips="title" />;
+
 // ---------- Variant B: two-column card ----------
 
 function Ring({ done, count }: { done: number; count: number }) {
@@ -489,8 +530,8 @@ function FlightC({ item, data }: { item: Item; data: BoardData }) {
 
 // ---------- the line's prototype sections, and the switcher ----------
 
-const DOSSIER = { a: DossierA, b: DossierB, c: DossierC };
-const FLIGHT = { a: FlightA, b: FlightB, c: FlightC };
+const DOSSIER = { a1: DossierA1, a2: DossierA2, a: DossierA, b: DossierB, c: DossierC };
+const FLIGHT = { a1: FlightA, a2: FlightA, a: FlightA, b: FlightB, c: FlightC };
 
 export function PrototypeDossiers({ items, variant }: { items: Item[]; variant: keyof typeof VARIANTS }) {
   const { data, now } = useBoardStore();
@@ -505,7 +546,7 @@ export function PrototypeInFlight({ items, variant }: { items: Item[]; variant: 
   return <Card title={`Everything else in flight · ${rows.length}`}>{rows.map((i) => <F key={i.id} item={i} data={data} />)}</Card>;
 }
 
-const KEYS: Variant[] = ['a', 'b', 'c', 'current'];
+const KEYS: Variant[] = ['a1', 'a2', 'a', 'b', 'c', 'current'];
 const nameOf = (v: Variant) => (v === 'current' ? 'Today' : VARIANTS[v]);
 
 /** The prototype's floating bar: arrows and ←/→ cycle the variants through `?variant=`. */
@@ -527,7 +568,6 @@ export function PrototypeSwitcher({ variant, onVariant }: { variant: Variant; on
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
   });
-  if (!new URLSearchParams(location.search).has('variant')) return null;
   return (
     <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full bg-neutral-900 px-1.5 py-1 text-xs text-white shadow-lg ring-1 ring-white/10">
       <button type="button" aria-label="Previous variant" onClick={() => go(-1)} className="grid size-6 place-items-center rounded-full hover:bg-white/15"><ChevronLeft className="size-4" /></button>

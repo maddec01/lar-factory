@@ -16,10 +16,16 @@ Follow `implement` (`~/.claude/skills/implement/SKILL.md` in Claude Code,
 changes and `writing-for-agents` when the slice edits skills, `AGENTS.md` or
 `CLAUDE.md`. Skip its code review step. Each commit is one reviewable step
 with a conventional message (`AGENTS.md` lists types and scopes), never a
-fixup or `--no-verify`. Run the checks `AGENTS.md` names for the layers changed, then rebase
-onto the build branch tip. Work another repository needs is never a commit
+fixup or `--no-verify`. Work another repository needs is never a commit
 here: report it as `needs <owner/repo>: <the work>`. Cite other-repo work
 per `../cross-repo-citations.md`.
+
+Run only the checks `AGENTS.md` names for the files and platforms the slice
+changed, narrowed to the affected tests where `AGENTS.md` says how. The
+builder runs the full suite once per build. A changed file that several
+platforms build is a change to each of those platforms. A slice that changes
+only tests or docs builds nothing and runs the affected tests plus the format
+and lint checks `AGENTS.md` names. Then rebase onto the build branch tip.
 
 Report your absolute worktree path and slice branch, or that the slice is
 blocked (too big, checks won't pass) and why, with your worktree path.

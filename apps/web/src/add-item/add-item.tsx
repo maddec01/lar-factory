@@ -133,15 +133,16 @@ function AddItemForm() {
   };
   return (
     <Modal.Form ref={form} id="add-item-form" noValidate aria-busy={phase === 'pending'} onSubmit={onSubmit} onInput={edit} onChange={keepForm}>
-      {/* Narrower than 40rem, the side panel stacks under the editor and the two scroll as one. */}
+      {/* Narrower than 40rem, the side panel stacks under the editor, which grows with its text, and the two scroll as one;
+          each row sizes to its content, so a long text pushes the panel down rather than running under it. */}
       <div className="@container flex min-h-0 flex-1 flex-col">
         <Fieldset id="item-fields" unstyled disabled={locked}
-          className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_16rem] border-t border-base-300 @max-[40rem]:grid-cols-[minmax(0,1fr)] @max-[40rem]:content-start @max-[40rem]:overflow-y-auto">
+          className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_16rem] border-t border-base-300 @max-[40rem]:grid-cols-[minmax(0,1fr)] @max-[40rem]:auto-rows-max @max-[40rem]:content-start @max-[40rem]:overflow-y-auto">
           <div className="flex min-h-0 flex-col gap-3 overflow-y-auto px-5 pb-5 pt-4 sm:px-6 @max-[40rem]:min-h-80 @max-[40rem]:overflow-visible">
             <input id="item-title" name="title" required maxLength={256} autoComplete="off" defaultValue={kept?.title} aria-label="Title" placeholder="Title"
               className="w-full shrink-0 border-0 bg-transparent p-0 text-xl font-semibold tracking-tight text-base-content outline-none placeholder:font-medium placeholder:text-(--muted-foreground)" />
             <DescriptionEditor label="Description" placeholder="Add a description… - for a list, 1. for steps, # for a heading"
-              value={kept?.description ?? ''} onChange={onDescription} disabled={locked} fill />
+              value={kept?.description ?? ''} onChange={onDescription} disabled={locked} fill="wide" />
             <Result message={message} />
           </div>
           <aside aria-label="Details" className="grid content-start gap-5 overflow-y-auto border-l border-base-300 bg-base-50/60 px-4 py-4 @max-[40rem]:overflow-visible @max-[40rem]:border-l-0 @max-[40rem]:border-t">

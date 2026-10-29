@@ -42,6 +42,9 @@ export const selectAll = (el: HTMLElement) => act(async () => editorOf(el).updat
   $setSelection(selection);
 }, { discrete: true }));
 
+/** Puts the caret after the editor's last character, as a click past its text does. */
+export const selectEnd = (el: HTMLElement) => act(async () => editorOf(el).update(() => { $getRoot().selectEnd(); }, { discrete: true }));
+
 /** Pastes `text` as plain text, as a paste from a text editor does. */
 export async function pastePlain(el: Element, text: string): Promise<void> {
   // jsdom has no ClipboardEvent or DataTransfer, so the event carries a stand-in holding only the text.

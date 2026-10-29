@@ -250,6 +250,9 @@ importers:
       '@lexical/code':
         specifier: 0.52.0
         version: 0.52.0(typescript@7.0.2)
+      '@lexical/html':
+        specifier: 0.52.0
+        version: 0.52.0(typescript@7.0.2)
       '@lexical/link':
         specifier: 0.52.0
         version: 0.52.0(typescript@7.0.2)

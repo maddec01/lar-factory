@@ -23,6 +23,7 @@
     "@lar-factory/shared": "workspace:*",
     "@lar-factory/ui": "workspace:*",
     "@lexical/code": "0.52.0",
+    "@lexical/html": "0.52.0",
     "@lexical/link": "0.52.0",
     "@lexical/list": "0.52.0",
     "@lexical/markdown": "0.52.0",

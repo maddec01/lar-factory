@@ -108,6 +108,10 @@ _Avoid_: system label, default tag
 A label the user chooses for one repository so Add item can offer it, such as the part of the product an item touches.
 _Avoid_: area label, applicability
 
+**Label group**:
+The Custom labels that share the text before ": ", such as `app: music` and `app: video` in the group "app". Add item shows each group as one section.
+_Avoid_: label category, label section
+
 **Overlay**:
 The board's temporary view of successful item creations and status changes
 while GitHub catches up; GitHub remains authoritative.

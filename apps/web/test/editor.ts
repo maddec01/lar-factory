@@ -13,7 +13,7 @@ Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
 document.addEventListener('selectionchange', (event) => event.stopImmediatePropagation(), true);
 
 /** The Lexical editor behind a description editor's text area. */
-export const editorOf = (el: Element): LexicalEditor => (el as Element & { __lexicalEditor: LexicalEditor }).__lexicalEditor;
+const editorOf = (el: Element): LexicalEditor => (el as Element & { __lexicalEditor: LexicalEditor }).__lexicalEditor;
 
 /** Types `text` at the selection, or at the end when there is none; "\n" presses Enter. */
 export async function typeInto(el: Element, text: string): Promise<void> {

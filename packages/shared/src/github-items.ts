@@ -226,7 +226,10 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
     slices: normalizeSlices(rawSlices(raw, builds), active, blocked),
   };
-  if (isRawConcept(raw)) item.map = parseConceptMap(c.body ?? '');
+  if (isRawConcept(raw)) {
+    const map = bodyMap(c.body);
+    if (map) item.map = map;
+  }
   return item;
 }
 
@@ -251,7 +254,8 @@ export function normalizeItems(raws: RawItem[], searched: Searched = {}): Item[]
   // An item with sub-issues on the board is a dossier too, so its body's map sections show, when it has any.
   const parents = parentKeys(board);
   for (const item of board) {
-    const map = item.map ? undefined : parentMap(bodies.get(item.id), parents.has(refKey(item.repo, item.number)));
+    if (item.map || !parents.has(refKey(item.repo, item.number))) continue;
+    const map = bodyMap(bodies.get(item.id));
     if (map) item.map = map;
   }
   return board;
@@ -260,11 +264,11 @@ export function normalizeItems(raws: RawItem[], searched: Searched = {}): Item[]
 /** The `repo#number` keys of the issues the items name as their parent. */
 const parentKeys = (items: readonly Item[]) => new Set(items.flatMap((i) => (i.parent ? [refKey(i.parent.repo, i.parent.number)] : [])));
 
-/** A parent's map, from its body, when the body has any of the map's sections. */
-function parentMap(body: string | undefined, isParent: boolean): ConceptMap | undefined {
-  if (!isParent || !body) return undefined;
+/** A map from an issue body, only when at least one section has parsed content. */
+function bodyMap(body: string | undefined): ConceptMap | undefined {
+  if (!body) return undefined;
   const map = parseConceptMap(body);
-  return map.destination || map.decisions.length || map.fog.length || map.check ? map : undefined;
+  return map.destination || map.decisions.length || map.fog.length || map.check?.title || map.check?.steps.length ? map : undefined;
 }
 
 /** The issues the line shows as dossiers, whose bodies hold their maps: every concept, and every item with a sub-issue on the board. */

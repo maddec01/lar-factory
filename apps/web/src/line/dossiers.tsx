@@ -208,7 +208,7 @@ function About({ parent, find }: { parent: Item; find: FindRef }) {
   if (!map) return <div className="grid content-start gap-5"><p className="m-0 text-(--muted-foreground)">No map yet. The parts come from the item's children.</p></div>;
   return (
     <div className="grid content-start gap-5" data-about>
-      <section className="grid gap-1.5"><Heading>Destination</Heading><p className="m-0 leading-relaxed">{map.destination}</p></section>
+      <section className="grid gap-1.5"><Heading>Destination</Heading><p className="m-0 leading-relaxed">{map.destination || 'No destination recorded.'}</p></section>
       <section className="grid gap-1.5">
         <Heading>Decisions so far <span className="tabular-nums">{map.decisions.length}</span></Heading>
         <ul className="m-0 grid list-none gap-1.5 p-0">
@@ -221,7 +221,7 @@ function About({ parent, find }: { parent: Item; find: FindRef }) {
           <ul className="m-0 grid list-none gap-1.5 p-0">
             {map.fog.map((q) => <li key={q} className="flex gap-2"><CircleHelp className="mt-0.5 size-3.5 shrink-0 text-(--st-amber)" /><span><Refs text={q} find={find} /></span></li>)}
           </ul>
-        ) : <p className="m-0 text-(--muted-foreground)">None. Every decision is made.</p>}
+        ) : <p className="m-0 text-(--muted-foreground)">No open questions recorded.</p>}
       </section>
       {map.check && (
         <section className="grid gap-1.5 rounded-lg border border-(--border) p-3" data-check>

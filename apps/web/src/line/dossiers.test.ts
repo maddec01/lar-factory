@@ -92,7 +92,7 @@ test("the map shows the destination, decisions so far and open questions, each #
   expect([...about.querySelectorAll('li')].map(text)[4]).toBe('What does the sign-in screen look like on the website and in the apps? (#202)');
   await press(button(about, '#203'));
   expect(dialogTitle()).toBe(`#203 ${sample.items.find((i) => i.number === 203)!.title}`);
-  expect(text(dossier(C180).querySelector('[data-about] > section:nth-child(3) p'))).toBe('None. Every decision is made.');
+  expect(text(dossier(C180).querySelector('[data-about] > section:nth-child(3) p'))).toBe('No open questions recorded.');
 });
 
 test("in the map, #n opens the issue in the concept's repository, and owner/repo#n the one in that repository", async () => {
@@ -339,4 +339,21 @@ test('the checklist keeps a build before a research decision blocked by that bui
   const research = { ...decision([{ repo: build.repo!, number: build.number!, state: 'open' }]), labels: ['decision-research'] };
   await mountPage({ ...sample, items: [c200, research, build] });
   expect([...dossier().querySelectorAll('[data-checklist] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([build.id, research.id]);
+});
+
+test('an unstructured concept says no map exists and makes no claim about decisions', async () => {
+  const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: 'A concept written as ordinary prose.' });
+  await mountPage({ ...sample, items: normalizeItems([concept]) });
+  const about = dossier('I_700');
+  expect(text(about)).toContain('No map yet.');
+  expect(text(about)).not.toContain('Every decision is made');
+  expect(text(about)).not.toContain('Destination');
+});
+
+test('a partial map names missing destination and open questions without claiming decisions are complete', async () => {
+  await mountPage(withItem(C200, { map: { destination: '', decisions: ['Keep the existing API.'], fog: [] } }));
+  const about = dossier().querySelector('[data-about]')!;
+  expect(text(about)).toContain('No destination recorded.');
+  expect(text(about)).toContain('No open questions recorded.');
+  expect(text(about)).not.toContain('Every decision is made');
 });

@@ -250,3 +250,13 @@ test('an item closed as not planned is no board item, from either item source', 
   ];
   assert.deepEqual(normalizeItems(raws, {}).map((i) => i.number), [4]);
 });
+
+test('a concept without parsed map content has no map, while a partial map keeps its content', () => {
+  for (const body of ['', 'A concept written as ordinary prose.', '## Notes\nSome notes.', '## Destination\n\n## Decisions so far\n\n## Fog\n\n## End-to-end check\n']) {
+    const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body });
+    assert.equal(normalizeItem(concept)?.map, undefined, body);
+    assert.equal(normalizeItems([concept])[0]?.map, undefined, body);
+  }
+  const partial = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: '## Fog\n- Where will it run?' });
+  assert.deepEqual(normalizeItem(partial)?.map, { destination: '', decisions: [], fog: ['Where will it run?'] });
+});

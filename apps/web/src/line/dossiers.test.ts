@@ -61,9 +61,12 @@ beforeEach(() => {
 
 test('each open concept and item with sub-issues on the board is a dossier, in board order, between the Queue and the rest of the line', async () => {
   await mountPage();
-  expect([...$('.line > div')!.children].map((el) => el.getAttribute('data-dossier') ?? el.className.split(' ')[0])).toEqual(['queue', C200, C180, 'overflow-hidden']);
+  expect([...$('.line > div')!.children].map((el) => el.className.split(' ')[0])).toEqual(['queue', 'grid', 'overflow-hidden']);
+  const list = $('[data-dossiers]')!;
+  expect([[...list.children].map((el) => el.getAttribute('data-dossier')), list.className.split(' ')], 'the dossiers sit 8 px apart')
+    .toEqual([[C200, C180], expect.arrayContaining(['gap-2'])]);
   await receive({ ...sample, items: sample.items.filter((i) => !i.labels.includes('concept') && i.parent?.number !== 180) });
-  expect($$('[data-dossier]'), 'none without a concept or a parent').toEqual([]);
+  expect([$$('[data-dossier]'), $('[data-dossiers]')], 'none without a concept or a parent').toEqual([[], null]);
 });
 
 test('a dossier starts collapsed to its two header lines, and the browser remembers it opened across a reload', async () => {
@@ -95,8 +98,8 @@ test('only the title opens the item; anywhere else on the header but the chips o
   const was = toggle().getAttribute('aria-expanded');
   await press(header().querySelector('[data-chips]')!);
   expect(toggle().getAttribute('aria-expanded'), 'a chip leaves it as it was').toBe(was);
-  await press(next().querySelector('button')!);
-  expect([dialogTitle(), toggle().getAttribute('aria-expanded')], 'its "waits on you" opens that part, not the dossier').toEqual(['#202 Sign-in screen', was]);
+  await press(next());
+  expect([dialogTitle(), toggle().getAttribute('aria-expanded')], "what's next opens no dialog; it toggles the dossier").toEqual(['', was === 'true' ? 'false' : 'true']);
 });
 
 /** A pointer click (`detail` 1) or a key press's click (`detail` 0) on `el`. */
@@ -143,6 +146,9 @@ test('line 1 holds the kind, the full title, its T3 threads, and chips that hide
   expect(chips(), 'parts in Needs you, open decisions and the fog left').toEqual(['1 need you', '2 decisions', '2 fog']);
   expect([text(line(1, C180).firstElementChild!.firstElementChild!.firstElementChild), chips(C180)]).toEqual(['Coupled work', []]);
   expect(text(header(C180).querySelector('[data-threads]')), 'a zero count is left out').toBe('3 T3 threads · 1 running');
+  await receive({ ...sample, items: sample.items.map((i) => ({ ...i, threads: [] })) });
+  const none = header().querySelector('[data-threads]')!;
+  expect([none.textContent, none.className.split(' ').includes('empty:hidden'), none.getAttribute('title')], 'with no threads, nothing: never "0 T3 threads"').toEqual(['', true, null]);
 });
 
 test('line 1 stays one row: its threads and Azure fields give up their room to an ellipsis, the title keeps its own and the chips theirs', async () => {
@@ -170,25 +176,30 @@ test('the blocked chip counts the blocked slices of unfinished parts', async () 
   expect(chips()).toContain('2 blocked');
 });
 
-test("line 2 has the part bar, parts done, what's next and repositories in the same fixed columns in every dossier", async () => {
+const col = (name: string, id = C200) => line(2, id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
+
+test("line 2 has the part bar, parts done, what's next, agent figures and repositories in the same fixed columns in every dossier", async () => {
   await mountPage();
   const grid = (id: string) => line(2, id).className.split(' ').filter((c) => c.includes('grid-cols'));
-  expect(grid(C200)).toEqual(['grid-cols-[18rem_5.5rem_minmax(0,1fr)]', 'lg:grid-cols-[18rem_5.5rem_minmax(0,1fr)_9rem]']);
+  expect(grid(C200)).toEqual(['grid-cols-[18rem_5.5rem_minmax(0,1fr)_9.5rem]', 'lg:grid-cols-[18rem_5.5rem_minmax(0,1fr)_9.5rem_9rem]']);
   expect(grid(C180)).toEqual(grid(C200));
-  expect([...line(2).children].map(text)).toEqual(['', '2/6 parts', '#202 waits on you', 'lar-server']);
-  expect(line(2).querySelectorAll('[data-part-bar] li').length, 'a segment per part').toBe(6);
-  expect(next().querySelector('button span')!.className.split(' '), "what's next ends in an ellipsis").toContain('truncate');
-  expect(header().querySelector('[data-repos]')!.className.split(' '), 'repositories drop below 1024 px').toEqual(expect.arrayContaining(['hidden', 'lg:block']));
-  expect([text(line(2, C180).children[1]), text(next(C180)), text(header(C180).querySelector('[data-repos]'))]).toEqual(['2/2 parts', 'Nothing waits on you', 'lar-server + lar-apple']);
-  expect(next(C180).querySelector('span')!.title, 'its cut-off text reads in full in a tooltip').toBe('Nothing waits on you');
+  expect([...line(2).children].map(text)).toEqual(['', '2/6 parts', 'Needs you#202 Sign-in screen', '1h 31m · 6.23M · $9.11', 'lar-server']);
+  expect(col('bar').querySelectorAll('[data-part-bar] li').length, 'a segment per part').toBe(6);
+  expect(next().querySelector('[title]')!.className.split(' '), "what's next ends in an ellipsis").toContain('truncate');
+  expect(col('repos').className.split(' '), 'repositories are muted text that drops below 1024 px').toEqual(expect.arrayContaining(['hidden', 'lg:block', 'text-(--muted-foreground)']));
+  expect([text(line(2, C180).children[1]), text(next(C180)), text(col('repos', C180))]).toEqual(['2/2 parts', 'Nothing waits on you', 'lar-server + lar-apple']);
+  expect(next(C180).querySelector('[title]')!.getAttribute('title'), 'its cut-off text reads in full in a tooltip').toBe('Nothing waits on you');
 });
 
-test('the header keeps the stage track, the agent total and the Azure fields', async () => {
+test('the header has no stage track and no repository dots; the agent figures sit on one line, and nothing shows without them', async () => {
   await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
-  const figures = header().querySelector('[data-figures]')!;
-  expect(figures.querySelector('ol')!.getAttribute('title')).toBe('Shaping');
-  expect([...figures.lastElementChild!.children].map(text), "#200's parts' figures").toEqual(['1h 31m', '6.23M · $9.11']);
+  expect([header().querySelector('[data-figures]'), header().querySelector('[class*="rounded-full"]:not([data-part-bar] li)')]).toEqual([null, null]);
+  expect(header().children.length, 'the chevron, line 1 and line 2').toBe(3);
+  const figures = col('figures').firstElementChild!;
+  expect([figures.children.length, text(figures), figures.className.split(' ')], "#200's parts' figures, one truncating line").toEqual([0, '1h 31m · 6.23M · $9.11', expect.arrayContaining(['truncate'])]);
   expect(text(line(1).querySelector('[data-azure]'))).toBe('Feature · Active · Ana');
+  await receive({ ...sample, items: sample.items.map((i) => ({ ...i, stats: undefined })) });
+  expect(text(col('figures')), 'no figures, an empty column').toBe('');
 });
 
 test('a concept keeps the provider counts when Reset hides an unfinished part', async () => {
@@ -227,6 +238,12 @@ test('parts in Verify or Ready to merge get their own row after Needs you, which
   const rows = [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')].map((r) => text(r.firstElementChild));
   expect(rows.slice(0, 2)).toEqual(['Needs you 1', 'To verify or merge 2']);
   expect(chips()).toContain('1 need you');
+  expect(text(next()), "what's next names the part in Needs you first").toBe('Needs you#202 Sign-in screen');
+  await receive(withItem('I_sample12', { status: 'Verify' }, withItem('I_sample10', { status: 'Verify' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] }))));
+  expect([chips(), text(next())], 'with none in Needs you, no need-you chip and no Needs you wording').toEqual([['2 decisions', '2 fog'], 'To verify#202 Sign-in screen']);
+  await receive(withItem('I_sample12', { status: 'Done' }, withItem('I_sample10', { status: 'Done' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] }))));
+  expect(text(next()), 'a part ready to merge is named to merge').toBe('To merge#140 Owner accounts');
+  await receive(withItem('I_sample10', { status: 'Verify' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] })));
   const verify = dossier().querySelector('[data-attention-row="verify"]')!;
   expect([...verify.lastElementChild!.children].map(text)).toEqual(['#140 Owner accountsReady to merge', '#201 Relay: broker only or full TURN?Verify']);
   await press(button(verify, '#140 Owner accounts'));
@@ -259,7 +276,7 @@ test('the Ready to start row and the header agree on what can start: a Queued de
   const data = withItem('I_sample12', { status: 'Shaping' }, withDecision());
   await mountPage(data);
   const ready = () => dossier().querySelector('[data-attention-row="ready"]');
-  expect([text(ready()!.firstElementChild), text(startIn(next()))]).toEqual(['Ready to start 1', 'Start #204 ▾']);
+  expect([text(ready()!.firstElementChild), text(startIn(next()))]).toEqual(['Ready to start 1', 'Start ▾']);
   await receive(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
   expect([ready(), startIn(next())], 'a live thread').toEqual([null, null]);
   await receive(withItem('I_d204', { statuses: ['Queued', 'Verify'] }, data));
@@ -340,13 +357,13 @@ test('a blocked build shows only Start after, a Start, in place of Start build',
   expect(startIn(step('I_sample13'))).toBeNull();
   const after = step('I_sample13').querySelector<HTMLElement>('[data-start-after]')!;
   expect([text(after), after.dataset.kind]).toEqual(['Start after #202 ▾', 'start']);
-  expect(text(next()), 'the header offers no start while a part waits on you').toBe('#202 waits on you');
+  expect(text(next()), 'the header offers no start while a part waits on you').toBe('Needs you#202 Sign-in screen');
 });
 
 test('once its blockers close, Start build sends the build, and the header offers it too', async () => {
   holdPosts(unblocked());
   await mountPage(withItem('I_sample12', { status: 'Shaping' }, unblocked()));
-  expect(text(startIn(next()))).toBe('Start #140 ▾');
+  expect(text(startIn(next()))).toBe('Start ▾');
   await pressMenu(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
   await press(entries()[1]!);
@@ -479,7 +496,7 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
   await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });
-  expect([text(line(1, 'I_100').firstElementChild!.firstElementChild!.firstElementChild), text(line(2, 'I_100'))]).toEqual(['Coupled work', '0/2 partsSome parts are outside the boardlar-factory']);
+  expect([text(line(1, 'I_100').firstElementChild!.firstElementChild!.firstElementChild), text(line(2, 'I_100'))]).toEqual(['Coupled work', '0/2 partsMoving#102 Issue 102lar-factory']);
   expect(progress('I_100').map((r) => r.dataset.item), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
   expect(phases('I_100').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build lar-factory']);
   expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();

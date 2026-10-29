@@ -18,6 +18,16 @@ test('a slow startup failure keeps its diagnostic until the child closes', async
   await assert.rejects(startBoard(t, {}, true, false, {}, dir), /delayed startup diagnostic/);
 });
 
+test('waiting for server output finds past messages and rejects if the board closes before a future message', async (t) => {
+  const board = await startBoard(t);
+  await board.untilLogged(`board on ${board.url}`);
+  assert.deepEqual(await board.untilCalled((args) => args[0] === '--version'), ['--version']);
+  const waiting = assert.rejects(board.untilLogged('a message that never arrives'), /Board closed before the expected message/);
+  await board.stop();
+  await waiting;
+  await assert.rejects(board.untilLogged('a message that never arrives'), /Board closed before the expected message/);
+});
+
 const alive = (pid: number) => {
   try { process.kill(pid, 0); return true; } catch { return false; }
 };

@@ -49,7 +49,8 @@ export async function factoryRepo(t: TestContext) {
   await symlink('../../../../packages/shared', join(repo, 'apps/server/node_modules/@lar-factory/shared'));
   git('add', '.');
   git('commit', '-m', 'feat(board): initial fixture');
-  git('clone', '--bare', repo, origin);
+  // Use the clone transport: concurrent fixtures can fail while Git copies local loose objects.
+  git('clone', '--bare', '--no-local', repo, origin);
   git('remote', 'add', 'origin', origin);
   git('fetch', 'origin');
   return { dir, repo, origin, env, git };

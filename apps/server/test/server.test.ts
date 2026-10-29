@@ -81,16 +81,14 @@ test('sample mode never writes through the local GitHub login', async (t) => {
 });
 
 test('successful refreshes eventually remove a created item whose issue is absent', async (t) => {
-  const board = await startBoard(t, {}, false, true);
+  // Three authoritative reads must finish, even when each takes most of a second.
+  const board = await startBoard(t, { readDelay: 800, delayedRepos: ['maddec01/lar-factory'] }, false, true);
   await onboarded(board);
   const initial = await board.board();
   const response = await board.post({ session: initial.capture.session, requestId: randomUUID(), draft });
   assert.equal((await response.json()).board.items.length, 1, 'creation appears immediately');
   // GitHub keeps returning no issue, as when the item was removed before reconciliation.
-  for (let attempt = 0; attempt < 40; attempt++) {
-    if (!(await board.board()).items.length) return;
-    await new Promise((r) => setTimeout(r, 50));
-  }
+  await until(board, (data) => data.items.length === 0);
   assert.equal((await board.board()).items.length, 0, 'a temporary overlay cannot outlive repeated authoritative reads');
 });
 
@@ -170,10 +168,11 @@ test('refreshes keep a stats block in open linked PRs, edit only when it changes
     return { ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: prs } } };
   };
   const items = [withPrs(12, [pr(40, 'OPEN'), pr(41, 'MERGED')]), withPrs(13, [pr(42, 'OPEN')])];
-  const board = await startBoard(t, { items }, false, true, { T3_STATE_DB: db });
+  // A slow live-body read must finish before checking the edit and its next authoritative read.
+  const board = await startBoard(t, { items, prReadDelay: 2500 }, false, true, { T3_STATE_DB: db });
   const edits = async () => (await board.calls()).filter((args) => args[2] === 'PATCH');
-  for (let attempt = 0; attempt < 80 && !(await edits()).length; attempt++) await new Promise((r) => setTimeout(r, 25));
-  await new Promise((r) => setTimeout(r, 400));
+  await board.untilLogged('updated item stats in https://github.com/maddec01/lar-factory/pull/40');
+  await until(board, (data) => data.items.find((item) => item.number === 12)?.linkedPrs.some((pr) => pr.body?.includes('<!-- lar-stats-data ')) === true);
   const made = await edits();
   assert.equal(made.length, 1, 'later refreshes see the block is current and leave the PR alone');
   assert.equal(made[0]![3], 'repos/maddec01/lar-factory/pulls/40', 'merged PRs and items without stats are left alone');
@@ -314,11 +313,10 @@ test('before an edit the board reads the PR again, keeps edits made since its re
     pr(43, 'PR 43'), pr(44, `PR 44\n\n${block}`), pr(40, 'PR 40'),
   ] } } }];
   const liveBodies = { [url(40)]: 'PR 40, edited by hand', [url(43)]: `PR 43\n\n${block}` };
-  const board = await startBoard(t, { items, liveBodies }, false, false, { T3_STATE_DB: db });
+  // The sequential PR reads deliberately outlast the former two-second poll.
+  const board = await startBoard(t, { items, liveBodies, prReadDelay: 1200 }, false, false, { T3_STATE_DB: db });
   const prCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && args[1] !== 'graphql' && !readsRepositoryConfig(args));
-  for (let attempt = 0; attempt < 80 && !(await prCalls()).some((args) => args[2] === 'PATCH'); attempt++) {
-    await new Promise((r) => setTimeout(r, 25));
-  }
+  await board.untilLogged(`updated item stats in ${url(40)}`);
   const calls = await prCalls();
   assert.deepEqual(calls.filter((args) => args[2] !== 'PATCH').map((args) => args[1]),
     ['repos/maddec01/lar-factory/pulls/43', 'repos/maddec01/lar-factory/pulls/40'], 'only PRs the board thinks need an edit are read');
@@ -334,22 +332,20 @@ test('PR edits run beside the refreshes without holding them up, and never two s
   const items = [{ ...raw, content: { ...raw.content, closedByPullRequestsReferences: { nodes: [
     { number: 40, url: 'https://github.com/maddec01/lar-factory/pull/40', state: 'OPEN', isDraft: false, body: 'PR 40' },
   ] } } }];
-  // Refreshes run every 100 ms; the edit takes 1.5 s.
-  const board = await startBoard(t, { items, prEditDelay: 1500 }, false, true, { T3_STATE_DB: db });
+  const dir = mkdtempSync(join(tmpdir(), 'lar-pr-edit-'));
+  t.onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+  const release = join(dir, 'release');
+  // Keep the edit pending until a slow refresh finishes, regardless of process scheduling.
+  const board = await startBoard(t, { items, prEditHold: release, readDelay: 1500, delayedRepos: ['maddec01/lar-factory'] }, false, true, { T3_STATE_DB: db });
   const prCalls = async () => (await board.calls()).filter((args) => (args[1]?.startsWith('repos/') && !readsRepositoryConfig(args)) || args[2] === 'PATCH');
-  for (let attempt = 0; attempt < 80 && !(await prCalls()).some((args) => args[2] === 'PATCH'); attempt++) {
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  type Board = { fetchedAt: string; items: { linkedPrs: { body?: string }[] }[] };
-  const first = (await board.board()) as Board;
-  let later = first;
-  for (let attempt = 0; attempt < 40 && later.fetchedAt === first.fetchedAt; attempt++) {
-    await new Promise((r) => setTimeout(r, 25));
-    later = (await board.board()) as Board;
-  }
+  await board.untilCalled((args) => args[2] === 'PATCH');
+  const first = await board.board();
+  const later = await until(board, (data) => data.fetchedAt !== first.fetchedAt);
   assert.notEqual(later.fetchedAt, first.fetchedAt, 'the board refreshed while the edit was under way');
   assert.equal(later.items[0]?.linkedPrs[0]?.body, 'PR 40', 'the edit had not landed yet');
-  await new Promise((r) => setTimeout(r, 1700));
+  writeFileSync(release, '');
+  await board.untilLogged('updated item stats in https://github.com/maddec01/lar-factory/pull/40');
+  await until(board, (data) => data.items[0]?.linkedPrs[0]?.body?.includes('<!-- lar-stats-data ') === true);
   assert.deepEqual((await prCalls()).map((args) => args[2] === 'PATCH' ? 'PATCH' : 'read'), ['read', 'PATCH'],
     'refreshes during the edit started no second sync');
 });

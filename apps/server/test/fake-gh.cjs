@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Test-only GitHub transport. Never contacts GitHub.
 const fs = require('node:fs');
+const { dirname } = require('node:path');
 const args = process.argv.slice(2);
 const options = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
 options.delayedRepos ??= (options.repositories ?? ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec01/lar-factory']).filter((repo) => !(repo in (options.repoIssues ?? {})));
@@ -275,12 +276,19 @@ const main = async () => {
   if (args[0] === 'issue' && args[1] === 'close') return;
   // A PR read: options.liveBodies holds bodies edited since the board's read.
   if (args[0] === 'api' && /^repos\/[\w.-]+\/[\w.-]+\/pulls\/\d+$/.test(args[1])) {
+    if (options.prReadDelay) await new Promise((r) => setTimeout(r, options.prReadDelay));
     const url = `https://github.com/${args[1].slice('repos/'.length).replace('/pulls/', '/pull/')}`;
     const read = Object.values(options.repoIssues ?? {}).flat().flatMap((issue) => issue.closedByPullRequestsReferences?.nodes ?? []).find((pr) => pr.url === url);
     return output({ url, body: options.liveBodies?.[url] ?? read?.body ?? null });
   }
   if (args[0] === 'api' && args[2] === 'PATCH') {
-    if (options.prEditDelay) await new Promise((r) => setTimeout(r, options.prEditDelay));
+    if (options.prEditHold) await new Promise((resolve) => {
+      const ready = () => {
+        if (fs.existsSync(options.prEditHold)) { watcher.close(); resolve(); }
+      };
+      const watcher = fs.watch(dirname(options.prEditHold), ready);
+      ready();
+    });
     if (options.fail === 'pr-edit') {
       process.stderr.write('HTTP 502: Bad Gateway');
       process.exitCode = 1;

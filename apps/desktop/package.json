@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "pnpm --dir ../web run build && vp pack && node scripts/start-electron.mjs",
     "build": "pnpm --dir ../web run build && vp pack && node scripts/build-desktop-artifact.ts",
-    "test": "pnpm --dir ../web run build && vp test run",
+    "test": "{ test -f ../web/dist/index.html || pnpm --dir ../web run build; } && vp test run",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {

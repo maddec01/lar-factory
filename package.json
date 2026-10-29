@@ -7,7 +7,7 @@
   },
   "packageManager": "pnpm@12.14.0",
   "scripts": {
-    "test": "pnpm -r test",
+    "test": "pnpm -r --filter '!@lar-factory/desktop' test; s=$?; pnpm run test:desktop && exit $s",
     "test:shared": "pnpm --filter @lar-factory/shared test",
     "test:ui": "pnpm --filter @lar-factory/ui test",
     "test:server": "pnpm --filter @lar-factory/server test",

@@ -1,5 +1,6 @@
-// The line's dossiers: each open concept, and each open item with sub-issues on the board, shown whole: its header,
-// its map, its parts as a checklist or a map, and their rows. Ports the old Board view's concept block tests.
+// The line's dossiers: each open concept, and each open item with sub-issues on the board: its two header lines,
+// collapsed until opened, then what keeps the work moving, its parts as a Work map or a list, and their rows. Ports the old Board view's
+// concept block tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text } from '../../test/support.ts';
@@ -10,8 +11,14 @@ import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 const C200 = 'I_sample09';
 const C180 = 'I_sample23';
 const dossier = (id = C200) => $(`[data-dossier="${id}"]`)!;
-/** The header's four cells: title, track, agent and side. */
-const header = (id = C200) => [...dossier(id).firstElementChild!.children] as HTMLElement[];
+const header = (id = C200) => dossier(id).firstElementChild as HTMLElement;
+const line = (n: 1 | 2, id = C200) => header(id).querySelector<HTMLElement>(`[data-line="${n}"]`)!;
+/** Line 2's "what's next": the part that waits on you, the first part that can start, or the fallback. */
+const next = (id = C200) => header(id).querySelector<HTMLElement>('[data-next]')!;
+const chips = (id = C200) => [...header(id).querySelectorAll('[data-chip]')].map(text);
+const toggle = (id = C200) => header(id).querySelector<HTMLButtonElement>('[aria-expanded]')!;
+const OPEN_KEY = 'lar-board:dossier-open:';
+const VIEW_KEY = 'lar-board:dossier-view:';
 const step = (id: string, d = C200) => dossier(d).querySelector<HTMLElement>(`[data-part="${id}"]`)!;
 const phases = (d = C200) => [...dossier(d).querySelectorAll('[data-checklist] [data-phase]')];
 const progress = (d = C200) => [...dossier(d).querySelectorAll('[data-item]')].slice(1) as HTMLElement[];
@@ -42,7 +49,15 @@ const withDecision = (blockers?: Item['blockers']) => writable({ ...sample, item
 const receive = (data: BoardData) => settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(data));
 const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, title: `Thread ${id}`, state, updated: '2026-10-21T09:00:00.000Z' });
 
-beforeEach(() => localStorage.clear());
+/** Every sample dossier starts open on its parts list here, so the tests of a dossier's body see it; the collapsed
+ *  and Work map tests clear this. */
+beforeEach(() => {
+  localStorage.clear();
+  for (const id of [C200, C180, 'I_100', 'I_700']) {
+    localStorage.setItem(OPEN_KEY + id, '1');
+    localStorage.setItem(VIEW_KEY + id, 'list');
+  }
+});
 
 test('each open concept and item with sub-issues on the board is a dossier, in board order, between the Queue and the rest of the line', async () => {
   await mountPage();
@@ -51,60 +66,217 @@ test('each open concept and item with sub-issues on the board is a dossier, in b
   expect($$('[data-dossier]'), 'none without a concept or a parent').toEqual([]);
 });
 
-test('the header shows the kind, status, parts done and repositories, the title, its T3 threads and the agent total', async () => {
+test('a dossier starts collapsed to its two header lines, and the browser remembers it opened across a reload', async () => {
+  localStorage.clear();
   await mountPage();
-  const [title, track, agent, side] = header();
-  expect([...title!.children].map(text)).toEqual([
-    'ConceptShaping · 2/6 parts done · lar-server', '#200 lar cloud: website sign-in and relay', '4 T3 threads · 1 running · 1 need you',
-  ]);
-  expect(title!.className.split(' '), 'one column as wide as the cell, so the lines truncate at 840 px, not overflow').toContain('grid-cols-[minmax(0,1fr)]');
-  expect(track!.getAttribute('title')).toBe('Shaping');
-  expect([...agent!.children].map(text), "#200's parts' figures").toEqual(['1h 31m', '6.23M · $9.11']);
-  expect(text(side)).toBe('#202 waits on you');
-  expect(text(header(C180)[0]!.firstElementChild)).toBe('Coupled workIn progress · 2/2 parts done · lar-server + lar-apple');
-  expect([text(header(C180)[0]!.lastElementChild), text(header(C180)[3])]).toEqual(['3 T3 threads · 1 running · 0 need you', 'Nothing waits on you']);
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  expect([toggle().getAttribute('aria-expanded'), dossier().children.length, dossier().querySelector('[data-work-map]')]).toEqual(['false', 1, null]);
+  await press(line(2));
+  expect([toggle().getAttribute('aria-expanded'), localStorage.getItem(OPEN_KEY + C200)]).toEqual(['true', '1']);
+  expect(dossier().querySelector('[data-work-map]'), 'opened, it shows its body').not.toBeNull();
+  vi.resetModules();
+  await mountPage();
+  expect([toggle().getAttribute('aria-expanded'), toggle(C180).getAttribute('aria-expanded')], 'the others stay collapsed').toEqual(['true', 'false']);
+  await press(toggle());
+  expect([dossier().children.length, localStorage.getItem(OPEN_KEY + C200)]).toEqual([1, '0']);
 });
 
-test('the header opens the dossier\'s item, and its "waits on you" opens that part', async () => {
+test('only the title opens the item; anywhere else on the header but the chips opens or closes the dossier', async () => {
+  localStorage.clear();
   await mountPage();
-  await press(header()[3]!.querySelector('button')!);
-  expect(dialogTitle()).toBe('#202 Sign-in screen');
-  await press(dossier().firstElementChild!);
-  expect(dialogTitle()).toBe('#200 lar cloud: website sign-in and relay');
+  await press(header().querySelector('[data-title]')!);
+  expect([dialogTitle(), toggle().getAttribute('aria-expanded')]).toEqual(['#200 lar cloud: website sign-in and relay', 'false']);
+  await press($('[data-item-dialog] [aria-label="Close"]') ?? document.body);
+  for (const el of [line(1), line(2)]) {
+    const was = toggle().getAttribute('aria-expanded');
+    await press(el);
+    expect(toggle().getAttribute('aria-expanded'), el.outerHTML.slice(0, 40)).not.toBe(was);
+  }
+  const was = toggle().getAttribute('aria-expanded');
+  await press(header().querySelector('[data-chips]')!);
+  expect(toggle().getAttribute('aria-expanded'), 'a chip leaves it as it was').toBe(was);
+  await press(next().querySelector('button')!);
+  expect([dialogTitle(), toggle().getAttribute('aria-expanded')], 'its "waits on you" opens that part, not the dossier').toEqual(['#202 Sign-in screen', was]);
+});
+
+/** A pointer click (`detail` 1) or a key press's click (`detail` 0) on `el`. */
+const clickWith = (el: Element, detail: number) => settle(() => {
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail }));
+});
+/** Selects the text of `el`. */
+const select = (el: Element) => {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  window.getSelection()!.removeAllRanges();
+  window.getSelection()!.addRange(range);
+};
+
+test('letting go of a drag that selected text in the header leaves the dossier as it was', async () => {
+  localStorage.clear();
+  await mountPage();
+  select(line(2));
+  await clickWith(line(2), 1);
+  expect(toggle().getAttribute('aria-expanded')).toBe('false');
+  window.getSelection()!.removeAllRanges();
+  await clickWith(line(2), 1);
+  expect(toggle().getAttribute('aria-expanded')).toBe('true');
+});
+
+test('a selection elsewhere never stops the dossier toggling, nor does one in the header stop a key press on the chevron', async () => {
+  localStorage.clear();
+  await mountPage();
+  select(header(C180));
+  await clickWith(line(2), 1);
+  expect(toggle().getAttribute('aria-expanded'), 'a click, with text selected in another dossier').toBe('true');
+  select(line(2));
+  await clickWith(toggle(), 0);
+  expect(toggle().getAttribute('aria-expanded'), 'Enter or Space on Collapse, with text selected in the header').toBe('false');
+  window.getSelection()!.removeAllRanges();
+});
+
+test('line 1 holds the kind, the full title, its T3 threads, and chips that hide at zero', async () => {
+  await mountPage();
+  const title = header().querySelector('[data-title]')!;
+  expect([text(line(1).firstElementChild!.firstElementChild!.firstElementChild), text(title)]).toEqual(['Concept', '#200 lar cloud: website sign-in and relay']);
+  expect(title.className.split(' '), 'the title wraps, never truncates').not.toContain('truncate');
+  expect(text(header().querySelector('[data-threads]'))).toBe('4 T3 threads · 1 running · 1 awaiting your reply');
+  expect(chips(), 'parts in Needs you, open decisions and the fog left').toEqual(['1 need you', '2 decisions', '2 fog']);
+  expect([text(line(1, C180).firstElementChild!.firstElementChild!.firstElementChild), chips(C180)]).toEqual(['Coupled work', []]);
+  expect(text(header(C180).querySelector('[data-threads]')), 'a zero count is left out').toBe('3 T3 threads · 1 running');
+});
+
+test('line 1 stays one row: its threads and Azure fields give up their room to an ellipsis, the title keeps its own and the chips theirs', async () => {
+  await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
+  const [meta, chipsEl] = [...line(1).children] as HTMLElement[];
+  const classes = (el: Element) => el.className.split(' ');
+  expect(classes(meta!), 'nothing on line 1 wraps onto a row of its own').not.toContain('flex-wrap');
+  const [title, threads, azure] = [...meta!.children] as HTMLElement[];
+  expect(classes(title!), 'the badge and title shrink last').not.toContain('shrink-[1000]');
+  expect(header().querySelector('[data-title]')!.className.split(' '), 'the title is only as wide as its text').not.toContain('flex-1');
+  for (const el of [threads!, azure!]) {
+    expect(classes(el)).toEqual(expect.arrayContaining(['shrink-[1000]', 'truncate']));
+    expect(classes(el), 'a stub floor only from lg up, so a narrow line gives the title its room')
+      .toEqual(expect.arrayContaining(['min-w-0', 'lg:min-w-10']));
+    expect(classes(el)).not.toContain('min-w-10');
+  }
+  expect([threads!.title, azure!.querySelector('[data-azure]')!.getAttribute('title')], 'each keeps its full text in a tooltip')
+    .toEqual(['4 T3 threads · 1 running · 1 awaiting your reply', 'Feature · Active · Ana']);
+  expect(classes(chipsEl!)).toContain('shrink-0');
+});
+
+test('the blocked chip counts the blocked slices of unfinished parts', async () => {
+  const s13 = sample.items.find((i) => i.id === 'I_sample13')!;
+  await mountPage(withItem('I_sample13', { slices: s13.slices.map((x, n) => (n < 2 ? { ...x, progress: 'blocked' as const } : x)) }));
+  expect(chips()).toContain('2 blocked');
+});
+
+test("line 2 has the part bar, parts done, what's next and repositories in the same fixed columns in every dossier", async () => {
+  await mountPage();
+  const grid = (id: string) => line(2, id).className.split(' ').filter((c) => c.includes('grid-cols'));
+  expect(grid(C200)).toEqual(['grid-cols-[18rem_5.5rem_minmax(0,1fr)]', 'lg:grid-cols-[18rem_5.5rem_minmax(0,1fr)_9rem]']);
+  expect(grid(C180)).toEqual(grid(C200));
+  expect([...line(2).children].map(text)).toEqual(['', '2/6 parts', '#202 waits on you', 'lar-server']);
+  expect(line(2).querySelectorAll('[data-part-bar] li').length, 'a segment per part').toBe(6);
+  expect(next().querySelector('button span')!.className.split(' '), "what's next ends in an ellipsis").toContain('truncate');
+  expect(header().querySelector('[data-repos]')!.className.split(' '), 'repositories drop below 1024 px').toEqual(expect.arrayContaining(['hidden', 'lg:block']));
+  expect([text(line(2, C180).children[1]), text(next(C180)), text(header(C180).querySelector('[data-repos]'))]).toEqual(['2/2 parts', 'Nothing waits on you', 'lar-server + lar-apple']);
+  expect(next(C180).querySelector('span')!.title, 'its cut-off text reads in full in a tooltip').toBe('Nothing waits on you');
+});
+
+test('the header keeps the stage track, the agent total and the Azure fields', async () => {
+  await mountPage(withItem(C200, { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' } }));
+  const figures = header().querySelector('[data-figures]')!;
+  expect(figures.querySelector('ol')!.getAttribute('title')).toBe('Shaping');
+  expect([...figures.lastElementChild!.children].map(text), "#200's parts' figures").toEqual(['1h 31m', '6.23M · $9.11']);
+  expect(text(line(1).querySelector('[data-azure]'))).toBe('Feature · Active · Ana');
 });
 
 test('a concept keeps the provider counts when Reset hides an unfinished part', async () => {
   const data = withItem(C180, { subIssues: { total: 2, completed: 1 } });
   await mountPage({ ...data, repos: data.repos.filter((r) => r.repo !== 'maddec01/lar-apple'),
     items: data.items.filter((i) => i.repo !== 'maddec01/lar-apple') });
-  expect(text(header(C180)[0]!.firstElementChild)).toContain('1/2 parts done');
+  expect(text(line(2, C180).children[1])).toBe('1/2 parts');
   expect(text(dossier(C180))).toContain("1 part the board doesn't read");
-  expect(text(header(C180)[3])).not.toContain('Nothing waits on you');
-  await press(button(dossier(C180), 'Map'));
+  expect(text(next(C180))).not.toContain('Nothing waits on you');
+  await press(button(dossier(C180), 'Work map'));
   expect(text(dossier(C180))).toContain("1 part the board doesn't read");
 });
 
-test("the map shows the destination, decisions so far and open questions, each #n opening its item", async () => {
+test('an open dossier has no About section; what keeps the work moving is in labelled rows, each with its entries', async () => {
   await mountPage();
-  const about = dossier().querySelector('[data-about]')!;
-  expect([...about.children].slice(0, 3).map((s) => text(s.firstElementChild))).toEqual(['Destination', 'Decisions so far 3', 'Open questions 2']);
-  expect(text(about.querySelector('p'))).toMatch(/^Anyone with a lar server signs in on lar\.app/);
-  expect([...about.querySelectorAll('li')].map(text)[4]).toBe('What does the sign-in screen look like on the website and in the apps? (#202)');
-  await press(button(about, '#203'));
-  expect(dialogTitle()).toBe(`#203 ${sample.items.find((i) => i.number === 203)!.title}`);
-  expect(text(dossier(C180).querySelector('[data-about] > section:nth-child(3) p'))).toBe('No open questions recorded.');
+  expect(dossier().querySelector('[data-about]')).toBeNull();
+  expect(text(dossier())).not.toContain('Destination');
+  const rows = () => [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')];
+  expect(rows().map((r) => [r.dataset.attentionRow, text(r.firstElementChild)])).toEqual([
+    ['you', 'Needs you 1'], ['decisions', 'Open decisions 2'], ['waiting', 'Waiting 1'], ['fog', 'Fog 2'],
+  ]);
+  const entries = (key: string) => [...dossier().querySelector(`[data-attention-row="${key}"] dd`)!.children].map(text);
+  expect(entries('decisions')).toEqual(['#202 Sign-in screenprototype · Needs you', '#201 Relay: broker only or full TURN?grill · Shaping']);
+  expect(entries('waiting')).toEqual(['#140 Owner accountswaits on #202']);
+  expect(entries('fog'), "the map's fog questions").toEqual(c200.map!.fog);
+  await press(button(dossier().querySelector('[data-attention-row="you"]')!, '#202 Sign-in screen'));
+  expect(dialogTitle(), 'a part opens its item').toBe('#202 Sign-in screen');
+  await press($('[data-item-dialog] [aria-label="Close"]')!);
+  await press(button(dossier().querySelector('[data-attention-row="fog"]')!, '#201'));
+  expect(dialogTitle(), "a fog question's #n opens its item").toBe(`#201 ${sample.items.find((i) => i.number === 201)!.title}`);
+  expect(dossier(C180).querySelector('[data-attention]'), 'no rows when nothing has entries').toBeNull();
 });
 
-test("in the map, #n opens the issue in the concept's repository, and owner/repo#n the one in that repository", async () => {
-  const s10 = sample.items.find((i) => i.id === 'I_sample10')!;
-  const twin: Item = { ...s10, id: 'I_twin', repo: 'maddec01/lar-apple', url: 'https://github.com/maddec01/lar-apple/issues/201', title: 'Apple twin' };
-  const map = { ...c200.map!, decisions: [...c200.map!.decisions, 'The apps follow maddec01/lar-apple#201.'] };
-  await mountPage({ ...sample, items: [twin, ...sample.items.map((i) => (i.id === C200 ? { ...i, map } : i))] });
-  const about = dossier().querySelector('[data-about]')!;
-  await press(button(about, '#201'));
-  expect(dialogTitle()).toBe(`#201 ${s10.title}`);
-  await press(button(about, 'maddec01/lar-apple#201'));
-  expect(dialogTitle()).toBe('#201 Apple twin');
+test('parts in Verify or Ready to merge get their own row after Needs you, which with the chip counts only Needs you', async () => {
+  await mountPage(withItem('I_sample10', { status: 'Verify' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] })));
+  const rows = [...dossier().querySelectorAll<HTMLElement>('[data-attention-row]')].map((r) => text(r.firstElementChild));
+  expect(rows.slice(0, 2)).toEqual(['Needs you 1', 'To verify or merge 2']);
+  expect(chips()).toContain('1 need you');
+  const verify = dossier().querySelector('[data-attention-row="verify"]')!;
+  expect([...verify.lastElementChild!.children].map(text)).toEqual(['#140 Owner accountsReady to merge', '#201 Relay: broker only or full TURN?Verify']);
+  await press(button(verify, '#140 Owner accounts'));
+  expect(dialogTitle()).toBe('#140 Owner accounts');
+});
+
+test('blocked slices name the part they belong to and what they wait on', async () => {
+  const s13 = sample.items.find((i) => i.id === 'I_sample13')!;
+  await mountPage(withItem('I_sample13', { slices: s13.slices.map((x, n) => (n === 0 ? { ...x, progress: 'blocked' as const } : x)) }));
+  const blocked = dossier().querySelector('[data-attention-row="blocked"]')!;
+  expect([text(blocked.firstElementChild), [...blocked.lastElementChild!.children].map(text)])
+    .toEqual(['Blocked slices 1', [`#${s13.slices[0]!.number} ${s13.slices[0]!.title}slice of #140 · waits on a re-slice`]]);
+  await press(button(blocked, '#140'));
+  expect(dialogTitle()).toBe('#140 Owner accounts');
+});
+
+test('a part with nothing to wait on is ready to start, with its Start', async () => {
+  holdPosts(unblocked());
+  await mountPage(unblocked());
+  const ready = dossier().querySelector('[data-attention-row="ready"]')!;
+  expect([text(ready.firstElementChild), text(ready.querySelector('dd > div > span'))]).toEqual(['Ready to start 1', '#140 Owner accounts']);
+  expect(dossier().querySelector('[data-attention-row="waiting"]'), 'nothing waits').toBeNull();
+  await pressMenu(startIn(ready)!);
+  expect(dialogTitle(), 'Start opens its menu, not the dialog').toBe('');
+  await press(entries()[1]!);
+  expect(posted()).toEqual([['/api/start-build', { session: 's1', itemId: 'I_sample13', model: { instanceId: 'codex', model: 'gpt-5.5' } }]]);
+});
+
+test('the Ready to start row and the header agree on what can start: a Queued decision can, a part with a live thread or two statuses cannot', async () => {
+  const data = withItem('I_sample12', { status: 'Shaping' }, withDecision());
+  await mountPage(data);
+  const ready = () => dossier().querySelector('[data-attention-row="ready"]');
+  expect([text(ready()!.firstElementChild), text(startIn(next()))]).toEqual(['Ready to start 1', 'Start #204 ▾']);
+  await receive(withItem('I_d204', { threads: [thread('t1', 'running')] }, data));
+  expect([ready(), startIn(next())], 'a live thread').toEqual([null, null]);
+  await receive(withItem('I_d204', { statuses: ['Queued', 'Verify'] }, data));
+  expect([ready(), startIn(next())], 'two statuses').toEqual([null, null]);
+});
+
+test('a dossier opens on its Work map, and the browser remembers a switch to the parts list for that dossier alone', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  for (const id of [C200, C180]) localStorage.removeItem(VIEW_KEY + id);
+  await mountPage();
+  expect([button(dossier(), 'Work map').getAttribute('aria-pressed'), dossier().querySelector('[data-work-map]') !== null]).toEqual(['true', true]);
+  await press(button(dossier(), 'Parts list'));
+  expect([dossier().querySelector('[data-work-map]'), dossier().querySelector('[data-checklist]') !== null, localStorage.getItem(VIEW_KEY + C200)]).toEqual([null, true, 'list']);
+  vi.resetModules();
+  await mountPage();
+  expect(button(dossier(), 'Parts list').getAttribute('aria-pressed'), 'it stays on the parts list').toBe('true');
+  expect(button(dossier(C180), 'Work map').getAttribute('aria-pressed'), 'the other dossier stays on its Work map').toBe('true');
 });
 
 test('the checklist runs Decide, then Build per repository, then Check, the done parts folded', async () => {
@@ -168,13 +340,13 @@ test('a blocked build shows only Start after, a Start, in place of Start build',
   expect(startIn(step('I_sample13'))).toBeNull();
   const after = step('I_sample13').querySelector<HTMLElement>('[data-start-after]')!;
   expect([text(after), after.dataset.kind]).toEqual(['Start after #202 ▾', 'start']);
-  expect(text(header()[3]), 'the header offers no start while a part waits on you').toBe('#202 waits on you');
+  expect(text(next()), 'the header offers no start while a part waits on you').toBe('#202 waits on you');
 });
 
 test('once its blockers close, Start build sends the build, and the header offers it too', async () => {
   holdPosts(unblocked());
   await mountPage(withItem('I_sample12', { status: 'Shaping' }, unblocked()));
-  expect(text(startIn(header()[3]!))).toBe('Start #140 ▾');
+  expect(text(startIn(next()))).toBe('Start #140 ▾');
   await pressMenu(startIn(step('I_sample13'))!);
   expect(dialogTitle(), 'the menu opens without the dialog').toBe('');
   await press(entries()[1]!);
@@ -189,14 +361,14 @@ const twice = (data: BoardData = sample) => withItem('I_sample13', { statuses: [
 test('a part that carries two statuses offers no Start build in its step or the header', async () => {
   await mountPage(twice(withItem('I_sample12', { status: 'Shaping' }, unblocked())));
   expect(startIn(step('I_sample13'))).toBeNull();
-  expect(startIn(header()[3]!)).toBeNull();
+  expect(startIn(next())).toBeNull();
 });
 
 test('a blocked part that carries two statuses offers no Start after in its step or its map node', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage(twice());
   expect(step('I_sample13').querySelector('[data-start], [data-start-after]')).toBeNull();
-  await press(button(dossier(), 'Map'));
+  await press(button(dossier(), 'Work map'));
   expect(dossier().querySelector('[data-map-part="I_sample13"] :is([data-start], [data-start-after])')).toBeNull();
 });
 
@@ -227,14 +399,14 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
 test('in the map, a part waiting on something that is neither Ready nor Queued starts by itself after it', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage(withItem('I_sample10', { blockers: [{ number: 203, repo: 'maddec01/lar-server', state: 'open' }] }));
-  await press(button(dossier(), 'Map'));
+  await press(button(dossier(), 'Work map'));
   expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('starts by itself after #203');
 });
 
 test("in the map, a part waiting on another repository's issue names it without its owner", async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage(withItem('I_sample10', { blockers: [{ number: 12, repo: 'maddec01/lar-apple', state: 'open' }] }));
-  await press(button(dossier(), 'Map'));
+  await press(button(dossier(), 'Work map'));
   expect(text(dossier().querySelector('[data-map-part="I_sample10"]'))).toContain('starts by itself after lar-apple#12');
 });
 
@@ -245,10 +417,8 @@ test('Open thread takes Start\'s place while a part has a live thread', async ()
   expect(step('I_d204').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/t1');
 });
 
-test("the end-to-end check comes from the map: its title, numbered steps and waiting, with running it not built yet", async () => {
+test("the parts list ends on the map's end-to-end check, waiting, with running it not built yet", async () => {
   await mountPage();
-  const box = dossier().querySelector('[data-about] [data-check]')!;
-  expect([...box.children].map(text)).toEqual(['End-to-end check', 'Sign in on the website, then stream from a phone off Wi-Fiwaiting', 'Create an owner account on lar.appRegister a server with the accountOpen the app on cellular and play a 4K title']);
   const check = phases()[2]!;
   expect(text(check)).toContain('waitingwaits on #140Thread starts when #140 is done');
   for (const label of ['Run end-to-end', 'Watch run']) {
@@ -263,15 +433,14 @@ test('a map with no End-to-end check section has no Check phase, and its map say
   const { check: _, ...map } = c200.map!;
   await mountPage(withItem(C200, { map }));
   expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build lar-server']);
-  expect(dossier().querySelector('[data-check]')).toBeNull();
-  await press(button(dossier(), 'Map'));
+  await press(button(dossier(), 'Work map'));
   expect(text(dossier().querySelector('[data-work-map]'))).toContain('No end-to-end check written yet');
 });
 
 test('a Map lane named owner/name shows it once', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage({ ...sample, repos: [...sample.repos, { repo: 'fabrikam/lar-server', role: 'fork', labels: [] }] });
-  await press(button(dossier(), 'Map'));
+  await press(button(dossier(), 'Work map'));
   const lanes = [...dossier().querySelectorAll('[data-work-map] .sticky')];
   expect(lanes.map(text)).toEqual(['Decisionsgrill, prototype, research', 'maddec01/lar-server']);
 });
@@ -279,12 +448,11 @@ test('a Map lane named owner/name shows it once', async () => {
 test('the Map view draws a lane per repository and Decisions, its parts by wave, and arrows for what waits on what', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   await mountPage();
-  const toggle = button(dossier(), 'Map');
+  const toggle = button(dossier(), 'Work map');
   await press(toggle);
-  expect([toggle.getAttribute('aria-pressed'), button(dossier(), 'Checklist').getAttribute('aria-pressed')]).toEqual(['true', 'false']);
+  expect([toggle.getAttribute('aria-pressed'), button(dossier(), 'Parts list').getAttribute('aria-pressed')]).toEqual(['true', 'false']);
   const map = dossier().querySelector('[data-work-map]')!;
   expect(dossier().querySelector('[data-checklist]'), 'the map takes the checklist\'s place').toBeNull();
-  expect(dossier().querySelector('[data-about]'), 'the map\'s sections stay under it').not.toBeNull();
   expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research', 'lar-servermaddec01/lar-server']);
   const subtitle = map.querySelectorAll('.sticky')[1]!.lastElementChild!;
   expect([subtitle.className.split(' ').includes('truncate'), subtitle.getAttribute('title')], 'owner/name stays on one line').toEqual([true, 'maddec01/lar-server']);
@@ -302,7 +470,7 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   expect(dialogTitle()).toBe('#201 Relay: broker only or full TURN?');
 });
 
-test('an item with sub-issues on the board is coupled work; with no map, it says its parts come from its children', async () => {
+test('an item with sub-issues on the board is coupled work, its parts from its children', async () => {
   const parent = rawIssue('I_parent', 100, 'In progress', ['build'], {
     subIssuesSummary: { total: 3, completed: 0 },
     subIssues: { nodes: [sliceRef(101, 'OPEN'), sliceRef(102, 'OPEN'), sliceRef(103, 'OPEN')] },
@@ -311,9 +479,7 @@ test('an item with sub-issues on the board is coupled work; with no map, it says
     parent: { number: 100, title: 'Issue 100', url: 'https://github.com/maddec01/lar-factory/issues/100', state: 'OPEN', repository: { nameWithOwner: 'maddec01/lar-factory' } },
   });
   await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });
-  const d = dossier('I_100');
-  expect(text(header('I_100')[0]!.firstElementChild)).toBe('Coupled workIn progress · 0/2 parts done · lar-factory');
-  expect(text(d.querySelector('[data-checklist]')!.previousElementSibling)).toBe("No map yet. The parts come from the item's children.");
+  expect([text(line(1, 'I_100').firstElementChild!.firstElementChild!.firstElementChild), text(line(2, 'I_100'))]).toEqual(['Coupled work', '0/2 partsSome parts are outside the boardlar-factory']);
   expect(progress('I_100').map((r) => r.dataset.item), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
   expect(phases('I_100').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build lar-factory']);
   expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();
@@ -341,19 +507,8 @@ test('the checklist keeps a build before a research decision blocked by that bui
   expect([...dossier().querySelectorAll('[data-checklist] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([build.id, research.id]);
 });
 
-test('an unstructured concept says no map exists and makes no claim about decisions', async () => {
+test('a concept with no map has no fog row', async () => {
   const concept = rawIssue('I_concept', 700, 'Shaping', ['concept'], { body: 'A concept written as ordinary prose.' });
   await mountPage({ ...sample, items: normalizeItems([concept]) });
-  const about = dossier('I_700');
-  expect(text(about)).toContain('No map yet.');
-  expect(text(about)).not.toContain('Every decision is made');
-  expect(text(about)).not.toContain('Destination');
-});
-
-test('a partial map names missing destination and open questions without claiming decisions are complete', async () => {
-  await mountPage(withItem(C200, { map: { destination: '', decisions: ['Keep the existing API.'], fog: [] } }));
-  const about = dossier().querySelector('[data-about]')!;
-  expect(text(about)).toContain('No destination recorded.');
-  expect(text(about)).toContain('No open questions recorded.');
-  expect(text(about)).not.toContain('Every decision is made');
+  expect([dossier('I_700').querySelector('[data-attention]'), dossier('I_700').querySelector('[data-about]')]).toEqual([null, null]);
 });

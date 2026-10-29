@@ -217,6 +217,10 @@ export function saveResetting(repo: string, prUrl: string, dir = boardDataDir())
 /** The list's repositories on the board: neither still onboarding nor resetting. */
 export const onTheBoard = (list: readonly OnboardedRepository[]) => list.filter((e) => !e.onboarding && !e.resetting);
 
+/** The reset PRs still waiting to merge or close, including after a board restart. */
+export const stillResetting = (list: readonly OnboardedRepository[]) =>
+  list.flatMap(({ repo, resetting }) => resetting ? [{ repo, prUrl: resetting.prUrl }] : []);
+
 /** Writes repositories.json with `content` and returns its list. */
 function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {
   const file = join(dir, 'repositories.json');

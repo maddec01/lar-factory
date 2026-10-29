@@ -84,9 +84,9 @@ test("a Reset whose PR gh can't close keeps the confirmation open with gh's mess
 
 const ONBOARDED = sample.repos[0]!.repo;
 
-test('Reset of an onboarded repository says what its PR removes, what it drops and what it leaves, then posts it, drops the row and links the PR', async () => {
+test('Reset of an onboarded repository says what its PR removes, what it drops and what it leaves, then keeps its reset PR in Settings until the reset finishes', async () => {
   const resetPr = `https://github.com/${ONBOARDED}/pull/30`;
-  const sent = serve(sample, { body: { error: null, prUrl: resetPr, board: { ...sample, repos: sample.repos.slice(1) } } });
+  const sent = serve(sample, { body: { error: null, prUrl: resetPr, board: { ...sample, repos: sample.repos.slice(1), resetting: [{ repo: ONBOARDED, prUrl: resetPr }] } } });
   await openReset(sample, ONBOARDED);
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe(`Reset ${ONBOARDED}?`);
   expect([...dialog()!.querySelectorAll('#reset-detail li')].map(text)).toEqual([
@@ -99,9 +99,19 @@ test('Reset of an onboarded repository says what its PR removes, what it drops a
   await settle(() => vi.advanceTimersByTime(50));
   expect(sent).toEqual([{ repo: ONBOARDED }]);
   expect(dialog()).toBeNull();
-  expect(row(ONBOARDED)).toBeNull();
+  expect(text(row(ONBOARDED))).toContain('Resetting. Merge the PR to finish.');
+  expect(row(ONBOARDED)!.querySelector('a')!.textContent).toBe('Open PR');
+  expect(row(ONBOARDED)!.querySelector('a')!.getAttribute('href')).toBe(resetPr);
+  expect(row(ONBOARDED)!.querySelector('button')).toBeNull();
   expect(text(toast()!)).toContain(`Opened ${ONBOARDED}'s reset PR.`);
   expect(toast()!.querySelector('a')!.getAttribute('href')).toBe(resetPr);
+  await settle(() => vi.advanceTimersByTime(5_001));
+  expect(row(ONBOARDED)!.querySelector('a')!.getAttribute('href')).toBe(resetPr);
+  await settle(async () => {
+    const { useBoardStore } = await import('../board/board-store.ts');
+    useBoardStore.getState().receive({ ...sample, repos: sample.repos.slice(1), resetting: [] });
+  });
+  expect(row(ONBOARDED)).toBeNull();
 });
 
 test('Reset of an onboarded repository with an open Edit PR says it closes that PR first, and links it; one without says nothing of it', async () => {

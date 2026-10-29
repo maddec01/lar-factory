@@ -1,7 +1,7 @@
 // Reset in Settings › Repositories: the repository its confirmation names, and whether the server is resetting it,
 // closing an onboarding PR and dropping the entry of a repository still onboarding, or opening the reset PR of an
-// onboarded one. The confirmation closes once the board drops the repository, with a toast linking the reset PR it
-// opened, and stays open with gh's message when Reset fails.
+// onboarded one. The confirmation closes once the board hides its items, with a toast linking the reset PR it
+// opened. Settings keeps that PR until it resolves. A failed Reset stays open with gh's message.
 
 import { create } from 'zustand';
 import { shownRepo } from '@lar-factory/shared';

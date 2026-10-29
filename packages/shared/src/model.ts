@@ -413,6 +413,8 @@ export interface BoardData {
   itemSourceProblems?: ItemSourceProblem[];
   /** The repositories on this Mac's list that are still onboarding, in the list's order. Absent in sample mode. */
   onboarding?: OnboardingRepository[];
+  /** Repositories waiting for their reset PR to merge or close, kept in this Mac's list. */
+  resetting?: { repo: string; prUrl: string }[];
   /** A T3 project the board offers to onboard, as its repository has .lar-factory.json and isn't on the list. Absent in sample mode. */
   onboardingOffers?: OnboardingOffer[];
   refreshSeconds: number;

@@ -1,15 +1,15 @@
 // The line's dossiers: each open concept, and each open item with sub-issues on the board. A dossier starts collapsed
 // to its two header lines: its kind, title and chips (parts that need you, open decisions, blocked slices, fog), then
-// its part bar, parts done, what's next and repositories in columns that line up across every dossier. Opened, it
-// lists what keeps the work moving (parts that need you, parts to verify or merge, open decisions, blocked slices,
-// waiting parts, parts ready to start and the map's fog), then its Work map or its parts list, then each part's row
-// on the stage track, its done parts folded away. The browser remembers which dossiers are open and which view each
-// shows.
+// its part bar, parts done, what's next, agent figures and repositories in columns that line up across every dossier
+// and In flight row. Opened, it lists what keeps the work moving (parts that need you, parts to verify or merge, open
+// decisions, blocked slices, waiting parts, parts ready to start and the map's fog), then its Work map or its parts
+// list, then each part's row on the stage track, its done parts folded away. The browser remembers which dossiers are
+// open and which view each shows.
 
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Ban, Check, ChevronDown, ChevronRight, CircleHelp, FlaskConical, GitPullRequest, ListChecks, Map as MapIcon, MessagesSquare } from 'lucide-react';
-import { duration, formatTokens, formatUsd, itemTotal, kindOf, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
+import { duration, formatTokens, formatUsd, kindOf, plural, prLabel, ref, repoKey, repoName } from '@lar-factory/shared';
 import type { BoardData, Blocker, EndToEndCheck, Item, ItemThread } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -24,7 +24,8 @@ import { ItemStatusGlyph, STATUS_COLOR, StatusGlyph } from '../items/status-glyp
 import { DECISION_KINDS, THREAD_GLYPH, dossiersOf, isDone, openWaits, threadsOf } from './dossier-parts.ts';
 import type { Part } from './dossier-parts.ts';
 import { PartStart, startable } from './part-start.tsx';
-import { AgentCell, OnYourDesk, Row, StageHeader, stageOf, threadText, Track, YOURS, picked, statsOf } from './stage-track.tsx';
+import { HEAD_A1, LINE2_A1, Figures, figuresOf } from './columns.tsx';
+import { OnYourDesk, Row, StageHeader, stageOf, threadText, YOURS, picked, statsOf } from './stage-track.tsx';
 import { WorkMap } from './work-map.tsx';
 
 const NOT_BUILT = "isn't built yet: no workflow runs an end-to-end check";
@@ -289,69 +290,110 @@ function PartSide({ part, data }: { part: Part; data: BoardData }) {
   return <span>{threadText(item)}</span>;
 }
 
-/** The header's side: the part that waits on you, else the first part that can start, else that nothing waits on you. */
-function HeaderSide({ parts, data, missing }: { parts: Part[]; data: BoardData; missing: number }) {
-  const yours = parts.find((p) => YOURS.includes(p.item.status));
-  const first = parts.find((p) => !isDone(p.item) && startable(p));
-  const note = (text: string) => <span className="truncate" title={text}>{text}</span>;
-  if (yours) {
-    return (
-      <button type="button" onClick={(e) => { e.stopPropagation(); open(yours.item); }} title={`${ref(yours.item)} ${yours.item.title}`}
-        className="flex min-w-0 items-center gap-1 rounded px-1 text-(--warning-foreground) hover:bg-(--accent)">
-        <StatusGlyph status={yours.item.status} className="size-3 shrink-0" /><span className="truncate">{ref(yours.item)} waits on you</span>
-      </button>
-    );
-  }
-  if (first) return <span className="min-w-0" onClick={stop}><PartStart part={first} data={data} label={`Start ${ref(first.item)}`} /></span>;
-  return note(missing ? 'Some parts are outside the board' : 'Nothing waits on you');
+type Slice = Item['slices'][number];
+
+/** A dossier's reading for its header: parts done and counted, and the parts each chip and "what's next" name.
+ *  `needsYou` holds the parts in Needs you; `yours` adds those in Verify or Ready to merge. */
+interface Moving {
+  parts: Part[]; done: number; count: number;
+  needsYou: Part[]; yours: Part[]; decisions: Part[]; blockedSlices: { part: Part; slice: Slice }[];
+  ready: Part[]; active: Part[]; fog: string[];
+}
+
+function moving(parent: Item, parts: Part[]): Moving {
+  const ahead = parts.filter((p) => !isDone(p.item));
+  return {
+    parts,
+    done: Math.max(parent.subIssues.completed, parts.length - ahead.length),
+    count: Math.max(parent.subIssues.total, parts.length),
+    needsYou: ahead.filter((p) => p.item.status === 'Needs you'),
+    yours: ahead.filter((p) => YOURS.includes(p.item.status)),
+    decisions: ahead.filter((p) => DECISION_KINDS.includes(p.kind)),
+    blockedSlices: ahead.flatMap((part) => part.item.slices.filter((s) => s.progress === 'blocked').map((slice) => ({ part, slice }))),
+    ready: ahead.filter(startable),
+    active: ahead.filter((p) => ['Shaping', 'In progress', 'Review'].includes(p.item.status)),
+    fog: parent.map?.fog ?? [],
+  };
+}
+
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" aria-expanded={on} aria-label={on ? 'Collapse' : 'Expand'} onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      className="grid size-6 shrink-0 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground)">
+      {on ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+    </button>
+  );
+}
+
+const kindLabel = (parent: Item) => (kindOf(parent) === 'concept' ? 'Concept' : 'Coupled work');
+const repos = (m: Moving, data: BoardData) => [...new Set(m.parts.map((p) => repoName(repoKey(p.item), data.repos)))].join(' + ');
+
+/** Every part as a segment in its status colour, done first, so the bar fills left to right; a dashed one per part the board doesn't read. */
+function PartsBar({ m }: { m: Moving }) {
+  const order = [...m.parts].sort((a, b) => Number(isDone(b.item)) - Number(isDone(a.item)) || stageOf(b.item.status) - stageOf(a.item.status));
+  const unread = m.count - m.parts.length;
+  return (
+    <ol className="m-0 flex min-w-0 list-none gap-[2px] p-0" title={`${m.done}/${m.count} parts done`} data-part-bar>
+      {order.map((p) => (
+        <li key={p.item.id} title={`${ref(p.item)} ${p.item.title}: ${p.item.status}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${p.item.status === 'In progress' ? 'status-pulse' : ''}`}
+          style={{ background: isDone(p.item) ? 'var(--st-done)' : p.item.status === 'Queued' || p.item.status === 'List' ? 'var(--soft)' : STATUS_COLOR[p.item.status] }} />
+      ))}
+      {Array.from({ length: Math.max(0, unread) }, (_, n) => <li key={`u${n}`} className="h-1.5 min-w-[3px] flex-1 rounded-full border border-dashed border-(--input)" />)}
+    </ol>
+  );
+}
+
+/** The one thing to say next: what waits on you (a part in Needs you first), else what can start, else what's moving. */
+function nextOf(m: Moving): { tone: 'you' | 'start' | 'moving' | 'none'; part?: Part; text: string } {
+  const yours = m.needsYou[0] ?? m.yours[0];
+  if (yours) return { tone: 'you', part: yours, text: `${ref(yours.item)} ${yours.item.title}` };
+  if (m.ready[0]) return { tone: 'start', part: m.ready[0], text: `${ref(m.ready[0].item)} ${m.ready[0].item.title}` };
+  if (m.active[0]) return { tone: 'moving', part: m.active[0], text: `${ref(m.active[0].item)} ${m.active[0].item.title}` };
+  return { tone: 'none', text: m.count > m.parts.length ? 'Some parts are outside the board' : 'Nothing waits on you' };
 }
 
 /** Line 1's thread counts and Azure fields: they give up their room before the title does, ending in an ellipsis.
  *  Below `lg` they may shrink to nothing, so a narrow line's title keeps its room; their tooltips keep the text. */
 const META = 'min-w-0 lg:min-w-10 shrink-[1000] truncate';
 
-/** Line 2's columns, the same fixed widths in every dossier: part bar, parts done, what's next, and repositories,
- *  which drop below 1024 px. "What's next" takes the rest, so it shrinks first. */
-const LINE2 = 'grid grid-cols-[18rem_5.5rem_minmax(0,1fr)] items-center gap-x-4 lg:grid-cols-[18rem_5.5rem_minmax(0,1fr)_9rem]';
-
-/** Every part as a segment in its status colour, done first, so the bar fills left to right; a dashed one per part the board doesn't read. */
-function PartBar({ parts, count }: { parts: Part[]; count: number }) {
-  const order = [...parts].sort((a, b) => Number(isDone(b.item)) - Number(isDone(a.item)) || stageOf(b.item.status) - stageOf(a.item.status));
-  return (
-    <ol className="m-0 flex min-w-0 list-none gap-[2px] p-0" data-part-bar>
-      {order.map(({ item }) => (
-        <li key={item.id} title={`${ref(item)} ${item.title}: ${item.status}`} className={`h-1.5 min-w-[3px] flex-1 rounded-full ${item.status === 'In progress' ? 'status-pulse' : ''}`}
-          style={{ background: isDone(item) ? 'var(--st-done)' : item.status === 'Queued' || item.status === 'List' ? 'var(--soft)' : STATUS_COLOR[item.status] }} />
-      ))}
-      {Array.from({ length: Math.max(0, count - parts.length) }, (_, n) => <li key={n} className="h-1.5 min-w-[3px] flex-1 rounded-full border border-dashed border-(--input)" />)}
-    </ol>
-  );
-}
-
-/** The dossier's T3 threads, then how many run and how many wait for the user's reply, each left out at zero,
- *  so the threads' wording never contradicts the "need you" chip, which counts parts. */
+/** The dossier's T3 threads, then how many run and how many wait for the user's reply, each left out at zero (with no
+ *  threads, nothing), so the threads' wording never contradicts the "need you" chip, which counts parts. */
 function threadCounts(threads: ReturnType<typeof threadsOf>): string {
+  if (!threads.length) return '';
   const running = threads.filter((t) => t.state === 'running').length;
   const waiting = threads.filter((t) => t.state === 'needs you').length;
   return [plural(threads.length, 'T3 thread'), running && `${running} running`, waiting && `${waiting} awaiting your reply`].filter(Boolean).join(' · ');
 }
 
-/** A count chip, hidden at zero. */
-function Chip({ n, word, tone, icon }: { n: number; word: string; tone: 'warning' | 'danger' | 'neutral' | 'accent'; icon: ReactNode }) {
+/** A small count chip: `n` and its word, coloured by `tone`, hidden at zero. */
+function Count({ n, word, tone, icon }: { n: number; word: string; tone: 'warning' | 'danger' | 'neutral' | 'accent'; icon?: ReactNode }) {
   if (!n) return null;
-  return <Badge tone={tone} className="whitespace-nowrap tabular-nums" data-chip>{icon}{n} {word}</Badge>;
+  return <Badge tone={tone} className="tabular-nums whitespace-nowrap" data-chip>{icon}{n} {word}</Badge>;
 }
 
 /** What needs the user's eye: parts in Needs you, open decisions, blocked slices and the map's remaining fog. */
-function Chips({ parent, parts }: { parent: Item; parts: Part[] }) {
-  const ahead = parts.filter((p) => !isDone(p.item));
-  const decisions = ahead.filter((p) => DECISION_KINDS.includes(p.kind)).length;
+function Counts({ m }: { m: Moving }) {
   return <>
-    <Chip n={ahead.filter((p) => p.item.status === 'Needs you').length} word="need you" tone="warning" icon={<StatusGlyph status="Needs you" className="size-3" />} />
-    <Chip n={decisions} word={decisions === 1 ? 'decision' : 'decisions'} tone="accent" icon={<MessagesSquare />} />
-    <Chip n={ahead.flatMap((p) => p.item.slices).filter((x) => x.progress === 'blocked').length} word="blocked" tone="danger" icon={<Ban />} />
-    <Chip n={parent.map?.fog.length ?? 0} word="fog" tone="neutral" icon={<CircleHelp />} />
+    <Count n={m.needsYou.length} word="need you" tone="warning" icon={<StatusGlyph status="Needs you" className="size-3" />} />
+    <Count n={m.decisions.length} word={m.decisions.length === 1 ? 'decision' : 'decisions'} tone="accent" icon={<MessagesSquare />} />
+    <Count n={m.blockedSlices.length} word="blocked" tone="danger" icon={<Ban />} />
+    <Count n={m.fog.length} word="fog" tone="neutral" icon={<CircleHelp />} />
   </>;
+}
+
+/** Next, as a sentence with its Start. */
+function Next({ m, data }: { m: Moving; data: BoardData }) {
+  const n = nextOf(m);
+  // A part on your desk is named as its attention row names it: Needs you, or to verify or merge.
+  const yours = n.part?.item.status === 'Verify' ? 'To verify' : n.part?.item.status === 'Ready to merge' ? 'To merge' : 'Needs you';
+  const word = { you: yours, start: 'Next', moving: 'Moving', none: '' }[n.tone];
+  return (
+    <span className="flex min-w-0 items-center gap-2 text-[12px]">
+      {word && <span className={`shrink-0 font-medium ${n.tone === 'you' ? 'text-(--warning-foreground)' : 'text-(--muted-foreground)'}`}>{word}</span>}
+      <span className="min-w-0 truncate" title={n.text}>{n.text}</span>
+      {n.part && n.tone === 'start' && <span className="shrink-0" onClick={stop}><PartStart part={n.part} data={data} label="Start" /></span>}
+    </span>
+  );
 }
 
 /** A concept or coupled parent, in full: what keeps it moving, its parts as a Work map or a list, then their rows. */
@@ -387,49 +429,41 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
     return builds.some((b) => b.item.repo !== repo && b.waitsOn.some((w) => group.some((p) => p.item.repo === w.repo && p.item.number === w.number)))
       ? 'goes first' : 'runs in parallel';
   };
-  const names = [...new Set(items.map((i) => repoName(repoKey(i), data.repos)))];
+  const m = moving(parent, parts);
   const done = items.filter(isDone).length;
-  const count = Math.max(parent.subIssues.total, items.length);
+  const { count } = m;
   const missing = count - items.length;
-  const completed = Math.max(parent.subIssues.completed, done);
   const threads = [parent, ...items].flatMap(threadsOf);
-  const total = itemTotal(parent, data.items) ?? parent.stats;
   const rows = parts.filter((p) => showDone || !isDone(p.item));
   const check = parent.map?.check;
 
   return (
     <article className="overflow-hidden rounded-xl border border-(--border) bg-(--card)" data-dossier={parent.id}>
       {/* Only the title opens the item; anywhere else on the two lines but the chips opens or closes the dossier. */}
-      <div onClick={toggle} data-item={parent.id} data-open={on} className={`grid cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 px-2 py-2 hover:bg-(--accent) ${on ? 'border-b border-(--border)' : ''} ${picked(isPicked)}`}>
-        <button type="button" aria-expanded={on} aria-label={on ? 'Collapse' : 'Expand'}
-          className="grid size-6 place-items-center rounded-md text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground)">
-          {on ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-        </button>
-        <span className="flex min-w-0 items-start justify-between gap-x-2 pt-0.5" data-line="1">
+      <div onClick={toggle} data-item={parent.id} data-open={on} className={`${HEAD_A1} cursor-pointer rounded-xl hover:bg-(--accent) ${on ? 'rounded-b-none border-b border-(--border)' : ''} ${picked(isPicked)}`}>
+        <Toggle on={on} onToggle={() => setOpen(!on)} />
+        <span className="flex min-w-0 items-start justify-between gap-x-2 gap-y-1 pt-0.5" data-line="1">
           {/* One row: the threads and Azure fields shrink first, down to an ellipsis, so the title keeps its room. */}
           <span className="flex min-w-0 flex-1 items-baseline gap-x-2">
             {/* The badge and title stay together, so a long title wraps beside the badge instead of below it. */}
-            <span className="flex min-w-0 items-start gap-x-2">
-              <Badge tone="neutral" className="shrink-0">{kindOf(parent) === 'concept' ? 'Concept' : 'Coupled work'}</Badge>
-              <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} data-title
-                className="min-w-0 rounded text-left text-[14px] font-medium tracking-tight hover:underline"><ItemTitle item={parent} /></button>
+            <span className="flex min-w-0 items-start gap-2">
+              <Badge tone="neutral" className="mt-px shrink-0">{kindLabel(parent)}</Badge>
+              <button type="button" onClick={(e) => { e.stopPropagation(); open(parent); }} title={parent.title} data-title
+                className="min-w-0 rounded text-left text-[14px] font-medium hover:underline"><ItemTitle item={parent} /></button>
             </span>
-            <span className={`${META} text-[11px] text-(--muted-foreground)`} title={threadCounts(threads)} data-threads>
+            <span className={`${META} text-[11px] text-(--muted-foreground) empty:hidden`} title={threadCounts(threads) || undefined} data-threads>
               {threadCounts(threads)}
             </span>
             <span className={`${META} empty:hidden`}><AzureFields azure={parent.azure} /></span>
           </span>
-          <span onClick={(e) => e.stopPropagation()} className="flex shrink-0 gap-1" data-chips><Chips parent={parent} parts={parts} /></span>
+          <span onClick={stop} className="flex shrink-0 gap-1" data-chips><Counts m={m} /></span>
         </span>
-        <span className="row-span-2 grid w-[11rem] grid-cols-[minmax(0,1fr)] items-center gap-x-4 @2xl:w-[19rem] @2xl:grid-cols-[minmax(0,1fr)_6rem]" data-figures>
-          <Track status={parent.status} />
-          <AgentCell s={total && total !== 'unavailable' ? total : null} />
-        </span>
-        <span className={`col-start-2 ${LINE2} text-[11px] text-(--muted-foreground)`} data-line="2">
-          <PartBar parts={parts} count={count} />
-          <span className="tabular-nums">{completed}/{count} parts</span>
-          <span className="flex min-w-0 items-center" data-next><HeaderSide parts={parts} data={data} missing={missing} /></span>
-          <span className="hidden truncate text-right lg:block" title={names.join(' + ')} data-repos>{names.join(' + ')}</span>
+        <span className={`col-start-2 grid ${LINE2_A1} items-center gap-x-4`} data-line="2">
+          <span data-col="bar"><PartsBar m={m} /></span>
+          <span className="text-[11px] tabular-nums text-(--muted-foreground)">{m.done}/{m.count} parts</span>
+          <span data-col="next" className="min-w-0" data-next><Next m={m} data={data} /></span>
+          <span data-col="figures" className="grid min-w-0"><Figures s={figuresOf(parent, data, true)} /></span>
+          <span data-col="repos" className="hidden truncate text-right text-[11px] text-(--muted-foreground) lg:block" title={repos(m, data)}>{repos(m, data)}</span>
         </span>
       </div>
 
@@ -479,5 +513,7 @@ function Dossier({ parent, parts, data, now }: { parent: Item; parts: Part[]; da
 /** `items` are the line's items in the main area's scope. */
 export function Dossiers({ items }: { items: Item[] }) {
   const { data, now } = useBoardStore();
-  return dossiersOf(items, data.items).map(({ parent, parts }) => <Dossier key={parent.id} parent={parent} parts={parts} data={data} now={now} />);
+  const dossiers = dossiersOf(items, data.items);
+  if (!dossiers.length) return null;
+  return <div className="grid gap-2" data-dossiers>{dossiers.map(({ parent, parts }) => <Dossier key={parent.id} parent={parent} parts={parts} data={data} now={now} />)}</div>;
 }

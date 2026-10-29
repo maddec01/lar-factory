@@ -52,7 +52,7 @@ export function OnYourDesk({ status }: { status: Status }) {
 export const statsOf = (item: Item): ItemStats | null => (item.stats && item.stats !== 'unavailable' ? item.stats : null);
 
 /** Agent time over tokens and cost; a dash before any thread has worked on it. */
-export function AgentCell({ s }: { s: ItemStats | null }) {
+function AgentCell({ s }: { s: ItemStats | null }) {
   if (!s) return <span className={`${AGENT} text-right text-[11px] text-(--muted-foreground)`}>Unavailable</span>;
   return (
     <span className={`${AGENT} text-right text-[11px] leading-tight tabular-nums text-(--muted-foreground)`} title={s.frozen ? 'As it stood at merge' : 'Agent time · tokens · cost'}>
@@ -63,7 +63,7 @@ export function AgentCell({ s }: { s: ItemStats | null }) {
 }
 
 /** Six stage cells: the stages behind filled, the current one coloured up to its glyph, the rest faint. */
-export function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
+function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
   const at = stageOf(status);
   return (
     <ol className="m-0 grid list-none grid-cols-6 gap-px p-0" title={`${status}${waiting ? ', waiting' : ''}`}>

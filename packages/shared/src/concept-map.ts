@@ -19,7 +19,11 @@ function sections(body: string): Map<string, string[]> {
 
 const matches = (lines: string[], pattern: RegExp) => lines.flatMap((line) => pattern.exec(line)?.[1]?.trim() || []);
 
-const bullets = (lines: string[] = []) => matches(lines, /^[-*]\s+(.+)$/);
+/** A bullet that only says there is nothing, such as "none", "None." or "_none_". */
+const NONE = /^[\W_]*none[\W_]*$/i;
+
+/** A section's bullets, leaving out a placeholder "none". */
+const bullets = (lines: string[] = []) => matches(lines, /^[-*]\s+(.+)$/).filter((b) => !NONE.test(b));
 
 const STEP = /^\d+[.)]\s+(.+)$/;
 

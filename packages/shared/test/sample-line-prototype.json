@@ -1,0 +1,3368 @@
+{
+  "repos": [
+    {
+      "repo": "maddec01/lar-server",
+      "path": "~/test/lar-server",
+      "role": "Backend API server",
+      "labels": [
+        "area: server",
+        "area: web"
+      ],
+      "items": "issues"
+    },
+    {
+      "repo": "maddec01/lar-apple",
+      "path": "~/test/lar-apple",
+      "role": "Apple client app",
+      "labels": [
+        "app: music",
+        "app: video",
+        "app: photos",
+        "app: books",
+        "os: ios",
+        "os: macos",
+        "os: tvos",
+        "os: watchos"
+      ],
+      "items": "issues"
+    }
+  ],
+  "refreshSeconds": 45,
+  "fetchedAt": "2026-10-21T09:40:00.000Z",
+  "error": "gh api graphql failed: error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com",
+  "firstRead": {
+    "step": "finishing",
+    "running": [],
+    "settled": true
+  },
+  "modelChoices": [],
+  "t3EnvironmentId": "sample-environment",
+  "items": [
+    {
+      "id": "I_sample01",
+      "status": "List",
+      "statuses": [
+        "List"
+      ],
+      "content": "ticket",
+      "number": 61,
+      "title": "Arr instances, catalog bindings and content requests",
+      "url": "https://github.com/maddec01/lar-server/issues/61",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "feature",
+        "area: server",
+        "area: web"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T08:09:14Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_sample02",
+      "status": "List",
+      "statuses": [
+        "List"
+      ],
+      "content": "ticket",
+      "number": 114,
+      "title": "Verify VideoToolbox 8-bit HEVC decoding during hardware detection",
+      "url": "https://github.com/maddec01/lar-server/issues/114",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "bug",
+        "area: server"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T08:09:19Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_sample03",
+      "status": "List",
+      "statuses": [
+        "List"
+      ],
+      "content": "ticket",
+      "number": 12,
+      "title": "Remember the last subtitle language per show",
+      "url": "https://github.com/maddec01/lar-apple/issues/12",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "feature",
+        "app: music",
+        "os: ios",
+        "os: macos"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-20T15:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_sample04",
+      "status": "List",
+      "statuses": [
+        "List"
+      ],
+      "content": "ticket",
+      "number": 900004,
+      "title": "Shared playback history across devices",
+      "url": "https://github.com/maddec01/lar-server/issues/900004",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-19T10:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_sample05",
+      "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
+      "content": "ticket",
+      "number": 129,
+      "title": "Run more than one 4K HDR to 1080p stream at a time",
+      "url": "https://github.com/maddec01/lar-server/issues/129",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T07:30:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_sample06",
+      "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
+      "content": "ticket",
+      "number": 20,
+      "title": "Player controls stay visible after scrubbing <on tvOS>",
+      "url": "https://github.com/maddec01/lar-apple/issues/20",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "bug"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T06:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_sample21",
+      "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
+      "content": "ticket",
+      "number": 900021,
+      "title": "Offline downloads on watchOS",
+      "url": "https://github.com/maddec01/lar-server/issues/900021",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-20T10:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_sample07",
+      "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
+      "content": "ticket",
+      "number": 130,
+      "title": "Show cold bitmap subtitles within 3 s before preparation finishes",
+      "url": "https://github.com/maddec01/lar-server/issues/130",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "bug"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:10:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "stats": {
+        "agentMs": 1140000,
+        "wallMs": 720000,
+        "tokens": 1204000,
+        "costUsd": 1.92
+      },
+      "threads": [
+        {
+          "id": "sample-thread-130",
+          "title": "Shape: cold bitmap subtitles within 3 s",
+          "state": "running",
+          "updated": "2026-10-21T09:10:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample08",
+      "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
+      "content": "ticket",
+      "number": 22,
+      "title": "Continue watching row on the home screen",
+      "url": "https://github.com/maddec01/lar-apple/issues/22",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "feature"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 9,
+        "title": "Home screen refresh",
+        "url": "https://github.com/maddec01/lar-apple/issues/9",
+        "repo": "maddec01/lar-apple",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "stats": {
+        "agentMs": 2280000,
+        "wallMs": 1380000,
+        "tokens": 2501400,
+        "costUsd": 3.87
+      },
+      "threads": [
+        {
+          "id": "sample-thread-22",
+          "title": "Shape: continue watching row",
+          "state": "running",
+          "updated": "2026-10-21T09:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample09",
+      "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
+      "content": "ticket",
+      "number": 200,
+      "title": "lar cloud: website sign-in and relay",
+      "url": "https://github.com/maddec01/lar-server/issues/200",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "concept"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 6,
+        "completed": 2
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T08:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "map": {
+        "destination": "Anyone with a lar server signs in on lar.app with an owner account and streams their library away from home through a relay, with no port forwarding. The server registers with the cloud once; clients find it by account.",
+        "decisions": [
+          "Owner accounts live in the cloud, not on each server (#203 research).",
+          "Hosting the relay costs about $40 a month for the first 500 owners (#203).",
+          "Sign-in uses passkeys first, email links as fallback."
+        ],
+        "fog": [
+          "Does the relay only broker connections, or carry the stream too (full TURN)? (#201)",
+          "What does the sign-in screen look like on the website and in the apps? (#202)"
+        ],
+        "check": {
+          "title": "Sign in on the website, then stream from a phone off Wi-Fi",
+          "steps": [
+            "Create an owner account on lar.app",
+            "Register a server with the account",
+            "Open the app on cellular and play a 4K title"
+          ]
+        }
+      }
+    },
+    {
+      "id": "I_sample10",
+      "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
+      "content": "ticket",
+      "number": 201,
+      "title": "Relay: broker only or full TURN?",
+      "url": "https://github.com/maddec01/lar-server/issues/201",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-grill"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 200,
+        "title": "lar cloud: website sign-in and relay",
+        "url": "https://github.com/maddec01/lar-server/issues/200",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 203,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-21T09:20:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "sample-thread-201",
+          "title": "Grill: relay broker only or full TURN",
+          "state": "running",
+          "updated": "2026-10-24T08:40:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1680000,
+        "wallMs": 960000,
+        "tokens": 1870000,
+        "costUsd": 2.71
+      }
+    },
+    {
+      "id": "I_sample11",
+      "status": "Needs you",
+      "statuses": [
+        "Needs you"
+      ],
+      "content": "ticket",
+      "number": 23,
+      "title": "Faster library sync on large collections",
+      "url": "https://github.com/maddec01/lar-apple/issues/23",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "improvement"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 9,
+        "title": "Home screen refresh",
+        "url": "https://github.com/maddec01/lar-apple/issues/9",
+        "repo": "maddec01/lar-apple",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:30:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "stats": {
+        "agentMs": 3120000,
+        "wallMs": 1860000,
+        "tokens": 3150800,
+        "costUsd": 0.62
+      }
+    },
+    {
+      "id": "I_sample12",
+      "status": "Needs you",
+      "statuses": [
+        "Needs you"
+      ],
+      "content": "ticket",
+      "number": 202,
+      "title": "Sign-in screen",
+      "url": "https://github.com/maddec01/lar-server/issues/202",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-prototype"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 200,
+        "title": "lar cloud: website sign-in and relay",
+        "url": "https://github.com/maddec01/lar-server/issues/200",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:25:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "sample-thread-202",
+          "title": "Prototype: sign-in screen",
+          "state": "needs you",
+          "updated": "2026-10-21T16:20:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 2460000,
+        "wallMs": 1500000,
+        "tokens": 2950000,
+        "costUsd": 4.35
+      }
+    },
+    {
+      "id": "I_sample13",
+      "status": "Ready",
+      "statuses": [
+        "Ready"
+      ],
+      "content": "ticket",
+      "number": 140,
+      "title": "Owner accounts",
+      "url": "https://github.com/maddec01/lar-server/issues/140",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 200,
+        "title": "lar cloud: website sign-in and relay",
+        "url": "https://github.com/maddec01/lar-server/issues/200",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 202,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-21T08:30:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 144,
+          "title": "Owner table and sign-up",
+          "url": "https://github.com/maddec01/lar-server/issues/144",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 145,
+          "title": "Sign-in sessions",
+          "url": "https://github.com/maddec01/lar-server/issues/145",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "active"
+        },
+        {
+          "number": 146,
+          "title": "Owner settings page",
+          "url": "https://github.com/maddec01/lar-server/issues/146",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        }
+      ],
+      "threads": [
+        {
+          "id": "sample-thread-140",
+          "title": "Shape: owner accounts",
+          "state": "done",
+          "updated": "2026-10-21T08:30:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample22",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 150,
+      "title": "Relay for streaming away from home",
+      "url": "https://github.com/maddec01/lar-server/issues/150",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "feature",
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:40:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 160,
+          "title": "Relay protocol framing",
+          "url": "https://github.com/maddec01/lar-server/issues/160",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 161,
+          "title": "Relay auth handshake",
+          "url": "https://github.com/maddec01/lar-server/issues/161",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 162,
+          "title": "Session keys rotation",
+          "url": "https://github.com/maddec01/lar-server/issues/162",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 163,
+          "title": "Device pairing codes",
+          "url": "https://github.com/maddec01/lar-server/issues/163",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 164,
+          "title": "Pairing screen on Apple TV",
+          "url": "https://github.com/maddec01/lar-server/issues/164",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 165,
+          "title": "Relay health endpoint",
+          "url": "https://github.com/maddec01/lar-server/issues/165",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "active"
+        },
+        {
+          "number": 166,
+          "title": "Reconnect with backoff",
+          "url": "https://github.com/maddec01/lar-server/issues/166",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "active"
+        },
+        {
+          "number": 167,
+          "title": "Bandwidth probe before streaming",
+          "url": "https://github.com/maddec01/lar-server/issues/167",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "blocked"
+        },
+        {
+          "number": 168,
+          "title": "Fallback to direct connection",
+          "url": "https://github.com/maddec01/lar-server/issues/168",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 169,
+          "title": "Relay metrics dashboard",
+          "url": "https://github.com/maddec01/lar-server/issues/169",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 170,
+          "title": "Rate limits per owner",
+          "url": "https://github.com/maddec01/lar-server/issues/170",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 171,
+          "title": "Abuse report endpoint",
+          "url": "https://github.com/maddec01/lar-server/issues/171",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 172,
+          "title": "Relay load test",
+          "url": "https://github.com/maddec01/lar-server/issues/172",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 173,
+          "title": "Docs for self-hosting the relay",
+          "url": "https://github.com/maddec01/lar-server/issues/173",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        }
+      ],
+      "stats": {
+        "agentMs": 19800000,
+        "wallMs": 11400000,
+        "tokens": 31400000,
+        "costUsd": 46.9
+      },
+      "threads": [
+        {
+          "id": "sample-thread-150",
+          "title": "Build: relay for streaming away from home",
+          "state": "running",
+          "updated": "2026-10-21T09:40:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample14",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 30,
+      "title": "Chapter markers in the scrubber",
+      "url": "https://github.com/maddec01/lar-apple/issues/30",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "feature"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:35:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 33,
+          "url": "https://github.com/maddec01/lar-apple/pull/33",
+          "state": "open",
+          "isDraft": true,
+          "checks": {
+            "passed": 1,
+            "failed": 0,
+            "running": 2,
+            "total": 3,
+            "since": "2026-10-21T09:52:00Z"
+          },
+          "mergeState": "checking"
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 8040000,
+        "wallMs": 4800000,
+        "tokens": 16632500,
+        "costUsd": 24.18
+      },
+      "threads": [
+        {
+          "id": "sample-thread-30",
+          "title": "Build: chapter markers in the scrubber",
+          "state": "running",
+          "updated": "2026-10-21T09:35:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample23",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 180,
+      "title": "Resume playback across devices",
+      "url": "https://github.com/maddec01/lar-server/issues/180",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "feature"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 2,
+        "completed": 2
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-20T14:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 41,
+          "url": "https://github.com/maddec01/lar-apple/pull/41",
+          "state": "merged",
+          "isDraft": false,
+          "mergedAt": "2026-10-20T14:00:00Z",
+          "checks": {
+            "passed": 2,
+            "failed": 0,
+            "running": 0,
+            "total": 2,
+            "since": "2026-10-20T13:00:00Z"
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [],
+      "map": {
+        "destination": "Stop watching on one device and resume on another at the same second. The server stores each position per device and profile; the Apple apps read it on open.",
+        "decisions": [
+          "Positions are stored per profile, not per device (#181).",
+          "Apps poll on foreground; no push for now."
+        ],
+        "fog": [],
+        "check": {
+          "title": "Pause on iPhone, resume on Apple TV",
+          "steps": [
+            "Play a title on iPhone, pause at 12:34",
+            "Open the same title on Apple TV",
+            "Playback starts within a second of 12:34"
+          ]
+        }
+      },
+      "stats": {
+        "agentMs": 2700000,
+        "wallMs": 1800000,
+        "tokens": 3120000,
+        "costUsd": 6.4
+      },
+      "threads": [
+        {
+          "id": "sample-thread-180",
+          "title": "End-to-end: resume across devices",
+          "state": "running",
+          "updated": "2026-10-24T07:55:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample15",
+      "status": "Review",
+      "statuses": [
+        "Review"
+      ],
+      "content": "ticket",
+      "number": 141,
+      "title": "Transcoder leaks a file handle on cancel",
+      "url": "https://github.com/maddec01/lar-server/issues/141",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "bug"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:05:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 190,
+          "url": "https://github.com/maddec01/lar-server/pull/190",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "passed": 3,
+            "failed": 0,
+            "running": 2,
+            "total": 5,
+            "since": "2026-10-21T09:18:00Z"
+          },
+          "mergeState": "checking"
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 3900000,
+        "wallMs": 2340000,
+        "tokens": 7414800,
+        "costUsd": 11.05
+      },
+      "threads": [
+        {
+          "id": "sample-thread-141",
+          "title": "Build: transcoder file handle leak on cancel",
+          "state": "running",
+          "updated": "2026-10-21T09:05:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample16",
+      "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
+      "content": "ticket",
+      "number": 31,
+      "title": "New artwork grid layout",
+      "url": "https://github.com/maddec01/lar-apple/issues/31",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "feature"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T08:45:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 32,
+          "url": "https://github.com/maddec01/lar-apple/pull/32",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "passed": 1,
+            "failed": 0,
+            "running": 0,
+            "total": 1,
+            "since": "2026-10-21T08:40:00Z"
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [],
+      "stats": "unavailable"
+    },
+    {
+      "id": "I_sample26",
+      "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
+      "content": "ticket",
+      "number": 900026,
+      "title": "Bump FFmpeg to 7.1",
+      "url": "https://github.com/maddec01/lar-server/issues/900026",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T09:20:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 210,
+          "url": "https://github.com/maddec01/lar-server/pull/210",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "passed": 4,
+            "failed": 0,
+            "running": 2,
+            "total": 6,
+            "since": "2026-10-21T09:15:00Z"
+          },
+          "mergeState": "checking"
+        }
+      ],
+      "slices": []
+    },
+    {
+      "id": "I_sample27",
+      "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
+      "content": "ticket",
+      "number": 34,
+      "title": "Swipe between episodes",
+      "url": "https://github.com/maddec01/lar-apple/issues/34",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "feature"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T07:50:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 35,
+          "url": "https://github.com/maddec01/lar-apple/pull/35",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "passed": 3,
+            "failed": 1,
+            "running": 0,
+            "total": 4,
+            "since": "2026-10-21T07:30:00Z"
+          },
+          "mergeState": "blocked"
+        }
+      ],
+      "slices": []
+    },
+    {
+      "id": "I_sample28",
+      "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
+      "content": "ticket",
+      "number": 147,
+      "title": "Fall back to software transcoding when the GPU is busy",
+      "url": "https://github.com/maddec01/lar-server/issues/147",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T06:30:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 148,
+          "url": "https://github.com/maddec01/lar-server/pull/148",
+          "state": "open",
+          "isDraft": false,
+          "checks": null,
+          "mergeState": "conflicts"
+        }
+      ],
+      "slices": []
+    },
+    {
+      "id": "I_sample17",
+      "status": "Ready to merge",
+      "statuses": [
+        "Ready to merge"
+      ],
+      "content": "ticket",
+      "number": 142,
+      "title": "Cache probe results between restarts",
+      "url": "https://github.com/maddec01/lar-server/issues/142",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-21T08:50:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 151,
+          "url": "https://github.com/maddec01/lar-server/pull/151",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "passed": 4,
+            "failed": 1,
+            "running": 0,
+            "total": 5,
+            "since": "2026-10-21T08:30:00Z"
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 2820000,
+        "wallMs": 1680000,
+        "tokens": 4089500
+      }
+    },
+    {
+      "id": "I_sample18",
+      "status": "Done",
+      "statuses": [],
+      "content": "ticket",
+      "number": 203,
+      "title": "Hosting cost of the relay",
+      "url": "https://github.com/maddec01/lar-server/issues/203",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-research"
+      ],
+      "state": "closed",
+      "closedAs": "done",
+      "parent": {
+        "number": 200,
+        "title": "lar cloud: website sign-in and relay",
+        "url": "https://github.com/maddec01/lar-server/issues/200",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-19T12:00:00Z",
+      "closedAt": "2026-10-19T12:00:00Z",
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "sample-thread-203",
+          "title": "Research: hosting cost of the relay",
+          "state": "done",
+          "updated": "2026-10-19T10:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1320000,
+        "wallMs": 900000,
+        "tokens": 1410000,
+        "costUsd": 2.05
+      }
+    },
+    {
+      "id": "I_sample19",
+      "status": "Done",
+      "statuses": [],
+      "content": "ticket",
+      "number": 5,
+      "title": "Crash when a server goes offline mid-playback",
+      "url": "https://github.com/maddec01/lar-apple/issues/5",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "bug",
+        "os: watchos"
+      ],
+      "state": "closed",
+      "closedAs": "done",
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-20T16:00:00Z",
+      "closedAt": "2026-10-20T16:00:00Z",
+      "linkedPrs": [
+        {
+          "number": 6,
+          "url": "https://github.com/maddec01/lar-apple/pull/6",
+          "state": "merged",
+          "isDraft": false,
+          "checks": {
+            "passed": 1,
+            "failed": 0,
+            "running": 0,
+            "total": 1,
+            "since": "2026-10-20T15:00:00Z"
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 13260000,
+        "tokens": 27264400,
+        "costUsd": 41.2
+      }
+    },
+    {
+      "id": "I_sample24",
+      "status": "Done",
+      "statuses": [],
+      "content": "ticket",
+      "number": 181,
+      "title": "Store the playback position per device",
+      "url": "https://github.com/maddec01/lar-server/issues/181",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "closed",
+      "closedAs": "done",
+      "parent": {
+        "number": 180,
+        "title": "Resume playback across devices",
+        "url": "https://github.com/maddec01/lar-server/issues/180",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-18T11:00:00Z",
+      "closedAt": "2026-10-18T11:00:00Z",
+      "linkedPrs": [
+        {
+          "number": 182,
+          "url": "https://github.com/maddec01/lar-server/pull/182",
+          "state": "merged",
+          "isDraft": false,
+          "mergedAt": "2026-10-18T11:00:00Z",
+          "checks": {
+            "passed": 2,
+            "failed": 0,
+            "running": 0,
+            "total": 2,
+            "since": "2026-10-18T10:00:00Z"
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 7200000,
+        "wallMs": 3600000,
+        "tokens": 9800000,
+        "costUsd": 18,
+        "frozen": true
+      },
+      "threads": [
+        {
+          "id": "sample-thread-181",
+          "title": "Build: store the playback position per device",
+          "state": "done",
+          "updated": "2026-10-18T11:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample25",
+      "status": "Done",
+      "statuses": [],
+      "content": "ticket",
+      "number": 40,
+      "title": "Resume from the stored position",
+      "url": "https://github.com/maddec01/lar-apple/issues/40",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "closed",
+      "closedAs": "done",
+      "parent": {
+        "number": 180,
+        "title": "Resume playback across devices",
+        "url": "https://github.com/maddec01/lar-server/issues/180",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 181,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-20T14:00:00Z",
+      "closedAt": "2026-10-20T14:00:00Z",
+      "linkedPrs": [
+        {
+          "number": 41,
+          "url": "https://github.com/maddec01/lar-apple/pull/41",
+          "state": "merged",
+          "isDraft": false,
+          "mergedAt": "2026-10-20T14:00:00Z",
+          "checks": {
+            "passed": 2,
+            "failed": 0,
+            "running": 0,
+            "total": 2,
+            "since": "2026-10-20T13:00:00Z"
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [],
+      "stats": {
+        "agentMs": 10800000,
+        "wallMs": 5400000,
+        "tokens": 14200000,
+        "costUsd": 27,
+        "frozen": true
+      },
+      "threads": [
+        {
+          "id": "sample-thread-40",
+          "title": "Build: resume from the stored position",
+          "state": "done",
+          "updated": "2026-10-20T14:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_sample20",
+      "status": "Done",
+      "statuses": [],
+      "content": "ticket",
+      "number": 100,
+      "title": "Old cleanup task",
+      "url": "https://github.com/maddec01/lar-server/issues/100",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement"
+      ],
+      "state": "closed",
+      "closedAs": "done",
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-09-30T10:00:00Z",
+      "closedAt": "2026-09-30T10:00:00Z",
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_proto001",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 300,
+      "title": "Music app: library, playback, offline and lyrics on every Apple device",
+      "url": "https://github.com/maddec01/lar-server/issues/300",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "concept"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 29,
+        "completed": 9
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-300",
+          "title": "Map: music app",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 18600000,
+        "wallMs": 27900000,
+        "tokens": 41000000,
+        "costUsd": 61.2
+      },
+      "map": {
+        "destination": "Anyone with a lar server opens the Music app on iPhone, iPad, Mac, Apple TV or Apple Watch, browses their whole library by artist, album and playlist, plays it gapless with lyrics, and takes it offline.",
+        "decisions": [
+          "Music lives in its own library type, not a video library with audio files (#301).",
+          "Album artist wins over track artist for grouping (#301).",
+          "Gapless playback uses the server's pre-joined FLAC streams (#302).",
+          "Offline downloads keep the original codec up to 24/96 (#303).",
+          "Lyrics come from embedded tags first, then LRCLIB (#304).",
+          "No scrobbling in the first release (#301).",
+          "The queue syncs across devices through the playback-state API (#305).",
+          "ReplayGain is applied on the client, not baked into streams (#302).",
+          "Artwork falls back to the folder image, then MusicBrainz (#306).",
+          "Smart playlists stay server-side (#305).",
+          "The mini player docks above the tab bar on iOS (#307).",
+          "watchOS plays downloads only, no streaming (#303).",
+          "Search covers artists, albums, tracks and lyrics (#304).",
+          "Sorting ignores a leading \"The\" (#301).",
+          "Multi-disc albums show one track list with disc headers (#306).",
+          "CarPlay is a separate concept (#307).",
+          "The library scan runs incrementally on file change events (#308).",
+          "Unknown genres fold into \"Other\" (#306).",
+          "Downloads cap at 20 GB by default, set per device (#303).",
+          "Album pages show credits under the track list (#306)."
+        ],
+        "fog": [
+          "Does shuffle reshuffle when the queue syncs to another device? (#305)",
+          "How does the watch pick which downloads to keep when storage runs out? (#303)",
+          "Should lyrics scroll with the song or show a static sheet on tvOS? (#309)",
+          "Is a 24/96 download worth its size on cellular? (#310)"
+        ],
+        "check": {
+          "title": "Play an album gapless on iPhone, continue on Mac, then offline on the watch",
+          "steps": [
+            "Scan a FLAC library",
+            "Play an album on iPhone",
+            "Continue on the Mac from the same track",
+            "Download it to the watch and play in flight mode"
+          ]
+        }
+      }
+    },
+    {
+      "id": "I_proto002",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 301,
+      "title": "Library model for music",
+      "url": "https://github.com/maddec01/lar-server/issues/301",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-grill"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-301",
+          "title": "Decide: Library model for music",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto003",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 302,
+      "title": "Gapless and ReplayGain",
+      "url": "https://github.com/maddec01/lar-server/issues/302",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-research"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-302",
+          "title": "Decide: Gapless and ReplayGain",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto004",
+      "status": "Needs you",
+      "statuses": [
+        "Needs you"
+      ],
+      "content": "ticket",
+      "number": 303,
+      "title": "Offline download limits on watchOS",
+      "url": "https://github.com/maddec01/lar-server/issues/303",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-grill"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-303",
+          "title": "Decide: Offline download limits on watchOS",
+          "state": "needs you",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto005",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 304,
+      "title": "Lyrics source and search",
+      "url": "https://github.com/maddec01/lar-server/issues/304",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-research"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-304",
+          "title": "Decide: Lyrics source and search",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto006",
+      "status": "Needs you",
+      "statuses": [
+        "Needs you"
+      ],
+      "content": "ticket",
+      "number": 305,
+      "title": "Queue sync and shuffle across devices",
+      "url": "https://github.com/maddec01/lar-server/issues/305",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-grill"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-305",
+          "title": "Decide: Queue sync and shuffle across devices",
+          "state": "needs you",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto007",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 306,
+      "title": "Album page layout",
+      "url": "https://github.com/maddec01/lar-server/issues/306",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-prototype"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-306",
+          "title": "Decide: Album page layout",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto008",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 307,
+      "title": "Mini player placement",
+      "url": "https://github.com/maddec01/lar-server/issues/307",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-prototype"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-307",
+          "title": "Decide: Mini player placement",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto009",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 308,
+      "title": "Incremental library scan",
+      "url": "https://github.com/maddec01/lar-server/issues/308",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-research"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-308",
+          "title": "Decide: Incremental library scan",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto010",
+      "status": "Shaping",
+      "statuses": [
+        "Shaping"
+      ],
+      "content": "ticket",
+      "number": 309,
+      "title": "Lyrics on tvOS",
+      "url": "https://github.com/maddec01/lar-server/issues/309",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-prototype"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-309",
+          "title": "Decide: Lyrics on tvOS",
+          "state": "running",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1500000,
+        "wallMs": 2250000,
+        "tokens": 2100000,
+        "costUsd": 3.1
+      }
+    },
+    {
+      "id": "I_proto011",
+      "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
+      "content": "ticket",
+      "number": 310,
+      "title": "Hi-res downloads on cellular",
+      "url": "https://github.com/maddec01/lar-server/issues/310",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "decision-research"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_proto012",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 311,
+      "title": "Music library type and scanner",
+      "url": "https://github.com/maddec01/lar-server/issues/311",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 301,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        },
+        {
+          "number": 308,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 501,
+          "title": "Music library type",
+          "url": "https://github.com/maddec01/lar-server/issues/501",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 502,
+          "title": "Tag reader for FLAC, ALAC and MP3",
+          "url": "https://github.com/maddec01/lar-server/issues/502",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 503,
+          "title": "Incremental scan on file events",
+          "url": "https://github.com/maddec01/lar-server/issues/503",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-311",
+          "title": "Build: Music library type and scanner",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 8400000,
+        "wallMs": 12600000,
+        "tokens": 18000000,
+        "costUsd": 22.4
+      }
+    },
+    {
+      "id": "I_proto013",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 312,
+      "title": "Artist, album and track API",
+      "url": "https://github.com/maddec01/lar-server/issues/312",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 311,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 511,
+          "title": "Artists endpoint with album artist grouping",
+          "url": "https://github.com/maddec01/lar-server/issues/511",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 512,
+          "title": "Albums endpoint with disc headers",
+          "url": "https://github.com/maddec01/lar-server/issues/512",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-312",
+          "title": "Build: Artist, album and track API",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 8400000,
+        "wallMs": 12600000,
+        "tokens": 18000000,
+        "costUsd": 22.4
+      }
+    },
+    {
+      "id": "I_proto014",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 313,
+      "title": "Gapless FLAC stream joining with ReplayGain metadata",
+      "url": "https://github.com/maddec01/lar-server/issues/313",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 302,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        },
+        {
+          "number": 311,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 521,
+          "title": "Pre-join adjacent tracks of an album into one stream",
+          "url": "https://github.com/maddec01/lar-server/issues/521",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 522,
+          "title": "Carry ReplayGain track and album gain in the stream header",
+          "url": "https://github.com/maddec01/lar-server/issues/522",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 523,
+          "title": "Seek across a joined track boundary without a gap",
+          "url": "https://github.com/maddec01/lar-server/issues/523",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "blocked"
+        },
+        {
+          "number": 524,
+          "title": "Transcode joined streams for clients without FLAC support",
+          "url": "https://github.com/maddec01/lar-server/issues/524",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "active"
+        },
+        {
+          "number": 525,
+          "title": "Cache joined streams for the most played albums",
+          "url": "https://github.com/maddec01/lar-server/issues/525",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 526,
+          "title": "Expose gapless capability in the playback info endpoint",
+          "url": "https://github.com/maddec01/lar-server/issues/526",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-313",
+          "title": "Build: Gapless FLAC stream joining with ReplayGain metadata",
+          "state": "running",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 8400000,
+        "wallMs": 12600000,
+        "tokens": 18000000,
+        "costUsd": 22.4
+      }
+    },
+    {
+      "id": "I_proto015",
+      "status": "Review",
+      "statuses": [
+        "Review"
+      ],
+      "content": "ticket",
+      "number": 314,
+      "title": "Lyrics: embedded tags, LRCLIB lookup and search index",
+      "url": "https://github.com/maddec01/lar-server/issues/314",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 304,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 414,
+          "url": "https://github.com/maddec01/lar-server/pull/414",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "total": 6,
+            "passed": 6,
+            "failed": 0,
+            "running": 0,
+            "since": null
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [
+        {
+          "number": 531,
+          "title": "Read embedded synced lyrics",
+          "url": "https://github.com/maddec01/lar-server/issues/531",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 532,
+          "title": "LRCLIB lookup with caching",
+          "url": "https://github.com/maddec01/lar-server/issues/532",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 533,
+          "title": "Search index for lyric lines",
+          "url": "https://github.com/maddec01/lar-server/issues/533",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-314",
+          "title": "Build: Lyrics: embedded tags, LRCLIB lookup and search index",
+          "state": "running",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 8400000,
+        "wallMs": 12600000,
+        "tokens": 18000000,
+        "costUsd": 22.4
+      }
+    },
+    {
+      "id": "I_proto016",
+      "status": "Ready",
+      "statuses": [
+        "Ready"
+      ],
+      "content": "ticket",
+      "number": 315,
+      "title": "Queue sync over the playback-state API",
+      "url": "https://github.com/maddec01/lar-server/issues/315",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 305,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 541,
+          "title": "Queue model",
+          "url": "https://github.com/maddec01/lar-server/issues/541",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 542,
+          "title": "Sync endpoint",
+          "url": "https://github.com/maddec01/lar-server/issues/542",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 543,
+          "title": "Conflict rules",
+          "url": "https://github.com/maddec01/lar-server/issues/543",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-315",
+          "title": "Build: Queue sync over the playback-state API",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_proto017",
+      "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
+      "content": "ticket",
+      "number": 316,
+      "title": "Smart playlists",
+      "url": "https://github.com/maddec01/lar-server/issues/316",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 312,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_proto018",
+      "status": "Ready",
+      "statuses": [
+        "Ready"
+      ],
+      "content": "ticket",
+      "number": 317,
+      "title": "Download packages with original codec up to 24/96",
+      "url": "https://github.com/maddec01/lar-server/issues/317",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 303,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        },
+        {
+          "number": 310,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-317",
+          "title": "Build: Download packages with original codec up to 24/96",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_proto019",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 401,
+      "title": "Music tab: browse artists, albums and playlists",
+      "url": "https://github.com/maddec01/lar-apple/issues/401",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 312,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        },
+        {
+          "number": 306,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 601,
+          "title": "Artists grid",
+          "url": "https://github.com/maddec01/lar-apple/issues/601",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 602,
+          "title": "Album page with credits",
+          "url": "https://github.com/maddec01/lar-apple/issues/602",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 603,
+          "title": "Playlists list",
+          "url": "https://github.com/maddec01/lar-apple/issues/603",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-401",
+          "title": "Build: Music tab: browse artists, albums and playlists",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 8400000,
+        "wallMs": 12600000,
+        "tokens": 18000000,
+        "costUsd": 22.4
+      }
+    },
+    {
+      "id": "I_proto020",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 402,
+      "title": "Gapless player with ReplayGain on iOS and macOS",
+      "url": "https://github.com/maddec01/lar-apple/issues/402",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 313,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 611,
+          "title": "Audio engine on AVAudioEngine",
+          "url": "https://github.com/maddec01/lar-apple/issues/611",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 612,
+          "title": "Apply ReplayGain from stream header",
+          "url": "https://github.com/maddec01/lar-apple/issues/612",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "active"
+        },
+        {
+          "number": 613,
+          "title": "Now playing screen with scrubber",
+          "url": "https://github.com/maddec01/lar-apple/issues/613",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 614,
+          "title": "Lock screen and Control Center controls",
+          "url": "https://github.com/maddec01/lar-apple/issues/614",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 615,
+          "title": "AirPlay 2 output",
+          "url": "https://github.com/maddec01/lar-apple/issues/615",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "blocked"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-402",
+          "title": "Build: Gapless player with ReplayGain on iOS and macOS",
+          "state": "running",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 8400000,
+        "wallMs": 12600000,
+        "tokens": 18000000,
+        "costUsd": 22.4
+      }
+    },
+    {
+      "id": "I_proto021",
+      "status": "Verify",
+      "statuses": [
+        "Verify"
+      ],
+      "content": "ticket",
+      "number": 403,
+      "title": "Mini player docked above the tab bar",
+      "url": "https://github.com/maddec01/lar-apple/issues/403",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 307,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 503,
+          "url": "https://github.com/maddec01/lar-apple/pull/503",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "total": 6,
+            "passed": 6,
+            "failed": 0,
+            "running": 0,
+            "since": null
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [
+        {
+          "number": 621,
+          "title": "Mini player view",
+          "url": "https://github.com/maddec01/lar-apple/issues/621",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 622,
+          "title": "Dock above tab bar",
+          "url": "https://github.com/maddec01/lar-apple/issues/622",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-403",
+          "title": "Build: Mini player docked above the tab bar",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 8400000,
+        "wallMs": 12600000,
+        "tokens": 18000000,
+        "costUsd": 22.4
+      }
+    },
+    {
+      "id": "I_proto022",
+      "status": "Ready",
+      "statuses": [
+        "Ready"
+      ],
+      "content": "ticket",
+      "number": 404,
+      "title": "Lyrics sheet that scrolls with the song",
+      "url": "https://github.com/maddec01/lar-apple/issues/404",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 314,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-404",
+          "title": "Build: Lyrics sheet that scrolls with the song",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_proto023",
+      "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
+      "content": "ticket",
+      "number": 405,
+      "title": "Offline downloads on iPhone and iPad",
+      "url": "https://github.com/maddec01/lar-apple/issues/405",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 317,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_proto024",
+      "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
+      "content": "ticket",
+      "number": 406,
+      "title": "Watch app: play downloads in flight mode",
+      "url": "https://github.com/maddec01/lar-apple/issues/406",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 317,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        },
+        {
+          "number": 303,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_proto025",
+      "status": "Queued",
+      "statuses": [
+        "Queued"
+      ],
+      "content": "ticket",
+      "number": 407,
+      "title": "Apple TV music browsing and lyrics",
+      "url": "https://github.com/maddec01/lar-apple/issues/407",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 309,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_proto026",
+      "status": "Ready",
+      "statuses": [
+        "Ready"
+      ],
+      "content": "ticket",
+      "number": 408,
+      "title": "Search across artists, albums, tracks and lyrics",
+      "url": "https://github.com/maddec01/lar-apple/issues/408",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 300,
+        "title": "Music app: library, playback, offline and lyrics on every Apple device",
+        "url": "https://github.com/maddec01/lar-server/issues/300",
+        "repo": "maddec01/lar-server",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 314,
+          "repo": "maddec01/lar-server",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-408",
+          "title": "Build: Search across artists, albums, tracks and lyrics",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_proto027",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 420,
+      "title": "Picture in picture on iPad and Mac",
+      "url": "https://github.com/maddec01/lar-apple/issues/420",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "feature"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 3,
+        "completed": 1
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [],
+      "threads": [
+        {
+          "id": "pt-420",
+          "title": "Shape: picture in picture",
+          "state": "done",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "I_proto028",
+      "status": "Done",
+      "statuses": [
+        "Done"
+      ],
+      "content": "ticket",
+      "number": 330,
+      "title": "Low-latency HLS variant for PiP windows",
+      "url": "https://github.com/maddec01/lar-server/issues/330",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "build"
+      ],
+      "state": "closed",
+      "closedAs": "completed",
+      "parent": {
+        "number": 420,
+        "title": "Picture in picture on iPad and Mac",
+        "url": "https://github.com/maddec01/lar-apple/issues/420",
+        "repo": "maddec01/lar-apple",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": "2026-10-28T09:00:00Z",
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 701,
+          "title": "LL-HLS playlist",
+          "url": "https://github.com/maddec01/lar-server/issues/701",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 702,
+          "title": "Partial segments",
+          "url": "https://github.com/maddec01/lar-server/issues/702",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        }
+      ]
+    },
+    {
+      "id": "I_proto029",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 421,
+      "title": "Picture in picture controller with resume on return",
+      "url": "https://github.com/maddec01/lar-apple/issues/421",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 420,
+        "title": "Picture in picture on iPad and Mac",
+        "url": "https://github.com/maddec01/lar-apple/issues/420",
+        "repo": "maddec01/lar-apple",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 330,
+          "repo": "maddec01/lar-server",
+          "state": "closed"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 711,
+          "title": "AVPictureInPictureController wiring",
+          "url": "https://github.com/maddec01/lar-apple/issues/711",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 712,
+          "title": "Restore the full player when the PiP window closes",
+          "url": "https://github.com/maddec01/lar-apple/issues/712",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "active"
+        },
+        {
+          "number": 713,
+          "title": "Keep subtitles visible in the PiP window",
+          "url": "https://github.com/maddec01/lar-apple/issues/713",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "blocked"
+        },
+        {
+          "number": 714,
+          "title": "Hand off the position to the server on close",
+          "url": "https://github.com/maddec01/lar-apple/issues/714",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "waiting"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-421",
+          "title": "Build: PiP controller",
+          "state": "running",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 5700000,
+        "wallMs": 8550000,
+        "tokens": 9800000,
+        "costUsd": 12.8
+      }
+    },
+    {
+      "id": "I_proto030",
+      "status": "Ready",
+      "statuses": [
+        "Ready"
+      ],
+      "content": "ticket",
+      "number": 422,
+      "title": "Settings toggle for automatic picture in picture",
+      "url": "https://github.com/maddec01/lar-apple/issues/422",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": {
+        "number": 420,
+        "title": "Picture in picture on iPad and Mac",
+        "url": "https://github.com/maddec01/lar-apple/issues/420",
+        "repo": "maddec01/lar-apple",
+        "state": "open"
+      },
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [
+        {
+          "number": 421,
+          "repo": "maddec01/lar-apple",
+          "state": "open"
+        }
+      ],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": []
+    },
+    {
+      "id": "I_proto031",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 331,
+      "title": "Hardware tone mapping for HDR10+ and Dolby Vision profile 8 sources",
+      "url": "https://github.com/maddec01/lar-server/issues/331",
+      "repo": "maddec01/lar-server",
+      "labels": [
+        "improvement",
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 801,
+          "title": "Detect HDR10+ dynamic metadata",
+          "url": "https://github.com/maddec01/lar-server/issues/801",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 802,
+          "title": "Tone map with VideoToolbox on Apple silicon",
+          "url": "https://github.com/maddec01/lar-server/issues/802",
+          "repo": "maddec01/lar-server",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 803,
+          "title": "Tone map with VAAPI on Intel",
+          "url": "https://github.com/maddec01/lar-server/issues/803",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "active"
+        },
+        {
+          "number": 804,
+          "title": "Dolby Vision profile 8 to SDR",
+          "url": "https://github.com/maddec01/lar-server/issues/804",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "blocked"
+        },
+        {
+          "number": 805,
+          "title": "Fallback to software tone mapping",
+          "url": "https://github.com/maddec01/lar-server/issues/805",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 806,
+          "title": "Benchmark four parallel streams",
+          "url": "https://github.com/maddec01/lar-server/issues/806",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        },
+        {
+          "number": 807,
+          "title": "Expose tone mapping in transcoder logs",
+          "url": "https://github.com/maddec01/lar-server/issues/807",
+          "repo": "maddec01/lar-server",
+          "state": "open",
+          "progress": "waiting"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-331",
+          "title": "Build: HDR tone mapping",
+          "state": "running",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 12600000,
+        "wallMs": 18900000,
+        "tokens": 30500000,
+        "costUsd": 38.9
+      }
+    },
+    {
+      "id": "I_proto032",
+      "status": "Review",
+      "statuses": [
+        "Review"
+      ],
+      "content": "ticket",
+      "number": 430,
+      "title": "Subtitle styling: size, colour, background and position per profile",
+      "url": "https://github.com/maddec01/lar-apple/issues/430",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "feature",
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [
+        {
+          "number": 530,
+          "url": "https://github.com/maddec01/lar-apple/pull/530",
+          "state": "open",
+          "isDraft": false,
+          "checks": {
+            "total": 6,
+            "passed": 6,
+            "failed": 0,
+            "running": 0,
+            "since": null
+          },
+          "mergeState": "can merge"
+        }
+      ],
+      "slices": [
+        {
+          "number": 811,
+          "title": "Style model per profile",
+          "url": "https://github.com/maddec01/lar-apple/issues/811",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 812,
+          "title": "Settings screen",
+          "url": "https://github.com/maddec01/lar-apple/issues/812",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 813,
+          "title": "Render styles in the player",
+          "url": "https://github.com/maddec01/lar-apple/issues/813",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        },
+        {
+          "number": 814,
+          "title": "Sync styles to the server",
+          "url": "https://github.com/maddec01/lar-apple/issues/814",
+          "repo": "maddec01/lar-apple",
+          "state": "closed",
+          "progress": "done"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-430",
+          "title": "Build: subtitle styling",
+          "state": "running",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 7200000,
+        "wallMs": 10800000,
+        "tokens": 14000000,
+        "costUsd": 17.5
+      }
+    },
+    {
+      "id": "I_proto033",
+      "status": "In progress",
+      "statuses": [
+        "In progress"
+      ],
+      "content": "ticket",
+      "number": 431,
+      "title": "Remember playback speed per show",
+      "url": "https://github.com/maddec01/lar-apple/issues/431",
+      "repo": "maddec01/lar-apple",
+      "labels": [
+        "improvement",
+        "build"
+      ],
+      "state": "open",
+      "closedAs": null,
+      "parent": null,
+      "subIssues": {
+        "total": 0,
+        "completed": 0
+      },
+      "blockers": [],
+      "updatedAt": "2026-10-28T09:00:00Z",
+      "closedAt": null,
+      "linkedPrs": [],
+      "slices": [
+        {
+          "number": 821,
+          "title": "Store speed per show",
+          "url": "https://github.com/maddec01/lar-apple/issues/821",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "active"
+        },
+        {
+          "number": 822,
+          "title": "Apply on episode start",
+          "url": "https://github.com/maddec01/lar-apple/issues/822",
+          "repo": "maddec01/lar-apple",
+          "state": "open",
+          "progress": "waiting"
+        }
+      ],
+      "threads": [
+        {
+          "id": "pt-431",
+          "title": "Build: playback speed",
+          "state": "needs you",
+          "updated": "2026-10-28T08:00:00.000Z"
+        }
+      ],
+      "stats": {
+        "agentMs": 1800000,
+        "wallMs": 2700000,
+        "tokens": 2500000,
+        "costUsd": 3.2
+      }
+    }
+  ]
+}

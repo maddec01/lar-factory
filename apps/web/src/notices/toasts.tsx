@@ -11,8 +11,6 @@ import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 
 /** How long a success toast stays. */
 const TOAST_MS = 5_000;
-/** How often a toast that's being read or used checks whether it was left. */
-const RECHECK_MS = 1_000;
 /** Where focus goes when a closed toast had it and names nowhere of its own. */
 const FALLBACK_FOCUS = '.add-item';
 
@@ -118,15 +116,34 @@ function ToastBody({ slot, what, failed = false, body, onClose }: Toast & { onCl
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (failed) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const expire = (paused: boolean) => {
-      // Being read or used: check again soon, then give it a full 5 s once it's left.
-      if (ref.current?.closest('[data-slot="toast"]')?.matches(':hover, :focus-within')) timer = setTimeout(() => expire(true), RECHECK_MS);
-      else if (paused) timer = setTimeout(() => expire(false), TOAST_MS);
-      else onClose();
+    const entry = ref.current?.closest<HTMLElement>('[data-slot="toast"]');
+    if (!entry) return;
+    let hovered = entry.matches(':hover');
+    let focused = entry.contains(document.activeElement);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const restart = () => {
+      clearTimeout(timer);
+      if (!hovered && !focused) timer = setTimeout(onClose, TOAST_MS);
     };
-    timer = setTimeout(() => expire(false), TOAST_MS);
-    return () => clearTimeout(timer);
+    const enter = () => { hovered = true; restart(); };
+    const leave = () => { hovered = false; restart(); };
+    const focus = () => { focused = true; restart(); };
+    const blur = (event: FocusEvent) => {
+      focused = event.relatedTarget instanceof Node && entry.contains(event.relatedTarget);
+      restart();
+    };
+    entry.addEventListener('mouseenter', enter);
+    entry.addEventListener('mouseleave', leave);
+    entry.addEventListener('focusin', focus);
+    entry.addEventListener('focusout', blur);
+    restart();
+    return () => {
+      clearTimeout(timer);
+      entry.removeEventListener('mouseenter', enter);
+      entry.removeEventListener('mouseleave', leave);
+      entry.removeEventListener('focusin', focus);
+      entry.removeEventListener('focusout', blur);
+    };
   }, [failed, onClose]);
   return (
     <span ref={ref} data-toast={slot}>

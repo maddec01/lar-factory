@@ -14,6 +14,7 @@ import { useBoardStore } from './board/board-store.ts';
 import { useScopeStore } from './board/scope-store.ts';
 import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
+import { InstallPrototype, prototypeOn } from './install-prototype/install-prototype.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
 import { AbandonDialog } from './items/abandon-dialog.tsx';
 import { Line } from './line/line.tsx';
@@ -73,6 +74,8 @@ export function App() {
         <EditDialog />
         <ResetDialog />
         <LoadingScreen />
+        {/* PROTOTYPE #597: ?proto=597 */}
+        {prototypeOn() && <InstallPrototype />}
       </div>
     </TooltipProvider>
   );

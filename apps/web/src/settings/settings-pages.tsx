@@ -14,6 +14,7 @@ import { ChannelChoice, ProfileSwitch, ProfilesNote, UpdateAction, UpdateStatus,
 import { type Control, ToolState } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
+import { PrototypeSkillsSettings, prototypeOn } from '../install-prototype/install-prototype.tsx';
 
 interface Row {
   id: string;
@@ -269,9 +270,9 @@ export function pages(input: PagesInput): Page[] {
         { id: 'switch-after', title: 'Switch to T3 Code after Start', control: { type: 'unavailable' } },
       ] },
     ] },
-    { id: 'skills', label: 'Skills', icon: <Sparkles />, description: 'The skills and checklists Lar Factory installs, and the Claude profiles that get them.', groups: [
-      profileGroup(input),
-      bundledGroup(input),
+    { id: 'skills', label: 'Skills', icon: <Sparkles />, description: prototypeOn() ? "Lar's skills in each Release, and where they install." : 'The skills and checklists Lar Factory installs, and the Claude profiles that get them.', groups: [
+      // PROTOTYPE #597: ?proto=597 swaps the page for the variant's Settings > Skills.
+      ...prototypeOn() ? [{ title: '', rows: [], note: <PrototypeSkillsSettings /> }] : [profileGroup(input), bundledGroup(input)],
     ] },
     { id: 'notifications', label: 'Notifications', icon: <Bell />, description: 'Which changes on the board tell you, and when.', groups: [
       { title: 'Tell me when', rows: [

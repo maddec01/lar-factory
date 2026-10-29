@@ -89,6 +89,13 @@ test('a row shows its numbered title, status, repository and age, and a red badg
   expect(cells('I_sample14')[0]!.textContent).not.toContain('blocked by');
 });
 
+test('a long title wraps to two lines and is clamped after that', async () => {
+  await mountPage(withItem('I_sample13', { title: 'Owner accounts with a title long enough to run past one line of the title column at the app\'s narrowest width' }, loose));
+  const name = cells('I_sample13')[0]!.querySelector('.grid > span')!;
+  expect(name.className.split(' ')).toEqual(expect.arrayContaining(['line-clamp-2']));
+  expect(name.className.split(' ')).not.toContain('truncate');
+});
+
 test('the badge counts the blocked-by issues still open', async () => {
   await mountPage(withItem('I_sample13', { blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
@@ -325,18 +332,33 @@ const slices = (id = 'I_59') => {
 const count = (id = 'I_59') => cells(id)[0]!.querySelector<HTMLButtonElement>('button')!;
 const list = (id = 'I_59') => row(id).parentElement!.querySelector(':scope > div:last-child ul');
 
-test('a build shows its slice bar and its count, naming the blocked slices before the active ones', async () => {
+test('a build shows its slice bar and its count, naming the first blocked slice plus how many more are blocked or active', async () => {
   const raw = rawIssue('I_build', 59, 'In progress', ['build'], {
-    subIssuesSummary: { total: 4, completed: 1 },
-    subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
+    subIssuesSummary: { total: 5, completed: 1 },
+    subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN'), sliceRef(69, 'OPEN')] },
   });
-  await mountPage(boardOf([raw], { active: [66, 67], blocked: [67] }));
+  await mountPage(boardOf([raw], { active: [66, 67, 69], blocked: [67, 69] }));
   expect(slices()).toEqual({
-    segments: ['var(--st-done)', 'var(--st-now)', 'var(--st-review)', 'var(--soft)'],
-    count: '1/4 slices· blocked #67 Issue 67, active #66 Issue 66',
+    segments: ['var(--st-done)', 'var(--st-now)', 'var(--st-review)', 'var(--soft)', 'var(--st-review)'],
+    count: '1/5 slices· blocked #67 Issue 67 +2 more',
   });
+  const named = count().querySelector('[title]')!;
+  expect(named.getAttribute('title'), 'the rest are named on hover').toBe('blocked #67 Issue 67\nblocked #69 Issue 69\nactive #66 Issue 66');
   expect(cells('I_59')[0]!.querySelector('ol > li.status-pulse'), 'the active slice pulses').not.toBeNull();
   expect(rows().map((r) => r.dataset.item), 'slices are no rows of their own').toEqual(['I_59']);
+  await press(count());
+  expect([...list()!.querySelectorAll('li')].map((li) => text(li).slice(0, 3)), 'the list shows every slice').toEqual(['#65', '#66', '#67', '#68', '#69']);
+});
+
+test('with none blocked, a build names its first active slice, and no more when it is the only one', async () => {
+  const raw = rawIssue('I_build', 59, 'In progress', ['build'], {
+    subIssuesSummary: { total: 3, completed: 1 },
+    subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
+  });
+  await mountPage(boardOf([raw], { active: [66, 67] }));
+  expect(slices().count).toBe('1/3 slices· active #66 Issue 66 +1 more');
+  await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(boardOf([raw], { active: [67] })));
+  expect(slices().count).toBe('1/3 slices· active #67 Issue 67');
 });
 
 test('a build\'s count leaves out slices closed as not planned, and names none while none is active or blocked', async () => {

@@ -97,6 +97,12 @@ test('shipped lists this week\'s done items, newest first', async () => {
   expect(rows().map((r) => r.split(' ')[0])).toEqual(['#5', '#40', '#203', '#181']);
 });
 
+test('each row is named by its item\'s number and title, not by the popover\'s close', async () => {
+  await mountPage();
+  await openCounter('building');
+  expect(popup()!.querySelector('li button')!.getAttribute('aria-label')).toBe('#150 Relay for streaming away from home');
+});
+
 test('spend lists the five priciest items with their cost, out of every priced item', async () => {
   await mountPage();
   const pop = await openCounter('spend');

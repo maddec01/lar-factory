@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { CircleDollarSign } from 'lucide-react';
-import { boardSections, formatUsd, plural, repoKey, shortAgo } from '@lar-factory/shared';
+import { boardSections, formatUsd, plural, ref, repoKey, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item, Status } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Popover } from '@lar-factory/ui/design-system/Popover';
@@ -66,7 +66,7 @@ function Empty({ children }: { children: ReactNode }) {
 function Row({ item, data, now, trailing }: { item: Item; data: BoardData; now: number; trailing?: ReactNode }) {
   return (
     <li>
-      <Popover.Close asChild>
+      <Popover.Close asChild aria-label={`${ref(item)} ${item.title}`}>
         <button type="button" onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id}
           className="flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-left text-[13px] text-base-content outline-none hover:bg-base-200 focus-visible:bg-base-200">
           <ItemStatusGlyph item={item} />

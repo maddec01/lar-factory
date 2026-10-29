@@ -1,6 +1,6 @@
-// Everything else in flight: the line's table of every item past the Queue and short of Done, on one stage track,
-// with its agent figures, a build's slices, and its side action. Ports the old Board view's in-flight cards and slice
-// popover tests to the table.
+// Everything else in flight: the line's card of every item past the Queue and short of Done, each row on a collapsed
+// dossier's two lines and line 2 columns, with its agent figures, a build's slices, and its side action. Ports the old
+// Board view's in-flight cards and slice popover tests to the card.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
@@ -12,9 +12,9 @@ const table = () => $('[data-in-flight]')!;
 const rows = () => $$('[data-in-flight] [data-item]');
 const row = (id: string) => $(`[data-in-flight] [data-item="${id}"]`)!;
 const numberOf = (id: string) => sample.items.find((i) => i.id === id)!.number;
-/** The row's four cells: title, track, agent and side. */
-const cells = (id: string) => [...row(id).children] as HTMLElement[];
-const side = (id: string) => cells(id)[3]!;
+const meta = (id: string) => row(id).querySelector<HTMLElement>('[data-meta]')!;
+const col = (id: string, name: string) => row(id).querySelector<HTMLElement>(`[data-col="${name}"]`)!;
+const side = (id: string) => col(id, 'side');
 const startBuild = (id = 'I_sample13') => $<HTMLButtonElement>(`[data-in-flight] [data-start="${id}"]`)!;
 /** Clicks `el`; a menu it closes hands focus back on the next tick. */
 const press = (el: Element) => settle(() => {
@@ -39,15 +39,9 @@ const thread = (id: string, state: ItemThread['state']): ItemThread => ({ id, ti
 
 beforeEach(() => localStorage.clear());
 
-test('the table lists everything past the Queue and short of Done that no dossier shows, furthest along first, under the stage header', async () => {
+test('the card lists everything past the Queue and short of Done that no dossier shows, furthest along first, under its title', async () => {
   await mountPage();
-  const header = table().firstElementChild!;
-  expect(text(header.firstElementChild)).toBe('Everything else in flight · 11');
-  expect([...header.querySelectorAll('ol > li')].map((li) => [li.getAttribute('title'), text(li)])).toEqual([
-    ['Shaping, Needs you', 'RefineRefining'], ['Ready', 'ReadyReady'], ['In progress', 'BuildBuilding'],
-    ['Review', 'ReviewReview'], ['Verify, Ready to merge', 'VerifyVerify'], ['Done', 'DoneDone'],
-  ]);
-  expect([...header.children].slice(2).map(text)).toEqual(['Agent', 'Thread · next']);
+  expect(text(table().firstElementChild)).toBe('Everything else in flight · 11');
   expect(rows().map((r) => numberOf(r.dataset.item!)), 'Verify first, Refining last, in board order within a stage; #200 and #180 and their parts sit in dossiers')
     .toEqual([31, 900026, 34, 147, 142, 141, 150, 30, 130, 22, 23]);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(loose));
@@ -56,7 +50,7 @@ test('the table lists everything past the Queue and short of Done that no dossie
 
 test('with nothing in flight, the table says so', async () => {
   await mountPage({ ...sample, items: sample.items.filter((i) => ['List', 'Queued', 'Done'].includes(i.status)) });
-  expect(text(table())).toBe('Everything else in flight · 0RefineRefiningReadyReadyBuildBuildingReviewReviewVerifyVerifyDoneDoneAgentThread · nextNothing else in flight.');
+  expect(text(table())).toBe('Everything else in flight · 0Nothing else in flight.');
 });
 
 test('the table takes the main area\'s scope', async () => {
@@ -77,21 +71,24 @@ test("scoped to a repository whose items haven't landed yet, the main area says 
   expect([$('[data-reading]'), table() !== null]).toEqual([null, true]);
 });
 
-test('a row shows its numbered title, status, repository and age, and a red badge while it is blocked', async () => {
+test('line 1 shows the status glyph, the numbered title and muted meta: status, thread, repository, PR and a red badge while blocked', async () => {
   await mountPage(loose);
-  const [title] = cells('I_sample13');
-  expect(title!.getAttribute('title')).toBe('#140 Owner accounts');
-  const [name, meta] = [...title!.querySelectorAll('.grid > span')].map(text);
-  expect([name, meta]).toEqual(['#140 Owner accounts', 'Ready · lar-server · 1h agoblocked by 1']);
-  const badge = [...title!.querySelectorAll('span')].find((s) => text(s) === 'blocked by 1')!;
-  expect(badge.className).toContain('text-(--error-foreground)');
-  expect(title!.querySelector('.grid')!.className.split(' '), 'one column as wide as the cell, so the lines truncate at 840 px, not overflow').toContain('grid-cols-[minmax(0,1fr)]');
-  expect(cells('I_sample14')[0]!.textContent).not.toContain('blocked by');
+  const title = row('I_sample13').querySelector('[data-title]')!;
+  expect([text(title), title.getAttribute('title')]).toEqual(['#140 Owner accounts', 'Owner accounts']);
+  expect(row('I_sample13').querySelector('[data-glyph] svg'), 'the status glyph sits in the chevron\'s place').not.toBeNull();
+  expect([...meta('I_sample13').children].map(text)).toEqual(['Ready · Run finished · lar-server', 'blocked by 1']);
+  expect(meta('I_sample13').lastElementChild!.outerHTML).toContain('danger');
+  expect([...meta('I_sample14').children].map(text), 'a linked PR follows the repository').toEqual(['In progress · Thread running · lar-apple', 'PR #33 (draft)']);
+});
+
+test('no row has a coloured repository dot', async () => {
+  await mountPage(loose);
+  expect(table().querySelector('[class*="repo-tone"]')).toBeNull();
 });
 
 test('a long title wraps to two lines and is clamped after that', async () => {
   await mountPage(withItem('I_sample13', { title: 'Owner accounts with a title long enough to run past one line of the title column at the app\'s narrowest width' }, loose));
-  const name = cells('I_sample13')[0]!.querySelector('.grid > span')!;
+  const name = row('I_sample13').querySelector('[data-title]')!;
   expect(name.className.split(' ')).toEqual(expect.arrayContaining(['line-clamp-2']));
   expect(name.className.split(' ')).not.toContain('truncate');
 });
@@ -100,36 +97,41 @@ test('the badge counts the blocked-by issues still open', async () => {
   await mountPage(withItem('I_sample13', { blockers: [
     { number: 202, repo: 'maddec01/lar-server', state: 'open' }, { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
   ] }, loose));
-  expect(text(cells('I_sample13')[0]!)).toContain('blocked by 1');
+  expect(text(meta('I_sample13'))).toContain('blocked by 1');
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState()
     .receive(withItem('I_sample13', { blockers: [] }, loose)));
-  expect(cells('I_sample13')[0]!.textContent, 'with no open issue listed, nothing blocks').not.toContain('blocked by');
+  expect(meta('I_sample13').textContent, 'with no open issue listed, nothing blocks').not.toContain('blocked by');
   expect(text(startBuild())).toBe('Start build ▾');
 });
 
-test('the track fills the stages behind, marks the current one with its glyph, and dashes it while blocked', async () => {
+test('every row keeps line 2 on the dossiers\' columns at every width, its side action across both lines in the last column', async () => {
   await mountPage(loose);
-  const track = (id: string) => cells(id)[1]!;
-  const at = (id: string) => [...track(id).children].findIndex((li) => li.querySelector('svg'));
-  expect(['I_sample07', 'I_sample13', 'I_sample22', 'I_sample15', 'I_sample16', 'I_sample17'].map(at)).toEqual([0, 1, 2, 3, 4, 4]);
-  expect([track('I_sample13').getAttribute('title'), track('I_sample22').getAttribute('title')]).toEqual(['Ready, waiting', 'In progress']);
-  expect(track('I_sample13').querySelector('.border-dashed'), 'a blocked item waits').not.toBeNull();
-  expect(track('I_sample22').querySelector('.border-dashed')).toBeNull();
+  const lines = (id: string) => row(id).querySelector<HTMLElement>('[data-line2]')!;
+  const columns = (el: Element) => el.className.split(' ').filter((c) => c.includes('grid-cols-'));
+  expect(columns(lines('I_sample13')), 'the same columns as a dossier\'s line 2, so the slice bar sits under the part bar')
+    .toEqual(columns($('[data-dossier] [data-line="2"]')!));
+  expect(row('I_sample13').querySelector('[data-line="1"]')!.className.split(' ')).toEqual(expect.arrayContaining(['col-span-3', 'lg:col-span-4']));
+  expect(side('I_sample13').className.split(' '), 'below 1024 px, where the dossiers drop their last column, the action sits on line 1 above the figures')
+    .toEqual(expect.arrayContaining(['col-start-4', 'row-start-1', 'lg:col-start-5', 'lg:row-span-2', 'self-center']));
+  expect(side('I_sample13').className.split(' '), 'no column of its own past the dossiers\' four').not.toContain('col-start-5');
+  expect([...lines('I_sample14').children].map((c) => (c as HTMLElement).dataset.col ?? (c as HTMLElement).dataset.line), 'a row with no slices keeps line 2')
+    .toEqual(['1', 'side', 'bar', 'count', 'next', 'figures']);
+  expect([text(col('I_sample14', 'bar')), text(col('I_sample14', 'count')), text(col('I_sample14', 'next'))]).toEqual(['', '', '']);
+  expect(row('I_sample13').className.split(' ')).toEqual(expect.arrayContaining(['py-1.5', 'gap-y-1']));
 });
 
-test('the Agent column shows agent time over tokens and cost, or a dash before any thread worked on it', async () => {
+test('the figures column shows agent time, tokens and cost on one line, or nothing before any thread worked on it', async () => {
   const stats = { agentMs: (3 * 60 + 20) * 60_000, wallMs: 70 * 60_000, tokens: 12_436_000, costUsd: 41.197 };
   let data = withItem('I_sample14', { stats }, loose);
   data = withItem('I_sample15', { stats: { agentMs: 45 * 60_000, tokens: 980 } }, data);
   data = withItem('I_sample16', { stats: { ...stats, costUsd: 41, frozen: true } }, data);
   data = withItem('I_sample07', { stats: 'unavailable' }, data);
   await mountPage(data);
-  const agent = (id: string) => cells(id)[2]!;
-  expect([...agent('I_sample14').children].map(text)).toEqual(['3h 20m', '12.4M · $41.20']);
-  expect(agent('I_sample14').title).toBe('Agent time · tokens · cost');
-  expect(text(agent('I_sample15').lastElementChild), 'nothing priced').toBe('980 · Unavailable');
-  expect(agent('I_sample16').title).toBe('As it stood at merge');
-  expect([text(agent('I_sample13')), text(agent('I_sample07'))]).toEqual(['Unavailable', 'Unavailable']);
+  const figures = (id: string) => col(id, 'figures').firstElementChild as HTMLElement;
+  expect([text(figures('I_sample14')), figures('I_sample14').title]).toEqual(['3h 20m · 12.4M · $41.20', 'Agent time · tokens · cost']);
+  expect(text(figures('I_sample15')), 'nothing priced').toBe('45m · 980');
+  expect(figures('I_sample16').title).toBe('Agent time · tokens · cost, as it stood at merge');
+  expect([text(col('I_sample13', 'figures')), text(col('I_sample07', 'figures'))]).toEqual(['', '']);
 });
 
 test('a row opens the item dialog and stays marked while it shows', async () => {
@@ -140,16 +142,17 @@ test('a row opens the item dialog and stays marked while it shows', async () => 
   expect(row('I_sample15').className).not.toContain('ring-(--primary)');
 });
 
-test('the side says where the item waits on you, or shows its thread and its next action', async () => {
+test('the side says where the item waits on you, or shows its next action', async () => {
   await mountPage(loose);
-  const say = (id: string) => [text(side(id).firstElementChild), [...side(id).querySelectorAll('button, a')].map((b) => text(b))];
+  const say = (id: string) => [text(side(id)), [...side(id).querySelectorAll('button, a')].map((b) => text(b))];
   expect(say('I_sample16')).toEqual(['on your desk', []]);
   expect(say('I_sample17')).toEqual(['on your desk', []]);
   expect(say('I_sample11')).toEqual(['on your desk', []]);
-  expect(say('I_sample07')).toEqual(['Thread running', ['Open thread']]);
-  expect(say('I_sample14')).toEqual(['Thread running', ['Open thread']]);
-  expect(say('I_sample15')).toEqual(['Thread running', ['Open thread']]);
-  expect(say('I_sample13')).toEqual(['blocked by 1', ['Start after #202 ▾']]);
+  expect(say('I_sample07')).toEqual(['Open thread', ['Open thread']]);
+  expect(say('I_sample14')).toEqual(['Open thread', ['Open thread']]);
+  expect(say('I_sample15')).toEqual(['Open thread', ['Open thread']]);
+  expect(say('I_sample13')).toEqual(['Start after #202 ▾', ['Start after #202 ▾']]);
+  expect(meta('I_sample14').firstElementChild!.textContent, 'the thread moves to the meta').toContain('Thread running');
 });
 
 test('Start after on a blocked Ready row arms its start on the picked model, then reads Starts after until pressed again', async () => {
@@ -324,13 +327,13 @@ const build = (count: number) => rawIssue('I_build', 59, 'In progress', ['build'
   subIssuesSummary: { total: count, completed: 1 },
   subIssues: { nodes: Array.from({ length: count }, (_, i) => sliceRef(100 + i, i ? 'OPEN' : 'CLOSED')) },
 });
-/** The build row's slice bar segments' colours and its count button's text. */
+/** The build row's slice bar segments' colours, its count button's text and its first blocked or active slice. */
 const slices = (id = 'I_59') => {
-  const bar = cells(id)[0]!.querySelector('.grid.gap-1 > ol')!;
-  return { segments: [...bar.children].map((li) => (li as HTMLElement).style.background), count: text(cells(id)[0]!.querySelector('button')) };
+  const bar = col(id, 'bar').querySelector('ol')!;
+  return { segments: [...bar.children].map((li) => (li as HTMLElement).style.background), count: text(count(id)), next: text(col(id, 'next')) };
 };
-const count = (id = 'I_59') => cells(id)[0]!.querySelector<HTMLButtonElement>('button')!;
-const list = (id = 'I_59') => row(id).parentElement!.querySelector(':scope > div:last-child ul');
+const count = (id = 'I_59') => row(id).querySelector<HTMLButtonElement>('button[data-col="count"]')!;
+const list = (id = 'I_59') => $(`[data-flight="${id}"] [data-slices] ul`);
 
 test('a build shows its slice bar and its count, naming the first blocked slice plus how many more are blocked or active', async () => {
   const raw = rawIssue('I_build', 59, 'In progress', ['build'], {
@@ -340,11 +343,11 @@ test('a build shows its slice bar and its count, naming the first blocked slice 
   await mountPage(boardOf([raw], { active: [66, 67, 69], blocked: [67, 69] }));
   expect(slices()).toEqual({
     segments: ['var(--st-done)', 'var(--st-now)', 'var(--st-review)', 'var(--soft)', 'var(--st-review)'],
-    count: '1/5 slices· blocked #67 Issue 67 +2 more',
+    count: '1/5 slices', next: 'blocked Issue 67 +2 more',
   });
-  const named = count().querySelector('[title]')!;
-  expect(named.getAttribute('title'), 'the rest are named on hover').toBe('blocked #67 Issue 67\nblocked #69 Issue 69\nactive #66 Issue 66');
-  expect(cells('I_59')[0]!.querySelector('ol > li.status-pulse'), 'the active slice pulses').not.toBeNull();
+  expect(col('I_59', 'next').firstElementChild!.className, 'blocked reads in its colour').toContain('text-(--st-review)');
+  expect(col('I_59', 'next').getAttribute('title'), 'the rest are named on hover').toBe('blocked #67 Issue 67\nblocked #69 Issue 69\nactive #66 Issue 66');
+  expect(col('I_59', 'bar').querySelector('ol > li.status-pulse'), 'the active slice pulses').not.toBeNull();
   expect(rows().map((r) => r.dataset.item), 'slices are no rows of their own').toEqual(['I_59']);
   await press(count());
   expect([...list()!.querySelectorAll('li')].map((li) => text(li).slice(0, 3)), 'the list shows every slice').toEqual(['#65', '#66', '#67', '#68', '#69']);
@@ -356,9 +359,9 @@ test('with none blocked, a build names its first active slice, and no more when 
     subIssues: { nodes: [sliceRef(65, 'CLOSED'), sliceRef(66, 'OPEN'), sliceRef(67, 'OPEN')] },
   });
   await mountPage(boardOf([raw], { active: [66, 67] }));
-  expect(slices().count).toBe('1/3 slices· active #66 Issue 66 +1 more');
+  expect([slices().count, slices().next]).toEqual(['1/3 slices', 'active Issue 66 +1 more']);
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive(boardOf([raw], { active: [67] })));
-  expect(slices().count).toBe('1/3 slices· active #67 Issue 67');
+  expect([slices().count, slices().next]).toEqual(['1/3 slices', 'active Issue 67']);
 });
 
 test('a build\'s count leaves out slices closed as not planned, and names none while none is active or blocked', async () => {
@@ -367,7 +370,7 @@ test('a build\'s count leaves out slices closed as not planned, and names none w
     subIssues: { nodes: [sliceRef(65, 'CLOSED'), { ...sliceRef(66, 'CLOSED'), stateReason: 'NOT_PLANNED' }, sliceRef(67, 'OPEN'), sliceRef(68, 'OPEN')] },
   });
   await mountPage(boardOf([raw]));
-  expect(slices()).toEqual({ segments: ['var(--st-done)', 'var(--soft)', 'var(--soft)'], count: '1/3 slices' });
+  expect(slices()).toEqual({ segments: ['var(--st-done)', 'var(--soft)', 'var(--soft)'], count: '1/3 slices', next: '' });
 });
 
 test('an open slice the project auto-added is no row of its own', async () => {
@@ -383,9 +386,9 @@ test('an open slice the project auto-added is no row of its own', async () => {
 
 test('the count unfolds the slice list under the row and folds it again, without opening the dialog', async () => {
   await mountPage(loose);
-  expect([count('I_sample13').getAttribute('aria-expanded'), list('I_sample13')]).toEqual(['false', null]);
+  expect([count('I_sample13').getAttribute('aria-expanded'), count('I_sample13').getAttribute('aria-label'), list('I_sample13')]).toEqual(['false', 'Show slices', null]);
   await press(count('I_sample13'));
-  expect(count('I_sample13').getAttribute('aria-expanded')).toBe('true');
+  expect([count('I_sample13').getAttribute('aria-expanded'), count('I_sample13').getAttribute('aria-label')]).toEqual(['true', 'Hide slices']);
   expect([...list('I_sample13')!.querySelectorAll('li')].map(text)).toEqual(['#144Owner table and sign-updone', '#145Sign-in sessionsactive', '#146Owner settings pagewaiting']);
   expect(dialog()).toBeNull();
   await settle(async () => (await import('../board/board-store.ts')).useBoardStore.getState().receive({ ...loose, fetchedAt: '2026-10-21T09:59:00.000Z' }));
@@ -398,7 +401,7 @@ test('a 3-slice and a 14-slice build render the same row structure', async () =>
   // Tags only, with the slice bar's segments dropped.
   const shape = () => {
     const copy = row('I_59').cloneNode(true) as Element;
-    copy.querySelectorAll('.grid.gap-1 > ol > li').forEach((li) => li.remove());
+    copy.querySelectorAll('[data-col="bar"] ol > li').forEach((li) => li.remove());
     return [...copy.querySelectorAll('*')].map((e) => `${e.tagName}.${e.className}`).join(' ');
   };
   await mountPage(boardOf([build(14)], { active: [101, 102] }));
@@ -411,7 +414,7 @@ test.each(['Shaping', 'In progress', 'Review'] as const)('line activity follows 
   const id = 'I_sample14';
   const data = withItem(id, { status, threads: [] });
   await mountPage(data);
-  const activity = () => text(side(id).firstElementChild);
+  const activity = () => text(meta(id).firstElementChild).split(' · ')[1];
   expect(activity()).toBe('Not started');
   const { useBoardStore } = await import('../board/board-store.ts');
   for (const [state, expected] of [['running', 'Thread running'], ['stopped', 'Run stopped'], ['done', 'Run finished'], ['needs you', 'Thread needs you']] as const) {

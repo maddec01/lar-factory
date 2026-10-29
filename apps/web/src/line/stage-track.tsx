@@ -1,33 +1,19 @@
-// The line's rows, shared by the in-flight table and the dossiers: one grid for every row, so the stage and agent
-// columns line up down the page, the six-stage track, the agent figures, a build's slices, and the row itself.
+// The line's stages: the six-stage track a dossier's parts show, and what the line says of an item's thread and of an
+// item that waits on you.
 
-import { useState } from 'react';
-import type { ReactNode } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { duration, formatTokens, formatUsd, openBlockers, ref, repoKey, repoName, shortAgo } from '@lar-factory/shared';
-import type { BoardData, Item, ItemStats, Status, ThreadState } from '@lar-factory/shared';
-import { useItemDialogStore } from '../item-dialog/item-dialog-store.ts';
-import { AzureFields, ItemTitle, SliceBar, SliceList, repoTone } from '../items/item-parts.tsx';
-import { STATUS_COLOR, StatusGlyph, TwoStatusesMark } from '../items/status-glyph.tsx';
+import type { Item, ItemStats, Status, ThreadState } from '@lar-factory/shared';
+import { STATUS_COLOR, StatusGlyph } from '../items/status-glyph.tsx';
 
-const STAGES: { name: string; short: string; statuses: Status[] }[] = [
-  { name: 'Refining', short: 'Refine', statuses: ['Shaping', 'Needs you'] },
-  { name: 'Ready', short: 'Ready', statuses: ['Ready'] },
-  { name: 'Building', short: 'Build', statuses: ['In progress'] },
-  { name: 'Review', short: 'Review', statuses: ['Review'] },
-  { name: 'Verify', short: 'Verify', statuses: ['Verify', 'Ready to merge'] },
-  { name: 'Done', short: 'Done', statuses: ['Done'] },
+const STAGES: { name: string; statuses: Status[] }[] = [
+  { name: 'Refining', statuses: ['Shaping', 'Needs you'] },
+  { name: 'Ready', statuses: ['Ready'] },
+  { name: 'Building', statuses: ['In progress'] },
+  { name: 'Review', statuses: ['Review'] },
+  { name: 'Verify', statuses: ['Verify', 'Ready to merge'] },
+  { name: 'Done', statuses: ['Done'] },
 ];
 /** The status's stage on the track, or -1 for List and Queued, which sit before it. */
 export const stageOf = (s: Status) => STAGES.findIndex((st) => st.statuses.includes(s));
-/**
- * One grid for every row, in the table and in each dossier, so the stage and agent columns line up down the page.
- * Below the line's @2xl width, as at the app's 840 px minimum, the Agent column drops and the track narrows, so the
- * titles keep room to read.
- */
-const GRID = 'grid grid-cols-[minmax(0,1fr)_11rem_8rem] items-center gap-x-4 px-3 @2xl:grid-cols-[minmax(0,1fr)_13rem_6rem_8rem] @3xl:grid-cols-[minmax(0,1fr)_18rem_7rem_11rem]';
-/** The Agent column's cells, hidden while the grid leaves it out. */
-const AGENT = 'hidden @2xl:grid';
 export const picked = (on: boolean) => (on ? 'bg-(--accent) ring-2 ring-inset ring-(--primary)' : '');
 const PAST = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
@@ -51,17 +37,6 @@ export function OnYourDesk({ status }: { status: Status }) {
 
 export const statsOf = (item: Item): ItemStats | null => (item.stats && item.stats !== 'unavailable' ? item.stats : null);
 
-/** Agent time over tokens and cost; a dash before any thread has worked on it. */
-function AgentCell({ s }: { s: ItemStats | null }) {
-  if (!s) return <span className={`${AGENT} text-right text-[11px] text-(--muted-foreground)`}>Unavailable</span>;
-  return (
-    <span className={`${AGENT} text-right text-[11px] leading-tight tabular-nums text-(--muted-foreground)`} title={s.frozen ? 'As it stood at merge' : 'Agent time · tokens · cost'}>
-      <span className="font-medium text-(--foreground)">{duration(s.agentMs)}</span>
-      <span>{formatTokens(s.tokens)} · {s.costUsd !== undefined ? formatUsd(s.costUsd) : 'Unavailable'}</span>
-    </span>
-  );
-}
-
 /** Six stage cells: the stages behind filled, the current one coloured up to its glyph, the rest faint. */
 export function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
   const at = stageOf(status);
@@ -80,84 +55,5 @@ export function Track({ status, waiting }: { status: Status; waiting?: boolean }
         </li>
       ))}
     </ol>
-  );
-}
-
-/** The column header over a run of rows: `label`, the stage names, Agent and `side`. */
-export function StageHeader({ label, side }: { label: ReactNode; side: ReactNode }) {
-  return (
-    <div className={`${GRID} border-b border-(--border) py-1.5 text-[11px] text-(--muted-foreground)`}>
-      <span className="truncate font-medium">{label}</span>
-      <ol className="m-0 grid list-none grid-cols-6 gap-px p-0 text-center">
-        {STAGES.map((st) => <li key={st.name} title={st.statuses.join(', ')} className="truncate"><span className="@3xl:hidden">{st.short}</span><span className="hidden @3xl:inline">{st.name}</span></li>)}
-      </ol>
-      <span className={`${AGENT} text-right`}>Agent</span>
-      <span className="truncate text-right">{side}</span>
-    </div>
-  );
-}
-
-/**
- * A build's slices at a glance: the bar across the title column, the count, and the first stuck slice, or with none
- * stuck the first moving one, plus how many more are stuck or moving. Hovering names them all.
- */
-function SliceSummary({ item, open, onToggle }: { item: Item; open: boolean; onToggle: () => void }) {
-  const done = item.slices.filter((s) => s.progress === 'done').length;
-  const active = item.slices.filter((s) => s.progress === 'active');
-  const blocked = item.slices.filter((s) => s.progress === 'blocked');
-  const named = [...blocked.map((s) => ({ s, tone: 'text-(--st-review)', word: 'blocked' })), ...active.map((s) => ({ s, tone: 'text-(--st-now)', word: 'active' }))];
-  const first = named[0];
-  return (
-    <span className="grid gap-1">
-      <SliceBar item={item} />
-      <button type="button" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }} className="flex min-w-0 items-center gap-1 text-left text-[11px] text-(--muted-foreground) hover:text-(--foreground)">
-        {open ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
-        <span className="shrink-0 font-medium tabular-nums text-(--foreground)">{done}/{item.slices.length} slices</span>
-        {first && (
-          <span className="flex min-w-0 gap-1" title={named.map(({ s, word }) => `${word} #${s.number} ${s.title}`).join('\n')}>
-            <span className="min-w-0 truncate">· <span className={first.tone}>{first.word}</span> #{first.s.number} {first.s.title}</span>
-            {named.length > 1 && <span className="shrink-0 tabular-nums">{` +${named.length - 1} more`}</span>}
-          </span>
-        )}
-      </button>
-    </span>
-  );
-}
-
-/**
- * One piece of work on the track; the whole row opens it in the item dialog, and a build's slices unfold under it.
- * `children` sit under the row, for what its side action has to say.
- */
-export function Row({ item, data, now, side, waiting, nested, children }: {
-  item: Item; data: BoardData; now: number; side: ReactNode; waiting?: boolean; nested?: boolean; children?: ReactNode;
-}) {
-  const [slices, setSlices] = useState(false);
-  const isPicked = useItemDialogStore((state) => state.itemId === item.id);
-  const repo = repoKey(item);
-  const blocked = openBlockers(item).length;
-  return (
-    <div className="border-b border-(--border) last:border-b-0">
-      <div onClick={() => useItemDialogStore.getState().open(item.id)} data-item={item.id} className={`${GRID} cursor-pointer py-2 hover:bg-(--accent) ${picked(isPicked)}`}>
-        <span title={`${ref(item)} ${item.title}`} className="flex min-w-0 items-start gap-2 text-left">
-          {nested && <span className="mb-auto ml-1 h-3 w-2.5 shrink-0 rounded-bl border-b border-l border-(--input)" />}
-          <span className={`${repoTone(repo, data.repos)} mt-1.5 size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
-          <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-1">
-            <span className="line-clamp-2 text-[13px]"><ItemTitle item={item} /></span>
-            <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-(--muted-foreground)">
-              <TwoStatusesMark item={item} className="size-3" />
-              <span className="truncate">{item.status} · {repoName(repo, data.repos)} · {shortAgo(item.updatedAt, now)}</span>
-              {blocked > 0 && <span className="shrink-0 rounded bg-(--error-surface) px-1 text-(--error-foreground)">blocked by {blocked}</span>}
-            </span>
-            <AzureFields azure={item.azure} />
-            {item.slices.length > 0 && <SliceSummary item={item} open={slices} onToggle={() => setSlices(!slices)} />}
-          </span>
-        </span>
-        <Track status={item.status} waiting={waiting} />
-        <AgentCell s={statsOf(item)} />
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-[11px] text-(--muted-foreground)">{side}</div>
-      </div>
-      {children}
-      {slices && <div className={`pb-2 ${nested ? 'pl-12' : 'pl-7'} pr-3`}><SliceList item={item} /></div>}
-    </div>
   );
 }

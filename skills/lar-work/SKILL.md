@@ -216,4 +216,6 @@ Start build stays disabled until the user adds the project in T3. Start build:
    worktree on branch `<kind>/<n>-<slug>` from `main` (`fix` for a `bug`,
    `feat` for a `feature` or `improvement`, else `chore`), with the message
    `Build <owner/repo>#<n>. Read <installed lar-work>/agents/builder.md and follow it.`,
-   where `<installed lar-work>` is this skill's absolute path.
+   where `<installed lar-work>` is this skill's absolute path. The build
+   thread then archives the issue's idle shaping threads (the builder's
+   **Build** step 1).

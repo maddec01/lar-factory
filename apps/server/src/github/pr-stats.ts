@@ -10,29 +10,20 @@ const END = '<!-- /lar-stats -->';
 const MIN = 60_000;
 
 /**
- * Approximate display time: to 5 minutes under an hour, to 15 from an hour.
- * Exact figures live in the data comment; the server throttles edits while a build runs.
- */
-function roughDuration(ms: number): string {
-  const step = ms < 60 * MIN ? 5 * MIN : 15 * MIN;
-  return duration(Math.round(ms / step) * step);
-}
-
-/**
  * The marked block, figures as on cards: agent time, wall time when measured, total
  * tokens, then API cost when any of the tokens could be priced, in whole dollars so
  * the PR stays readable. The server limits writes while a build runs.
  */
 export function statsBlock(stats: ItemStats): string {
-  const wall = stats.wallMs === undefined ? '' : ` · wall ${roughDuration(stats.wallMs)}`;
+  const wall = stats.wallMs === undefined ? '' : ` · wall ${duration(stats.wallMs)}`;
   const cost = stats.costUsd === undefined ? '' : ` · ${wholeUsd(stats.costUsd)}`;
-  // Keep exact figures separate from the approximate figures people read.
+  // Keep exact figures separate from the whole minutes people read.
   const exact = `<!-- lar-stats-data ${JSON.stringify({ agentMs: stats.agentMs, wallMs: stats.wallMs, tokens: stats.tokens, costUsd: stats.costUsd })} -->\n`;
-  return `${START}\n**Item stats** (kept current by the lar board): Σ ${roughDuration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}\n${exact}${END}`;
+  return `${START}\n**Item stats** (kept current by the lar board): Σ ${duration(stats.agentMs)}${wall} · ${formatTokens(stats.tokens)}${cost}\n${exact}${END}`;
 }
 
-// A duration as roughDuration writes it, hours then minutes.
-const DURATION = String.raw`(?:(\d+)h )?(\d+)m`;
+// A displayed duration, hours then minutes, including <1m.
+const DURATION = String.raw`(?:(\d+)h )?(<1|\d+)m`;
 // The figures line statsBlock writes: agent time, wall time if any, tokens with a
 // K/M/B/T suffix, then the cost if any. Blocks from before wall time read
 // `agent time 1h 0m · 12.4M tokens`.
@@ -41,7 +32,8 @@ const FIGURES = new RegExp(
 );
 const SUFFIX = { '': 1, K: 1e3, M: 1e6, B: 1e9, T: 1e12 } as const;
 
-const minutes = (hours = '0', mins: string) => (Number(hours) * 60 + Number(mins)) * MIN;
+// Without exact data, <1m proves only that some time was spent.
+const minutes = (hours = '0', mins: string) => mins === '<1' ? 1 : (Number(hours) * 60 + Number(mins)) * MIN;
 
 /** The figures a body's block holds, as statsBlock wrote them, or null when it has no block or one that doesn't parse. */
 function blockStats(body: string): ItemStats | null {

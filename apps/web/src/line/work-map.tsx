@@ -122,7 +122,7 @@ function CheckNode({ check, width, after }: { check: EndToEndCheck; width: numbe
 }
 
 /** The map of `parts`, ending in `check`; a dossier with no check written ends in a note saying so. */
-export function WorkMap({ parts, check, data, now }: { parts: Part[]; check: EndToEndCheck | undefined; data: BoardData; now: number }) {
+export function WorkMap({ parts, check, data, now, repoDots = true }: { parts: Part[]; check: EndToEndCheck | undefined; data: BoardData; now: number; /** PROTOTYPE #472: a1 drops the lanes' repo dots. */ repoDots?: boolean }) {
   const { ref, width } = useWidth();
   const [hover, setHover] = useState<string | null>(null);
   const marker = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -138,7 +138,7 @@ export function WorkMap({ parts, check, data, now }: { parts: Part[]; check: End
           <div key={b.lane} className={`absolute left-0 border-t border-(--border) ${n % 2 ? 'bg-[color-mix(in_srgb,var(--muted)_50%,transparent)]' : ''}`} style={{ top: b.top, height: b.height, width: m.width }}>
             <div className="sticky left-0 flex h-full flex-col justify-center gap-0.5 bg-[color-mix(in_srgb,var(--background)_85%,transparent)] px-3" style={{ width: LABEL_W }}>
               <span className="flex items-center gap-1.5 text-xs font-medium">
-                {b.lane === DECISIONS ? <Lightbulb className="size-3.5 text-(--muted-foreground)" /> : <span className={`${repoTone(b.lane, data.repos)} size-2 rounded-full bg-[var(--k,var(--muted-foreground))]`} />}{b.lane === DECISIONS ? b.lane : repoName(b.lane, data.repos)}
+                {b.lane === DECISIONS ? <Lightbulb className="size-3.5 text-(--muted-foreground)" /> : repoDots && <span className={`${repoTone(b.lane, data.repos)} size-2 rounded-full bg-[var(--k,var(--muted-foreground))]`} />}{b.lane === DECISIONS ? b.lane : repoName(b.lane, data.repos)}
               </span>
               {b.lane === DECISIONS
                 ? <span className="text-[11px] text-(--muted-foreground)">grill, prototype, research</span>

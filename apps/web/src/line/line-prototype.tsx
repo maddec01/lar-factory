@@ -6,7 +6,8 @@
 // the title. A1 is the default when `?variant=` is missing; `?variant=current` shows today's line.
 // Round 3 (A1 only): line 2 gains the agent figures column, and In flight rows (`FlightA1`) use the same two lines and
 // columns as the Dossier, so the slice bar sits under the part bar. Figures sit on one line; a row's slice count
-// unfolds its slice list.
+// unfolds its slice list. v3: no repo dots in a1; an In flight row's repo joins its meta and its action spans both lines
+// in the repos column.
 
 import { useEffect, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
@@ -148,7 +149,7 @@ function ViewToggle({ view, onView }: { view: View; onView: (v: View) => void })
 }
 
 /** The checklist, compact: one line per open part with its slice bar, the done ones folded into a count. */
-function Checklist({ m, data, columns }: { m: Moving; data: BoardData; columns?: boolean }) {
+function Checklist({ m, data, columns, plain }: { m: Moving; data: BoardData; columns?: boolean; plain?: boolean }) {
   const [showDone, setShowDone] = useState(false);
   const shown = m.parts.filter((p) => showDone || !isDone(p.item));
   const doneN = m.parts.length - m.parts.filter((p) => !isDone(p.item)).length;
@@ -158,7 +159,7 @@ function Checklist({ m, data, columns }: { m: Moving; data: BoardData; columns?:
         {shown.map((p) => (
           <li key={p.item.id} onClick={() => open(p.item)} className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 hover:bg-(--accent)">
             <span className="flex min-w-0 items-center gap-2">
-              <span className={`${repoTone(repoKey(p.item), data.repos)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />
+              {!plain && <span className={`${repoTone(repoKey(p.item), data.repos)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} />}
               <PartLink part={p} wrap />
             </span>
             <span className="flex items-center justify-end gap-2 text-[11px] text-(--muted-foreground)">
@@ -175,12 +176,13 @@ function Checklist({ m, data, columns }: { m: Moving; data: BoardData; columns?:
   );
 }
 
-function PartsView({ m, data, now, columns }: { m: Moving; data: BoardData; now: number; columns?: boolean }) {
+/** `plain` (a1) draws repos as plain text, with no colour dots. */
+function PartsView({ m, data, now, columns, plain }: { m: Moving; data: BoardData; now: number; columns?: boolean; plain?: boolean }) {
   const [view, setView] = useState<View>('map');
   return (
     <div className="grid gap-3">
       <ViewToggle view={view} onView={setView} />
-      {view === 'map' ? <WorkMap parts={m.parts} check={m.parent.map?.check} data={data} now={now} /> : <Checklist m={m} data={data} columns={columns} />}
+      {view === 'map' ? <WorkMap parts={m.parts} check={m.parent.map?.check} data={data} now={now} repoDots={!plain} /> : <Checklist m={m} data={data} columns={columns} plain={plain} />}
     </div>
   );
 }
@@ -373,17 +375,17 @@ function DossierA2Lines({ m, data, now, chips }: { m: Moving; data: BoardData; n
           <span className={`flex gap-1 ${chips === 'end' ? 'shrink-0' : 'flex-wrap'}`}><Counts m={m} /></span>
         </span>
         <span className={`col-start-2 grid ${chips === 'end' ? LINE2_A1 : LINE2} items-center gap-x-4`} data-line2>
-          <PartsBar m={m} />
+          <span data-col="bar"><PartsBar m={m} /></span>
           <span className="text-[11px] tabular-nums text-(--muted-foreground)">{m.done}/{m.count} parts</span>
-          <Next m={m} data={data} compact />
-          {chips === 'end' && <Figures s={figuresOf(m.parent, data, true)} />}
-          <span className="truncate text-right text-[11px] text-(--muted-foreground)" title={repos(m, data)}>{repos(m, data)}</span>
+          <span data-col="next" className="min-w-0"><Next m={m} data={data} compact /></span>
+          {chips === 'end' && <span data-col="figures" className="grid min-w-0"><Figures s={figuresOf(m.parent, data, true)} /></span>}
+          <span data-col="repos" className="truncate text-right text-[11px] text-(--muted-foreground)" title={repos(m, data)}>{repos(m, data)}</span>
         </span>
       </div>
       {on && (
         <div className="grid gap-4 border-t border-(--border) px-4 py-3">
           <Attention m={m} data={data} layout="rows" />
-          <PartsView m={m} data={data} now={now} columns />
+          <PartsView m={m} data={data} now={now} columns plain={chips === 'end'} />
         </div>
       )}
     </article>
@@ -402,32 +404,28 @@ function FlightA1({ item, data }: { item: Item; data: BoardData }) {
     <div className="border-b border-(--border) last:border-b-0" data-flight={item.id}>
     <div onClick={() => open(item)} className={`${HEAD_A1} cursor-pointer hover:bg-(--accent)`}>
       <span className="grid size-6 place-items-center"><ItemStatusGlyph item={item} /></span>
-      <span className="flex min-w-0 items-start justify-between gap-x-2 pt-0.5">
-        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      {/* Line 1 spans line 2's first four columns; the side action takes the repos column across both lines. */}
+      <span className={`grid ${LINE2_A1} items-center gap-x-4 gap-y-1`} data-line2>
+        <span className="col-span-4 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 pt-0.5">
           <span className="line-clamp-2 text-[13px] font-medium" title={item.title}><ItemTitle item={item} /></span>
           <span className="inline-flex flex-wrap items-center gap-x-1.5 text-[11px] text-(--muted-foreground)">
-            <span>{item.status} · {threadText(item)}</span>
+            <span>{item.status} · {threadText(item)} · {repo}</span>
             {item.linkedPrs[0] && <span className="inline-flex items-center gap-1"><GitPullRequest className="size-3 text-(--st-done)" />{prLabel(item.linkedPrs[0])}</span>}
             {blocked > 0 && <Badge tone="danger">blocked by {blocked}</Badge>}
           </span>
         </span>
-        <span className="flex h-[1.1875rem] shrink-0 items-center text-[11px] text-(--muted-foreground)"><FlightSide item={item} data={data} /></span>
-      </span>
-      <span className={`col-start-2 grid ${LINE2_A1} items-center gap-x-4`} data-line2>
-        {item.slices.length ? <SliceBar item={item} thick /> : <span />}
+        <span data-col="repos" data-side className="col-start-5 row-span-2 row-start-1 flex items-center justify-end self-center text-[11px] text-(--muted-foreground)"><FlightSide item={item} data={data} /></span>
+        <span data-col="bar">{item.slices.length ? <SliceBar item={item} thick /> : null}</span>
         {item.slices.length ? (
           <button type="button" aria-expanded={slices} aria-label={slices ? 'Hide slices' : 'Show slices'} onClick={(e) => { e.stopPropagation(); setSlices(!slices); }}
             className="-ml-1 flex h-4 items-center gap-0.5 justify-self-start rounded px-1 text-[11px] tabular-nums text-(--muted-foreground) hover:bg-(--soft) hover:text-(--foreground)">
             {done}/{item.slices.length} slices{slices ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
           </button>
-        ) : <span />}
-        <span className="min-w-0 truncate text-[12px] leading-4" title={note.map(({ s, word }) => `${word} #${s.number} ${s.title}`).join('\n')}>
+        ) : <span className="h-4" />}
+        <span data-col="next" className="min-w-0 truncate text-[12px] leading-4" title={note.map(({ s, word }) => `${word} #${s.number} ${s.title}`).join('\n')}>
           {note[0] && <><span className={`font-medium ${sliceTone(note[0].s)}`}>{note[0].word}</span> {note[0].s.title}{note.length > 1 && <span className="text-(--muted-foreground)"> +{note.length - 1} more</span>}</>}
         </span>
-        <Figures s={figuresOf(item, data)} />
-        <span className="flex min-w-0 items-center justify-end gap-1.5 text-[11px] text-(--muted-foreground)" title={repo}>
-          <span className={`${repoTone(repoKey(item), data.repos)} size-1.5 shrink-0 rounded-full bg-[var(--k,var(--muted-foreground))]`} /><span className="truncate">{repo}</span>
-        </span>
+        <span data-col="figures" className="grid min-w-0"><Figures s={figuresOf(item, data)} /></span>
       </span>
     </div>
     {slices && <div className="pb-2 pl-10 pr-2"><SliceList item={item} /></div>}

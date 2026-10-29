@@ -5,14 +5,19 @@
 // and pull requests sit in a sidebar beside them when the dialog is 45rem wide, else between the description and the
 // comments. The board's fields show at
 // once; the description, comments and people load when it opens. Its footer has GitHub, or Azure DevOps for a work
-// item, and the one action the item's status asks for, with Back to List and Abandon at its left.
+// item, and the one action the item's status asks for, with Back to List and Abandon at its left. Its description has
+// Edit, and its header an expand control that grows it, the open editor taking the height. Closing it with unsaved edits
+// asks "Discard changes?" first.
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { HINTS, carriesTwoStatuses, itemRepos, keepOneText, onAzure, openBlockers, ref, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
+import { Button } from '@lar-factory/ui/design-system/Button';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { useBoardStore } from '../board/board-store.ts';
+import { kind } from '../buttons/button-kinds.tsx';
+import { EXPANDED, ExpandButton, useExpand } from '../expand-dialog/expand-dialog.tsx';
 import { AbandonButton, ActionError, BackToListButton, PickStatusButtons, QueueButton } from '../items/item-actions.tsx';
 import { OpenThread, hasLiveThread } from '../items/open-thread.tsx';
 import { PrLink } from '../items/pr-link.tsx';
@@ -24,6 +29,8 @@ import { StartMessage, useStartHolds } from '../items/start-control.tsx';
 import { ItemStatusGlyph, StatusGlyph } from '../items/status-glyph.tsx';
 import { ItemComments, ItemDescription, ItemMeta, ItemRelations } from './item-details-view.tsx';
 import { useItemDialogStore } from './item-dialog-store.ts';
+import { useDescriptionEdit } from './use-description-edit.ts';
+import type { DescriptionEdit } from './use-description-edit.ts';
 import { ItemProgress } from './item-progress.tsx';
 import { useItemDetails } from './use-item-details.ts';
 
@@ -64,13 +71,28 @@ const Section = ({ heading, children }: { heading: ReactNode; children: ReactNod
   <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2"><h2 className="m-0 text-[13px] font-medium">{heading}</h2>{children}</section>
 );
 
-function ItemDialogContent({ item, data, now }: { item: Item; data: BoardData; now: number }) {
-  const read = useItemDetails(item.id, item.updatedAt);
+interface ContentProps {
+  item: Item;
+  data: BoardData;
+  now: number;
+  read: ItemDetailsRead;
+  edit: DescriptionEdit;
+  expanded: boolean;
+  toggleExpanded: () => void;
+}
+
+function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpanded }: ContentProps) {
   const aside = hasRelations(item, read);
   const hint = carriesTwoStatuses(item) ? keepOneText(item.statuses) : HINTS[item.status];
+  // The open editor in an expanded dialog takes the height the rest leaves.
+  const fill = expanded && edit.editing;
+  const rows = fill ? 'min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]' : aside ? '@min-[45rem]:grid-rows-[auto_1fr]' : '';
   return (
-    <Modal.Content title={`${ref(item)} ${item.title}`} presentation="workspace" data-item-dialog
-      headerActions={<AgentWork item={item} className="whitespace-nowrap text-xs text-base-700 @max-[40rem]:hidden" />}>
+    <Modal.Content title={`${ref(item)} ${item.title}`} presentation="workspace" data-item-dialog style={expanded ? EXPANDED : undefined}
+      headerActions={<>
+        <AgentWork item={item} className="whitespace-nowrap text-xs text-base-700 @max-[40rem]:hidden" />
+        <ExpandButton expanded={expanded} toggle={toggleExpanded} />
+      </>}>
       <div className="@container grid shrink-0 gap-1 border-b border-base-300 px-5 pb-3 text-xs text-base-700 sm:px-6" data-item-summary>
         <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
           {itemRepos(item).map((repo) => <RepoTag key={repo} repo={repo} repos={data.repos} />)}
@@ -80,8 +102,9 @@ function ItemDialogContent({ item, data, now }: { item: Item; data: BoardData; n
         </div>
         {item.parent && <p className="m-0 min-w-0 wrap-anywhere" data-item-parent>Part of <a href={item.parent.url} target="_blank" rel="noopener" className="underline">#{item.parent.number} {item.parent.title}</a></p>}
       </div>
-      <Modal.Body>
-        <div className="@container grid grid-cols-[minmax(0,1fr)] gap-3 pt-2" data-item-body>
+      <Modal.Body layout={fill ? 'fill' : 'scroll'}>
+        {/* Filling, a column whose description and comments take what the rest leave, however many of the rest show. */}
+        <div className={`@container gap-3 pt-2 ${fill ? 'flex min-h-0 flex-1 flex-col' : 'grid grid-cols-[minmax(0,1fr)]'}`} data-item-body>
           <ItemProgress item={item} />
           {hint && (
             <div className="flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-(--warning-surface) px-3 py-2.5">
@@ -90,8 +113,8 @@ function ItemDialogContent({ item, data, now }: { item: Item; data: BoardData; n
             </div>
           )}
           <ItemMeta item={item} read={read} now={now} />
-          <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem] @min-[45rem]:grid-rows-[auto_1fr]' : ''}`}>
-            <ItemDescription read={read} className="@min-[45rem]:col-start-1" />
+          <div className={`grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-4 ${aside ? '@min-[45rem]:grid-cols-[minmax(0,1fr)_16rem]' : ''} ${rows}`}>
+            <ItemDescription read={read} edit={edit} fill={fill} className="@min-[45rem]:col-start-1" />
             {aside && (
               <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 @min-[45rem]:col-start-2 @min-[45rem]:row-span-2 @min-[45rem]:row-start-1 @min-[45rem]:border-l @min-[45rem]:border-(--border) @min-[45rem]:pl-6">
                 <ItemRelations item={item} read={read} />
@@ -115,6 +138,34 @@ function ItemDialogContent({ item, data, now }: { item: Item; data: BoardData; n
   );
 }
 
+/** Asks before closing the dialog drops unsaved edits to the description. */
+function DiscardPrompt({ keep, discard }: { keep: () => void; discard: () => void }) {
+  return (
+    <Modal onClose={keep}>
+      <Modal.Content title="Discard changes?" description="Your edits to the description haven't been saved.">
+        <Modal.Footer>
+          <Button {...kind('other')} onClick={keep}>Keep editing</Button>
+          <Button {...kind('main', 'danger')} onClick={discard}>Discard</Button>
+        </Modal.Footer>
+      </Modal.Content>
+    </Modal>
+  );
+}
+
+/** The dialog on one item, which holds its details, its description edit and its size until it closes. */
+function ItemModal({ item, data, now, close }: { item: Item; data: BoardData; now: number; close: () => void }) {
+  const { read, refresh } = useItemDetails(item.id, item.updatedAt);
+  const edit = useDescriptionEdit(item.id, read, refresh);
+  const [asking, setAsking] = useState(false);
+  const [expanded, toggleExpanded] = useExpand(asking);
+  return <>
+    <Modal onClose={() => (edit.dirty ? setAsking(true) : close())} loading={edit.saving}>
+      <ItemDialogContent item={item} data={data} now={now} read={read} edit={edit} expanded={expanded} toggleExpanded={toggleExpanded} />
+    </Modal>
+    {asking && <DiscardPrompt keep={() => setAsking(false)} discard={() => { setAsking(false); close(); }} />}
+  </>;
+}
+
 export function ItemDialog() {
   const { data, now } = useBoardStore();
   const { itemId, close } = useItemDialogStore();
@@ -124,5 +175,5 @@ export function ItemDialog() {
     if (itemId && !item) close();
   }, [itemId, item, close]);
   if (!item) return null;
-  return <Modal onClose={close}><ItemDialogContent item={item} data={data} now={now} /></Modal>;
+  return <ItemModal key={item.id} item={item} data={data} now={now} close={close} />;
 }

@@ -1,5 +1,5 @@
 // The details cache: a hit while the item's updatedAt matches, a miss once it changes, nothing kept for a provider
-// without a cache, and no more entries than the bound, dropping the one used longest ago.
+// without a cache, no more entries than the bound, dropping the one used longest ago, and none for an item dropped.
 
 import { expect, test } from 'vite-plus/test';
 import { createDetailsCache } from './details-cache.ts';
@@ -42,4 +42,13 @@ test('keeps at most the bound, dropping the entry used longest ago', () => {
   expect(cache.get('I_2', 't'), 'the one not used').toBeNull();
   expect(cache.get('I_1', 't')).not.toBeNull();
   expect(cache.get('I_3', 't')).not.toBeNull();
+});
+
+test('drop forgets the item\'s entry and no other', () => {
+  const cache = createDetailsCache(everything);
+  cache.put('I_1', entry('t'));
+  cache.put('I_2', entry('t'));
+  cache.drop('I_1');
+  expect(cache.get('I_1', 't')).toBeNull();
+  expect(cache.get('I_2', 't')).not.toBeNull();
 });

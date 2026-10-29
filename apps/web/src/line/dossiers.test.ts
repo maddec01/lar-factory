@@ -1,6 +1,6 @@
 // The line's dossiers: each open concept, and each open item with sub-issues on the board: its two header lines,
-// collapsed until opened, then what keeps the work moving, its parts as a Work map or a list, and their rows. Ports the old Board view's
-// concept block tests.
+// collapsed until opened, then what keeps the work moving and its parts as a Work map or a list. Ports the old Board
+// view's concept block tests.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
 import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text } from '../../test/support.ts';
@@ -20,9 +20,8 @@ const toggle = (id = C200) => header(id).querySelector<HTMLButtonElement>('[aria
 const OPEN_KEY = 'lar-board:dossier-open:';
 const VIEW_KEY = 'lar-board:dossier-view:';
 const step = (id: string, d = C200) => dossier(d).querySelector<HTMLElement>(`[data-part="${id}"]`)!;
-const phases = (d = C200) => [...dossier(d).querySelectorAll('[data-checklist] [data-phase]')];
-const progress = (d = C200) => [...dossier(d).querySelectorAll('[data-item]')].slice(1) as HTMLElement[];
-const row = (id: string, d = C200) => dossier(d).querySelector<HTMLElement>(`[data-item="${id}"]`)!;
+/** The parts the parts list shows, in its order. */
+const listed = (d = C200) => [...dossier(d).querySelectorAll<HTMLElement>('[data-parts-list] [data-part]')].map((p) => p.dataset.part);
 const startIn = (el: Element) => el.querySelector<HTMLButtonElement>('[data-start]');
 /** Clicks `el`; a menu it closes hands focus back on the next tick. */
 const press = (el: Element) => settle(() => {
@@ -230,7 +229,8 @@ test('an open dossier has no About section; what keeps the work moving is in lab
   await press($('[data-item-dialog] [aria-label="Close"]')!);
   await press(button(dossier().querySelector('[data-attention-row="fog"]')!, '#201'));
   expect(dialogTitle(), "a fog question's #n opens its item").toBe(`#201 ${sample.items.find((i) => i.number === 201)!.title}`);
-  expect(dossier(C180).querySelector('[data-attention]'), 'no rows when nothing has entries').toBeNull();
+  expect([dossier(C180).querySelector('[data-attention]'), text(dossier(C180).querySelector('[data-attention-none]'))], 'no rows when nothing has entries')
+    .toEqual([null, 'Nothing holds this up.']);
 });
 
 test('parts in Verify or Ready to merge get their own row after Needs you, which with the chip counts only Needs you', async () => {
@@ -245,6 +245,8 @@ test('parts in Verify or Ready to merge get their own row after Needs you, which
   expect(text(next()), 'a part ready to merge is named to merge').toBe('To merge#140 Owner accounts');
   await receive(withItem('I_sample10', { status: 'Verify' }, withItem('I_sample13', { status: 'Ready to merge', blockers: [] })));
   const verify = dossier().querySelector('[data-attention-row="verify"]')!;
+  expect([verify.firstElementChild!.className.split(' '), dossier().querySelector('[data-attention]')!.className.split(' ')], 'its long label never wraps: the labels\' column grows past 7.5rem to fit it')
+    .toEqual([expect.arrayContaining(['whitespace-nowrap']), expect.arrayContaining(['grid-cols-[minmax(7.5rem,max-content)_minmax(0,1fr)]'])]);
   expect([...verify.lastElementChild!.children].map(text)).toEqual(['#140 Owner accountsReady to merge', '#201 Relay: broker only or full TURN?Verify']);
   await press(button(verify, '#140 Owner accounts'));
   expect(dialogTitle()).toBe('#140 Owner accounts');
@@ -289,67 +291,64 @@ test('a dossier opens on its Work map, and the browser remembers a switch to the
   await mountPage();
   expect([button(dossier(), 'Work map').getAttribute('aria-pressed'), dossier().querySelector('[data-work-map]') !== null]).toEqual(['true', true]);
   await press(button(dossier(), 'Parts list'));
-  expect([dossier().querySelector('[data-work-map]'), dossier().querySelector('[data-checklist]') !== null, localStorage.getItem(VIEW_KEY + C200)]).toEqual([null, true, 'list']);
+  expect([dossier().querySelector('[data-work-map]'), dossier().querySelector('[data-parts-list]') !== null, localStorage.getItem(VIEW_KEY + C200)]).toEqual([null, true, 'list']);
   vi.resetModules();
   await mountPage();
   expect(button(dossier(), 'Parts list').getAttribute('aria-pressed'), 'it stays on the parts list').toBe('true');
   expect(button(dossier(C180), 'Work map').getAttribute('aria-pressed'), 'the other dossier stays on its Work map').toBe('true');
 });
 
-test('the checklist runs Decide, then Build per repository, then Check, the done parts folded', async () => {
+test('the parts list holds the open parts in dependency order, two columns where there is room, the done ones behind Show N done', async () => {
   await mountPage();
-  expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build lar-server', 'Checkthe agents run it once every build lands']);
-  expect([...phases()[0]!.querySelectorAll('[data-part]')].map((s) => s.getAttribute('data-part'))).toEqual(['I_sample12', 'I_sample10']);
-  const fold = button(phases()[0]!, '1 done');
+  expect(listed()).toEqual(['I_sample12', 'I_sample10', 'I_sample13']);
+  expect(dossier().querySelector('[data-parts-list]')!.className.split(' ')).toContain('@4xl:grid-cols-2');
+  const fold = button(dossier(), 'Show 1 done');
   await press(fold);
-  expect([fold.getAttribute('aria-expanded'), phases()[0]!.querySelectorAll('[data-part]').length]).toEqual(['true', 3]);
-  expect(phases(C180).map((p) => text(p.querySelector('h4'))), 'which repository goes first').toEqual(['Build lar-servergoes first', 'Build lar-appleafter lar-server', 'Checkthe agents run it once every build lands']);
+  expect([text(fold), fold.getAttribute('aria-expanded'), listed().length]).toEqual(['Hide 1 done', 'true', 4]);
+  expect(listed(C180), 'all done').toEqual([]);
+  await press(button(dossier(C180), 'Show 2 done'));
+  expect(listed(C180).length).toBe(2);
 });
 
-test('each step shows its kind, what it waits on, its figures and its own thread', async () => {
+test('the open body has no Check phase, progress rows or stage header; the Work map keeps the end-to-end check', async () => {
   await mountPage();
+  expect(text(dossier())).not.toContain('Run end-to-end');
+  expect(text(dossier())).not.toContain('Progress · ');
+  expect(dossier().querySelectorAll('[data-item]').length, "only the header's").toBe(1);
+});
+
+test('each part shows what it asks next, then its stage track, status, figures and thread, and its slice bar', async () => {
+  await mountPage(withItem('I_sample13', { azure: { type: 'Feature', state: 'Active', assignee: 'Ana' },
+    linkedPrs: [{ ...sample.items.flatMap((i) => i.linkedPrs)[0]!, number: 145, state: 'open', isDraft: false }] }));
   const lines = (id: string) => [...step(id).children].map(text);
-  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?grillOpen thread', 'Shaping28m · 1.87M · $2.71after #203 (done)', 'T3 · Grill: relay broker only or full TURN· running']);
-  expect(lines('I_sample12')).toEqual(['#202 Sign-in screenprototypeon your desk', 'Needs you41m · 2.95M · $4.35', 'T3 · Prototype: sign-in screen· needs you']);
-  expect(lines('I_sample13')).toEqual(['#140 Owner accountsbuildStart after #202 ▾', 'Ready1/3 sliceswaits on #202', '', 'T3 · Shape: owner accounts· done']);
-  const chip = button(step('I_sample13'), '#202');
-  expect(chip.className, 'an open blocker').toContain('text-(--warning-foreground)');
-  expect(button(step('I_sample10'), '#203 (done)').querySelector('.lucide-check'), 'a closed one is ticked').not.toBeNull();
-  await press(chip);
-  expect(dialogTitle()).toBe('#202 Sign-in screen');
+  expect(lines('I_sample10')).toEqual(['#201 Relay: broker only or full TURN?', 'Open thread', 'Shaping28m · 1.87M · $2.71T3 · Grill: relay broker only or full TURN· running']);
+  expect(lines('I_sample12')).toEqual(['#202 Sign-in screen', 'on your desk', 'Needs you41m · 2.95M · $4.35T3 · Prototype: sign-in screen· needs you']);
+  expect(lines('I_sample13').slice(0, 3)).toEqual(['#140 Owner accounts', '1/3Start after #202 ▾', 'ReadyFeature · Active · AnaPR #145T3 · Shape: owner accounts· done']);
+  expect(step('I_sample13').querySelector('[data-part-meta] ol')!.getAttribute('title'), "the stage track, dashed while it waits").toBe('Ready, waiting');
+  expect(step('I_sample10').querySelector('[data-part-meta] ol')!.getAttribute('title')).toBe('Shaping');
+  expect(step('I_sample13').children[3]!.className.split(' '), 'its slice bar under the row').toContain('col-span-2');
+  await press(button(step('I_sample10'), '#201 Relay: broker only or full TURN?'));
+  expect(dialogTitle(), 'a part opens its item').toBe('#201 Relay: broker only or full TURN?');
 });
 
-test('a step with no thread yet says when its thread starts', async () => {
+test('a part waiting on another, with no Start of its own, says what it waits on', async () => {
+  await mountPage(withItem('I_sample10', { blockers: [{ number: 140, repo: 'maddec01/lar-server', state: 'open' }] }));
+  expect(text(step('I_sample10').children[1])).toBe('waits on #140');
+  expect([...step('I_sample10').children[1]!.querySelectorAll('button, svg')], 'plain text: no chip, no status icon').toEqual([]);
+  const side = dossier().querySelector('[data-attention-row="waiting"] dd > div > span:last-child')!;
+  expect([text(side), side.children.length], 'the Waiting row says it the same way').toEqual(['waits on #202', 0]);
+});
+
+test('a part with no thread yet says when its thread starts', async () => {
   await mountPage(withItem('I_sample13', { threads: [] }));
-  expect(text(step('I_sample13').lastElementChild)).toBe('Thread starts when #202 is done');
+  expect(text(step('I_sample13').querySelector('[data-part-meta]')!.lastElementChild)).toBe('Thread starts when #202 is done');
 });
 
-test('a Ready part with completed prerequisites offers Start build without blocking wording', async () => {
+test('a Ready part with completed prerequisites offers Start without blocking wording', async () => {
   await mountPage(unblocked());
   const part = step('I_sample13');
-  expect(text(part)).toContain('Start build');
+  expect(text(startIn(part))).toBe('Start ▾');
   expect(text(part)).not.toContain('waits on');
-  expect(text(part)).toContain('after #202 (done)');
-});
-
-test('a part with mixed prerequisites only says it waits on the open ones', async () => {
-  await mountPage(withItem('I_sample13', { blockers: [
-    { number: 202, repo: 'maddec01/lar-server', state: 'open' },
-    { number: 203, repo: 'maddec01/lar-server', state: 'closed' },
-  ] }));
-  expect(text(step('I_sample13'))).toContain('waits on #202after #203 (done)');
-});
-
-test('the progress rows sit on the stage track, done parts folded, each side saying what it waits on', async () => {
-  await mountPage();
-  expect(text(dossier().lastElementChild!.firstElementChild!.firstElementChild)).toBe('Progress · 6 parts');
-  expect(progress().map((r) => r.dataset.item)).toEqual(['I_sample12', 'I_sample10', 'I_sample13']);
-  const side = (id: string) => text(row(id).lastElementChild);
-  expect([side('I_sample10'), side('I_sample12'), side('I_sample13')]).toEqual(['Thread running', 'on your desk', 'waits on #202']);
-  expect(row('I_sample13').children[1]!.getAttribute('title'), 'a waiting part is dashed').toBe('Ready, waiting');
-  await press(button(dossier(C180), '2 done'));
-  expect(progress(C180).map((r) => text(r.lastElementChild))).toEqual(['PR #182 (merged)', 'PR #41 (merged)']);
-  expect(button(dossier(C180), 'Hide 2 done')).toBeDefined();
 });
 
 test('a blocked build shows only Start after, a Start, in place of Start build', async () => {
@@ -392,7 +391,7 @@ test('a blocked part that carries two statuses offers no Start after in its step
 test("Start on a Queued decision is today's Start", async () => {
   holdPosts(withDecision());
   await mountPage(withDecision());
-  expect(text(step('I_d204'))).toMatch(/^#204 Pick the relay hostgrillStart ▾/);
+  expect(text(step('I_d204'))).toMatch(/^#204 Pick the relay hostStart ▾/);
   await pressMenu(startIn(step('I_d204'))!);
   await press(entries()[0]!);
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_d204' }]]);
@@ -434,24 +433,21 @@ test('Open thread takes Start\'s place while a part has a live thread', async ()
   expect(step('I_d204').querySelector('[data-open-thread]')!.getAttribute('href')).toBe('t3code://threads/sample-environment/t1');
 });
 
-test("the parts list ends on the map's end-to-end check, waiting, with running it not built yet", async () => {
-  await mountPage();
-  const check = phases()[2]!;
-  expect(text(check)).toContain('waitingwaits on #140Thread starts when #140 is done');
-  for (const label of ['Run end-to-end', 'Watch run']) {
-    const b = button(check, label);
-    expect([b.disabled, b.title, b.className.includes('disabled:pointer-events-auto'), b.dataset.kind, Boolean(b.querySelector('[data-slot="icon"] svg'))])
-      .toEqual([true, `${label} isn't built yet: no workflow runs an end-to-end check`, true, 'start', true]);
-  }
-});
-
-test('a map with no End-to-end check section has no Check phase, and its map says none is written', async () => {
+test('a map with no End-to-end check section says none is written', async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   const { check: _, ...map } = c200.map!;
   await mountPage(withItem(C200, { map }));
-  expect(phases().map((p) => text(p.querySelector('h4')))).toEqual(['Decide1/3 answered', 'Build lar-server']);
   await press(button(dossier(), 'Work map'));
   expect(text(dossier().querySelector('[data-work-map]'))).toContain('No end-to-end check written yet');
+});
+
+test('neither the parts list nor the Work map lanes draw a coloured repository dot', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  await mountPage();
+  await press(button(dossier(), 'Show 1 done'));
+  expect([listed().length, dossier().querySelector('[class*="repo-tone"]')]).toEqual([4, null]);
+  await press(button(dossier(), 'Work map'));
+  expect([dossier().querySelectorAll('[data-work-map] .sticky').length, dossier().querySelector('[class*="repo-tone"]')]).toEqual([2, null]);
 });
 
 test('a Map lane named owner/name shows it once', async () => {
@@ -469,7 +465,7 @@ test('the Map view draws a lane per repository and Decisions, its parts by wave,
   await press(toggle);
   expect([toggle.getAttribute('aria-pressed'), button(dossier(), 'Parts list').getAttribute('aria-pressed')]).toEqual(['true', 'false']);
   const map = dossier().querySelector('[data-work-map]')!;
-  expect(dossier().querySelector('[data-checklist]'), 'the map takes the checklist\'s place').toBeNull();
+  expect(dossier().querySelector('[data-parts-list]'), "the map takes the parts list's place").toBeNull();
   expect([...map.querySelectorAll('.sticky')].map(text)).toEqual(['Decisionsgrill, prototype, research', 'lar-servermaddec01/lar-server']);
   const subtitle = map.querySelectorAll('.sticky')[1]!.lastElementChild!;
   expect([subtitle.className.split(' ').includes('truncate'), subtitle.getAttribute('title')], 'owner/name stays on one line').toEqual([true, 'maddec01/lar-server']);
@@ -497,8 +493,7 @@ test('an item with sub-issues on the board is coupled work, its parts from its c
   });
   await mountPage({ ...sample, error: null, items: normalizeItems([parent, child], { builds: new Set(['maddec01/lar-factory#102', 'maddec01/lar-factory#103']) }) });
   expect([text(line(1, 'I_100').firstElementChild!.firstElementChild!.firstElementChild), text(line(2, 'I_100'))]).toEqual(['Coupled work', '0/2 partsMoving#102 Issue 102lar-factory']);
-  expect(progress('I_100').map((r) => r.dataset.item), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
-  expect(phases('I_100').map((p) => text(p.querySelector('h4'))), 'no Check phase without a map').toEqual(['Build lar-factory']);
+  expect(listed('I_100'), 'its build sub-issue is a part; its slice is not').toEqual(['I_102']);
   expect($('[data-in-flight] [data-item="I_102"]'), 'out of the rest of the line').toBeNull();
 });
 
@@ -509,19 +504,19 @@ test('the dossiers take the main area\'s scope', async () => {
   expect($$('[data-dossier]').map((d) => d.getAttribute('data-dossier')), '#180 through its Apple build').toEqual([C180]);
 });
 
-test('the checklist keeps cross-repository dependency order even when builds return to a repository', async () => {
+test('the parts list keeps cross-repository dependency order even when builds return to a repository', async () => {
   const first = { ...sample.items.find((i) => i.id === 'I_sample24')!, state: 'open' as const, status: 'Ready' as const, blockers: [] };
   const second = { ...sample.items.find((i) => i.id === 'I_sample25')!, state: 'open' as const, status: 'Ready' as const };
   const last: Item = { ...first, id: 'I_last', number: 999, title: 'Finish in the server', blockers: [{ repo: second.repo!, number: second.number!, state: 'open' }] };
   await mountPage({ ...sample, items: [...sample.items.filter((i) => ![first.id, second.id].includes(i.id)), last, second, first] });
-  expect([...dossier(C180).querySelectorAll('[data-checklist] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([first.id, second.id, last.id]);
+  expect([...dossier(C180).querySelectorAll('[data-parts-list] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([first.id, second.id, last.id]);
 });
 
-test('the checklist keeps a build before a research decision blocked by that build', async () => {
+test('the parts list keeps a build before a research decision blocked by that build', async () => {
   const build = { ...sample.items.find((i) => i.id === 'I_sample13')!, blockers: [] };
   const research = { ...decision([{ repo: build.repo!, number: build.number!, state: 'open' }]), labels: ['decision-research'] };
   await mountPage({ ...sample, items: [c200, research, build] });
-  expect([...dossier().querySelectorAll('[data-checklist] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([build.id, research.id]);
+  expect([...dossier().querySelectorAll('[data-parts-list] [data-part]')].map((p) => p.getAttribute('data-part'))).toEqual([build.id, research.id]);
 });
 
 test('a concept with no map has no fog row', async () => {

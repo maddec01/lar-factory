@@ -24,13 +24,52 @@ test('a success toast clears itself after 5 s', async () => {
 test('a toast with focus stays, then gets a full 5 s once focus leaves', async () => {
   await mountPage();
   await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
-  toast()!.querySelector<HTMLElement>('.view-item')!.focus();
+  await settle(() => toast()!.querySelector<HTMLElement>('.view-item')!.focus());
   await settle(() => vi.advanceTimersByTime(8_000));
   expect(toast(), 'still being used').not.toBeNull();
-  (document.activeElement as HTMLElement).blur();
-  await settle(() => vi.advanceTimersByTime(5_500));
+  await settle(() => (document.activeElement as HTMLElement).blur());
+  await settle(() => vi.advanceTimersByTime(4_999));
   expect(toast()).not.toBeNull();
+  await settle(() => vi.advanceTimersByTime(1));
+  expect(toast()).toBeNull();
+});
+
+test.each(['focus', 'hover'])('even a brief %s interaction gives a success another full 5 s', async (interaction) => {
+  await mountPage();
+  await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
+  const entry = toast()!;
   await settle(() => vi.advanceTimersByTime(1_000));
+  await settle(() => interaction === 'focus'
+    ? entry.querySelector<HTMLElement>('.view-item')!.focus()
+    : entry.dispatchEvent(new MouseEvent('mouseenter')));
+  await settle(() => vi.advanceTimersByTime(1_000));
+  await settle(() => interaction === 'focus'
+    ? (document.activeElement as HTMLElement).blur()
+    : entry.dispatchEvent(new MouseEvent('mouseleave')));
+  await settle(() => vi.advanceTimersByTime(4_999));
+  expect(toast()).not.toBeNull();
+  await settle(() => vi.advanceTimersByTime(1));
+  expect(toast()).toBeNull();
+});
+
+test('a success waits for both hover and focus to leave, including focus moving between its controls', async () => {
+  await mountPage();
+  await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
+  const entry = toast()!;
+  await settle(() => entry.dispatchEvent(new MouseEvent('mouseenter')));
+  await settle(() => vi.advanceTimersByTime(8_000));
+  expect(toast(), 'still hovered').not.toBeNull();
+  await settle(() => entry.querySelector<HTMLElement>('.view-item')!.focus());
+  await settle(() => entry.dispatchEvent(new MouseEvent('mouseleave')));
+  await settle(() => vi.advanceTimersByTime(8_000));
+  expect(toast(), 'still focused').not.toBeNull();
+  await settle(() => entry.querySelector<HTMLButtonElement>('.dismiss')!.focus());
+  await settle(() => vi.advanceTimersByTime(8_000));
+  expect(toast(), 'focus moved within the toast').not.toBeNull();
+  await settle(() => (document.activeElement as HTMLElement).blur());
+  await settle(() => vi.advanceTimersByTime(4_999));
+  expect(toast()).not.toBeNull();
+  await settle(() => vi.advanceTimersByTime(1));
   expect(toast()).toBeNull();
 });
 
@@ -43,7 +82,7 @@ test('a new notice replaces the last, and its close button closes it', async () 
   expect(document.querySelectorAll('[data-toast]').length).toBe(1);
   expect(text(toast())).toMatch(/^Moved #114 /);
   const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;
-  close.focus();
+  await settle(() => close.focus());
   await settle(() => close.click());
   expect(toast()).toBeNull();
   expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
@@ -170,7 +209,7 @@ test('closing a focused toast prefers its target in the open item dialog over th
     focusAfter: ['[data-back-to-list="I_sample05"]'],
   }));
   const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;
-  close.focus();
+  await settle(() => close.focus());
   await settle(() => close.click());
   expect(toast()).toBeNull();
   expect(document.activeElement).toBe(target);

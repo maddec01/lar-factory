@@ -7,11 +7,11 @@ const stats: ItemStats = { agentMs: 65 * 60_000, wallMs: 47 * 60_000, tokens: 12
 const block = statsBlock(stats);
 
 test('the block shows agent time, wall time, total tokens and API cost, between markers', () => {
-  assert.equal(block, '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 0m · wall 45m · 12.4M · $41\n<!-- lar-stats-data {"agentMs":3900000,"wallMs":2820000,"tokens":12436000,"costUsd":41.2} -->\n<!-- /lar-stats -->');
+  assert.equal(block, '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 5m · wall 47m · 12.4M · $41\n<!-- lar-stats-data {"agentMs":3900000,"wallMs":2820000,"tokens":12436000,"costUsd":41.2} -->\n<!-- /lar-stats -->');
   assert.equal(statsBlock({ agentMs: 195 * 60_000, wallMs: 75 * 60_000, tokens: 980 }),
     '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 3h 15m · wall 1h 15m · 980\n<!-- lar-stats-data {"agentMs":11700000,"wallMs":4500000,"tokens":980} -->\n<!-- /lar-stats -->', 'nothing priced, no cost');
   assert.equal(statsBlock({ agentMs: stats.agentMs, tokens: 980 }),
-    '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 0m · 980\n<!-- lar-stats-data {"agentMs":3900000,"tokens":980} -->\n<!-- /lar-stats -->', 'no wall time, no wall part');
+    '<!-- lar-stats -->\n**Item stats** (kept current by the lar board): Σ 1h 5m · 980\n<!-- lar-stats-data {"agentMs":3900000,"tokens":980} -->\n<!-- /lar-stats -->', 'no wall time, no wall part');
 });
 
 test('the block displays whole dollars and preserves cents in its data', () => {
@@ -20,14 +20,14 @@ test('the block displays whole dollars and preserves cents in its data', () => {
   assert.equal(edits([item([pr(1, 'open', `Body\n\n${block}`)], { ...stats, costUsd: 41.4 })]).length, 1, 'the data retains cents; the server throttles running edits');
 });
 
-test('the block rounds agent and wall time to 5 minutes under an hour and to 15 from an hour, while retaining exact data', () => {
-  const time = (minutes: number) => /Σ ([^·]+) ·/.exec(statsBlock({ ...stats, agentMs: minutes * 60_000 }))?.[1];
-  assert.deepEqual([0.4, 2.4, 2.6, 52, 57.4, 59.9].map(time), ['0m', '0m', '5m', '50m', '55m', '1h 0m']);
-  assert.deepEqual([60, 67.4, 67.6, 128, 135].map(time), ['1h 0m', '1h 0m', '1h 15m', '2h 15m', '2h 15m']);
-  const wall = (minutes: number) => /wall ([^·]+) ·/.exec(statsBlock({ ...stats, wallMs: minutes * 60_000 }))?.[1];
-  assert.deepEqual([2.4, 2.6, 59.9, 67.4, 67.6].map(wall), ['0m', '5m', '1h 0m', '1h 0m', '1h 15m']);
-  assert.equal(edits([item([pr(1, 'open', `Body\n\n${block}`)], { ...stats, agentMs: 66 * 60_000, wallMs: 46 * 60_000 })]).length, 1,
-    'the data retains each minute; the server throttles running edits');
+test('PR times use minute precision and keep every positive short duration visible', () => {
+  const shown = (ms: number) => /Σ (.+) · 12.4M/.exec(statsBlock({ ...stats, agentMs: ms, wallMs: ms }))?.[1];
+  assert.deepEqual([0, 1, 24_000, 59_999, 60_000, 138_072, 3_599_999, 4_056_000].map(shown), [
+    '0m · wall 0m', '<1m · wall <1m', '<1m · wall <1m', '<1m · wall <1m',
+    '1m · wall 1m', '2m · wall 2m', '59m · wall 59m', '1h 7m · wall 1h 7m',
+  ]);
+  const exact = { agentMs: 138_072, wallMs: 138_072, tokens: 980 };
+  assert.deepEqual(mergedStats(item([pr(1, 'merged', statsBlock(exact))], null)), { ...exact, frozen: true });
 });
 
 test('a body without a block gets one appended; the text before it is kept byte for byte', () => {

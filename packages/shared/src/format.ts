@@ -1,7 +1,8 @@
 // Text helpers the server and the page share: times, durations, counts, token counts and costs.
 
-/** A running time in whole minutes: `12m`, `1h 5m`. */
+/** A running time in whole minutes: `<1m`, `12m`, `1h 5m`. */
 export function duration(ms: number): string {
+  if (ms > 0 && ms < 60_000) return '<1m';
   const m = Math.max(0, Math.floor(ms / 60_000));
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }

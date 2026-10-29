@@ -14,6 +14,7 @@
 @source "./add-item/add-item.tsx";
 @source "./app.tsx";
 @source "./copy/copy-button.tsx";
+@source "./description-editor";
 @source "./desk";
 @source "./item-dialog";
 @source "./items/item-parts.tsx";

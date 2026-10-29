@@ -12,7 +12,7 @@ import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 /** How long a success toast stays. */
 const TOAST_MS = 5_000;
 /** Where focus goes when a closed toast had it and names nowhere of its own. */
-const FALLBACK_FOCUS = ['.add-item', '.open-settings'];
+const FALLBACK_FOCUS = ['.add-item', '.open-settings', '[data-slot="modal-close"]'];
 
 /** Keeps a new entry visible without taking focus or scrolling when an older entry changes. */
 function scrollToNewest(viewport: HTMLDivElement | null) {
@@ -52,7 +52,7 @@ export function DismissButton({ what, onClick }: { what: string; onClick: (event
 
 const focusFirst = (selectors: string[]) => {
   // The item dialog holds focus while it's open, and its buttons share their data attributes with the board's.
-  const root = document.querySelector(OPEN_ITEM_DIALOG) ?? document;
+  const root = document.querySelector(OPEN_ITEM_DIALOG) ?? document.querySelector('[role="dialog"][data-state="open"]') ?? document;
   // querySelector returns the first in page order; take the first selector that matches.
   selectors.map((sel) => root.querySelector<HTMLElement>(sel)).find(Boolean)?.focus({ preventScroll: true });
 };

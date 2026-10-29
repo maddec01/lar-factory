@@ -3,6 +3,8 @@
 // live formatting), in today's Add item layout and in the item dialog's Edit description. X and Y differ only in the
 // Add item layout (X: one wide column, editor fills, labels as chips; Y: two columns, side panel), both with editor A.
 // Labels are grouped by the text before ": " in every variant.
+// Round 2 adds YB: layout Y with editor B filling the left column, the "Only for" checkbox on Azure repositories, and an
+// item dialog whose Edit asks "Discard changes?" before Escape or a click outside drops unsaved changes.
 
 import '../prototype.css';
 import { StrictMode, useEffect, useState } from 'react';
@@ -24,15 +26,15 @@ import { ITEM, KINDS, REPOS, groupLabels } from './mock.ts';
 import { MarkdownTextarea } from './markdown-textarea.tsx';
 import { LiveEditor } from './live-editor.tsx';
 
-const VARIANTS = { A: 'Editor: Markdown + smart lists', B: 'Editor: live formatting (Lexical)', X: 'Layout: one wide column', Y: 'Layout: two columns' } as const;
+const VARIANTS = { A: 'Editor: Markdown + smart lists', B: 'Editor: live formatting (Lexical)', X: 'Layout: one wide column', Y: 'Layout: two columns', YB: 'Round 2: layout Y with editor B' } as const;
 type Variant = keyof typeof VARIANTS;
 const KEYS = Object.keys(VARIANTS) as Variant[];
 
 type EditorProps = { value: string; onChange: (value: string) => void; fill?: boolean; label: string };
-const editorFor = (variant: Variant) => (variant === 'B' ? LiveEditor : MarkdownTextarea) as (props: EditorProps) => ReactNode;
+const editorFor = (variant: Variant) => (variant === 'B' || variant === 'YB' ? LiveEditor : MarkdownTextarea) as (props: EditorProps) => ReactNode;
 
-type Draft = { repo: string; kind: string; title: string; description: string; labels: string[] };
-const EMPTY: Draft = { repo: REPOS[0]!.repo, kind: '', title: '', description: '', labels: [] };
+type Draft = { repo: string; kind: string; title: string; description: string; labels: string[]; onlyFor: boolean };
+const EMPTY: Draft = { repo: REPOS[0]!.repo, kind: '', title: '', description: '', labels: [], onlyFor: true };
 
 // --- labels -------------------------------------------------------------------------------------------------------
 
@@ -79,6 +81,18 @@ function LabelChips({ draft, set }: { draft: Draft; set: (d: Draft) => void }) {
         </div>
       ))}
     </fieldset>
+  );
+}
+
+/** Only for <repo>, on an Azure repository only. */
+function OnlyFor({ draft, set }: { draft: Draft; set: (d: Draft) => void }) {
+  const repo = REPOS.find((r) => r.repo === draft.repo)!;
+  if (!repo.azure) return null;
+  return (
+    <div className="grid gap-1">
+      <Checkbox label={`Only for ${repo.name}`} checked={draft.onlyFor} onChange={() => set({ ...draft, onlyFor: !draft.onlyFor })} />
+      <p className="m-0 text-xs text-(--muted-foreground)">Unticked, it appears for every repository that reads the {repo.azure.team} team's backlog and current sprint.</p>
+    </div>
   );
 }
 
@@ -139,7 +153,7 @@ function AddItemModal({ variant, draft, set, onClose }: { variant: Variant; draf
     </Modal>
   );
 
-  if (variant === 'Y') return (
+  if (variant === 'Y' || variant === 'YB') return (
     <Modal onClose={onClose}>
       <Modal.Content title="Add item" presentation="paned">
         {intro}
@@ -150,6 +164,7 @@ function AddItemModal({ variant, draft, set, onClose }: { variant: Variant; draf
           </div>
           <aside className="grid content-start gap-4 overflow-y-auto border-l border-base-300 bg-base-50/60 px-4 py-4">
             <RepoKind draft={draft} set={set} stacked />
+            {variant === 'YB' && <OnlyFor draft={draft} set={set} />}
             <LabelChecks draft={draft} set={set} column />
           </aside>
         </div>
@@ -183,8 +198,12 @@ function ItemDialogMock({ variant, onClose }: { variant: Variant; onClose: () =>
   const [saved, setSaved] = useState(ITEM.description);
   const [editing, setEditing] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [asking, setAsking] = useState(false);
+  // YB: Escape or a click outside with unsaved changes asks first.
+  const close = () => (variant === 'YB' && editing !== null && editing !== saved ? setAsking(true) : onClose());
   return (
-    <Modal onClose={onClose}>
+    <>
+    <Modal onClose={close}>
       <Modal.Content title={`${ITEM.ref} ${ITEM.title}`} presentation="workspace">
         <div className="shrink-0 border-b border-base-300 px-5 pb-3 text-xs text-base-700 sm:px-6">lar · List · updated 2h ago</div>
         <Modal.Body>
@@ -212,9 +231,20 @@ function ItemDialogMock({ variant, onClose }: { variant: Variant; onClose: () =>
             </section>
           </div>
         </Modal.Body>
-        <Modal.Footer><Button {...kind('other')} onClick={onClose}>Close</Button></Modal.Footer>
+        <Modal.Footer><Button {...kind('other')} onClick={close}>Close</Button></Modal.Footer>
       </Modal.Content>
     </Modal>
+    {asking && (
+      <Modal onClose={() => setAsking(false)}>
+        <Modal.Content title="Discard changes?" description="Your edits to the description haven't been saved.">
+          <Modal.Footer>
+            <Button {...kind('other')} onClick={() => setAsking(false)}>Keep editing</Button>
+            <Button {...kind('main')} onClick={() => { setAsking(false); onClose(); }}>Discard</Button>
+          </Modal.Footer>
+        </Modal.Content>
+      </Modal>
+    )}
+    </>
   );
 }
 
@@ -254,10 +284,10 @@ function Switcher({ variant, go }: { variant: Variant; go: (v: Variant) => void 
 function Page() {
   const [variant, setVariant] = useState(readVariant);
   const [open, setOpen] = useState<string | null>(() => params().get('open') ?? 'add');
-  const [draft, setDraft] = useState<Draft>({ ...EMPTY, title: 'Show lyrics while playing', labels: ['app: music'], description: '- Lyrics under the artwork\n- Scroll with the song' });
+  const [draft, setDraft] = useState<Draft>({ ...EMPTY, title: 'Show lyrics while playing', labels: ['app: music'], onlyFor: true, description: '- Lyrics under the artwork\n- Scroll with the song' });
   const go = (v: Variant) => { setVariant(v); setParam('variant', v); };
   const show = (o: string | null) => { setOpen(o); setParam('open', o); };
-  const itemDialog = variant === 'A' || variant === 'B';
+  const itemDialog = variant !== 'X' && variant !== 'Y';
   return (
     <TooltipProvider>
       <div className="grid gap-4 p-6">
@@ -268,7 +298,7 @@ function Page() {
           <Button {...kind('other')} onClick={() => setDraft(EMPTY)}>Clear draft</Button>
           {!itemDialog && <span className="text-xs text-(--muted-foreground)">X and Y are layout variants; the item dialog uses editor A.</span>}
         </div>
-        <p className="m-0 max-w-3xl text-sm text-(--muted-foreground)">Throwaway, mock data, nothing is written. ← → or the bar below switch variants (?variant=A|B|X|Y, ?open=add|item).</p>
+        <p className="m-0 max-w-3xl text-sm text-(--muted-foreground)">Throwaway, mock data, nothing is written. ← → or the bar below switch variants (?variant=A|B|X|Y|YB, ?open=add|item).</p>
       </div>
       {/* The draft's state, above the modal's overlay. */}
       <pre className="pointer-events-none fixed right-3 top-3 z-[2147483647] m-0 max-h-[40vh] w-80 overflow-hidden whitespace-pre-wrap rounded-md bg-black/85 p-3 font-mono text-[11px] text-white shadow-xl">

@@ -34,7 +34,7 @@ test('a missing t3 replaces the main area with a notice and Recheck', async () =
   expect(recheckButton().textContent).toBe('Recheck');
   expect($('.desk'), 'the notice replaces the desk and the line').toBeNull();
   expect($('.line')).toBeNull();
-  expect($('.warnings')).toBeNull();
+  expect($('[data-warning]')).toBeNull();
 });
 
 test('a t3 override that points nowhere is named', async () => {

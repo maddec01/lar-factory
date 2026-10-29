@@ -18,12 +18,10 @@ async function openStream(t: TestContext, board: Board) {
   let buffered = '';
   const pushed: BoardData[] = [];
   async function next(check: (data: BoardData) => boolean): Promise<BoardData> {
-    const deadline = AbortSignal.timeout(3_000);
     for (;;) {
       const found = pushed.splice(0).find(check);
       if (found) return found;
-      const { value, done } = await Promise.race([reader.read(),
-        new Promise<never>((_, reject) => deadline.addEventListener('abort', () => reject(new Error('No matching push'))))]);
+      const { value, done } = await reader.read();
       if (done) throw new Error('The stream ended');
       buffered += value;
       const events = buffered.split('\n\n');
@@ -55,7 +53,8 @@ test('the stream sends the board at once with the same headers as other endpoint
 test('the stream pushes each read of GitHub as soon as it finishes', async (t) => {
   // A source reads at most every 2 s however often a read is asked for, which the fast clock shortens, so the asked
   // read runs at once instead of on a later tick.
-  const board = await startBoard(t, { items: [boardIssue(1, 'List')] }, false, true);
+  // The slow source also outlasts the old three-second stream polling budget.
+  const board = await startBoard(t, { items: [boardIssue(1, 'List')], readDelay: 3500, delayedRepos: ['maddec01/lar-factory'] }, false, true);
   const stream = await openStream(t, board);
   // A repository's items show as its read lands, before the first read ends, so wait for that read to end.
   await stream.next((d) => d.firstRead.settled && statusOf(d, 'I_1') === 'List');

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createServer, type Socket } from 'node:net';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -134,9 +134,9 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const post = (body: unknown, origin = url, path = '/api/items') => fetch(`${url}${path}`, { method: 'POST',
     headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   let url = '';
-  // The listening line follows bind. On failure, close follows the last diagnostic on stdout/stderr.
-  // Let the caller's test deadline bound this wait, rather than racing a loaded child against a polling budget.
-  url = await new Promise<string>((resolve, reject) => {
+  // Wait for the current or next matching output. On failure, close follows the last diagnostic on stdout/stderr.
+  // Let the caller's test deadline bound the wait, rather than racing a loaded child against a polling budget.
+  const logged = (find: (output: string) => string | undefined) => new Promise<string>((resolve, reject) => {
     const cleanup = () => {
       child.stdout!.off('data', ready);
       child.stderr!.off('data', ready);
@@ -144,16 +144,20 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
       child.off('error', failed);
     };
     const ready = () => {
-      const address = logs.match(/board on (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
-      if (address) { cleanup(); resolve(address); }
+      const found = find(logs);
+      if (found !== undefined) { cleanup(); resolve(found); }
     };
-    const closed = () => { cleanup(); reject(new Error(logs || 'Board closed before listening')); };
+    const closed = () => { cleanup(); reject(new Error(`Board closed before the expected message: ${logs}`)); };
     const failed = (error: Error) => { cleanup(); reject(error); };
     child.stdout!.on('data', ready);
     child.stderr!.on('data', ready);
     child.once('close', closed);
     child.once('error', failed);
+    ready();
+    if (child.stdout!.closed && child.stderr!.closed) closed();
   });
+  // The listening line follows bind.
+  url = await logged((output) => output.match(/board on (http:\/\/127\.0\.0\.1:\d+)/)?.[1]);
   const response = await fetch(`${url}/api/board`);
   if (!response.ok) throw new Error(`Board answered ${response.status}: ${logs}`);
   return {
@@ -162,8 +166,23 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
     stop,
     update: (value: object) => writeFile(stateFile, JSON.stringify(value)),
     calls: () => readCalls(stateFile + '.calls'),
+    /** Waits for a matching gh call, including one already recorded, within the caller's test deadline. */
+    untilCalled: (check: (args: string[]) => boolean) => new Promise<string[]>((resolve, reject) => {
+      const ready = () => {
+        void readCalls(stateFile + '.calls').then((calls) => {
+          const found = calls.find(check);
+          if (found) { watcher.close(); resolve(found); }
+        }).catch(failed);
+      };
+      const watcher = watch(stateFile + '.calls', ready);
+      const failed = (error: Error) => { watcher.close(); reject(error); };
+      watcher.on('error', failed);
+      ready();
+    }),
     t3Calls: () => readCalls(stateFile + '.t3calls'),
     logs: () => logs,
+    /** Waits for a server log message, including one already printed, within the caller's test deadline. */
+    untilLogged: (message: string) => logged((output) => output.includes(message) ? message : undefined),
     /** How many skill checks the board has asked for. */
     skillChecks: () => skillChecks,
     board,

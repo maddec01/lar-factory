@@ -2,7 +2,7 @@
 // Ported from the tool notice cases of test/render.test.ts and its saved copies.
 
 import { expect, test } from 'vite-plus/test';
-import { $, $$, bannerText, fetchMock, mountPage, push, sample, settle, toolChecks } from '../../test/support.ts';
+import { $, $$, warningText, fetchMock, mountPage, push, sample, settle, toolChecks } from '../../test/support.ts';
 import type { BoardData, ToolChecks } from '@lar-factory/shared';
 
 const withTools = (failed: Partial<ToolChecks>, fields: Partial<BoardData> = {}): BoardData => ({ ...sample, tools: toolChecks(failed), ...fields });
@@ -34,7 +34,7 @@ test('a missing t3 replaces the main area with a notice and Recheck', async () =
   expect(recheckButton().textContent).toBe('Recheck');
   expect($('.desk'), 'the notice replaces the desk and the line').toBeNull();
   expect($('.line')).toBeNull();
-  expect($('.banners')).toBeNull();
+  expect($('.warnings')).toBeNull();
 });
 
 test('a t3 override that points nowhere is named', async () => {
@@ -46,29 +46,29 @@ test('a t3 override that points nowhere is named', async () => {
 
 test('a missing or logged-out gh shows its own notice, and other read failures show none', async () => {
   await mountPage(withTools({ gh: { result: 'missing', fix: 'brew install gh' } }, failed));
-  const banners = () => $$('.banners .banner');
-  expect(banners().length).toBe(1);
-  expect(banners()[0]!.getAttribute('role')).toBe('alert');
-  expect(bannerText(banners()[0]!)).toEqual(['GitHub CLI not found.', 'The board reads GitHub through gh. Install it with brew install gh Copy, '
+  const warnings = () => $$('[data-slot="toaster"] [data-toast-color="warning"]');
+  expect(warnings().length).toBe(1);
+  expect(warnings()[0]!.getAttribute('role')).toBe('status');
+  expect(warningText(warnings()[0]!)).toEqual(['GitHub CLI not found.', 'The board reads GitHub through gh. Install it with brew install gh Copy, '
     + 'then press Recheck. The board also looks again every 10 seconds. Recheck']);
-  expect(banners()[0]!.dataset.tone).toBe('warning');
-  expect(banners()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install gh');
+  expect(warnings()[0]!.dataset.toastColor).toBe('warning');
+  expect(warnings()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install gh');
 
   await push(withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } }, failed));
-  expect(banners().length).toBe(1);
-  expect(bannerText(banners()[0]!)).toEqual(['GitHub CLI is logged out.', 'The board reads GitHub through gh. Run gh auth login Copy in a terminal, '
+  expect(warnings().length).toBe(1);
+  expect(warningText(warnings()[0]!)).toEqual(['GitHub CLI is logged out.', 'The board reads GitHub through gh. Run gh auth login Copy in a terminal, '
     + 'then press Recheck. The board also looks again every 10 seconds. Recheck']);
 
   await push(withTools({ gh: { result: 'missing', override: 'GH_PATH=/nowhere/gh', fix: 'brew install gh' } }));
-  expect(banners()[0]!.textContent).toContain('No runnable gh is at GH_PATH=/nowhere/gh. Point GH_PATH at gh or unset it, then press Recheck.');
+  expect(warnings()[0]!.textContent).toContain('No runnable gh is at GH_PATH=/nowhere/gh. Point GH_PATH at gh or unset it, then press Recheck.');
 
   await push(withTools({}, failed));
-  expect(banners(), 'a failed read is the title bar\'s to show').toEqual([]);
+  expect(warnings(), 'a failed read is the title bar\'s to show').toEqual([]);
 });
 
-test('a gh older than 2.94.0 shows its banner with brew upgrade gh, and the board still shows', async () => {
+test('a gh older than 2.94.0 shows its warning with brew upgrade gh, and the board still shows', async () => {
   await mountPage(withTools({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }));
-  expect($$('.banners .banner').map(bannerText)).toEqual([['GitHub CLI is older than 2.94.0.', "lar-work's scripts need the --parent, "
+  expect($$('[data-slot="toaster"] [data-toast-color="warning"]').map(warningText)).toEqual([['GitHub CLI is older than 2.94.0.', "lar-work's scripts need the --parent, "
     + '--add-sub-issue and --blocked-by flags that gh 2.94.0 added, and this gh is 2.93.1. Run brew upgrade gh Copy in a terminal, '
     + 'then press Recheck. Recheck']]);
   expect($('.desk')).not.toBeNull();
@@ -95,7 +95,7 @@ test('Recheck posts, shows Checking…, then the board once the tool is found, a
   expect($('.desk')).not.toBeNull();
 });
 
-test("after Recheck a gh banner says it's still logged out, or why Recheck failed, until the server answers again", async () => {
+test("after Recheck a gh warning says it's still logged out, or why Recheck failed, until the server answers again", async () => {
   holdRecheck();
   const loggedOut = withTools({ gh: { result: 'logged-out', fix: 'gh auth login' } });
   await mountPage(loggedOut);
@@ -126,30 +126,30 @@ test('a Recheck note answers only the tool problems it found, and goes once they
   await push(withTools({}));
   await push(loggedOut);
   expect(recheckButton()).not.toBeNull();
-  expect(note(), 'a gh that logs out again opens a banner without the note').toBeNull();
+  expect(note(), 'a gh that logs out again opens a warning without the note').toBeNull();
 });
 
-test('a missing git, jq or curl shows a banner with its install command and Recheck, and the board still shows', async () => {
+test('a missing git, jq or curl shows a warning with its install command and Recheck, and the board still shows', async () => {
   await mountPage(withTools({ jq: { result: 'missing', fix: 'brew install jq' } }));
-  const banners = () => $$('.banners .banner');
-  expect(banners().map(bannerText)).toEqual([['jq not found.', "lar-work's scripts read gh's answers with jq. Install it with brew install jq Copy, "
+  const warnings = () => $$('[data-slot="toaster"] [data-toast-color="warning"]');
+  expect(warnings().map(warningText)).toEqual([['jq not found.', "lar-work's scripts read gh's answers with jq. Install it with brew install jq Copy, "
     + 'then press Recheck. Recheck']]);
-  expect(banners()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install jq');
+  expect(warnings()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install jq');
   expect($('.desk')).not.toBeNull();
 
   await push(withTools({ git: { result: 'missing', override: 'GIT_PATH=/nowhere/git', fix: 'brew install git' }, curl: { result: 'missing', fix: 'brew install curl' } }));
-  expect(banners().map((b) => bannerText(b)[0])).toEqual(['git not found.', 'curl not found.']);
-  expect(bannerText(banners()[0]!)[1]).toBe("lar-work's agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. "
+  expect(warnings().map((b) => warningText(b)[0])).toEqual(['git not found.', 'curl not found.']);
+  expect(warningText(warnings()[0]!)[1]).toBe("lar-work's agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. "
     + 'Point GIT_PATH at git, or unset it and install it with brew install git Copy, then press Recheck. Recheck');
-  expect(bannerText(banners()[1]!)[1]).toContain("lar-work's scripts tell the board to refresh with curl. Install it with brew install curl Copy");
+  expect(warningText(warnings()[1]!)[1]).toContain("lar-work's scripts tell the board to refresh with curl. Install it with brew install curl Copy");
 });
 
-test('an az that fails its check shows a banner with its fix, and the board still shows', async () => {
+test('an az that fails its check shows a warning with its fix, and the board still shows', async () => {
   holdRecheck();
   const loggedOut = withTools({ az: { result: 'logged-out', version: '2.67.0', fix: 'az login' } });
   await mountPage(loggedOut);
-  const banners = () => $$('.banners .banner');
-  expect(banners().map(bannerText)).toEqual([['Azure CLI is logged out.', 'The board reads repositories on Azure DevOps through az. '
+  const warnings = () => $$('[data-slot="toaster"] [data-toast-color="warning"]');
+  expect(warnings().map(warningText)).toEqual([['Azure CLI is logged out.', 'The board reads repositories on Azure DevOps through az. '
     + 'Run az login Copy in a terminal, then press Recheck. Recheck']]);
   expect($('.desk')).not.toBeNull();
   await settle(() => recheckButton().click());
@@ -157,20 +157,20 @@ test('an az that fails its check shows a banner with its fix, and the board stil
   expect(note()!.textContent).toBe('Still logged out.');
 
   await push(withTools({ az: { result: 'no-extension', fix: 'az extension add --name azure-devops' } }));
-  expect(bannerText(banners()[0]!)).toEqual(['Azure CLI has no azure-devops extension.', 'The board reads repositories on Azure DevOps through az. '
+  expect(warningText(warnings()[0]!)).toEqual(['Azure CLI has no azure-devops extension.', 'The board reads repositories on Azure DevOps through az. '
     + 'Run az extension add --name azure-devops Copy in a terminal, then press Recheck. Recheck']);
   await push(withTools({ az: { result: 'missing', fix: 'brew install azure-cli' } }));
-  expect(bannerText(banners()[0]!)[0]).toBe('Azure CLI not found.');
-  expect(bannerText(banners()[0]!)[1]).toContain('Install it with brew install azure-cli Copy, then press Recheck.');
+  expect(warningText(warnings()[0]!)[0]).toBe('Azure CLI not found.');
+  expect(warningText(warnings()[0]!)[1]).toContain('Install it with brew install azure-cli Copy, then press Recheck.');
   await push(withTools({}));
-  expect(banners(), 'an az nobody needs is not checked and shows nothing').toEqual([]);
+  expect(warnings(), 'an az nobody needs is not checked and shows nothing').toEqual([]);
 });
 
-test('T3 Code not running shows a banner with its fix and Recheck, and the board still shows', async () => {
+test('T3 Code not running shows a warning with its fix and Recheck, and the board still shows', async () => {
   holdRecheck();
   const closed = withTools({ t3: { result: 'not-running', version: '0.1.3-nightly.1' } });
   await mountPage(closed);
-  expect($$('.banners .banner').map(bannerText)).toEqual([['T3 Code is not running.', 'The board starts threads through T3 Code, which has to be open. '
+  expect($$('[data-slot="toaster"] [data-toast-color="warning"]').map(warningText)).toEqual([['T3 Code is not running.', 'The board starts threads through T3 Code, which has to be open. '
     + 'Open T3 Code, then press Recheck. The board also looks again every 10 seconds. Recheck']]);
   expect($('.tool-missing'), 'only a missing t3 fills the main area').toBeNull();
   expect($('.desk')).not.toBeNull();
@@ -179,5 +179,5 @@ test('T3 Code not running shows a banner with its fix and Recheck, and the board
   await answer(board(closed));
   expect(note()!.textContent).toBe('Still not running.');
   await push(withTools({}));
-  expect($$('.banners .banner')).toEqual([]);
+  expect($$('[data-slot="toaster"] [data-toast-color="warning"]')).toEqual([]);
 });

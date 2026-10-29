@@ -2,12 +2,9 @@
 // down the page fetches /api/board every 15 s.
 
 import { useBoardStore } from './board-store.ts';
-import { useDismissStore } from '../notices/dismiss-store.ts';
 import type { BoardData } from '@lar-factory/shared';
 
 const POLL_MS = 15_000;
-/** The key of the banner that says the page can't reach the server. */
-export const CLIENT_ERROR = 'client-error';
 
 export function startLiveData(): void {
   const board = useBoardStore.getState();
@@ -19,8 +16,6 @@ export function startLiveData(): void {
   const receive = (text: string) => {
     const data = JSON.parse(text) as BoardData;
     board.receive(data);
-    // The server answered: if it goes away again, say so even if the last banner was closed.
-    useDismissStore.getState().restore(CLIENT_ERROR);
   };
 
   function schedule(): void {

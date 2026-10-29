@@ -1,5 +1,5 @@
 // The notices for a failed command check: a missing t3 replaces the main area; T3 Code not running shows a
-// banner, as does a gh that's missing, logged out, or too old, a missing git, jq or
+// warning, as does a gh that's missing, logged out, or too old, a missing git, jq or
 // curl and an az that fails its check.
 
 import type { ReactNode } from 'react';
@@ -7,7 +7,7 @@ import { GH_FLOOR, type AzCheck, type CommandCheck, type FailedCheck, type GhChe
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { BrandMark } from '@lar-factory/ui/design-system/BrandMark';
 import { CopyButton } from '../copy/copy-button.tsx';
-import { Banner } from './banner.tsx';
+import { Warning } from './warning.tsx';
 import { useRecheckStore } from './recheck-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
@@ -61,17 +61,17 @@ export function T3Missing({ check }: { check: FailedCheck<T3Check> }) {
   );
 }
 
-/** The banner while T3 Code isn't running, which stops starts but not the read. */
-export function T3NotRunningBanner({ check }: { check: FailedCheck<T3Check> }) {
+/** The warning while T3 Code isn't running, which stops starts but not the read. */
+export function T3NotRunningWarning({ check }: { check: FailedCheck<T3Check> }) {
   return (
-    <Banner title="T3 Code is not running.">
+    <Warning dismissKey="t3" title="T3 Code is not running.">
       The board starts threads through T3 Code, which has to be open. Open T3 Code, then press Recheck.
       {' '}{LOOKS_AGAIN} <Recheck check={check} />
-    </Banner>
+    </Warning>
   );
 }
 
-/** gh's banner title and what to do, by its check's result. */
+/** gh's warning title and what to do, by its check's result. */
 function ghNotice(check: FailedCheck<GhCheck>): { title: string; body: ReactNode } {
   switch (check.result) {
     case 'missing':
@@ -87,42 +87,37 @@ function ghNotice(check: FailedCheck<GhCheck>): { title: string; body: ReactNode
   }
 }
 
-/** One gh banner, by its check's result. */
-function OneGhBanner({ check }: { check: FailedCheck<GhCheck> }) {
+/** The warning for a missing, logged-out or outdated gh. */
+export function GhWarning({ check }: { check: FailedCheck<GhCheck> }) {
   const { title, body } = ghNotice(check);
   return (
-    <Banner title={title}>
+    <Warning dismissKey="gh" title={title}>
       {body}
       {/* An old gh doesn't stop the read, so only Recheck looks again. */}
       {check.result !== 'outdated' && <>{' '}{LOOKS_AGAIN}</>} <Recheck check={check} />
-    </Banner>
+    </Warning>
   );
 }
 
-/** The banner for a missing, logged-out or outdated gh. */
-export function GhBanner({ check }: { check: FailedCheck<GhCheck> }) {
-  return <OneGhBanner check={check} />;
-}
-
-/** az's banner title by its check's result. */
+/** az's warning title by its check's result. */
 const AZ_TITLES: Record<FailedCheck<AzCheck>['result'], string> = {
   'missing': 'Azure CLI not found.', 'logged-out': 'Azure CLI is logged out.', 'no-extension': 'Azure CLI has no azure-devops extension.',
 };
 
-/** The banner for an az that fails its check, which shows only while a listed repository is on Azure DevOps and never stops the read. */
-export function AzBanner({ check }: { check: FailedCheck<AzCheck> }) {
+/** The warning for an az that fails its check, which shows only while a listed repository is on Azure DevOps and never stops the read. */
+export function AzWarning({ check }: { check: FailedCheck<AzCheck> }) {
   return (
-    <Banner title={AZ_TITLES[check.result]}>
+    <Warning dismissKey="az" title={AZ_TITLES[check.result]}>
       The board reads repositories on Azure DevOps through <code>az</code>.{' '}
       {check.result === 'missing'
         ? <Fix check={check} tool="az" what="az">Install it with <CopyableCommand command={check.fix} />, then press Recheck.</Fix>
         : <>Run <CopyableCommand command={check.fix} /> in a terminal, then press Recheck.</>}
       {' '}<Recheck check={check} />
-    </Banner>
+    </Warning>
   );
 }
 
-/** What lar-work does with each command whose check is a banner of its own. */
+/** What lar-work does with each command whose check is a warning of its own. */
 const COMMAND_USES = {
   git: "lar-work's agents branch, commit and push with",
   jq: "lar-work's scripts read gh's answers with",
@@ -130,17 +125,17 @@ const COMMAND_USES = {
 } as const;
 export type Command = keyof typeof COMMAND_USES;
 
-/** The banner for a missing git, jq or curl, which the board reads without. */
-export function CommandBanner({ name, check }: { name: Command; check: FailedCheck<CommandCheck> }) {
+/** The warning for a missing git, jq or curl, which the board reads without. */
+export function CommandWarning({ name, check }: { name: Command; check: FailedCheck<CommandCheck> }) {
   const { fix: install, override } = check;
   return (
-    <Banner title={`${name} not found.`}>
+    <Warning dismissKey={name} title={`${name} not found.`}>
       {COMMAND_USES[name]} <code>{name}</code>.{' '}
       {override
         ? <>No runnable <code>{name}</code> is at <code>{override}</code>. Point {override.split('=')[0]} at {name}, or unset it and install it</>
         : <>Install it</>}
       {' '}with <CopyableCommand command={install} />, then press Recheck.
       {' '}<Recheck check={check} />
-    </Banner>
+    </Warning>
   );
 }

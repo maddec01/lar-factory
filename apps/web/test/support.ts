@@ -125,8 +125,8 @@ export async function pressMenu(el: Element): Promise<void> {
 export const $ = <T extends Element = HTMLElement>(selector: string) => document.querySelector<T>(selector);
 export const $$ = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 export const text = (el: Element | null | undefined) => el?.textContent ?? '';
-/** A banner's title and description. */
-export const bannerText = (el: Element) => ['title', 'description'].map((slot) => text(el.querySelector(`[data-slot="${slot}"]`)));
+/** A warning's title and description. */
+export const warningText = (el: Element) => ['title', 'description'].map((slot) => text(el.querySelector(`[data-slot="${slot}"]`)));
 /** Whether a checkbox, a native one included, or a radio is checked, as aria-checked says it: 'true' or 'false'. */
 export const checkedOf = (el: Element) => (el instanceof HTMLInputElement ? String(el.checked) : el.getAttribute('aria-checked'));
 

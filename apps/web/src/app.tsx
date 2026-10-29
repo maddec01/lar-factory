@@ -1,10 +1,10 @@
 // The page, the control room: the title bar, then a card for each repository still onboarding, the offers to onboard
-// T3 projects that have a Repository config, the banners, Your desk and the line, scoped to the repository the title
+// T3 projects that have a Repository config, Your desk and the line, scoped to the repository the title
 // bar or the List modal picked; a repository whose items the first read hasn't landed yet says it's reading instead
 // of an empty desk and line. While no t3 is found, the notice replaces the content and the title bar shows only its
 // brand and Settings; while no repository is onboarded or onboarding, the empty state offering onboarding replaces
 // it. Settings opens as a modal over it all. The loading screen covers all of it until the server's first read has
-// settled or a repository's items have landed.
+// settled or a repository's items have landed. Every screen shares the notification stack.
 
 import { LoaderCircle } from 'lucide-react';
 import { boardSections, failedCheck, inRepo, noneOnboarded, repoName, stillReading } from '@lar-factory/shared';
@@ -17,7 +17,7 @@ import { ItemDialog } from './item-dialog/item-dialog.tsx';
 import { AbandonDialog } from './items/abandon-dialog.tsx';
 import { Line } from './line/line.tsx';
 import { LoadingScreen } from './loading/loading-screen.tsx';
-import { Banners } from './notices/banners.tsx';
+import { Warnings } from './notices/warnings.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
 import { NotificationStack } from './notices/toasts.tsx';
 import { EmptyState } from './onboarding/empty-state.tsx';
@@ -38,7 +38,6 @@ function Content() {
       <div className="grid gap-7 px-6 py-5">
         <OnboardingCards />
         <OnboardingOffers />
-        <Banners />
         {scope && stillReading(data, scope)
           ? <p className="m-0 flex items-center justify-center gap-2 p-6 text-sm text-base-700" data-reading><LoaderCircle className="size-4 animate-spin" />Reading {repoName(scope, data.repos)}…</p>
           : <>
@@ -52,7 +51,7 @@ function Content() {
 
 export function App() {
   const t3 = useBoardStore((state) => failedCheck(state.data.tools, 't3'));
-  // T3 Code not running is a banner; only a missing t3 replaces the main area.
+  // T3 Code not running is a warning; only a missing t3 replaces the main area.
   const missing = t3?.result === 'missing' ? t3 : undefined;
   const empty = useBoardStore((state) => noneOnboarded(state.data));
   return (
@@ -66,6 +65,7 @@ export function App() {
         {/* Outside main, so the announcement sits apart from the page. */}
         <CopyStatus />
         <NotificationStack />
+        <Warnings />
         <ItemDialog />
         <SettingsDialog />
         <AbandonDialog />

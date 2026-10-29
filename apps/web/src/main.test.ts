@@ -1,7 +1,7 @@
 // The page shell: first paint, the control room, live data, and what a re-render keeps.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, $$, NOW, bannerText, fetchMock, mountPage, push, sample, settle, stream, text } from '../test/support.ts';
+import { $, $$, NOW, warningText, fetchMock, mountPage, push, sample, settle, stream, text } from '../test/support.ts';
 import { BRAND_BLOCK_COLOR, BRAND_MARK_BLOCK, BRAND_MARK_L } from '@lar-factory/shared';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -37,19 +37,19 @@ test('an entered title round-trips through the inline board data without closing
   expect(document.body.textContent).toContain(title);
 });
 
-test('fresh data shows no banner', async () => {
+test('fresh data shows no warning', async () => {
   await mountPage(fresh);
-  expect($('.banner')).toBeNull();
+  expect($('[data-toast-color="warning"]')).toBeNull();
 });
 
-test('stale data and a failed read show no banner, the title bar carries them', async () => {
+test('stale data and a failed read show no warning, the title bar carries them', async () => {
   await mountPage(sample);
-  expect($('.banner')).toBeNull();
+  expect($('[data-toast-color="warning"]')).toBeNull();
 });
 
-test('the page is the control room, with no tabs: the title bar, banners, desk and line', async () => {
+test('the page is the control room, with no tabs: the title bar, desk and line', async () => {
   await mountPage();
-  expect([...$('main')!.querySelectorAll('.title-bar, .banners, .desk, .line')].map((el) => el.classList[0])).toEqual(['title-bar', 'banners', 'desk', 'line']);
+  expect([...$('main')!.querySelectorAll('.title-bar, .desk, .line')].map((el) => el.classList[0])).toEqual(['title-bar', 'desk', 'line']);
   expect($$('[role="tablist"], [role="tab"], [role="tabpanel"]')).toEqual([]);
 });
 
@@ -90,32 +90,32 @@ test("a failed fetch says the server can't be reached and keeps the last data", 
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect(bannerText($('.banner[role="alert"]')!)).toEqual(["Can't reach the board server.", 'HTTP 502 Showing the last data this page received.']);
+  expect(warningText($('[data-toast-color="warning"][role="status"]')!)).toEqual(["Can't reach the board server.", 'HTTP 502 Showing the last data this page received.']);
   expect($$('.desk-card')).toHaveLength(8);
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect($('.banner')).toBeNull();
+  expect($('[data-toast-color="warning"]')).toBeNull();
 });
 
-test("the lost server's banner closes, and the next failure after the server answers shows it again", async () => {
+test("the lost server's warning closes, and the next failure after the server answers shows it again", async () => {
   await mountPage(fresh);
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  const close = $<HTMLButtonElement>('.banner .dismiss')!;
+  const close = $<HTMLButtonElement>('[data-toast-color="warning"] .dismiss')!;
   expect(close.getAttribute('aria-label')).toBe("Dismiss: can't reach the board server");
   close.focus();
   await settle(() => close.click());
-  expect($('.banner')).toBeNull();
+  expect($('[data-toast-color="warning"]')).toBeNull();
   expect(document.activeElement, 'focus stays on the page').toBe($('.add-item'));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect($('.banner'), 'it stays closed while the server stays away').toBeNull();
+  expect($('[data-toast-color="warning"]'), 'it stays closed while the server stays away').toBeNull();
 
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(fresh)));
   await settle(() => vi.advanceTimersByTime(15_000));
   fetchMock.mockImplementation(async () => new Response('', { status: 502 }));
   await settle(() => vi.advanceTimersByTime(15_000));
-  expect(bannerText($('.banner[role="alert"]')!)[0]).toBe("Can't reach the board server.");
+  expect(warningText($('[data-toast-color="warning"][role="status"]')!)[0]).toBe("Can't reach the board server.");
 });
 
 test('new data keeps focus', async () => {

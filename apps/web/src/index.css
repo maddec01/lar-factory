@@ -26,8 +26,8 @@
 @source "./list";
 @source "./onboarding";
 @source "./repositories";
-@source "./notices/banner.tsx";
-@source "./notices/banners.tsx";
+@source "./notices/warning.tsx";
+@source "./notices/warnings.tsx";
 @source "./notices/form-result.tsx";
 @source "./notices/toasts.tsx";
 @source "./settings";

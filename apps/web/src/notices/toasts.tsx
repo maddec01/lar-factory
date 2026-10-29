@@ -12,7 +12,7 @@ import { OPEN_ITEM_DIALOG } from '../item-dialog/item-dialog-store.ts';
 /** How long a success toast stays. */
 const TOAST_MS = 5_000;
 /** Where focus goes when a closed toast had it and names nowhere of its own. */
-const FALLBACK_FOCUS = '.add-item';
+const FALLBACK_FOCUS = ['.add-item', '.open-settings'];
 
 /** Keeps a new entry visible without taking focus or scrolling when an older entry changes. */
 function scrollToNewest(viewport: HTMLDivElement | null) {
@@ -65,7 +65,7 @@ export function refocus(selectors: string[]): void {
 }
 
 /** Moves focus to the first of `next` that's on the page, or to the fallback. */
-const focusAfterClose = (next: string[]) => focusFirst([...next, FALLBACK_FOCUS]);
+const focusAfterClose = (next: string[]) => focusFirst([...next, ...FALLBACK_FOCUS]);
 
 /** Closes something in `close`, then, if focus was inside `el`, moves it to the first of `next` that's on the page. */
 export function closeKeepingFocus(el: Element | null, close: () => void, next: string[] = []): void {

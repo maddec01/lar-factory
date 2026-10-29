@@ -34,7 +34,12 @@ scan-and-rewrite pass. Code is out of scope.
   `<lar-work>/cross-repo-citations.md` for citing other-repo work.
 - **UI-check**: runs the visible checks and Verify captures per
   `<lar-work>/screenshots.md`, keeps screenshots in its own context, and
-  returns their absolute paths and a verdict.
+  leaves the app it started running. It returns the screenshots' absolute
+  paths, a verdict and its app report: the commit it ran, how to reach the
+  app, and the processes it started, each with something a later thread can
+  recheck, such as the port it listens on. Whoever stops those processes,
+  now or in a later thread, first confirms each one still holds what the
+  report names and stops only the ones that do.
 
 ## Build
 
@@ -86,7 +91,13 @@ scan-and-rewrite pass. Code is out of scope.
 6. A subagent runs the full check suite `AGENTS.md` names, once, on the build
    branch HEAD, and returns that commit's tree (`git rev-parse HEAD^{tree}`):
    the step 6 tree. A UI-check subagent checks anything user-visible.
-   Failures go to the fixer. All must pass.
+   Failures go to the fixer. All must pass. A fix for a failing step 6 check
+   reruns only the fixer's checks, and the step 6 tree stays the tree the full
+   suite ran on, so the approver finds a changed tree and reruns the full
+   suite. When a fix moves HEAD after the
+   UI-check ran, stop the processes its app report lists and run the UI-check
+   again on the new HEAD, so the last app report names the commit review
+   starts from.
 7. Push the branch. Don't open the PR yet.
 
 Ordinary questions to the user follow `<lar-work>/questions.md`: Needs you,
@@ -103,7 +114,8 @@ comment and relaunch with
 `t3_thread_launch`: message `Build <owner/repo#n>. Read <lar-work>/agents/builder.md and follow it.`,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
 The handoff names the step and review round to resume at and, once step 6
-has run, the step 6 tree; at a review round,
+has run, the step 6 tree and the last UI-check app report, whose processes the
+next thread stops when review ends; at a review round,
 the round's base sha, each reviewer's verdict, open findings, fixed findings,
 and rejected findings with reasons, and the unreviewed fixes so far, each as
 the line **Approve** describes. Otherwise finish in place.
@@ -134,8 +146,9 @@ Set **Review**. Review runs in review rounds, at most three.
 Round 1: in parallel, start one **reviewer subagent** per file in this
 folder: `reviewer-code.md`, `reviewer-security.md`, `reviewer-ux.md`,
 `reviewer-ui.md`. Give each only its file's path, the issue reference, the repo
-path and the diff command `git diff origin/main...HEAD`. Skip the UI reviewer
-when nothing user-visible changed, and say so.
+path and the diff command `git diff origin/main...HEAD`. Also give the UI
+reviewer the last UI-check app report. Skip the UI reviewer when nothing
+user-visible changed, and say so.
 
 Each returns a verdict (`approve` or `changes`), findings and what it couldn't
 check. Reply to the findings you reject with a reason. Before handing the ones
@@ -153,7 +166,8 @@ reviewer's final result is its latest round's.
 
 Review ends when no reviewer comes back (the round fixed no finding, or you
 skipped the reviewer of every fixed finding), or after round 3: hand round 3's
-findings you agree with to the fixer, with no further review.
+findings you agree with to the fixer, with no further review. When review
+ends, stop the processes the last UI-check app report lists.
 
 ## Approve
 

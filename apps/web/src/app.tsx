@@ -8,7 +8,6 @@
 
 import { LoaderCircle } from 'lucide-react';
 import { boardSections, failedCheck, inRepo, noneOnboarded, repoName, stillReading } from '@lar-factory/shared';
-import { Toaster } from '@lar-factory/ui/toasts';
 import { TooltipProvider } from '@lar-factory/ui/design-system/Tooltip';
 import { useBoardStore } from './board/board-store.ts';
 import { useScopeStore } from './board/scope-store.ts';
@@ -20,6 +19,7 @@ import { Line } from './line/line.tsx';
 import { LoadingScreen } from './loading/loading-screen.tsx';
 import { Banners } from './notices/banners.tsx';
 import { T3Missing } from './notices/tool-notices.tsx';
+import { NotificationStack } from './notices/toasts.tsx';
 import { EmptyState } from './onboarding/empty-state.tsx';
 import { OnboardingCards } from './onboarding/onboarding-cards.tsx';
 import { OnboardingOffers } from './onboarding/onboarding-offers.tsx';
@@ -65,7 +65,7 @@ export function App() {
         </main>
         {/* Outside main, so the announcement sits apart from the page. */}
         <CopyStatus />
-        <Toaster position="top-center" />
+        <NotificationStack />
         <ItemDialog />
         <SettingsDialog />
         <AbandonDialog />

@@ -2,7 +2,8 @@
 // shown through the design system's Toaster. Ported from the toast cases of test/render.test.ts.
 
 import { expect, test, vi } from 'vite-plus/test';
-import { $, fetchMock, mountPage, moved, sample, settle, text, toast } from '../../test/support.ts';
+import type { BoardData } from '@lar-factory/shared';
+import { $, $$, addStylesheet, fetchMock, mountPage, moved, sample, settle, text, toast, toolChecks } from '../../test/support.ts';
 
 /** Shows a toast straight from the store, as the Add item form will. */
 async function notify(notice: Parameters<typeof import('./notices.tsx').notify>[0]): Promise<void> {
@@ -56,6 +57,89 @@ test('toasts in different slots each show, a failure as an alert', async () => {
   expect(document.querySelectorAll('[data-toast]').length).toBe(2);
   expect(document.querySelector('[data-toast="update"]')!.closest('[data-slot="toast"]')!.getAttribute('role')).toBe('alert');
   expect(document.querySelector('[data-toast="notice"]')!.closest('[data-slot="toast"]')!.getAttribute('role')).toBe('status');
+  expect($('[data-toast="update"]')!.closest<HTMLElement>('[data-slot="toast"]')!.dataset.toastColor).toBe('danger');
+  expect($('[data-toast="notice"]')!.closest<HTMLElement>('[data-slot="toast"]')!.dataset.toastColor).toBe('success');
+  expect($$('[data-slot="toaster"] button.dismiss').map((el) => el.getAttribute('aria-label')))
+    .toEqual(['Dismiss: Update failed', 'Dismiss: Added #61']);
+});
+
+test('more than five slots coexist in chronological order, with the newest at the bottom', async () => {
+  await mountPage();
+  const { showToast } = await import('./toasts.tsx');
+  for (const slot of ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh']) {
+    await settle(() => showToast({ slot, what: slot, body: slot }));
+  }
+  expect($$('[data-slot="toaster"]')).toHaveLength(1);
+  expect($$('[data-slot="toaster"] [data-toast]').map((el) => el.dataset.toast))
+    .toEqual(['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh']);
+});
+
+test('a new entry scrolls into view without taking keyboard focus', async () => {
+  await mountPage();
+  const { showToast } = await import('./toasts.tsx');
+  await settle(() => showToast({ slot: 'first', what: 'First', body: 'First' }));
+  const viewport = $('[data-slot="toaster"]')!;
+  // jsdom has no layout; stand in for a viewport whose entries exceed its height.
+  Object.defineProperty(viewport, 'scrollHeight', { value: 1_000 });
+  viewport.scrollTop = 0;
+  $('.add-item')!.focus();
+  await settle(() => showToast({ slot: 'second', what: 'Second', body: 'Second' }));
+  expect(viewport.scrollTop).toBe(1_000);
+  expect(document.activeElement).toBe($('.add-item'));
+});
+
+test.each(['expires', 'is dismissed'])('reading an older warning keeps its scroll position when the newest toast %s', async (removal) => {
+  await mountPage({ ...sample, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) });
+  const { showToast } = await import('./toasts.tsx');
+  await settle(() => showToast({ slot: 'newest', what: 'Newest', body: 'Newest' }));
+  const viewport = $('[data-slot="toaster"]')!;
+  // jsdom has no layout; stand in for a viewport whose entries exceed its height.
+  Object.defineProperty(viewport, 'scrollHeight', { value: 1_000 });
+  const warningControl = $<HTMLButtonElement>('[data-warning="gh"] .dismiss')!;
+  await settle(() => warningControl.focus());
+  viewport.scrollTop = 50;
+  await settle(() => removal === 'expires'
+    ? vi.advanceTimersByTime(5_000)
+    : $<HTMLButtonElement>('[data-toast="newest"] .dismiss')!.click());
+  expect($('[data-toast="newest"]')).toBeNull();
+  expect(viewport.scrollTop).toBe(50);
+  expect(document.activeElement).toBe(warningControl);
+});
+
+test('replacement moves only its slot to the bottom, and clearing removes only the named slot', async () => {
+  await mountPage();
+  const { showToast, clearToast } = await import('./toasts.tsx');
+  for (const slot of ['first', 'second', 'third']) {
+    await settle(() => showToast({ slot, what: slot, body: slot }));
+  }
+  const third = $('[data-toast="third"]');
+  await settle(() => showToast({ slot: 'first', what: 'Replacement', body: 'Replacement' }));
+  expect($$('[data-toast]').map((el) => el.dataset.toast)).toEqual(['second', 'third', 'first']);
+  expect(text($('[data-toast="first"]'))).toBe('Replacement');
+  await settle(() => clearToast('second'));
+  await settle(() => clearToast('missing'));
+  expect($$('[data-toast]').map((el) => el.dataset.toast)).toEqual(['third', 'first']);
+  expect($('[data-toast="third"]')).toBe(third);
+});
+
+test('another slot appearing or clearing does not restart a success timer or scroll away from older entries', async () => {
+  await mountPage();
+  const { showToast, clearToast } = await import('./toasts.tsx');
+  await settle(() => showToast({ slot: 'first', what: 'First', body: 'First' }));
+  await settle(() => vi.advanceTimersByTime(4_900));
+  await settle(() => showToast({ slot: 'second', failed: true, what: 'Second', body: 'Second' }));
+  const viewport = $('[data-slot="toaster"]')!;
+  viewport.scrollTop = 50;
+  await settle(() => vi.advanceTimersByTime(100));
+  expect($('[data-toast="first"]')).toBeNull();
+  expect($('[data-toast="second"]')).not.toBeNull();
+  expect(viewport.scrollTop).toBe(50);
+  await settle(() => showToast({ slot: 'third', what: 'Third', body: 'Third' }));
+  await settle(() => vi.advanceTimersByTime(4_900));
+  await settle(() => clearToast('second'));
+  expect($('[data-toast="third"]')).not.toBeNull();
+  await settle(() => vi.advanceTimersByTime(100));
+  expect($('[data-toast="third"]')).toBeNull();
 });
 
 test('a failure stays until it is closed', async () => {
@@ -64,6 +148,50 @@ test('a failure stays until it is closed', async () => {
   await settle(() => showToast({ slot: 'update', failed: true, what: 'Update failed', body: 'Update failed' }));
   await settle(() => vi.advanceTimersByTime(60_000));
   expect(toast()).not.toBeNull();
+  await settle(() => toast()!.querySelector<HTMLButtonElement>('[aria-label="Dismiss: Update failed"]')!.click());
+  expect(toast()).toBeNull();
+});
+
+test('closing a focused toast prefers its target in the open item dialog over the same target on the board', async () => {
+  await mountPage();
+  // Exercise the toast's focus contract without the Modal's own focus trap redirecting focus before it closes.
+  const dialog = document.createElement('dialog');
+  dialog.open = true;
+  dialog.setAttribute('data-item-dialog', '');
+  dialog.setAttribute('data-state', 'open');
+  const target = document.createElement('button');
+  target.setAttribute('data-back-to-list', 'I_sample05');
+  target.textContent = 'Back to List';
+  dialog.append(target);
+  document.body.append(dialog);
+  const { showToast } = await import('./toasts.tsx');
+  await settle(() => showToast({
+    slot: 'notice', failed: true, what: 'Move failed', body: 'Move failed',
+    focusAfter: ['[data-back-to-list="I_sample05"]'],
+  }));
+  const close = toast()!.querySelector<HTMLButtonElement>('button.dismiss')!;
+  close.focus();
+  await settle(() => close.click());
+  expect(toast()).toBeNull();
+  expect(document.activeElement).toBe(target);
+});
+
+test.each<{ screen: string; data: BoardData; selector: string }>([
+  { screen: 'board', data: sample, selector: '.desk' },
+  { screen: 'empty state', data: { ...sample, repos: [], items: [], repositoryConfigProblems: [], error: null }, selector: '[data-empty-state]' },
+  { screen: 'T3 Code missing', data: { ...sample, tools: { ...sample.tools!, t3: { result: 'missing' } } }, selector: '.tool-missing' },
+  { screen: 'loading', data: { ...sample, fetchedAt: null, firstRead: { step: 'repositories', running: [], settled: false } }, selector: '.loading-screen' },
+])('the stack is available above loading on the $screen screen', async ({ data, selector }) => {
+  await mountPage(data);
+  addStylesheet();
+  const { showToast } = await import('./toasts.tsx');
+  await settle(() => showToast({ slot: 'update', failed: true, what: 'Update failed', body: 'Update failed' }));
+  const viewport = $('[data-slot="toaster"]')!;
+  expect($(selector)).not.toBeNull();
+  expect(toast()).not.toBeNull();
+  expect(viewport.closest('main, [inert]')).toBeNull();
+  expect(Number(getComputedStyle(viewport).zIndex)).toBeGreaterThan(Number(getComputedStyle($('.loading-screen')!).zIndex));
+  expect(getComputedStyle(toast()!).flexShrink).toBe('0');
 });
 
 test('View item opens the item in the item dialog and closes the toast', async () => {
@@ -110,10 +238,20 @@ test('a build start announces the outcome and links the thread without printing 
   expect(toast()!.querySelector('a')!.getAttribute('href')).toBe('t3code://threads/sample-environment/raw-thread-id');
 });
 
-test('notifications sit at the top of the page, away from dialog footer actions', async () => {
+test('notifications sit in a bounded, scrollable stack with a gap from the bottom-right corner', async () => {
   await mountPage();
+  addStylesheet();
   await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
   const viewport = $('[data-slot="toaster"]')!;
-  expect(viewport.classList.contains('top-0')).toBe(true);
-  expect(viewport.classList.contains('bottom-0')).toBe(false);
+  expect(viewport.classList.contains('bottom-0')).toBe(true);
+  expect(viewport.classList.contains('right-0')).toBe(true);
+  expect(viewport.classList.contains('top-0')).toBe(false);
+  const style = getComputedStyle(viewport);
+  expect(style.bottom).toBe('calc(var(--spacing) * 16)');
+  expect(style.right).toBe('calc(var(--spacing) * 4)');
+  expect(style.width).toBe('min(calc(var(--spacing) * 104), calc(100vw - var(--spacing) * 8))');
+  expect(style.maxHeight).toBe('min(60vh, calc(100dvh - var(--spacing) * 20))');
+  expect(style.overflowY).toBe('auto');
+  expect(style.flexDirection).toBe('column');
+  expect(style.pointerEvents).toBe('auto');
 });

@@ -30,6 +30,10 @@ export default defineConfig({
     ...sharedTest,
     environment: 'jsdom',
     include: ['src/**/*.test.ts'],
+    // Each test's mountPage loads src/main.tsx afresh, which is slow while the root `pnpm test` runs packages
+    // at once. The warm-up in test/support.ts runs in a beforeAll, so hooks get the same time.
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
     // Every test's page stays mounted, and ninna-ui's toast list is global to its module. Run through Vite, the
     // module is loaded again after each test's vi.resetModules, so a test's toasts reach only its own page.
     server: { deps: { inline: ['@ninna-ui/feedback'] } },

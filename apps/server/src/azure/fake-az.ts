@@ -4,6 +4,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 export interface WorkItem {
   id: number;
+  /** Its revision; 1 when absent. A patch whose /rev test names another fails as Azure DevOps fails it. */
+  rev?: number;
   type: string;
   state: string;
   title?: string;
@@ -88,7 +90,7 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
   const flag = (args: string[], name: string) => args[args.indexOf(name) + 1]!;
   const route = (args: string[], key: string) => args.find((a) => a.startsWith(`${key}=`))?.slice(key.length + 1);
   const raw = (i: WorkItem, version?: string) => ({
-    id: i.id, rev: 1, ...version?.startsWith('7.2-preview') && i.descriptionFormat && { multilineFieldsFormat: { 'System.Description': i.descriptionFormat } }, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
+    id: i.id, rev: i.rev ?? 1, ...version?.startsWith('7.2-preview') && i.descriptionFormat && { multilineFieldsFormat: { 'System.Description': i.descriptionFormat } }, url: `https://dev.azure.com/contoso/_apis/wit/workItems/${i.id}`,
     fields: {
       'System.WorkItemType': i.type, 'System.State': i.state, 'System.AreaPath': i.area ?? TEAM_AREA, 'System.Title': i.title ?? `Item ${i.id}`, 'System.ChangedDate': '2026-10-21T08:00:00Z',
       ...i.reproSteps !== undefined && { 'Microsoft.VSTS.TCM.ReproSteps': i.reproSteps },
@@ -131,7 +133,12 @@ export function fakeAz({ items, sprint = items.map((i) => i.id), backlog = items
     if (args[0] === 'rest' && flag(args, '--method') === 'patch') {
       const id = Number(/\/_apis\/wit\/workitems\/(\d+)\?/.exec(flag(args, '--url'))?.[1]);
       if (!byId.has(id)) throw new Error(`fake az: no work item ${id}`);
-      patches.push({ id, ops: JSON.parse(readFileSync(flag(args, '--body').slice(1), 'utf8')) as unknown[] });
+      const ops = JSON.parse(readFileSync(flag(args, '--body').slice(1), 'utf8')) as { op: string; path: string; value: unknown }[];
+      const rev = ops.find((o) => o.op === 'test' && o.path === '/rev');
+      if (rev && rev.value !== (byId.get(id)!.rev ?? 1)) {
+        throw new Error('az rest failed: Bad Request({"message":"TF26071: This work item has been changed by someone else since you opened it. You will need to refresh it and discard your changes."})');
+      }
+      patches.push({ id, ops });
       return JSON.stringify(raw(byId.get(id)!));
     }
     if (args[0] === 'devops' && args[1] === 'invoke') {

@@ -3,7 +3,7 @@
 
 import type { IssueRef, Item, ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
 import type { Refused } from '../config/edit-config.ts';
-import { graphql, message } from './github.ts';
+import { editIssueBody, graphql, message } from './github.ts';
 
 /** Comments read per open; older ones are paged by their cursor. */
 const COMMENT_LIMIT = 10;
@@ -105,4 +105,16 @@ export async function readGithubOlderComments(item: Item, before: string, run?: 
   catch (err) { return { status: 502, error: message(err) }; }
   if (!node?.comments) return { status: 404, error: 'GitHub has no such item.' };
   return { comments: node.comments.nodes.map(toComment).reverse(), olderCursor: olderCursor(node.comments) };
+}
+
+/** Saves `body` as the issue's markdown body. Returns null, or the refusal: 403 when GitHub refuses the edit, else 502 with gh's message. */
+export async function saveGithubDescription(item: Item, body: string, run?: (args: string[]) => Promise<string>): Promise<Refused | null> {
+  if (!item.repo || item.number === null) return { status: 404, error: 'That item is not a GitHub issue.' };
+  try {
+    await editIssueBody(item.repo, item.number, body, run);
+    return null;
+  } catch (err) {
+    const text = message(err);
+    return { status: /HTTP 403|not accessible|permission/i.test(text) ? 403 : 502, error: `Could not save the description. ${text}` };
+  }
 }

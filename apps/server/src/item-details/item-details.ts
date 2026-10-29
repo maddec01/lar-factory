@@ -1,21 +1,26 @@
-// The item dialog's details for one item. Sample mode serves them from a file beside the board's fixture; otherwise
-// each provider reads its own.
+// The item dialog's details for one item, and its description's save. Sample mode serves the details from a file beside
+// the board's fixture and saves nothing; otherwise each provider reads and writes its own.
 
 import { readFileSync } from 'node:fs';
 import { onAzure } from '@lar-factory/shared';
-import type { Item, ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
+import type { DescriptionSave, Item, ItemComment, ItemCommentsPage, ItemDetails } from '@lar-factory/shared';
 import type { Refused } from '../config/edit-config.ts';
 import { readAzureItemDetails, readAzureOlderComments } from '../azure/azure-details.ts';
-import { readGithubItemDetails, readGithubOlderComments } from '../github/github-details.ts';
+import { saveAzureDescription } from '../azure/azure-writes.ts';
+import { readGithubItemDetails, readGithubOlderComments, saveGithubDescription } from '../github/github-details.ts';
 
 /** Reads one item's details, or says why it can't. */
 type ReadItemDetails = (item: Item) => Promise<ItemDetails | Refused>;
 /** Reads the 10 comments older than `before`, a cursor its details or an earlier page gave, or says why it can't. */
 type ReadOlderComments = (item: Item, before: string) => Promise<ItemCommentsPage | Refused>;
 
+/** Saves the item's description as markdown; null when the provider took it, else the refusal to show. */
+type SaveDescription = (item: Item, save: Omit<DescriptionSave, 'itemId'>) => Promise<Refused | null>;
+
 export interface ItemDetailsReader {
   details: ReadItemDetails;
   olderComments: ReadOlderComments;
+  saveDescription: SaveDescription;
 }
 
 /** Comments per older page; GitHub and Azure DevOps both answer 10. */
@@ -40,6 +45,7 @@ function fromFile(file: string): ItemDetailsReader {
       const from = Number(before) || 0;
       return { comments: older.slice(from, from + PAGE), olderCursor: from + PAGE < older.length ? String(from + PAGE) : null };
     },
+    saveDescription: async () => ({ status: 403, error: 'Saving descriptions is disabled in sample mode.' }),
   };
 }
 
@@ -50,5 +56,10 @@ export function createItemDetails(sampleFile: string | null): ItemDetailsReader 
   return {
     details: (item) => (azure(item) ? readAzureItemDetails(item) : readGithubItemDetails(item)),
     olderComments: (item, before) => (azure(item) ? readAzureOlderComments(item, before) : readGithubOlderComments(item, before)),
+    async saveDescription(item, { body, bodyField, revision }) {
+      if (!azure(item)) return saveGithubDescription(item, body);
+      if (!bodyField || revision === undefined) return { status: 400, error: 'Send the field and revision the work item\'s details gave.' };
+      return saveAzureDescription(item, { body, bodyField, revision });
+    },
   };
 }

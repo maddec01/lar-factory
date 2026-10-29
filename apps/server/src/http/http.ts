@@ -233,6 +233,18 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
       restarted: () => withBoard({ error: 'The board restarted. Press Abandon again.' }),
       run: forItem('Name the item to abandon.', (itemId) => commands.abandon(itemId)),
     },
+    '/api/item-description': {
+      what: 'the description and its item', disabled: 'Saving descriptions is disabled in sample mode.',
+      async run({ itemId, body, bodyField, revision }) {
+        if (typeof itemId !== 'string' || !itemId || typeof body !== 'string') return { status: 400, body: { error: 'Name the item and send its description.' } };
+        if ((bodyField !== undefined && bodyField !== 'System.Description' && bodyField !== 'Microsoft.VSTS.TCM.ReproSteps')
+          || (revision !== undefined && !Number.isSafeInteger(revision))) return { status: 400, body: { error: 'Send the field and revision the work item\'s details gave.' } };
+        const item = board.snapshot().items.find((i) => i.id === itemId);
+        if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+        const refused = await itemDetails.saveDescription(item, { body, ...bodyField !== undefined && { bodyField }, ...revision !== undefined && { revision: revision as number } });
+        return refused ? { status: refused.status, body: { error: refused.error } } : { status: 200, body: { error: null } };
+      },
+    },
     '/api/onboarding/projects': {
       what: 'the folder to add', disabled: 'Sample mode onboards no repository.',
       async run(input) {

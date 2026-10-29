@@ -1,6 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { ITEM_DETAILS_QUERY, OLDER_COMMENTS_QUERY, readGithubItemDetails, readGithubOlderComments } from './github-details.ts';
+import { existsSync, readFileSync } from 'node:fs';
+import { ITEM_DETAILS_QUERY, OLDER_COMMENTS_QUERY, readGithubItemDetails, readGithubOlderComments, saveGithubDescription } from './github-details.ts';
 import type { Item } from '@lar-factory/shared';
 
 const item = (id: string): Item => ({ id } as Item);
@@ -76,4 +77,25 @@ test('older comments of an item GitHub no longer has or of a failed call answer 
   assert.deepEqual(await readGithubOlderComments(item('I_gone'), 'CUR_1', fakeGh(null).run), { status: 404, error: 'GitHub has no such item.' });
   const failing = async () => { throw new Error('gh api graphql failed: HTTP 403'); };
   assert.deepEqual(await readGithubOlderComments(item('I_7'), 'CUR_1', failing), { status: 502, error: 'gh api graphql failed: HTTP 403' });
+});
+
+const issue = (number: number): Item => ({ id: `I_${number}`, repo: 'maddec01/lar-server', number } as Item);
+
+test('a saved description is the issue body, through gh issue edit --body-file', async () => {
+  const calls: { args: string[]; body: string }[] = [];
+  const run = async (args: string[]) => {
+    calls.push({ args, body: readFileSync(args[args.indexOf('--body-file') + 1]!, 'utf8') });
+    return '';
+  };
+  assert.equal(await saveGithubDescription(issue(12), '- a\n- b', run), null);
+  assert.deepEqual(calls.map((c) => [c.args.filter((a, i) => c.args[i - 1] !== '--body-file'), c.body]),
+    [[['issue', 'edit', '12', '-R', 'maddec01/lar-server', '--body-file'], '- a\n- b']]);
+  assert.ok(!existsSync(calls[0]!.args.at(-1)!), 'the body file is removed after');
+});
+
+test('a failed edit answers its message, and no right to edit the issue is 403', async () => {
+  const failing = (message: string) => async () => { throw new Error(message); };
+  assert.deepEqual(await saveGithubDescription(issue(12), 'x', failing('HTTP 403: Resource not accessible by integration')),
+    { status: 403, error: 'Could not save the description. HTTP 403: Resource not accessible by integration' });
+  assert.deepEqual(await saveGithubDescription(issue(12), 'x', failing('timed out')), { status: 502, error: 'Could not save the description. timed out' });
 });

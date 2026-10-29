@@ -1,5 +1,8 @@
 // Reads repository issues and linked PRs through the local `gh` CLI (`gh api graphql`).
 
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, RawLinkedPr, Searched, Status } from '@lar-factory/shared';
 import { createCooldown } from '../tools/cooldown.ts';
@@ -461,6 +464,18 @@ export async function addIssueLabel(repo: string, number: number, label: string,
     return null;
   } catch (err) {
     return `Could not add the ${label} label. ${message(err)}`;
+  }
+}
+
+/** Replaces an issue's body, written to a file for gh's --body-file. */
+export async function editIssueBody(repo: string, number: number, body: string, run: (args: string[]) => Promise<string> = gh): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), 'lar-body-'));
+  try {
+    const file = join(dir, 'body.md');
+    await writeFile(file, body);
+    await run(['issue', 'edit', String(number), '-R', repo, '--body-file', file]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 }
 

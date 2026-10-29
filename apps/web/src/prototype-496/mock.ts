@@ -1,9 +1,9 @@
-// PROTOTYPE #496, throwaway: the same mock data for every variant.
+// PROTOTYPE #496, throwaway: mock data for both dialogs.
 
 export const REPOS = [
   { repo: 'maddec01/lar', name: 'lar', labels: ['app: music', 'app: video', 'os: ios', 'os: macos', 'area: server', 'UI', 'Review'] },
   { repo: 'maddec01/lar-factory', name: 'lar-factory', labels: ['area: board', 'area: skills', 'UI'] },
-  // An Azure repository, for YB's "Only for" checkbox.
+  // An Azure repository, for the "Only for" checkbox.
   { repo: 'contoso/payments', name: 'payments', labels: ['area: api', 'area: web', 'Review'], azure: { team: 'Payments' } },
 ] as { repo: string; name: string; labels: string[]; azure?: { team: string } }[];
 

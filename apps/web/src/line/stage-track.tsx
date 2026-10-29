@@ -63,7 +63,7 @@ function AgentCell({ s }: { s: ItemStats | null }) {
 }
 
 /** Six stage cells: the stages behind filled, the current one coloured up to its glyph, the rest faint. */
-function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
+export function Track({ status, waiting }: { status: Status; waiting?: boolean }) {
   const at = stageOf(status);
   return (
     <ol className="m-0 grid list-none grid-cols-6 gap-px p-0" title={`${status}${waiting ? ', waiting' : ''}`}>

@@ -271,6 +271,12 @@ _Avoid_: test board, dev board
 The installable desktop app that runs the board and updates itself from Releases.
 _Avoid_: Electron app, desktop board, dashboard
 
+**Notification**:
+A message the board app shows in the stack in its bottom-right corner: a toast for
+something that just happened, or a warning for a lasting condition, which stays
+until the condition clears or the User closes it.
+_Avoid_: toast (for both kinds), banner, notice
+
 **Loading screen**:
 The screen the board app and the board page show until the first read settles or a repository's items land, at launch and after a board server restart. The board then fills in as each other repository's read lands. It shows the lar Factory lockup, whose L draws itself, over one line naming the current step, then fades into the board.
 _Avoid_: splash, spinner, starting page

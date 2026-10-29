@@ -29,7 +29,8 @@ scan-and-rewrite pass. Code is out of scope.
   failures that matter.
 - **Fixer**: commits on the build branch here as `git commit --fixup <sha>`
   (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
-  never `--no-verify`, and reruns the checks. Its prompt carries
+  never `--no-verify`, and reruns only the checks `AGENTS.md` names for the
+  files its fix touched, never the full suite. Its prompt carries
   `<lar-work>/cross-repo-citations.md` for citing other-repo work.
 - **UI-check**: runs the visible checks and Verify captures per
   `<lar-work>/screenshots.md`, keeps screenshots in its own context, and
@@ -82,9 +83,10 @@ scan-and-rewrite pass. Code is out of scope.
    build is added the same way (by the fixer during review) without stopping;
    list each in one issue comment headed **Domain docs added by the build**,
    kept current through review fixes, for the reviewers and approver.
-6. A subagent runs the checks `AGENTS.md` names for the layers changed; a
-   UI-check subagent checks anything user-visible. Failures go to the fixer.
-   All must pass.
+6. A subagent runs the full check suite `AGENTS.md` names, once, on the build
+   branch HEAD, and returns that commit's tree (`git rev-parse HEAD^{tree}`):
+   the step 6 tree. A UI-check subagent checks anything user-visible.
+   Failures go to the fixer. All must pass.
 7. Push the branch. Don't open the PR yet.
 
 Ordinary questions to the user follow `<lar-work>/questions.md`: Needs you,
@@ -100,7 +102,8 @@ post a handoff written per `~/.agents/skills/handoff/SKILL.md` as an issue
 comment and relaunch with
 `t3_thread_launch`: message `Build <owner/repo#n>. Read <lar-work>/agents/builder.md and follow it.`,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
-The handoff names the step and review round to resume at; at a review round,
+The handoff names the step and review round to resume at and, once step 6
+has run, the step 6 tree; at a review round,
 the round's base sha, each reviewer's verdict, open findings, fixed findings,
 and rejected findings with reasons, and the unreviewed fixes so far, each as
 the line **Approve** describes. Otherwise finish in place.
@@ -155,10 +158,15 @@ findings you agree with to the fixer, with no further review.
 ## Approve
 
 Start the **Approver subagent** with `approver.md`, the issue reference, the
-repo path, every reviewer's final result, your rejected findings and the
-unreviewed fixes. An unreviewed fix is a round-3 fix or a fix whose reviewer
+repo path, the step 6 tree, every reviewer's final result, your rejected
+findings and the unreviewed fixes. An unreviewed fix is a round-3 fix or a fix whose reviewer
 you skipped; list each as a line naming the finding, its severity, its
 reviewer, its round and, for a skip, your recorded reason. It opens the PR and returns a recommended status; the item stays in Review. Link the PR to this thread (`link_pull_request`).
+When the approver reports a rebase conflict or a failing check instead, hand
+it to the fixer; for a conflict, the fixer rebases onto `origin/main` and
+resolves it. Add the fix to the unreviewed fixes, then start the approver
+again. After two such restarts, set **Needs you**, comment on the issue with
+the conflict or failing check, and ask the user how to go on.
 
 ## Checks
 

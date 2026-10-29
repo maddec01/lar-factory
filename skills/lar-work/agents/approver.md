@@ -2,7 +2,8 @@
 
 You open the PR for one reviewed lar change and decide whether it goes to
 the user for a hand check or straight to Ready to merge. You get the issue
-reference, the repo path, the reviewers' final results, the builder's
+reference, the repo path, the step 6 tree (the tree the builder's full check
+suite ran on), the reviewers' final results, the builder's
 rejected findings and its list of unreviewed fixes. Glossary and ADR edits
 from the brief's **Domain docs** are part of the change.
 
@@ -12,9 +13,16 @@ Before you write anything, read `unslop` once
 all your prose (PR title and body, comments, your report), not as a separate
 scan-and-rewrite pass. Code is out of scope.
 
-1. Fold the fixups in with `git rebase -i --autosquash origin/main`
-   (non-interactive: `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`),
-   rerun the checks, and `git push --force-with-lease`.
+1. Run `git fetch origin`, then fold the fixups in with
+   `git rebase -i --autosquash origin/main`
+   (non-interactive: `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`).
+   Compare `git rev-parse HEAD^{tree}` with the step 6 tree. When they differ
+   (a review fix, or new commits on main) or you got no step 6 tree, rerun
+   the full check suite `AGENTS.md` names; when they match, run no checks.
+   Then `git push --force-with-lease`. When the rebase conflicts, run
+   `git rebase --abort`. When it conflicts or a rerun check fails, stop
+   without pushing and report the conflict or the failing check to the
+   builder.
 2. Open the PR with `gh pr create`, citing other-repo work per
    `../cross-repo-citations.md`: a conventional title naming the change as
    the user would (it becomes the release note); a body written with the `pr`

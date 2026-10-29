@@ -1,7 +1,7 @@
 /* Banners, the missing-tool notice, close buttons and toasts. */
 
-.banner .err { white-space: pre-wrap; word-break: break-word; }
-.banner code { overflow-wrap: anywhere; }
+[data-warning] .err { white-space: pre-wrap; word-break: break-word; }
+[data-warning] code { overflow-wrap: anywhere; }
 /* Fills the main area below the title bar. */
 .tool-missing { flex: 1; display: grid; place-items: center; padding: --spacing(5); }
 .tool-missing-box h1 { font-size: var(--text-base); font-weight: 600; margin: --spacing(3) 0 0; letter-spacing: -0.01em; }

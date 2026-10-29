@@ -318,8 +318,12 @@ _Avoid_: inbox, queue
 The board's view of the work moving through the factory: the Queue, the dossiers, and everything else in flight on one stage track.
 
 **Dossier**:
-A concept, or an item with sub-issues, shown whole on the line: its destination, decisions, parts, what waits on what, and its threads.
+A concept, or an item with sub-issues, shown on the line. Collapsed, it is two lines of progress and what's next. Expanded, it shows what needs the user, what is blocked or ready, the remaining fog of its map, its threads, and its Work map or parts list. The full map is in its item dialog.
 _Avoid_: concept card
+
+**Work map**:
+A dossier's diagram of its parts: one lane per repository plus a Decisions lane, columns in dependency order, and arrows for what waits on what.
+_Avoid_: map (that is the concept's written account), graph
 
 **Item dialog**:
 The board page's view of one item, with what its provider shows: description, comments, people, labels, dates, relations and linked PRs. Its description is the one thing the user can edit there.

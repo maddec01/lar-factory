@@ -54,3 +54,20 @@ test('closing a focused warning on the T3 Code missing screen returns focus to S
   expect(warning('gh')).toBeNull();
   expect(document.activeElement).toBe($('.open-settings'));
 });
+
+test.each(['item', 'settings'])('closing a focused warning keeps focus in the open %s dialog', async (kind) => {
+  await mountPage({ ...healthy, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) });
+  // Exercise the notification's focus fallback without the modal trap redirecting focus before close.
+  const dialog = document.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('data-state', 'open');
+  if (kind === 'item') dialog.setAttribute('data-item-dialog', '');
+  const close = document.createElement('button');
+  close.setAttribute('data-slot', 'modal-close');
+  close.textContent = 'Close';
+  dialog.append(close);
+  document.body.append(dialog);
+  await settle(() => warning('gh')!.querySelector<HTMLElement>('.dismiss')!.focus());
+  await closeWarning('gh');
+  expect(dialog.contains(document.activeElement)).toBe(true);
+});

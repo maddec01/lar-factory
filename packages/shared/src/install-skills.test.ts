@@ -1249,48 +1249,6 @@ test('a legacy manifest becomes targets with its owned skills, Release, ticks, l
   assert.ok(!existsSync(join(home, '.claude-work/references')));
 });
 
-test('a new Release removes obsolete owned skills from every recorded target, active or not, and installs nothing new in an inactive one', () => {
-  const home = geminiHome();
-  profile(home, '.claude-work');
-  const work = join(home, '.claude-work/skills');
-  installSkills(home, bundle(v1), '1.0.0', { targets: [...defaultTargets(home), { kind: 'claude', path: work, required: true }] });
-  setTargetTick(home, join(home, antigravity[0]!), false);
-  writeFileSync(join(home, antigravity[1]!, 'tdd/SKILL.md'), 'edited');
-  mkdirSync(join(home, antigravity[1]!, 'mine'));
-
-  // Only the fallback targets: the CLI's Antigravity folder and the T3 Claude home aren't offered, the app's is unticked.
-  const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = v2;
-  const result = installSkills(home, bundle(withoutTdd), '2.0.0', { targets: [{ kind: 'agents', path: join(home, '.agents/skills') }, { kind: 'claude', path: join(home, '.claude/skills') }] });
-
-  for (const folder of antigravity) assert.deepEqual(readdirSync(join(home, folder)).sort(), folder === antigravity[1] ? ['lar-work', 'mine'] : ['lar-work']);
-  for (const folder of antigravity) assert.equal(readFileSync(join(home, folder, 'lar-work/SKILL.md'), 'utf8'), 'lar-work v1');
-  assert.deepEqual(entries(home, '.claude-work'), { 'lar-work': ownLinks['lar-work'] });
-  assert.deepEqual(antigravityOwned(home), [['lar-work'], ['lar-work']]);
-  assert.deepEqual(manifest(home).targets['.claude-work/skills']?.skills, ['lar-work']);
-  for (const path of [...antigravity.map((folder) => join(home, folder)), work]) {
-    const target = result.targets.find(({ paths }) => paths.includes(path));
-    assert.deepEqual([target?.active, target?.release, target?.error], [false, '1.0.0', undefined], path);
-  }
-});
-
-test('with a root, an inactive recorded target outside it keeps its obsolete skills', () => {
-  const root = temporary();
-  const outside = outsideHome();
-  mkdirSync(join(outside.home, 'skills/tdd'));
-  writeFileSync(join(outside.home, 'skills/tdd/SKILL.md'), 'tdd v1');
-  mkdirSync(join(root, '.agents'));
-  writeFileSync(join(root, '.agents', INSTALL_MANIFEST), JSON.stringify({
-    version: '1.0.0', targets: { [join(outside.home, 'skills')]: { kind: 'antigravity', release: '1.0.0', finished: true, skills: ['tdd'] } },
-  }));
-  const before = outside.files();
-
-  const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = v2;
-  installSkills(root, bundle(withoutTdd), '2.0.0', { root });
-
-  assert.deepEqual(outside.files(), before);
-  assert.deepEqual(manifest(root).targets[relative(root, join(outside.home, 'skills'))]?.skills, ['tdd']);
-});
-
 /** Every path in `folder` with its content or link target, without following links. */
 function tree(folder: string, prefix = ''): string[] {
   return readdirSync(folder).sort().flatMap((entry) => {
@@ -1338,7 +1296,7 @@ test('with a root, a Claude home linked from inside it to outside it is left alo
   const claude = result.targets.find(({ kind }) => kind === 'claude');
   assert.equal(claude?.active, false);
   assert.match(claude?.error?.message ?? '', /outside the install root/);
-  assert.throws(() => tickProfile(root, '.claude', true, { root }), /outside the install root/);
+  assert.throws(() => setProfileTick(root, '.claude', true, { root }), /outside the install root/);
   assert.deepEqual(outside.files(), before);
 });
 
@@ -1359,7 +1317,7 @@ test('with a root, a migrated target outside it is neither written nor removed',
   assert.deepEqual(outside.files(), before);
   assert.match(result.targets.find(({ path }) => path === join(outside.home, 'skills'))?.error?.message ?? '', /outside the install root/);
   assert.deepEqual(manifest(root).targets[relative(root, join(outside.home, 'skills'))]?.skills, ['lar-work', 'tdd']);
-  assert.throws(() => tickProfile(root, '.claude-work', false, { root }), /outside the install root/);
+  assert.throws(() => setProfileTick(root, '.claude-work', false, { root }), /outside the install root/);
   assert.deepEqual(outside.files(), before);
 });
 

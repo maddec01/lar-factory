@@ -172,3 +172,78 @@ test('a selected target with a missing provider home stays visible with its read
   expect(text(tray())).toContain('Work Claude');
   expect(text(tray())).toContain('Not installed until ~/Profiles/claude-gone exists.');
 });
+
+const succeeded: InstallSnapshot = { ...installing, installed: true, running: null, targets: [{ ...target,
+  running: false, finished: true, release: '1.0.0',
+  skills: [{ name: 'lar-build', state: 'installed' }, { name: 'lar-shape', state: 'installed' }],
+}] };
+
+test('installation stays open through progress and closes five seconds after every target succeeds', async () => {
+  const bridge = stubInstall(installing);
+  await mountPage(sample);
+  await settle(() => vi.advanceTimersByTime(60_000));
+  expect(tray()).not.toBeNull();
+  await bridge.push(succeeded);
+  await settle(() => vi.advanceTimersByTime(4_999));
+  expect(tray()).not.toBeNull();
+  await settle(() => vi.advanceTimersByTime(1));
+  expect(tray()).toBeNull();
+});
+
+test('success waits for hover and focus to leave, then starts a full five seconds', async () => {
+  const bridge = stubInstall(installing);
+  await mountPage(sample);
+  const entry = tray()!.closest('[data-slot="toast"]')!;
+  await settle(() => entry.dispatchEvent(new MouseEvent('mouseenter')));
+  await settle(() => toggle().focus());
+  await bridge.push(succeeded);
+  await settle(() => vi.advanceTimersByTime(10_000));
+  expect(tray()).not.toBeNull();
+  await settle(() => entry.dispatchEvent(new MouseEvent('mouseleave')));
+  await settle(() => vi.advanceTimersByTime(10_000));
+  expect(tray()).not.toBeNull();
+  await settle(() => tray()!.querySelector<HTMLButtonElement>('.dismiss')!.focus());
+  await settle(() => vi.advanceTimersByTime(10_000));
+  expect(tray()).not.toBeNull();
+  await settle(() => (document.activeElement as HTMLElement).blur());
+  await settle(() => vi.advanceTimersByTime(4_999));
+  expect(tray()).not.toBeNull();
+  await settle(() => vi.advanceTimersByTime(1));
+  expect(tray()).toBeNull();
+});
+
+test.each(['global error', 'partial failure', 'Clash', 'incomplete', 'running'])('%s prevents automatic success closure', async (condition) => {
+  const snapshot: InstallSnapshot = condition === 'global error' ? { ...succeeded, error: 'Cannot read install targets' }
+    : condition === 'partial failure' ? { ...succeeded, targets: [...succeeded.targets, { ...target, path: '~/late/skills',
+      running: false, finished: false, error: 'EACCES: permission denied', skills: [{ name: 'lar-build', state: 'failed' }] }] }
+    : condition === 'Clash' ? { ...succeeded, blocked: [{ skill: 'lar-build', paths: [{ place: 'agents', path: '~/late/skills/lar-build' }] }] }
+    : condition === 'running' ? { ...succeeded, running: 'discovery' }
+    : { ...succeeded, targets: [...succeeded.targets, { ...target, running: false }] };
+  stubInstall(snapshot);
+  await mountPage(sample);
+  await settle(() => vi.advanceTimersByTime(60_000));
+  expect(tray()).not.toBeNull();
+});
+
+test('late work cancels the success timer and progress updates preserve one expanded notification', async () => {
+  const bridge = stubInstall(succeeded);
+  await mountPage(sample);
+  await settle(() => toggle().click());
+  await settle(() => (document.activeElement as HTMLElement).blur());
+  const entry = tray();
+  await settle(() => vi.advanceTimersByTime(4_900));
+  const late: InstallSnapshot = { ...succeeded, running: 'discovery', discovery: 'available', targets: [...succeeded.targets,
+    { ...target, path: '~/late/skills', paths: ['~/late/skills'], instances: [] }] };
+  await bridge.push(late);
+  await settle(() => vi.advanceTimersByTime(60_000));
+  expect(tray()).toBe(entry);
+  expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  expect($$('[data-install-overview]')).toHaveLength(1);
+  expect(text(tray())).toContain('Release 1.0.0 · Installed');
+  await bridge.push({ ...late, running: null, targets: [...succeeded.targets, { ...succeeded.targets[0]!, path: '~/late/skills', paths: ['~/late/skills'] }] });
+  await settle(() => entry!.closest('[data-slot="toast"]')!.dispatchEvent(new MouseEvent('mouseleave')));
+  await settle(() => vi.advanceTimersByTime(4_900));
+  await bridge.push({ ...late, running: null, targets: [...succeeded.targets, { ...succeeded.targets[0]!, path: '~/late/skills', paths: ['~/late/skills'] }] });
+  await settle(() => vi.advanceTimersByTime(100));
+  expect(tray()).toBeNull();
+});

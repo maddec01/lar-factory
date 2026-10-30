@@ -31,6 +31,11 @@ export const fromBoard = (url: string | undefined, boardOrigin: string): boolean
   }
 };
 
+/** Checks the current origin on every page mutation, including after the board server restarts. */
+export const boardPageOnly = (boardOrigin: () => string, refusal: string) => (url: string | undefined) => {
+  if (!fromBoard(url, boardOrigin())) throw new Error(refusal);
+};
+
 export interface BoardInput {
   /** The home the app installs into. */
   readonly home: string;

@@ -18,6 +18,7 @@ const secret: unknown = ipcRenderer.sendSync(LaunchSecret.CHANNEL);
 const bridge: BoardAppBridge = {
   platform: process.platform,
   ...(typeof secret === "string" && { secret }),
+  boardReady: () => ipcRenderer.invoke(IpcChannels.INSTALL_BOARD_READY),
   getInstallState: () => ipcRenderer.invoke(IpcChannels.INSTALL_GET_STATE),
   onInstallState: (listener) => {
     const wrappedListener = (_event: Electron.IpcRendererEvent, snapshot: unknown) => {

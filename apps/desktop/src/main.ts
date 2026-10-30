@@ -203,24 +203,13 @@ const makeSkillChecks = (env: Record<string, string | undefined>) =>
     env: process.env,
   }, T3Instances.discover(env, NodeOS.homedir()));
 
-/**
- * Checks the skills in the fallback targets at launch, then asks T3 until it answers and checks its targets. The board's
- * page reports what each check found, Drift, Clashes and failures, in its notices; a native dialog would hold the main
- * process on macOS and keep the window on the starting page.
- */
-const checkSkillsAtLaunch = (checks: SkillInstall.Checks) =>
-  checks.atLaunch.pipe(
-    Effect.ignore,
-    Effect.andThen(SkillInstall.discoverUntilAnswered(checks, SkillInstall.REDISCOVER_EVERY)),
-  );
-
 /** Throws for a call from any page but the current board server's, and while no server is ready. */
 const boardPageOnly = (boardOrigin: () => string, refusal: string) => (event: Electron.IpcMainInvokeEvent) => {
-  if (!InstallBoard.fromBoard(event.senderFrame?.url, boardOrigin())) throw new Error(refusal);
+  InstallBoard.boardPageOnly(boardOrigin, refusal)(event.senderFrame?.url);
 };
 
 /** The page's skill install calls, and each new install state sent to the window. */
-const handleInstall = (window: Electron.BrowserWindow, boardOrigin: () => string, checks: SkillInstall.Checks | undefined) => {
+const handleInstall = (window: Electron.BrowserWindow, boardOrigin: () => string, checks: SkillInstall.Checks | undefined, ready: () => void) => {
   const checkSender = boardPageOnly(boardOrigin, "Only the board's page can change the skill install");
   const board = InstallBoard.makeInstallBoard({
     home: SkillInstall.installHome(NodeOS.homedir(), process.env),
@@ -229,6 +218,10 @@ const handleInstall = (window: Electron.BrowserWindow, boardOrigin: () => string
   }, checks);
   board.subscribe((snapshot) => {
     if (!window.isDestroyed()) window.webContents.send(IpcChannels.INSTALL_STATE, snapshot);
+  });
+  Electron.ipcMain.handle(IpcChannels.INSTALL_BOARD_READY, (event) => {
+    checkSender(event);
+    ready();
   });
   Electron.ipcMain.handle(IpcChannels.INSTALL_GET_STATE, (event) => {
     checkSender(event);
@@ -313,7 +306,8 @@ const program = Effect.gen(function* () {
   const env = yield* ShellEnvironment.childEnvironment(process.env);
   // One pair of checks for the whole run, so the launch's check and each Start build's take turns.
   const skillChecks = yield* makeSkillChecks(env);
-  handleInstall(board.window, board.origin, skillChecks);
+  const installReady = skillChecks ? yield* SkillInstall.launchWhenReady(skillChecks) : () => {};
+  handleInstall(board.window, board.origin, skillChecks, installReady);
   const config = BoardServer.makeStartConfig({
     ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
     executablePath: process.execPath,
@@ -345,9 +339,6 @@ const program = Effect.gen(function* () {
     start: supervisor.stop.pipe(Effect.andThen(supervisor.start)),
   }));
   yield* supervisor.start;
-  // Starts after the board server. The copy is synchronous, so it blocks the main
-  // process briefly after start.
-  if (skillChecks) yield* Effect.forkScoped(checkSkillsAtLaunch(skillChecks));
   // The app replaces the launch agent that ran the board before it.
   yield* Effect.forkScoped(
     LaunchAgentCleanup.onLaunch({

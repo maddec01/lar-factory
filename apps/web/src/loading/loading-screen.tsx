@@ -4,9 +4,10 @@
 
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BRAND_BLOCK_COLOR, BRAND_MARK_BAR, BRAND_MARK_BLOCK, BRAND_MARK_CENTRE_LINE, BRAND_MARK_L, BRAND_MARK_VIEWBOX } from '@lar-factory/shared';
+import { boardApp, BRAND_BLOCK_COLOR, BRAND_MARK_BAR, BRAND_MARK_BLOCK, BRAND_MARK_CENTRE_LINE, BRAND_MARK_L, BRAND_MARK_VIEWBOX } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { stepText } from './step-text.ts';
+import { useInstallStore } from '../settings/install-store.ts';
 
 /** The draw (lar-apple's LarLogoMark): the block from 0.1 s, the L's trace from 0.42 s, "ar" from 1 s, the product's fade ending at 1.75 s. */
 const DRAW_MS = 1750;
@@ -94,6 +95,12 @@ export function LoadingScreen() {
   const { phase, drawn } = useScreen(read.settled || landed);
   const { current, leaving, rolled } = useLines(stepText(read));
   useInertBoard(phase !== 'gone');
+  const installs = useInstallStore((state) => state.snapshot?.installs);
+  const follow = useInstallStore((state) => state.follow);
+  useEffect(follow, [follow]);
+  useEffect(() => {
+    if (phase === 'gone' && installs) void boardApp()?.boardReady().catch(() => {});
+  }, [phase, installs]);
   if (phase === 'gone') return null;
   // In the body, beside the board's root, so the board can be inert without the screen.
   return createPortal(

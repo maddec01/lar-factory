@@ -228,3 +228,71 @@ test('Azure List defaults to backlog priority and retains native work item field
   expect(rows()).toEqual(['I_sample01', 'I_sample02']);
   expect(text($('[data-list-modal] [data-azure]'))).toBe('Product Backlog Item · Committed · Ana Silva');
 });
+
+test('List expands below the header and restores its search', async () => {
+  await mountPage();
+  await open();
+  await type('sample');
+  await settle(() => $<HTMLButtonElement>('[data-list-modal] button[aria-label="Expand"]')!.click());
+  expect((modal() as HTMLElement).style.top).toBe('52px');
+  expect((modal() as HTMLElement).style.height).toBe('calc(100dvh - (52px + 1rem))');
+  await settle(() => $<HTMLButtonElement>('[data-list-modal] button[aria-label="Restore size"]')!.click());
+  expect(search().value).toBe('sample');
+});
+
+test('a child copies List size once and owns the expansion shortcut', async () => {
+  localStorage.setItem('lar-board:match-list-size', '1');
+  try {
+    await mountPage();
+    await open();
+    await settle(() => $<HTMLButtonElement>('[data-list-modal] button[aria-label="Expand"]')!.click());
+    await settle(() => $<HTMLButtonElement>('[data-list-modal] button.add-item')!.click());
+    const dialogs = $$<HTMLElement>('[role="dialog"]');
+    const child = dialogs.at(-1)!;
+    expect(child.style.top).toBe('52px');
+    await settle(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', shiftKey: true, ctrlKey: true, metaKey: true, bubbles: true })));
+    expect(child.style.top).toBe('');
+    expect((modal() as HTMLElement).style.top).toBe('52px');
+    await closeTop();
+    expect((modal() as HTMLElement).style.top).toBe('52px');
+  } finally {
+    localStorage.removeItem('lar-board:match-list-size');
+  }
+});
+
+test('the saved List opening preference applies each time while permitting Restore', async () => {
+  localStorage.setItem('lar-board:open-list-expanded', '1');
+  try {
+    await mountPage();
+    await open();
+    expect((modal() as HTMLElement).style.top).toBe('52px');
+    await settle(() => $<HTMLButtonElement>('[data-list-modal] button[aria-label="Restore size"]')!.click());
+    expect((modal() as HTMLElement).style.top).toBe('');
+    await closeTop();
+    await open();
+    expect((modal() as HTMLElement).style.top).toBe('52px');
+  } finally {
+    localStorage.removeItem('lar-board:open-list-expanded');
+  }
+});
+
+for (const match of [false, true]) {
+  for (const listExpanded of [false, true]) {
+    for (const childKind of ['item', 'add'] as const) {
+      test(`${childKind} opens over ${listExpanded ? 'expanded' : 'collapsed'} List with matching ${match ? 'on' : 'off'}`, async () => {
+        localStorage.setItem('lar-board:match-list-size', match ? '1' : '0');
+        try {
+          await mountPage();
+          await open();
+          if (listExpanded) await settle(() => $<HTMLButtonElement>('[data-list-modal] button[aria-label="Expand"]')!.click());
+          const opener = childKind === 'item' ? '[data-list-modal] button[data-item]' : '[data-list-modal] button.add-item';
+          await settle(() => $<HTMLButtonElement>(opener)!.click());
+          const child = $$<HTMLElement>('[role="dialog"]').at(-1)!;
+          expect(child.style.top).toBe(match && listExpanded ? '52px' : '');
+        } finally {
+          localStorage.removeItem('lar-board:match-list-size');
+        }
+      });
+    }
+  }
+}

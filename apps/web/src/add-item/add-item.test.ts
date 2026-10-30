@@ -173,7 +173,7 @@ test('the expand button and Ctrl+Shift+E grow the dialog to the window and back,
   expect([expand().getAttribute('aria-label'), expand().getAttribute('aria-keyshortcuts')]).toEqual(['Expand', 'Control+Shift+E']);
   await settle(() => expand().click());
   expect(dialog()!.style.width).toBe('calc(100vw - 2rem)');
-  expect(dialog()!.style.height).toBe('calc(100dvh - 2rem)');
+  expect(dialog()!.style.height).toBe('calc(100dvh - (52px + 1rem))');
   expect(expand().getAttribute('aria-label')).toBe('Restore size');
   editorArea().focus();
   await settle(() => editorArea().dispatchEvent(new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true, bubbles: true })));

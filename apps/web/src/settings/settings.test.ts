@@ -166,7 +166,8 @@ test('unfinished settings show availability inline without controls or fictional
   await settle(() => section('Appearance').click());
   expect(text(row('scheme'))).toContain('Not available yet');
   expect(text(row('font-size'))).not.toContain('13');
-  expect($$('.settings-body [role="radio"], .settings-body [role="switch"], .settings-body input')).toHaveLength(0);
+  expect($$('.settings-body [role="radio"], .settings-body input')).toHaveLength(0);
+  expect(switches()).toHaveLength(2);
   await settle(() => section('T3 Code').click());
   expect(text(body())).not.toContain('Connected');
   expect(text(row('base'))).toContain('Not available yet');
@@ -813,4 +814,24 @@ test('Diagnostics names the address serving this board', async () => {
   await open('Diagnostics');
   expect(text(row('d-server'))).toContain('http://127.0.0.1:4388');
   expect(text(row('d-server'))).not.toContain('4317');
+});
+
+
+test('dialog preferences default off and persist when Settings reopens', async () => {
+  localStorage.removeItem('lar-board:match-list-size');
+  localStorage.removeItem('lar-board:open-list-expanded');
+  try {
+    await open('Appearance');
+    expect(switches().map(ticked)).toEqual([false, false]);
+    for (const control of switches()) await settle(() => control.click());
+    expect(localStorage.getItem('lar-board:match-list-size')).toBe('1');
+    expect(localStorage.getItem('lar-board:open-list-expanded')).toBe('1');
+    await settle(() => close().click());
+    await settle(() => settingsButton()!.click());
+    await settle(() => section('Appearance').click());
+    expect(switches().map(ticked)).toEqual([true, true]);
+  } finally {
+    localStorage.removeItem('lar-board:match-list-size');
+    localStorage.removeItem('lar-board:open-list-expanded');
+  }
 });

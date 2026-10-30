@@ -1,6 +1,7 @@
 // Settings shows working controls and real read-only values. Unbuilt controls show their availability inline.
 
-import type { ComponentProps, ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
+import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
 import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
 import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-skills';
@@ -11,9 +12,17 @@ import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { useResetStore } from '../repositories/reset-store.ts';
 import { ChannelChoice, ProfileSwitch, ProfilesNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
-import { type Control, ToolState } from './controls.tsx';
+import { Switch, type Control, ToolState } from './controls.tsx';
 import { profilePath } from './settings-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
+
+function DialogPreference({ preference, label }: { preference: keyof typeof DIALOG_PREFERENCES; label: string }) {
+  const [on, setOn] = useState(() => dialogPreference(preference));
+  return <Switch label={label} on={on} onChange={(next) => {
+    localStorage.setItem(DIALOG_PREFERENCES[preference], next ? '1' : '0');
+    setOn(next);
+  }} />;
+}
 
 interface Row {
   id: string;
@@ -231,6 +240,10 @@ export function pages(input: PagesInput): Page[] {
       ] },
     ] },
     { id: 'appearance', label: 'Appearance', icon: <Palette />, description: "The board's theme, density and what each item shows.", groups: [
+      { title: 'Dialogs', rows: [
+        { id: 'match-list-size', title: 'Match List size when opening Item or Add item', control: custom(() => <DialogPreference preference="matchList" label="Match List size when opening Item or Add item" />) },
+        { id: 'open-list-expanded', title: 'Open List expanded', control: custom(() => <DialogPreference preference="openList" label="Open List expanded" />) },
+      ] },
       { title: 'Theme', rows: [
         { id: 'scheme', title: 'Color scheme', control: { type: 'unavailable' } },
         { id: 'follow-t3', title: "Follow T3 Code's theme", control: { type: 'unavailable' } },

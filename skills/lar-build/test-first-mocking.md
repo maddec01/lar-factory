@@ -1,3 +1,5 @@
+Ported from mattpocock/skills, `skills/engineering/tdd/mocking.md`. See [UPSTREAM.md](../../UPSTREAM.md) for the Ports record.
+
 # When to Mock
 
 Mock at **system boundaries** only:

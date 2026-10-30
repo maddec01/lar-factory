@@ -26,7 +26,7 @@ scan-and-rewrite pass. Code is out of scope.
    builder.
 2. Open the PR with `gh pr create`, citing other-repo work per
    `../shared/cross-repo-citations.md`: a conventional title naming the change as
-   the user would (it becomes the release note); a body written with the `<lar-build>/skills/pr/SKILL.md`
+   the user would (it becomes the release note); a body written with the `<lar-build>/write-pr.md`
    skill holding:
    - a text summary of the UI reviewer's checks and results, per
      `../screenshots.md` (relative to this file);

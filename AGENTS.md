@@ -14,7 +14,7 @@ the flow and `docs/plan.md` for how it was set up.
   `packages/shared` and `packages/ui` (the design system). Apps import only
   packages, never each other. Code sits in feature folders (`src/github/`,
   `src/items/`) with no wrapper folders such as `services/`. File names are
-  kebab-case, except Copies and Ports, which keep their source's names. Unit
+  kebab-case, except Copies and code Ports, which keep their source's names. Skill-text Ports use kebab-case names for their lar step. Unit
   tests sit next to the file they test.
 - `packages/ui` holds Copies of lar-server's design system, listed in its `UPSTREAM.md`.
   Never edit one: take a fresh copy from upstream and update its row.

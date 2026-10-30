@@ -124,3 +124,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+The PR Port Summary visuals and placement guidance credit Dex Horthy, Humanlayer, from the show-me skill: https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md.

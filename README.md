@@ -118,7 +118,7 @@ newly listed ones, and replaces the checklists.
 
 The app manages only `lar-shape` and `lar-build`. User-installed skills keep
 their own sources. Copies inside lar's skills change through the checkout's
-`/skill-sync`; lar rules live beside the step that loads each Copy.
+`/skill-sync`; lar rules live beside the step that loads each Copy. Workflow Ports are lar step files adapted from upstream, with source credits in their headers and reviewed commits in `UPSTREAM.md`.
 
 ## Board
 

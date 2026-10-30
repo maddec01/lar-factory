@@ -32,3 +32,13 @@ it('reports malformed snapshots explicitly', async () => {
   const adapter = new ProjectProtocol({ read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }), write: async () => {} }, { issue: async () => { throw Error(); }, revoke: async () => {} }, async () => Response.json({ projects: [{}], updatedAt: '2026-01-01' }), supportedProjectVersion);
   expect((await adapter.readProjects()).availability).toBe('malformed');
 });
+
+it('revokes a newly issued session if Keychain storage fails', async () => {
+  const revoked: string[] = [];
+  const adapter = new ProjectProtocol({ read: async () => undefined, write: async () => { throw Error('locked'); } }, {
+    issue: async () => ({ token: 'fixture', sessionId: 'new', expiresAt: '2099-01-01' }),
+    revoke: async id => { revoked.push(id); },
+  }, async () => { throw Error('must not request'); }, supportedProjectVersion);
+  expect((await adapter.readProjects()).availability).toBe('renewal-required');
+  expect(revoked).toEqual(['new']);
+});

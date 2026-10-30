@@ -16,7 +16,7 @@ import {
   blockedBy, listed, type DriftChoice, type InstallOperation, type InstallSnapshot, type SkillCheckOutcome,
 } from "@lar-factory/shared";
 import {
-  InstallError, installSkills, profileTargets, setTargetTick, type InstallResult, type OfferedTarget, type TickResult,
+  InstallError, installSkills, profileTargets, setTargetTick, t3Targets, type InstallResult, type OfferedTarget, type TickResult,
 } from "@lar-factory/shared/install-skills";
 import type { InstanceDiscovery, ProviderInstance } from "@lar-factory/shared/install-targets";
 
@@ -84,7 +84,7 @@ type Check = Effect.Effect<InstallResult, SkillInstallError>;
 export type Discover = (home: string) => Effect.Effect<InstanceDiscovery>;
 
 /** The targets the app installs into whether or not T3 answers: ~/.agents/skills and the default Claude home. */
-export const fallbackTargets = (home: string): Array<OfferedTarget> => [
+const fallbackTargets = (home: string): Array<OfferedTarget> => [
   { kind: "agents", path: NodePath.join(home, ".agents/skills") },
   { kind: "claude", path: NodePath.join(home, ".claude/skills") },
 ];
@@ -120,7 +120,7 @@ export interface CheckState {
   readonly discovery: InstallSnapshot["discovery"];
   /** T3's instances as it last listed them this run. */
   readonly instances: ReadonlyArray<ProviderInstance>;
-  /** The targets each check offers: the fallback ones and those of T3's instances. */
+  /** The targets each check offers: the fallback ones and those of T3's instances, or before T3 answers those it last required. */
   readonly targets: ReadonlyArray<OfferedTarget>;
   /** The last check's outcome, or none before the first. */
   readonly outcome?: InstallResult | SkillInstallError;
@@ -133,13 +133,14 @@ export interface Checks {
   /** Asks T3, then checks the targets it reports as `atLaunch` does; undefined when T3 doesn't answer. */
   readonly afterDiscovery: Effect.Effect<InstallResult | undefined, SkillInstallError>;
   /**
-   * The check before each Start build, after asking T3 again, which leaves the conflicts dialog to the launch. With
-   * `replace` it overwrites the Drift of every active target first, as Replace does.
+   * The check before each Start build, after asking T3 again. With the User's Drift choice it reuses the answer T3
+   * gave the check that asked about Drift, so the build waits for T3 once; with `replace` it overwrites the Drift of
+   * every active target first, as Replace does.
    */
   readonly beforeBuild: (drift?: DriftChoice) => Check;
-  /** The User's retry: asks T3 again, then checks, which tries each failed target again. */
+  /** The User's retry: always asks T3 again, then checks, which tries each failed target again. */
   readonly retry: Check;
-  /** The User's Replace: asks T3 again, then overwrites the Drift of every active target with this Release. */
+  /** The User's Replace: reuses T3's last answer, or asks again if T3 didn't give one, then overwrites the Drift of every active target with this Release. */
   readonly replace: Check;
   /**
    * Ticks or unticks the target at `path`, then checks, which installs into a newly ticked target. A refused tick
@@ -165,7 +166,7 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
   if (!install) return Effect.succeed(undefined);
   return oneAtATime.pipe(Effect.map((serial): Checks => {
     const listeners = new Set<() => void>();
-    let state: CheckState = { running: null, discovery: "waiting", instances: [], targets: fallbackTargets(install.home) };
+    let state: CheckState = { running: null, discovery: "waiting", instances: [], targets: offlineTargets(install.home) };
     const update = (next: Partial<CheckState>) => {
       state = { ...state, ...next };
       for (const listener of listeners) listener();
@@ -179,6 +180,12 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
       } else update({ discovery: answer.reason });
       return answer.available;
     }));
+    /**
+     * T3's last answer when it gave one, or a new one: a T3 that didn't answer may have started since. Replace and the
+     * check after the User's Drift choice reuse the last available answer however old it is, on purpose: they act on
+     * the targets the User was shown. Retry and Start build always ask T3 again.
+     */
+    const reuse = Effect.suspend(() => state.discovery === "available" ? Effect.succeed(true) : learn);
     const settle = (outcome: InstallResult | SkillInstallError) => Effect.sync(() => update({ running: null, outcome }));
     // One check, run inside a turn the caller holds.
     const checkNow = (operation: InstallOperation, options: { recordWarning: boolean; replace?: boolean }): Check =>
@@ -193,9 +200,9 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
     return {
       atLaunch: check("launch", { recordWarning: true }),
       afterDiscovery: learn.pipe(Effect.flatMap((available) => available ? check("discovery", { recordWarning: true }) : Effect.succeed(undefined))),
-      beforeBuild: (drift) => learn.pipe(Effect.andThen(check("build", { recordWarning: false, replace: drift === "replace" }))),
+      beforeBuild: (drift) => (drift ? reuse : learn).pipe(Effect.andThen(check("build", { recordWarning: false, replace: drift === "replace" }))),
       retry: learn.pipe(Effect.andThen(check("retry", { recordWarning: true }))),
-      replace: learn.pipe(Effect.andThen(check("replace", { recordWarning: true, replace: true }))),
+      replace: reuse.pipe(Effect.andThen(check("replace", { recordWarning: true, replace: true }))),
       tick: (path, ticked) => serial(Effect.suspend(() => {
         update({ running: "tick" });
         return Effect.try({
@@ -262,52 +269,5 @@ export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: 
   return {
     refusal: `${listed(skills)} changed since Lar Factory installed ${skills.length > 1 ? "them" : "it"}. Replace and start, or start anyway.`,
     drift: skills,
-  };
-};
-
-/** `outcome` without the failures of its targets that `shown`, an earlier check's outcome the user already saw, reported. */
-export const unshown = (outcome: InstallResult, shown: InstallResult | SkillInstallError): InstallResult => {
-  if (shown instanceof SkillInstallError) return outcome;
-  const failed = new Set(failures(shown));
-  return {
-    ...outcome,
-    targets: outcome.targets.map(({ error, ...target }) =>
-      error && !failed.has(`${target.path}: ${error.message}`) ? { ...target, error } : target),
-  };
-};
-
-/** A message box for the user. */
-export interface Notice {
-  readonly type: "warning" | "error";
-  readonly message: string;
-  readonly detail: string;
-}
-
-/**
- * What to tell the user after an install: nothing, its error or the targets it failed in, or a warning that names its
- * Clashes, on the first launch of a version. The board's page reports Drift, with its Replace.
- */
-export const notice = (outcome: InstallResult | SkillInstallError): Notice | undefined => {
-  if (!(outcome instanceof SkillInstallError) && failures(outcome).length > 0) {
-    return {
-      type: "error",
-      message: "Lar Factory couldn't install its skills everywhere",
-      detail: `${failures(outcome).join("\n")}\n\nThe other folders are installed. The next Start build or launch tries these again.`,
-    };
-  }
-  if (outcome instanceof SkillInstallError) {
-    return {
-      type: "error",
-      message: "Lar Factory couldn't install its skills",
-      detail: outcome.changed
-        ? `${outcome.message}\n\nThe install stopped partway, so some skills may be the new version and some the old. The next Start build or launch tries again.`
-        : `${outcome.message}\n\nThe previous skills are still in place. The next Start build or launch tries again.`,
-    };
-  }
-  if (!outcome.warn) return undefined;
-  return {
-    type: "warning",
-    message: "Lar Factory left some skills alone",
-    detail: `These folders have a bundled skill's name but Lar Factory didn't install them, so it didn't overwrite them:\n\n${outcome.conflicts.join("\n")}`,
   };
 };

@@ -204,8 +204,9 @@ const makeSkillChecks = (env: Record<string, string | undefined>) =>
   }, T3Instances.discover(env, NodeOS.homedir()));
 
 /**
- * Checks the skills in the fallback targets at launch, then in T3's targets once it answers, and shows the user each
- * check's error or conflicts. The second notice leaves out the failures the first named. The board's page reports Drift.
+ * Checks the skills in the fallback targets at launch, then asks T3 until it answers and checks its targets. The board's
+ * page reports what each check found, Drift, Clashes and failures, in its notices; a native dialog would hold the main
+ * process on macOS and keep the window on the starting page.
  */
 const checkSkillsAtLaunch = (checks: SkillInstall.Checks) =>
   checks.atLaunch.pipe(

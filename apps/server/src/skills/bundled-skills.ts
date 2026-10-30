@@ -18,29 +18,39 @@ export function bundleUrl(env: NodeJS.ProcessEnv = process.env): URL {
 
 const LAR = { author: 'Lar', licence: 'MIT', repo: 'maddec01/lar-factory', commit: 'main' };
 
-interface Copy { source: string; path: string; commit: string; date: string }
+/** A Copy or Port: the upstream source it comes from and its repository path in lar. */
+interface Upstream { source: string; path: string }
 
-/** UPSTREAM.md's rows by Skill, and its Authors line by source. */
+/** The cells, without backticks, of each row in the table whose header row starts with `header`. */
+function tableRows(markdown: string, header: string): string[][] {
+  const lines = markdown.split('\n');
+  const start = lines.findIndex((line) => line.startsWith(header));
+  if (start < 0) return [];
+  const end = lines.findIndex((line, index) => index > start && !line.startsWith('|'));
+  return lines.slice(start + 2, end < 0 ? undefined : end).map((row) => row.split('|').slice(1, -1).map((cell) => cell.trim().replace(/^`|`$/g, '')));
+}
+
+/** UPSTREAM.md's Copies and Ports, and its Authors line by source. */
 function parseUpstream(markdown: string) {
-  const copies = new Map<string, Copy>();
-  for (const [, name, source, , repositoryPath, commit, date] of markdown.matchAll(/^\| `([^`]+)` \| (\S+) \| `([^`]+)` \| `([^`]+)` \| `([0-9a-f]+)` \| (\S+) \|/gm)) {
-    copies.set(name!, { source: source!, path: repositoryPath!, commit: commit!, date: date! });
-  }
+  const included: Upstream[] = [
+    ...tableRows(markdown, '| Skill | Source | Path | Repository path |').map(([, source, , path]) => ({ source: source!, path: path! })),
+    ...tableRows(markdown, '| Port | Source | Path | Sections |').map(([path, source]) => ({ source: source!, path: path! })),
+  ];
   const authors = new Map<string, { author: string; licence: string }>();
   const line = /^Authors: (.*)$/m.exec(markdown)?.[1] ?? '';
   for (const [, source, author, licence] of line.matchAll(/(\S+\/\S+) by ([^(]+?) \(([^)]+)\)/g)) {
     authors.set(source!, { author: author!, licence: licence! });
   }
-  return { copies, authors };
+  return { included, authors };
 }
 
-/** The two installed skills, credited to Lar and the authors of their included Copies. */
+/** The two installed skills, credited to Lar and the authors of the Copies and Ports they include. */
 export function readBundledSkills(bundle: string): BundledSkill[] {
-  const { copies, authors } = parseUpstream(readFileSync(join(bundle, 'UPSTREAM.md'), 'utf8'));
+  const { included, authors } = parseUpstream(readFileSync(join(bundle, 'UPSTREAM.md'), 'utf8'));
   return ['lar-shape', 'lar-build'].map((name) => ({
     name, author: LAR.author, licence: LAR.licence,
     source: `https://github.com/${LAR.repo}/tree/main/skills/${name}`,
-    includedAuthors: [...new Set([...copies.values()].filter((copy) => copy.path.startsWith(`skills/${name}/`) || copy.path.startsWith('skills/shared/')).map((copy) => authors.get(copy.source)?.author ?? copy.source.split('/')[0]!))].sort(),
+    includedAuthors: [...new Set(included.filter((file) => file.path.startsWith(`skills/${name}/`) || file.path.startsWith('skills/shared/')).map((file) => authors.get(file.source)?.author ?? file.source.split('/')[0]!))].sort(),
     notices: `https://github.com/${LAR.repo}/blob/main/THIRD_PARTY_NOTICES.md`,
   }));
 }

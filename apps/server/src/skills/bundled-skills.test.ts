@@ -11,11 +11,11 @@ import { BUNDLE_URL, bundleUrl, bundledSkillNames, installHome, readBundledSkill
 
 const UPSTREAM = `# Upstream
 
-| Skill | Source | Path | Commit | Date | Overridden in |
-| ----- | ------ | ---- | ------ | ---- | ------------- |
-| \`tdd\` | mattpocock/skills | \`skills/engineering/tdd\` | \`5beb35b040e3\` | 2026-10-19 |  |
-| \`unslop\` | cursor/plugins | \`pstack/skills/unslop\` | \`8b3326d99fd4\` | 2026-10-22 |  |
-| \`references/security-checklist.md\` | addyosmani/agent-skills | \`references/security-checklist.md\` | \`aeac41d4d005\` | 2026-10-13 |  |
+| Skill | Source | Path | Repository path | Commit | Date | Overridden in |
+| ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
+| \`tdd\` | mattpocock/skills | \`skills/engineering/tdd\` | \`skills/lar-build/skills/tdd\` | \`5beb35b040e3\` | 2026-10-19 |  |
+| \`unslop\` | cursor/plugins | \`pstack/skills/unslop\` | \`skills/shared/skills/unslop\` | \`8b3326d99fd4\` | 2026-10-22 |  |
+| \`references/security-checklist.md\` | addyosmani/agent-skills | \`references/security-checklist.md\` | \`skills/lar-build/references/security-checklist.md\` | \`aeac41d4d005\` | 2026-10-13 |  |
 
 Full commits: mattpocock/skills \`5beb35b040e3de97e54fa9e386d7e42d15c295c2\`.
 
@@ -49,6 +49,21 @@ test('the assembled bundle installs only Lar skills with shared copies and neste
       assert.deepEqual(readFileSync(join(root, 'skills', row.name, 'shared', relative)), readFileSync(source));
     }
   }
+});
+
+test('each skill credits the authors of the Copies and Ports inside it, once each', async (t) => {
+  // lar-shape's only addyosmani source is a Port, and lar-build's Port cites sections that read like a lar-shape path.
+  const upstream = UPSTREAM.replace('Full commits', `| Port | Source | Path | Sections | Commit | Date |
+| ---- | ------ | ---- | -------- | ------ | ---- |
+| \`skills/lar-shape/agents/doubt.md\` | addyosmani/agent-skills | \`skills/doubt-driven-development\` | \`skills/doubt-driven-development/SKILL.md#Doubt\` | \`aeac41d4d005\` | 2026-10-13 |
+| \`skills/lar-build/agents/reviewer.md\` | obra/superpowers | \`skills/lar-shape\` | \`skills/lar-shape/SKILL.md\` | \`e5a6b7c8d9f0\` | 2026-10-20 |
+
+Full commits`).replace('Authors: ', 'Authors: obra/superpowers by Jesse Vincent (MIT), ');
+  const credits = Object.fromEntries(readBundledSkills(await bundleWith(t, [], [], upstream)).map((skill) => [skill.name, skill.includedAuthors]));
+  assert.deepEqual(credits, {
+    'lar-shape': ['Addy Osmani', 'Lauren Tan'],
+    'lar-build': ['Addy Osmani', 'Jesse Vincent', 'Lauren Tan', 'Matt Pocock'],
+  });
 });
 
 /** A home whose install manifest holds `status`. */

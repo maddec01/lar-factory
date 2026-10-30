@@ -1,7 +1,6 @@
-// PROTOTYPE (#691), throwaway: three stub scenarios for the onboarding tradeoff prototype (round 2). Every question,
-// detected fact and deferred choice is mocked here; nothing reads a provider or writes anything. Each option carries
-// its tradeoff three ways (a cost line, what you get and give up, an access limit) and each question says whether it
-// can change later, so the variants differ only in how a step presents them.
+// PROTOTYPE (#691), throwaway: three stub scenarios for the onboarding prototype (round 3: deferred choices). Every
+// question, detected fact, deferred choice and later prompt is mocked here; nothing reads a provider or writes
+// anything. Round 3 shows only each option's cost line (round 2's A1); the other tradeoff fields are left from round 2.
 
 export const PROTOTYPE_691 = import.meta.env.MODE !== 'test' && (import.meta.env.DEV || import.meta.env.VITE_LAR_PROTOTYPE === '1');
 
@@ -61,6 +60,123 @@ export const DEFERRED: { name: string; when: string }[] = [
   { name: 'Clash resolution', when: 'Asked when a project rule blocks factory work.' },
   { name: 'Dependencies', when: 'Asked during refinement, when work needs another repository.' },
 ];
+
+/** D2: the one line a step says about the choice deferred from it, if any. */
+export function deferredOnStep(scenario: Scenario, id: QuestionId): string | null {
+  const github = scenario.detected[0]!.value === 'GitHub';
+  const types = github ? 'labels' : 'work item types and tags';
+  switch (id) {
+    case 'repository': return scenario.detected.some((d) => d.label === 'Repository config' && !d.value.startsWith('None'))
+      ? null : 'You’ll be offered a shared Repository config when a setting is worth sharing with your team.';
+    case 'consent': return `You’ll map the factory’s kinds to your ${types}, and choose how to publish, the first time you publish refined work.`;
+    case 'docs': return 'You’ll choose whether to publish drafts when a build first writes them.';
+    case 'skills': return 'If a project rule blocks factory work, you’ll choose how to resolve it then.';
+    case 'connections': return 'If work needs a repository that isn’t onboarded, refinement asks then.';
+    default: return null;
+  }
+}
+
+/** One option on a later prompt, with its cost line; `disabled` is the badge when detected access refuses it. */
+export type LaterOption = { id: string; title: string; cost: string; disabled?: string };
+type LaterQuestion = { title: string; detected: string; options: LaterOption[]; fallback: string };
+/** One row of the Vocabulary mapping: a factory term and the team's ticket types or labels it could map to. */
+type MappingRow = { term: string; what: string; options: LaterOption[]; fallback: string };
+
+/** The just-in-time prompts a feature raises after onboarding; the same in every variant. */
+export type LaterPrompts = {
+  publish: { trigger: string; where: LaterQuestion; mappingHelp: string; mapping: MappingRow[]; limits: string[] };
+  addition: { trigger: string; question: LaterQuestion; limits: string[] };
+};
+
+const BODY_LINE: LaterOption = { id: 'body', title: 'A line in the ticket body', cost: 'Readers see it; filters and boards can’t.' };
+const LEAVE_OUT: LaterOption = { id: 'none', title: 'Leave it out', cost: 'Tickets don’t say what they are; you sort them yourself.' };
+const refusedLabel = (name: string): LaterOption => ({ id: `label-${name}`, title: `Label “${name}”`, cost: 'Refused by GitHub: you have no triage access.', disabled: 'Refused' });
+const label = (name: string, found = true): LaterOption => ({ id: `label-${name}`, title: `Label “${name}”`,
+  cost: found ? 'Filters and boards can find it.' : 'Not in the repository yet: the factory creates it on first use.' });
+const adoType = (name: string): LaterOption => ({ id: `type-${name}`, title: `${name} work item`, cost: 'Boards shows it in its own backlog level.' });
+const adoTag = (name: string): LaterOption => ({ id: `tag-${name}`, title: `Tag “${name}” on a User Story`, cost: 'Stays in the team’s backlog; a query finds it.' });
+
+export const LATER: Record<Scenario['id'], LaterPrompts> = {
+  '1': {
+    publish: {
+      trigger: 'You’re publishing “Offline sync” to acme/iapp: one concept and three builds.',
+      where: { title: 'Where should refined work go?', detected: 'Your access can open issues and edit your own issue bodies.', fallback: 'issues', options: [
+        { id: 'issues', title: 'Open issues in acme/iapp', cost: 'Maintainers see them as issues from you; links between them are written as text.' },
+        { id: 'handover', title: 'Give me a handover to post', cost: 'You post each ticket yourself; the factory can’t keep them current.' },
+      ] },
+      mappingHelp: 'How each ticket says what it is. acme/iapp has labels bug and enhancement, but you can’t add labels.',
+      mapping: [
+        { term: 'Concept', what: 'The map issue pairing its builds and decisions', fallback: 'body', options: [BODY_LINE, refusedLabel('epic'), LEAVE_OUT] },
+        { term: 'Build', what: 'One PR’s worth of work', fallback: 'body', options: [BODY_LINE, LEAVE_OUT] },
+        { term: 'Bug', what: 'Kind', fallback: 'body', options: [BODY_LINE, refusedLabel('bug'), LEAVE_OUT] },
+        { term: 'Feature', what: 'Kind', fallback: 'body', options: [BODY_LINE, refusedLabel('enhancement'), LEAVE_OUT] },
+        { term: 'Improvement', what: 'Kind', fallback: 'body', options: [BODY_LINE, refusedLabel('enhancement'), LEAVE_OUT] },
+      ],
+      limits: ['No triage access: labels, sub-issues and blocked-by are refused, so kinds and links go in the body as text.'],
+    },
+    addition: {
+      trigger: 'Refinement would mark kinds with labels in acme/iapp.',
+      question: { title: 'Add the factory’s labels to acme/iapp?', detected: 'acme/iapp has bug and enhancement; concept and build are missing.', fallback: 'handover', options: [
+        { id: 'create', title: 'Create concept and build labels', cost: 'Refused by GitHub: you have no triage access.', disabled: 'Refused' },
+        { id: 'handover', title: 'Ask a maintainer', cost: 'You get a handover with the labels to request; until then kinds stay in the body.' },
+        { id: 'not-now', title: 'Not now', cost: 'Kinds stay as a line in the body; filters can’t find them. Asked again only from Settings.' },
+      ] },
+      limits: ['Without triage, the factory can’t create or add labels here.'],
+    },
+  },
+  '2': {
+    publish: {
+      trigger: 'You’re publishing “Refund retries” to Payments\\API: one concept and two builds.',
+      where: { title: 'Where should refined work go?', detected: 'Your access can create and edit work items in Payments\\API.', fallback: 'items', options: [
+        { id: 'items', title: 'Create work items in Payments\\API', cost: 'The team sees them on its board; related items are linked once you confirm.' },
+        { id: 'handover', title: 'Give me a handover to post', cost: 'You create each work item yourself; the factory can’t keep them current.' },
+      ] },
+      mappingHelp: 'How each ticket says what it is. Payments\\API uses Epic, Feature, User Story and Bug.',
+      mapping: [
+        { term: 'Concept', what: 'The map item pairing its builds and decisions', fallback: 'type-Feature', options: [adoType('Feature'), adoType('Epic'), BODY_LINE] },
+        { term: 'Build', what: 'One PR’s worth of work', fallback: 'type-User Story', options: [adoType('User Story'), { id: 'type-Task', title: 'Task work item', cost: 'Hidden from the backlog; only sprint boards show it.' }] },
+        { term: 'Bug', what: 'Kind', fallback: 'type-Bug', options: [adoType('Bug'), adoTag('bug')] },
+        { term: 'Feature', what: 'Kind', fallback: 'tag-feature', options: [adoTag('feature'), BODY_LINE] },
+        { term: 'Improvement', what: 'Kind', fallback: 'tag-improvement', options: [adoTag('improvement'), BODY_LINE] },
+      ],
+      limits: ['Linking related work items wasn’t test-written: the factory asks once more before the first link.'],
+    },
+    addition: {
+      trigger: 'Refinement would mark kinds with tags in Payments\\API.',
+      question: { title: 'Use the factory’s tags in Payments\\API?', detected: 'No feature or improvement tags exist yet. Contributors can add tags as they use them.', fallback: 'tags', options: [
+        { id: 'tags', title: 'Add feature and improvement tags as used', cost: 'Teammates see new tags in Boards; queries can find factory work.' },
+        { id: 'not-now', title: 'Not now', cost: 'Kinds stay as a line in the description; queries can’t find them.' },
+      ] },
+      limits: ['The Repository config doesn’t name tags, so this choice is yours on this Mac.'],
+    },
+  },
+  '3': {
+    publish: {
+      trigger: 'You’re publishing “Dark mode” to pedro/side-project: one concept and two builds.',
+      where: { title: 'Where should refined work go?', detected: 'You own pedro/side-project: every write is allowed.', fallback: 'issues', options: [
+        { id: 'issues', title: 'Open issues in pedro/side-project', cost: 'Linked as sub-issues and blocked-by, so GitHub tracks them.' },
+        { id: 'handover', title: 'Give me a handover to post', cost: 'You post each ticket yourself; the factory can’t keep them current.' },
+      ] },
+      mappingHelp: 'How each ticket says what it is. pedro/side-project has GitHub’s default labels.',
+      mapping: [
+        { term: 'Concept', what: 'The map issue pairing its builds and decisions', fallback: 'label-concept', options: [label('concept', false), BODY_LINE] },
+        { term: 'Build', what: 'One PR’s worth of work', fallback: 'label-build', options: [label('build', false), BODY_LINE] },
+        { term: 'Bug', what: 'Kind', fallback: 'label-bug', options: [label('bug'), BODY_LINE] },
+        { term: 'Feature', what: 'Kind', fallback: 'label-enhancement', options: [label('enhancement'), label('feature', false), BODY_LINE] },
+        { term: 'Improvement', what: 'Kind', fallback: 'label-enhancement', options: [label('enhancement'), label('improvement', false), BODY_LINE] },
+      ],
+      limits: [],
+    },
+    addition: {
+      trigger: 'Refinement would mark kinds with labels in pedro/side-project.',
+      question: { title: 'Add the factory’s labels to pedro/side-project?', detected: 'Missing: concept and build. bug and enhancement exist.', fallback: 'create', options: [
+        { id: 'create', title: 'Create concept and build labels', cost: 'Two new labels anyone can see; filters find factory work.' },
+        { id: 'not-now', title: 'Not now', cost: 'Kinds stay as a line in the body; filters can’t find them.' },
+      ] },
+      limits: [],
+    },
+  },
+};
 
 export const LOCAL_NOTE = 'Factory progress (Status, the Queue, build phases, slices and reviews) stays on this Mac for every repository.';
 

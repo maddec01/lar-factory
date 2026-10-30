@@ -3,15 +3,13 @@
 // and the update pill's step, Download or Restart to update, or else Check now. Each group's note says what the last
 // call did.
 
-import type { TargetSnapshot, UpdateChannel } from '@lar-factory/shared';
+import type { UpdateChannel } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { FormResult } from '../notices/form-result.tsx';
 import { useUpdateStore } from '../updates/update-store.ts';
 import { canCheckForUpdate, getUpdateDisabledReason, resolveUpdateButtonAction, resolveUpdatePill, updateStatusText } from '../updates/update-button-logic.ts';
 import { SmallButton, Choice, Switch } from './controls.tsx';
 import { type SettingsResult, useSettingsStore } from './settings-store.ts';
-import { useDriftStore } from '../notices/drift-store.ts';
-import { useInstallStore } from './install-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
@@ -26,34 +24,6 @@ export function TargetSwitch({ path }: { path: string }) {
   // the store ignores a change that comes in meanwhile.
   return <Switch on={target?.active ?? false} label={path} disabled={!installs || !installed || (target?.locked ?? false)} busy={pending !== null}
     onChange={(on) => void setTick(path, on)} />;
-}
-
-/** Current skill work and retained results, within the existing target row. */
-export function TargetProgress({ target }: { target: TargetSnapshot }) {
-  const { replacing, retrying, error, retryError, replace, retry } = useDriftStore();
-  const snapshot = useInstallStore((state) => state.snapshot);
-  const states = { pending: 'Waiting', checking: 'Checking', installing: 'Installing', installed: 'Installed', drift: 'Drift', blocked: 'Clash', missing: 'Missing', failed: 'Failed' };
-  const blocked = target.skills.filter(({ state }) => state === 'blocked');
-  const drift = target.skills.some(({ state }) => state === 'drift');
-  const failed = !!target.error || target.skills.some(({ state }) => state === 'failed');
-  const successful = target.skills.filter(({ state }) => state === 'installed').length;
-  const busy = !!snapshot?.running || replacing || retrying;
-  const status = target.running ? target.operation === 'check' ? 'Checking' : target.operation === 'replace' ? 'Replacing Drift' : 'Installing'
-    : failed ? 'Install failed' : blocked.length ? 'Clash' : drift ? 'Drift detected'
-    : target.active && target.skills.length > 0 && successful === target.skills.length ? 'Installed' : 'Not installed';
-  return <div className="grid gap-2 text-xs [overflow-wrap:anywhere]">
-    <p className="m-0" role="status">{target.release ? `Release ${target.release}` : 'No Release installed'} · {status}</p>
-    {target.operation && target.operation !== 'check' && <progress className="w-full" aria-label={`Skills installed in ${target.path}`} value={successful} max={target.skills.length || 1} />}
-    {target.skills.length > 0 && <ul className="m-0 list-none p-0">{target.skills.map(({ name, state }) => <li key={name}>{name}: {states[state]}</li>)}</ul>}
-    {!!target.replaced?.length && <p className="m-0">Replaced Drift: {target.replaced.join(', ')}</p>}
-    {target.error && <p className="m-0">{target.path}: {target.error}. Check access to this folder, then Retry.</p>}
-    {blocked.map(({ name }) => <p className="m-0" key={name}>Clash at {target.path}/{name}. Move that path away, then Retry.</p>)}
-    {snapshot?.installs && (failed || blocked.length > 0 || drift) && <div className="flex flex-wrap gap-2">
-      {(failed || blocked.length > 0) && <Button {...kind('other')} data-retry-install disabled={busy} onClick={() => void retry()}>{retrying ? 'Retrying…' : 'Retry'}</Button>}
-      {drift && <Button {...kind('other')} disabled={busy} onClick={() => void replace()}>{replacing ? 'Replacing…' : 'Replace Drift'}</Button>}
-      {(error || retryError) && <span role="alert">{error || retryError}</span>}
-    </div>}
-  </div>;
 }
 
 /** What the group's last call did. It stays mounted, as a live region. */

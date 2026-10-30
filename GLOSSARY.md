@@ -99,7 +99,7 @@ Taking a repository off the board: it leaves this Mac's list, and a PR removes i
 _Avoid_: offboarding, uninstall
 
 **Clash**:
-Something in a repository that makes agents work against the factory, such as a rule to push to main, another tracker's setup, or a project skill named like a bundled one.
+Something in a repository or an agent's skills folder that makes agents work against the factory, such as a rule to push to main, another tracker's setup, or a project or User skill named like a lar skill.
 _Avoid_: conflict
 
 **Kind**:
@@ -301,7 +301,7 @@ The modal the title bar's List button opens, showing the items in List: reposito
 _Avoid_: sidebar, list panel, drawer
 
 **Provider**:
-The service that hosts a repository and its tickets: GitHub or Azure DevOps. A thread's agent runs on a provider instance instead (see Model choice).
+The service that hosts a repository and its tickets: GitHub or Azure DevOps. A thread's agent runs on a Provider instance instead.
 _Avoid_: platform, board provider, host
 
 **Item source**:
@@ -378,9 +378,17 @@ _Avoid_: copy, vendored file
 A Copy of a review checklist inside `lar-build`, loaded by the review that needs it.
 _Avoid_: reference, reference file
 
-**Claude profile**:
-One Claude Code config folder (`~/.claude` or a `~/.claude-*` folder) with its own login and its own skills.
-_Avoid_: Claude instance, config dir
+**Provider instance**:
+One agent setup T3 Code can run threads on, with its own driver, home and settings, such as a second Claude login. Lar's skills install into each one.
+_Avoid_: Claude profile, agent instance, config dir
+
+**Install target**:
+A folder where the board app installs lar's skills. Several provider instances can read the same target; T3 supplies targets and the User can select additional ones in Settings.
+_Avoid_: agent folder, profile target
+
+**Drift**:
+A lar skill in an agent that no longer matches the Release that installed it, because the User edited or deleted it.
+_Avoid_: tampered skill, modified skill
 
 ### Releases
 

@@ -284,6 +284,10 @@ something that just happened, or a warning for a lasting condition, which stays
 until the condition clears or the User closes it.
 _Avoid_: toast (for both kinds), banner, notice
 
+**Install overview**:
+The notification in the board app's bottom-right corner that shows lar's skills installing into each install target at first launch and after each new Release, with each target's result, Drift it replaced and any Clash.
+_Avoid_: install modal, install dialog
+
 **Loading screen**:
 The screen the board app and the board page show until the first read settles or a repository's items land, at launch and after a board server restart. The board then fills in as each other repository's read lands. It shows the Lar Factory lockup, whose L draws itself, over one line naming the current step, then fades into the board.
 _Avoid_: splash, spinner, starting page

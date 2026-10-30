@@ -57,3 +57,17 @@ test('a missing t3 is a failed run that says how to install it', async () => {
   assert.deepEqual(run.ended, 'failed');
   assert.match((run as { why: string }).why, /^t3 was not found\. Install the T3 Code CLI or set T3_PATH\.$/);
 });
+
+test('only the exact unavailable answer releases a thread', async () => {
+  const { lookupThread } = await import('./t3.ts');
+  for (const result of [
+    { code: 1, stdout: '', stderr: 'Thread abc is no longer available.' },
+    { code: 1, stdout: '{}', stderr: 'Thread abc is no longer available.' },
+    { code: 0, stdout: '{"thread":{"threadId":"abc"},"messages":[]}' },
+    { code: 0, stdout: '{}' },
+  ]) {
+    const answer = await lookupThread('abc', t3With(result).run);
+    assert.equal(answer, result.code === 0 && result.stdout.includes('threadId') ? 'live'
+      : result.code === 1 && result.stdout === '' ? 'deleted' : 'unknown');
+  }
+});

@@ -4,7 +4,7 @@
 // writes nothing.
 //   A: step per question. B: summary first, change rows one at a time. C: ask only what's uncertain, then a recap.
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Pencil } from 'lucide-react';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
@@ -123,9 +123,13 @@ function Shell({ title, help, place, progress, children, footer }: {
   title: string; help: string; place: string; progress: [number, number]; children: ReactNode; footer: ReactNode;
 }) {
   const close = () => setParams({ variant: 'closed' });
+  const bar = useContext(BarSlot);
+  const [content, setContent] = useState<HTMLDivElement | null>(null);
   return (
     <Modal onClose={close}>
-      <Modal.Content data-onboarding-dialog title={title} description={help} focusFirstField={false}>
+      <Modal.Content ref={setContent} data-onboarding-dialog title={title} description={help} focusFirstField={false}>
+        {/* Appended to the dialog itself (order-first puts it on top), so it takes its own space and never covers the footer. */}
+        {content && createPortal(bar, content)}
         <div className="grid shrink-0 gap-2 px-5 pb-4 sm:px-6">
           <Text tone="muted">{place}</Text>
           <Progress value={progress[0]} max={progress[1]} caption={`${progress[0]} of ${progress[1]}`} aria-label={`${progress[0]} of ${progress[1]}`} />
@@ -138,6 +142,9 @@ function Shell({ title, help, place, progress, children, footer }: {
 }
 
 type VariantProps = { scenario: Scenario; answers: Answers; setAnswer: (id: Question['id'], v: string | string[]) => void; finish: () => void };
+
+// The bar, rendered inside each dialog so the modal's focus trap and outside-click dismissal treat it as part of it.
+const BarSlot = createContext<ReactNode>(null);
 
 const changedOf = (q: Question, answers: Answers) => answers[q.id] !== undefined && JSON.stringify(answers[q.id]) !== JSON.stringify(q.fallback);
 
@@ -273,23 +280,25 @@ function Finished({ scenario, answers, back }: { scenario: Scenario; answers: An
   );
 }
 
-function Bar({ variant, scenario }: { variant: VariantKey | null; scenario: Scenario }) {
+function Bar({ variant, scenario, inDialog }: { variant: VariantKey | null; scenario: Scenario; inDialog: boolean }) {
   const keys = Object.keys(VARIANTS) as VariantKey[];
   const cycle = (d: number) => setParams({ variant: keys[(keys.indexOf(variant ?? 'A') + d + keys.length) % keys.length]! });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, [contenteditable], [role=radio]')) return;
-      if (e.key === 'ArrowLeft') cycle(-1);
-      if (e.key === 'ArrowRight') cycle(1);
+      // preventDefault so a focused scenario select doesn't also step its option.
+      if (e.key === 'ArrowLeft') { e.preventDefault(); cycle(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); cycle(1); }
     };
     addEventListener('keydown', onKey, true);
     return () => removeEventListener('keydown', onKey, true);
   });
   const pill = 'grid size-7 place-items-center rounded-full hover:bg-white/15';
-  // In body, so it sits above the dialog's viewport.
-  return createPortal(
-    <div className="pointer-events-auto fixed bottom-4 left-1/2 z-[1000] flex -translate-x-1/2 items-center gap-1 rounded-full bg-neutral-900 px-1.5 py-1 text-xs text-white shadow-lg ring-1 ring-white/20">
+  const bar = (
+    <div data-prototype-bar className={inDialog
+      ? 'order-first flex shrink-0 items-center justify-center gap-1 bg-neutral-900 px-1.5 py-1 text-xs text-white'
+      : 'fixed top-4 left-1/2 z-[1000] flex -translate-x-1/2 items-center gap-1 rounded-full bg-neutral-900 px-1.5 py-1 text-xs text-white shadow-lg ring-1 ring-white/20'}>
       <span className="px-2 font-medium">Prototype #691</span>
       <span className="h-4 w-px bg-white/25" />
       <button type="button" className={pill} aria-label="Previous variant" onClick={() => cycle(-1)}><ChevronLeft className="size-4" /></button>
@@ -299,9 +308,10 @@ function Bar({ variant, scenario }: { variant: VariantKey | null; scenario: Scen
       <select className="rounded-full bg-transparent px-2 py-1 text-white" aria-label="Scenario" value={scenario.id} onChange={(e) => setParams({ scenario: e.target.value })}>
         {SCENARIOS.map((s) => <option key={s.id} value={s.id} className="text-black">{s.id}. {s.name}</option>)}
       </select>
-    </div>,
-    document.body,
+    </div>
   );
+  // With the dialog closed there's no modal to join, so it floats at the top of the board.
+  return inDialog ? bar : createPortal(bar, document.body);
 }
 
 /** Mounted by the wizard dialog in prototype builds: the picked variant over the board, and the bar. */
@@ -323,11 +333,11 @@ export function PrototypeFlow() {
   // Keyed by scenario so each variant's own place (step, open row) starts fresh on a scenario switch; answers persist across variants.
   const key = `${variant}-${scenario.id}`;
   return (
-    <>
+    <BarSlot.Provider value={<Bar variant={variant} scenario={scenario} inDialog />}>
       {variant && (finished[scenario.id]
         ? <Finished scenario={scenario} answers={current} back={() => { setFinished({ ...finished, [scenario.id]: false }); setAnswers({ ...answers, [scenario.id]: {} }); }} />
         : variant === 'A' ? <VariantA key={key} {...props} /> : variant === 'B' ? <VariantB key={key} {...props} /> : <VariantC key={key} {...props} />)}
-      <Bar variant={variant} scenario={scenario} />
-    </>
+      {!variant && <Bar variant={variant} scenario={scenario} inDialog={false} />}
+    </BarSlot.Provider>
   );
 }

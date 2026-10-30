@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit -p . && pnpm -r run typecheck",
     "sample": "pnpm --filter @lar-factory/server sample",
     "dev": "pnpm --filter @lar-factory/desktop dev",
-    "knip": "knip"
+    "knip": "knip",
+    "assemble:skills": "node scripts/assemble-skills.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

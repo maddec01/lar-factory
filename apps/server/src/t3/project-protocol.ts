@@ -20,6 +20,7 @@ export interface ProjectRead { availability: ProjectAvailability; observation?: 
 /** Server-only authenticated reads. No errors or credentials cross this boundary. */
 export class ProjectProtocol {
   private observation?: ProjectObservation;
+  private snapshotTime = -Infinity;
   private pending?: Promise<BoardSession>;
   private readonly vault: SessionVault;
   private readonly authority: SessionAuthority;
@@ -73,6 +74,9 @@ export class ProjectProtocol {
         if (!isRecord(project) || !['id', 'title', 'workspaceRoot'].every(key => typeof project[key] === 'string' && project[key].trim())) return result('malformed');
         projects.push({ id: project.id as string, title: project.title as string, workspaceRoot: project.workspaceRoot as string });
       }
+      const snapshotTime = Date.parse(body.updatedAt);
+      if (snapshotTime < this.snapshotTime) return result('malformed');
+      this.snapshotTime = snapshotTime;
       this.observation = { projects, observedAt: new Date(this.now()).toISOString() };
       return result('available');
     } catch { return result('unavailable'); }

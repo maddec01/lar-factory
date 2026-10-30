@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { boardApp, type InstallOperationResult, type InstallSnapshot, type TargetSnapshot, type UpdateChannel } from '@lar-factory/shared';
+import { useInstallStore } from './install-store.ts';
 import { useUpdateStore } from '../updates/update-store.ts';
 
 /** What the last call did, and the group it came from: the Install targets or the updates. */
@@ -68,8 +69,11 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     const app = boardApp();
     if (!open || !app) return;
     const latest = () => call === opening;
-    unfollow = app.onInstallState((snapshot) => latest() && set(fromSnapshot(snapshot)));
-    void app.getInstallState().then(
+    const store = useInstallStore.getState();
+    const unsubscribe = useInstallStore.subscribe(({ snapshot }) => snapshot && latest() && set(fromSnapshot(snapshot)));
+    const stop = store.follow();
+    unfollow = () => { unsubscribe(); stop(); };
+    void store.read().then(
       (snapshot) => {
         if (!latest()) return;
         set(fromSnapshot(snapshot));
@@ -85,7 +89,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     const target = get().targets?.find((candidate) => candidate.path === path);
     try {
       const { snapshot, conflicts = [], removed, error } = await boardApp()!.setTargetTick(path, ticked);
-      set(fromSnapshot(snapshot));
+      useInstallStore.getState().accept(snapshot);
       if (error) set({ result: { text: `Couldn't change ${path}: ${error}`, tone: 'error', from: 'targets' } });
       else if (conflicts.length) set({ result: { text: `Installed into ${path}, but left these alone because Lar Factory didn't make them:`, tone: 'warning', paths: conflicts, from: 'targets' } });
       else set({ result: { text: ticked ? `Installed the skills into ${path}.` : untickText(target, path, removed), tone: 'success', from: 'targets' } });

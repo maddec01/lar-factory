@@ -2,6 +2,7 @@
 // Replace and Retry. It follows the state the app pushes while the page shows its warnings; outside the app there is none.
 
 import { create } from 'zustand';
+import { useInstallStore } from '../settings/install-store.ts';
 import { boardApp, type InstallOperationResult, type InstallSnapshot } from '@lar-factory/shared';
 
 interface DriftState {
@@ -37,10 +38,6 @@ const fromSnapshot = (snapshot: InstallSnapshot) => ({
   ],
 });
 
-/** The page reads the state once, however often the warning mounts; after that the pushes keep it current. */
-let reading: Promise<unknown> | undefined;
-let pushed = false;
-
 const failure = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export const useDriftStore = create<DriftState>()((set, get) => {
@@ -50,7 +47,8 @@ export const useDriftStore = create<DriftState>()((set, get) => {
     set({ [busy]: true, [error]: null });
     try {
       const result = await call();
-      set({ ...fromSnapshot(result.snapshot), [error]: result.error ?? null });
+      useInstallStore.getState().accept(result.snapshot);
+      set({ [error]: result.error ?? null });
     } catch (cause) {
       set({ [error]: failure(cause) });
     } finally {
@@ -66,15 +64,14 @@ export const useDriftStore = create<DriftState>()((set, get) => {
     retrying: false,
     retryError: null,
     follow: () => {
-      const app = boardApp();
-      if (!app) return () => {};
-      const stop = app.onInstallState((snapshot) => {
-        pushed = true;
-        set(fromSnapshot(snapshot));
-      });
-      // A push that lands before the read answers is newer, so the read doesn't overwrite it.
-      reading ??= app.getInstallState().then((snapshot) => pushed || set(fromSnapshot(snapshot)), () => {});
-      return stop;
+      const apply = () => {
+        const snapshot = useInstallStore.getState().snapshot;
+        if (snapshot) set(fromSnapshot(snapshot));
+      };
+      const unsubscribe = useInstallStore.subscribe(apply);
+      const unfollow = useInstallStore.getState().follow();
+      apply();
+      return () => { unsubscribe(); unfollow(); };
     },
     replace: () => operate('replacing', 'error', () => boardApp()!.replaceDrift()),
     retry: () => operate('retrying', 'retryError', () => boardApp()!.retryInstall()),

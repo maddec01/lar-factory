@@ -21,12 +21,12 @@ and copied files follow their own rules.
    copy, whether upstream changed since the recorded commit, upstream HEAD's
    12-character sha and date (`== <name>: changed (<source>
    <commit>..<head>, <date>)`), the upstream commits and the diff of the
-   copy's path and of the licence file its `LICENSE` comes from. Then run
-   `bash <this skill>/scripts/override-changes.sh <checkout>`. It prints each
-   Override (a lar rule that sets aside part of a Copy, listed in the row's
-   "Overridden in" column) whose cited section upstream changed, and each one
-   whose cited heading or file upstream renamed or deleted. When it flags
-   none it prints `no Overrides touched`; tell the maintainer so.
+   copy's path and of the licence file its `LICENSE` comes from. Under each
+   copy's header it also prints the Override marks: each Override (a lar rule
+   that sets aside part of a Copy, listed in the row's "Overridden in" column)
+   whose cited section upstream changed, and each one whose cited heading or
+   file upstream renamed or deleted. When it flags none it ends with
+   `no Overrides touched`; tell the maintainer so.
 3. For each changed copy, summarise in two or three lines what changed and what
    it would do to the factory, and give your recommendation: take or skip. Show
    every Override the script printed for that copy, verbatim, and say whether the

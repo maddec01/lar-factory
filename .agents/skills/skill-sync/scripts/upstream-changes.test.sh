@@ -72,4 +72,107 @@ out=$(run)
 check "reports a licence that appears closer to the copy" "$out" "^== demo: changed"
 check "shows the new licence" "$out" "^\\+Apache 2.0$"
 
+# Override marks, in a second upstream repo.
+marks="$base/owner/marks.git"
+mkdir -p "$marks/skills/demo" "$marks/refs"
+git -C "$marks" init --quiet
+cat >"$marks/skills/demo/SKILL.md" <<'EOF2'
+# Demo
+
+## Steps
+
+Run the steps.
+
+### Detail
+
+Some detail.
+
+```bash
+# not a heading
+```
+
+## Showing
+
+Show the work.
+
+## Gone
+
+This heading goes.
+
+## Last
+
+The end.
+EOF2
+printf '# Notes\n\nNotes.\n' >"$marks/skills/demo/NOTES.md"
+printf '# Old\n\nOld.\n' >"$marks/skills/demo/OLD.md"
+printf '# Check\n\n## Items\n\nOne.\n' >"$marks/refs/check.md"
+repo=$marks commit first
+mfirst=$(git -C "$marks" rev-parse --short=12 HEAD)
+sed -i.bak -e 's/^Some detail\.$/More detail./' -e '/^## Gone$/,/^This heading goes\.$/d' "$marks/skills/demo/SKILL.md"
+rm "$marks/skills/demo/SKILL.md.bak" "$marks/skills/demo/OLD.md"
+repo=$marks commit second
+
+factory="$base/marks-factory"
+mkdir -p "$factory"
+cat >"$factory/UPSTREAM.md" <<EOF2
+| Skill | Source | Path | Repository path | Commit | Date | Overridden in |
+| ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
+| \`demo\` | owner/marks | \`skills/demo\` | \`skills/nested/demo\` | \`$mfirst\` | 2026-10-01 | SKILL.md#Steps (skills/lar-work/SKILL.md); SKILL.md#Showing (skills/lar-work/agents/planner.md); SKILL.md#Gone (skills/lar-work/SKILL.md); NOTES.md#Notes (skills/lar-work/SKILL.md); OLD.md#Old (skills/lar-work/SKILL.md); SKILL.md#Missing (skills/lar-work/SKILL.md); SKILL.md (skills/lar-work/SKILL.md); NOTES.md (skills/lar-work/SKILL.md) |
+| \`references/check.md\` | owner/marks | \`refs/check.md\` | \`skills/nested/references/check.md\` | \`$mfirst\` | 2026-10-01 | check.md#Items (skills/lar-work/SKILL.md) |
+| \`plain\` | owner/marks | \`skills/demo\` | \`skills/nested/plain\` | \`$mfirst\` | 2026-10-01 |  |
+EOF2
+
+out=$(run)
+check "flags a section whose subsection changed" "$out" "^demo: SKILL.md#Steps \\(skills/lar-work/SKILL.md\\): upstream changed this section$"
+check "leaves out a section the diff doesn't touch" "$out" "SKILL.md#Showing" absent
+check "flags a deleted heading" "$out" "^demo: SKILL.md#Gone \\(skills/lar-work/SKILL.md\\): upstream renamed or deleted this heading$"
+check "leaves out an unchanged file" "$out" "NOTES.md#Notes" absent
+check "flags a deleted file" "$out" "^demo: OLD.md#Old \\(skills/lar-work/SKILL.md\\): upstream renamed or deleted OLD.md$"
+check "flags a heading missing at the recorded commit" "$out" "^demo: SKILL.md#Missing \\(skills/lar-work/SKILL.md\\): no such heading at $mfirst$"
+check "flags a whole-file citation whose file changed" "$out" "^demo: SKILL.md \\(skills/lar-work/SKILL.md\\): upstream changed this file$"
+check "leaves out a whole-file citation whose file didn't change" "$out" "^demo: NOTES.md " absent
+check "leaves out an unchanged single-file Copy" "$out" "check.md#Items" absent
+check "leaves out a row with no Overrides" "$out" "^plain:" absent
+check "prints the marks under their Copy's header" "$(grep -A1 '^== demo: changed' <<<"$out")" "^demo: SKILL.md#Steps "
+check "prints the Copy's diff after its marks" "$(sed -n '/^== demo:/,/^== references/p' <<<"$out" | sed -n '/^diff --git/,$p')" "^demo: " absent
+check "says nothing about untouched Overrides when it flags some" "$out" "no Overrides touched" absent
+
+quiet="$base/quiet"
+mkdir -p "$quiet"
+grep -v '^| .demo. ' "$factory/UPSTREAM.md" >"$quiet/UPSTREAM.md"
+out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$quiet")
+check "says so when it flags nothing" "$out" "^no Overrides touched$"
+
+bad="$base/bad"
+mkdir -p "$bad"
+sed -e "s/$mfirst/--output=x/" "$factory/UPSTREAM.md" >"$bad/UPSTREAM.md"
+if out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$bad" 2>&1); then
+    echo "FAIL exits non-zero on a Commit that isn't a sha"; fail=1
+else
+    check "exits non-zero on a Commit that isn't a sha" "$out" "^demo: Commit '--output=x' is not a hex sha$"
+fi
+
+missing="$base/missing"
+mkdir -p "$missing"
+sed -e "s/$mfirst/deadbeef1234/" "$factory/UPSTREAM.md" >"$missing/UPSTREAM.md"
+if out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$missing" 2>&1); then
+    echo "FAIL exits non-zero on a Commit upstream doesn't have"; fail=1
+else
+    check "exits non-zero on a Commit upstream doesn't have" "$out" "^demo: Commit deadbeef1234 not found upstream$"
+    check "flags nothing for a Commit upstream doesn't have" "$out" "no such file" absent
+fi
+
+if out=$(SKILL_SYNC_GIT_BASE="file://$base/nonexistent" bash "$here/upstream-changes.sh" "$factory" 2>"$base/clone.err"); then
+    echo "FAIL exits non-zero on a failed clone"; fail=1
+else
+    check "exits non-zero on a failed clone and prints nothing" "$out" "." absent
+    check "says the clone failed and the scan stopped" "$(cat "$base/clone.err")" "^demo: could not clone owner/marks; scan stopped$"
+fi
+
+if out=$(bash "$here/upstream-changes.sh" "$marks/refs" 2>&1); then
+    echo "FAIL exits non-zero without UPSTREAM.md"; fail=1
+else
+    check "exits non-zero without UPSTREAM.md" "$out" "^no UPSTREAM.md in "
+fi
+
 exit $fail

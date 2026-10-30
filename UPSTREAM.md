@@ -9,7 +9,7 @@ Override in its own skill, citing the Copy's file and section heading, and lists
 "Overridden in" lists the Copy's Overrides: lar rules, in lar's own skills, that
 replace or set aside part of the Copy. Each entry is `<copy file>#<heading> (<lar file>)`,
 with the copy file relative to the Copy's folder (or the file name, for a Copy that
-is one file), and `; ` separates entries. `skill-sync`'s `override-changes.sh` reads
+is one file), and `; ` separates entries. `skill-sync`'s `upstream-changes.sh` reads
 it and flags each Override an upstream change touches.
 
 | Skill | Source | Path | Repository path | Commit | Date | Overridden in |

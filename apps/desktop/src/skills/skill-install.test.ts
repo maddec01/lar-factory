@@ -81,7 +81,7 @@ describe("oneAtATime", () => {
 });
 
 describe("makeChecks", () => {
-  it.effect("installs with the Claude profile's links, then restores an edited skill on the next launch", () =>
+  it.effect("installs with the Claude profile's links, then reports an edited skill as Drift on the next launch and leaves it", () =>
     Effect.gen(function* () {
       const home = tempDir("skill-home-");
       NodeFS.mkdirSync(NodePath.join(home, ".claude"));
@@ -97,9 +97,12 @@ describe("makeChecks", () => {
       assert.strictEqual(second?.installed, false);
 
       NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
-      const third = yield* check(input);
-      assert.strictEqual(third?.installed, true);
-      assert.strictEqual(NodeFS.readFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "utf8"), "# lar-work\n");
+      const third = yield* check(input, "beforeBuild");
+      assert.strictEqual(third?.installed, false);
+      assert.deepStrictEqual(third?.drift.map(({ skill }) => skill), ["lar-work"]);
+      assert.strictEqual(SkillInstall.buildRefusal(third!), null);
+      assert.include(SkillInstall.notice(third!)?.detail, NodePath.join(home, ".agents/skills/lar-work"));
+      assert.strictEqual(NodeFS.readFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "utf8"), "edited");
     }));
 
   it.effect("shows a blocking folder's dialog on the first launch of a version, not the next", () =>
@@ -175,13 +178,13 @@ describe("makeChecks", () => {
 describe("notice", () => {
   it("says nothing after a clean install", () => {
     assert.strictEqual(
-      SkillInstall.notice({ installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], warn: false }),
+      SkillInstall.notice({ installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], drift: [], replaced: [], warn: false }),
       undefined,
     );
   });
 
   const conflicted = { installed: false, version: "1.0.0", skills: [], conflicts: ["/home/.agents/skills/lar-work"],
-    blocked: [{ skill: "lar-work", paths: [{ place: "agents" as const, path: "/home/.agents/skills/lar-work" }] }] };
+    blocked: [{ skill: "lar-work", paths: [{ place: "agents" as const, path: "/home/.agents/skills/lar-work" }] }], drift: [], replaced: [] };
 
   it("warns about conflicts and names each path", () => {
     const notice = SkillInstall.notice({ ...conflicted, warn: true });
@@ -191,6 +194,13 @@ describe("notice", () => {
 
   it("says nothing about conflicts an earlier launch of this version reported", () => {
     assert.strictEqual(SkillInstall.notice({ ...conflicted, warn: false }), undefined);
+  });
+
+  it("warns about Drift on every launch and names each skill's paths", () => {
+    const drift = [{ skill: "tdd", paths: [{ place: "agents" as const, path: "/home/.agents/skills/tdd" }] }];
+    const notice = SkillInstall.notice({ ...conflicted, conflicts: [], blocked: [], drift, warn: false });
+    assert.strictEqual(notice?.message, "Some of Lar Factory's skills changed");
+    assert.include(notice?.detail, "tdd: /home/.agents/skills/tdd");
   });
 
   it("reports a failed install as an error that the next Start build or launch retries", () => {
@@ -210,7 +220,7 @@ describe("notice", () => {
 });
 
 describe("buildRefusal", () => {
-  const clean = { installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], warn: false };
+  const clean = { installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], drift: [], replaced: [], warn: false };
 
   it("lets a build start once no skill is blocked, whatever the other conflicts", () => {
     assert.strictEqual(SkillInstall.buildRefusal(clean), null);
@@ -237,9 +247,13 @@ describe("buildRefusal", () => {
     assert.match(refusal ?? "", /blocked by a path .* Move that path away/);
   });
 
-  it("gives a failed restore's reason", () => {
+  it("lets a build start with Drift", () => {
+    assert.strictEqual(SkillInstall.buildRefusal({ ...clean, drift: [{ skill: "tdd", paths: [{ place: "agents", path: "/home/.agents/skills/tdd" }] }] }), null);
+  });
+
+  it("gives a failed install's reason", () => {
     const refusal = SkillInstall.buildRefusal(new SkillInstall.SkillInstallError({ message: "EACCES: lar-work", changed: true }));
-    assert.include(refusal, "couldn't restore");
+    assert.include(refusal, "couldn't install");
     assert.include(refusal, "EACCES: lar-work");
   });
 });

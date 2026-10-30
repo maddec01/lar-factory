@@ -1,5 +1,5 @@
-// Asks the board app's main process to check and restore the installed skills before Start build. The main
-// process owns every check, so a check at app start and one for Start build never write the same folders at once.
+// Asks the board app's main process to check the installed skills before Start build, installing a new Release. The
+// main process owns every check, so a check at app start and one for Start build never write the same folders at once.
 
 import type { EventEmitter } from 'node:events';
 import { SKILL_CHECK_ENV, isSkillCheckAnswer } from '@lar-factory/shared';

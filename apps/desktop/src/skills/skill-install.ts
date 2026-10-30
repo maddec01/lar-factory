@@ -1,6 +1,6 @@
-// Installs the skills and checklists bundled in the app, with the engine in packages/shared/src/install-skills.ts.
-// A packaged app checks them at launch and before each Start build, and restores any that differ from its bundle;
-// a dev run does so only when started with INSTALL_FLAG. The main process runs every check one at a time.
+// Installs the skills bundled in the app, with the engine in packages/shared/src/install-skills.ts. A packaged app
+// checks them at launch and before each Start build: it installs a new Release and reports Drift, which it leaves as
+// it is. A dev run does so only when started with INSTALL_FLAG. The main process runs every check one at a time.
 
 import * as NodePath from "node:path";
 
@@ -56,7 +56,7 @@ export const plan = (input: LaunchInput): Plan | undefined => {
   return { home: installHome(input.home, input.env), bundle: input.bundle, version: input.version };
 };
 
-/** One check of the installed skills against the bundle, which restores any that differ. */
+/** One check of the installed skills against the bundle, which installs a new Release and reports Drift. */
 export type Check = Effect.Effect<InstallResult, SkillInstallError>;
 
 /** A lock that makes the checks it wraps run one at a time: one that starts while another runs waits for it to finish. */
@@ -71,8 +71,8 @@ export interface Checks {
 }
 
 /**
- * This launch's checks, which check the installed skills and restore any that differ from the bundle, one run at a
- * time; undefined when the launch checks nothing. A failed check doesn't write the manifest, so the next one tries again.
+ * This launch's checks, which install a new Release and report Drift, one run at a time; undefined when the launch
+ * checks nothing. A failed check doesn't write the manifest, so the next one tries again.
  */
 export const makeChecks = (input: LaunchInput): Effect.Effect<Checks | undefined> => {
   const install = plan(input);
@@ -88,10 +88,13 @@ export const makeChecks = (input: LaunchInput): Effect.Effect<Checks | undefined
   return oneAtATime.pipe(Effect.map((serial) => ({ atLaunch: serial(check(true)), beforeBuild: serial(check(false)) })));
 };
 
-/** Why Start build can't run after a check: a failed restore, or a skill a path the app didn't install blocks. */
+/**
+ * Why Start build can't run after a check: a failed install, or a Clash, a path the app didn't install that blocks a
+ * skill. Drift doesn't stop it: the build runs with the skills as they are.
+ */
 export const buildRefusal = (outcome: InstallResult | SkillInstallError): string | null => {
   if (outcome instanceof SkillInstallError) {
-    return `Lar Factory couldn't restore its skills, so the build can't start: ${outcome.message}`;
+    return `Lar Factory couldn't install its skills, so the build can't start: ${outcome.message}`;
   }
   if (outcome.blocked.length === 0) return null;
   const skills = outcome.blocked.map(({ skill, paths }) => `${skill} is ${blockedBy(paths).join("")}.`);
@@ -106,7 +109,10 @@ export interface Notice {
   readonly detail: string;
 }
 
-/** What to tell the user after an install: nothing, its error, or its conflicts on the first launch of a version. */
+/**
+ * What to tell the user after an install: nothing, its error, or a warning that names its Clashes, on the first launch
+ * of a version, and its Drift, on every launch.
+ */
 export const notice = (outcome: InstallResult | SkillInstallError): Notice | undefined => {
   if (outcome instanceof SkillInstallError) {
     return {
@@ -117,10 +123,19 @@ export const notice = (outcome: InstallResult | SkillInstallError): Notice | und
         : `${outcome.message}\n\nThe previous skills are still in place. The next Start build or launch tries again.`,
     };
   }
-  if (!outcome.warn) return undefined;
+  const parts = [
+    ...outcome.warn
+      ? [`These folders have a bundled skill's name but Lar Factory didn't install them, so it didn't overwrite them:\n\n${outcome.conflicts.join("\n")}`]
+      : [],
+    ...outcome.drift.length > 0
+      ? [`These skills changed since Lar Factory installed them, and it left them as they are:\n\n${
+        outcome.drift.map(({ skill, paths }) => `${skill}: ${paths.map(({ path }) => path).join(", ")}`).join("\n")}`]
+      : [],
+  ];
+  if (parts.length === 0) return undefined;
   return {
     type: "warning",
-    message: "Lar Factory left some skills alone",
-    detail: `These folders have a bundled skill's name but Lar Factory didn't install them, so it didn't overwrite them:\n\n${outcome.conflicts.join("\n")}`,
+    message: outcome.warn ? "Lar Factory left some skills alone" : "Some of Lar Factory's skills changed",
+    detail: parts.join("\n\n"),
   };
 };

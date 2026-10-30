@@ -3,7 +3,7 @@
 You deliver one lar build in your own worktree from its brief alone, never the
 shaping conversation, then run its review. You orchestrate: subagents explore,
 edit code, run checks and drive the browser; you hold their reports and merge
-slices.
+slices. A Small build is the exception: you implement it yourself.
 
 `<lar-build>` is the installed skill folder holding this file's parent. Set a status with
 `bash <lar-build>/shared/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
@@ -14,11 +14,8 @@ item's URL there. Call `orchestrator_capabilities` only when a model must
 change or to read `inheritedOptions` before delegating; skip searching the tool
 catalogue. Read each file or skill a step names only when that step runs.
 
-Before you write anything, read `unslop` once (`<lar-build>/shared/write-prose.md`
-in Claude Code, `<lar-build>/shared/write-prose.md` in Codex), also in a fresh
-thread resuming after a handoff. Apply its rules while drafting all your prose
-(chat, issue comments, handoffs, retro text, docs), not as a separate
-scan-and-rewrite pass. Code is out of scope.
+Read the prose rules once as `<lar-build>/SKILL.md` says, also in a fresh
+thread resuming after a handoff, and pass them in every subagent's brief.
 
 ## Subagents
 
@@ -32,14 +29,6 @@ scan-and-rewrite pass. Code is out of scope.
   never `--no-verify`, and reruns only the checks `AGENTS.md` names for the
   files its fix touched, never the full suite. Its prompt carries
   `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
-- **UI-check**: runs the visible checks and Verify captures per
-  `<lar-build>/screenshots.md`, keeps screenshots in its own context, and
-  leaves the app it started running. It returns the screenshots' absolute
-  paths, a verdict and its app report: the commit it ran, how to reach the
-  app, and the processes it started, each with something a later thread can
-  recheck, such as the port it listens on. Whoever stops those processes,
-  now or in a later thread, first confirms each one still holds what the
-  report names and stops only the ones that do.
 
 ## Build
 
@@ -76,11 +65,21 @@ scan-and-rewrite pass. Code is out of scope.
      unarchived (the tools were missing or an archive failed), and none when
      there were neither. Finding nothing to archive is the normal result once
      the shaping threads are gone. This step never stops a build.
-2. **Plan.** If the build already has slices (a handoff), clear `active` from
-   every open slice (the resume command in **Slices**), start a re-slice
-   planner if any open slice is `blocked`, and go to **Implement**.
-   Otherwise start a **planner** subagent with `planner.md`, the issue
-   reference and the repo path; it returns the slice list.
+2. **Plan.** On a resume, a handoff that says `Small build` skips **Plan**:
+   if the handoff says the change isn't done, finish it as below and go to
+   step 5; otherwise go to the step the handoff names. A build that already
+   has slices clears `active` from every open slice (the resume command in
+   **Slices**), starts a re-slice planner if any open slice is `blocked`, and
+   goes to **Implement**.
+   Otherwise decide whether this is a **Small build**: one change, or every
+   part touches the same files. Implement a Small build yourself in this
+   worktree, test first per `<lar-build>/test-first.md`, with no planner,
+   slice sub-issues or slice worktrees, using `<lar-build>/coding-style.md`,
+   plus `<lar-build>/design-modules.md` when a module's shape changes. Commit
+   per the repo's commit rules, run the checks `AGENTS.md` names for the
+   changed files, then go to step 5. Any other build starts a **planner**
+   subagent with `planner.md`, the issue reference and the repo path; it
+   returns the slice list.
 3. **Implement.** In parallel, start an **implementer** child task for each
    ready slice (the ready-slices command in **Slices**) not already running,
    while no planner runs, per **Implementer** in
@@ -120,14 +119,10 @@ scan-and-rewrite pass. Code is out of scope.
    kept current through review fixes, for the reviewers and approver.
 6. A subagent runs the full check suite `AGENTS.md` names, once, on the build
    branch HEAD, and returns that commit's tree (`git rev-parse HEAD^{tree}`):
-   the step 6 tree. A UI-check subagent checks anything user-visible.
-   Failures go to the fixer. All must pass. A fix for a failing step 6 check
-   reruns only the fixer's checks, and the step 6 tree stays the tree the full
-   suite ran on, so the approver finds a changed tree and reruns the full
-   suite. When a fix moves HEAD after the
-   UI-check ran, stop the processes its app report lists and run the UI-check
-   again on the new HEAD, so the last app report names the commit review
-   starts from.
+   the step 6 tree. Failures go to the fixer. All must pass. A fix for a
+   failing step 6 check reruns only the fixer's checks, and the step 6 tree
+   stays the tree the full suite ran on, so the approver finds a changed tree
+   and reruns the full suite.
 7. Push the branch. Don't open the PR yet.
 
 Ordinary questions to the user follow `<lar-build>/shared/questions.md`: Needs you,
@@ -143,12 +138,15 @@ post a handoff written per `<lar-build>/shared/handoff-content.md` as an issue
 comment and relaunch with
 `t3_thread_launch`: message `Build <owner/repo#n>. Read <lar-build>/agents/builder.md and follow it.`,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
-The handoff names the step and review round to resume at and, once step 6
-has run, the step 6 tree and the last UI-check app report, whose processes the
-next thread stops when review ends; at a review round,
-the round's base sha, each reviewer's verdict, open findings, fixed findings,
-and rejected findings with reasons, and the unreviewed fixes so far, each as
-the line **Approve** describes. Otherwise finish in place.
+The handoff names the step and review round to resume at. For a Small build
+it says `Small build` and whether the change is done, so the next thread skips
+**Plan** instead of reading no slices as not planned. Once step 6 has run it
+names the step 6 tree. At a review round it also lists the round's base sha,
+each reviewer's verdict, open findings, fixed findings, and rejected findings
+with reasons, the skipped reviewers with reasons, the unreviewed fixes so far,
+each as the line **Approve** describes, and every UI app report so far,
+whose processes the next thread stops when review ends. Otherwise finish in
+place.
 
 Work in another repository (a planner or implementer `needs <owner/repo>`, a
 failed check or a failed Verify) becomes a build there, and this build carries
@@ -171,41 +169,55 @@ remove `active` from every slice still carrying it.
 
 ## Review
 
-Set **Review**. Review runs in review rounds, at most three.
+Set **Review**. Review runs in review rounds, at most two.
 
-Round 1: in parallel, start one **reviewer subagent** per file in this
-folder: `reviewer-code.md`, `reviewer-security.md`, `reviewer-ux.md`,
-`reviewer-ui.md`. Give each only its file's path, the issue reference, the repo
-path and the diff command `git diff origin/main...HEAD`. Also give the UI
-reviewer the last UI-check app report. Skip the UI reviewer when nothing
-user-visible changed, and say so.
+Round 1: read what `git diff origin/main...HEAD` touches and pick the
+reviewers from it. In parallel, start one **reviewer subagent** for each:
+
+- **Code** (`reviewer-code.md`): always.
+- **Security** (`reviewer-security.md`): the diff touches input handling,
+  auth, sessions or permissions, filesystem paths or uploads, shell scripts,
+  dependencies or lockfiles, CI, secrets or network calls.
+- **UI** (`reviewer-ui.md`): anything visible on screen changed. It runs the
+  app itself and returns its screenshots' absolute paths and an app report:
+  the commit it ran, how to reach the app, and the processes it started,
+  each with something a later thread can recheck, such as the port it
+  listens on.
+- **Performance** (`reviewer-performance.md`): the diff touches rendering,
+  polling, queries or loops over large data.
+
+Give each only the prose rules, its file's path, the issue reference, the repo
+path and the diff command `git diff origin/main...HEAD`. Record each reviewer
+you skip with a reason, and say so in chat.
 
 Each returns a verdict (`approve` or `changes`), findings and what it couldn't
 check. Reply to the findings you reject with a reason. Before handing the ones
 you agree with to the fixer, note HEAD (`git rev-parse HEAD`) as this round's
 base.
 
-Next round: for each fixed finding, decide whether its reviewer comes back,
-nits included, whatever that reviewer's verdict; record each skip with a
-reason. Rerun, in parallel, each reviewer with a fixed finding you didn't skip.
-Give it its file's path, the issue reference, the repo path, the diff command
-`git diff <round base>..HEAD` (every fixup of the round, not only its own) and
-the list of its findings that were fixed; never the whole-branch diff. Its
-findings stay within that fix diff. Handle its findings as in round 1. A
+Round 2: rerun, in parallel, only the reviewers with a fixed finding. Give
+each the prose rules, its file's path, the issue reference, the repo path, the
+diff command `git diff <round base>..HEAD` (every fixup of round 1, not only
+its own) and the list of its findings that were fixed; never the whole-branch
+diff. The UI reviewer also gets round 1's app report, to reuse the app it left
+running. Its findings stay within that fix diff. Reply to the ones you reject
+as in round 1, and hand the ones you agree with to the fixer, with no further
+review. A finding you agree with that the fixer leaves unfixed in either round
+is still open after round 2, and goes to the approver for the PR body. A
 reviewer's final result is its latest round's.
 
-Review ends when no reviewer comes back (the round fixed no finding, or you
-skipped the reviewer of every fixed finding), or after round 3: hand round 3's
-findings you agree with to the fixer, with no further review. When review
-ends, stop the processes the last UI-check app report lists.
+Review ends when round 1 fixed no finding, or after round 2. When review
+ends, stop the processes listed in every UI app report of the build. Whoever
+stops them, now or in a later thread, first confirms each one still holds
+what its report names and stops only the ones that do.
 
 ## Approve
 
 Start the **Approver subagent** with `approver.md`, the issue reference, the
 repo path, the step 6 tree, every reviewer's final result, your rejected
-findings and the unreviewed fixes. An unreviewed fix is a round-3 fix or a fix whose reviewer
-you skipped; list each as a line naming the finding, its severity, its
-reviewer, its round and, for a skip, your recorded reason. It opens the PR and returns a recommended status; the item stays in Review. Link the PR to this thread (`link_pull_request`).
+findings, the findings still open after round 2 and the unreviewed fixes. An
+unreviewed fix is a round-2 fix; list each as a line naming the finding, its
+severity and its reviewer. It opens the PR and returns a recommended status; the item stays in Review. Link the PR to this thread (`link_pull_request`).
 When the approver reports a rebase conflict or a failing check instead, hand
 it to the fixer; for a conflict, the fixer rebases onto `origin/main` and
 resolves it. Add the fix to the unreviewed fixes, then start the approver
@@ -244,8 +256,8 @@ and restart **Checks**. If they say stop, set **Needs you** and go to
 ## Retro
 
 Run once, last, after the final status is set and the PR is unwatched. Show the
-UI reviewer's and UI-check's screenshots with captions and absolute file
-paths, beside the PR link. Follow `<lar-build>/review-session.md` for this
+UI reviewer's screenshots with captions and absolute file paths, beside the PR
+link. Follow `<lar-build>/review-session.md` for this
 thread. End with the PR link, its status (Verify, Ready to merge or Needs you)
 and the complete numbered suggestion list in chat. Collect picks and any
 clarifications in chat per [Retro picks](../shared/questions.md#retro-picks).

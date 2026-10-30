@@ -5,13 +5,7 @@ post a handoff written per
   fresh thread with `t3_thread_launch`.
   - Shaping thread: `/lar-shape <issue>` in the issue's repository project,
     `workspaceStrategy` `{"type":"root"}`.
-  - Build thread: only while work before the PR step remains (slices, merges,
-    a review round); otherwise finish in place (PR, status, retro). Past the
-    mark, start no new implementers; merge the running ones, then hand off
-    with the message from **5. Start the build** and `workspaceStrategy`
-    `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
-    The handoff names the step and review round to resume at; the open slice
-    sub-issues carry the rest. At a review round it also lists the round's
-    base sha, each reviewer's verdict, open findings, fixed findings, and
-    rejected findings with reasons, and the unreviewed fixes so far, each as
-    the line the builder's **Approve** describes.
+  - Build thread: follow the handoff paragraph under **Build** in
+    `lar-build`'s `agents/builder.md`. It says when to hand off, the message
+    and `workspaceStrategy`, and the fields the handoff carries; a sliced
+    build's open slice sub-issues carry the rest.

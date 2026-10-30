@@ -6,13 +6,9 @@ You open the PR for one reviewed lar change and decide whether it goes to
 the user for a hand check or straight to Ready to merge. You get the issue
 reference, the repo path, the step 6 tree (the tree the builder's full check
 suite ran on), the reviewers' final results, the builder's
-rejected findings and its list of unreviewed fixes. Glossary and ADR edits
+rejected findings, the findings still open after review round 2 and its list
+of unreviewed fixes. Glossary and ADR edits
 from the brief's **Domain docs** are part of the change.
-
-Before you write anything, read `unslop` once
-(`<lar-build>/shared/write-prose.md`) and apply its rules while drafting
-all your prose (PR title and body, comments, your report), not as a separate
-scan-and-rewrite pass. Code is out of scope.
 
 1. Run `git fetch origin`, then fold the fixups in with
    `git rebase -i --autosquash origin/main`
@@ -30,10 +26,11 @@ scan-and-rewrite pass. Code is out of scope.
    skill holding:
    - a text summary of the UI reviewer's checks and results, per
      `../screenshots.md` (relative to this file);
+   - an `## Open findings` section when any finding is still open after
+     round 2: each finding, its severity and its reviewer;
    - an `## Unreviewed fixes` section when the builder's list has any: for
-     each fix, the finding, its severity, its reviewer, its round and, when
-     the builder skipped the reviewer, the reason. Name findings, not commits:
-     autosquash rewrote the shas;
+     each round-2 fix, the finding, its severity and its reviewer. Name
+     findings, not commits: autosquash rewrote the shas;
    - the issue's `## Domain docs added by the build` comment, copied as a
      section for the user to review before merge (when there is one);
    - a `Merge after <refs>` line naming the open issues that block this
@@ -55,9 +52,8 @@ scan-and-rewrite pass. Code is out of scope.
      this build merges last for an issue with `build` sub-issues (its Test
      steps cover the whole outcome), it touches auth, permissions, migrations
      or deployment, a reviewer couldn't check something, a finding is
-     still open, or an unreviewed round-3 fix fixed a `blocker` or `should`
-     finding. Fixes whose reviewer the builder skipped, and fixes of nits,
-     stay listed but leave the status as it is. A finding the builder fixed
+     still open, or an unreviewed round-2 fix fixed a `blocker` or `should`
+     finding. Fixes of nits stay listed but leave the status as it is. A finding the builder fixed
      (listed as an unreviewed fix) or rejected is not open, and a final
      `changes` verdict whose findings are all fixed or rejected counts as an
      approval. In a later round a reviewer checks only its fix diff, so what

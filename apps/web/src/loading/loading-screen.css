@@ -1,4 +1,4 @@
-/* The loading screen over the board page: the lar Factory lockup, whose L draws itself, over the step line. */
+/* The loading screen over the board page: the Lar Factory lockup, whose L draws itself, over the step line. */
 
 .loading-screen {
   position: fixed;
@@ -15,13 +15,14 @@
 .loading-screen.is-leaving { opacity: 0; pointer-events: none; transition: opacity 600ms ease-in-out; }
 
 /* --- The lockup: the title bar Brand's, scaled up. The mark is 0.705em, the cap height, and sits on the baseline, so
-   its top meets the top of the "l"; the box is trimmed to cap height and baseline, so the screen centres the lockup
-   on what you see, not on the font's line box. "lar" bold, "Factory" medium in the muted colour. -------------------- */
+   it stands in for the "L" of "Lar"; the box is trimmed to cap height and baseline, so the screen centres the lockup
+   on what you see, not on the font's line box. "ar" bold, "Factory" medium in the muted colour. --------------------- */
 
 .loading-lockup { --lockup: clamp(2.5rem, 9vw, 4rem); position: relative; font-size: var(--lockup); }
 .loading-wordmark { width: max-content; line-height: 1; text-box: trim-both cap alphabetic; }
 .loading-mark { display: inline; overflow: visible; width: 0.705em; height: 0.705em; vertical-align: baseline; }
-.loading-lar { margin-left: 0.266em; font-weight: 700; letter-spacing: -0.03em; }
+.loading-lar { display: inline-block; margin-left: 0.07em; font-weight: 700; letter-spacing: -0.03em; clip-path: inset(-0.5em -1em -0.5em 0); } /* clipped at its left edge, so "ar" can slide out from behind the mark */
+.loading-lar-slide { display: inline-block; }
 .loading-factory { margin-left: 0.26em; font-weight: 500; color: var(--muted-foreground); }
 
 /* The step line hangs below the baseline by half the lockup's size, clear of the "y", under the lockup's middle,
@@ -47,23 +48,27 @@
 .loading-mark-trace { display: none; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .loading-screen:not(.is-drawn) .loading-mark-trace {
-    display: inline;
-    stroke-dasharray: 1 2; /* a gap longer than the path, so a zero-length round cap paints no dot */
-    stroke-dashoffset: 1;
-    opacity: 0;
-    animation: loading-trace 900ms cubic-bezier(0.42, 0, 0.58, 1) 150ms forwards; /* SwiftUI's easeInOut(0.9).delay(0.15) */
-  }
+  /* "Home first" (lar-brand preview/prototype-startup.html, variant C): the block, the room, appears first; the L wraps
+     around it as wall and floor in one trace; then "ar" slides out from behind the mark and the product fades in. */
   .loading-screen:not(.is-drawn) .loading-mark-block {
     opacity: 0;
-    transform: scale(0.6);
+    transform: scale(0.3);
     transform-box: fill-box;
-    transform-origin: right top; /* LarLogoMark's .topTrailing anchor */
-    animation: loading-settle 500ms cubic-bezier(0.2, 0.9, 0.3, 1) 800ms forwards; /* .spring(duration: 0.5), no bounce */
+    transform-origin: center;
+    animation: loading-settle 480ms cubic-bezier(0.34, 1.45, 0.64, 1) 100ms forwards; /* a small overshoot */
   }
-  /* The filled L replaces the trace once it ends; the stroke covers the same outline, so the swap doesn't show. */
-  .loading-screen:not(.is-drawn) .loading-mark-fill { opacity: 0; animation: loading-show 0ms linear 1050ms forwards; }
-  .loading-screen:not(.is-drawn) :is(.loading-lar, .loading-factory) { opacity: 0; animation: loading-show 500ms ease-out 800ms forwards; }
+  .loading-screen:not(.is-drawn) .loading-mark-trace {
+    display: inline;
+    stroke-dasharray: 1 2; /* a gap longer than the path, so only the drawn length shows */
+    stroke-dashoffset: 1;
+    opacity: 0;
+    animation: loading-trace 700ms cubic-bezier(0.42, 0, 0.58, 1) 420ms forwards;
+  }
+  /* The filled L replaces the trace once it ends; the stroke covers the same outline but for its
+     3-unit outer corner, which it draws square, too small for the swap to show. */
+  .loading-screen:not(.is-drawn) .loading-mark-fill { opacity: 0; animation: loading-show 0ms linear 1120ms forwards; }
+  .loading-screen:not(.is-drawn) .loading-lar-slide { translate: -1.25em 0; animation: loading-slide 520ms cubic-bezier(0.16, 1, 0.3, 1) 1000ms forwards; }
+  .loading-screen:not(.is-drawn) .loading-factory { opacity: 0; animation: loading-show 450ms ease-out 1300ms forwards; }
 
   /* A step change: the old line rolls up and out with a slight blur while the new one rolls in from below. */
   .loading-roll-in { animation: loading-roll-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
@@ -77,5 +82,6 @@
 }
 @keyframes loading-settle { to { opacity: 1; transform: scale(1); } }
 @keyframes loading-show { to { opacity: 1; } }
+@keyframes loading-slide { to { translate: 0 0; } }
 @keyframes loading-roll-in { from { opacity: 0; translate: 0 0.75em; filter: blur(--spacing(0.75)); } }
 @keyframes loading-roll-out { to { opacity: 0; translate: 0 -0.75em; filter: blur(--spacing(0.75)); } }

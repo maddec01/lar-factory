@@ -1,4 +1,4 @@
-// The loading screen: the lar Factory lockup over one line naming the first read's step. It covers the board from the
+// The loading screen: the Lar Factory lockup over one line naming the first read's step. It covers the board from the
 // page's first paint until the first read has settled, or a repository's items have landed, and the mark has drawn,
 // then fades out. It comes back whenever the server's first read is unsettled again with nothing read, after a restart.
 
@@ -8,8 +8,8 @@ import { BRAND_BLOCK_COLOR, BRAND_MARK_BAR, BRAND_MARK_BLOCK, BRAND_MARK_CENTRE_
 import { useBoardStore } from '../board/board-store.ts';
 import { stepText } from './step-text.ts';
 
-/** The L's trace and the block's spring (lar-apple's LarLogoMark: 0.15 s delay and 0.9 s trace, 0.8 s delay and 0.5 s spring). */
-const DRAW_MS = 1300;
+/** The draw (lar-apple's LarLogoMark): the block from 0.1 s, the L's trace from 0.42 s, "ar" from 1 s, the product's fade ending at 1.75 s. */
+const DRAW_MS = 1750;
 const EXIT_MS = 600;
 const ROLL_MS = 380;
 
@@ -66,12 +66,12 @@ function useLines(text: string): Lines {
   return lines;
 }
 
-/** The mark: the L traced along its centre line, then the block springing in; the filled L stands in for the trace once drawn. */
+/** The mark: the block springing in, then the L traced around it along its centre line; the filled L stands in for the trace once drawn. */
 function Mark() {
   return (
     <svg className="loading-mark" viewBox={BRAND_MARK_VIEWBOX} aria-hidden>
       <path className="loading-mark-block" d={BRAND_MARK_BLOCK} fill={BRAND_BLOCK_COLOR} />
-      <path className="loading-mark-trace" d={BRAND_MARK_CENTRE_LINE} pathLength={1} fill="none" stroke="currentColor" strokeWidth={BRAND_MARK_BAR} strokeLinecap="round" strokeLinejoin="round" />
+      <path className="loading-mark-trace" d={BRAND_MARK_CENTRE_LINE} pathLength={1} fill="none" stroke="currentColor" strokeWidth={BRAND_MARK_BAR} strokeLinecap="butt" strokeLinejoin="miter" />
       <path className="loading-mark-fill" d={BRAND_MARK_L} fill="currentColor" />
     </svg>
   );
@@ -101,7 +101,7 @@ export function LoadingScreen() {
       <div className="loading-lockup">
         <div className="loading-wordmark">
           <Mark />
-          <span className="loading-lar">lar</span>
+          <span className="loading-lar"><span className="loading-lar-slide">ar</span></span>
           <span className="loading-factory">Factory</span>
         </div>
         <p className="loading-line" role="status">

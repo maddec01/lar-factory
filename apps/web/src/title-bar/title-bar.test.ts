@@ -96,10 +96,10 @@ test('in a browser, where nothing updates, there\'s no update pill', async () =>
   expect(controls()).toEqual(['brand', 'scope', 'refreshed', 'counters', 'list', 'add item', 'divider', 'settings']);
 });
 
-test('the brand reads "lar Factory": the copied BrandMark, then Factory on its baseline', async () => {
+test('the brand reads "Lar Factory": the copied BrandMark, then Factory on its baseline', async () => {
   await mountPage();
   const brand = $('.title-bar .brand')!;
-  expect(text(brand)).toBe('larFactory');
+  expect(text(brand)).toBe('arFactory');
   expect(brand.className.split(' ')).toEqual(expect.arrayContaining(['inline-flex', 'items-baseline']));
   const [mark, factory] = [...brand.children];
   expect(mark!.className.split(' ')).toContain('lar-brand-mark');

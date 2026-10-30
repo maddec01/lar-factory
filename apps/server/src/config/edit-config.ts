@@ -16,12 +16,12 @@ import { prHost } from './pr-host.ts';
 import { findRepositoryConfig, isConfigAnswers, isRepo, readRepositoryList } from './repository-config.ts';
 
 const EDIT_BRANCH = 'lar-factory/edit-config';
-const TITLE = "chore: edit lar Factory's Repository config";
-const UPDATE_TITLE = "chore: update lar Factory's Repository config to version";
-const BODY = 'This PR changes `.lar-factory.json`, the Repository config lar Factory reads for this repository, as Edit in the board\'s '
+const TITLE = "chore: edit Lar Factory's Repository config";
+const UPDATE_TITLE = "chore: update Lar Factory's Repository config to version";
+const BODY = 'This PR changes `.lar-factory.json`, the Repository config Lar Factory reads for this repository, as Edit in the board\'s '
   + 'Settings › Repositories saved it. The board keeps the default branch\'s values until this PR merges.';
-const updateBody = (version: number) => `This PR rewrites \`.lar-factory.json\`, the Repository config lar Factory reads for this repository, `
-  + `with the same values in the shape lar Factory writes at version ${version}. Until it merges the board reads the older file, with defaults.`;
+const updateBody = (version: number) => `This PR rewrites \`.lar-factory.json\`, the Repository config Lar Factory reads for this repository, `
+  + `with the same values in the shape Lar Factory writes at version ${version}. Until it merges the board reads the older file, with defaults.`;
 
 type Run = (args: string[]) => Promise<string>;
 export type Refused = { status: number; error: string };

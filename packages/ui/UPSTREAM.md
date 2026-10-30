@@ -10,7 +10,7 @@ the Copies instead (`docs/adr/0027-copy-the-design-system-from-lar-server.md`).
 | `src/design-system/actions/Button.tsx` | maddec01/lar-server | `web/src/shared/design-system/actions/Button.tsx` | `4e302af3c8a2` |
 | `src/design-system/actions/IconButton.tsx` | maddec01/lar-server | `web/src/shared/design-system/actions/IconButton.tsx` | `4e302af3c8a2` |
 | `src/design-system/display/Badge.tsx` | maddec01/lar-server | `web/src/shared/design-system/display/Badge.tsx` | `4e302af3c8a2` |
-| `src/design-system/display/BrandMark.tsx` | maddec01/lar-server | `web/src/shared/design-system/display/BrandMark.tsx` | `4e302af3c8a2` |
+| `src/design-system/display/BrandMark.tsx` | maddec01/lar-server | `web/src/shared/design-system/display/BrandMark.tsx` | `c745225a7894` |
 | `src/design-system/display/NoticeCard.tsx` | maddec01/lar-server | `web/src/shared/design-system/display/NoticeCard.tsx` | `4e302af3c8a2` |
 | `src/design-system/display/ToneTile.ts` | maddec01/lar-server | `web/src/shared/design-system/display/ToneTile.ts` | `4e302af3c8a2` |
 | `src/design-system/feedback/Alert.tsx` | maddec01/lar-server | `web/src/shared/design-system/feedback/Alert.tsx` | `4e302af3c8a2` |

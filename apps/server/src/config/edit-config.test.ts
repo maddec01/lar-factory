@@ -175,7 +175,7 @@ test("the config update PR rewrites only .lar-factory.json with the default bran
   assert.deepEqual(field(commit!, 'parents[]'), ['abc123']);
   assert.deepEqual(field(branch!, 'ref'), ['refs/heads/lar-factory/edit-config']);
   assert.deepEqual(pr!.slice(0, 8), ['pr', 'create', '-R', REPO, '--base', 'main', '--head', 'lar-factory/edit-config']);
-  assert.match(pr!.join(' '), /update lar Factory's Repository config to version 2/);
+  assert.match(pr!.join(' '), /update Lar Factory's Repository config to version 2/);
   assert.deepEqual(rest, []);
 });
 

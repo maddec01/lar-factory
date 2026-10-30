@@ -5,7 +5,7 @@
 
 import { cpSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { InstallTarget, InstallTargetKind } from './install-targets.ts';
 import { isRecord } from './is-record.ts';
 
@@ -67,7 +67,13 @@ export interface InstallResult {
   targets: TargetResult[];
 }
 
-export interface InstallOptions {
+/** The isolation limit of a call to the engine. */
+export interface RootOption {
+  /** The folder every write must stay in, as `LAR_FACTORY_INSTALL_ROOT` names it. Unset by default: no limit. */
+  root?: string | undefined;
+}
+
+export interface InstallOptions extends RootOption {
   /** The targets to install into, deduplicated by their real path. `defaultTargets(home)` by default. */
   targets?: OfferedTarget[];
   /** The time a replacement of Drift records; the clock by default. */
@@ -199,13 +205,15 @@ export function defaultTargets(home: string): OfferedTarget[] {
  * owns by then. A failed upgrade leaves its Release the previous one, unfinished, so the next install retries it; a
  * failure in a target already on this Release keeps it there, so its Drift stays Drift. Only a bundle or
  * manifest that can't be read or written throws an `InstallError`.
+ * With `root`, a target whose real path leaves it, through an absolute path or a link, fails before any write there
+ * and keeps its manifest entry, and a manifest whose real path leaves it throws before any write.
  */
 export function installSkills(home: string, bundle: string, version: string, options: InstallOptions = {}): InstallResult {
   const progress = { changed: false };
   try {
     return install(home, bundle, version, {
       targets: options.targets ?? defaultTargets(home), now: options.now ?? (() => new Date()),
-      recordWarning: options.recordWarning ?? true, replace: options.replace ?? false,
+      recordWarning: options.recordWarning ?? true, replace: options.replace ?? false, root: options.root,
     }, progress);
   } catch (error) {
     if (error instanceof InstallError) throw error;
@@ -214,7 +222,10 @@ export function installSkills(home: string, bundle: string, version: string, opt
 }
 
 /** `installSkills` without the error wrapping. Every write sets `progress.changed`. */
-function install(home: string, bundle: string, version: string, options: Required<InstallOptions>, progress: { changed: boolean }): InstallResult {
+function install(
+  home: string, bundle: string, version: string, options: Required<Omit<InstallOptions, 'root'>> & RootOption, progress: { changed: boolean },
+): InstallResult {
+  confine(join(home, '.agents'), options.root);
   const manifestPath = join(home, '.agents', INSTALL_MANIFEST);
   const current = readManifest(home);
 
@@ -242,6 +253,12 @@ function install(home: string, bundle: string, version: string, options: Require
   const agents = join(home, '.agents/skills');
   const agentsKey = targetKey(agents);
   const targets = resolveTargets(options.targets, states);
+  for (const target of targets) {
+    const outside = target.active && outsideRoot(target.key, options.root);
+    if (!outside) continue;
+    target.active = false;
+    target.error = { message: outside, changed: false };
+  }
   // Copies first, so each Claude target links to the skills ~/.agents/skills owns after this install.
   for (const target of [...targets].sort((a, b) => Number(a.kind === 'claude') - Number(b.kind === 'claude'))) {
     if (!target.active) {
@@ -471,10 +488,13 @@ export interface TickResult {
 /**
  * Ticks or unticks one Claude profile's `skills/` target and applies it at once. Ticking links every skill
  * ~/.agents/skills owns and puts back a missing or wrong engine link; unticking removes only the links and checklist
- * copy the engine made, and keeps the target in the manifest. Needs an earlier install.
+ * copy the engine made, and keeps the target in the manifest. Needs an earlier install. With `root`, a profile or
+ * manifest whose real path leaves it throws before any write.
  */
-export function setProfileTick(home: string, name: string, ticked: boolean): TickResult {
+export function setProfileTick(home: string, name: string, ticked: boolean, { root }: RootOption = {}): TickResult {
   if (!listProfileFolders(home).includes(name)) throw new Error(`${name} is not a Claude profile in ${home}`);
+  confine(join(home, '.agents'), root);
+  confine(join(home, name, 'skills'), root);
   const manifest = readManifest(home);
   const agentsKey = targetKey(join(home, '.agents/skills'));
   const agents = manifest?.targets[agentsKey];
@@ -568,6 +588,21 @@ function targetKey(path: string): string {
       existing = dirname(existing);
     }
   }
+}
+
+/** Why `key`, a real path, can't take writes: it leaves `root`. Undefined without a root or inside it. */
+function outsideRoot(key: string, root: string | undefined): string | undefined {
+  if (root === undefined) return undefined;
+  const limit = targetKey(root);
+  const inside = relative(limit, key);
+  if (inside === '' || (inside.split(sep)[0] !== '..' && !isAbsolute(inside))) return undefined;
+  return `${key} is outside the install root ${limit}, so Lar Factory left it alone`;
+}
+
+/** Throws an `InstallError` before any write when `path` resolves outside `root`. */
+function confine(path: string, root: string | undefined): void {
+  const outside = outsideRoot(targetKey(path), root);
+  if (outside) throw new InstallError(outside, false);
 }
 
 /**

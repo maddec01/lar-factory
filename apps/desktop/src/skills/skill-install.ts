@@ -88,14 +88,20 @@ export const makeChecks = (input: LaunchInput): Effect.Effect<Checks | undefined
   return oneAtATime.pipe(Effect.map((serial) => ({ atLaunch: serial(check(true)), beforeBuild: serial(check(false)) })));
 };
 
+/** Each Install target the check failed in, as `<path>: <reason>`. */
+const failures = (outcome: InstallResult) =>
+  outcome.targets.flatMap(({ path, error }) => error ? [`${path}: ${error.message}`] : []);
+
 /**
- * Why Start build can't run after a check: a failed install, or a Clash, a path the app didn't install that blocks a
- * skill. Drift doesn't stop it: the build runs with the skills as they are.
+ * Why Start build can't run after a check: a failed install, in any target, or a Clash, a path the app didn't install
+ * that blocks a skill. Drift doesn't stop it: the build runs with the skills as they are.
  */
 export const buildRefusal = (outcome: InstallResult | SkillInstallError): string | null => {
   if (outcome instanceof SkillInstallError) {
     return `Lar Factory couldn't install its skills, so the build can't start: ${outcome.message}`;
   }
+  const failed = failures(outcome);
+  if (failed.length > 0) return `Lar Factory couldn't install its skills, so the build can't start. ${failed.join(" ")}`;
   if (outcome.blocked.length === 0) return null;
   const skills = outcome.blocked.map(({ skill, paths }) => `${skill} is ${blockedBy(paths).join("")}.`);
   const one = outcome.blocked.length === 1 && outcome.blocked[0]!.paths.length === 1;
@@ -110,10 +116,17 @@ export interface Notice {
 }
 
 /**
- * What to tell the user after an install: nothing, its error, or a warning that names its Clashes, on the first launch
- * of a version, and its Drift, on every launch.
+ * What to tell the user after an install: nothing, its error or the targets it failed in, or a warning that names its
+ * Clashes, on the first launch of a version, and its Drift, on every launch.
  */
 export const notice = (outcome: InstallResult | SkillInstallError): Notice | undefined => {
+  if (!(outcome instanceof SkillInstallError) && failures(outcome).length > 0) {
+    return {
+      type: "error",
+      message: "Lar Factory couldn't install its skills everywhere",
+      detail: `${failures(outcome).join("\n")}\n\nThe other folders are installed. The next Start build or launch tries these again.`,
+    };
+  }
   if (outcome instanceof SkillInstallError) {
     return {
       type: "error",

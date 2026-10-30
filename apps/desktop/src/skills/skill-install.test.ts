@@ -175,16 +175,161 @@ describe("makeChecks", () => {
     }));
 });
 
-describe("notice", () => {
-  it("says nothing after a clean install", () => {
-    assert.strictEqual(
-      SkillInstall.notice({ installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], drift: [], replaced: [], warn: false }),
-      undefined,
-    );
+describe("requiredTargets", () => {
+  it("gives every instance's targets, disabled ones too, once per path and required", () => {
+    const agents = { kind: "agents" as const, path: "/home/.agents/skills" };
+    const custom = { kind: "claude" as const, path: "/work/claude/skills" };
+    const instances: Array<ProviderInstance> = [
+      { id: "codex", driver: "codex", displayName: "Codex", enabled: true, targets: [agents] },
+      { id: "cursor", driver: "cursor", displayName: "Cursor", enabled: false, targets: [agents] },
+      { id: "work", driver: "claudeAgent", displayName: "Work", enabled: false, targets: [custom] },
+    ];
+    assert.deepStrictEqual(SkillInstall.requiredTargets(instances), [{ ...agents, required: true }, { ...custom, required: true }]);
+  });
+});
+
+describe("makeChecks with T3", () => {
+  it.effect("installs into the fallback targets at launch without waiting for T3", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      NodeFS.mkdirSync(NodePath.join(home, ".claude"));
+      const made = yield* checks(launch({ home, bundle: makeBundle() }), () => Effect.never);
+
+      const outcome = yield* made.atLaunch;
+      assert.strictEqual(outcome.installed, true);
+      assert.isTrue(NodeFS.existsSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md")));
+      assert.isTrue(NodeFS.lstatSync(NodePath.join(home, ".claude/skills/lar-work")).isSymbolicLink());
+    }));
+
+  it.effect("installs into the targets T3 reports once it answers, and leaves the existing ones as they are", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      const work = NodePath.join(home, "work-claude");
+      NodeFS.mkdirSync(work);
+      let answer: InstanceDiscovery = { available: false, reason: "timed-out" };
+      const made = yield* checks(launch({ home, bundle: makeBundle() }), asking(() => answer));
+      yield* made.atLaunch;
+      assert.strictEqual(yield* made.afterDiscovery, undefined);
+      NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
+
+      answer = answering([{ kind: "claude", path: NodePath.join(work, "skills") }]);
+      const found = yield* made.afterDiscovery;
+      assert.isTrue(NodeFS.lstatSync(NodePath.join(work, "skills/lar-work")).isSymbolicLink());
+      assert.strictEqual(read(NodePath.join(work, "skills/lar-work/SKILL.md")), "edited");
+      assert.deepStrictEqual(found?.drift.map(({ skill }) => skill), ["lar-work"]);
+      const target = found?.targets.find(({ path }) => path === NodePath.join(work, "skills"));
+      assert.deepStrictEqual([target?.required, target?.active, target?.finished], [true, true, true]);
+    }));
+
+  it.live("keeps asking a T3 that timed out until it answers, then installs its new targets and leaves the others", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      const work = NodePath.join(home, "work-claude");
+      NodeFS.mkdirSync(work);
+      let asked = 0;
+      const made = yield* checks(launch({ home, bundle: makeBundle() }), asking(() =>
+        ++asked < 3 ? { available: false, reason: "timed-out" } : answering([{ kind: "claude", path: NodePath.join(work, "skills") }])));
+      yield* made.atLaunch;
+      NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
+
+      yield* SkillInstall.discoverUntilAnswered(made, "5 millis");
+
+      assert.strictEqual(asked, 3);
+      assert.strictEqual(made.state().discovery, "available");
+      assert.isTrue(NodeFS.lstatSync(NodePath.join(work, "skills/lar-work")).isSymbolicLink());
+      assert.strictEqual(read(NodePath.join(home, ".agents/skills/lar-work/SKILL.md")), "edited");
+    }));
+
+  it.effect("keeps T3's targets through a later outage", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      const work = NodePath.join(home, "work-claude");
+      NodeFS.mkdirSync(work);
+      let answer = answering([{ kind: "claude", path: NodePath.join(work, "skills") }]);
+      const made = yield* checks(launch({ home, bundle: makeBundle() }), asking(() => answer));
+      yield* made.afterDiscovery;
+
+      answer = { available: false, reason: "unauthenticated" };
+      NodeFS.rmSync(NodePath.join(work, "skills/lar-work"));
+      const build = yield* made.beforeBuild();
+      const target = build.targets.find(({ path }) => path === NodePath.join(work, "skills"));
+      assert.deepStrictEqual([target?.required, target?.active], [true, true]);
+      assert.deepStrictEqual(build.drift.map(({ paths }) => paths.map(({ path }) => path)), [[NodePath.join(work, "skills/lar-work")]]);
+    }));
+
+  it.effect("installs into a Claude home the User unticked once T3 requires it", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      NodeFS.mkdirSync(NodePath.join(home, ".claude"));
+      let answer: InstanceDiscovery = { available: false, reason: "not-running" };
+      const made = yield* checks(launch({ home, bundle: makeBundle() }), asking(() => answer));
+      yield* made.atLaunch;
+      setTargetTick(home, NodePath.join(home, ".claude/skills"), false);
+      yield* made.atLaunch;
+      assert.isFalse(NodeFS.existsSync(NodePath.join(home, ".claude/skills/lar-work")));
+
+      answer = answering([{ kind: "claude", path: NodePath.join(home, ".claude/skills") }]);
+      yield* made.afterDiscovery;
+      assert.isTrue(NodeFS.lstatSync(NodePath.join(home, ".claude/skills/lar-work")).isSymbolicLink());
+    }));
+
+  it.effect("refuses Start build for a T3 target the install failed in, but not for a T3 outage alone", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      NodeFS.writeFileSync(NodePath.join(home, "gemini"), "a file, not a folder");
+      const broken = NodePath.join(home, "gemini/skills");
+      let answer: InstanceDiscovery = { available: false, reason: "timed-out" };
+      const made = yield* checks(launch({ home, bundle: makeBundle() }), asking(() => answer));
+      assert.strictEqual(SkillInstall.buildRefusal(yield* made.beforeBuild()), null);
+
+      answer = answering([{ kind: "antigravity", path: broken }]);
+      const refusal = SkillInstall.buildRefusal(yield* made.beforeBuild());
+      assert.include(refusal, `${broken}: `);
+    }));
+
+  it.effect("on a new Release with T3 down, removes obsolete skills from migrated Antigravity copies no fallback target offers", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      const folders = [".gemini/config/skills", ".gemini/antigravity-cli/skills"];
+      for (const folder of [".agents/skills", ...folders]) {
+        for (const skill of ["lar-work", "old"]) {
+          NodeFS.mkdirSync(NodePath.join(home, folder, skill), { recursive: true });
+          NodeFS.writeFileSync(NodePath.join(home, folder, skill, "SKILL.md"), `${skill} 0.9`);
+        }
+      }
+      NodeFS.mkdirSync(NodePath.join(home, ".gemini/config/skills/mine"));
+      NodeFS.writeFileSync(NodePath.join(home, ".agents/.lar-factory-install.json"), JSON.stringify({
+        version: "0.9.0", skills: ["lar-work", "old"], antigravity: Object.fromEntries(folders.map((folder) => [folder, ["lar-work", "old"]])),
+      }));
+      const made = yield* checks(launch({ home, bundle: makeBundle() }), outage);
+
+      const outcome = yield* made.atLaunch;
+      assert.deepStrictEqual(NodeFS.readdirSync(NodePath.join(home, ".agents/skills")), ["lar-work"]);
+      assert.deepStrictEqual(NodeFS.readdirSync(NodePath.join(home, folders[0]!)).sort(), ["lar-work", "mine"]);
+      assert.deepStrictEqual(NodeFS.readdirSync(NodePath.join(home, folders[1]!)), ["lar-work"]);
+      assert.strictEqual(SkillInstall.buildRefusal(outcome), null);
+    }));
+
+  it.effect("runs a launch check and a build check that start together one after the other", () =>
+    Effect.gen(function* () {
+      const home = tempDir("skill-home-");
+      const made = yield* checks(launch({ home, bundle: makeBundle() }), outage);
+      const [launched, built] = yield* Effect.all([made.atLaunch, made.beforeBuild()], { concurrency: "unbounded" });
+      assert.deepStrictEqual([launched.installed, built.installed], [true, false]);
+    }));
+});
+
+describe("buildAnswer", () => {
+  const clean = { installed: false, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], drift: [], replaced: [], warn: false, targets: [] };
+  const drift = [{ skill: "tdd", paths: [{ place: "agents" as const, path: "/home/.agents/skills/tdd" }, { place: "agents" as const, path: "/work/skills/tdd" }] },
+    { skill: "grill", paths: [{ place: "agents" as const, path: "/home/.agents/skills/grill" }] }];
+
+  it("lets a build without Drift start, whatever the choice", () => {
+    assert.deepStrictEqual(SkillInstall.buildAnswer(clean), { refusal: null });
   });
 
   const conflicted = { installed: false, version: "1.0.0", skills: [], conflicts: ["/home/.agents/skills/lar-work"],
-    blocked: [{ skill: "lar-work", paths: [{ place: "agents" as const, path: "/home/.agents/skills/lar-work" }] }], drift: [], replaced: [] };
+    blocked: [{ skill: "lar-work", paths: [{ place: "agents" as const, path: "/home/.agents/skills/lar-work" }] }], drift: [], replaced: [], targets: [] };
 
   it("warns about conflicts and names each path", () => {
     const notice = SkillInstall.notice({ ...conflicted, warn: true });
@@ -211,6 +356,13 @@ describe("notice", () => {
     assert.include(notice?.detail, "next Start build or launch");
   });
 
+  it("names each target an install failed in as an error", () => {
+    const failed = { kind: "antigravity" as const, path: "/home/.gemini/config/skills", paths: [], required: false, active: true, finished: false, error: { message: "EACCES", changed: false } };
+    const notice = SkillInstall.notice({ ...conflicted, conflicts: [], blocked: [], warn: false, targets: [failed] });
+    assert.strictEqual(notice?.type, "error");
+    assert.include(notice?.detail, "/home/.gemini/config/skills: EACCES");
+  });
+
   it("says an install that stopped after replacing files stopped partway", () => {
     const notice = SkillInstall.notice(new SkillInstall.SkillInstallError({ message: "EACCES", changed: true }));
     assert.notInclude(notice?.detail, "still in place");
@@ -220,7 +372,7 @@ describe("notice", () => {
 });
 
 describe("buildRefusal", () => {
-  const clean = { installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], drift: [], replaced: [], warn: false };
+  const clean = { installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], drift: [], replaced: [], warn: false, targets: [] };
 
   it("lets a build start once no skill is blocked, whatever the other conflicts", () => {
     assert.strictEqual(SkillInstall.buildRefusal(clean), null);
@@ -249,6 +401,13 @@ describe("buildRefusal", () => {
 
   it("lets a build start with Drift", () => {
     assert.strictEqual(SkillInstall.buildRefusal({ ...clean, drift: [{ skill: "tdd", paths: [{ place: "agents", path: "/home/.agents/skills/tdd" }] }] }), null);
+  });
+
+  it("names each target the install failed in, even with Drift alone", () => {
+    const failed = { kind: "claude" as const, path: "/home/.claude/skills", paths: [], required: true, active: true, finished: false, error: { message: "EACCES", changed: true } };
+    const refusal = SkillInstall.buildRefusal({ ...clean, targets: [failed], drift: [{ skill: "tdd", paths: [{ place: "agents", path: "/home/.agents/skills/tdd" }] }] });
+    assert.include(refusal, "couldn't install");
+    assert.include(refusal, "/home/.claude/skills: EACCES");
   });
 
   it("gives a failed install's reason", () => {

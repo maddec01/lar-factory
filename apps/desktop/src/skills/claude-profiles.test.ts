@@ -3,16 +3,19 @@ import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 
-import { installSkills } from "@lar-factory/shared/install-skills";
+import { installSkills, setProfileTick } from "@lar-factory/shared/install-skills";
 import { makeBundle, tempDir } from "../../test/support.ts";
 import * as ClaudeProfiles from "./claude-profiles.ts";
 
-/** A throwaway home with two Claude profiles and the bundle's skill installed. */
+/** A throwaway home with two Claude profiles, ~/.claude and the ticked .claude-work, and the bundle's skill installed. */
 const makeHome = (install = true) => {
   const home = tempDir("profiles-home-");
   NodeFS.mkdirSync(NodePath.join(home, ".claude"));
   NodeFS.mkdirSync(NodePath.join(home, ".claude-work"));
-  if (install) installSkills(home, makeBundle(), "1.0.0");
+  if (install) {
+    installSkills(home, makeBundle(), "1.0.0");
+    setProfileTick(home, ".claude-work", true);
+  }
   return home;
 };
 
@@ -113,6 +116,6 @@ describe("setTick", () => {
     const home = makeHome(false);
     const result = ClaudeProfiles.setTick(home, ".claude", false);
     assert.strictEqual(result.error, "No skills are installed in ~/.agents yet");
-    assert.deepStrictEqual(result.profiles, [{ name: ".claude", ticked: true }, { name: ".claude-work", ticked: true }]);
+    assert.deepStrictEqual(result.profiles, [{ name: ".claude", ticked: true }, { name: ".claude-work", ticked: false }]);
   });
 });

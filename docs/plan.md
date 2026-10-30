@@ -1,3 +1,8 @@
+> Current skill layout: Releases install only `lar-shape` and `lar-build`.
+> Shared source is in `skills/shared/`; upstream maintenance runs from
+> `.agents/skills/skill-sync/`. The numbered setup below records the original
+> rollout; its CLI installation steps are historical.
+
 > Historical setup plan. Item tracking below reflects the current GitHub issue source; Azure repositories read their team's backlog and current sprint together.
 
 # Lar Factory plan
@@ -20,8 +25,8 @@ Owner tags: **Claude** means an agent does it. **You** means only you can do it.
 - GitHub issues hold the work, one repo per platform. Lar Factory's local board
   reads those repositories together.
 - Nothing starts until you move it to Queued. You start queued items with
-  `/lar-work <issue>` in a new T3 thread. Automatic pickup with a limit comes later.
-- The `lar-work` skill sizes an item up and picks one of three routes: clear,
+  `/lar-shape <issue>` in a new T3 thread. Automatic pickup with a limit comes later.
+- The `lar-shape` skill sizes an item up and picks one of three routes: clear,
   needs decisions, or foggy. Foggy work becomes a parent issue whose body is
   the map, with decision and build sub-issues linked by blocked-by.
 - Builds pass four reviewers (code, security, UX, UI), then an approver opens
@@ -113,13 +118,13 @@ No releases for lar-apple until TestFlight is set up.
         Done;
       - installing: `npx skills add maddec01/lar-factory -g -s <names>`, and
         which skills are copies (with their upstream source) and which are
-        lar's own (`lar-work`, `skill-sync`);
+        lar's own (`lar-shape`, `skill-sync`);
       - updating: copies only change when a `skill-sync` PR merges, then
         `npx skills update -g` pulls the change;
       - avoiding conflicts: one source per skill name. Add Matt's or Addy's
         other skills by name only (`-s <name>`), never all at once, because
         that would switch the copies back to upstream;
-      - lar-specific rules live in `lar-work` and each repo's `AGENTS.md`,
+      - lar-specific rules live in `lar-shape` and each repo's `AGENTS.md`,
         never in the copies;
       - running the board, and the credits and licences of the copied skills;
     - this plan, moved in as `docs/plan.md`.
@@ -130,10 +135,10 @@ No releases for lar-apple until TestFlight is set up.
     ```
     lar-factory/
       skills/
-        grilling/, tdd/, ...  copies of Matt's and Addy's skills, original names
-        lar-work/             the lar work skill
-          agents/             builder, reviewers (code, security, UX, UI), approver
-        skill-sync/
+        lar-shape/            shaping steps and their Copies
+        lar-build/            build steps, agents and their Copies
+        shared/               source assembled into both skills
+      .agents/skills/skill-sync/  checkout-only upstream maintenance
       board/                  the local board app, its template, its saved-copy test
       config                  lar repos and platforms, board refresh interval, limits
       UPSTREAM.md             source repo and commit for every copied skill
@@ -146,7 +151,7 @@ No releases for lar-apple until TestFlight is set up.
     pnpm workspace (`apps/server`, `apps/web`, `apps/desktop`, `packages/shared`);
     the README's repo layout is current.
 
-    The build agents live inside `lar-work` as prompt files, because
+    The build agents live inside `lar-build` as prompt files, because
     `npx skills` installs skills but not `.claude/agents` files. This way they
     install along with the skill.
 
@@ -158,7 +163,7 @@ No releases for lar-apple until TestFlight is set up.
     - from Addy: `code-review-and-quality`, `security-and-hardening`,
       `doubt-driven-development`, `frontend-ui-engineering`,
       `browser-testing-with-devtools`;
-    - `developer-profile` stays in its own repo, as it is today.
+    - `developer-profile` lives in `skills/lar-build/coding-style.md`.
 14. **Claude.** Test the install with one skill before switching the rest:
     - run `npx skills add maddec01/lar-factory -g -s grilling`;
     - check that `~/.agents/.skill-lock.json` now lists `maddec01/lar-factory`
@@ -168,12 +173,12 @@ No releases for lar-apple until TestFlight is set up.
 
     If the CLI behaves differently, stop here and rethink before step 15.
 15. **Claude, you approve.** Install the rest the same way, globally from your
-    repo: the other copies from step 13, `lar-work`, and `skill-sync`.
+    repo: the other copies from step 13, `lar-shape`, and `skill-sync`.
     - The `skills` CLI keeps one source per skill name, so the copies now
       update from your repo, which only changes when you merge something.
       Their files match what's installed today, so your other projects behave
       the same.
-    - `lar-work` has its own prefixed name, so it can never collide with
+    - `lar-shape` has its own prefixed name, so it can never collide with
       anything.
     - Every other Matt skill (`wayfinder`, `to-spec`, `to-tickets`,
       `implement-spec`, `triage`, `grill-me` and the rest) stays installed from
@@ -187,13 +192,13 @@ No releases for lar-apple until TestFlight is set up.
     stay safe to use in every project. Conventional PR titles and branch
     cleanup (review fixes as `--fixup` commits folded in with
     `git rebase --autosquash`) go in each lar repo's `AGENTS.md` and in the
-    builder prompt inside `lar-work`, not in `pr`.
+    builder prompt inside `lar-build`, not in `pr`.
 17. **Claude.** Write `skill-sync`. It compares each copied skill with the
     latest upstream version against the commit in `UPSTREAM.md` and lists the
     changes. You pick which ones to take. It merges them through a PR in
     `lar-factory` and updates `UPSTREAM.md`, then you run
     `npx skills update -g`.
-18. **Claude.** Write the `lar-work` skill:
+18. **Claude.** Write the `lar-shape` skill:
     - read the issue, the code and related docs, then propose a route (clear,
       needs decisions, foggy) in two or three lines for you to confirm;
     - clear and needs-decisions routes: grill in the same thread, build
@@ -208,7 +213,7 @@ No releases for lar-apple until TestFlight is set up.
       `doubt-driven-development` before anything moves to Ready;
     - move the issue's Status at every step, and hand off to a fresh thread if
       the context passes about 150k tokens.
-19. **Claude.** Write the build agent prompts in `lar-work/agents`:
+19. **Claude.** Write the build agent prompts in `lar-build/agents`:
     - builder: its own worktree, `tdd`, `developer-profile`, conventional
       commits, exploration notes for big builds;
     - reviewers in parallel: code (`code-review-and-quality` plus Matt's
@@ -244,7 +249,7 @@ No releases for lar-apple until TestFlight is set up.
 
 ## Phase 4: trial runs
 
-25. **You, with Claude.** Run one small bug through `/lar-work`.
+25. **You, with Claude.** Run one small bug through `/lar-shape`.
 26. **You, with Claude.** Run one visual feature with prototypes.
 27. **You, with Claude.** Run the lar cloud concept (website sign-in and relay)
     as the first foggy item, using `docs/lar-hosted-services-todo.md` and

@@ -12,7 +12,7 @@ Look at the repository root:
   glossary, and the root `docs/adr/` holds decisions that span contexts.
 
 A root `CONTEXT.md` or `CONTEXT-MAP.md` is the glossary or map under its old
-name. When none of these exist, proceed silently; the `domain-modeling` skill
+name. When none of these exist, proceed silently; the domain-modeling steps bundled in `lar-shape` and `lar-build`
 creates them when a term or decision settles.
 
 ## Before shaping or building
@@ -24,7 +24,7 @@ the work touches, and the ADRs for the area you change.
 
 Write the glossary's terms in issue titles, briefs, test names and code, and
 reach past each term's _Avoid_ list to the term itself. A concept the glossary
-lacks is a sign the work coins a term: note it for `domain-modeling`.
+lacks is a sign the work coins a term: record it in the brief for `lar-build`.
 
 ## Flag ADR conflicts
 

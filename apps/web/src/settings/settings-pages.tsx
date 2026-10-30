@@ -70,7 +70,7 @@ export function toolState(check: ToolCheck | undefined, login = false): Componen
 const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
   ['gh', 'Reads GitHub repository issues and linked pull requests.'],
   ['t3', 'Starts the lar-shape threads in T3 Code.'],
-  ['git', "lar-shape's agents branch, commit and push with it."],
+  ['git', "lar-build's agents branch, commit and push with it."],
   ['jq', "lar-shape's scripts read gh's answers with it."],
   ['curl', "lar-shape's scripts tell the board to refresh with it."],
 ];

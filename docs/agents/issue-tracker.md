@@ -25,7 +25,7 @@ mention creates neither.
 Each item has one Status: List, Queued, Shaping, Needs you, Ready, In progress,
 Review, Verify, Ready to merge or Done. It lives as one
 `status-<name>` label on the issue, such as `status-needs-you`. Move an item
-with the `lar-work` skill's `scripts/status.sh <issue-url> "<Status>"`. Closing
+with the `lar-shape` skill's `shared/scripts/status.sh <issue-url> "<Status>"`. Closing
 an issue makes it Done. State lives in Status alone, so assignees and other
 labels stay free of it.
 
@@ -34,7 +34,7 @@ labels stay free of it.
 Work too broad or unclear for one issue is a `concept` issue: a map whose
 native sub-issues are decisions (`decision-grill`, `decision-prototype`,
 `decision-research`, `decision-task`) and builds (`build`). A build becomes
-one PR, and its slices are its sub-issues. The `lar-work` skill runs this
+one PR, and its slices are its sub-issues. The `lar-shape` and `lar-build` skills run this
 workflow; read it before shaping, slicing or building.
 
 ## When a skill says "publish to the issue tracker"

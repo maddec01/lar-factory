@@ -4,10 +4,10 @@ Skills, build agents and a local board for working on lar. See the README for
 the flow and `docs/plan.md` for how it was set up.
 
 - `skills/` holds copies of upstream skills, unchanged, plus lar's own skills
-  (`lar-work`, `skill-sync`). Never edit a copy by hand: upstream changes come in
-  through `skill-sync`, which updates `UPSTREAM.md`. lar rules go in `lar-work` or
+  (`lar-shape`, `lar-build`); checkout-only `skill-sync` lives in `.agents/skills/`. Never edit a copy by hand: upstream changes come in
+  through `skill-sync`, which updates `UPSTREAM.md`. lar rules go in the skill that loads the Copy or
   in each lar repo's `AGENTS.md`. To set aside part of a Copy, write an Override:
-  a lar rule in `lar-work` that cites the Copy's file and section heading, listed
+  a rule beside the step that loads the Copy, citing its file and section heading, listed
   in the Copy's "Overridden in" column of `UPSTREAM.md`.
 - The board is a root pnpm workspace laid out like T3 Code's monorepo:
   `apps/server`, `apps/web`, `apps/desktop` (the Electron board app),
@@ -21,7 +21,7 @@ the flow and `docs/plan.md` for how it was set up.
 - Nothing secret goes in this public repo or in any repository's Repository config
   (`.lar-factory.json`); the board reads GitHub through the local `gh` login.
 - Every commit and PR title uses conventional commits (`type(scope): description`;
-  scopes: `board`, `lar-work`, `skill-sync`, `skills`, `ci`). A required check and the
+  scopes: `board`, `lar-shape`, `lar-build`, `skill-sync`, `skills`, `ci`). A required check and the
   `commit-msg` hook enforce it. Update branches by rebase; fold review fixes in with
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   The user merges every PR.
@@ -34,10 +34,10 @@ the flow and `docs/plan.md` for how it was set up.
   usually holds 4317). Stop it with that command `| xargs kill`; never `pkill` by pattern.
 - Release secrets wizard changes: run `bash scripts/release-secrets.test.sh` and
   `shellcheck scripts/release-secrets.sh`. Never run the wizard without `--dry-run`.
-- lar-work script changes: run `bash skills/lar-work/scripts/slice.test.sh`,
-  `bash skills/lar-work/scripts/status.test.sh` and
-  `bash skills/lar-work/scripts/repo-config.test.sh`.
-- skill-sync script changes: run each `skills/skill-sync/scripts/*.test.sh` with `bash`.
+- Shared script changes: run `bash skills/shared/scripts/slice.test.sh`,
+  `bash skills/shared/scripts/status.test.sh` and
+  `bash skills/shared/scripts/repo-config.test.sh`.
+- skill-sync script changes: run each `.agents/skills/skill-sync/scripts/*.test.sh` with `bash`.
 - PRs appear on the board through the issues they track. Set the issue’s status with `status.sh`; a standalone PR has no board status.
 
 ## Domain docs
@@ -64,6 +64,8 @@ reusing the download cache in `~/Library/Caches/electron`.
 - Setup changes: run `bash scripts/setup-worktree.test.sh`.
 
 ## Agent skills
+
+Use `lar-shape` for shaping and decisions, and `lar-build` for builds.
 
 ### Issue tracker
 GitHub issues in this repository, moved through Lar Factory's board. See `docs/agents/issue-tracker.md`.

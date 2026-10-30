@@ -23,7 +23,7 @@ test('writes reject foreign and missing origins before touching GitHub', async (
   }
   const calls = await board.calls();
   // Reads and the startup gh probe touch nothing; the startup read's offers look for open PRs.
-  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && !(args[0] === 'api' && args[1] === '-i') && args[0] !== '--version' && args[0] !== 'auth' && !readsRepositoryConfig(args)
+  const writes = calls.filter((args) => !(args[0] === 'api' && args[1] === 'graphql') && !(args[0] === 'api' && args[1] === '-i') && args[0] !== '--version' && args[0] !== 'auth' && !readsRepositoryConfig(args) && !args[1]?.includes('/contents/')
     && !(args[0] === 'pr' && args[1] === 'list'));
   assert.equal(writes.length, 0);
 });
@@ -315,7 +315,7 @@ test('before an edit the board reads the PR again, keeps edits made since its re
   const liveBodies = { [url(40)]: 'PR 40, edited by hand', [url(43)]: `PR 43\n\n${block}` };
   // The sequential PR reads deliberately outlast the former two-second poll.
   const board = await startBoard(t, { items, liveBodies, prReadDelay: 1200 }, false, false, { T3_STATE_DB: db });
-  const prCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && args[1] !== 'graphql' && !readsRepositoryConfig(args));
+  const prCalls = async () => (await board.calls()).filter((args) => args[0] === 'api' && (args[1]?.includes('/pulls/') || args[2] === 'PATCH'));
   await board.untilLogged(`updated item stats in ${url(40)}`);
   const calls = await prCalls();
   assert.deepEqual(calls.filter((args) => args[2] !== 'PATCH').map((args) => args[1]),
@@ -337,7 +337,7 @@ test('PR edits run beside the refreshes without holding them up, and never two s
   const release = join(dir, 'release');
   // Keep the edit pending until a slow refresh finishes, regardless of process scheduling.
   const board = await startBoard(t, { items, prEditHold: release, readDelay: 1500, delayedRepos: ['maddec01/lar-factory'] }, false, true, { T3_STATE_DB: db });
-  const prCalls = async () => (await board.calls()).filter((args) => (args[1]?.startsWith('repos/') && !readsRepositoryConfig(args)) || args[2] === 'PATCH');
+  const prCalls = async () => (await board.calls()).filter((args) => args[1]?.includes('/pulls/') || args[2] === 'PATCH');
   await board.untilCalled((args) => args[2] === 'PATCH');
   const first = await board.board();
   const later = await until(board, (data) => data.fetchedAt !== first.fetchedAt);

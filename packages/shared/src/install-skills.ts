@@ -552,6 +552,7 @@ export function setTargetTick(home: string, path: string, ticked: boolean, { roo
       kind: 'claude',
       ...ticked ? { ...installed.release !== undefined && { release: installed.release }, finished: installed.finished } : { ...state.release !== undefined && { release: state.release }, finished: state.finished },
       skills: [...work.owned].sort(), selection,
+      ...state.required && { required: true },
       ...!ticked && state.references && exists(join(dirname(target.path), 'references')) && { references: true },
     };
   }

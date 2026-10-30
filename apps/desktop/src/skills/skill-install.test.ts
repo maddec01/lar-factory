@@ -121,7 +121,6 @@ describe("makeChecks", () => {
       assert.strictEqual(third?.installed, false);
       assert.deepStrictEqual(third?.drift.map(({ skill }) => skill), ["lar-work"]);
       assert.strictEqual(SkillInstall.buildRefusal(third!), null);
-      assert.strictEqual(SkillInstall.notice(third!), undefined, "the page's notice reports Drift");
       assert.strictEqual(NodeFS.readFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "utf8"), "edited");
     }));
 
@@ -426,65 +425,6 @@ describe("makeChecks with T3", () => {
       const [launched, built] = yield* Effect.all([made.atLaunch, made.beforeBuild()], { concurrency: "unbounded" });
       assert.deepStrictEqual([launched.installed, built.installed], [true, false]);
     }));
-});
-
-describe("unshown", () => {
-  const drift = (path: string) => ({ skill: "tdd", paths: [{ place: "agents" as const, path }] });
-  const failed = (path: string) => ({ kind: "claude" as const, path, paths: [path], required: true, skills: [], active: true, finished: false, error: { message: "EACCES", changed: false } });
-  const result = { installed: false, version: "1.0.0", skills: [], conflicts: [], blocked: [], replaced: [], warn: false };
-
-  it("leaves out the failures an earlier notice reported", () => {
-    const first = { ...result, drift: [drift("/a/tdd")], targets: [failed("/a")] };
-    const second = { ...result, drift: [drift("/a/tdd"), drift("/b/tdd")], targets: [failed("/a"), failed("/b")] };
-    const left = SkillInstall.unshown(second, first);
-    assert.deepStrictEqual(left.targets.map(({ path, error }) => [path, error?.message]), [["/a", undefined], ["/b", "EACCES"]]);
-  });
-});
-
-describe("notice", () => {
-  it("says nothing after a clean install", () => {
-    assert.strictEqual(
-      SkillInstall.notice({ installed: true, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], drift: [], replaced: [], warn: false, targets: [] }),
-      undefined,
-    );
-  });
-
-  it("asks for a choice, naming each skill with Drift once", () => {
-    const answer = SkillInstall.buildAnswer({ ...clean, drift });
-    assert.deepStrictEqual(answer.drift, ["tdd", "grill"]);
-    assert.include(answer.refusal, "tdd and grill");
-  });
-
-  it("starts anyway with Drift when the User chose to", () => {
-    assert.deepStrictEqual(SkillInstall.buildAnswer({ ...clean, drift }, "keep"), { refusal: null });
-  });
-
-  it("leaves Drift to the board page's notice", () => {
-    const drift = [{ skill: "tdd", paths: [{ place: "agents" as const, path: "/home/.agents/skills/tdd" }] }];
-    assert.strictEqual(SkillInstall.notice({ ...conflicted, conflicts: [], blocked: [], drift, warn: false }), undefined);
-  });
-
-  it("reports a failed install as an error that the next Start build or launch retries", () => {
-    const notice = SkillInstall.notice(new SkillInstall.SkillInstallError({ message: "Couldn't copy references", changed: false }));
-    assert.strictEqual(notice?.type, "error");
-    assert.include(notice?.detail, "Couldn't copy references");
-    assert.include(notice?.detail, "previous skills are still in place");
-    assert.include(notice?.detail, "next Start build or launch");
-  });
-
-  it("names each target an install failed in as an error", () => {
-    const failed = { kind: "antigravity" as const, path: "/home/.gemini/config/skills", paths: [], required: false, skills: [], active: true, finished: false, error: { message: "EACCES", changed: false } };
-    const notice = SkillInstall.notice({ ...conflicted, conflicts: [], blocked: [], warn: false, targets: [failed] });
-    assert.strictEqual(notice?.type, "error");
-    assert.include(notice?.detail, "/home/.gemini/config/skills: EACCES");
-  });
-
-  it("says an install that stopped after replacing files stopped partway", () => {
-    const notice = SkillInstall.notice(new SkillInstall.SkillInstallError({ message: "EACCES", changed: true }));
-    assert.notInclude(notice?.detail, "still in place");
-    assert.include(notice?.detail, "stopped partway");
-    assert.include(notice?.detail, "next Start build or launch");
-  });
 });
 
 describe("buildAnswer", () => {

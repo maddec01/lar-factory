@@ -5,7 +5,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
-import { INSTALL_MANIFEST, defaultTargets, describeTargets, installSkills, profileTargets, readSkillStatus, setTargetTick, type InstallResult, type RootOption, type TargetResult } from './install-skills.ts';
+import { INSTALL_MANIFEST, defaultTargets, describeTargets, installSkills, profileTargets, readSkillStatus, setTargetTick, t3Targets, type InstallResult, type RootOption, type TargetResult } from './install-skills.ts';
 
 function temporary(): string {
   const path = realpathSync(mkdtempSync(join(tmpdir(), 'install-skills-')));

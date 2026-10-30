@@ -1,5 +1,7 @@
 #!/bin/bash
 # Usage: upstream-changes.sh <lar-factory checkout>
+# Prints three parts, each under its own heading line: "== Copies", "== Ports"
+# and "== New skills".
 # For every row in UPSTREAM.md's Copies table, prints the upstream log and diff
 # of that skill's folder and of its source's licence file (see licence-file.sh, looked up at both
 # ends) from the recorded commit to upstream HEAD, with HEAD's 12-character sha
@@ -12,9 +14,15 @@
 # prints, as <port>: <section>: <reason>, each entry in the row's Sections
 # that the change touches, and in the diff it puts ">> <section>" above each
 # hunk that changes a line of that section (see mark_hunks). Prints
-# "no Port sections touched" at the end when it flags none. Exits non-zero on a
-# missing UPSTREAM.md, on a Commit that isn't a hex sha or that upstream doesn't
-# have, and on a failed clone or git command. Clones into a temp folder.
+# "no Port sections touched" at the end when it flags none.
+# For every source a row uses, prints "== new skills in <source> (<from>..<head>)"
+# and each skill folder (a folder holding a SKILL.md) upstream added since that
+# source's commit on the "Checked up to" line, leaving out folders a row's Path
+# names; or "== new skills in <source>: none (<head>)"; or, when the line has
+# no entry for the source, says so and goes on. Exits non-zero on a
+# missing UPSTREAM.md, on a Source that isn't <owner>/<repo>, on a Commit that
+# isn't a hex sha or that upstream doesn't have, and on a failed clone or git
+# command. Clones into a temp folder.
 # SKILL_SYNC_GIT_BASE overrides https://github.com.
 set -euo pipefail
 
@@ -196,13 +204,17 @@ report_header() {
     fi
 }
 
+sources=""
+tracked=""
 flagged=0
+echo "== Copies"
 # Reads rows in this shell, not a pipeline or $(...), so set -e stops the
 # script on a failed clone or git command and the flag count survives the loop.
 while IFS='|' read -r _ name source path _ commit _ overrides _; do
     name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
     path=$(echo "$path" | tr -d ' `'); commit=$(echo "$commit" | tr -d ' `')
     fetch "$name" "$source" "$commit"
+    sources+="$source"$'\n'; tracked+="$path"$'\n'
     paths=("$path")
     # The licence file at both ends, so one added or moved upstream shows too.
     for rev in "$commit" HEAD; do
@@ -227,11 +239,13 @@ done < <(upstream_rows "$factory/UPSTREAM.md" Copies)
 if [[ $flagged == 0 ]]; then echo "no Overrides touched"; fi
 
 flagged=0
+echo "== Ports"
 while IFS='|' read -r _ name source path sections commit _; do
     name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
     commit=$(echo "$commit" | tr -d ' `')
     fetch "$name" "$source" "$commit"
     IFS=';' read -ra paths <<<"$(echo "$path" | tr -d ' `')"
+    sources+="$source"$'\n'; tracked+=$(printf '%s\n' "${paths[@]}")$'\n'
     report_header "$name" "$source" "$commit" "${paths[@]}"
     : >"$work/specs"
     while IFS= read -r entry; do
@@ -260,3 +274,37 @@ while IFS='|' read -r _ name source path sections commit _; do
 done < <(upstream_rows "$factory/UPSTREAM.md" Ports)
 
 if [[ $flagged == 0 ]]; then echo "no Port sections touched"; fi
+
+# checked_up_to <source>
+# Prints the commit the "Checked up to" line holds for <source>, or nothing.
+checked_up_to() {
+    local entry
+    sed -n 's/^Checked up to: //p' "$factory/UPSTREAM.md" | sed 's/\.$//' | tr ',' '\n' |
+        while read -r entry; do
+            if [[ ${entry%% *} == "$1" ]]; then echo "${entry#* }" | tr -d ' `'; fi
+        done
+}
+
+# skill_folders <rev>
+# Prints each folder holding a SKILL.md at <rev> in $clone, sorted.
+skill_folders() {
+    git -C "$clone" ls-tree -r --name-only "$1" | sed -n 's|/SKILL\.md$||p' | LC_ALL=C sort
+}
+
+echo "== New skills"
+while IFS= read -r source; do
+    from=$(checked_up_to "$source")
+    if [[ -z $from ]]; then
+        echo "== new skills in $source: no \"Checked up to\" entry in UPSTREAM.md"
+        continue
+    fi
+    fetch "$source: Checked up to" "$source" "$from"
+    added=$(LC_ALL=C comm -13 <(skill_folders "$from") <(skill_folders HEAD) |
+        grep -vxF -f <(printf '%s' "$tracked" | grep .) || true)
+    if [[ -n $added ]]; then
+        echo "== new skills in $source ($from..$head)"
+        echo "$added"
+    else
+        echo "== new skills in $source: none ($head)"
+    fi
+done < <(printf '%s' "$sources" | awk 'NF && !seen[$0]++')

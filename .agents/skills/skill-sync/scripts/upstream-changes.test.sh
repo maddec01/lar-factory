@@ -44,6 +44,9 @@ run() { SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$fa
 out=$(run)
 check "reports an unchanged copy" "$out" "^== demo: unchanged \\(owner/repo $first, "
 check "reports Port rows apart from Copies" "$out" "^== skills/lar-build/agents/doubt.md: unchanged"
+check "heads the Copies" "$(head -1 <<<"$out")" "^== Copies$"
+check "heads the Ports after the Copies" "$(sed -n '/^== Copies$/,$p' <<<"$out")" "^== Ports$"
+check "heads the new skills after the Ports" "$(sed -n '/^== Ports$/,$p' <<<"$out")" "^== New skills$"
 
 echo c > "$repo/pack/skills/other/SKILL.md"
 echo 'Root licence, new year' > "$repo/LICENSE"
@@ -142,6 +145,7 @@ mkdir -p "$quiet"
 grep -v '^| .demo. ' "$factory/UPSTREAM.md" >"$quiet/UPSTREAM.md"
 out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$quiet")
 check "says so when it flags nothing" "$out" "^no Overrides touched$"
+check "heads the Ports right after saying so" "$(grep -A1 '^no Overrides touched$' <<<"$out")" "^== Ports$"
 
 # Ports, in a third upstream repo with two skill folders.
 ports="$base/owner/ports.git"
@@ -217,6 +221,7 @@ EOF2
 out=$(run)
 check "reports an unchanged Port" "$out" "^== skills/lar-build/agents/reviewer.md: unchanged \\(owner/ports $pfirst, "
 check "says so when no Port section is touched" "$out" "^no Port sections touched$"
+check "heads the new skills right after saying so" "$(grep -A1 '^no Port sections touched$' <<<"$out")" "^== New skills$"
 check "reads a backticked Sections entry" "$out" "no such file" absent
 
 sed -i.bak -e 's/^Check five axes\.$/Check six axes./' -e 's/^Label each finding\.$/Label every finding./' \
@@ -247,6 +252,65 @@ check "leaves a hunk outside every cited section unmarked" "$above" "^>> " absen
 check "marks every hunk of a whole-file citation" "$(grep -A1 '^>> skills/doubt/checks.md$' <<<"$port")" "^@@ "
 check "marks a hunk in a deleted cited file" "$(grep -A1 '^>> skills/doubt/gone.md$' <<<"$port")" "^@@ "
 check "says nothing about untouched Port sections when it flags some" "$out" "no Port sections touched" absent
+
+# New skills, in a fourth upstream repo.
+fresh="$base/owner/fresh.git"
+mkdir -p "$fresh/skills/old" "$fresh/skills/dropped"
+git -C "$fresh" init --quiet
+printf '# Old\n' >"$fresh/skills/old/SKILL.md"
+printf '# Dropped\n' >"$fresh/skills/dropped/SKILL.md"
+repo=$fresh commit first
+ffirst=$(git -C "$fresh" rev-parse --short=12 HEAD)
+mkdir -p "$fresh/skills/new" "$fresh/skills/group/deep" "$fresh/skills/copied" "$fresh/skills/ported" "$fresh/docs"
+printf '# Old, edited\n' >"$fresh/skills/old/SKILL.md"
+printf '# New\n' >"$fresh/skills/new/SKILL.md"
+printf '# Deep\n' >"$fresh/skills/group/deep/SKILL.md"
+printf '# Copied\n' >"$fresh/skills/copied/SKILL.md"
+printf '# Ported\n' >"$fresh/skills/ported/SKILL.md"
+printf '# Docs\n' >"$fresh/docs/README.md"
+repo=$fresh commit second
+fhead=$(git -C "$fresh" rev-parse --short=12 HEAD)
+
+factory="$base/fresh-factory"
+mkdir -p "$factory"
+cat >"$factory/UPSTREAM.md" <<EOF2
+| Skill | Source | Path | Repository path | Commit | Date | Overridden in |
+| ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
+| \`copied\` | owner/fresh | \`skills/copied\` | \`skills/nested/copied\` | \`$fhead\` | 2026-10-01 |  |
+
+| Port | Source | Path | Sections | Commit | Date |
+| ---- | ------ | ---- | -------- | ------ | ---- |
+| \`skills/lar-build/agents/ported.md\` | owner/fresh | \`skills/ported\` | skills/ported/SKILL.md | \`$fhead\` | 2026-10-01 |
+
+Full commits: owner/fresh \`$fhead\`.
+
+Checked up to: owner/fresh \`$ffirst\`.
+
+Authors: owner/fresh by Owner (MIT).
+EOF2
+
+out=$(run)
+fresh_out=$(sed -n '/^== new skills in owner\/fresh/,$p' <<<"$out")
+check "heads the new skills with the source and range" "$out" "^== new skills in owner/fresh \\($ffirst..$fhead\\)$"
+check "lists a skill folder upstream added" "$fresh_out" "^skills/new$"
+check "lists a nested skill folder upstream added" "$fresh_out" "^skills/group/deep$"
+check "leaves out a skill folder present at Checked up to" "$fresh_out" "^skills/old$" absent
+check "leaves out a dropped skill no row tracks" "$fresh_out" "skills/dropped" absent
+check "leaves out a new skill a Copy row tracks" "$fresh_out" "skills/copied" absent
+check "leaves out a new skill a Port row tracks" "$fresh_out" "skills/ported" absent
+check "leaves out folders without a SKILL.md" "$fresh_out" "docs" absent
+
+sed -i.bak "s/^Checked up to: owner\/fresh \`$ffirst\`/Checked up to: owner\/fresh \`$fhead\`/" "$factory/UPSTREAM.md"
+out=$(run)
+check "says so when a source added no skills" "$out" "^== new skills in owner/fresh: none \\($fhead\\)$"
+
+sed -i.bak '/^Checked up to:/d' "$factory/UPSTREAM.md"
+if out=$(run 2>&1); then
+    check "names a source missing from Checked up to" "$out" "^== new skills in owner/fresh: no \"Checked up to\" entry in UPSTREAM.md$"
+else
+    echo "FAIL runs on when a source is missing from Checked up to"; fail=1
+fi
+
 factory="$base/marks-factory"
 
 bad="$base/bad"
@@ -280,7 +344,7 @@ fi
 if out=$(SKILL_SYNC_GIT_BASE="file://$base/nonexistent" bash "$here/upstream-changes.sh" "$factory" 2>"$base/clone.err"); then
     echo "FAIL exits non-zero on a failed clone"; fail=1
 else
-    check "exits non-zero on a failed clone and prints nothing" "$out" "." absent
+    check "exits non-zero on a failed clone and prints only the Copies heading" "$(grep -vx '== Copies' <<<"$out")" "." absent
     check "says the clone failed and the scan stopped" "$(cat "$base/clone.err")" "^demo: could not clone owner/marks; scan stopped$"
 fi
 

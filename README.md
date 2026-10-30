@@ -100,10 +100,12 @@ holds their common source; assembly copies it into both release skills.
 Install the board app from
 [GitHub Releases](https://github.com/maddec01/lar-factory/releases): download the
 newest Release's dmg and drag Lar Factory into Applications. The app installs
-`lar-shape` and `lar-build` into `~/.agents/skills`, and links them into the
-Claude profiles ticked in Settings (`~/.claude` and each `~/.claude-*`). Each
-skill carries its own upstream content and checklists. On every launch the app
-restores installed content that differs from the Release.
+`lar-shape` and `lar-build` into every Install target: the skills folder of each
+Provider instance T3 Code lists, plus `~/.agents/skills`, `~/.claude` and any
+targets ticked in Settings. Each skill carries its own upstream content and
+checklists. The app writes a target only when its Release changes, or when you
+choose Replace for Drift. At launch and before Start build it reports Drift, a lar
+skill you edited or deleted, and asks before replacing it.
 
 If you run `npx skills add` yourself, always pass `-a`: `-y` without it installs into
 every agent the CLI knows.
@@ -161,10 +163,10 @@ the build signs and notarizes, and fails unless `CSC_LINK`, `CSC_KEY_PASSWORD`,
 
 The app's build assembles `lar-shape` and `lar-build` into `apps/desktop/dist-electron/bundle`,
 which packaging puts in the app's `Resources/bundle`.
-A packaged app installs them into `~/.agents` and the ticked Claude profiles on every
-launch, after its window opens, and writes only the skills, links and checklists that
-differ from the bundle. It shows a dialog for an error, and for a conflict on the
-first launch of each version. A run from a checkout installs only with `--install-skills`,
+A packaged app installs them into its Install targets after its window opens, and
+writes a target only when the target's recorded Release differs from the bundle's.
+It reports a Clash, a same-named skill the app doesn't own, and leaves it untouched.
+It shows a dialog for an error. A run from a checkout installs only with `--install-skills`,
 and `LAR_FACTORY_INSTALL_ROOT` puts the install in another folder instead of your
 home. From the repo root:
 

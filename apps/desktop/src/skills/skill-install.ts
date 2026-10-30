@@ -13,7 +13,7 @@ import { InstallError, installSkills, type InstallResult } from "@lar-factory/sh
 
 /** Starts a dev run's install. A packaged app ignores it and installs on every launch. */
 export const INSTALL_FLAG = "--install-skills";
-/** Installs into this folder instead of the user's home, for dev runs and tests. */
+/** Installs into this folder instead of the user's home, for dev runs and tests, and never writes outside it. */
 export const ROOT_ENV = "LAR_FACTORY_INSTALL_ROOT";
 
 export interface LaunchInput {
@@ -30,6 +30,8 @@ export interface LaunchInput {
 /** One call to the install engine. */
 export interface Plan {
   readonly home: string;
+  /** The folder ROOT_ENV names, which every write must stay in. */
+  readonly root?: string;
   readonly bundle: string;
   readonly version: string;
 }
@@ -47,13 +49,17 @@ export class SkillInstallError extends Data.TaggedError("SkillInstallError")<{
 export const locateBundle = (appPath: string, isPackaged: boolean) =>
   isPackaged ? NodePath.resolve(appPath, "../bundle") : NodePath.resolve(appPath, "dist-electron/bundle");
 
+/** The folder ROOT_ENV names, or undefined when it is unset or empty. */
+export const installRoot = (env: LaunchInput["env"]) => env[ROOT_ENV] || undefined;
+
 /** The home the app installs into: the user's, or the folder ROOT_ENV names. */
-export const installHome = (home: string, env: LaunchInput["env"]) => env[ROOT_ENV] || home;
+export const installHome = (home: string, env: LaunchInput["env"]) => installRoot(env) ?? home;
 
 /** What this launch installs, or undefined when it installs nothing. */
 export const plan = (input: LaunchInput): Plan | undefined => {
   if (!input.isPackaged && !input.argv.includes(INSTALL_FLAG)) return undefined;
-  return { home: installHome(input.home, input.env), bundle: input.bundle, version: input.version };
+  const root = installRoot(input.env);
+  return { home: root ?? input.home, ...root && { root }, bundle: input.bundle, version: input.version };
 };
 
 /** One check of the installed skills against the bundle, which installs a new Release and reports Drift. */
@@ -78,7 +84,7 @@ export const makeChecks = (input: LaunchInput): Effect.Effect<Checks | undefined
   const install = plan(input);
   if (!install) return Effect.succeed(undefined);
   const check = (recordWarning: boolean): Check => Effect.try({
-    try: () => installSkills(install.home, install.bundle, install.version, { recordWarning }),
+    try: () => installSkills(install.home, install.bundle, install.version, { recordWarning, root: install.root }),
     catch: (cause) =>
       new SkillInstallError({
         message: cause instanceof Error ? cause.message : String(cause),

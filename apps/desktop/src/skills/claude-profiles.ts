@@ -37,14 +37,17 @@ export const list = (home: string): ProfilesResult => {
   }
 };
 
-/** Ticks or unticks one profile at once; a refused or failed call leaves the profiles as they were. */
-export const setTick = (home: string, name: unknown, ticked: unknown): ProfilesResult => {
+/**
+ * Ticks or unticks one profile at once; a refused or failed call leaves the profiles as they were. With `root`, a
+ * profile whose real path leaves it is refused.
+ */
+export const setTick = (home: string, name: unknown, ticked: unknown, root?: string): ProfilesResult => {
   try {
     if (typeof name !== "string" || !isProfileName(name)) {
       throw new Error(`${String(name)} is not a Claude profile`);
     }
     if (typeof ticked !== "boolean") throw new Error("A tick must be true or false");
-    const { conflicts, removed } = setProfileTick(home, name, ticked);
+    const { conflicts, removed } = setProfileTick(home, name, ticked, { root });
     return { ...list(home), conflicts: conflicts.map((path) => inHome(path, home)), removed };
   } catch (cause) {
     return { ...list(home), error: inHome(message(cause), home) };

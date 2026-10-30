@@ -102,6 +102,15 @@ describe("setTick", () => {
     }
   });
 
+  it("refuses a profile linked outside the install root, and writes nothing there", () => {
+    const home = makeHome();
+    const outside = tempDir("profiles-outside-");
+    NodeFS.symlinkSync(outside, NodePath.join(home, ".claude-elsewhere"));
+    const result = ClaudeProfiles.setTick(home, ".claude-elsewhere", true, home);
+    assert.include(result.error, "outside the install root");
+    assert.deepStrictEqual(NodeFS.readdirSync(outside), []);
+  });
+
   it("refuses a profile the home doesn't have", () => {
     const result = ClaudeProfiles.setTick(makeHome(), ".claude-gone", true);
     assert.strictEqual(result.error, ".claude-gone is not a Claude profile in ~");

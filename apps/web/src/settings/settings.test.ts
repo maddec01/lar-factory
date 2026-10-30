@@ -22,14 +22,20 @@ const snapshotOf = (claude: boolean, work: boolean, extra: Partial<InstallSnapsh
 const listed = snapshotOf(true, false);
 const bothTicked = snapshotOf(true, true);
 
+/**
+ * The app's bridge, whose `getInstallState` is Settings' reads: the page's Drift warning reads the state once as it
+ * mounts, and that read gets `listed`.
+ */
 function stubBridge(setResult: InstallOperationResult = { snapshot: listed }) {
   let push: (snapshot: InstallSnapshot) => void = () => {};
+  const reads = vi.fn(async () => listed);
+  let mounted = false;
   const bridge = stubApp({
-    getInstallState: vi.fn(async () => listed),
+    getInstallState: () => (mounted ? reads() : (mounted = true, Promise.resolve(listed))),
     onInstallState: vi.fn((listener: (snapshot: InstallSnapshot) => void) => { push = listener; return () => { push = () => {}; }; }),
     setTargetTick: vi.fn(async (_path: string, _ticked: boolean) => setResult),
   });
-  return Object.assign(bridge, { push: (snapshot: InstallSnapshot) => settle(() => push(snapshot)) });
+  return { ...bridge, getInstallState: reads, push: (snapshot: InstallSnapshot) => settle(() => push(snapshot)) };
 }
 
 const settingsButton = () => $<HTMLButtonElement>('.open-settings');

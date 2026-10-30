@@ -367,6 +367,49 @@ test('Start build in a Ready item’s footer sends the build, then tags it Start
   expect(text(inDialog('[data-start-result="I_sample13"]'))).toBe('Started');
 });
 
+const DRIFT = { thread: null, error: 'lar-build changed since Lar Factory installed it. Replace and start, or start anyway.', drift: ['lar-build'] };
+
+test.each([['Replace and start', 'replace'], ['Start anyway', 'keep']] as const)(
+  'Start build with Drift asks first, and %s sends the build again with that choice', async (label, drift) => {
+    holdPosts(readyBuild);
+    await mountPage(readyBuild);
+    await openItem('I_sample13');
+    await pressMenu(button('start', 'I_sample13'));
+    await settle(() => vi.advanceTimersByTime(20));
+    await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
+    await answer(DRIFT, 409);
+    const dialog = $('#drift-choice')!;
+    expect(dialog.getAttribute('role')).toBe('alertdialog');
+    expect(text(dialog)).toContain('lar-build changed since Lar Factory installed it.');
+    expect($$('#drift-choice [data-slot="modal-footer"] button').map(text)).toEqual(['Cancel', 'Start anyway', 'Replace and start']);
+    expect($('#drift-choice [type="submit"]')!.textContent, 'Replace and start is the default').toBe('Replace and start');
+    await settle(() => vi.advanceTimersByTime(50));
+    expect(document.activeElement, 'focus starts on the default').toBe($('#drift-choice [type="submit"]'));
+    expect(inDialog('p.start [role="alert"]'), 'the question is no failure').toBeNull();
+    await settle(() => $$<HTMLButtonElement>('#drift-choice [data-slot="modal-footer"] button').find((b) => text(b) === label)!.click());
+    expect($('#drift-choice')).toBeNull();
+    expect(posted()).toEqual([
+      ['/api/start-build', { session: 's1', itemId: 'I_sample13' }],
+      ['/api/start-build', { session: 's1', itemId: 'I_sample13', drift }],
+    ]);
+    await answer({ thread: { threadId: 'thread-1', title: 'Build maddec01/lar-server#140' }, error: null });
+    expect(text(inDialog('[data-start-result="I_sample13"]'))).toBe('Started');
+  });
+
+test('Cancel on the Drift question starts nothing and leaves Start build', async () => {
+  holdPosts(readyBuild);
+  await mountPage(readyBuild);
+  await openItem('I_sample13');
+  await pressMenu(button('start', 'I_sample13'));
+  await settle(() => vi.advanceTimersByTime(20));
+  await settle(() => $$('[role="menu"] [role="menuitemradio"]')[0]!.click());
+  await answer(DRIFT, 409);
+  await settle(() => $$<HTMLButtonElement>('#drift-choice [data-slot="modal-footer"] button')[0]!.click());
+  expect($('#drift-choice')).toBeNull();
+  expect(posted()).toHaveLength(1);
+  expect(text(button('start', 'I_sample13'))).toBe('Start build ▾');
+});
+
 test('a build the board started, through Start after or from another page, shows Started at once', async () => {
   await mountPage({ ...readyBuild, startedBuilds: { I_sample13: { threadId: 'build-1', title: 'Build maddec01/lar-server#140' } } });
   await openItem('I_sample13');

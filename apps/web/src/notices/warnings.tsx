@@ -1,9 +1,11 @@
-// Active warnings on every screen. Item-source problems covered by az's fix stay hidden.
+// Active warnings on every screen, and the board app's Drift, Clashes and failed installs. Item-source problems covered by az's fix stay hidden.
 
 import { failedCheck } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { CLIENT_ERROR } from './dismiss-store.ts';
 import { Warning } from './warning.tsx';
+import { DriftWarning } from './drift-warning.tsx';
+import { ClashWarning, InstallFailedWarning } from './install-warnings.tsx';
 import { ItemSourceWarning } from './item-source-warning.tsx';
 import { RepositoryConfigWarning } from './repository-config-warning.tsx';
 import { AzWarning, CommandWarning, GhWarning, T3NotRunningWarning } from './tool-notices.tsx';
@@ -33,6 +35,9 @@ export function Warnings() {
         return check && <CommandWarning key={name} name={name} check={check} />;
       })}
       {az && <AzWarning check={az} />}
+      <DriftWarning />
+      <ClashWarning />
+      <InstallFailedWarning />
       {data.repositoryConfigProblems?.map((p) => <RepositoryConfigWarning key={p.repo.toLowerCase()} {...p} />)}
       {data.itemSourceProblems?.filter((p) => !(az && p.fix === az.fix))
         .map((p) => <ItemSourceWarning key={p.repo.toLowerCase()} {...p} repos={data.repos} />)}

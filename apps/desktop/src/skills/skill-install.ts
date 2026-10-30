@@ -13,7 +13,7 @@ import * as Effect from "effect/Effect";
 import * as Semaphore from "effect/Semaphore";
 
 import {
-  blockedBy, type DriftChoice, type InstallOperation, type InstallSnapshot, type SkillCheckOutcome,
+  blockedBy, listed, type DriftChoice, type InstallOperation, type InstallSnapshot, type SkillCheckOutcome,
 } from "@lar-factory/shared";
 import {
   InstallError, installSkills, profileTargets, setTargetTick, type InstallResult, type OfferedTarget, type TickResult,
@@ -247,10 +247,6 @@ export const buildRefusal = (outcome: InstallResult | SkillInstallError, drift?:
   return `The build can't start while a skill is blocked. ${skills.join(" ")} Move ${one ? "that path" : "each path"} away, then start the build again.`;
 };
 
-/** The skill names in `list`, as one phrase: `a`, `a and b`, `a, b and c`. */
-const named = (list: ReadonlyArray<string>) =>
-  list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list.at(-1)}` : list.join("");
-
 /**
  * What the check before a Start build tells the board server, given the User's Drift choice. A failure or a Clash
  * refuses the build. Drift asks for a choice until the User makes one: Start anyway (`keep`) starts with the skills
@@ -261,10 +257,10 @@ export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: 
   if (refusal || outcome instanceof SkillInstallError || outcome.drift.length === 0 || drift === "keep") return { refusal };
   const skills = outcome.drift.map(({ skill }) => skill);
   if (drift === "replace") {
-    return { refusal: `Lar Factory couldn't replace ${named(skills)}, so the build can't start. They still differ from Release ${outcome.version}.` };
+    return { refusal: `Lar Factory couldn't replace ${listed(skills)}, so the build can't start. They still differ from Release ${outcome.version}.` };
   }
   return {
-    refusal: `${named(skills)} changed since Lar Factory installed ${skills.length > 1 ? "them" : "it"}. Replace and start, or start anyway.`,
+    refusal: `${listed(skills)} changed since Lar Factory installed ${skills.length > 1 ? "them" : "it"}. Replace and start, or start anyway.`,
     drift: skills,
   };
 };

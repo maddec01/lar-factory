@@ -217,7 +217,7 @@ export function createBoardServer({ board, commands, startAfter, page, appSecret
     '/api/start-build': {
       what: 'the build to start', disabled: 'Starting builds is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Start build again.' }),
-      run: forItem('Name the build to start.', (itemId, input) => commands.startBuild(itemId, input.model)),
+      run: forItem('Name the build to start.', (itemId, input) => commands.startBuild(itemId, input.model, input.drift)),
     },
     '/api/arm': {
       what: 'the item to start after its blockers', disabled: 'Start after is disabled in sample mode.',

@@ -4,22 +4,23 @@ import assert from 'node:assert/strict';
 import { NOT_LANDED, readsRepositoryConfig, SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
-import type { BoardData, RawItem } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, RawItem, SkillCheckOutcome } from '@lar-factory/shared';
 
 /** A Ready issue in lar-factory, with labels and, optionally, a parent. */
 const readyIssue = (number: number, labels: string[], parent?: number): RawItem =>
   rawIssue(`I_${number}`, number, 'Ready', labels, parent ? { parent: sliceRef(parent, 'OPEN') } : {});
 
 /** A board that can start lar-factory builds, and the home it runs in; `skillCheck` answers its skill checks as the board app. */
-async function buildBoard(t: TestContext, items: object[], options: object = {}, env: Record<string, string> = {}, skillCheck?: () => string | null) {
+async function buildBoard(t: TestContext, items: object[], options: object = {}, env: Record<string, string> = {},
+  skillCheck?: (drift?: DriftChoice) => string | null | SkillCheckOutcome) {
   const startable = startableEnv(t);
   const board = await startBoard(t, { items, ...options }, false, false, { ...startable, ...env }, undefined, skillCheck);
   await until(board, (d) => d.items.length === items.length);
   return { board, home: startable.HOME! };
 }
 
-const startBuild = (board: Board, itemId: string, model?: unknown, origin = board.url) =>
-  board.postSession({ itemId, model }, '/api/start-build', origin);
+const startBuild = (board: Board, itemId: string, model?: unknown, origin = board.url, drift?: unknown) =>
+  board.postSession({ itemId, model, drift }, '/api/start-build', origin);
 
 const message = (home: string, number: number) =>
   `Build maddec01/lar-factory#${number}. Read ${home}/.agents/skills/lar-build/agents/builder.md and follow it.`;
@@ -66,6 +67,30 @@ test('a refused skill check refuses Start build with its reason, writes nothing 
   refusal = null;
   assert.equal((await startBuild(board, 'I_12')).status, 200);
   assert.equal(board.skillChecks(), 2);
+});
+
+test('Drift asks for a choice before Start build writes anything, then starts on the choice the User sends', async (t) => {
+  const choices: (DriftChoice | undefined)[] = [];
+  const { board, home } = await buildBoard(t, [readyIssue(12, ['feature'], 40), boardIssue(40, 'Ready', undefined, ['concept'])],
+    {}, { BOARD_SKILL_CHECK: '1' }, (drift) => {
+      choices.push(drift);
+      return drift ? null : { refusal: 'Some skills changed: lar-build. Replace them or start anyway.', drift: ['lar-build'] };
+    });
+  const asked = await startBuild(board, 'I_12');
+  assert.equal(asked.status, 409);
+  const answer = await asked.json();
+  assert.deepEqual([answer.error, answer.drift, answer.thread], ['Some skills changed: lar-build. Replace them or start anyway.', ['lar-build'], null]);
+  assert.deepEqual([...await writes(board), ...await board.t3Calls()], []);
+  assert.equal((await startBuild(board, 'I_12', undefined, board.url, 'keep')).status, 200);
+  assert.deepEqual(choices, [undefined, 'keep']);
+  assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message(home, 12)]);
+});
+
+test('Start build refuses a Drift choice it doesn\'t know without checking the skills', async (t) => {
+  const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { BOARD_SKILL_CHECK: '1' }, () => null);
+  const refused = await startBuild(board, 'I_12', undefined, board.url, 'overwrite');
+  assert.equal(refused.status, 422);
+  assert.equal(board.skillChecks(), 0);
 });
 
 test('without a bundle Start build asks for no skill check', async (t) => {

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
 import type { TestContext } from 'vite-plus/test';
 import { isSkillCheckRequest } from '@lar-factory/shared';
-import type { BoardData, SkillCheckAnswer } from '@lar-factory/shared';
+import type { BoardData, DriftChoice, SkillCheckAnswer, SkillCheckOutcome } from '@lar-factory/shared';
 import { checkouts, testEnv } from './repo-support.ts';
 import { projectsDb } from './stats-db.ts';
 
@@ -63,10 +63,11 @@ export function writeOnboarding(home: string, repo: string): void {
 /**
  * Starts a board on the fake gh, whose state `options` holds. Its home lists TEST_REPOSITORIES as onboarded, or
  * `options.repositories` (null for no list file), unless the home already has a list. `skillCheck`, when given, plays
- * the board app: the board gets an IPC channel, and each skill check it asks for gets `skillCheck`'s answer.
+ * the board app: the board gets an IPC channel, and each skill check it asks for gets `skillCheck`'s answer to its
+ * Drift choice, a refusal or null standing for an outcome without Drift.
  */
 export async function startBoard(t: TestContext, options = {}, fixture = false, fastRefresh = false, env: Record<string, string> = {}, directory?: string,
-  skillCheck?: () => string | null) {
+  skillCheck?: (drift?: DriftChoice) => string | null | SkillCheckOutcome) {
   const dir = await mkdtemp(join(tmpdir(), 'lar-board-test-'));
   const stateFile = join(dir, 'github.json');
   await writeFile(stateFile, JSON.stringify(options));
@@ -106,7 +107,8 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   if (skillCheck) child.on('message', (message) => {
     if (!isSkillCheckRequest(message)) return;
     skillChecks += 1;
-    child.send({ type: 'skills-checked', id: message.id, refusal: skillCheck() } satisfies SkillCheckAnswer);
+    const outcome = skillCheck(message.drift);
+    child.send({ type: 'skills-checked', id: message.id, ...typeof outcome === 'object' && outcome ? outcome : { refusal: outcome } } satisfies SkillCheckAnswer);
   });
   let logs = '';
   child.stdout!.on('data', (data: Buffer) => { logs += data.toString(); });

@@ -4,8 +4,8 @@
 
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isOnboarding, pickRepoText, repoTag, startRepo, validateDraft, workMessage } from '@lar-factory/shared';
-import type { BoardData, CreationProgress, CreationResult, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, StartResult, Status } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDriftChoice, isOnboarding, pickRepoText, repoTag, startRepo, validateDraft, workMessage } from '@lar-factory/shared';
+import type { BoardData, CreationProgress, CreationResult, DriftChoice, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, SkillCheckOutcome, StartResult, Status } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
 import { issueLabels } from '../github/github.ts';
@@ -39,8 +39,9 @@ export interface ItemCommands {
   /**
    * Starts a Ready build's thread in a new worktree, or retries a confirmed stopped run, once nothing open blocks it, as
    * lar-shape's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
+   * Drift refuses it with the skills that changed until `drift` carries the User's DriftChoice.
    */
-  startBuild(itemId: string, model: unknown): Promise<Reply>;
+  startBuild(itemId: string, model: unknown, drift?: unknown): Promise<Reply>;
   abandon(itemId: string): Promise<Reply>;
 }
 
@@ -53,10 +54,11 @@ export interface ItemCommandsDeps {
   /** Reads the model choices T3 offers now into the board data. */
   offerModelChoices(): ModelGroup[];
   /**
-   * Checks the installed skills against the bundle and restores any that differ, before Start build: resolves with
-   * why the build can't start, or null. Missing without a bundle, so Start build checks nothing.
+   * Checks the installed skills against the bundle before Start build, replacing Drift if `drift` says so: resolves
+   * with why the build can't start, or null, and the skills with Drift while it waits for a choice. Missing without a
+   * bundle, so Start build checks nothing.
    */
-  checkSkills?: () => Promise<string | null>;
+  checkSkills?: (drift?: DriftChoice) => Promise<SkillCheckOutcome>;
   /** The repository's T3 project as the onboarded repositories are now; tests stand in for it. */
   projectOf?: (repo: string) => Promise<RepositoryProject>;
   /** Starts a T3 thread; tests stand in for t3. */
@@ -359,7 +361,8 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       };
     }),
 
-    startBuild: (itemId, model) => startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
+    startBuild: (itemId, model, drift) => startOnce(buildStarts, 'startedBuilds', itemId, model, (item, choice) => {
+      if (drift !== undefined && !isDriftChoice(drift)) return reply(422, { error: 'Choose Replace and start or Start anyway.' });
       if (item.status !== 'Ready') return reply(409, { error: `Only Ready items can start a build; this one is in ${item.status}.` });
       const busy = busyReason(itemId, 'start');
       if (busy) return withBoard(409, { error: busy });
@@ -372,8 +375,8 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       const { repo } = item;
       return async () => {
         // A refusal comes before any write, so a build that can't start changes nothing on GitHub.
-        const skills = await checkSkills?.();
-        if (skills) return { thread: null, error: skills, refused: true };
+        const skills = await checkSkills?.(drift);
+        if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true, ...skills.drift && { drift: skills.drift } };
         const repoProject = await projectOf(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
         const parent = await parentInProgress(item);

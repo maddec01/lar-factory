@@ -77,7 +77,6 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       (snapshot) => {
         if (!latest()) return;
         set(fromSnapshot(snapshot));
-        if (snapshot.error) set({ result: { text: snapshot.error, tone: 'error', from: 'targets' } });
       },
       (error) => latest() && set({ targets: [], result: { text: `Couldn't read the Install targets: ${failure(error)}`, tone: 'error', from: 'targets' } }),
     );
@@ -91,7 +90,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       const { snapshot, conflicts = [], removed, error } = await boardApp()!.setTargetTick(path, ticked);
       useInstallStore.getState().accept(snapshot);
       if (error) set({ result: { text: `Couldn't change ${path}: ${error}`, tone: 'error', from: 'targets' } });
-      else if (conflicts.length) set({ result: { text: `Installed into ${path}, but left these alone because Lar Factory didn't make them:`, tone: 'warning', paths: conflicts, from: 'targets' } });
+      else if (conflicts.length) set({ result: { text: `${ticked ? `Installed into ${path}, but` : `${untickText(target, path, removed)} It`} left these alone because Lar Factory didn't make them:`, tone: 'warning', paths: conflicts, from: 'targets' } });
       else set({ result: { text: ticked ? `Installed the skills into ${path}.` : untickText(target, path, removed), tone: 'success', from: 'targets' } });
     } catch (error) {
       set({ result: { text: `Couldn't change ${path}: ${failure(error)}`, tone: 'error', from: 'targets' } });

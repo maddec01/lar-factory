@@ -588,12 +588,13 @@ test('unticking says only what it removed', async () => {
 
 test('unticking a copy target says its copies stay', async () => {
   const bridge = stubBridge();
-  const extra = targetAt('~/extra/skills', true, { kind: 'agents' });
+  const extra = targetAt('~/extra/skills', true, { kind: 'agents', release: '0.2.0', skills: [{ name: 'lar-build', state: 'installed' }] });
   bridge.getInstallState.mockResolvedValueOnce({ ...listed, targets: [extra] });
   bridge.setTargetTick.mockResolvedValueOnce({ snapshot: { ...listed, targets: [{ ...extra, active: false }] }, removed: { links: [], checklists: false } });
   await open();
   await settle(() => switchOf('~/extra/skills').click());
   expect(result().textContent).toBe('Lar Factory no longer installs into ~/extra/skills, and left its copies there.');
+  expect(text(row('target-~/extra/skills'))).toContain('Copies retained; future installs off');
 });
 
 test('a tick that left paths alone names each one', async () => {
@@ -928,4 +929,154 @@ test('a delayed read failure cannot discard a newer pushed snapshot', async () =
   await settle(() => fail(new Error('old read failed')));
   expect(profileTicks()).toEqual([true, true]);
   expect(result().textContent).not.toContain('old read failed');
+});
+
+test('Skills groups shared readers and custom homes with disabled badges and locked ticks', async () => {
+  const bridge = stubBridge();
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, discovery: 'available', instances: [
+    { id: 'codex', driver: 'codex', displayName: 'Codex personal', enabled: true },
+    { id: 'cursor', driver: 'cursor', displayName: 'Cursor work', enabled: false },
+    { id: 'claude', driver: 'claudeAgent', displayName: 'Claude work', enabled: true },
+  ], targets: [
+    targetAt('~/.agents/skills', true, { kind: 'agents', locked: true, instances: ['codex', 'cursor'], release: '0.2.0' }),
+    targetAt('~/custom-claude/skills', true, { locked: true, instances: ['claude'] }),
+    targetAt('~/.claude-work/skills', false),
+  ] });
+  await open();
+  const shared = row('target-~/.agents/skills');
+  expect($$('.settings-row[data-row="target-~/.agents/skills"]')).toHaveLength(1);
+  expect(text(shared)).toContain('Codex personal');
+  const disabled = shared.querySelector('[data-reader="cursor"]')!;
+  expect(disabled.getAttribute('aria-label')).toContain('Disabled in T3 Code');
+  expect(disabled.className).toContain('text-(--muted-foreground)');
+  expect(switchOf('~/.agents/skills').disabled).toBe(true);
+  expect(switchOf('~/custom-claude/skills').disabled).toBe(true);
+  expect(switchOf('~/custom-claude/skills').getAttribute('aria-description')).toContain('provider instances read it');
+  expect(text(row('target-~/custom-claude/skills'))).toContain('Claude work');
+  expect(switchOf('~/.claude-work/skills').disabled).toBe(false);
+  expect(text(row('target-~/.claude-work/skills'))).toContain('Manual target');
+});
+
+test('Skills explains discovery waiting, unavailable and completed without provider targets', async () => {
+  const bridge = stubBridge();
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, discovery: 'waiting' });
+  await open();
+  expect(text(body())).toContain('Waiting for T3 Code to list its provider instances');
+  expect(switchOf('~/.agents/skills')).not.toBeNull();
+  await bridge.push({ ...listed, discovery: 'timed-out' });
+  expect(text(body())).toContain('T3 Code is unavailable');
+  expect(text(body())).toContain('timed out');
+  await bridge.push({ ...listed, discovery: 'available' });
+  expect(text(body())).toContain('Discovery completed. No provider targets were reported');
+  expect(text(body())).not.toContain('Waiting for T3 Code');
+});
+
+test('a failed first install can retry globally in Settings after dismissal without target rows', async () => {
+  const failed: InstallSnapshot = { ...listed, overview: 'dismissed', installed: false, targets: [], error: 'EACCES: cannot read the install manifest' };
+  const bridge = stubApp({
+    getInstallState: vi.fn(async () => failed),
+    retryInstall: vi.fn(async (): Promise<InstallOperationResult> => ({ snapshot: failed, error: 'Still no permission' })),
+  });
+  await open();
+  const retry = () => $<HTMLButtonElement>('.settings-body [data-retry-install]')!;
+  expect(retry()).not.toBeNull();
+  expect(retry().getAttribute('aria-label')).toContain('all active targets');
+  await settle(() => retry().click());
+  expect(bridge.retryInstall).toHaveBeenCalledOnce();
+  expect(text(body())).toContain('Still no permission');
+  expect(retry().disabled).toBe(false);
+  bridge.retryInstall.mockResolvedValueOnce({ snapshot: { ...listed, overview: 'dismissed' } });
+  await settle(() => retry().click());
+  expect(bridge.retryInstall).toHaveBeenCalledTimes(2);
+  expect(text(body())).not.toContain('Still no permission');
+  expect(text(body())).not.toContain('EACCES');
+  expect(profileTicks()).toEqual([true, false]);
+  expect($('[data-install-overview]')).toBeNull();
+});
+
+test('dismissed Drift stays in Settings with failed Replace and later recovery', async () => {
+  const target = targetAt('~/.agents/skills', true, { kind: 'agents', locked: true, release: '0.2.0', finished: false,
+    skills: [{ name: 'lar-build', state: 'drift' }] });
+  const drifted: InstallSnapshot = { ...listed, targets: [target], drift: [{ skill: 'lar-build', paths: [{ place: 'agents', path: '~/.agents/skills/lar-build' }] }] };
+  let pushInstall = (_next: InstallSnapshot) => {};
+  const bridge = stubApp({
+    getInstallState: vi.fn(async () => drifted),
+    onInstallState: (listener: (next: InstallSnapshot) => void) => { pushInstall = listener; return () => {}; },
+    replaceDrift: vi.fn(async (): Promise<InstallOperationResult> => ({ snapshot: drifted, error: 'EACCES: ~/.agents/skills/lar-build' })),
+  });
+  await open();
+  const warning = () => $('[data-warning="drift"]')?.closest('[data-slot="toast"]');
+  await settle(() => warning()!.querySelector<HTMLButtonElement>('.dismiss')!.click());
+  await settle(() => pushInstall({ ...drifted }));
+  await settle(() => section('General').click());
+  await settle(() => section('Skills').click());
+  expect(warning()).toBeUndefined();
+  expect(text(row('target-~/.agents/skills'))).toContain('lar-build: Drift');
+  const replace = () => row('target-~/.agents/skills').querySelector<HTMLButtonElement>('[data-replace-drift]')!;
+  await settle(() => replace().click());
+  expect(text(row('target-~/.agents/skills'))).toContain('EACCES');
+  expect(replace().disabled).toBe(false);
+  expect(warning()).toBeUndefined();
+  const recovered = { ...drifted, drift: [], targets: [{ ...target, finished: true, replaced: ['lar-build'], skills: [{ name: 'lar-build', state: 'installed' as const }] }] };
+  bridge.replaceDrift.mockResolvedValueOnce({ snapshot: recovered });
+  await settle(() => replace().click());
+  expect(text(row('target-~/.agents/skills'))).toContain('Replaced Drift: lar-build');
+  expect(text(body())).not.toContain('EACCES');
+  expect(replace()).toBeNull();
+  expect(bridge.replaceDrift).toHaveBeenCalledTimes(2);
+});
+
+test('Settings retains Clash paths and Retry after the overview closes', async () => {
+  const clashed: InstallSnapshot = { ...listed, overview: 'dismissed', targets: [targetAt('~/.claude/skills', true, {
+    finished: false, operation: 'install', skills: [{ name: 'lar-build', state: 'blocked' }],
+  })], blocked: [{ skill: 'lar-build', paths: [{ place: 'profile', profile: '.claude', path: '~/.claude/skills/lar-build' }] }] };
+  const bridge = stubApp({ getInstallState: vi.fn(async () => clashed), retryInstall: vi.fn(async () => ({ snapshot: listed })) });
+  await open();
+  const target = row('target-~/.claude/skills');
+  expect(text(target)).toContain('lar-build: Clash');
+  expect(text(target)).toContain('Clash at ~/.claude/skills/lar-build');
+  expect(text(target)).toContain('does not own this path. Rename or remove it, then Retry.');
+  await settle(() => target.querySelector<HTMLButtonElement>('[data-retry-install]')!.click());
+  expect(bridge.retryInstall).toHaveBeenCalledOnce();
+  expect(text(body())).not.toContain('Clash at');
+  expect($('[data-install-overview]')).toBeNull();
+});
+
+test('a dependent Claude target directs Clash recovery to the source path only', async () => {
+  stubApp({ getInstallState: vi.fn(async () => ({ ...listed, overview: 'dismissed' as const,
+    targets: [targetAt('~/.claude/skills', true, {
+      finished: false, operation: 'install', skills: [{ name: 'lar-build', state: 'blocked' }],
+    })], blocked: [{ skill: 'lar-build', paths: [{ place: 'agents' as const, path: '~/.agents/skills/lar-build' }] }],
+  })) });
+  await open();
+  const target = row('target-~/.claude/skills');
+  expect(text(target)).toContain('lar-build: Blocked by source Clash');
+  expect(text(target)).toContain('Clash at ~/.agents/skills/lar-build');
+  expect(text(target)).not.toContain('Clash at ~/.claude/skills/lar-build');
+  expect(text(target)).toContain('Rename or remove it, then Retry.');
+});
+
+test('manual ticks wait while a global recovery is pending and become usable after failure', async () => {
+  const target = targetAt('~/.agents/skills', true, { kind: 'agents', locked: true, skills: [{ name: 'lar-build', state: 'drift' }] });
+  const drifted = { ...listed, targets: [target, targetAt('~/.claude-work/skills', false)], drift: [{ skill: 'lar-build', paths: [{ place: 'agents' as const, path: '~/.agents/skills/lar-build' }] }] };
+  let finish!: (result: InstallOperationResult) => void;
+  const bridge = stubApp({ getInstallState: vi.fn(async () => drifted),
+    replaceDrift: vi.fn(() => new Promise<InstallOperationResult>((resolve) => { finish = resolve; })), setTargetTick: vi.fn() });
+  await open();
+  await settle(() => row('target-~/.agents/skills').querySelector<HTMLButtonElement>('[data-replace-drift]')!.click());
+  const control = switchOf('~/.claude-work/skills');
+  expect(control.getAttribute('aria-disabled')).toBe('true');
+  await settle(() => control.click());
+  expect(bridge.setTargetTick).not.toHaveBeenCalled();
+  await settle(() => finish({ snapshot: drifted, error: 'Copy failed' }));
+  expect(control.getAttribute('aria-disabled')).toBe('false');
+});
+
+test('unticking reports removed owned links and retained unowned paths', async () => {
+  stubBridge({ snapshot: snapshotOf(false, false), removed: { links: ['lar-build'], checklists: false }, conflicts: ['~/.claude/skills/lar-shape'] });
+  await open();
+  await settle(() => switchOf('~/.claude/skills').click());
+  expect(result().textContent).toContain('Removed the skill links from ~/.claude/skills.');
+  expect(result().textContent).toContain("left these alone because Lar Factory didn't make them");
+  expect(result().textContent).not.toContain('Installed into');
 });

@@ -11,25 +11,32 @@ import { canCheckForUpdate, getUpdateDisabledReason, resolveUpdateButtonAction, 
 import { SmallButton, Choice, Switch } from './controls.tsx';
 import { type SettingsResult, useSettingsStore } from './settings-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
+import { useInstallStore } from './install-store.ts';
+import { InstallRecovery } from './target-progress.tsx';
+import { useDriftStore } from '../notices/drift-store.ts';
 
 const CHANNELS: { value: UpdateChannel; label: string }[] = [
   { value: 'nightly', label: 'Nightly' },
   { value: 'latest', label: 'Latest' },
 ];
 
-export function TargetSwitch({ path }: { path: string }) {
+export function TargetSwitch({ path, reason }: { path: string; reason?: string }) {
   const { targets, installs, installed, pending, setTick } = useSettingsStore();
+  const running = useInstallStore((state) => state.snapshot?.running);
+  const recovering = useDriftStore((state) => state.replacing || state.retrying);
   const target = targets?.find((candidate) => candidate.path === path);
   // Busy rather than disabled while a tick changes, so focus stays on the switch just pressed;
   // the store ignores a change that comes in meanwhile.
-  return <Switch on={target?.active ?? false} label={path} disabled={!installs || !installed || (target?.locked ?? false)} busy={pending !== null}
+  return <Switch on={target?.active ?? false} label={path} description={reason} disabled={!installs || !installed || (target?.locked ?? false)} busy={pending !== null || !!running || recovering}
     onChange={(on) => void setTick(path, on)} />;
 }
 
 /** What the group's last call did. It stays mounted, as a live region. */
 function Result({ from }: { from: NonNullable<SettingsResult['from']> }) {
   const stored = useSettingsStore((state) => state.result);
-  const result = stored.from === from ? stored : { text: '' } as SettingsResult;
+  const error = useInstallStore((state) => state.snapshot?.error);
+  const result: SettingsResult = stored.from === from ? stored
+    : from === 'targets' && error ? { text: error, tone: 'error' } : { text: '' };
   return (
     <FormResult id="settings-result" text={result.text} tone={result.tone}>
       {result.paths && <ul>{result.paths.map((path) => <li key={path}><code>{path}</code></li>)}</ul>}
@@ -39,6 +46,10 @@ function Result({ from }: { from: NonNullable<SettingsResult['from']> }) {
 
 export function TargetsNote() {
   const { targets, installs, installed } = useSettingsStore();
+  const snapshot = useInstallStore((state) => state.snapshot);
+  const unavailable = { 'not-running': 'not running', unauthenticated: 'authentication failed', 'timed-out': 'discovery timed out', failed: 'discovery failed' };
+  const driftInRows = targets?.some((target) => snapshot?.drift.some(({ skill, paths }) =>
+    paths.some(({ path }) => target.paths.some((folder) => path === `${folder}/${skill}`))));
   return (
     <div className="targets-note grid gap-2 px-1" aria-busy={targets === null}>
       {!installs && (
@@ -48,7 +59,14 @@ export function TargetsNote() {
         <p className="m-0 text-xs text-(--muted-foreground)">Lar Factory hasn't installed its skills yet, so you can't tick or untick a folder. It installs them when it starts. If the install failed, use Retry to try again.</p>
       )}
       {targets === null && <p className="m-0 text-xs text-(--muted-foreground)">Loading…</p>}
+      {targets !== null && installs && snapshot && <p role="status" className="m-0 text-xs text-(--muted-foreground)">
+        {snapshot.discovery === 'waiting' ? 'Waiting for T3 Code to list its provider instances. Fallback targets remain available.'
+          : snapshot.discovery !== 'available' ? `T3 Code is unavailable: ${unavailable[snapshot.discovery]}. The app will keep trying. Fallback targets remain available.`
+          : !snapshot.targets.some(({ instances }) => instances.length) ? 'Discovery completed. No provider targets were reported. Manual and fallback targets remain available.'
+          : 'T3 Code listed its provider targets. Required targets stay ticked, including those read by disabled instances.'}
+      </p>}
       <Result from="targets" />
+      {targets !== null && <InstallRecovery failed={!!snapshot?.error} drift={!!snapshot?.drift.length && !driftInRows} />}
     </div>
   );
 }

@@ -315,7 +315,14 @@ function install(
       if (target.kind === 'claude') {
         const linkable = (states[agentsKey]?.skills ?? []).filter((name) => bundled.includes(name));
         linkTarget(target.path, agents, work, linkable, placeOf(target), conflict, drift, report);
-        for (const skill of bundled.filter((name) => !linkable.includes(name))) report(skill, 'blocked');
+        for (const skill of bundled.filter((name) => !linkable.includes(name))) {
+          const sourceClash = blocking.get(skill)?.some(({ path }) => path === join(agents, skill));
+          report(skill, sourceClash ? 'blocked' : 'failed');
+        }
+        if ([...skillsProgress.values()].includes('failed')) {
+          const sourceError = targets.find(({ key }) => key === agentsKey)?.error;
+          error = { message: `Source copies in ${agents} are unavailable${sourceError ? `: ${sourceError.message}` : ''}`, changed: work.changed };
+        }
       } else copyTarget(target, bundle, bundled, digests, previous, upgrading, work, conflict, drift, report);
     } catch (cause) {
       error = { message: (cause as Error).message, changed: work.changed };

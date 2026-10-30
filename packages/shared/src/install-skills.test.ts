@@ -1490,6 +1490,7 @@ test('reports real per-skill work, Clashes and target-specific replaced Drift', 
 
 test('partial copy failure reports successful swaps and retries only the unfinished work', () => {
   const home = temporary();
+  mkdirSync(join(home, '.claude'));
   const source = bundle(v1);
   const events: import('./install-skills.ts').TargetProgress[] = [];
   const rename = fs.renameSync;
@@ -1504,6 +1505,11 @@ test('partial copy failure reports successful swaps and retries only the unfinis
     assert.deepEqual(done.skills, [{ name: 'lar-work', state: 'installed' }, { name: 'tdd', state: 'failed' }]);
     assert.equal(done.target.finished, false);
     assert.match(done.target.error!.message, /Copy target denied/);
+    const dependent = events.findLast((event) => event.target.kind === 'claude')!;
+    assert.deepEqual(dependent.skills, [{ name: 'lar-work', state: 'installed' }, { name: 'tdd', state: 'failed' }]);
+    assert.equal(dependent.target.finished, false);
+    assert.match(dependent.target.error!.message, /Source copies in .*\.agents\/skills.*Copy target denied/);
+    assert.equal(existsSync(join(home, '.claude/skills/tdd')), false);
   } finally {
     mocked.mockRestore();
     syncBuiltinESMExports();
@@ -1514,6 +1520,7 @@ test('partial copy failure reports successful swaps and retries only the unfinis
   assert.equal(recovered.target.error, undefined);
   assert.equal(recovered.target.finished, true);
   assert.ok(recovered.skills.every(({ state }) => state === 'installed'));
+  assert.equal(events.findLast((event) => event.target.kind === 'claude')!.target.error, undefined);
   assert.ok(events.every((event) => !event.skills.some(({ name, state }) => name === 'lar-work' && state === 'installing')));
 });
 

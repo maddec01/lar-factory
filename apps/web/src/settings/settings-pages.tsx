@@ -3,17 +3,16 @@
 import { useState, type ComponentProps, type ReactNode } from 'react';
 import { DIALOG_PREFERENCES, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
 import { Archive, Bell, ExternalLink, FolderGit2, Keyboard, Palette, Plug, RefreshCw, Settings2, Sparkles, Stethoscope } from 'lucide-react';
-import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
-import type { BlockingPath, ClaudeProfile } from '@lar-factory/shared/install-skills';
+import { GH_FLOOR, blockedBy, clock, day, itemSource, repoName, shownRepo, type BoardData, type BundledSkill, type CheckedTool, type TargetSnapshot, type OnboardingProgress, type ToolCheck } from '@lar-factory/shared';
+import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { RepoTag } from '../items/item-parts.tsx';
 import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { useResetStore } from '../repositories/reset-store.ts';
-import { ChannelChoice, ProfileSwitch, ProfilesNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
+import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { Switch, type Control, ToolState } from './controls.tsx';
-import { profilePath } from './settings-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
 function DialogPreference({ preference, label }: { preference: keyof typeof DIALOG_PREFERENCES; label: string }) {
@@ -39,13 +38,13 @@ export interface PagesInput {
   data: BoardData;
   /** Whether the board app's bridge is there. */
   app: boolean;
-  /** The bridge's Claude profiles, null while they load. */
-  profiles: ClaudeProfile[] | null;
+  /** The bridge's Install targets, null while they load. */
+  targets: TargetSnapshot[] | null;
   /** The running version, once the updater has said. */
   version: string | null;
 }
 
-const ONLY_APP_PROFILES = 'Only the board app links skills into Claude profiles.';
+const ONLY_APP_TARGETS = 'Only the board app installs skills into agent folders.';
 const ONLY_APP_UPDATES = 'Only the board app updates itself.';
 
 /**
@@ -148,12 +147,31 @@ function repositoryGroup(data: BoardData): Group {
     footer: <Button {...kind('other')} onClick={() => useWizardStore.getState().start()}>Add repository</Button> };
 }
 
-function profileGroup({ app, profiles }: PagesInput): Group {
-  const description = 'The app links its skills and copies its checklists into each ticked profile.';
-  if (!app) return { title: 'Claude profiles', description: ONLY_APP_PROFILES, rows: [] };
+/** Why a target can't be unticked, or nothing. */
+function lockedReason({ locked, instances }: TargetSnapshot): string | undefined {
+  if (!locked) return undefined;
+  return instances.length > 0 ? "T3 Code's provider instances read it, so it stays ticked." : "Claude's skill links point here, so it stays ticked.";
+}
+
+/**
+ * What a target's row says: for a selected target whose provider home doesn't exist, that it isn't installed until
+ * the home does, since its switch shows off; otherwise why it can't be unticked, or nothing.
+ */
+function targetNote(target: TargetSnapshot): string | undefined {
+  if (!target.homeMissing) return lockedReason(target);
+  const home = target.path.replace(/\/skills$/, '');
+  const why = target.instances.length > 0 ? "T3 Code's provider instances read it; " : '';
+  return `Not installed until ${home} exists. ${why}Lar Factory installs here once it exists.`;
+}
+
+function targetGroup({ app, targets }: PagesInput): Group {
+  const description = 'The app installs its skills into each ticked folder: copies, or links in a Claude home.';
+  if (!app) return { title: 'Install targets', description: ONLY_APP_TARGETS, rows: [] };
   return {
-    title: 'Claude profiles', description, note: <ProfilesNote />,
-    rows: (profiles ?? []).map(({ name }) => ({ id: `profile-${name}`, title: profilePath(name), control: custom(() => <ProfileSwitch name={name} />) })),
+    title: 'Install targets', description, note: <TargetsNote />,
+    rows: (targets ?? []).map((target) => ({
+      id: `target-${target.path}`, title: target.path, description: targetNote(target), control: custom(() => <TargetSwitch path={target.path} />),
+    })),
   };
 }
 
@@ -282,8 +300,8 @@ export function pages(input: PagesInput): Page[] {
         { id: 'switch-after', title: 'Switch to T3 Code after Start', control: { type: 'unavailable' } },
       ] },
     ] },
-    { id: 'skills', label: 'Skills', icon: <Sparkles />, description: 'The skills and checklists Lar Factory installs, and the Claude profiles that get them.', groups: [
-      profileGroup(input),
+    { id: 'skills', label: 'Skills', icon: <Sparkles />, description: 'The skills and checklists Lar Factory installs, and the folders that get them.', groups: [
+      targetGroup(input),
       bundledGroup(input),
     ] },
     { id: 'notifications', label: 'Notifications', icon: <Bell />, description: 'Which changes on the board tell you, and when.', groups: [

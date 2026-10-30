@@ -1,8 +1,9 @@
 // Installs the skills bundled in the app, with the engine in packages/shared/src/install-skills.ts. A packaged app
 // checks them at launch and before each Start build: it installs a new Release and reports Drift, which it leaves as
 // it is. A dev run does so only when started with INSTALL_FLAG. The launch installs into the fallback targets at
-// once, then into the Install targets of T3's provider instances once T3 answers; T3 can't unselect those. The main
-// process runs every check one at a time.
+// once, then into the Install targets of T3's provider instances once T3 answers; T3 can't unselect those. The
+// board's page can retry, replace Drift and tick a target. The main process runs every check and operation one at a
+// time, and keeps what they found for the page.
 
 import * as NodePath from "node:path";
 
@@ -11,11 +12,9 @@ import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Semaphore from "effect/Semaphore";
 
+import { blockedBy, type InstallOperation, type InstallSnapshot } from "@lar-factory/shared";
 import {
-  blockedBy, type DriftChoice, type InstallOperation, type InstallSnapshot, type SkillCheckOutcome,
-} from "@lar-factory/shared";
-import {
-  InstallError, installSkills, profileTargets, setTargetTick, t3Targets, type InstallResult, type OfferedTarget, type TickResult,
+  InstallError, installSkills, profileTargets, setTargetTick, type InstallResult, type OfferedTarget, type TickResult,
 } from "@lar-factory/shared/install-skills";
 import type { InstanceDiscovery, ProviderInstance } from "@lar-factory/shared/install-targets";
 
@@ -61,7 +60,7 @@ export const locateBundle = (appPath: string, isPackaged: boolean) =>
   isPackaged ? NodePath.resolve(appPath, "../bundle") : NodePath.resolve(appPath, "dist-electron/bundle");
 
 /** The folder ROOT_ENV names, or undefined when it is unset or empty. */
-export const installRoot = (env: LaunchInput["env"]) => env[ROOT_ENV] || undefined;
+const installRoot = (env: LaunchInput["env"]) => env[ROOT_ENV] || undefined;
 
 /** The home the app installs into: the user's, or the folder ROOT_ENV names. */
 export const installHome = (home: string, env: LaunchInput["env"]) => installRoot(env) ?? home;
@@ -83,7 +82,7 @@ type Check = Effect.Effect<InstallResult, SkillInstallError>;
 export type Discover = (home: string) => Effect.Effect<InstanceDiscovery>;
 
 /** The targets the app installs into whether or not T3 answers: ~/.agents/skills and the default Claude home. */
-const fallbackTargets = (home: string): Array<OfferedTarget> => [
+export const fallbackTargets = (home: string): Array<OfferedTarget> => [
   { kind: "agents", path: NodePath.join(home, ".agents/skills") },
   { kind: "claude", path: NodePath.join(home, ".claude/skills") },
 ];
@@ -119,7 +118,7 @@ export interface CheckState {
   readonly discovery: InstallSnapshot["discovery"];
   /** T3's instances as it last listed them this run. */
   readonly instances: ReadonlyArray<ProviderInstance>;
-  /** The targets each check offers: the fallback ones and those of T3's instances, or before T3 answers those it last required. */
+  /** The targets each check offers: the fallback ones and those of T3's instances. */
   readonly targets: ReadonlyArray<OfferedTarget>;
   /** The last check's outcome, or none before the first. */
   readonly outcome?: InstallResult | SkillInstallError;
@@ -131,15 +130,11 @@ export interface Checks {
   readonly atLaunch: Check;
   /** Asks T3, then checks the targets it reports as `atLaunch` does; undefined when T3 doesn't answer. */
   readonly afterDiscovery: Effect.Effect<InstallResult | undefined, SkillInstallError>;
-  /**
-   * The check before each Start build, after asking T3 again. With the User's Drift choice it reuses the answer T3
-   * gave the check that asked about Drift, so the build waits for T3 once; with `replace` it overwrites the Drift of
-   * every active target first, as Replace does.
-   */
-  readonly beforeBuild: (drift?: DriftChoice) => Check;
-  /** The User's retry: always asks T3 again, then checks, which tries each failed target again. */
+  /** The check before each Start build, after asking T3 again, which leaves the conflicts dialog to the launch. */
+  readonly beforeBuild: Check;
+  /** The User's retry: asks T3 again, then checks, which tries each failed target again. */
   readonly retry: Check;
-  /** The User's Replace: reuses T3's last answer, or asks again if T3 didn't give one, then overwrites the Drift of every active target with this Release. */
+  /** The User's Replace: asks T3 again, then overwrites the Drift of every active target with this Release. */
   readonly replace: Check;
   /**
    * Ticks or unticks the target at `path`, then checks, which installs into a newly ticked target. A refused tick
@@ -150,6 +145,9 @@ export interface Checks {
   /** Calls `listener` after each change to `state`; the returned function stops it. */
   readonly subscribe: (listener: () => void) => () => void;
 }
+
+const failure = (cause: unknown, changed: boolean) =>
+  new SkillInstallError({ message: cause instanceof Error ? cause.message : String(cause), changed });
 
 /**
  * This launch's checks, which install a new Release and report Drift, one run at a time; undefined when the launch
@@ -162,7 +160,7 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
   if (!install) return Effect.succeed(undefined);
   return oneAtATime.pipe(Effect.map((serial): Checks => {
     const listeners = new Set<() => void>();
-    let state: CheckState = { running: null, discovery: "waiting", instances: [], targets: offlineTargets(install.home) };
+    let state: CheckState = { running: null, discovery: "waiting", instances: [], targets: fallbackTargets(install.home) };
     const update = (next: Partial<CheckState>) => {
       state = { ...state, ...next };
       for (const listener of listeners) listener();
@@ -176,12 +174,6 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
       } else update({ discovery: answer.reason });
       return answer.available;
     }));
-    /**
-     * T3's last answer when it gave one, or a new one: a T3 that didn't answer may have started since. Replace and the
-     * check after the User's Drift choice reuse the last available answer however old it is, on purpose: they act on
-     * the targets the User was shown. Retry and Start build always ask T3 again.
-     */
-    const reuse = Effect.suspend(() => state.discovery === "available" ? Effect.succeed(true) : learn);
     const settle = (outcome: InstallResult | SkillInstallError) => Effect.sync(() => update({ running: null, outcome }));
     // One check, run inside a turn the caller holds.
     const checkNow = (operation: InstallOperation, options: { recordWarning: boolean; replace?: boolean }): Check =>
@@ -196,9 +188,9 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
     return {
       atLaunch: check("launch", { recordWarning: true }),
       afterDiscovery: learn.pipe(Effect.flatMap((available) => available ? check("discovery", { recordWarning: true }) : Effect.succeed(undefined))),
-      beforeBuild: (drift) => (drift ? reuse : learn).pipe(Effect.andThen(check("build", { recordWarning: false, replace: drift === "replace" }))),
+      beforeBuild: learn.pipe(Effect.andThen(check("build", { recordWarning: false }))),
       retry: learn.pipe(Effect.andThen(check("retry", { recordWarning: true }))),
-      replace: reuse.pipe(Effect.andThen(check("replace", { recordWarning: true, replace: true }))),
+      replace: learn.pipe(Effect.andThen(check("replace", { recordWarning: true, replace: true }))),
       tick: (path, ticked) => serial(Effect.suspend(() => {
         update({ running: "tick" });
         return Effect.try({

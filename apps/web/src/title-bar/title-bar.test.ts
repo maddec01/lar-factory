@@ -3,7 +3,7 @@
 // divider, Update while there's an update, and Settings. Above the missing-t3 notice only the brand and Settings.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { clock } from '@lar-factory/shared';
+import { clock, type InstallSnapshot } from '@lar-factory/shared';
 import { $, $$, NOW, fullScreen, mountPage, pressMenu, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
 
 // jsdom has no ResizeObserver, which the copied Modal's scroll fade observes with.
@@ -108,7 +108,10 @@ test('the brand reads "lar Factory": the copied BrandMark, then Factory on its b
 });
 
 test('above the missing-t3 notice the bar holds only the brand and Settings, which opens', async () => {
-  stubApp({ listProfiles: vi.fn(async () => ({ profiles: [{ name: '.claude', ticked: true }], installed: true, conflicts: [] })) });
+  stubApp({ getInstallState: vi.fn(async (): Promise<InstallSnapshot> => ({
+    installs: true, installed: true, version: '0.2.0', running: null, discovery: 'not-running', instances: [], drift: [], replaced: [], conflicts: [], blocked: [],
+    targets: [{ kind: 'claude', path: '~/.claude/skills', paths: ['~/.claude/skills'], locked: false, active: true, finished: true, instances: [], skills: [] }],
+  })) });
   await mountPage({ ...sample, tools: toolChecks({ t3: { result: 'missing' } }) });
   expect(controls()).toEqual(['brand', 'settings']);
   await settle(() => $<HTMLButtonElement>('.title-bar .open-settings')!.click());

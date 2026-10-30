@@ -34,8 +34,12 @@ export interface TargetResult {
   paths: string[];
   required: boolean;
   selection?: TargetSelection;
+  /** The skills lar owns there: copies, or for a Claude target links. */
+  skills: string[];
   /** False for a target this install left alone: unticked, not offered and not ticked, or a missing Claude home. */
   active: boolean;
+  /** True for a selected Claude target left alone because its home folder doesn't exist; the engine never creates one. */
+  homeMissing?: true;
   /** The Release installed there, which an unfinished install doesn't change. */
   release?: string;
   /** True once an install of `release` there completed. */
@@ -114,12 +118,6 @@ type Conflict = (path: string, blocks?: BlockingPlace & { skill: string }) => vo
 
 /** Handles an owned path of `skill` that no longer matches its Release. True when the install overwrites it. */
 type Drift = (skill: string, at: BlockingPath) => boolean;
-
-export interface ClaudeProfile {
-  /** The profile's folder name in the home: `.claude` or `.claude-<name>`. */
-  name: string;
-  ticked: boolean;
-}
 
 /** What the engine made in one Install target. */
 interface TargetState {
@@ -257,7 +255,7 @@ function install(
   const states = { ...current?.targets };
   const agents = join(home, '.agents/skills');
   const agentsKey = targetKey(agents);
-  const targets = resolveTargets(options.targets, states);
+  const targets = resolveTargets(options.targets, [], states);
   for (const target of targets) {
     const outside = target.active && outsideRoot(target.key, options.root);
     if (!outside) continue;
@@ -310,6 +308,7 @@ function install(
     };
     states[target.key] = state;
     target.finished = state.finished;
+    target.skills = skills;
     if (state.release !== undefined) target.release = state.release;
     if (error) target.error = error;
   }
@@ -339,37 +338,45 @@ function install(
 }
 
 /**
- * The offered targets, one per real path, then the manifest's other targets. A target of two kinds is a copy, the
+ * The offered targets, one per real path, then the `known` targets and the manifest's other targets, which aren't
+ * offered. A target of two kinds is a copy, the
  * kind of ~/.agents/skills or else Antigravity's, so a link never points at itself. It is active when T3 requires it,
  * when it is offered and not unticked, or when the User ticked it; a Claude target also needs its home folder.
  */
-function resolveTargets(offered: OfferedTarget[], states: Record<string, TargetState>): Target[] {
+function resolveTargets(offered: OfferedTarget[], known: InstallTarget[], states: Record<string, TargetState>): Target[] {
   const rank = { agents: 0, antigravity: 1, claude: 2 };
   const targets = new Map<string, Target>();
   for (const { kind, path, required = false } of offered) {
     const key = targetKey(path);
     const target = targets.get(key);
     if (!target) {
-      targets.set(key, { key, kind, path, paths: [path], required, active: true, finished: false });
+      targets.set(key, { key, kind, path, paths: [path], required, skills: [], active: true, finished: false });
       continue;
     }
     target.paths.push(path);
     target.required ||= required;
     if (rank[kind] < rank[target.kind]) target.kind = kind;
   }
+  for (const { kind, path } of known) {
+    const key = targetKey(path);
+    if (!targets.has(key)) targets.set(key, { key, kind, path, paths: [path], required: false, skills: [], active: false, finished: false });
+  }
   for (const [key, state] of Object.entries(states)) {
-    if (!targets.has(key)) targets.set(key, { key, kind: state.kind, path: key, paths: [key], required: false, active: false, finished: false });
+    if (!targets.has(key)) targets.set(key, { key, kind: state.kind, path: key, paths: [key], required: false, skills: [], active: false, finished: false });
   }
   return [...targets.values()].map((target) => {
     const state = states[target.key];
     const offeredHere = offered.some(({ path }) => target.paths.includes(path));
     const selected = target.required || (offeredHere ? state?.selection !== 'unticked' : state?.selection === 'ticked');
+    const homeMissing = selected && target.kind === 'claude' && !isFolder(dirname(target.path));
     return {
       ...target,
       ...state?.selection && { selection: state.selection },
       ...state?.release !== undefined && { release: state.release },
+      skills: state?.skills ?? [],
       finished: state?.finished ?? false,
-      active: selected && (target.kind !== 'claude' || isFolder(dirname(target.path))),
+      active: selected && !homeMissing,
+      ...homeMissing && { homeMissing: true as const },
     };
   });
 }
@@ -466,15 +473,18 @@ function copyTarget(
   removeObsolete(target, bundled, work);
 }
 
-/** Every Claude profile in `home`, ticked when its skills folder is an active target of the default install. */
-export function listClaudeProfiles(home: string): ClaudeProfile[] {
-  const manifest = readManifest(home);
-  const targets = resolveTargets(defaultTargets(home), { ...manifest?.targets });
-  return listProfileFolders(home).map((name) => {
-    const key = targetKey(join(home, name, 'skills'));
-    const target = targets.find((candidate) => candidate.key === key);
-    return { name, ticked: target?.active ?? false };
-  });
+/** Each Claude profile's `skills/` in `home`, which Settings lists whether or not an install offers it. */
+export function profileTargets(home: string): InstallTarget[] {
+  return listProfileFolders(home).map((name) => ({ kind: 'claude', path: join(home, name, 'skills') }));
+}
+
+/**
+ * Every target an install offered `targets` would see, then the `known` ones it isn't offered, then the manifest's
+ * others, each with the state the manifest records, without writing anything. A `known` target is active only once
+ * the User ticks it.
+ */
+export function describeTargets(home: string, targets: OfferedTarget[] = defaultTargets(home), known: InstallTarget[] = []): TargetResult[] {
+  return resolveTargets(targets, known, { ...readManifest(home)?.targets }).map(({ key: _, ...target }) => target);
 }
 
 /**
@@ -501,23 +511,33 @@ export interface TickResult {
   };
 }
 
+export interface TickOptions extends RootOption {
+  /** The targets an install offers, as `installSkills` takes them. `defaultTargets(home)` by default. */
+  targets?: OfferedTarget[];
+  /** Targets the User can tick that the install doesn't offer, as `describeTargets` takes them. */
+  known?: InstallTarget[];
+}
+
 /**
- * Ticks or unticks one Claude profile's `skills/` target and applies it at once. Ticking links every skill
- * ~/.agents/skills owns and puts back a missing or wrong engine link; unticking removes only the links and checklist
- * copy the engine made, and keeps the target in the manifest. Needs an earlier install. With `root`, a profile or
- * manifest whose real path leaves it throws before any write.
+ * Ticks or unticks the Install target at `path`, one `describeTargets` lists, and records the choice. A Claude target
+ * changes at once: ticking links every skill ~/.agents/skills owns and puts back a missing or wrong engine link, and
+ * needs an earlier install; unticking removes only the links and checklist copy the engine made. A copy target only
+ * records the choice: the next install copies into a ticked one, and an unticked one keeps its copies and what lar
+ * owns there. Either way the target stays in the manifest. A target T3 requires, and ~/.agents/skills, which Claude
+ * targets link to, can't be unticked. With `root`, a target or manifest whose real path leaves it throws before any
+ * write.
  */
-export function setProfileTick(home: string, name: string, ticked: boolean, { root }: RootOption = {}): TickResult {
-  if (!listProfileFolders(home).includes(name)) throw new Error(`${name} is not a Claude profile in ${home}`);
+export function setTargetTick(home: string, path: string, ticked: boolean, { root, targets = defaultTargets(home), known = [] }: TickOptions = {}): TickResult {
+  const manifest = readManifest(home) ?? { targets: {} };
+  const target = resolveTargets(targets, known, manifest.targets).find((candidate) => candidate.paths.includes(path));
+  if (!target) throw new Error(`${path} is not an Install target`);
+  const agents = join(home, '.agents/skills');
+  const agentsKey = targetKey(agents);
+  if (!ticked && target.required) throw new Error(`T3 Code's provider instances read ${path}, so it stays ticked`);
+  if (!ticked && target.key === agentsKey) throw new Error(`Claude's skills link to ${path}, so it stays ticked`);
   confine(join(home, '.agents'), root);
-  confine(join(home, name, 'skills'), root);
-  const manifest = readManifest(home);
-  const agentsKey = targetKey(join(home, '.agents/skills'));
-  const agents = manifest?.targets[agentsKey];
-  if (!manifest || !agents) throw new Error(`No skills are installed in ${join(home, '.agents')} yet`);
-  const path = join(home, name, 'skills');
-  const key = targetKey(path);
-  const state = manifest.targets[key] ?? { kind: 'claude' as const, finished: false, skills: [] };
+  confine(target.key, root);
+  const state = manifest.targets[target.key] ?? { kind: target.kind, finished: false, skills: [] };
   const conflicts: string[] = [];
   const removed = { links: [] as string[], checklists: false };
   const selection: TargetSelection = ticked ? 'ticked' : 'unticked';
@@ -532,7 +552,6 @@ export function setProfileTick(home: string, name: string, ticked: boolean, { ro
       kind: 'claude',
       ...ticked ? { ...installed.release !== undefined && { release: installed.release }, finished: installed.finished } : { ...state.release !== undefined && { release: state.release }, finished: state.finished },
       skills: [...work.owned].sort(), selection,
-      ...state.required && { required: true },
       ...!ticked && state.references && exists(join(dirname(target.path), 'references')) && { references: true },
     };
   }

@@ -46,12 +46,15 @@ function GroupView({ group }: { group: Group }) {
           <div key={row.id} className="settings-row grid gap-2 px-4 py-3" data-row={row.id}>
             <div className="flex items-center gap-x-6 gap-y-2">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">{row.title}</div>
+                <div className="settings-row-title min-w-0 text-[13px] font-medium [overflow-wrap:anywhere]">{row.title}</div>
                 {row.control.type !== 'unavailable' && row.description && <div className="text-xs text-(--muted-foreground)">{row.description}</div>}
               </div>
-              {row.control.type === 'custom'
-                ? row.control.render()
-                : <span className="text-xs text-(--muted-foreground)">Not available yet</span>}
+              {/* The title wraps, so a long path never pushes the control out of the row. */}
+              <div className="settings-row-control shrink-0">
+                {row.control.type === 'custom'
+                  ? row.control.render()
+                  : <span className="text-xs text-(--muted-foreground)">Not available yet</span>}
+              </div>
             </div>
             {row.below}
           </div>
@@ -65,13 +68,13 @@ function GroupView({ group }: { group: Group }) {
 
 function SettingsModal() {
   const data = useBoardStore((state) => state.data);
-  const profiles = useSettingsStore((state) => state.profiles);
+  const targets = useSettingsStore((state) => state.targets);
   const version = useUpdateStore((state) => state.state?.currentVersion ?? null);
   const { section, setSection, setOpen } = useSettingsStore();
   // The title bar's Update pill follows the updater too, but it isn't there above the missing-t3 notice.
   const follow = useUpdateStore((state) => state.follow);
   useEffect(follow, [follow]);
-  const all = pages({ data, app: !!boardApp(), profiles, version });
+  const all = pages({ data, app: !!boardApp(), targets, version });
   const byId = new Map(all.map((p) => [p.id, p]));
   const [query, setQuery] = useState('');
   const search = useRef<HTMLInputElement>(null);

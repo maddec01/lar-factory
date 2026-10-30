@@ -5,7 +5,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
-import { INSTALL_MANIFEST, defaultTargets, describeTargets, installSkills, profileTargets, readSkillStatus, setTargetTick, t3Targets, type InstallResult, type RootOption, type TargetResult } from './install-skills.ts';
+import { INSTALL_MANIFEST, defaultTargets, describeTargets, installSkills, profileTargets, readSkillStatus, setTargetTick, type InstallResult, type RootOption, type TargetResult } from './install-skills.ts';
 
 function temporary(): string {
   const path = realpathSync(mkdtempSync(join(tmpdir(), 'install-skills-')));
@@ -39,6 +39,17 @@ const v2 = {
   'skills/lar-work/references/review.md': 'review v2',
 };
 
+/** Ticks or unticks the Claude profile `name` in `home`, as Settings does. */
+function tickProfile(home: string, name: string, ticked: boolean, options: RootOption = {}) {
+  return setTargetTick(home, join(home, name, 'skills'), ticked, { ...options, known: profileTargets(home) });
+}
+
+/** Each Claude profile in `home`, ticked when its skills folder is an active target of the default install. */
+function profileTicks(home: string): { name: string; ticked: boolean }[] {
+  const targets = describeTargets(home, defaultTargets(home), profileTargets(home));
+  return profileTargets(home).map(({ path }) => ({ name: basename(dirname(path)), ticked: targets.find((target) => target.paths.includes(path))?.active ?? false }));
+}
+
 function read(home: string, path: string): string {
   return readFileSync(join(home, '.agents', path), 'utf8');
 }
@@ -61,9 +72,9 @@ function finished(kind: string, release: string, skills: string[], extra: Partia
 }
 
 /** The result for ~/.agents/skills in `home` after an install of `release` finished there. */
-function agentsResult(home: string, release: string) {
+function agentsResult(home: string, release: string, skills = ['lar-work', 'tdd']) {
   const path = join(home, '.agents/skills');
-  return { kind: 'agents', path, paths: [path], required: false, active: true, release, finished: true };
+  return { kind: 'agents', path, paths: [path], required: false, skills, active: true, release, finished: true };
 }
 
 /** The manifest status of skills installed with a Release. */
@@ -85,7 +96,7 @@ test('a fresh install copies every skill and checklist and writes the manifest',
 
   assert.deepEqual(result, {
     installed: true, version: '1.0.0', skills: ['lar-work', 'tdd'], conflicts: [], blocked: [], drift: [], replaced: [], warn: false,
-    targets: [agentsResult(home, '1.0.0'), { kind: 'claude', path: join(home, '.claude/skills'), paths: [join(home, '.claude/skills')], required: false, active: false, finished: false }],
+    targets: [agentsResult(home, '1.0.0'), { kind: 'claude', path: join(home, '.claude/skills'), paths: [join(home, '.claude/skills')], required: false, skills: [], active: false, finished: false, homeMissing: true }],
   });
   for (const [path, content] of Object.entries(v1)) {
     assert.equal(readFileSync(join(home, '.agents', path), 'utf8'), content);
@@ -248,7 +259,7 @@ test('an install that already matches writes nothing, not even the manifest', ()
   mkdirSync(join(home, '.gemini'));
   const source = bundle(linked);
   installSkills(home, source, '1.0.0');
-  setProfileTick(home, '.claude-off', false);
+  tickProfile(home, '.claude-off', false);
   installSkills(home, source, '1.0.0');
 
   const { result, writes } = writesDuring(() => installSkills(home, source, '1.0.0', { now }));
@@ -396,7 +407,7 @@ test('an upgrade whose bundle drops a skill removes its copy, edited or not, and
 
   assert.deepEqual(result, {
     installed: true, version: '2.0.0', skills: ['lar-work'], conflicts: [], blocked: [], drift: [], replaced: [], warn: false,
-    targets: [agentsResult(home, '2.0.0'), { kind: 'claude', path: join(home, '.claude/skills'), paths: [join(home, '.claude/skills')], required: false, active: false, finished: false }],
+    targets: [agentsResult(home, '2.0.0', ['lar-work']), { kind: 'claude', path: join(home, '.claude/skills'), paths: [join(home, '.claude/skills')], required: false, skills: [], active: false, finished: false, homeMissing: true }],
   });
   assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'other']);
   assert.deepEqual(manifest(home), { version: '2.0.0', status: matching('lar-work'), targets: { '.agents/skills': finished('agents', '2.0.0', ['lar-work']) } });
@@ -567,10 +578,10 @@ test('a fresh install links every skill into ~/.claude, and ticking another prof
   const result = installSkills(home, bundle(linked), '1.0.0');
 
   assert.deepEqual(result.conflicts, []);
-  assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: false }]);
+  assert.deepEqual(profileTicks(home), [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: false }]);
   assert.ok(!existsSync(join(home, '.claude-work/skills')));
-  setProfileTick(home, '.claude-work', true);
-  assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: true }]);
+  tickProfile(home, '.claude-work', true);
+  assert.deepEqual(profileTicks(home), [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: true }]);
   for (const name of ['.claude', '.claude-work']) {
     assert.deepEqual(entries(home, name), ownLinks);
     assert.equal(readFileSync(join(home, name, 'skills/lar-work/references/review.md'), 'utf8'), 'review v1');
@@ -594,23 +605,23 @@ test('unticking a profile removes only the engine links and checklists, and tick
   const home = temporary();
   profile(home, '.claude-work');
   installSkills(home, bundle(linked), '1.0.0');
-  setProfileTick(home, '.claude-work', true);
+  tickProfile(home, '.claude-work', true);
   mkdirSync(join(home, '.claude-work/skills/mine'));
   writeFileSync(join(home, '.claude-work/settings.json'), '{}');
 
-  assert.deepEqual(setProfileTick(home, '.claude-work', false), { conflicts: [], removed: { links: ['lar-work', 'tdd'], checklists: false } });
+  assert.deepEqual(tickProfile(home, '.claude-work', false), { conflicts: [], removed: { links: ['lar-work', 'tdd'], checklists: false } });
 
   assert.deepEqual(entries(home, '.claude-work'), { mine: 'folder' });
   assert.ok(!existsSync(join(home, '.claude-work/references')));
   assert.equal(readFileSync(join(home, '.claude-work/settings.json'), 'utf8'), '{}');
-  assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude-work', ticked: false }]);
+  assert.deepEqual(profileTicks(home), [{ name: '.claude-work', ticked: false }]);
   assert.ok(existsSync(join(home, '.agents/skills/tdd/SKILL.md')));
 
-  assert.deepEqual(setProfileTick(home, '.claude-work', true), { conflicts: [], removed: { links: [], checklists: false } });
+  assert.deepEqual(tickProfile(home, '.claude-work', true), { conflicts: [], removed: { links: [], checklists: false } });
 
   assert.deepEqual(entries(home, '.claude-work'), { ...ownLinks, mine: 'folder' });
   assertChecklistsResolve(home, '.claude-work');
-  assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude-work', ticked: true }]);
+  assert.deepEqual(profileTicks(home), [{ name: '.claude-work', ticked: true }]);
 });
 
 test('a profile that appears after the first install starts unticked with no links', () => {
@@ -621,11 +632,11 @@ test('a profile that appears after the first install starts unticked with no lin
 
   installSkills(home, bundle(linked), '2.0.0');
 
-  assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude', ticked: true }, { name: '.claude-later', ticked: false }]);
+  assert.deepEqual(profileTicks(home), [{ name: '.claude', ticked: true }, { name: '.claude-later', ticked: false }]);
   assert.deepEqual(readdirSync(join(home, '.claude-later')), []);
   assert.deepEqual(Object.keys(manifest(home).targets), ['.agents/skills', '.claude/skills']);
 
-  setProfileTick(home, '.claude-later', true);
+  tickProfile(home, '.claude-later', true);
 
   assert.deepEqual(entries(home, '.claude-later'), ownLinks);
   assertChecklistsResolve(home, '.claude-later');
@@ -641,7 +652,7 @@ test('a first install leaves a link to the right skill folder as a Clash', () =>
   assert.deepEqual(result.blocked, [{ skill: 'tdd', paths: [{ place: 'profile', profile: '.claude', path: join(home, '.claude/skills/tdd') }] }]);
   assert.deepEqual(entries(home, '.claude'), { ...ownLinks, tdd: join(home, '.agents/skills/tdd') });
 
-  setProfileTick(home, '.claude', false);
+  tickProfile(home, '.claude', false);
 
   assert.deepEqual(entries(home, '.claude'), { tdd: join(home, '.agents/skills/tdd') });
 });
@@ -670,16 +681,16 @@ test('an entry the engine did not make is left in place and reported as a confli
   mkdirSync(join(home, '.claude-later/references'));
   writeFileSync(join(home, '.claude-later/references/mine.md'), 'mine');
 
-  assert.deepEqual(setProfileTick(home, '.claude-later', true), {
+  assert.deepEqual(tickProfile(home, '.claude-later', true), {
     conflicts: [], removed: { links: [], checklists: false },
   });
   assert.equal(readFileSync(join(home, '.claude-later/references/mine.md'), 'utf8'), 'mine');
   assert.deepEqual(entries(home, '.claude-later'), ownLinks);
 
-  assert.deepEqual(setProfileTick(home, '.claude-later', false), { conflicts: [], removed: { links: ['lar-work', 'tdd'], checklists: false } });
+  assert.deepEqual(tickProfile(home, '.claude-later', false), { conflicts: [], removed: { links: ['lar-work', 'tdd'], checklists: false } });
   assert.equal(readFileSync(join(home, '.claude-later/references/mine.md'), 'utf8'), 'mine');
 
-  setProfileTick(home, '.claude', false);
+  tickProfile(home, '.claude', false);
 
   assert.deepEqual(entries(home, '.claude'), { tdd: 'folder' });
 });
@@ -692,7 +703,7 @@ test('a link to the right skill folder the engine did not make is a Clash whenev
   mkdirSync(join(home, '.claude-later/skills'), { recursive: true });
   symlinkSync(join(home, '.agents/skills/tdd'), join(home, '.claude-later/skills/tdd'));
 
-  assert.deepEqual(setProfileTick(home, '.claude-later', true).conflicts, [join(home, '.claude-later/skills/tdd')]);
+  assert.deepEqual(tickProfile(home, '.claude-later', true).conflicts, [join(home, '.claude-later/skills/tdd')]);
 
   symlinkSync(join(home, '.agents/skills/grill'), join(home, '.claude/skills/grill'));
   assert.deepEqual(installSkills(home, bundle({ ...linked, 'skills/grill/SKILL.md': 'grill' }), '2.0.0').conflicts, [join(home, '.claude/skills/grill'), join(home, '.claude-later/skills/tdd')]);
@@ -711,7 +722,7 @@ test('manifest profiles and links that are not one profile folder name are ignor
   }));
 
   installSkills(home, bundle(linked), '2.0.0');
-  setProfileTick(home, '.claude', false);
+  tickProfile(home, '.claude', false);
 
   assert.deepEqual(readdirSync(join(root, 'outside')), []);
   assert.ok(lstatSync(join(root, 'outside-link')).isSymbolicLink());
@@ -736,7 +747,7 @@ test('manifest profile entries that are not an object are dropped and wrong fiel
     // Without an entry, ~/.claude is a default target again, and the links it made before are Clashes.
     '.claude/skills': finished('claude', '2.0.0', []),
   });
-  assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: false }]);
+  assert.deepEqual(profileTicks(home), [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: false }]);
 });
 
 test('an upgrade links new skills and removes the links of a dropped skill from every profile', () => {
@@ -744,7 +755,7 @@ test('an upgrade links new skills and removes the links of a dropped skill from 
   profile(home, '.claude');
   profile(home, '.claude-work');
   installSkills(home, bundle(linked), '1.0.0');
-  setProfileTick(home, '.claude-work', true);
+  tickProfile(home, '.claude-work', true);
   const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = linked;
 
   installSkills(home, bundle({ ...withoutTdd, 'skills/grill/SKILL.md': 'grill v2' }), '2.0.0');
@@ -769,13 +780,63 @@ test('an upgrade that drops a skill leaves a folder put in place of its profile 
 
   assert.deepEqual(entries(home, '.claude'), { 'lar-work': ownLinks['lar-work'], tdd: 'folder' });
 });
-test('ticking a folder that is not a Claude profile throws', () => {
+test('ticking a folder that is not an Install target throws', () => {
   const home = temporary();
   profile(home, '.claude');
   installSkills(home, bundle(linked), '1.0.0');
 
-  assert.throws(() => setProfileTick(home, '.claude-missing', true), /\.claude-missing/);
-  assert.throws(() => setProfileTick(home, '../.claude', true), /\.\.\/\.claude/);
+  const missing = join(home, '.claude-missing/skills');
+  assert.throws(() => tickProfile(home, '.claude-missing', true), { message: `${missing} is not an Install target` });
+  assert.throws(() => setTargetTick(home, join(home, 'elsewhere/skills'), true), /elsewhere\/skills is not an Install target/);
+});
+
+test('a target T3 requires and ~/.agents/skills refuse an untick and write nothing', () => {
+  const home = temporary();
+  profile(home, '.claude-t3');
+  const t3 = join(home, '.claude-t3/skills');
+  const targets = [...defaultTargets(home), { kind: 'claude' as const, path: t3, required: true }];
+  installSkills(home, bundle(linked), '1.0.0', { targets });
+  const before = read(home, INSTALL_MANIFEST);
+
+  assert.throws(() => setTargetTick(home, t3, false, { targets }), /T3 Code's provider instances read .*, so it stays ticked/);
+  assert.throws(() => setTargetTick(home, join(home, '.agents/skills'), false, { targets }), /Claude's skills link to .*, so it stays ticked/);
+  assert.equal(read(home, INSTALL_MANIFEST), before);
+  assert.ok(lstatSync(join(t3, 'lar-work')).isSymbolicLink());
+});
+
+test('ticking a copy target records it and the next install copies there; unticking keeps its copies and ownership', () => {
+  const home = temporary();
+  const extra = join(home, 'extra/skills');
+  const known = [{ kind: 'agents' as const, path: extra }];
+  const source = bundle(linked);
+  installSkills(home, source, '1.0.0');
+  assert.equal(describeTargets(home, defaultTargets(home), known).find(({ path }) => path === extra)?.active, false);
+
+  setTargetTick(home, extra, true, { known });
+  assert.equal(existsSync(join(extra, 'lar-work')), false);
+  installSkills(home, source, '1.0.0');
+  assert.deepEqual(readdirSync(extra).sort(), ['lar-work', 'tdd']);
+
+  setTargetTick(home, extra, false, { known });
+  const [target] = describeTargets(home, defaultTargets(home), known).filter(({ path }) => path === extra);
+  assert.deepEqual([target?.active, target?.selection, target?.skills], [false, 'unticked', ['lar-work', 'tdd']]);
+  assert.deepEqual(readdirSync(extra).sort(), ['lar-work', 'tdd']);
+});
+
+test('describeTargets lists each target with the skills lar owns there and writes nothing', () => {
+  const home = temporary();
+  profile(home, '.claude');
+  profile(home, '.claude-work');
+  installSkills(home, bundle(linked), '1.0.0');
+  const before = read(home, INSTALL_MANIFEST);
+
+  const targets = describeTargets(home, defaultTargets(home), profileTargets(home));
+  assert.deepEqual(targets.map(({ path, active, release, skills }) => [relative(home, path), active, release, skills]), [
+    ['.agents/skills', true, '1.0.0', ['lar-work', 'tdd']],
+    ['.claude/skills', true, '1.0.0', ['lar-work', 'tdd']],
+    ['.claude-work/skills', false, undefined, []],
+  ]);
+  assert.equal(read(home, INSTALL_MANIFEST), before);
 });
 
 test('the same version reports a ticked profile missing or wrong link as Drift, Replace puts it back, and an unticked profile stays', () => {
@@ -784,8 +845,8 @@ test('the same version reports a ticked profile missing or wrong link as Drift, 
   profile(home, '.claude-off');
   const source = bundle(linked);
   installSkills(home, source, '1.0.0');
-  setProfileTick(home, '.claude-off', true);
-  setProfileTick(home, '.claude-off', false);
+  tickProfile(home, '.claude-off', true);
+  tickProfile(home, '.claude-off', false);
   rmSync(join(home, '.claude/skills/lar-work'));
   rmSync(join(home, '.claude/skills/tdd'));
   symlinkSync('../../elsewhere/tdd', join(home, '.claude/skills/tdd'));
@@ -1092,7 +1153,7 @@ test('targets that resolve to one folder install once and share one result', () 
     targets: [{ kind: 'agents', path: join(home, '.agents/skills') }, { kind: 'claude', path: alias }, { kind: 'claude', path: real, required: true }],
   });
 
-  assert.deepEqual(result.targets.slice(1), [{ kind: 'claude', path: alias, paths: [alias, real], required: true, active: true, release: '1.0.0', finished: true }]);
+  assert.deepEqual(result.targets.slice(1), [{ kind: 'claude', path: alias, paths: [alias, real], required: true, skills: ['lar-work', 'tdd'], active: true, release: '1.0.0', finished: true }]);
   assert.deepEqual(entries(home, 'claude-home'), { 'lar-work': '../../.agents/skills/lar-work', tdd: '../../.agents/skills/tdd' });
   assert.deepEqual(Object.keys(manifest(home).targets), ['.agents/skills', 'claude-home/skills']);
 });
@@ -1172,7 +1233,7 @@ test('an unticked target gets no writes, and its Clash neither shows nor blocks 
   const home = temporary();
   profile(home, '.claude');
   installSkills(home, bundle(linked), '1.0.0');
-  setProfileTick(home, '.claude', false);
+  tickProfile(home, '.claude', false);
   mkdirSync(join(home, '.claude/skills/tdd'), { recursive: true });
   const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = linked;
 
@@ -1180,7 +1241,7 @@ test('an unticked target gets no writes, and its Clash neither shows nor blocks 
 
   assert.deepEqual([result.conflicts, result.blocked], [[], []]);
   assert.deepEqual(result.targets[1], {
-    kind: 'claude', path: join(home, '.claude/skills'), paths: [join(home, '.claude/skills')], required: false, selection: 'unticked', active: false,
+    kind: 'claude', path: join(home, '.claude/skills'), paths: [join(home, '.claude/skills')], required: false, selection: 'unticked', skills: [], active: false,
     release: '1.0.0', finished: true,
   });
   assert.deepEqual(entries(home, '.claude'), { tdd: 'folder' });
@@ -1197,7 +1258,7 @@ test('a target T3 requires installs even when the migrated manifest says the Use
 
   const result = installSkills(home, bundle(linked), '1.0.0', { targets: [...defaultTargets(home), { kind: 'claude', path, required: true }] });
 
-  assert.deepEqual(result.targets.at(-1), { kind: 'claude', path, paths: [path], required: true, selection: 'unticked', active: true, release: '1.0.0', finished: true });
+  assert.deepEqual(result.targets.at(-1), { kind: 'claude', path, paths: [path], required: true, selection: 'unticked', skills: ['lar-work', 'tdd'], active: true, release: '1.0.0', finished: true });
   assert.deepEqual(entries(home, '.claude-work'), ownLinks);
   assertChecklistsResolve(home, '.claude-work');
 });
@@ -1221,7 +1282,7 @@ test('a legacy manifest becomes targets with its owned skills, Release, ticks, l
     antigravity: Object.fromEntries(antigravity.map((folder) => [folder, ['lar-work', 'tdd']])),
   }));
 
-  assert.deepEqual(listClaudeProfiles(home), ['.claude', '.claude-off', '.claude-work'].map((name) => ({ name, ticked: name !== '.claude-off' })));
+  assert.deepEqual(profileTicks(home), ['.claude', '.claude-off', '.claude-work'].map((name) => ({ name, ticked: name !== '.claude-off' })));
   const same = installSkills(home, source, '1.0.0');
 
   assert.deepEqual([same.drift.map(({ skill }) => skill), same.conflicts], [['tdd'], []]);
@@ -1245,7 +1306,7 @@ test('a legacy manifest becomes targets with its owned skills, Release, ticks, l
   for (const name of ['.claude', '.claude-work']) assert.deepEqual(entries(home, name), { 'lar-work': ownLinks['lar-work'] });
   for (const folder of antigravity) assert.deepEqual(readdirSync(join(home, folder)), ['lar-work']);
   assert.ok(!existsSync(join(home, '.claude-off/skills')));
-  setProfileTick(home, '.claude-work', false);
+  tickProfile(home, '.claude-work', false);
   assert.ok(!existsSync(join(home, '.claude-work/references')));
 });
 
@@ -1359,7 +1420,7 @@ test('with a root, a Claude home linked from inside it to outside it is left alo
   const claude = result.targets.find(({ kind }) => kind === 'claude');
   assert.equal(claude?.active, false);
   assert.match(claude?.error?.message ?? '', /outside the install root/);
-  assert.throws(() => setProfileTick(root, '.claude', true, { root }), /outside the install root/);
+  assert.throws(() => tickProfile(root, '.claude', true, { root }), /outside the install root/);
   assert.deepEqual(outside.files(), before);
 });
 
@@ -1380,7 +1441,7 @@ test('with a root, a migrated target outside it is neither written nor removed',
   assert.deepEqual(outside.files(), before);
   assert.match(result.targets.find(({ path }) => path === join(outside.home, 'skills'))?.error?.message ?? '', /outside the install root/);
   assert.deepEqual(manifest(root).targets[relative(root, join(outside.home, 'skills'))]?.skills, ['lar-work', 'tdd']);
-  assert.throws(() => setProfileTick(root, '.claude-work', false, { root }), /outside the install root/);
+  assert.throws(() => tickProfile(root, '.claude-work', false, { root }), /outside the install root/);
   assert.deepEqual(outside.files(), before);
 });
 

@@ -1,7 +1,7 @@
 // The board app's main process: starts the board server as a child with the login
 // shell's PATH, shows its page in a window, starts the server again if it crashes,
 // checks the bundled skills at launch and before each Start build, removes the old
-// launch agent, answers the settings screen's profile calls, checks Releases for updates, drains and stops the server
+// launch agent, answers the page's skill install calls, checks Releases for updates, drains and stops the server
 // before it installs one and stops the server when the app quits. Modelled on T3 Code's apps/desktop/src/main.ts and window/DesktopWindow.ts.
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
@@ -20,7 +20,7 @@ import * as Electron from "electron";
 
 import * as BoardServer from "./board-server/BoardServer.ts";
 import * as BoardSupervisor from "./board-server/BoardSupervisor.ts";
-import * as ClaudeProfiles from "./skills/claude-profiles.ts";
+import * as InstallBoard from "./skills/install-board.ts";
 import * as LaunchAgentCleanup from "./launch-agent/launch-agent-cleanup.ts";
 import * as SkillInstall from "./skills/skill-install.ts";
 import * as T3Instances from "./skills/t3-instances.ts";
@@ -184,6 +184,9 @@ const openBoardWindow = (secret: string) => {
   return { window, events, progress, origin: () => origin, forgetOrigin, showStarting };
 };
 
+/** The folder holding the app's bundled skills. */
+const skillBundle = () => SkillInstall.locateBundle(Electron.app.getAppPath(), Electron.app.isPackaged);
+
 /**
  * The launch's skill checks, or undefined when this run checks nothing: a dev run without the install flag. `env` is
  * the login shell's environment, which finds the `t3` CLI.
@@ -193,7 +196,7 @@ const makeSkillChecks = (env: Record<string, string | undefined>) =>
     isPackaged: Electron.app.isPackaged,
     version: Electron.app.getVersion(),
     home: NodeOS.homedir(),
-    bundle: SkillInstall.locateBundle(Electron.app.getAppPath(), Electron.app.isPackaged),
+    bundle: skillBundle(),
     argv: process.argv,
     env: process.env,
   }, T3Instances.discover(env, NodeOS.homedir()));
@@ -211,21 +214,35 @@ const checkSkillsAtLaunch = (checks: SkillInstall.Checks) =>
 
 /** Throws for a call from any page but the current board server's, and while no server is ready. */
 const boardPageOnly = (boardOrigin: () => string, refusal: string) => (event: Electron.IpcMainInvokeEvent) => {
-  if (!ClaudeProfiles.fromBoard(event.senderFrame?.url, boardOrigin())) throw new Error(refusal);
+  if (!InstallBoard.fromBoard(event.senderFrame?.url, boardOrigin())) throw new Error(refusal);
 };
 
-/** The settings screen's calls: list the Claude profiles and tick or untick one by name. */
-const handleProfiles = (boardOrigin: () => string) => {
-  const checkSender = boardPageOnly(boardOrigin, "Only the board's page can change the Claude profiles");
-  const home = SkillInstall.installHome(NodeOS.homedir(), process.env);
-  const root = SkillInstall.installRoot(process.env);
-  Electron.ipcMain.handle(IpcChannels.LIST_PROFILES, (event) => {
-    checkSender(event);
-    return ClaudeProfiles.list(home);
+/** The page's skill install calls, and each new install state sent to the window. */
+const handleInstall = (window: Electron.BrowserWindow, boardOrigin: () => string, checks: SkillInstall.Checks | undefined) => {
+  const checkSender = boardPageOnly(boardOrigin, "Only the board's page can change the skill install");
+  const board = InstallBoard.makeInstallBoard({
+    home: SkillInstall.installHome(NodeOS.homedir(), process.env),
+    version: Electron.app.getVersion(),
+    bundle: skillBundle(),
+  }, checks);
+  board.subscribe((snapshot) => {
+    if (!window.isDestroyed()) window.webContents.send(IpcChannels.INSTALL_STATE, snapshot);
   });
-  Electron.ipcMain.handle(IpcChannels.SET_PROFILE_TICK, (event, name: unknown, ticked: unknown) => {
+  Electron.ipcMain.handle(IpcChannels.INSTALL_GET_STATE, (event) => {
     checkSender(event);
-    return ClaudeProfiles.setTick(home, name, ticked, root);
+    return board.snapshot();
+  });
+  Electron.ipcMain.handle(IpcChannels.INSTALL_RETRY, (event) => {
+    checkSender(event);
+    return board.retry();
+  });
+  Electron.ipcMain.handle(IpcChannels.INSTALL_REPLACE, (event) => {
+    checkSender(event);
+    return board.replace();
+  });
+  Electron.ipcMain.handle(IpcChannels.INSTALL_SET_TICK, (event, path: unknown, ticked: unknown) => {
+    checkSender(event);
+    return board.setTick(path, ticked);
   });
 };
 
@@ -284,7 +301,6 @@ const program = Effect.gen(function* () {
   // One secret per launch, shared by the restarted servers and the page.
   const secret = LaunchSecret.make();
   const board = openBoardWindow(secret);
-  handleProfiles(board.origin);
   // Opening the app again brings this window forward; the second copy has already quit.
   Electron.app.on("second-instance", () => {
     if (board.window.isMinimized()) board.window.restore();
@@ -295,6 +311,7 @@ const program = Effect.gen(function* () {
   const env = yield* ShellEnvironment.childEnvironment(process.env);
   // One pair of checks for the whole run, so the launch's check and each Start build's take turns.
   const skillChecks = yield* makeSkillChecks(env);
+  handleInstall(board.window, board.origin, skillChecks);
   const config = BoardServer.makeStartConfig({
     ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
     executablePath: process.execPath,

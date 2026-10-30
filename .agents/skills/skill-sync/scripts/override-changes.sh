@@ -10,6 +10,9 @@
 # SKILL_SYNC_GIT_BASE overrides https://github.com.
 set -euo pipefail
 
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source-path=SCRIPTDIR source=upstream-rows.sh
+source "$here/upstream-rows.sh"
 factory=$(cd "${1:-.}" && pwd)
 if [[ ! -f "$factory/UPSTREAM.md" ]]; then
     echo "no UPSTREAM.md in $factory" >&2
@@ -42,7 +45,7 @@ flag() { echo "$1: $2: $3"; flagged=$((flagged + 1)); }
 
 # Reads rows in this shell, not a pipeline or $(...), so set -e stops the
 # script on a failed clone or git command and flag's count survives the loop.
-while IFS='|' read -r _ name source path repository_path commit _ overrides _; do
+while IFS='|' read -r _ name source path _ commit _ overrides _; do
     name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
     path=$(echo "$path" | tr -d ' `'); commit=$(echo "$commit" | tr -d ' `')
     [[ -n "${overrides// /}" ]] || continue
@@ -99,6 +102,6 @@ while IFS='|' read -r _ name source path repository_path commit _ overrides _; d
             flag "$name" "$entry" "upstream changed this section"
         fi
     done < <(tr ';' '\n' <<<"$overrides")
-done < <(grep -E '^\| `' "$factory/UPSTREAM.md" || true)
+done < <(upstream_rows "$factory/UPSTREAM.md" Copies)
 
 if [[ $flagged == 0 ]]; then echo "no Overrides touched"; fi

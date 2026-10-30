@@ -1,8 +1,9 @@
 #!/bin/bash
 # Usage: copy-licences.sh <lar-factory checkout>
-# For every row in UPSTREAM.md, writes the source's licence file (see
-# licence-file.sh) at the row's commit, byte for byte, to LICENSE in the Copy's
-# folder: skills/<name>, or the folder of a single-file Copy such as references/.
+# For every row in UPSTREAM.md's Copies table, writes the source's licence file
+# (see licence-file.sh) at the row's commit, byte for byte, to LICENSE in the
+# Copy's folder: skills/<name>, or the folder of a single-file Copy such as
+# references/. Ports get no LICENSE.
 # Prints each LICENSE it writes or removes, and warns about each source with no
 # licence file, whose Copy gets no LICENSE. Exits non-zero on a Commit that
 # isn't a hex sha or a Copy whose folder is missing.
@@ -12,11 +13,13 @@ set -euo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source-path=SCRIPTDIR source=licence-file.sh
 source "$here/licence-file.sh"
+# shellcheck source-path=SCRIPTDIR source=upstream-rows.sh
+source "$here/upstream-rows.sh"
 factory=$(cd "${1:-.}" && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-grep -E '^\| `' "$factory/UPSTREAM.md" | while IFS='|' read -r _ name source path repository_path commit _; do
+upstream_rows "$factory/UPSTREAM.md" Copies | while IFS='|' read -r _ name source path repository_path commit _; do
     name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
     path=$(echo "$path" | tr -d ' `'); commit=$(echo "$commit" | tr -d ' `')
     if [[ ! $commit =~ ^[0-9a-f]{7,40}$ ]]; then

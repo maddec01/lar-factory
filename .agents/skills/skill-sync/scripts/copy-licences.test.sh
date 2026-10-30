@@ -36,8 +36,10 @@ commit "$bare" first
 bare_head=$(git -C "$bare" rev-parse --short=12 HEAD)
 
 factory="$base/factory"
-mkdir -p "$factory/skills/nested/demo" "$factory/skills/nested/deep" "$factory/skills/nested/plain" "$factory/skills/nested/own" "$factory/skills/nested/references"
+mkdir -p "$factory/skills/nested/demo" "$factory/skills/nested/deep" "$factory/skills/nested/plain" "$factory/skills/nested/own" "$factory/skills/nested/references" "$factory/skills/nested/port/agents"
 echo r > "$factory/skills/nested/references/list.md"
+echo p > "$factory/skills/nested/port/agents/doubt.md"
+echo kept > "$factory/skills/nested/port/agents/LICENSE"
 
 echo stale > "$factory/skills/nested/plain/LICENSE"
 cat >"$factory/UPSTREAM.md" <<EOF2
@@ -47,6 +49,12 @@ cat >"$factory/UPSTREAM.md" <<EOF2
 | \`deep\` | owner/nested | \`pack/skills/deep\` | \`skills/nested/deep\` | \`$nested_head\` | 2026-01-01 |  |
 | \`plain\` | owner/bare | \`skills/plain\` | \`skills/nested/plain\` | \`$bare_head\` | 2026-01-01 |  |
 | \`references/list.md\` | owner/root | \`refs/list.md\` | \`skills/nested/references/list.md\` | \`$old\` | 2026-01-01 |  |
+
+Ports follow upstream up to the commit last reviewed.
+
+| Port | Source | Path | Sections | Commit | Date |
+| ---- | ------ | ---- | -------- | ------ | ---- |
+| \`skills/nested/port/agents/doubt.md\` | owner/root | \`skills/demo\` | skills/demo/SKILL.md#Steps | \`$old\` | 2026-01-01 |
 EOF2
 
 fail=0
@@ -67,6 +75,9 @@ check "reports each licence it writes" "$out" "^wrote skills/nested/demo/LICENSE
 check "reports the nested licence's path" "$out" "^wrote skills/nested/deep/LICENSE from owner/nested pack/LICENSE.md$"
 check "warns about a source with no licence" "$out" "^no licence: plain \\(owner/bare\\), removed skills/nested/plain/LICENSE$"
 if [[ -e "$factory/skills/nested/plain/LICENSE" ]]; then echo "FAIL removes the LICENSE of a source with none"; fail=1; else echo "ok   removes the LICENSE of a source with none"; fi
+check "leaves Port rows out of its report" "$out" "port|doubt" absent
+if [[ "$(cat "$factory/skills/nested/port/agents/LICENSE")" == kept ]]; then echo "ok   leaves a LICENSE beside a Port alone"; else echo "FAIL leaves a LICENSE beside a Port alone"; fail=1; fi
+if [[ -e "$factory/skills/nested/port/LICENSE" ]]; then echo "FAIL writes no LICENSE for a Port"; fail=1; else echo "ok   writes no LICENSE for a Port"; fi
 if [[ -e "$factory/skills/nested/own/LICENSE" ]]; then echo "FAIL leaves folders UPSTREAM.md doesn't list alone"; fail=1; else echo "ok   leaves folders UPSTREAM.md doesn't list alone"; fi
 
 out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/copy-licences.sh" "$factory")
@@ -78,8 +89,10 @@ out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/copy-licences.sh" "$factory
 same "follows the commit a take records" "$factory/skills/nested/demo/LICENSE" "$root" "$new:LICENSE"
 check "reports the updated licence" "$out" "^wrote skills/nested/demo/LICENSE from owner/root LICENSE$"
 
-# shellcheck disable=SC2016 # the backticks are Markdown
-printf '| `gone` | owner/root | `skills/gone` | `skills/nested/gone` | `%s` | 2026-01-01 |  |\n' "$new" >>"$factory/UPSTREAM.md"
+# Into the Copies table, above the Ports table.
+sed -i.bak "/^| \`references\/list.md\` /a\\
+| \`gone\` | owner/root | \`skills/gone\` | \`skills/nested/gone\` | \`$new\` | 2026-01-01 |  |
+" "$factory/UPSTREAM.md" && rm "$factory/UPSTREAM.md.bak"
 if out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/copy-licences.sh" "$factory" 2>&1); then
     echo "FAIL exits non-zero when a listed Copy's folder is missing"; fail=1
 else

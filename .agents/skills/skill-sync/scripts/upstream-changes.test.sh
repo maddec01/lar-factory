@@ -27,6 +27,10 @@ cat >"$factory/UPSTREAM.md" <<EOF2
 | Skill | Source | Path | Repository path | Commit | Date | Overridden in |
 | ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
 | \`demo\` | owner/repo | \`pack/skills/demo\` | \`skills/nested/demo\` | \`$first\` | 2026-01-01 |  |
+
+| Port | Source | Path | Sections | Commit | Date |
+| ---- | ------ | ---- | -------- | ------ | ---- |
+| \`skills/lar-build/agents/doubt.md\` | owner/repo | \`pack/skills/other\` | pack/skills/other/SKILL.md | \`$first\` | 2026-01-01 |
 EOF2
 
 fail=0
@@ -39,6 +43,7 @@ run() { SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$fa
 
 out=$(run)
 check "reports an unchanged copy" "$out" "^== demo: unchanged \\(owner/repo $first, "
+check "reads only the Copies table" "$out" "doubt" absent
 
 echo c > "$repo/pack/skills/other/SKILL.md"
 echo 'Root licence, new year' > "$repo/LICENSE"

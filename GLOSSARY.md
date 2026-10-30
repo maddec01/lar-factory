@@ -130,7 +130,7 @@ The person who installs the board app and runs the factory on their own reposito
 _Avoid_: owner
 
 **Maintainer**:
-The person who keeps lar-factory itself: syncs the skill Copies with upstream and starts Releases.
+The person who keeps lar-factory itself: syncs the skill Copies and Ports with upstream and starts Releases.
 _Avoid_: owner, author
 
 **Shaping thread**:
@@ -354,21 +354,21 @@ _Avoid_: UI kit, component library, theme
 ### Upstream files
 
 **Copy**:
-A file taken unchanged from an upstream source and recorded in its folder's record (UPSTREAM.md for skills and checklists, the copy record for the design system copied from lar-server); it changes only through a fresh copy from upstream.
+A file taken unchanged from an upstream source into one of lar's skills or the design system, and recorded in its folder's record; it changes only through a fresh copy from upstream.
 _Avoid_: vendored file, dependency
 
 **Override**:
-A lar rule, written in one of lar's own skills, that replaces or sets aside part of a Copy's instructions.
+A lar rule, written in the lar file that loads a Copy, that sets aside part of the Copy's instructions.
 _Avoid_: patch, tweak, local change
 
 **Port**:
-A file adapted from upstream code that names its source and commit in its header; we edit it freely.
+A file adapted from upstream code or skill text that names its source and commit at the top; we edit it freely.
 _Avoid_: copy, vendored file
 
 ### Skills
 
 **Checklist**:
-A shared reference file that several skills link to, installed next to the skills.
+A Copy of a review checklist inside `lar-build`, loaded by the review that needs it.
 _Avoid_: reference, reference file
 
 **Claude profile**:

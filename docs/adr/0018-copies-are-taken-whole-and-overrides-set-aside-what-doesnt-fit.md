@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0031
+---
+
 # Copies are taken whole, and Overrides set aside what doesn't fit
 
 Settled in issue #357.

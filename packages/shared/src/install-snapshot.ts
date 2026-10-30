@@ -2,7 +2,7 @@
 // instances that read it and the last check's Drift, Clashes and failures. Paths in the user's home read `~/…`. It
 // carries no instance's environment, HOME value or provider configuration.
 
-import type { SkillPaths, TargetSelection, TickResult } from './install-skills.ts';
+import type { SkillPaths, TargetSelection, TickResult, InstallSkillState, TargetProgress } from './install-skills.ts';
 import type { InstallTargetKind, UnavailableReason } from './install-targets.ts';
 
 /** What the app is doing with the skills: a check at launch, after T3 answers or before Start build, or the User's operation. */
@@ -20,7 +20,7 @@ export interface InstanceIdentity {
  * A bundled skill in one target: `installed` where lar owns it, `drift` where it no longer matches its Release,
  * `blocked` by a Clash, and `missing` where lar hasn't installed it.
  */
-export type TargetSkillState = 'installed' | 'drift' | 'blocked' | 'missing';
+export type TargetSkillState = InstallSkillState | 'missing';
 
 export interface TargetSnapshot {
   kind: InstallTargetKind;
@@ -36,16 +36,23 @@ export interface TargetSnapshot {
   homeMissing?: true;
   /** The Release installed there. */
   release?: string;
-  /** True once an install of `release` there finished. */
+  /** True once every bundled skill installed successfully there, with no Clash or failure. */
   finished: boolean;
   /** The ids of the provider instances that read it. */
   instances: string[];
   skills: { name: string; state: TargetSkillState }[];
+  /** Actual work in this launch, retained after the operation finishes. Checks never imply a reinstall. */
+  operation?: TargetProgress['operation'];
+  running?: boolean;
+  /** Drift successfully replaced in this target during this app launch. */
+  replaced?: string[];
   /** Why the last check failed there. */
   error?: string;
 }
 
 export interface InstallSnapshot {
+  /** Monotonic within one app launch, so a delayed read or command cannot overwrite a newer push. */
+  revision?: number;
   /** False when this run installs nothing, a dev run without `--install-skills`; every operation is then refused. */
   installs: boolean;
   /** False until the app first installs its skills. */
@@ -59,7 +66,7 @@ export interface InstallSnapshot {
   targets: TargetSnapshot[];
   /** The last check's Drift, left in place. */
   drift: SkillPaths[];
-  /** The skills whose Drift the last check overwrote. */
+  /** The skills whose Drift this app launch overwrote in any target. */
   replaced: string[];
   /** The last check's Clashes. */
   conflicts: string[];

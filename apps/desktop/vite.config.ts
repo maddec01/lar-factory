@@ -35,6 +35,18 @@ export default defineConfig({
       },
     },
     {
+      // The ownership engine has its own entry so synchronous filesystem work stays off the main thread.
+      format: "cjs",
+      outDir: "dist-electron",
+      dts: false,
+      sourcemap: true,
+      outExtensions: () => ({ js: ".cjs" }),
+      outputOptions: { codeSplitting: false },
+      entry: { "install-worker": "src/skills/install-worker.ts" },
+      clean: false,
+      deps: { alwaysBundle: (id) => !id.startsWith("node:"), onlyBundle: false },
+    },
+    {
       // Sandboxed preloads must be self-contained, without shared runtime chunks.
       format: "cjs",
       outDir: "dist-electron",

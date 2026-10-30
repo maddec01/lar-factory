@@ -76,11 +76,14 @@ const describe = (input: BoardInput, state: CheckState, installs: boolean): Desc
   let described: Described["targets"] = [];
   try {
     described = describeTargets(home, [...state.targets], profileTargets(home)).map((target) => {
-      const checked = outcome?.targets.find(({ paths }) => paths.some((path) => target.paths.includes(path)));
+      const progress = state.progress?.find(({ target: { paths } }) => paths.some((path) => target.paths.includes(path)));
+      const checked = progress?.target ?? outcome?.targets.find(({ paths }) => paths.some((path) => target.paths.includes(path)));
+      const current = checked ?? target;
       const skillState = (skill: string): TargetSkillState =>
         outcome && at(outcome.blocked, skill, target.paths) ? "blocked"
         : outcome && at(outcome.drift, skill, target.paths) ? "drift"
         : target.skills.includes(skill) ? "installed" : "missing";
+      const skills = progress?.skills ?? bundled.map((name) => ({ name, state: skillState(name) }));
       const shown: TargetSnapshot = {
         kind: target.kind,
         path: tilde(target.path),
@@ -89,10 +92,11 @@ const describe = (input: BoardInput, state: CheckState, installs: boolean): Desc
         ...target.selection && { selection: target.selection },
         active: target.active,
         ...target.homeMissing && { homeMissing: true },
-        ...target.release !== undefined && { release: target.release },
-        finished: target.finished,
+        ...current.release !== undefined && { release: current.release },
+        finished: current.finished && !checked?.error && skills.every(({ state }) => state === "installed"),
         instances: state.instances.filter(({ targets: read }) => read.some(({ path }) => target.paths.includes(path))).map(({ id }) => id),
-        skills: bundled.map((name) => ({ name, state: skillState(name) })),
+        skills,
+        ...progress && { operation: progress.operation, running: progress.running, replaced: progress.replaced },
         ...checked?.error && { error: tilde(checked.error.message) },
       };
       return { real: target.path, shown };
@@ -102,6 +106,7 @@ const describe = (input: BoardInput, state: CheckState, installs: boolean): Desc
   }
   const targets = described.map(({ shown }) => shown);
   const snapshot: InstallSnapshot = {
+    revision: state.revision ?? 0,
     installs,
     installed: targets.some(({ release }) => release !== undefined),
     version: input.version,
@@ -110,7 +115,7 @@ const describe = (input: BoardInput, state: CheckState, installs: boolean): Desc
     instances: state.instances.map(({ id, driver, displayName, enabled }) => ({ id, driver, displayName, enabled })),
     targets,
     drift: shownPaths(outcome?.drift ?? []),
-    replaced: outcome?.replaced ?? [],
+    replaced: [...new Set(state.progress?.flatMap(({ replaced }) => replaced) ?? outcome?.replaced ?? [])].sort(),
     conflicts: (outcome?.conflicts ?? []).map(tilde),
     blocked: shownPaths(outcome?.blocked ?? []),
     ...error !== undefined && { error: tilde(error) },

@@ -71,6 +71,16 @@ export interface InstallResult {
   targets: TargetResult[];
 }
 
+/** Work observed at a physical target. Installed counts only skills checked or written successfully. */
+export type InstallSkillState = 'pending' | 'checking' | 'installing' | 'installed' | 'drift' | 'blocked' | 'failed';
+export interface TargetProgress {
+  target: TargetResult;
+  operation: 'install' | 'check' | 'replace';
+  running: boolean;
+  skills: { name: string; state: InstallSkillState }[];
+  replaced: string[];
+}
+
 /** The isolation limit of a call to the engine. */
 export interface RootOption {
   /** The folder every write must stay in, as `LAR_FACTORY_INSTALL_ROOT` names it. Unset by default: no limit. */
@@ -78,6 +88,8 @@ export interface RootOption {
 }
 
 export interface InstallOptions extends RootOption {
+  /** Called during actual skill work, with an independent snapshot. */
+  onProgress?: (progress: TargetProgress) => void;
   /** The targets to install into, deduplicated by their real path. `defaultTargets(home)` by default. */
   targets?: OfferedTarget[];
   /** The time a replacement of Drift records; the clock by default. */
@@ -216,7 +228,7 @@ export function installSkills(home: string, bundle: string, version: string, opt
   try {
     return install(home, bundle, version, {
       targets: options.targets ?? defaultTargets(home), now: options.now ?? (() => new Date()),
-      recordWarning: options.recordWarning ?? true, replace: options.replace ?? false, root: options.root,
+      recordWarning: options.recordWarning ?? true, replace: options.replace ?? false, root: options.root, ...options.onProgress && { onProgress: options.onProgress },
     }, progress);
   } catch (error) {
     if (error instanceof InstallError) throw error;
@@ -226,7 +238,7 @@ export function installSkills(home: string, bundle: string, version: string, opt
 
 /** `installSkills` without the error wrapping. Every write sets `progress.changed`. */
 function install(
-  home: string, bundle: string, version: string, options: Required<Omit<InstallOptions, 'root'>> & RootOption, progress: { changed: boolean },
+  home: string, bundle: string, version: string, options: Required<Omit<InstallOptions, 'root' | 'onProgress'>> & Pick<InstallOptions, 'root' | 'onProgress'>, progress: { changed: boolean },
 ): InstallResult {
   confine(join(home, '.agents'), options.root);
   const manifestPath = join(home, '.agents', INSTALL_MANIFEST);
@@ -265,6 +277,8 @@ function install(
   // Copies first, so each Claude target links to the skills ~/.agents/skills owns after this install.
   for (const target of [...targets].sort((a, b) => Number(a.kind === 'claude') - Number(b.kind === 'claude'))) {
     if (!target.active) {
+      if (target.error) options.onProgress?.({ target: structuredClone(target), operation: 'install', running: false,
+        skills: bundled.map((name) => ({ name, state: 'failed' })), replaced: [] });
       const previous = states[target.key];
       if (previous) states[target.key] = leave(target, previous, bundled, outsideRoot(target.key, options.root) === undefined);
       target.skills = states[target.key]?.skills ?? target.skills;
@@ -272,12 +286,27 @@ function install(
     }
     const previous = states[target.key] ?? { kind: target.kind, finished: false, skills: [] };
     const upgrading = previous.release !== version || !previous.finished;
+    const replacing = new Set<string>();
+    const skillsProgress = new Map<string, InstallSkillState>(bundled.map((name) => [name, 'pending']));
+    let operation: TargetProgress['operation'] = upgrading ? 'install' : options.replace ? 'replace' : 'check';
+    const emit = (running: boolean) => options.onProgress?.({
+      target: structuredClone(target), operation, running,
+      skills: [...skillsProgress].map(([name, state]) => ({ name, state })),
+      replaced: [...replacing].filter((name) => skillsProgress.get(name) === 'installed').sort(),
+    });
+    const report = (skill: string, state: InstallSkillState) => {
+      if (state === 'installing' && operation === 'check') operation = 'install';
+      skillsProgress.set(skill, state);
+      emit(true);
+    };
+    emit(true);
     const drift: Drift = (skill, at) => {
       if (upgrading || options.replace) {
-        replaced.add(skill);
+        replacing.add(skill);
         return true;
       }
       drifting.set(skill, [...drifting.get(skill) ?? [], at]);
+      report(skill, 'drift');
       return false;
     };
     const work: Work = { owned: new Set(previous.skills), digests: { ...previous.digests }, changed: false };
@@ -285,8 +314,9 @@ function install(
     try {
       if (target.kind === 'claude') {
         const linkable = (states[agentsKey]?.skills ?? []).filter((name) => bundled.includes(name));
-        linkTarget(target.path, agents, work, linkable, placeOf(target), conflict, drift);
-      } else copyTarget(target, bundle, bundled, digests, previous, upgrading, work, conflict, drift);
+        linkTarget(target.path, agents, work, linkable, placeOf(target), conflict, drift, report);
+        for (const skill of bundled.filter((name) => !linkable.includes(name))) report(skill, 'blocked');
+      } else copyTarget(target, bundle, bundled, digests, previous, upgrading, work, conflict, drift, report);
     } catch (cause) {
       error = { message: (cause as Error).message, changed: work.changed };
     }
@@ -310,7 +340,12 @@ function install(
     target.finished = state.finished;
     target.skills = skills;
     if (state.release !== undefined) target.release = state.release;
-    if (error) target.error = error;
+    if (error) {
+      target.error = error;
+      for (const [name, state] of skillsProgress) if (state === 'pending' || state === 'installing' || state === 'checking') skillsProgress.set(name, 'failed');
+    }
+    for (const name of replacing) if (skillsProgress.get(name) === 'installed') replaced.add(name);
+    emit(false);
   }
 
   const upgrading = current?.version !== version;
@@ -435,18 +470,21 @@ function placeOf(target: InstallTarget): BlockingPlace {
  */
 function copyTarget(
   target: Target, bundle: string, bundled: string[], digests: Record<string, string>, previous: TargetState, upgrading: boolean,
-  work: Work, conflict: Conflict, drift: Drift,
+  work: Work, conflict: Conflict, drift: Drift, report: (skill: string, state: InstallSkillState) => void,
 ): void {
   const place = placeOf(target);
   const copies: Copy[] = bundled.filter((skill) => {
+    report(skill, 'checking');
     const path = join(target.path, skill);
     if (work.owned.has(skill) || !exists(path)) return true;
     conflict(path, { skill, ...place });
+    report(skill, 'blocked');
     return false;
   }).filter((skill) => {
     const path = join(target.path, skill);
     if (exists(path) && treeDigest(path, false) === digests[skill]) {
       work.digests[skill] = digests[skill]!;
+      report(skill, 'installed');
       return false;
     }
     if (!work.owned.has(skill)) return true;
@@ -461,11 +499,15 @@ function copyTarget(
 
   const staged: { copy: Copy; temporary: string }[] = [];
   try {
-    for (const copy of copies) staged.push({ copy, temporary: stage(copy) });
+    for (const copy of copies) {
+      report(copy.skill, 'installing');
+      staged.push({ copy, temporary: stage(copy) });
+    }
     for (const { copy, temporary } of staged) {
       swap(temporary, copy.target, work);
       work.owned.add(copy.skill);
       work.digests[copy.skill] = digests[copy.skill]!;
+      report(copy.skill, 'installed');
     }
   } finally {
     for (const { temporary } of staged) rmSync(temporary, { recursive: true, force: true });
@@ -579,28 +621,33 @@ export function isProfileName(name: string): boolean {
  * made one, which it stops owning. An engine link that is missing or points anywhere else goes to `drift`, and is
  * put back only when that returns true. Each write sets `work.changed`.
  */
-function linkTarget(folder: string, agents: string, work: Work, skills: string[], place: BlockingPlace, conflict: Conflict, drift: Drift): void {
+function linkTarget(folder: string, agents: string, work: Work, skills: string[], place: BlockingPlace, conflict: Conflict, drift: Drift,
+  report: (skill: string, state: InstallSkillState) => void = () => {}): void {
   for (const skill of [...work.owned]) {
     if (skills.includes(skill)) continue;
     if (removeLink(join(folder, skill))) work.changed = true;
     work.owned.delete(skill);
   }
   for (const skill of skills) {
+    report(skill, 'checking');
     const path = join(folder, skill);
     const target = join(agents, skill);
     const made = work.owned.has(skill);
-    if (made && exists(path) && pointsAt(path, target)) continue;
+    if (made && exists(path) && pointsAt(path, target)) { report(skill, 'installed'); continue; }
     if (exists(path) && (!made || !lstatSync(path).isSymbolicLink())) {
       conflict(path, { skill, ...place });
       work.owned.delete(skill);
+      report(skill, 'blocked');
       continue;
     }
     if (made && !drift(skill, { ...place, path })) continue;
+    report(skill, 'installing');
     removeLink(path);
     mkdirSync(folder, { recursive: true });
     symlinkSync(relative(folder, target), path);
     work.owned.add(skill);
     work.changed = true;
+    report(skill, 'installed');
   }
 }
 

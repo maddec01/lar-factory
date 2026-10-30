@@ -16,9 +16,11 @@ import {
   blockedBy, listed, type DriftChoice, type InstallOperation, type InstallSnapshot, type SkillCheckOutcome,
 } from "@lar-factory/shared";
 import {
-  InstallError, installSkills, profileTargets, setTargetTick, t3Targets, type InstallResult, type OfferedTarget, type TickResult,
+  InstallError, profileTargets, setTargetTick, t3Targets, type InstallResult, type OfferedTarget, type TickResult, type TargetProgress,
 } from "@lar-factory/shared/install-skills";
 import type { InstanceDiscovery, ProviderInstance } from "@lar-factory/shared/install-targets";
+
+import { runInstall } from "./install-runner.ts";
 
 /** How long the launch waits before it asks a T3 that didn't answer again. */
 export const REDISCOVER_EVERY = "30 seconds";
@@ -116,6 +118,8 @@ export const oneAtATime = Semaphore.make(1).pipe(Effect.map((semaphore) => semap
 
 /** What this launch's checks know, for the board's page. It holds T3's instances, never their settings. */
 export interface CheckState {
+  readonly revision?: number;
+  readonly progress?: ReadonlyArray<TargetProgress>;
   readonly running: InstallOperation | null;
   readonly discovery: InstallSnapshot["discovery"];
   /** T3's instances as it last listed them this run. */
@@ -161,14 +165,14 @@ const failure = (cause: unknown, changed: boolean) =>
  * run keeps. The engine installs only into a target whose Release differs, so a new target leaves the others as they
  * are. A failed check doesn't write the manifest, so the next one tries again.
  */
-export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effect<Checks | undefined> => {
+export const makeChecks = (input: LaunchInput, discover: Discover, run: typeof runInstall = runInstall): Effect.Effect<Checks | undefined> => {
   const install = plan(input);
   if (!install) return Effect.succeed(undefined);
   return oneAtATime.pipe(Effect.map((serial): Checks => {
     const listeners = new Set<() => void>();
     let state: CheckState = { running: null, discovery: "waiting", instances: [], targets: offlineTargets(install.home) };
     const update = (next: Partial<CheckState>) => {
-      state = { ...state, ...next };
+      state = { ...state, ...next, revision: (state.revision ?? 0) + 1 };
       for (const listener of listeners) listener();
     };
     const learn = discover(install.home).pipe(Effect.map((answer) => {
@@ -186,15 +190,34 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
      * the targets the User was shown. Retry and Start build always ask T3 again.
      */
     const reuse = Effect.suspend(() => state.discovery === "available" ? Effect.succeed(true) : learn);
-    const settle = (outcome: InstallResult | SkillInstallError) => Effect.sync(() => update({ running: null, outcome }));
+    const progressed = (event: TargetProgress) => {
+      const earlier = state.progress ?? [];
+      const previous = earlier.find(({ target }) => target.paths.some((path) => event.target.paths.includes(path)));
+      const next = {
+        ...event,
+        // A read-only check keeps earlier results while it verifies them. Actual writes report installing again.
+        skills: event.skills.map((skill) => event.operation === "check" && ["pending", "checking"].includes(skill.state)
+          ? previous?.skills.find(({ name }) => name === skill.name) ?? skill : skill),
+        target: event.running && previous?.target.error ? { ...event.target, error: previous.target.error } : event.target,
+        replaced: [...new Set([...(previous?.replaced ?? []), ...event.replaced])].sort(),
+      };
+      update({ progress: [...earlier.filter((entry) => entry !== previous), next] });
+    };
+    const settle = (outcome: InstallResult | SkillInstallError) => Effect.sync(() => update({
+      running: null, outcome,
+      ...outcome instanceof SkillInstallError && { progress: state.progress?.map((event) => event.running ? {
+        ...event, running: false, target: { ...event.target, error: { message: outcome.message, changed: outcome.changed } },
+        skills: event.skills.map((skill) => ["pending", "checking", "installing"].includes(skill.state) ? { ...skill, state: "failed" as const } : skill),
+      } : event) ?? [] },
+    }));
     // One check, run inside a turn the caller holds.
     const checkNow = (operation: InstallOperation, options: { recordWarning: boolean; replace?: boolean }): Check =>
       Effect.suspend(() => {
         update({ running: operation });
-        return Effect.try({
-          try: () => installSkills(install.home, install.bundle, install.version, { ...options, root: install.root, targets: [...state.targets] }),
+        return Effect.tryPromise({
+          try: () => run({ ...install, options: { ...options, root: install.root, targets: [...state.targets] } }, progressed),
           catch: (cause) => failure(cause, cause instanceof InstallError ? cause.changed : true),
-        }).pipe(Effect.tap(settle), Effect.tapError(settle));
+        }).pipe(Effect.uninterruptible, Effect.tap(settle), Effect.tapError(settle));
       });
     const check = (operation: InstallOperation, options: { recordWarning: boolean; replace?: boolean }) => serial(checkNow(operation, options));
     return {
@@ -210,7 +233,10 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
           catch: (cause) => failure(cause, false),
         }).pipe(
           Effect.tapError(() => Effect.sync(() => update({ running: null }))),
-          Effect.flatMap((result) => checkNow("tick", { recordWarning: false }).pipe(Effect.as(result))),
+          Effect.flatMap((result) => {
+            if (!ticked) update({ progress: (state.progress ?? []).filter(({ target }) => !target.paths.includes(path)) });
+            return checkNow("tick", { recordWarning: false }).pipe(Effect.as(result));
+          }),
         );
       })),
       state: () => state,

@@ -1464,3 +1464,77 @@ test('without a root, an offered target at an absolute home elsewhere installs a
   assert.equal(result.targets.find(({ path }) => path === join(other.home, 'skills'))?.error, undefined);
   assert.ok(lstatSync(join(other.home, 'skills/tdd')).isSymbolicLink());
 });
+
+
+test('reports real per-skill work, Clashes and target-specific replaced Drift', () => {
+  const home = temporary();
+  const source = bundle(v1);
+  const events: import('./install-skills.ts').TargetProgress[] = [];
+  mkdirSync(join(home, '.agents/skills/tdd'), { recursive: true });
+  installSkills(home, source, '1.0.0', { onProgress: (event) => events.push(event) });
+  const copying = events.find((event) => event.skills.some(({ name, state }) => name === 'lar-work' && state === 'installing'))!;
+  assert.equal(copying.running, true);
+  assert.equal(copying.operation, 'install');
+  const done = events.findLast((event) => event.target.kind === 'agents')!;
+  assert.deepEqual(done.skills, [{ name: 'lar-work', state: 'installed' }, { name: 'tdd', state: 'blocked' }]);
+  assert.equal(done.running, false);
+  writeFileSync(join(home, '.agents/skills/lar-work/SKILL.md'), 'edited');
+  events.length = 0;
+  installSkills(home, source, '1.0.0', { replace: true, onProgress: (event) => events.push(event) });
+  assert.deepEqual(events.findLast((event) => event.target.kind === 'agents')!.replaced, ['lar-work']);
+  events.length = 0;
+  installSkills(home, source, '1.0.0', { onProgress: (event) => events.push(event) });
+  assert.ok(events.every((event) => event.operation === 'check'));
+  assert.ok(events.every((event) => event.skills.every(({ state }) => state !== 'installing')));
+});
+
+test('partial copy failure reports successful swaps and retries only the unfinished work', () => {
+  const home = temporary();
+  const source = bundle(v1);
+  const events: import('./install-skills.ts').TargetProgress[] = [];
+  const rename = fs.renameSync;
+  const mocked = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+    if (String(to) === join(home, '.agents/skills/tdd')) throw new Error('Copy target denied');
+    return rename(from, to);
+  });
+  syncBuiltinESMExports();
+  try {
+    installSkills(home, source, '1.0.0', { onProgress: (event) => events.push(event) });
+    const done = events.findLast((event) => event.target.kind === 'agents')!;
+    assert.deepEqual(done.skills, [{ name: 'lar-work', state: 'installed' }, { name: 'tdd', state: 'failed' }]);
+    assert.equal(done.target.finished, false);
+    assert.match(done.target.error!.message, /Copy target denied/);
+  } finally {
+    mocked.mockRestore();
+    syncBuiltinESMExports();
+  }
+  events.length = 0;
+  installSkills(home, source, '1.0.0', { onProgress: (event) => events.push(event) });
+  const recovered = events.findLast((event) => event.target.kind === 'agents')!;
+  assert.equal(recovered.target.error, undefined);
+  assert.equal(recovered.target.finished, true);
+  assert.ok(recovered.skills.every(({ state }) => state === 'installed'));
+  assert.ok(events.every((event) => !event.skills.some(({ name, state }) => name === 'lar-work' && state === 'installing')));
+});
+
+test('a failed replacement never reports Drift it did not overwrite', () => {
+  const home = temporary();
+  const source = bundle(v1);
+  installSkills(home, source, '1.0.0');
+  writeFileSync(join(home, '.agents/skills/lar-work/SKILL.md'), 'edited');
+  const rename = fs.renameSync;
+  const mocked = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+    if (String(to) === join(home, '.agents/skills/lar-work') && String(from).includes('.installing-') && !String(from).endsWith('.previous')) throw new Error('Swap denied');
+    return rename(from, to);
+  });
+  syncBuiltinESMExports();
+  try {
+    const events: import('./install-skills.ts').TargetProgress[] = [];
+    const result = installSkills(home, source, '1.0.0', { replace: true, onProgress: (event) => events.push(event) });
+    assert.deepEqual(result.replaced, []);
+    assert.deepEqual(events.findLast((event) => event.target.kind === 'agents')!.replaced, []);
+  } finally {
+    mocked.mockRestore();
+    syncBuiltinESMExports();
+  }
+});

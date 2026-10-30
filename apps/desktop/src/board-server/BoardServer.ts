@@ -16,7 +16,9 @@ import * as Schedule from "effect/Schedule";
 import type * as Scope from "effect/Scope";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
-import { SKILL_CHECK_ENV, isSkillCheckRequest, type SkillCheckAnswer } from "@lar-factory/shared";
+import {
+  SKILL_CHECK_ENV, isSkillCheckRequest, type DriftChoice, type SkillCheckAnswer, type SkillCheckOutcome,
+} from "@lar-factory/shared";
 
 const DEFAULT_PORT_TIMEOUT = Duration.seconds(30);
 const READINESS_TIMEOUT = Duration.minutes(1);
@@ -107,14 +109,14 @@ export type StartStep = "starting" | "healthz";
 
 /**
  * Starts the server, reads the port it reports and waits for `/healthz` to answer, calling `progress` as each step
- * begins. `checkSkills` answers each skill check the server asks for with why Start build can't run, or null; if it
- * rejects, the answer is that reason. Closing the scope stops the server: SIGTERM, then SIGKILL after a grace period.
+ * begins. `checkSkills` answers each skill check the server asks for, given its Drift choice, with what it found; if
+ * it rejects, the answer is that reason. Closing the scope stops the server: SIGTERM, then SIGKILL after a grace period.
  */
 export const start = Effect.fn("BoardServer.start")(function* (
   config: StartConfig,
   options?: {
     readonly portTimeout?: Duration.Input;
-    readonly checkSkills?: (() => Promise<string | null>) | undefined;
+    readonly checkSkills?: ((drift?: DriftChoice) => Promise<SkillCheckOutcome>) | undefined;
     readonly progress?: ((step: StartStep) => void) | undefined;
   },
 ): Effect.fn.Return<RunningBoard, BoardServerError, Scope.Scope | HttpClient.HttpClient> {
@@ -156,15 +158,15 @@ const spawn = (config: StartConfig) =>
     catch: (cause) => new BoardServerError({ message: `could not start the board server: ${String(cause)}` }),
   });
 
-const answerSkillChecks = (child: NodeChildProcess.ChildProcess, checkSkills: () => Promise<string | null>) =>
+const answerSkillChecks = (child: NodeChildProcess.ChildProcess, checkSkills: (drift?: DriftChoice) => Promise<SkillCheckOutcome>) =>
   child.on("message", (message) => {
     if (!isSkillCheckRequest(message)) return;
     // A check that throws refuses the build too, so Start build never waits for an answer that won't come.
-    void checkSkills().catch((cause: unknown) =>
-      `Lar Factory couldn't check its skills, so the build can't start: ${cause instanceof Error ? cause.message : String(cause)}`,
-    ).then((refusal) => {
+    void checkSkills(message.drift).catch((cause: unknown): SkillCheckOutcome => ({
+      refusal: `Lar Factory couldn't check its skills, so the build can't start: ${cause instanceof Error ? cause.message : String(cause)}`,
+    })).then((outcome) => {
       // A server that exited meanwhile has no one to read the answer.
-      if (child.connected) child.send({ type: "skills-checked", id: message.id, refusal } satisfies SkillCheckAnswer);
+      if (child.connected) child.send({ type: "skills-checked", id: message.id, ...outcome } satisfies SkillCheckAnswer);
     });
   });
 

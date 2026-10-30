@@ -18,6 +18,8 @@ import * as Effect from "effect/Effect";
 import { HttpClient } from "effect/http";
 import * as Electron from "electron";
 
+import type { DriftChoice } from "@lar-factory/shared";
+
 import * as BoardServer from "./board-server/BoardServer.ts";
 import * as BoardSupervisor from "./board-server/BoardSupervisor.ts";
 import * as InstallBoard from "./skills/install-board.ts";
@@ -202,9 +204,8 @@ const makeSkillChecks = (env: Record<string, string | undefined>) =>
   }, T3Instances.discover(env, NodeOS.homedir()));
 
 /**
- * Checks the skills in the fallback targets at launch, then asks T3 until it answers and checks its targets. The board's
- * page reports what each check found, Drift, Clashes and failures, in its notices; a native dialog would hold the main
- * process on macOS and keep the window on the starting page.
+ * Checks the skills in the fallback targets at launch, then in T3's targets once it answers, and shows the user each
+ * check's error or conflicts. The second notice leaves out the failures the first named. The board's page reports Drift.
  */
 const checkSkillsAtLaunch = (checks: SkillInstall.Checks) =>
   checks.atLaunch.pipe(
@@ -319,9 +320,9 @@ const program = Effect.gen(function* () {
     secret,
     checksSkills: skillChecks !== undefined,
   });
-  const checkSkills = skillChecks && (() => Effect.runPromise(skillChecks.beforeBuild.pipe(Effect.match({
-    onFailure: SkillInstall.buildRefusal,
-    onSuccess: SkillInstall.buildRefusal,
+  const checkSkills = skillChecks && ((drift?: DriftChoice) => Effect.runPromise(skillChecks.beforeBuild(drift).pipe(Effect.match({
+    onFailure: (failed) => SkillInstall.buildAnswer(failed, drift),
+    onSuccess: (outcome) => SkillInstall.buildAnswer(outcome, drift),
   }))));
   // Quitting closes the scope, which stops the server or cancels a pending restart.
   const supervisor = yield* BoardSupervisor.makeControl(

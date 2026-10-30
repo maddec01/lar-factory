@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: bash skills/skill-sync/scripts/preview-copy.test.sh
+# Usage: bash .agents/skills/skill-sync/scripts/preview-copy.test.sh
 # Runs preview-copy.sh against a local repo standing in for GitHub.
 set -euo pipefail
 

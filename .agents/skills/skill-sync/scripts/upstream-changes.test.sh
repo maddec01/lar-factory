@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: bash skills/skill-sync/scripts/upstream-changes.test.sh
+# Usage: bash .agents/skills/skill-sync/scripts/upstream-changes.test.sh
 # Runs upstream-changes.sh against a local repo standing in for GitHub.
 set -euo pipefail
 
@@ -24,9 +24,9 @@ first=$(git -C "$repo" rev-parse --short=12 HEAD)
 factory="$base/factory"
 mkdir -p "$factory"
 cat >"$factory/UPSTREAM.md" <<EOF2
-| Skill | Source | Path | Commit | Date | Overridden in |
-| ----- | ------ | ---- | ------ | ---- | ------------- |
-| \`demo\` | owner/repo | \`pack/skills/demo\` | \`$first\` | 2026-01-01 |  |
+| Skill | Source | Path | Repository path | Commit | Date | Overridden in |
+| ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
+| \`demo\` | owner/repo | \`pack/skills/demo\` | \`skills/nested/demo\` | \`$first\` | 2026-01-01 |  |
 EOF2
 
 fail=0

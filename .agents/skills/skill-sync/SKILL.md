@@ -5,13 +5,12 @@ disable-model-invocation: true
 ---
 
 The copied skills in `maddec01/lar-factory` change only through this skill.
+This skill lives only in `.agents/skills/skill-sync` in the checkout.
 `UPSTREAM.md` records the upstream commit each copy matches. This is the
 maintainer's tool: the maintainer runs it in the factory, and users get skills only
 through a Release.
 
-Before writing anything, read the `unslop` skill
-(`~/.claude/skills/unslop/SKILL.md` in Claude Code,
-`~/.agents/skills/unslop/SKILL.md` in Codex) and follow its rules for all prose
+Before writing anything, read `skills/shared/skills/unslop/SKILL.md` in the checkout and follow its rules for all prose
 you write: chat, commit messages, the PR body and `UPSTREAM.md`. Apply them while
 drafting, as you write each sentence, not as a later scan-and-rewrite pass. Code
 and copied files follow their own rules.
@@ -54,7 +53,7 @@ and copied files follow their own rules.
    - **Take a change**: make the Copy's folder or file match upstream's path
      at the new commit. Copy every upstream file whole. Delete each file
      upstream deleted there, inside the Copy's own folder under
-     `skills/<name>/` only, and keep its `LICENSE`; a single-file Copy changes
+     the row's `Repository path` only, and keep its `LICENSE`; a single-file Copy changes
      only that file. In its
      `UPSTREAM.md` row, set the commit to the 12-character upstream commit you
      took and the Date to that commit's date as YYYY-MM-DD (the `<head>` and
@@ -64,8 +63,7 @@ and copied files follow their own rules.
      in the same commit as the take.
    - **Skip a change**: leave the copy and its row alone. The change shows up
      again on the next sync; tell the maintainer so. Skips are recorded nowhere.
-   - **Add**: copy the folder at that commit unchanged into `skills/<name>` (a
-     file under `references/` goes to `references/`). Add its `UPSTREAM.md` row
+   - **Add**: copy the folder at that commit unchanged into the destination chosen inside `lar-shape`, `lar-build` or `skills/shared`; record it in `Repository path` and keep the upstream path in `Path`. Add its `UPSTREAM.md` row
      with the 12-character commit and that commit's date as YYYY-MM-DD, and
      the source's full commit to the "Full commits" line. When the source is
      new, add its licence to `THIRD_PARTY_NOTICES.md` under a
@@ -74,8 +72,7 @@ and copied files follow their own rules.
      author and licence its licence file names, such as `Matt Pocock (MIT)`.
    - **Drop**: delete the copy and its `UPSTREAM.md` row, and remove each
      Override that row lists from its lar file. Deleting a folder deletes its
-     `LICENSE`; delete `references/LICENSE` once no row lists a file under
-     `references/`. When no row uses its
+     `LICENSE`; delete the sibling `LICENSE` once no row lists a file in that folder. When no row uses its
      source any more, also remove that source's full commit, its "Authors"
      entry and its `THIRD_PARTY_NOTICES.md` section. Tell the maintainer the installed copies in
      `~/.agents/skills` and `~/.claude/skills` stay, since they use them in
@@ -83,8 +80,7 @@ and copied files follow their own rules.
 
    After any take or add, run `bash <this skill>/scripts/copy-licences.sh <checkout>`.
    For every `UPSTREAM.md` row it writes the source's licence file at the row's
-   commit, byte for byte, to `LICENSE` in the Copy's folder (`references/LICENSE`
-   for the files under `references/`). It picks the licence file with the same
+   commit, byte for byte, to `LICENSE` in the Copy's folder (beside single-file Copies). It picks the licence file with the same
    rule as `preview-copy.sh` and `upstream-changes.sh`: the nearest one from the
    upstream path up to the repo root, such as `pstack/LICENSE` in cursor/plugins.
    It prints each `LICENSE` it writes or removes, and `no licence: <name>` for a
@@ -96,8 +92,7 @@ and copied files follow their own rules.
    and open a PR listing what was taken, skipped, added and dropped. The maintainer
    merges it.
 7. Tell them to start a Release after merging and install it. The board app's
-   first launch of the new version updates the skills and the checklists in
-   `references/`, and installs an added copy with no further edit.
+   first launch of the new version updates the skills and their bundled Copies.
 
-Never edit a copy for lar reasons. lar rules belong in `lar-work` or a repo's
+Never edit a copy for lar reasons. lar rules belong in `lar-shape`, `lar-build` or a repo's
 `AGENTS.md`.

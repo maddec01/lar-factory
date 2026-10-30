@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: bash skills/skill-sync/scripts/override-changes.test.sh
+# Usage: bash .agents/skills/skill-sync/scripts/override-changes.test.sh
 # Runs override-changes.sh against a local repo standing in for GitHub.
 set -euo pipefail
 
@@ -50,11 +50,11 @@ git -C "$repo" add . && git -C "$repo" -c user.name=t -c user.email=t@t commit -
 factory="$base/factory"
 mkdir -p "$factory"
 cat >"$factory/UPSTREAM.md" <<EOF
-| Skill | Source | Path | Commit | Date | Overridden in |
-| ----- | ------ | ---- | ------ | ---- | ------------- |
-| \`demo\` | owner/repo | \`skills/demo\` | \`$first\` | 2026-10-01 | SKILL.md#Steps (skills/lar-work/SKILL.md); SKILL.md#Showing (skills/lar-work/agents/planner.md); SKILL.md#Gone (skills/lar-work/SKILL.md); NOTES.md#Notes (skills/lar-work/SKILL.md); OLD.md#Old (skills/lar-work/SKILL.md); SKILL.md#Missing (skills/lar-work/SKILL.md) |
-| \`references/check.md\` | owner/repo | \`refs/check.md\` | \`$first\` | 2026-10-01 | check.md#Items (skills/lar-work/SKILL.md) |
-| \`plain\` | owner/repo | \`skills/demo\` | \`$first\` | 2026-10-01 |  |
+| Skill | Source | Path | Repository path | Commit | Date | Overridden in |
+| ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
+| \`demo\` | owner/repo | \`skills/demo\` | \`skills/nested/demo\` | \`$first\` | 2026-10-01 | SKILL.md#Steps (skills/lar-work/SKILL.md); SKILL.md#Showing (skills/lar-work/agents/planner.md); SKILL.md#Gone (skills/lar-work/SKILL.md); NOTES.md#Notes (skills/lar-work/SKILL.md); OLD.md#Old (skills/lar-work/SKILL.md); SKILL.md#Missing (skills/lar-work/SKILL.md) |
+| \`references/check.md\` | owner/repo | \`refs/check.md\` | \`skills/nested/references/check.md\` | \`$first\` | 2026-10-01 | check.md#Items (skills/lar-work/SKILL.md) |
+| \`plain\` | owner/repo | \`skills/demo\` | \`skills/nested/plain\` | \`$first\` | 2026-10-01 |  |
 EOF
 
 fail=0

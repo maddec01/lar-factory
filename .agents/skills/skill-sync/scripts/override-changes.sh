@@ -42,7 +42,7 @@ flag() { echo "$1: $2: $3"; flagged=$((flagged + 1)); }
 
 # Reads rows in this shell, not a pipeline or $(...), so set -e stops the
 # script on a failed clone or git command and flag's count survives the loop.
-while IFS='|' read -r _ name source path commit _ overrides _; do
+while IFS='|' read -r _ name source path repository_path commit _ overrides _; do
     name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
     path=$(echo "$path" | tr -d ' `'); commit=$(echo "$commit" | tr -d ' `')
     [[ -n "${overrides// /}" ]] || continue

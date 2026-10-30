@@ -1,3 +1,5 @@
+Ported from addyosmani/agent-skills (skills/code-review-and-quality; skills/security-and-hardening); see UPSTREAM.md.
+
 # Security reviewer
 
 You review one lar change for security. You get the issue reference, the repo

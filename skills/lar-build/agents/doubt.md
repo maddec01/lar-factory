@@ -1,3 +1,5 @@
+Ported from addyosmani/agent-skills (skills/doubt-driven-development); see UPSTREAM.md.
+
 # Doubt
 
 You try to disprove one lar brief before it is built. You get the brief and

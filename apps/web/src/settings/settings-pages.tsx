@@ -11,7 +11,7 @@ import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { useResetStore } from '../repositories/reset-store.ts';
-import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
+import { ChannelChoice, TargetProgress, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { Switch, type Control, ToolState } from './controls.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
@@ -171,6 +171,7 @@ function targetGroup({ app, targets }: PagesInput): Group {
     title: 'Install targets', description, note: <TargetsNote />,
     rows: (targets ?? []).map((target) => ({
       id: `target-${target.path}`, title: target.path, description: targetNote(target), control: custom(() => <TargetSwitch path={target.path} />),
+      below: <TargetProgress target={target} />,
     })),
   };
 }

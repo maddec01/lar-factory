@@ -881,3 +881,51 @@ test('dialog preferences default off and persist when Settings reopens', async (
     localStorage.removeItem('lar-board:open-list-expanded');
   }
 });
+
+test('Skills shows live work and recovery without counting blocked skills as installed', async () => {
+  const bridge = stubBridge();
+  await open();
+  const work = targetAt('~/.agents/skills', true, { kind: 'agents', release: '0.1.0', finished: false,
+    operation: 'install', running: true, skills: [{ name: 'lar-build', state: 'installed' }, { name: 'lar-shape', state: 'installing' }] });
+  await bridge.push({ ...listed, running: 'launch', targets: [work] });
+  expect(text(row('target-~/.agents/skills'))).toContain('Release 0.1.0');
+  expect(text(row('target-~/.agents/skills'))).toContain('lar-shape: Installing');
+  const progress = row('target-~/.agents/skills').querySelector('progress')!;
+  expect([progress.value, progress.max]).toEqual([1, 2]);
+  await bridge.push({ ...listed, targets: [{ ...work, running: false, error: 'Permission denied. Fix access and Retry.',
+    skills: [{ name: 'lar-build', state: 'installed' }, { name: 'lar-shape', state: 'failed' }], replaced: ['lar-build'] }] });
+  expect(text(row('target-~/.agents/skills'))).toContain('Permission denied');
+  expect(text(row('target-~/.agents/skills'))).toContain('Replaced Drift: lar-build');
+  expect(row('target-~/.agents/skills').querySelector('progress')!.value).toBe(1);
+  expect(row('target-~/.agents/skills').querySelector('button[data-retry-install]')).not.toBeNull();
+  await bridge.push({ ...listed, targets: [{ ...work, operation: 'check', running: true }] });
+  expect(row('target-~/.agents/skills').querySelector('progress')).toBeNull();
+  expect(text(row('target-~/.agents/skills'))).toContain('Checking');
+});
+
+test('a push before the initial Settings read wins and uses the shared subscription', async () => {
+  const bridge = stubBridge();
+  let finish!: (snapshot: InstallSnapshot) => void;
+  bridge.getInstallState.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  await open();
+  await bridge.push({ ...bothTicked, revision: 2 });
+  await settle(() => finish({ ...listed, revision: 1 }));
+  expect(profileTicks()).toEqual([true, true]);
+  expect(bridge.onInstallState).toHaveBeenCalledOnce();
+  await settle(() => close().click());
+  await bridge.push({ ...listed, revision: 3 });
+  await settle(() => settingsButton()!.click());
+  expect(profileTicks()).toEqual([true, false]);
+  expect(bridge.setTargetTick).not.toHaveBeenCalled();
+});
+
+test('a delayed read failure cannot discard a newer pushed snapshot', async () => {
+  const bridge = stubBridge();
+  let fail!: (cause: Error) => void;
+  bridge.getInstallState.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+  await open();
+  await bridge.push({ ...bothTicked, revision: 2 });
+  await settle(() => fail(new Error('old read failed')));
+  expect(profileTicks()).toEqual([true, true]);
+  expect(result().textContent).not.toContain('old read failed');
+});

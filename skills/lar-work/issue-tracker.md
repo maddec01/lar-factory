@@ -79,7 +79,7 @@ hyphens for spaces, such as `status-shaping` or `status-ready-to-merge`. An issu
 stores Done: closing the issue, or moving the work item to a Completed-category
 State, makes it Done.
 
-Move an item with `bash <lar-work>/scripts/status.sh <issue-url> "<Status>"`
+Move an item with `bash <lar-work>/../shared/scripts/status.sh <issue-url> "<Status>"`
 as the workflow directs, passing a work item's URL on Azure DevOps. It swaps the
 issue's label or the work item's tag. On a work
 item it also moves State when the state category changes: the first
@@ -158,7 +158,7 @@ Then add its blocked-by links with `--add-blocked-by`
 above.
 
 ```sh
-bash <lar-work>/scripts/slice.sh "$repo" "$build" "<title>" /path/to/slice.md
+bash <lar-work>/../shared/scripts/slice.sh "$repo" "$build" "<title>" /path/to/slice.md
 ```
 
 An **active slice** carries the `active` label while
@@ -234,7 +234,7 @@ fi
 
 ## Capture-only Concepts
 
-Follow [Retro capture](retro-capture.md), with its persisted plan, stable
+Follow [Retro capture](../shared/retro-capture.md), with its persisted plan, stable
 selection IDs, reconciliation and visibility rules. A selected suggestion
 spanning repositories goes to the factory repository, even when the source
 issue and checkout are in another repository. Run label setup there after
@@ -342,7 +342,7 @@ Tag every decision `decision-<method>` and every build `build`; a kind or
 off the board and contribute only to parent counts:
 
 ```sh
-child_url=$(bash <lar-work>/scripts/slice.sh "$azure_repo" "$parent_url" "Decide the approach" /path/to/decision.md)
+child_url=$(bash <lar-work>/../shared/scripts/slice.sh "$azure_repo" "$parent_url" "Decide the approach" /path/to/decision.md)
 child=${child_url##*/}
 retag "$child" "" "decision-grill"
 
@@ -370,7 +370,7 @@ repository changes, that work is a build: a child Task of the item, tagged
 that the item waits for. Reuse an open child Task that covers the work.
 
 ```sh
-build_url=$(bash <lar-work>/scripts/slice.sh "$azure_repo" "$item_url" "<title>" /path/to/brief.md)
+build_url=$(bash <lar-work>/../shared/scripts/slice.sh "$azure_repo" "$item_url" "<title>" /path/to/brief.md)
 build=${build_url##*/}
 retag "$build" "" build
 retag "$build" "" "repo-<that repository>"
@@ -386,7 +386,7 @@ no link between providers yet: tell the user and leave it out.
 
 A slice is a child Task of a work item tagged `build`; a child tagged `build`
 is a build, never a slice. Create it with
-`bash <lar-work>/scripts/slice.sh "$azure_repo" "$build_url" "<title>" /path/to/slice.md`,
+`bash <lar-work>/../shared/scripts/slice.sh "$azure_repo" "$build_url" "<title>" /path/to/slice.md`,
 which creates an untagged Task, then add its predecessor links. Slices carry
 only slice tags (`active` or `blocked`), with no factory Status; reserve `build`,
 `decision-*` and `concept` for board items. The `active` and

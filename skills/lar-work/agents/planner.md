@@ -13,7 +13,7 @@ scan-and-rewrite pass. Code is out of scope.
   `~/.agents/skills/to-tickets/SKILL.md` in Codex) on the build: explore
   the code, then split the work into vertical slices, each sized for one fresh
   context. Chain slices that touch the same file with blocked-by.
-- Publish each slice with `bash <lar-work>/scripts/slice.sh <owner/repo>
+- Publish each slice with `bash <lar-work>/../shared/scripts/slice.sh <owner/repo>
   <build> "<title>" <body-file>`, then add native blocked-by links (**Slices**
   in `<lar-work>/issue-tracker.md`). On Azure DevOps pass the Azure repository
   and the build's work item URL, and link blockers as predecessors (**Azure

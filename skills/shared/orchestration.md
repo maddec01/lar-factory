@@ -39,6 +39,6 @@ options against the request; report a capability mismatch, never downgrade.
   first runs `git fetch origin main` and
   `git switch -c prototype/<n>-<slug> origin/main`. It returns each variant's start command (or
   HTML path), the worktree path, the branch and a preferred port, and leaves no
-  server running ([SKILL.md 2. Size up](SKILL.md#2-size-up)).
+  server running ([SKILL.md 2. Size up](../size-up.md)).
 - **Planner, reviewers, checks** and every other role: native subagent, unless
   model options make it a child task.

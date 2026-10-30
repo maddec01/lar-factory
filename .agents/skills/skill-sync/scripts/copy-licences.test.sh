@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: bash skills/skill-sync/scripts/copy-licences.test.sh
+# Usage: bash .agents/skills/skill-sync/scripts/copy-licences.test.sh
 # Runs copy-licences.sh against local repos standing in for GitHub.
 set -euo pipefail
 
@@ -36,15 +36,17 @@ commit "$bare" first
 bare_head=$(git -C "$bare" rev-parse --short=12 HEAD)
 
 factory="$base/factory"
-mkdir -p "$factory/skills/demo" "$factory/skills/deep" "$factory/skills/plain" "$factory/skills/own" "$factory/references"
-echo stale > "$factory/skills/plain/LICENSE"
+mkdir -p "$factory/skills/nested/demo" "$factory/skills/nested/deep" "$factory/skills/nested/plain" "$factory/skills/nested/own" "$factory/skills/nested/references"
+echo r > "$factory/skills/nested/references/list.md"
+
+echo stale > "$factory/skills/nested/plain/LICENSE"
 cat >"$factory/UPSTREAM.md" <<EOF2
-| Skill | Source | Path | Commit | Date | Overridden in |
-| ----- | ------ | ---- | ------ | ---- | ------------- |
-| \`demo\` | owner/root | \`skills/demo\` | \`$old\` | 2026-01-01 |  |
-| \`deep\` | owner/nested | \`pack/skills/deep\` | \`$nested_head\` | 2026-01-01 |  |
-| \`plain\` | owner/bare | \`skills/plain\` | \`$bare_head\` | 2026-01-01 |  |
-| \`references/list.md\` | owner/root | \`refs/list.md\` | \`$old\` | 2026-01-01 |  |
+| Skill | Source | Path | Repository path | Commit | Date | Overridden in |
+| ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
+| \`demo\` | owner/root | \`skills/demo\` | \`skills/nested/demo\` | \`$old\` | 2026-01-01 |  |
+| \`deep\` | owner/nested | \`pack/skills/deep\` | \`skills/nested/deep\` | \`$nested_head\` | 2026-01-01 |  |
+| \`plain\` | owner/bare | \`skills/plain\` | \`skills/nested/plain\` | \`$bare_head\` | 2026-01-01 |  |
+| \`references/list.md\` | owner/root | \`refs/list.md\` | \`skills/nested/references/list.md\` | \`$old\` | 2026-01-01 |  |
 EOF2
 
 fail=0
@@ -58,14 +60,14 @@ same() { # <description> <file> <repo> <commit:path>
 }
 
 out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/copy-licences.sh" "$factory")
-same "copies a root licence byte for byte at the recorded commit" "$factory/skills/demo/LICENSE" "$root" "$old:LICENSE"
-same "copies the licence nearest the path, not the root one" "$factory/skills/deep/LICENSE" "$nested" "$nested_head:pack/LICENSE.md"
-same "gives references/ its source's licence" "$factory/references/LICENSE" "$root" "$old:LICENSE"
-check "reports each licence it writes" "$out" "^wrote skills/demo/LICENSE from owner/root LICENSE$"
-check "reports the nested licence's path" "$out" "^wrote skills/deep/LICENSE from owner/nested pack/LICENSE.md$"
-check "warns about a source with no licence" "$out" "^no licence: plain \\(owner/bare\\), removed skills/plain/LICENSE$"
-if [[ -e "$factory/skills/plain/LICENSE" ]]; then echo "FAIL removes the LICENSE of a source with none"; fail=1; else echo "ok   removes the LICENSE of a source with none"; fi
-if [[ -e "$factory/skills/own/LICENSE" ]]; then echo "FAIL leaves folders UPSTREAM.md doesn't list alone"; fail=1; else echo "ok   leaves folders UPSTREAM.md doesn't list alone"; fi
+same "copies a root licence byte for byte at the recorded commit" "$factory/skills/nested/demo/LICENSE" "$root" "$old:LICENSE"
+same "copies the licence nearest the path, not the root one" "$factory/skills/nested/deep/LICENSE" "$nested" "$nested_head:pack/LICENSE.md"
+same "gives references/ its source's licence" "$factory/skills/nested/references/LICENSE" "$root" "$old:LICENSE"
+check "reports each licence it writes" "$out" "^wrote skills/nested/demo/LICENSE from owner/root LICENSE$"
+check "reports the nested licence's path" "$out" "^wrote skills/nested/deep/LICENSE from owner/nested pack/LICENSE.md$"
+check "warns about a source with no licence" "$out" "^no licence: plain \\(owner/bare\\), removed skills/nested/plain/LICENSE$"
+if [[ -e "$factory/skills/nested/plain/LICENSE" ]]; then echo "FAIL removes the LICENSE of a source with none"; fail=1; else echo "ok   removes the LICENSE of a source with none"; fi
+if [[ -e "$factory/skills/nested/own/LICENSE" ]]; then echo "FAIL leaves folders UPSTREAM.md doesn't list alone"; fail=1; else echo "ok   leaves folders UPSTREAM.md doesn't list alone"; fi
 
 out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/copy-licences.sh" "$factory")
 check "rewrites nothing on a second run" "$out" "^wrote" absent
@@ -73,15 +75,15 @@ check "warns again about a source with no licence" "$out" "^no licence: plain \\
 
 sed -i.bak "s/\`$old\`/\`$new\`/" "$factory/UPSTREAM.md" && rm "$factory/UPSTREAM.md.bak"
 out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/copy-licences.sh" "$factory")
-same "follows the commit a take records" "$factory/skills/demo/LICENSE" "$root" "$new:LICENSE"
-check "reports the updated licence" "$out" "^wrote skills/demo/LICENSE from owner/root LICENSE$"
+same "follows the commit a take records" "$factory/skills/nested/demo/LICENSE" "$root" "$new:LICENSE"
+check "reports the updated licence" "$out" "^wrote skills/nested/demo/LICENSE from owner/root LICENSE$"
 
 # shellcheck disable=SC2016 # the backticks are Markdown
-printf '| `gone` | owner/root | `skills/gone` | `%s` | 2026-01-01 |  |\n' "$new" >>"$factory/UPSTREAM.md"
+printf '| `gone` | owner/root | `skills/gone` | `skills/nested/gone` | `%s` | 2026-01-01 |  |\n' "$new" >>"$factory/UPSTREAM.md"
 if out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/copy-licences.sh" "$factory" 2>&1); then
     echo "FAIL exits non-zero when a listed Copy's folder is missing"; fail=1
 else
-    check "exits non-zero when a listed Copy's folder is missing" "$out" "^gone: no folder skills/gone$"
+    check "exits non-zero when a listed Copy's folder is missing" "$out" "^gone: no folder skills/nested/gone$"
 fi
 
 exit $fail

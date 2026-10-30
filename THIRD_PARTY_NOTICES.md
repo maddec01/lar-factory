@@ -3,14 +3,14 @@
 This file lists the notice of every upstream project lar copies from. The
 skills listed in `UPSTREAM.md` are copied from the projects below and keep
 their licences; `developer-profile` is lar's own and needs none. Files under
-`references/` come from addyosmani/agent-skills.
+`skills/lar-build/references/` come from addyosmani/agent-skills.
 `apps/desktop` and `apps/web` port code from pingdotgg/t3code; each Port says so in
 its header. `packages/ui` copies lar-server's design system, which is lar's own and
 needs no notice.
 `.github/scripts/release-plan.cjs` and `.github/workflows/release.yml` adapt code
 from pingdotgg/t3code.
 
-`skills/pr/CREDITS.md` reuses Dex Horthy's `show-me` text from humanlayer/humanlayer.
+`skills/lar-build/skills/pr/CREDITS.md` reuses Dex Horthy's `show-me` text from humanlayer/humanlayer.
 Matt Pocock credits it in that file, so it has no section here.
 
 ## mattpocock/skills

@@ -15,7 +15,7 @@ factory=$(cd "${1:-.}" && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-grep -E '^\| `' "$factory/UPSTREAM.md" | while IFS='|' read -r _ name source path commit _; do
+grep -E '^\| `' "$factory/UPSTREAM.md" | while IFS='|' read -r _ name source path repository_path commit _; do
     name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
     path=$(echo "$path" | tr -d ' `'); commit=$(echo "$commit" | tr -d ' `')
     if [[ ! $commit =~ ^[0-9a-f]{7,40}$ ]]; then

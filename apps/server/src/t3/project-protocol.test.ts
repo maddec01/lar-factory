@@ -42,3 +42,16 @@ it('revokes a newly issued session if Keychain storage fails', async () => {
   expect((await adapter.readProjects()).availability).toBe('renewal-required');
   expect(revoked).toEqual(['new']);
 });
+
+it('renews before expiry, persists the replacement, and revokes the old session', async () => {
+  const events: string[] = [];
+  const adapter = new ProjectProtocol({
+    read: async () => ({ token: 'old-fixture', sessionId: 'old', expiresAt: new Date(30_000).toISOString() }),
+    write: async session => { events.push(`stored:${session.sessionId}`); },
+  }, {
+    issue: async () => ({ token: 'new-fixture', sessionId: 'new', expiresAt: new Date(3_600_000).toISOString() }),
+    revoke: async id => { events.push(`revoked:${id}`); },
+  }, async token => { expect(token).toBe('new-fixture'); return Response.json({ projects: [], updatedAt: '2026-01-01' }); }, supportedProjectVersion, () => 0);
+  expect((await adapter.readProjects()).availability).toBe('available');
+  expect(events).toEqual(['stored:new', 'revoked:old']);
+});

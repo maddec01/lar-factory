@@ -21,7 +21,7 @@ verifies visible changes and merges every PR; the rest is yours.
   shaping, concept and decision threads, and a fresh thread resuming one after
   a handoff. Build threads get it from `agents/builder.md`.
 - Move the issue's Status on the "lar" board at every step:
-  `bash <this skill>/scripts/status.sh <owner/repo#n> "<Status>"`, or the work
+  `bash <this skill>/../shared/scripts/status.sh <owner/repo#n> "<Status>"`, or the work
   item's URL on Azure DevOps. Statuses:
   List, Queued, Shaping, Needs you, Ready, In progress, Review, Verify,
   Ready to merge. `status.sh` refuses Done: closing the issue, or completing
@@ -32,9 +32,9 @@ verifies visible changes and merges every PR; the rest is yours.
 - **Tools**: `gh issue view <ref> --comments` and `gh issue comment` for
   issues, and on Azure DevOps the read and comment commands in
   [Azure DevOps](issue-tracker.md#azure-devops); `t3_thread_launch` for a handoff thread; a native subagent or a
-  `delegate_task` child task per [Orchestration](orchestration.md) for
+  `delegate_task` child task per [Orchestration](../shared/orchestration.md) for
   delegated work; `AskUserQuestion` for ordinary questions to the user, following
-  the [question guide](questions.md). Retro picks and their clarifications
+  the [question guide](../shared/questions.md). Retro picks and their clarifications
   stay in chat. Call `orchestrator_capabilities` only to change a model or to
   read `inheritedOptions` before delegating; never search the tool catalogue.
 - Read each linked file or skill only when its step runs.
@@ -57,7 +57,7 @@ verifies visible changes and merges every PR; the rest is yours.
     the line the builder's **Approve** describes.
 - Never merge or push to `main`. Commit and PR rules are in each repo's
   `AGENTS.md`, except citing another repository's work, which follows
-  [Cross-repository citations](cross-repo-citations.md).
+  [Cross-repository citations](../shared/cross-repo-citations.md).
 
 ## Grilling with docs
 
@@ -81,7 +81,7 @@ conditions. The builder writes them to the repo in the build PR.
 Read the issue with comments, parent, sub-issues and blockers, then route:
 
 - **Unfinished retro capture record** (first, even over a passing brief):
-  finish only that capture per [Retro capture](retro-capture.md), keeping the
+  finish only that capture per [Retro capture](../shared/retro-capture.md), keeping the
   source status. Rerun no build or retro; start no shaping or thread. Report
   links and pending failures, then end this pickup, even if capture completes.
 - A `decision-*` sub-issue: [Decisions](concepts.md#decisions).
@@ -92,15 +92,15 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
   `AGENTS.md`, `GLOSSARY.md`, relevant ADRs and the code this issue touches,
   and returns ≤300 words in `domain-modeling` vocabulary: what exists, where,
   and what the issue would change. It also returns each onboarded repository's **role**:
-  `bash <this skill>/scripts/repo-config.sh --list` lists the repositories, and
-  `bash <this skill>/scripts/repo-config.sh <owner/repo>` (or an Azure
+  `bash <this skill>/../shared/scripts/repo-config.sh --list` lists the repositories, and
+  `bash <this skill>/../shared/scripts/repo-config.sh <owner/repo>` (or an Azure
   repository's origin URL or `<org>/<project>/<repo>`) prints one's config,
   read from its default branch (this checkout may be another repo's).
 
 ## 2. Size up
 
 Pick the route yourself; never ask the user to pick one by name. Ask them to
-confirm it ([question UI](questions.md)) in a few lines: what you understood
+confirm it ([question UI](../shared/questions.md)) in a few lines: what you understood
 the item to be; the repositories that change, named from the repository
 roles; the open questions, or "none";
 and what happens next in plain
@@ -120,7 +120,7 @@ label. On Azure DevOps the kind is a tag, added with `retag`
 - **Open questions**: settle every one here by **Grilling with docs**, for bugs
   and features alike. A question of how something looks or feels gets a
   **Prototype** child task with `prototype`, started per
-  [Orchestration](orchestration.md): two or three variants differing only on
+  [Orchestration](../shared/orchestration.md): two or three variants differing only on
   that question; a logic or state question gets an HTML page. It keeps its
   screenshots in its own context and returns each variant's start command (or
   HTML path), the worktree path, the branch, a preferred port and a short
@@ -149,7 +149,7 @@ label. On Azure DevOps the kind is a tag, added with `retag`
   - When the user picks, or the thread ends without a pick, stop exactly the
     noted PIDs. An app left installed on the simulator stays.
   - If `preview_open` or `device_open` is unavailable or fails, stop, tell
-    the user why and ask how to go on per [Questions](questions.md). Never fall
+    the user why and ask how to go on per [Questions](../shared/questions.md). Never fall
     back to anything outside T3.
 - **Another repository changes** (its role says it serves or uses what this
   item changes): that work becomes a build there, a

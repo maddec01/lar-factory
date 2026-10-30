@@ -16,7 +16,7 @@ it and flags each Override an upstream change touches.
 | ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
 | `grilling` | mattpocock/skills | `skills/productivity/grilling` | `skills/lar-shape/skills/grilling` | `5beb35b040e3` | 2026-10-19 |  |
 | `domain-modeling` | mattpocock/skills | `skills/engineering/domain-modeling` | `skills/shared/skills/domain-modeling` | `5beb35b040e3` | 2026-10-19 |  |
-| `prototype` | mattpocock/skills | `skills/engineering/prototype` | `skills/lar-shape/skills/prototype` | `5beb35b040e3` | 2026-10-19 | LOGIC.md#3. Build the shareable HTML file (skills/lar-work/SKILL.md); LOGIC.md#4. Hand it over (skills/lar-work/SKILL.md); LOGIC.md#Anti-patterns (skills/lar-work/SKILL.md); UI.md#5. Hand it over (skills/lar-work/SKILL.md); SKILL.md#Rules that apply to both (skills/lar-work/SKILL.md) |
+| `prototype` | mattpocock/skills | `skills/engineering/prototype` | `skills/lar-shape/skills/prototype` | `5beb35b040e3` | 2026-10-19 | LOGIC.md#3. Build the shareable HTML file (skills/lar-shape/size-up.md); LOGIC.md#4. Hand it over (skills/lar-shape/size-up.md); LOGIC.md#Anti-patterns (skills/lar-shape/size-up.md); UI.md#5. Hand it over (skills/lar-shape/size-up.md); SKILL.md#Rules that apply to both (skills/lar-shape/size-up.md) |
 | `research` | mattpocock/skills | `skills/engineering/research` | `skills/lar-shape/skills/research` | `5beb35b040e3` | 2026-10-19 |  |
 | `diagnosing-bugs` | mattpocock/skills | `skills/engineering/diagnosing-bugs` | `skills/lar-shape/skills/diagnosing-bugs` | `5beb35b040e3` | 2026-10-19 |  |
 | `tdd` | mattpocock/skills | `skills/engineering/tdd` | `skills/lar-build/skills/tdd` | `5beb35b040e3` | 2026-10-19 |  |

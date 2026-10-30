@@ -84,20 +84,20 @@ than repeat a possibly successful mutation.
 3. Otherwise create one issue with an actionable title, the selected
    improvement, useful context, safe provenance and the exact selection ID in
    its body. An Azure DevOps destination gets a work item with
-   tags for labels and no label setup ([Azure DevOps](issue-tracker.md#azure-devops)).
-   On GitHub, first follow [label setup](issue-tracker.md#label-setup) for the
+   tags for labels and no label setup ([Azure DevOps](issue-tracker/azure-devops.md#azure-devops)).
+   On GitHub, first follow [label setup](issue-tracker/label-setup.md#label-setup) for the
    **destination** repository, including the factory repository for a
    cross-repository concept captured from another repository. Do this after persisting the
    source plan; if setup fails, leave capture pending and retry setup before
    creating the issue. Follow destination label conventions (`bug`, `feature`,
    `improvement` as fits); capture text is not a passing brief. A
    cross-repository concept gets the `concept` label and the sections in
-   [Concepts](concepts.md): Destination (with affected repositories), Decisions
+   [Concepts](../concepts.md): Destination (with affected repositories), Decisions
    so far (confirmed choices only), Fog (unshaped decomposition), Out of scope,
    Map (no sub-issues yet). Capture creates no decisions or sub-issues and
    starts no shaping or build.
 4. For a **new** issue only, after retaining its URL, run
-   `bash <lar-work>/scripts/status.sh <issue-url> "List"`. Creation and board
+   `bash <this skill>/shared/scripts/status.sh <issue-url> "List"`. Creation and board
    placement are separate: a failure leaves that URL with `Board: pending`;
    retry placement on the same issue, never create a replacement. Recovered
    creations still need their pending placement.
@@ -106,5 +106,5 @@ than repeat a possibly successful mutation.
    clear the remaining steps. Otherwise leave it pending with the exact
    unfinished steps and errors. Report created/reused links (respecting
    visibility) and pending failures to the user. Resume with
-   `/lar-work <source-owner/repo#n>`; Pick up finishes capture only, even when
+   `/lar-shape <source-owner/repo#n>`; Pick up finishes capture only, even when
    the source already has a passing brief.

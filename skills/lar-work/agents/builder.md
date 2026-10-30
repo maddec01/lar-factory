@@ -6,7 +6,7 @@ edit code, run checks and drive the browser; you hold their reports and merge
 slices.
 
 `<lar-work>` is the folder holding this file's parent. Set a status with
-`bash <lar-work>/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
+`bash <lar-work>/../shared/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
 name: the ones named here, plus `gh issue view <ref> --comments` and
 `gh issue comment`, or on Azure DevOps the read and comment commands in
 **Azure DevOps** in `<lar-work>/issue-tracker.md`. `status.sh` takes a work

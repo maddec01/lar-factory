@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONFIG_VERSION, isRecord, sameRepo } from '@lar-factory/shared';
-import { boardDataDir } from '../port/board-record.ts';
+import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { notEditable, type Refused } from './edit-config.ts';
 
 const FILE = 'config-update-notices.json';

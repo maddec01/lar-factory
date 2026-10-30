@@ -8,12 +8,12 @@ import {
   PROVIDERS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider,
   type RepositoryConfigAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
+import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { AGENT_DOC_PATHS, withoutAgentSkills } from '../onboarding/agent-setup.ts';
 import { problemOf } from '../azure/azure-items.ts';
 import { readBranchFile as readAzureFile } from '../azure/azure-repos.ts';
 import { ReadProblem } from '../items/item-source.ts';
 import { readBranchFile } from '../github/github.ts';
-import { boardDataDir } from '../port/board-record.ts';
 
 /** One repository's Repository config, with each field its file leaves out filled in. */
 export interface RepositoryConfig {

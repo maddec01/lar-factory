@@ -2,8 +2,8 @@
 // this Mac's list, so the board shows the repository with Resume, also after a restart.
 
 import { sameRepo, type OnboardingRepository } from '@lar-factory/shared';
+import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { findRepositoryConfig, isProgress, isRepo, readRepositoryList, saveOnboarding, stillOnboarding } from '../config/repository-config.ts';
-import { boardDataDir } from '../port/board-record.ts';
 
 /**
  * Stores the body's `progress` for its `repo`, in place of the onboarding saved under `replaces` when it names one, and

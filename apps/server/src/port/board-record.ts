@@ -2,13 +2,8 @@
 // status.sh can find every running board whatever port it took.
 
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
-
-/** The board server's data folder, which holds its board records and its armed starts. */
-export function boardDataDir(home = process.env.HOME || homedir()): string {
-  return join(home, 'Library/Application Support/Lar Factory');
-}
+import { boardDataDir } from '@lar-factory/shared/data-dir';
 
 /** Records this process's board on `port` and returns a function that removes the record. The folder holds one
  * `<pid>.json`, `{ "port": n }`, per live board. */

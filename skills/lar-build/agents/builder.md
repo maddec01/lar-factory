@@ -5,17 +5,17 @@ shaping conversation, then run its review. You orchestrate: subagents explore,
 edit code, run checks and drive the browser; you hold their reports and merge
 slices.
 
-`<lar-work>` is the folder holding this file's parent. Set a status with
-`bash <lar-work>/../shared/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
+`<lar-build>` is the installed skill folder holding this file's parent. Set a status with
+`bash <lar-build>/shared/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
 name: the ones named here, plus `gh issue view <ref> --comments` and
 `gh issue comment`, or on Azure DevOps the read and comment commands in
-**Azure DevOps** in `<lar-work>/issue-tracker.md`. `status.sh` takes a work
+**Azure DevOps** in `<lar-build>/shared/issue-tracker/slices.md`. `status.sh` takes a work
 item's URL there. Call `orchestrator_capabilities` only when a model must
 change or to read `inheritedOptions` before delegating; skip searching the tool
 catalogue. Read each file or skill a step names only when that step runs.
 
-Before you write anything, read `unslop` once (`~/.claude/skills/unslop/SKILL.md`
-in Claude Code, `~/.agents/skills/unslop/SKILL.md` in Codex), also in a fresh
+Before you write anything, read `unslop` once (`<lar-build>/shared/skills/unslop/SKILL.md`
+in Claude Code, `<lar-build>/shared/skills/unslop/SKILL.md` in Codex), also in a fresh
 thread resuming after a handoff. Apply its rules while drafting all your prose
 (chat, issue comments, handoffs, retro text, docs), not as a separate
 scan-and-rewrite pass. Code is out of scope.
@@ -23,7 +23,7 @@ scan-and-rewrite pass. Code is out of scope.
 ## Subagents
 
 - **Spawn**: a native subagent or a child task, per
-  `<lar-work>/orchestration.md`. Keep each running child task's `taskId`.
+  `<lar-build>/shared/orchestration.md`. Keep each running child task's `taskId`.
 - **Report**: every prompt carries the factory report rule: ≤300 words, no
   whole files, logs or screenshots; check runs report pass/fail and only the
   failures that matter.
@@ -31,9 +31,9 @@ scan-and-rewrite pass. Code is out of scope.
   (`--fixup=amend:<sha>` when the fix makes that commit's message wrong),
   never `--no-verify`, and reruns only the checks `AGENTS.md` names for the
   files its fix touched, never the full suite. Its prompt carries
-  `<lar-work>/cross-repo-citations.md` for citing other-repo work.
+  `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
 - **UI-check**: runs the visible checks and Verify captures per
-  `<lar-work>/screenshots.md`, keeps screenshots in its own context, and
+  `<lar-build>/screenshots.md`, keeps screenshots in its own context, and
   leaves the app it started running. It returns the screenshots' absolute
   paths, a verdict and its app report: the commit it ran, how to reach the
   app, and the processes it started, each with something a later thread can
@@ -57,7 +57,7 @@ scan-and-rewrite pass. Code is out of scope.
      until no page is left (each returns up to 100). `t3_thread_search`
      covers only active threads, so it misses some.
    - A thread matches when its first user message, read with `t3_thread_read`
-     where the list lacks it, runs `/lar-work` or `$lar-work` on this build's
+     where the list lacks it, runs `/lar-shape` or `$lar-shape` on this build's
      issue: the ref in your own `Build <ref>` message, which also matches on
      Azure DevOps. The message may name it as `owner/repo#n`, with owner and
      repo in any case, or as a bare `#n`. The number matches exactly, so
@@ -84,10 +84,10 @@ scan-and-rewrite pass. Code is out of scope.
 3. **Implement.** In parallel, start an **implementer** child task for each
    ready slice (the ready-slices command in **Slices**) not already running,
    while no planner runs, per **Implementer** in
-   `<lar-work>/orchestration.md`, and track it by its `taskId`. Give it
+   `<lar-build>/shared/orchestration.md`, and track it by its `taskId`. Give it
    `implementer.md`, the slice reference, the build branch and the full
    slice branch name, and add `active` to the slice (**Slices** in
-   `<lar-work>/issue-tracker.md`). Derive the name from the build issue
+   `<lar-build>/shared/issue-tracker/slices.md`). Derive the name from the build issue
    number `<n>`, the slice issue number `<m>` and a slug of the slice title.
    The first attempt uses `slice/<n>-<m>-<slug>`. When
    `git branch --list 'slice/<n>-<m>-*'` finds a branch, a restart (after a
@@ -103,17 +103,17 @@ scan-and-rewrite pass. Code is out of scope.
    fast-forward, send a subagent to the implementer's reported worktree path to
    rebase onto the build branch tip, then merge again. After each merge, remove
    `active` and close the slice sub-issue (**Slices** in
-   `<lar-work>/issue-tracker.md`), and run **Implement** again. A slice
+   `<lar-build>/shared/issue-tracker/slices.md`), and run **Implement** again. A slice
    reported blocked gets the blocked-slice commands in **Slices**, and a
    re-slice planner if none runs. A slice closed any other way loses `active`
    too. A wrong brief follows the stop rule below. Done when every slice is
    closed.
 5. A subagent writes the brief's **Domain docs** in its own commit,
-   following `domain-modeling`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
+   following `<lar-build>/shared/skills/domain-modeling/SKILL.md`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
    links them from `AGENTS.md` as the repo's `docs/agents/domain.md` says
    (without that file, it adds a **Domain docs** section to `AGENTS.md`
    pointing to both). Its prompt carries
-   `<lar-work>/cross-repo-citations.md` for citing other-repo work.
+   `<lar-build>/shared/cross-repo-citations.md` for citing other-repo work.
    A new term or ADR-worthy decision (all three conditions) settled during the
    build is added the same way (by the fixer during review) without stopping;
    list each in one issue comment headed **Domain docs added by the build**,
@@ -130,7 +130,7 @@ scan-and-rewrite pass. Code is out of scope.
    starts from.
 7. Push the branch. Don't open the PR yet.
 
-Ordinary questions to the user follow `<lar-work>/questions.md`: Needs you,
+Ordinary questions to the user follow `<lar-build>/shared/questions.md`: Needs you,
 `AskUserQuestion`, answers on the issue, status back. Retro picks and their
 clarifications use chat and preserve the final status, per the same guide.
 
@@ -139,9 +139,9 @@ implementers or planners, wait for any running planner to return (a native
 subagent outlives a handoff), and merge or `task_cancel` every running
 child task: task IDs work only in the thread that created them, so the
 handoff carries none. Then
-post a handoff written per `~/.agents/skills/handoff/SKILL.md` as an issue
+post a handoff written per `<lar-build>/shared/skills/handoff/SKILL.md` as an issue
 comment and relaunch with
-`t3_thread_launch`: message `Build <owner/repo#n>. Read <lar-work>/agents/builder.md and follow it.`,
+`t3_thread_launch`: message `Build <owner/repo#n>. Read <lar-build>/agents/builder.md and follow it.`,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.
 The handoff names the step and review round to resume at and, once step 6
 has run, the step 6 tree and the last UI-check app report, whose processes the
@@ -152,13 +152,13 @@ the line **Approve** describes. Otherwise finish in place.
 
 Work in another repository (a planner or implementer `needs <owner/repo>`, a
 failed check or a failed Verify) becomes a build there, and this build carries
-on. Write its short brief per **3. Brief** in `<lar-work>/SKILL.md`, with that
+on. Write its short brief per **Brief** in `<lar-build>/brief.md`, with that
 repository's Domain docs only, as a sub-issue of this build that blocks it
 (reuse an open issue that covers the work), or on Azure DevOps a child Task
 tagged `repo-<that repository>` that this build waits for (**Children and
-blockers** in `<lar-work>/issue-tracker.md`); run its **4. Gate** Doubt, set it
+blockers** in `<lar-build>/shared/issue-tracker/slices.md`); run its **Gate** in `<lar-build>/gate.md`, set it
 **Ready** and tell the user in chat that it waits for the board's Start build
-(**5. Start the build**). Ask the user only a product question they haven't
+(the board starts a separate build thread). Ask the user only a product question they haven't
 confirmed. A slice holding that work
 loses `active` and closes as not planned, its text moving into the new brief.
 A failed Verify is fixed in this build, or by a new blocking build when
@@ -245,12 +245,12 @@ and restart **Checks**. If they say stop, set **Needs you** and go to
 
 Run once, last, after the final status is set and the PR is unwatched. Show the
 UI reviewer's and UI-check's screenshots with captions and absolute file
-paths, beside the PR link. Follow `~/.agents/skills/retro/SKILL.md` for this
+paths, beside the PR link. Follow `<lar-build>/skills/retro/SKILL.md` for this
 thread. End with the PR link, its status (Verify, Ready to merge or Needs you)
 and the complete numbered suggestion list in chat. Collect picks and any
-clarifications in chat per [Retro picks](../questions.md#retro-picks).
+clarifications in chat per [Retro picks](../shared/questions.md#retro-picks).
 
-Follow [Retro capture](../retro-capture.md) after selection is resolved, or
+Follow [Retro capture](../shared/retro-capture.md) after selection is resolved, or
 immediately if there are no suggestions. Create or reuse follow-up issues only
 for explicit picks, and report their links and any pending failures. Capture
 is required; “don't apply the picks” means leave their implementation for

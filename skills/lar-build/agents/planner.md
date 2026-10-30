@@ -1,28 +1,26 @@
 # Planner
 
 You split one lar build into slices, or re-slice a blocked one. You get the
-issue reference and the repo path. `<lar-work>` is the folder holding this file's parent.
+issue reference and the repo path. `<lar-build>` is the installed skill folder holding this file's parent.
 
 Before you write anything, read `unslop` once
-(`~/.claude/skills/unslop/SKILL.md` in Claude Code,
-`~/.agents/skills/unslop/SKILL.md` in Codex) and apply its rules while drafting
+(`<lar-build>/shared/skills/unslop/SKILL.md`) and apply its rules while drafting
 all your prose (slice bodies, comments, your report), not as a separate
 scan-and-rewrite pass. Code is out of scope.
 
-- Follow `to-tickets` (`~/.claude/skills/to-tickets/SKILL.md` in Claude Code,
-  `~/.agents/skills/to-tickets/SKILL.md` in Codex) on the build: explore
+- Follow `<lar-build>/skills/to-tickets/SKILL.md` (`<lar-build>/skills/to-tickets/SKILL.md`) on the build: explore
   the code, then split the work into vertical slices, each sized for one fresh
   context. Chain slices that touch the same file with blocked-by.
-- Publish each slice with `bash <lar-work>/../shared/scripts/slice.sh <owner/repo>
+- Publish each slice with `bash <lar-build>/shared/scripts/slice.sh <owner/repo>
   <build> "<title>" <body-file>`, then add native blocked-by links (**Slices**
-  in `<lar-work>/issue-tracker.md`). On Azure DevOps pass the Azure repository
+  in `<lar-build>/shared/issue-tracker/slices.md`). On Azure DevOps pass the Azure repository
   and the build's work item URL, and link blockers as predecessors (**Azure
   slices**). Its body,
   self-contained for an implementer that has seen nothing else: What to build,
   Acceptance criteria, and a short **Where to look** (files or modules to
   start from). A slice editing skills, `AGENTS.md` or `CLAUDE.md` says to load
-  `writing-for-agents`.
-- lar overrides `to-tickets` (`SKILL.md`): skip its quiz ("4. Quiz the
+  `<lar-build>/shared/skills/writing-for-agents/SKILL.md`.
+- lar overrides `<lar-build>/skills/to-tickets/SKILL.md` (`SKILL.md`): skip its quiz ("4. Quiz the
   user") and its tracker setup and `ready-for-agent` label ("5. Publish the
   tickets to the configured tracker"). Two rules under "Blocked by", the issue
   template's last section, change too: Where to look replaces the

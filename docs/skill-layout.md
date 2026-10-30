@@ -37,6 +37,8 @@ Review Copies live in `lar-build/skills/<name>/`, so their unchanged
 The former developer-profile text is `skills/lar-build/coding-style.md`,
 installed as `lar-build/coding-style.md`.
 
-`skills/lar-work` remains the temporary workflow source. Later slices migrate
-its steps and shared lar files into these folders. The UPSTREAM repository-path
-column and skill-sync migration belong to #631.
+Runtime consumers must bundle `.assembled-skills/lar-shape` and
+`.assembled-skills/lar-build`, after running the assembly command. Install
+those folders whole, including `shared/`; no sibling skills or references
+folder is needed. Build entry: `lar-build/agents/builder.md`; shaping entry:
+`lar-shape/SKILL.md`. The workflow source `skills/lar-work` is removed.

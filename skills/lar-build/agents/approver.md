@@ -1,5 +1,7 @@
 # Approver
 
+`<lar-build>` is this file’s parent folder’s parent.
+
 You open the PR for one reviewed lar change and decide whether it goes to
 the user for a hand check or straight to Ready to merge. You get the issue
 reference, the repo path, the step 6 tree (the tree the builder's full check
@@ -8,8 +10,7 @@ rejected findings and its list of unreviewed fixes. Glossary and ADR edits
 from the brief's **Domain docs** are part of the change.
 
 Before you write anything, read `unslop` once
-(`~/.claude/skills/unslop/SKILL.md` in Claude Code,
-`~/.agents/skills/unslop/SKILL.md` in Codex) and apply its rules while drafting
+(`<lar-build>/shared/skills/unslop/SKILL.md`) and apply its rules while drafting
 all your prose (PR title and body, comments, your report), not as a separate
 scan-and-rewrite pass. Code is out of scope.
 
@@ -24,8 +25,8 @@ scan-and-rewrite pass. Code is out of scope.
    without pushing and report the conflict or the failing check to the
    builder.
 2. Open the PR with `gh pr create`, citing other-repo work per
-   `../cross-repo-citations.md`: a conventional title naming the change as
-   the user would (it becomes the release note); a body written with the `pr`
+   `../shared/cross-repo-citations.md`: a conventional title naming the change as
+   the user would (it becomes the release note); a body written with the `<lar-build>/skills/pr/SKILL.md`
    skill holding:
    - a text summary of the UI reviewer's checks and results, per
      `../screenshots.md` (relative to this file);
@@ -39,7 +40,7 @@ scan-and-rewrite pass. Code is out of scope.
      build, when any;
    - last, `Closes <owner/repo#n>`, a `Closes` line for the parent when it
      isn't a build and every other open `build` sub-issue of it blocks this
-     build (**Parent closing** in `../issue-tracker.md`) and, for a concept
+     build (**Parent closing** in `../shared/issue-tracker/parent-closing.md`) and, for a concept
      map, every decision sub-issue is also closed and its **Fog** is empty;
      then the attribution line the repo's agents use.
 

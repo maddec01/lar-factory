@@ -105,3 +105,16 @@ export async function addProject(folder: string): Promise<string | null> {
   if (code === null) return "t3 didn't answer in time. Check T3 Code's projects before adding the folder again.";
   return `t3 could not add the project: ${detail}`;
 }
+
+/** Confirms deletion only from the CLI's exact unavailable response. */
+export async function lookupThread(id: string, run: T3Run = runT3): Promise<'live' | 'deleted' | 'unknown'> {
+  try {
+    const result = await run(['thread', 'show', id, '--json', '--messages', '0'], 10_000);
+    if (result.code === 1 && result.stdout === '' && result.stderr.trim() === `Thread ${id} is no longer available.`) return 'deleted';
+    if (result.code === 0) {
+      const answer: unknown = JSON.parse(result.stdout);
+      if (isRecord(answer) && isRecord(answer.thread) && answer.thread.threadId === id) return 'live';
+    }
+  } catch { /* A failed lookup leaves the Start protected. */ }
+  return 'unknown';
+}

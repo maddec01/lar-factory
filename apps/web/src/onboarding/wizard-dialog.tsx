@@ -10,6 +10,9 @@ import { Text } from '@lar-factory/ui/design-system/Typography';
 import { Progress } from '@lar-factory/ui/progress';
 import { useBoardStore } from '../board/board-store.ts';
 import { StepBody } from './steps.tsx';
+// PROTOTYPE (#691), throwaway: the flow-shape variants and their bar.
+import { PrototypeFlow } from './prototype-691-flow.tsx';
+import { PROTOTYPE_691 } from './prototype-691-scenarios.ts';
 import { type Run, type StepId, STEPS, onboarded, pickedProject, prClosed, stepReady, stepTitle, useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
@@ -116,5 +119,5 @@ export function WizardDialog() {
     const timer = setTimeout(() => { if (document.activeElement === document.body) closedFocus(opener)?.focus(); });
     return () => clearTimeout(timer);
   }, [open, opener]);
-  return run && <WizardModal run={run} />;
+  return <>{run && <WizardModal run={run} />}{PROTOTYPE_691 && <PrototypeFlow />}</>;
 }

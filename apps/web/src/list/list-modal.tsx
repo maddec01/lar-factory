@@ -22,6 +22,7 @@ import { AzureFields, repoTone } from '../items/item-parts.tsx';
 import { ItemStatusGlyph } from '../items/status-glyph.tsx';
 import { useScopeStore } from '../board/scope-store.ts';
 import { matchesSearch } from './list-search.ts';
+import { EXPANDED, ExpandButton, useExpand, dialogPreference } from '../expand-dialog/expand-dialog.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
 const SORTS = {
@@ -103,6 +104,9 @@ function useFocusSearchWhenOpenerGoes(searchField: React.RefObject<HTMLInputElem
 }
 
 function ListModal({ onClose }: { onClose: () => void }) {
+  const childOpen = useItemDialogStore((state) => state.itemId !== null);
+  const addOpen = useAddItemStore((state) => state.open);
+  const [expanded, toggleExpanded] = useExpand(childOpen || addOpen, dialogPreference('openList'));
   const data = useBoardStore((state) => state.data);
   const now = useBoardStore((state) => state.now);
   const { scope, setScope } = useScopeStore();
@@ -129,7 +133,7 @@ function ListModal({ onClose }: { onClose: () => void }) {
   );
   return (
     <Modal onClose={onClose}>
-      <Modal.Content data-list-modal title="List" focusFirstField
+      <Modal.Content data-list-modal data-expanded={expanded} style={expanded ? EXPANDED : undefined} headerActions={<ExpandButton expanded={expanded} toggle={toggleExpanded} />} title="List" focusFirstField
         sidebar={
           <SidebarPane label="Repositories">
             <GroupItem label="All repositories" count={groups.reduce((n, group) => n + group.items.length, 0)} icon={<Inbox />} active={active === null} onPick={() => setPick(null)} />

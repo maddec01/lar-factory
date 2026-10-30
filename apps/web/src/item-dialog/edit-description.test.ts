@@ -255,7 +255,7 @@ test('the expand button and Ctrl+Shift+E grow the item dialog and back, the edit
   await openItem(github);
   const expand = () => inDialog<HTMLButtonElement>('button[data-expand]')!;
   await press(expand());
-  expect(dialog()!.style.height).toBe('calc(100dvh - 2rem)');
+  expect(dialog()!.style.height).toBe('calc(100dvh - (52px + 1rem))');
   await press(editButton());
   expect(description().querySelector('[data-description-editor]')!.className.split(' ')).toContain('flex-1');
   await settle(() => editorArea()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'E', ctrlKey: true, shiftKey: true, bubbles: true })));

@@ -7,15 +7,28 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '@lar-factory/ui/design-system/Tooltip';
 
+export const DIALOG_PREFERENCES = {
+  matchList: 'lar-board:match-list-size',
+  openList: 'lar-board:open-list-expanded',
+} as const;
+
+export function dialogPreference(key: keyof typeof DIALOG_PREFERENCES): boolean {
+  return localStorage.getItem(DIALOG_PREFERENCES[key]) === '1';
+}
+
+function childOpeningSize(): boolean {
+  return dialogPreference('matchList') && document.querySelector('[data-list-modal]')?.getAttribute('data-expanded') === 'true';
+}
+
 const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 const SHORTCUT = MAC ? '⌘⇧E' : 'Ctrl+Shift+E';
 
 /** The expanded dialog's size, inline so it wins over the Modal Copy's own size classes. */
-export const EXPANDED: CSSProperties = { width: 'calc(100vw - 2rem)', maxWidth: 'none', height: 'calc(100dvh - 2rem)', maxHeight: 'none' };
+export const EXPANDED: CSSProperties = { width: 'calc(100vw - 2rem)', maxWidth: 'none', height: 'calc(100dvh - (52px + 1rem))', maxHeight: 'none', top: '52px', translate: '-50% 0' };
 
 /** Whether the dialog is expanded, and a toggle; the shortcut toggles it too, unless `paused` while a prompt sits on top. */
-export function useExpand(paused = false): readonly [boolean, () => void] {
-  const [expanded, setExpanded] = useState(false);
+export function useExpand(paused = false, initial = childOpeningSize()): readonly [boolean, () => void] {
+  const [expanded, setExpanded] = useState(initial);
   useEffect(() => {
     if (paused) return;
     const onKey = (event: KeyboardEvent) => {

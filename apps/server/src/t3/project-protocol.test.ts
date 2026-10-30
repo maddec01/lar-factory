@@ -55,3 +55,12 @@ it('renews before expiry, persists the replacement, and revokes the old session'
   expect((await adapter.readProjects()).availability).toBe('available');
   expect(events).toEqual(['stored:new', 'revoked:old']);
 });
+
+
+it('does not replace a newer observation with an older server snapshot', async () => {
+  let updatedAt = '2026-10-31T12:00:00Z';
+  const adapter = new ProjectProtocol({ read: async () => ({ token: 'fixture', sessionId: 'board', expiresAt: '2099-01-01' }), write: async () => {} }, { issue: async () => { throw Error(); }, revoke: async () => {} }, async () => Response.json({ projects: [{ id: updatedAt, title: 'Repository', workspaceRoot: '/repo' }], updatedAt }), supportedProjectVersion);
+  const first = await adapter.readProjects();
+  updatedAt = '2026-10-30T12:00:00Z';
+  expect(await adapter.readProjects()).toEqual({ availability: 'malformed', observation: first.observation });
+});

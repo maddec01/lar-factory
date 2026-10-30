@@ -1,3 +1,5 @@
+Ported from addyosmani/agent-skills (skills/code-review-and-quality); see UPSTREAM.md.
+
 # Code reviewer
 
 `<lar-build>` is this file’s parent folder’s parent.

@@ -25,10 +25,6 @@ Maintainer ports an upstream change or skips it.
 
 | Skill | Source | Path | Repository path | Commit | Date | Overridden in |
 | ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
-| `grilling` | mattpocock/skills | `skills/productivity/grilling` | `skills/lar-shape/skills/grilling` | `5beb35b040e3` | 2026-10-19 |  |
-| `prototype` | mattpocock/skills | `skills/engineering/prototype` | `skills/lar-shape/skills/prototype` | `5beb35b040e3` | 2026-10-19 | LOGIC.md#3. Build the shareable HTML file (skills/lar-shape/size-up.md); LOGIC.md#4. Hand it over (skills/lar-shape/size-up.md); LOGIC.md#Anti-patterns (skills/lar-shape/size-up.md); UI.md#5. Hand it over (skills/lar-shape/size-up.md); SKILL.md#Rules that apply to both (skills/lar-shape/size-up.md) |
-| `research` | mattpocock/skills | `skills/engineering/research` | `skills/lar-shape/skills/research` | `5beb35b040e3` | 2026-10-19 |  |
-| `diagnosing-bugs` | mattpocock/skills | `skills/engineering/diagnosing-bugs` | `skills/lar-shape/skills/diagnosing-bugs` | `5beb35b040e3` | 2026-10-19 |  |
 | `tdd` | mattpocock/skills | `skills/engineering/tdd` | `skills/lar-build/skills/tdd` | `5beb35b040e3` | 2026-10-19 |  |
 | `code-review` | mattpocock/skills | `skills/engineering/code-review` | `skills/lar-build/skills/code-review` | `5beb35b040e3` | 2026-10-19 |  |
 | `codebase-design` | mattpocock/skills | `skills/engineering/codebase-design` | `skills/lar-build/skills/codebase-design` | `5beb35b040e3` | 2026-10-19 |  |
@@ -55,6 +51,19 @@ Maintainer ports an upstream change or skips it.
 | `skills/lar-build/agents/reviewer-security.md` | addyosmani/agent-skills | `skills/code-review-and-quality; skills/security-and-hardening` | skills/code-review-and-quality/SKILL.md#4. Security; skills/security-and-hardening/SKILL.md#Authentication and sessions; skills/security-and-hardening/SKILL.md#Rate limiting; skills/security-and-hardening/SKILL.md#Injection, XSS, and access control; skills/security-and-hardening/SKILL.md#Input validation and uploads; skills/security-and-hardening/SKILL.md#Destructive operations on derived paths; skills/security-and-hardening/SKILL.md#Secrets; skills/security-and-hardening/SKILL.md#Headers, CORS, and responses; skills/security-and-hardening/SKILL.md#Server-side fetches (SSRF); skills/security-and-hardening/SKILL.md#Dependencies and supply chain | `aeac41d4d005` | 2026-10-13 |
 | `skills/lar-build/agents/doubt.md` | addyosmani/agent-skills | `skills/doubt-driven-development` | skills/doubt-driven-development/SKILL.md#Step 3: DOUBT — Invoke the fresh-context reviewer | `aeac41d4d005` | 2026-10-13 |
 | `skills/lar-shape/agents/doubt.md` | addyosmani/agent-skills | `skills/doubt-driven-development` | skills/doubt-driven-development/SKILL.md#Step 3: DOUBT — Invoke the fresh-context reviewer | `aeac41d4d005` | 2026-10-13 |
+
+| `skills/lar-shape/grill.md` | mattpocock/skills | `skills/productivity/grilling` | skills/productivity/grilling/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-shape/prototype-logic.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/LOGIC.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-shape/prototype-ui.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/UI.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-shape/prototype-question.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-shape/research-question.md` | mattpocock/skills | `skills/engineering/research` | skills/engineering/research/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-shape/diagnose-bug.md` | mattpocock/skills | `skills/engineering/diagnosing-bugs` | skills/engineering/diagnosing-bugs/SKILL.md#Redact; skills/engineering/diagnosing-bugs/SKILL.md#Phase 1: Build a feedback loop; skills/engineering/diagnosing-bugs/SKILL.md#Phase 2: Reproduce + minimise; skills/engineering/diagnosing-bugs/SKILL.md#Phase 3: Hypothesise; skills/engineering/diagnosing-bugs/SKILL.md#Phase 4: Instrument | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/grill.md` | mattpocock/skills | `skills/productivity/grilling` | skills/productivity/grilling/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/prototype-logic.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/LOGIC.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/prototype-ui.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/UI.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/prototype-question.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/research-question.md` | mattpocock/skills | `skills/engineering/research` | skills/engineering/research/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/diagnose-bug.md` | mattpocock/skills | `skills/engineering/diagnosing-bugs` | skills/engineering/diagnosing-bugs/SKILL.md#Redact; skills/engineering/diagnosing-bugs/SKILL.md#Phase 1: Build a feedback loop; skills/engineering/diagnosing-bugs/SKILL.md#Phase 2: Reproduce + minimise; skills/engineering/diagnosing-bugs/SKILL.md#Phase 3: Hypothesise; skills/engineering/diagnosing-bugs/SKILL.md#Phase 4: Instrument | `5beb35b040e3` | 2026-10-19 |
 
 Full commits: mattpocock/skills `5beb35b040e3de97e54fa9e386d7e42d15c295c2`, addyosmani/agent-skills `aeac41d4d005999432bb7312f7ff06383a91d59d`, cursor/plugins `8b3326d99fd4b993cb33a24dad8af03175c642c5`.
 

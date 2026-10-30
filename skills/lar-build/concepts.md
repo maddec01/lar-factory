@@ -51,11 +51,10 @@ blocked-by, closed ones styled done. Redraw it whenever a sub-issue changes.>
    ([native relationship commands](shared/issue-tracker/native-relationships.md#native-relationships), or
    [Children and blockers](shared/issue-tracker/azure-devops.md#children-and-blockers) on Azure DevOps).
    Put them in Queued; the rest stays in Fog.
-3. Start each `decision-research` now, in the background, with the [research](skills/research/SKILL.md)
-   skill. Findings go on a `research/<n>-<slug>` branch linked from the
-   sub-issue.
+3. Start each `decision-research` now, in the background, with the [research](research-question.md)
+   step.
 4. Keep the map in Shaping while decisions are open. Each `grill`,
-   [prototype](skills/prototype/SKILL.md) or `task` decision waits in Queued for the board's Start, which
+   [prototype](prototype-question.md) or `task` decision waits in Queued for the board's Start, which
    opens its **decision thread** in its repository project's root with
    `/lar-shape <owner/repo#n>`. A blocked one starts only once every issue it's
    blocked by closes, by hand or through the board's Start after. Research

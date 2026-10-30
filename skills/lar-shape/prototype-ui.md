@@ -1,8 +1,10 @@
+Ported from mattpocock/skills (skills/engineering/prototype); see UPSTREAM.md.
+
 # UI Prototype
 
 Generate **several radically different UI variations** on a single route, switchable from a floating bottom bar. The user flips between variants in the browser, picks one (or steals bits from each), then throws the rest away.
 
-If the question is about logic/state rather than what something looks like, this is the wrong branch. Use [LOGIC.md](LOGIC.md).
+If the question is about logic/state rather than what something looks like, this is the wrong branch. Use [prototype-logic.md](prototype-logic.md).
 
 ## When this is the right shape
 
@@ -35,7 +37,7 @@ In both sub-shapes the floating bottom bar is identical.
 
 ### 1. State the question and pick N
 
-Default to **3 variants**. More than 5 stops being radically different and starts being noise, so cap there.
+Build two or three variants differing only on the open design question.
 
 Write down the plan in one line, in the prototype's location or a top-of-file comment:
 
@@ -93,11 +95,11 @@ Put the switcher in a single shared component so both sub-shapes can reuse it. L
 
 ### 5. Hand it over
 
-Surface the URL (and the `?variant=` keys). The user will flip through whenever they get to it. The interesting feedback is usually **"I want the header from B with the sidebar from C"**, which is the actual design they want.
+Show every variant inside T3 per [Show the variants](prototype-question.md#show-the-variants-inside-t3). Ask which variant or combination the user picks.
 
 ### 6. Capture the answer and clean up
 
-Once a variant has won, capture the answer (which variant and why), then capture the prototype the way the [SKILL](SKILL.md) describes. Fold the winner into the real code and move the rest onto the throwaway branch, not into main:
+Once a variant has won, capture the answer (which variant and why), then capture the prototype the way the [SKILL](prototype-question.md) describes. Fold the winner into the real code and move the rest onto the throwaway branch, not into main:
 
 - **Sub-shape A**: fold the winner into the existing page; drop the losing variants and the switcher from main.
 - **Sub-shape B**: promote the winning variant to a real route; drop the throwaway route and the switcher from main.

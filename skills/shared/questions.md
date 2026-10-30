@@ -6,7 +6,9 @@ Gate assumptions, Doubt findings, Concepts,
 `decision-grill`, and the builder's stops. Retro picks and their
 clarifications use [chat](#retro-picks).
 If the tool is deferred, load it with `ToolSearch`; if it isn't available, ask
-in the `grilling` chat format.
+in chat with each numbered question, its title and body, followed by the
+recommended answer. Separate questions with a horizontal rule. Word each so
+"yes" accepts the recommendation.
 
 Every ordinary question batch runs these once, however many calls it takes:
 
@@ -16,7 +18,7 @@ Every ordinary question batch runs these once, however many calls it takes:
 3. Set the status back to the step's: Shaping while shaping, In progress or
    Review in a build.
 
-Map the `grilling` format onto the call instead of repeating it in chat:
+Use this format for the call:
 
 - question: `Qn - <title>: <body>`, worded so "yes" accepts the
   recommendation;

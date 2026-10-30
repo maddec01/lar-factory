@@ -145,6 +145,50 @@ describe("snapshot", () => {
     }
     assert.isFalse(NodeFS.existsSync(NodePath.join(home, ".agents")));
   });
+
+  it.effect("keeps known Drift actionable after Replace fails before reading targets", () =>
+    Effect.gen(function* () {
+      const home = makeHome();
+      const { checks, board } = yield* launch(home, () => notRunning, home);
+      yield* checks.atLaunch;
+      NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
+      yield* checks.beforeBuild();
+      const drift = board.snapshot().drift;
+      const manifest = NodePath.join(home, ".agents/.lar-factory-install.json");
+      const original = NodeFS.readFileSync(manifest, "utf8");
+      NodeFS.writeFileSync(manifest, "{");
+      const failed = yield* Effect.promise(board.replace);
+      assert.include(failed.error, "Couldn't read");
+      assert.deepStrictEqual(failed.snapshot.drift, drift);
+      assert.deepStrictEqual(board.snapshot().drift, drift);
+      NodeFS.writeFileSync(manifest, original);
+      const recovered = yield* Effect.promise(board.replace);
+      assert.strictEqual(recovered.error, undefined);
+      assert.deepStrictEqual(recovered.snapshot.drift, []);
+      assert.deepStrictEqual(recovered.snapshot.replaced, ["lar-work"]);
+    }));
+
+  it.effect("keeps Drift in a target whose replacement copy fails and clears it after recovery", () =>
+    Effect.gen(function* () {
+      const home = makeHome();
+      const { checks, board } = yield* launch(home, () => notRunning, home);
+      yield* checks.atLaunch;
+      NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
+      yield* checks.beforeBuild();
+      const drift = board.snapshot().drift;
+      const skills = NodePath.join(home, ".agents/skills");
+      NodeFS.chmodSync(skills, 0o500);
+      try {
+        const failed = yield* Effect.promise(board.replace);
+        assert.isDefined(target(failed.snapshot, "~/.agents/skills")?.error);
+        assert.deepStrictEqual(failed.snapshot.drift, drift);
+      } finally {
+        NodeFS.chmodSync(skills, 0o700);
+      }
+      const recovered = yield* Effect.promise(board.replace);
+      assert.deepStrictEqual(recovered.snapshot.drift, []);
+      assert.deepStrictEqual(recovered.snapshot.replaced, ["lar-work"]);
+    }));
 });
 
 describe("setTick", () => {

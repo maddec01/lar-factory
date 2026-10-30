@@ -128,6 +128,8 @@ export interface CheckState {
   readonly instances: ReadonlyArray<ProviderInstance>;
   /** The targets each check offers: the fallback ones and those of T3's instances, or before T3 answers those it last required. */
   readonly targets: ReadonlyArray<OfferedTarget>;
+  /** Last completed check, retained when a later operation fails before it can check Drift or Clashes. */
+  readonly lastResult?: InstallResult;
   /** The last check's outcome, or none before the first. */
   readonly outcome?: InstallResult | SkillInstallError;
 }
@@ -208,13 +210,33 @@ export const makeChecks = (input: LaunchInput, discover: Discover, run: typeof r
       };
       update({ progress: [...earlier.filter((entry) => entry !== previous), next] });
     };
-    const settle = (outcome: InstallResult | SkillInstallError) => Effect.sync(() => update({
-      running: null, outcome,
-      ...outcome instanceof SkillInstallError && { progress: state.progress?.map((event) => event.running ? {
-        ...event, running: false, target: { ...event.target, error: { message: outcome.message, changed: outcome.changed } },
-        skills: event.skills.map((skill) => ["pending", "checking", "installing"].includes(skill.state) ? { ...skill, state: "failed" as const } : skill),
-      } : event) ?? [] },
-    }));
+    const settle = (outcome: InstallResult | SkillInstallError) => Effect.sync(() => {
+      if (!(outcome instanceof SkillInstallError)) {
+        // A failed copy cannot establish that earlier Drift resolved. Keep only the failed paths whose skill did
+        // not finish, so a partial Replace can clear the skills it did replace while the others stay actionable.
+        const drift = new Map(outcome.drift.map(({ skill, paths }) => [skill, [...paths]]));
+        for (const { skill, paths } of state.lastResult?.drift ?? []) {
+          for (const at of paths) {
+            const failed = outcome.targets.find((target) => target.error && target.paths.some((folder) => at.path === NodePath.join(folder, skill)));
+            const installed = state.progress?.some((event) => failed?.paths.some((path) => event.target.paths.includes(path))
+              && event.skills.some(({ name, state }) => name === skill && state === "installed"));
+            if (!failed || installed) continue;
+            const known = drift.get(skill) ?? [];
+            if (!known.some(({ path }) => path === at.path)) drift.set(skill, [...known, at]);
+          }
+        }
+        outcome = { ...outcome, drift: [...drift].map(([skill, paths]) => ({ skill, paths })) };
+      }
+      const failed = outcome instanceof SkillInstallError ? outcome : undefined;
+      update({
+        running: null, outcome,
+        ...!(outcome instanceof SkillInstallError) && { lastResult: outcome },
+        ...failed && { progress: state.progress?.map((event) => event.running ? {
+          ...event, running: false, target: { ...event.target, error: { message: failed.message, changed: failed.changed } },
+          skills: event.skills.map((skill) => ["pending", "checking", "installing"].includes(skill.state) ? { ...skill, state: "failed" as const } : skill),
+        } : event) ?? [] },
+      });
+    });
     // One check, run inside a turn the caller holds.
     const checkNow = (operation: InstallOperation, options: { recordWarning: boolean; replace?: boolean }): Check =>
       Effect.suspend(() => {

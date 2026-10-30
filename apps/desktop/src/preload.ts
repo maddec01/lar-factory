@@ -1,7 +1,7 @@
 // The bridge between the main process and the board's page, as T3 Code's
 // apps/desktop/src/preload.ts. The page can tell from it that it runs in the app,
-// sends its secret with each write, the settings screen lists and ticks Claude
-// profiles through it, it follows the window's full screen, it follows and drives the app's updates,
+// sends its secret with each write, it follows the skill install and retries it, replaces Drift and ticks
+// Install targets through it, it follows the window's full screen, it follows and drives the app's updates,
 // and asks before restarting to install one (packages/shared/src/board-app.ts holds the bridge contract).
 //
 // Copyright (c) 2026 T3 Tools Inc. MIT License; the full notice is in THIRD_PARTY_NOTICES.md.
@@ -18,8 +18,20 @@ const secret: unknown = ipcRenderer.sendSync(LaunchSecret.CHANNEL);
 const bridge: BoardAppBridge = {
   platform: process.platform,
   ...(typeof secret === "string" && { secret }),
-  listProfiles: () => ipcRenderer.invoke(IpcChannels.LIST_PROFILES),
-  setProfileTick: (name, ticked) => ipcRenderer.invoke(IpcChannels.SET_PROFILE_TICK, name, ticked),
+  getInstallState: () => ipcRenderer.invoke(IpcChannels.INSTALL_GET_STATE),
+  onInstallState: (listener) => {
+    const wrappedListener = (_event: Electron.IpcRendererEvent, snapshot: unknown) => {
+      if (typeof snapshot !== "object" || snapshot === null) return;
+      listener(snapshot as Parameters<typeof listener>[0]);
+    };
+    ipcRenderer.on(IpcChannels.INSTALL_STATE, wrappedListener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannels.INSTALL_STATE, wrappedListener);
+    };
+  },
+  retryInstall: () => ipcRenderer.invoke(IpcChannels.INSTALL_RETRY),
+  replaceDrift: () => ipcRenderer.invoke(IpcChannels.INSTALL_REPLACE),
+  setTargetTick: (path, ticked) => ipcRenderer.invoke(IpcChannels.INSTALL_SET_TICK, path, ticked),
   getWindowFullscreenState: () => ipcRenderer.sendSync(IpcChannels.GET_WINDOW_FULLSCREEN_STATE) === true,
   onWindowFullscreenStateChange: (listener) => {
     const wrappedListener = (_event: Electron.IpcRendererEvent, fullscreen: unknown) => {

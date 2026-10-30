@@ -170,8 +170,11 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
   const unused = () => Promise.reject(new Error('not stubbed'));
   const bridge = {
     platform: 'darwin',
-    listProfiles: unused,
-    setProfileTick: unused,
+    getInstallState: unused,
+    onInstallState: () => () => {},
+    retryInstall: unused,
+    replaceDrift: unused,
+    setTargetTick: unused,
     getWindowFullscreenState: () => false,
     onWindowFullscreenStateChange: () => () => {},
     getUpdateState: async () => updatesOff,

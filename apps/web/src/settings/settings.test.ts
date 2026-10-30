@@ -1,28 +1,35 @@
 // Settings: the modal with its section list in groups, each section's title and description over its rows, the
-// Claude profiles with their switches and what a change did, the bundled skills with their last updates and install
+// Install targets with their switches and what a change did, the bundled skills with their last updates and install
 // states, the update channel, version, the update pill's state and step, and Check now, the tool rows, the repository rows with Resume and Add repository (Edit's dialog and Reset's confirmation have their own tests), and the rows that aren't built yet. The bridge stands in for the app's preload; without it
-// the profiles and updates explain that they need the board app.
+// the targets and updates explain that they need the board app.
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
-import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type OnboardingProgress, type ProfilesResult, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
+import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type InstallOperationResult, type InstallSnapshot, type OnboardingProgress, type TargetSnapshot, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { dialog, project, serve } from '../onboarding/onboarding-support.ts';
-import { INSTALL_RECHECK_MS } from './settings-store.ts';
 
-const listed: ProfilesResult = {
-  profiles: [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: false }],
-  installed: true,
-  conflicts: [],
-};
+/** A Claude target at `path`, ticked when `active`. */
+const targetAt = (path: string, active: boolean, extra: Partial<TargetSnapshot> = {}): TargetSnapshot =>
+  ({ kind: 'claude', path, paths: [path], locked: false, active, finished: active, instances: [], skills: [], ...extra });
 
-const bothTicked: ProfilesResult = { ...listed, profiles: [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: true }] };
+const snapshotOf = (claude: boolean, work: boolean, extra: Partial<InstallSnapshot> = {}): InstallSnapshot => ({
+  installs: true, installed: true, version: '0.2.0', running: null, discovery: 'not-running', instances: [],
+  targets: [targetAt('~/.agents/skills', true, { kind: 'agents', locked: true }), targetAt('~/.claude/skills', claude), targetAt('~/.claude-work/skills', work)],
+  drift: [], replaced: [], conflicts: [], blocked: [], ...extra,
+});
 
-function stubBridge(setResult: ProfilesResult = listed) {
-  return stubApp({
-    listProfiles: vi.fn(async () => listed),
-    setProfileTick: vi.fn(async (_name: string, _ticked: boolean) => setResult),
+const listed = snapshotOf(true, false);
+const bothTicked = snapshotOf(true, true);
+
+function stubBridge(setResult: InstallOperationResult = { snapshot: listed }) {
+  let push: (snapshot: InstallSnapshot) => void = () => {};
+  const bridge = stubApp({
+    getInstallState: vi.fn(async () => listed),
+    onInstallState: vi.fn((listener: (snapshot: InstallSnapshot) => void) => { push = listener; return () => { push = () => {}; }; }),
+    setTargetTick: vi.fn(async (_path: string, _ticked: boolean) => setResult),
   });
+  return Object.assign(bridge, { push: (snapshot: InstallSnapshot) => settle(() => push(snapshot)) });
 }
 
 const settingsButton = () => $<HTMLButtonElement>('.open-settings');
@@ -85,7 +92,7 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
   await open('General');
   await type(search(), 'dock');
   expect(sections().map(text)).toEqual(['General']);
-  await type(search(), 'claude');
+  await type(search(), 'targets');
   expect(sections().map(text)).toEqual(['Skills']);
   expect($$('.settings-nav [role="group"]').map((g) => g.getAttribute('aria-label')), 'a group with no match goes').toEqual(['Connections']);
   await type(search(), '');
@@ -97,7 +104,7 @@ test('search keeps the sections whose name or a row matches, and / focuses it', 
 
 test('a search that leaves out the open section shows the first one it keeps, and clearing it goes back', async () => {
   await open('General');
-  await type(search(), 'claude');
+  await type(search(), 'targets');
   expect(text(modal()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Skills');
   expect(section('Skills').getAttribute('aria-current')).toBe('page');
   await type(search(), '');
@@ -357,10 +364,10 @@ test('Diagnostics shows a missing git, jq or curl with its fix', async () => {
   expect(text(row('d-jq'))).toContain('Nothing runnable at JQ_PATH=/nowhere/jq. Fix: brew install jq');
 });
 
-test('a browser explains app-only features without fictional profiles or update values', async () => {
+test('a browser explains app-only features without fictional targets or update values', async () => {
   await open('Skills');
   expect(switches()).toHaveLength(0);
-  expect(text(body())).toContain('Only the board app links skills into Claude profiles.');
+  expect(text(body())).toContain('Only the board app installs skills into agent folders.');
   expect(text(body())).not.toContain('~/.claude-personal');
   await settle(() => section('Updates').click());
   expect(text(body())).toContain('Only the board app updates itself.');
@@ -442,7 +449,7 @@ test("Skills shows a Copy's Date as its last update, in a browser too", async ()
 });
 
 test("in the board app, a Lar skill's last update is the app's version", async () => {
-  stubApp({ listProfiles: vi.fn(async () => listed), getUpdateState: vi.fn(async () => ({ ...updatesOff, currentVersion: '0.2.0' })) });
+  stubApp({ getInstallState: vi.fn(async () => listed), getUpdateState: vi.fn(async () => ({ ...updatesOff, currentVersion: '0.2.0' })) });
   await open('Skills', { ...sample, bundledSkills: [larWork] });
   expect(text(row('bundled-lar-work').querySelector('.text-xs'))).toBe('Lar · MIT · updated in Lar Factory 0.2.0');
 });
@@ -456,7 +463,7 @@ test('a Date or restore from another year shows its year', async () => {
 
 test('Skills has no Skill sync group', async () => {
   await open('Skills', { ...sample, bundledSkills: [larWork] });
-  expect(groups().map(([title]) => title)).toEqual(['Claude profiles', 'Bundled skills']);
+  expect(groups().map(([title]) => title)).toEqual(['Install targets', 'Bundled skills']);
 });
 
 test("Skills says so in one row when it couldn't read the bundled skills", async () => {
@@ -467,172 +474,205 @@ test("Skills says so in one row when it couldn't read the bundled skills", async
   expect(group.querySelector('a, button, input')).toBeNull();
 });
 
-test('Skills lists every Claude profile with its tick', async () => {
+/** The switch of the target at `path`. */
+const switchOf = (path: string) => switches().find((box) => box.getAttribute('aria-label') === path)!;
+const profileTicks = () => ['~/.claude/skills', '~/.claude-work/skills'].map((path) => ticked(switchOf(path)));
+
+test('Skills lists every Install target with its tick, and a locked one says why it stays ticked', async () => {
   const bridge = stubBridge();
   await open();
-  expect(bridge.listProfiles).toHaveBeenCalledOnce();
-  expect(switches().slice(0, 2).map((s) => [s.getAttribute('aria-label'), ticked(s)])).toEqual([['~/.claude', true], ['~/.claude-work', false]]);
+  expect(bridge.getInstallState).toHaveBeenCalledOnce();
+  expect(switches().map((s) => [s.getAttribute('aria-label'), ticked(s), s.disabled])).toEqual([
+    ['~/.agents/skills', true, true], ['~/.claude/skills', true, false], ['~/.claude-work/skills', false, false]]);
+  expect(text(row('target-~/.agents/skills'))).toContain("Claude's skill links point here, so it stays ticked.");
   expect([result().getAttribute('role'), result().dataset.slot]).toEqual(['status', 'alert']);
 });
 
-test('ticking a profile installs it and shows the new ticks', async () => {
-  const bridge = stubBridge(bothTicked);
+test("a target T3 Code's instances read stays ticked and says so", async () => {
+  const bridge = stubBridge();
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, targets: [targetAt('~/.claude/skills', true, { locked: true, instances: ['claude'] })] });
   await open();
-  await settle(() => switches()[1]!.click());
-  expect(bridge.setProfileTick).toHaveBeenCalledWith('.claude-work', true);
-  expect(switches().slice(0, 2).map(ticked)).toEqual([true, true]);
-  expect(result().textContent).toBe('Linked the skills and checklists into ~/.claude-work.');
+  expect(switchOf('~/.claude/skills').disabled).toBe(true);
+  expect(text(row('target-~/.claude/skills'))).toContain("T3 Code's provider instances read it, so it stays ticked.");
+});
+
+test("a T3 target whose Claude home doesn't exist says it isn't installed", async () => {
+  const bridge = stubBridge();
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, targets: [targetAt('~/.claude-work/skills', false, { locked: true, instances: ['work'], homeMissing: true })] });
+  await open();
+  expect(text(row('target-~/.claude-work/skills'))).toContain(
+    "Not installed until ~/.claude-work exists. T3 Code's provider instances read it; Lar Factory installs here once it exists.");
+  expect(text(row('target-~/.claude-work/skills'))).not.toContain('stays ticked');
+});
+
+test('a long target path wraps beside its switch, which keeps its size', async () => {
+  const long = `~/${'very-long-folder-name/'.repeat(12)}skills`;
+  const bridge = stubBridge();
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, targets: [targetAt(long, true)] });
+  await open();
+  const title = row(`target-${long}`).querySelector('.settings-row-title')!;
+  expect(title.classList.contains('truncate')).toBe(false);
+  expect([...title.classList]).toEqual(expect.arrayContaining(['min-w-0', '[overflow-wrap:anywhere]']));
+  expect(switchOf(long).closest('.settings-row-control')!.classList.contains('shrink-0')).toBe(true);
+});
+
+test('ticking a target installs it and shows the new ticks', async () => {
+  const bridge = stubBridge({ snapshot: bothTicked });
+  await open();
+  await settle(() => switchOf('~/.claude-work/skills').click());
+  expect(bridge.setTargetTick).toHaveBeenCalledWith('~/.claude-work/skills', true);
+  expect(profileTicks()).toEqual([true, true]);
+  expect(result().textContent).toBe('Installed the skills into ~/.claude-work/skills.');
   expect(result().dataset.tone).toBe('success');
+});
+
+test('Settings follows each new install state while open', async () => {
+  const bridge = stubBridge();
+  await open();
+  await bridge.push(bothTicked);
+  expect(profileTicks()).toEqual([true, true]);
+  await settle(() => close().click());
+  await bridge.push(listed);
+  await settle(() => settingsButton()!.click());
+  expect(bridge.getInstallState).toHaveBeenCalledTimes(2);
+  expect(profileTicks()).toEqual([true, false]);
 });
 
 test('focus stays on a switch while its change runs and after', async () => {
   const bridge = stubBridge();
-  let finish!: (result: ProfilesResult) => void;
-  bridge.setProfileTick.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  let finish!: (result: InstallOperationResult) => void;
+  bridge.setTargetTick.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
   await open();
-  const box = switches()[1]!;
+  const box = switchOf('~/.claude-work/skills');
   box.focus();
   await settle(() => box.click());
   // A browser blurs a control that turns disabled; jsdom doesn't, so check it stays enabled too.
   expect(box.disabled).toBe(false);
   expect(document.activeElement).toBe(box);
   expect(box.getAttribute('aria-disabled')).toBe('true');
-  await settle(() => switches()[0]!.click());
-  expect(bridge.setProfileTick).toHaveBeenCalledOnce();
-  await settle(() => finish(bothTicked));
-  expect(document.activeElement).toBe(switches()[1]);
-  expect(switches()[1]!.getAttribute('aria-disabled')).toBe('false');
-  expect(switches().slice(0, 2).map(ticked)).toEqual([true, true]);
+  await settle(() => switchOf('~/.claude/skills').click());
+  expect(bridge.setTargetTick).toHaveBeenCalledOnce();
+  await settle(() => finish({ snapshot: bothTicked }));
+  expect(document.activeElement).toBe(switchOf('~/.claude-work/skills'));
+  expect(switchOf('~/.claude-work/skills').getAttribute('aria-disabled')).toBe('false');
+  expect(profileTicks()).toEqual([true, true]);
 });
 
-test('unticking a profile removes its links', async () => {
-  const bridge = stubBridge({ ...listed, profiles: [{ name: '.claude', ticked: false }, { name: '.claude-work', ticked: false }],
-    removed: { links: ['tdd'], checklists: true } });
+test('unticking a Claude target removes its links', async () => {
+  const bridge = stubBridge({ snapshot: snapshotOf(false, false), removed: { links: ['tdd'], checklists: true } });
   await open();
-  await settle(() => switches()[0]!.click());
-  expect(bridge.setProfileTick).toHaveBeenCalledWith('.claude', false);
-  expect(ticked(switches()[0]!)).toBe(false);
-  expect(result().textContent).toBe('Removed the skill links and checklists from ~/.claude.');
+  await settle(() => switchOf('~/.claude/skills').click());
+  expect(bridge.setTargetTick).toHaveBeenCalledWith('~/.claude/skills', false);
+  expect(ticked(switchOf('~/.claude/skills'))).toBe(false);
+  expect(result().textContent).toBe('Removed the skill links and checklists from ~/.claude/skills.');
 });
 
 test('unticking says only what it removed', async () => {
-  const bridge = stubBridge({ ...bothTicked, profiles: [{ name: '.claude', ticked: false }, { name: '.claude-work', ticked: true }],
-    removed: { links: ['tdd'], checklists: false } });
-  bridge.listProfiles.mockResolvedValueOnce(bothTicked);
+  const bridge = stubBridge({ snapshot: snapshotOf(false, true), removed: { links: ['tdd'], checklists: false } });
+  bridge.getInstallState.mockResolvedValueOnce(bothTicked);
   await open();
-  await settle(() => switches()[0]!.click());
-  expect(result().textContent).toBe('Removed the skill links from ~/.claude.');
+  await settle(() => switchOf('~/.claude/skills').click());
+  expect(result().textContent).toBe('Removed the skill links from ~/.claude/skills.');
 
-  bridge.setProfileTick.mockResolvedValueOnce({ ...listed, profiles: [{ name: '.claude', ticked: false }, { name: '.claude-work', ticked: false }],
-    removed: { links: [], checklists: false } });
-  await settle(() => switches()[1]!.click());
-  expect(bridge.setProfileTick).toHaveBeenLastCalledWith('.claude-work', false);
-  expect(result().textContent).toBe('Lar Factory had no skill links or checklists in ~/.claude-work to remove.');
+  bridge.setTargetTick.mockResolvedValueOnce({ snapshot: snapshotOf(false, false), removed: { links: [], checklists: false } });
+  await settle(() => switchOf('~/.claude-work/skills').click());
+  expect(bridge.setTargetTick).toHaveBeenLastCalledWith('~/.claude-work/skills', false);
+  expect(result().textContent).toBe('Lar Factory had no skill links or checklists in ~/.claude-work/skills to remove.');
+});
+
+test('unticking a copy target says its copies stay', async () => {
+  const bridge = stubBridge();
+  const extra = targetAt('~/extra/skills', true, { kind: 'agents' });
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, targets: [extra] });
+  bridge.setTargetTick.mockResolvedValueOnce({ snapshot: { ...listed, targets: [{ ...extra, active: false }] }, removed: { links: [], checklists: false } });
+  await open();
+  await settle(() => switchOf('~/extra/skills').click());
+  expect(result().textContent).toBe('Lar Factory no longer installs into ~/extra/skills, and left its copies there.');
 });
 
 test('a tick that left paths alone names each one', async () => {
-  stubBridge({ ...bothTicked, conflicts: ['~/.claude-work/skills/lar-work'] });
+  stubBridge({ snapshot: bothTicked, conflicts: ['~/.claude-work/skills/lar-work'] });
   await open();
-  await settle(() => switches()[1]!.click());
+  await settle(() => switchOf('~/.claude-work/skills').click());
   expect(result().textContent).toContain('left these alone because Lar Factory didn\'t make them');
   expect($$('#settings-result li').map((li) => li.textContent)).toEqual(['~/.claude-work/skills/lar-work']);
   expect(result().dataset.tone).toBe('warning');
 });
 
-test('a failed tick shows its error and keeps the old ticks', async () => {
-  stubBridge({ ...listed, error: 'No skills are installed in /Users/me/.agents yet' });
+test('a refused tick shows its error and keeps the old ticks', async () => {
+  stubBridge({ snapshot: listed, error: 'No skills are installed in ~/.agents yet' });
   await open();
-  await settle(() => switches()[1]!.click());
-  expect(switches().slice(0, 2).map(ticked)).toEqual([true, false]);
-  expect(result().textContent).toBe('Couldn\'t change ~/.claude-work: No skills are installed in /Users/me/.agents yet');
+  await settle(() => switchOf('~/.claude-work/skills').click());
+  expect(profileTicks()).toEqual([true, false]);
+  expect(result().textContent).toBe('Couldn\'t change ~/.claude-work/skills: No skills are installed in ~/.agents yet');
   expect(result().dataset.tone).toBe('error');
 });
 
-test('a profile\'s result shows under the profiles only', async () => {
-  stubBridge(bothTicked);
+test("a target's result shows under the targets only", async () => {
+  stubBridge({ snapshot: bothTicked });
   await open();
-  await settle(() => switches()[1]!.click());
+  await settle(() => switchOf('~/.claude-work/skills').click());
   await settle(() => section('Updates').click());
   expect(result().textContent).toBe('');
   await settle(() => section('Skills').click());
-  expect(result().textContent).toBe('Linked the skills and checklists into ~/.claude-work.');
+  expect(result().textContent).toBe('Installed the skills into ~/.claude-work/skills.');
 });
 
 test('a bridge that throws shows the error', async () => {
   const bridge = stubBridge();
-  bridge.listProfiles.mockRejectedValueOnce(new Error('home is gone'));
+  bridge.getInstallState.mockRejectedValueOnce(new Error('home is gone'));
   await open();
-  expect($('.settings-row[data-row="profile-.claude"]')).toBeNull();
-  expect(result().textContent).toBe('Couldn\'t read the Claude profiles: home is gone');
+  expect($('.settings-row[data-row="target-~/.claude/skills"]')).toBeNull();
+  expect(result().textContent).toBe('Couldn\'t read the Install targets: home is gone');
 });
 
-test('a list that fails shows its error in plain words', async () => {
+test("a state that couldn't read the targets shows its error", async () => {
   const bridge = stubBridge();
-  bridge.listProfiles.mockResolvedValueOnce({ profiles: [], installed: true, conflicts: [], error: 'Couldn\'t read /Users/me/.agents/.lar-factory-install.json' });
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, targets: [], error: 'Couldn\'t read ~/.agents/.lar-factory-install.json' });
   await open();
-  expect(result().textContent).toBe('Couldn\'t read the Claude profiles: Couldn\'t read /Users/me/.agents/.lar-factory-install.json');
-  expect(text(body())).not.toContain('No Claude profiles found');
+  expect(result().textContent).toBe('Couldn\'t read ~/.agents/.lar-factory-install.json');
 });
 
-test('Skills says Loading until the list arrives, also when opened again', async () => {
+test('Skills says Loading until the state arrives, also when opened again', async () => {
   const bridge = stubBridge();
-  let finish!: (result: ProfilesResult) => void;
-  bridge.listProfiles.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  let finish!: (snapshot: InstallSnapshot) => void;
+  bridge.getInstallState.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
   await open();
   expect(text(body())).toContain('Loading…');
-  expect($('.settings-row[data-row="profile-.claude"]')).toBeNull();
+  expect($('.settings-row[data-row="target-~/.claude/skills"]')).toBeNull();
   await settle(() => finish(listed));
   expect(text(body())).not.toContain('Loading…');
-  expect(switches().slice(0, 2).map(ticked)).toEqual([true, false]);
+  expect(profileTicks()).toEqual([true, false]);
 
   await settle(() => close().click());
-  bridge.listProfiles.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+  bridge.getInstallState.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
   await settle(() => settingsButton()!.click());
   expect(section('Skills').getAttribute('aria-current'), 'Settings opens on the section it showed').toBe('page');
   expect(text(body())).toContain('Loading…');
   await settle(() => finish(bothTicked));
-  expect(switches().slice(0, 2).map(ticked)).toEqual([true, true]);
+  expect(profileTicks()).toEqual([true, true]);
 });
 
-test('a home without Claude profiles says so', async () => {
+test('before the first install the switches show disabled with the reason, and turn on once it finishes', async () => {
   const bridge = stubBridge();
-  bridge.listProfiles.mockResolvedValueOnce({ profiles: [], installed: true, conflicts: [] });
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, installed: false });
   await open();
-  expect(text(body())).toContain('No Claude profiles found in ~.');
-});
+  expect(text(body())).toContain('Lar Factory hasn\'t installed its skills yet');
+  expect(['~/.claude/skills', '~/.claude-work/skills'].map((path) => switchOf(path).disabled)).toEqual([true, true]);
+  await settle(() => switchOf('~/.claude-work/skills').click());
+  expect(bridge.setTargetTick).not.toHaveBeenCalled();
 
-test('before the first install the switches show disabled with the reason', async () => {
-  const bridge = stubBridge();
-  bridge.listProfiles.mockResolvedValueOnce({ ...listed, installed: false });
-  await open();
-  expect(text(body())).toContain('Lar Factory hasn\'t installed its skills in ~/.agents yet');
-  expect(switches().slice(0, 2).map((s) => s.disabled)).toEqual([true, true]);
-  await settle(() => switches()[1]!.click());
-  expect(bridge.setProfileTick).not.toHaveBeenCalled();
-});
-
-test('open Settings turn the switches on once the launch install finishes', async () => {
-  const bridge = stubBridge();
-  bridge.listProfiles.mockResolvedValueOnce({ ...listed, installed: false }).mockResolvedValueOnce({ ...listed, installed: false });
-  await open();
-  expect(text(body())).toContain('ticks every profile it finds on that first install');
-  await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS));
-  expect(switches().slice(0, 2).map((s) => s.disabled)).toEqual([true, true]);
-  await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS));
-  expect(bridge.listProfiles).toHaveBeenCalledTimes(3);
+  await bridge.push(listed);
   expect(text(body())).not.toContain('hasn\'t installed');
-  expect(switches().slice(0, 2).map((s) => s.disabled)).toEqual([false, false]);
-  await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS * 2));
-  expect(bridge.listProfiles).toHaveBeenCalledTimes(3);
+  expect(['~/.claude/skills', '~/.claude-work/skills'].map((path) => switchOf(path).disabled)).toEqual([false, false]);
 });
 
-test('Closing Settings stops reading the profiles', async () => {
+test('a run that installs nothing says how to start one that does, with the switches disabled', async () => {
   const bridge = stubBridge();
-  bridge.listProfiles.mockResolvedValue({ ...listed, installed: false });
+  bridge.getInstallState.mockResolvedValueOnce({ ...listed, installs: false });
   await open();
-  await settle(() => close().click());
-  await settle(() => vi.advanceTimersByTime(INSTALL_RECHECK_MS * 3));
-  expect(bridge.listProfiles).toHaveBeenCalledOnce();
+  expect(text(body())).toContain('Start it with --install-skills');
+  expect(switches().every((box) => box.disabled)).toBe(true);
 });
 
 describe('updates', () => {
@@ -645,7 +685,7 @@ describe('updates', () => {
   function stubChannel(start: UpdateState = nightly) {
     let push: (state: UpdateState) => void = () => {};
     const bridge = stubApp({
-      listProfiles: vi.fn(async () => listed),
+      getInstallState: vi.fn(async () => listed),
       getUpdateState: vi.fn(async () => start),
       onUpdateState: vi.fn((listener: (state: UpdateState) => void) => { push = listener; return () => {}; }),
       setUpdateChannel: vi.fn(async (channel: UpdateChannel) => ({ ...start, channel })),

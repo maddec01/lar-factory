@@ -12,6 +12,7 @@ export * from './concept-map.ts';
 export * from './github-items.ts';
 export * from './page-data.ts';
 export * from './board-app.ts';
+export * from './install-snapshot.ts';
 export * from './is-record.ts';
 export * from './workflow-labels.ts';
 export * from './label-step.ts';

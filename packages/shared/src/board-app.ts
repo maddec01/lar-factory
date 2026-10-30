@@ -1,18 +1,7 @@
 // What the board app's preload bridge (apps/desktop/src/preload.ts) hands the page. Outside the app,
 // in a browser or `pnpm run sample`, there is no bridge, so whatever needs it doesn't show there.
 
-import type { ClaudeProfile, TickResult } from './install-skills.ts';
-
-/** The Claude profiles after a call, with what the last tick left alone and removed, or why it failed. */
-export interface ProfilesResult {
-  profiles: ClaudeProfile[];
-  /** False until the app first installs its skills; until then no tick can change. */
-  installed: boolean;
-  /** Paths in the home, as `~/…`. */
-  conflicts: string[];
-  removed?: TickResult['removed'];
-  error?: string;
-}
+import type { InstallOperationResult, InstallSnapshot } from './install-snapshot.ts';
 
 /** Where the app looks for updates: `nightly-mac.yml` or `latest-mac.yml` on the Releases. */
 export type UpdateChannel = 'latest' | 'nightly';
@@ -72,8 +61,16 @@ export interface BoardAppBridge {
   platform: string;
   /** The per-launch secret the app's server wants on each guarded write. */
   secret?: string | undefined;
-  listProfiles: () => Promise<ProfilesResult>;
-  setProfileTick: (name: string, ticked: boolean) => Promise<ProfilesResult>;
+  /** The skills' install state now. */
+  getInstallState: () => Promise<InstallSnapshot>;
+  /** Calls `listener` with each new install state; the returned function stops it. */
+  onInstallState: (listener: (snapshot: InstallSnapshot) => void) => () => void;
+  /** Checks the skills again, retrying each failed target. */
+  retryInstall: () => Promise<InstallOperationResult>;
+  /** Overwrites the Drift the last check found with the app's Release. */
+  replaceDrift: () => Promise<InstallOperationResult>;
+  /** Ticks or unticks the Install target at `path`, as the snapshot names it, then checks the skills. */
+  setTargetTick: (path: string, ticked: boolean) => Promise<InstallOperationResult>;
   /** Whether the window is in full screen, read at once, as T3 Code's. */
   getWindowFullscreenState: () => boolean;
   /** Calls `listener` as the window enters and leaves macOS full screen; the returned function stops it. */

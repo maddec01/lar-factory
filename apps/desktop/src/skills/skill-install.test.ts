@@ -287,7 +287,7 @@ describe("makeChecks with T3", () => {
       let answer: InstanceDiscovery = { available: false, reason: "not-running" };
       const made = yield* checks(launch({ home, bundle: makeBundle() }), asking(() => answer));
       yield* made.atLaunch;
-      setProfileTick(home, ".claude", false);
+      setTargetTick(home, NodePath.join(home, ".claude/skills"), false);
       yield* made.atLaunch;
       assert.isFalse(NodeFS.existsSync(NodePath.join(home, ".claude/skills/lar-work")));
 
@@ -388,10 +388,10 @@ describe("makeChecks with T3", () => {
     }));
 });
 
-describe("buildAnswer", () => {
-  const clean = { installed: false, version: "1.0.0", skills: ["lar-work"], conflicts: [], blocked: [], drift: [], replaced: [], warn: false, targets: [] };
-  const drift = [{ skill: "tdd", paths: [{ place: "agents" as const, path: "/home/.agents/skills/tdd" }, { place: "agents" as const, path: "/work/skills/tdd" }] },
-    { skill: "grill", paths: [{ place: "agents" as const, path: "/home/.agents/skills/grill" }] }];
+describe("unshown", () => {
+  const drift = (path: string) => ({ skill: "tdd", paths: [{ place: "agents" as const, path }] });
+  const failed = (path: string) => ({ kind: "claude" as const, path, paths: [path], required: true, skills: [], active: true, finished: false, error: { message: "EACCES", changed: false } });
+  const result = { installed: false, version: "1.0.0", skills: [], conflicts: [], blocked: [], replaced: [], warn: false };
 
   it("lets a build without Drift start, whatever the choice", () => {
     assert.deepStrictEqual(SkillInstall.buildAnswer(clean), { refusal: null });
@@ -413,16 +413,26 @@ describe("buildAnswer", () => {
     assert.strictEqual(answer.drift, undefined);
   });
 
-  it("never offers Start anyway for a Clash or a failed install", () => {
-    const blocked = [{ skill: "grill", paths: [{ place: "agents" as const, path: "/home/.agents/skills/grill" }] }];
-    const failed = { kind: "claude" as const, path: "/home/.claude/skills", paths: [], required: true, skills: [], active: true, finished: false, error: { message: "EACCES", changed: true } };
-    for (const outcome of [{ ...clean, drift, blocked }, { ...clean, drift, targets: [failed] }, new SkillInstall.SkillInstallError({ message: "EACCES", changed: false })]) {
-      for (const choice of [undefined, "keep" as const]) {
-        const answer = SkillInstall.buildAnswer(outcome, choice);
-        assert.isString(answer.refusal);
-        assert.strictEqual(answer.drift, undefined);
-      }
-    }
+  it("reports a failed install as an error that the next Start build or launch retries", () => {
+    const notice = SkillInstall.notice(new SkillInstall.SkillInstallError({ message: "Couldn't copy references", changed: false }));
+    assert.strictEqual(notice?.type, "error");
+    assert.include(notice?.detail, "Couldn't copy references");
+    assert.include(notice?.detail, "previous skills are still in place");
+    assert.include(notice?.detail, "next Start build or launch");
+  });
+
+  it("names each target an install failed in as an error", () => {
+    const failed = { kind: "antigravity" as const, path: "/home/.gemini/config/skills", paths: [], required: false, skills: [], active: true, finished: false, error: { message: "EACCES", changed: false } };
+    const notice = SkillInstall.notice({ ...conflicted, conflicts: [], blocked: [], warn: false, targets: [failed] });
+    assert.strictEqual(notice?.type, "error");
+    assert.include(notice?.detail, "/home/.gemini/config/skills: EACCES");
+  });
+
+  it("says an install that stopped after replacing files stopped partway", () => {
+    const notice = SkillInstall.notice(new SkillInstall.SkillInstallError({ message: "EACCES", changed: true }));
+    assert.notInclude(notice?.detail, "still in place");
+    assert.include(notice?.detail, "stopped partway");
+    assert.include(notice?.detail, "next Start build or launch");
   });
 });
 
@@ -459,7 +469,7 @@ describe("buildRefusal", () => {
   });
 
   it("names each target the install failed in, even with Drift alone", () => {
-    const failed = { kind: "claude" as const, path: "/home/.claude/skills", paths: [], required: true, active: true, finished: false, error: { message: "EACCES", changed: true } };
+    const failed = { kind: "claude" as const, path: "/home/.claude/skills", paths: [], required: true, skills: [], active: true, finished: false, error: { message: "EACCES", changed: true } };
     const refusal = SkillInstall.buildRefusal({ ...clean, targets: [failed], drift: [{ skill: "tdd", paths: [{ place: "agents", path: "/home/.agents/skills/tdd" }] }] });
     assert.include(refusal, "couldn't install");
     assert.include(refusal, "/home/.claude/skills: EACCES");

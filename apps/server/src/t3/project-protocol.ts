@@ -65,7 +65,8 @@ export class ProjectProtocol {
       const response = await this.request(session.token);
       if (response.status === 401 || response.status === 403) return result('renewal-required');
       if (!response.ok) return result('unavailable');
-      const body: unknown = await response.json();
+      let body: unknown;
+      try { body = await response.json(); } catch { return result('malformed'); }
       if (!isRecord(body) || typeof body.updatedAt !== 'string' || !Number.isFinite(Date.parse(body.updatedAt)) || !Array.isArray(body.projects)) return result('malformed');
       const projects: ProjectFact[] = [];
       for (const project of body.projects) {

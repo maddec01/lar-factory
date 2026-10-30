@@ -41,8 +41,14 @@ out-of-scope work, domain docs drafts and relationships between sub-issues.
 
 **Build**:
 An issue in one repository that changes only that repository and becomes one
-PR there, delivered through its slices.
+PR there, delivered through its slices, or by the builder alone when it's a
+Small build.
 _Avoid_: build issue
+
+**Small build**:
+A build the builder implements itself, without slices, because it's one change
+or every part touches the same files.
+_Avoid_: quick build, unsliced build
 
 **Slice**:
 A small, independently testable piece of a build, recorded as a sub-issue of
@@ -168,10 +174,11 @@ _Avoid_: child task (for native subagents), helper
 
 **Reviewer**:
 A fresh-context agent assessing a change on one review axis: code, security,
-UX or UI.
+UI or performance.
 
 **Review round**:
-One pass of the reviewers over a diff. The first covers the whole branch; each later one covers only the fixes from the round before, with at most three per build.
+One pass of the reviewers over a diff. The first covers the whole branch, and
+the second covers only the fixes from the first. A build has at most two.
 _Avoid_: Review pass, re-review
 
 **Approver**:

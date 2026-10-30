@@ -1,7 +1,7 @@
 // What the board app's preload bridge (apps/desktop/src/preload.ts) hands the page. Outside the app,
 // in a browser or `pnpm run sample`, there is no bridge, so whatever needs it doesn't show there.
 
-import type { InstallOperationResult, InstallSnapshot } from './install-snapshot.ts';
+import type { InstallOperationResult, InstallSnapshot, InstallOverviewClosure } from './install-snapshot.ts';
 
 /** Where the app looks for updates: `nightly-mac.yml` or `latest-mac.yml` on the Releases. */
 export type UpdateChannel = 'latest' | 'nightly';
@@ -67,6 +67,8 @@ export interface BoardAppBridge {
   getInstallState: () => Promise<InstallSnapshot>;
   /** Calls `listener` with each new install state; the returned function stops it. */
   onInstallState: (listener: (snapshot: InstallSnapshot) => void) => () => void;
+  /** Closes the overview for this app launch. Automatic closure applies only to the displayed successful revision. */
+  closeInstallOverview: (reason: InstallOverviewClosure, revision: number) => Promise<InstallSnapshot>;
   /** Checks the skills again, retrying each failed target. */
   retryInstall: () => Promise<InstallOperationResult>;
   /** Overwrites the Drift the last check found with the app's Release. */

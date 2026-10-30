@@ -227,6 +227,10 @@ const handleInstall = (window: Electron.BrowserWindow, boardOrigin: () => string
     checkSender(event);
     return board.snapshot();
   });
+  Electron.ipcMain.handle(IpcChannels.INSTALL_CLOSE_OVERVIEW, (event, reason: unknown, revision: unknown) => {
+    checkSender(event);
+    return board.closeOverview(reason, revision);
+  });
   Electron.ipcMain.handle(IpcChannels.INSTALL_RETRY, (event) => {
     checkSender(event);
     return board.retry();

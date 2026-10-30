@@ -30,6 +30,7 @@ const bridge: BoardAppBridge = {
       ipcRenderer.removeListener(IpcChannels.INSTALL_STATE, wrappedListener);
     };
   },
+  closeInstallOverview: (reason, revision) => ipcRenderer.invoke(IpcChannels.INSTALL_CLOSE_OVERVIEW, reason, revision),
   retryInstall: () => ipcRenderer.invoke(IpcChannels.INSTALL_RETRY),
   replaceDrift: () => ipcRenderer.invoke(IpcChannels.INSTALL_REPLACE),
   setTargetTick: (path, ticked) => ipcRenderer.invoke(IpcChannels.INSTALL_SET_TICK, path, ticked),

@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./install-skills": "./src/install-skills.ts",
+    "./install-targets": "./src/install-targets.ts",
     "./test/sample.json": "./test/sample.json",
     "./test/sample-details.json": "./test/sample-details.json",
     "./test/raw-items": "./test/raw-items.ts"

@@ -43,7 +43,7 @@ run() { SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$fa
 
 out=$(run)
 check "reports an unchanged copy" "$out" "^== demo: unchanged \\(owner/repo $first, "
-check "reads only the Copies table" "$out" "doubt" absent
+check "reports Port rows apart from Copies" "$out" "^== skills/lar-build/agents/doubt.md: unchanged"
 
 echo c > "$repo/pack/skills/other/SKILL.md"
 echo 'Root licence, new year' > "$repo/LICENSE"
@@ -58,7 +58,7 @@ out=$(run)
 check "reports a change to the licence file" "$out" "^== demo: changed \\(owner/repo $first..$head, "
 check "logs the licence commit" "$out" "bump licence$"
 check "shows the licence diff" "$out" "^\\+MIT 2026$"
-check "leaves out commits that touch neither" "$out" "outside the copy" absent
+check "leaves out commits that touch neither" "$(sed -n '/^== demo:/,/^== skills/p' <<<"$out")" "outside the copy" absent
 
 echo d > "$repo/pack/skills/demo/SKILL.md"
 commit "edit demo"
@@ -143,6 +143,112 @@ grep -v '^| .demo. ' "$factory/UPSTREAM.md" >"$quiet/UPSTREAM.md"
 out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$quiet")
 check "says so when it flags nothing" "$out" "^no Overrides touched$"
 
+# Ports, in a third upstream repo with two skill folders.
+ports="$base/owner/ports.git"
+mkdir -p "$ports/skills/review" "$ports/skills/doubt" "$ports/skills/unused"
+git -C "$ports" init --quiet
+cat >"$ports/skills/review/SKILL.md" <<'EOF2'
+# Review
+
+## Axes
+
+Check five axes.
+
+One.
+Two.
+Three.
+Four.
+Five.
+Six.
+
+## Severity
+
+One.
+Two.
+Three.
+Four.
+Five.
+Six.
+
+Label each finding.
+
+One.
+Two.
+Three.
+Four.
+Five.
+Six.
+
+## Moved
+
+Moves away.
+
+One.
+Two.
+Three.
+Four.
+Five.
+Six.
+
+## Untouched
+
+Stays put.
+EOF2
+printf '# Doubt\n\n## Loop\n\nDoubt it.\n' >"$ports/skills/doubt/SKILL.md"
+printf '# Checks\n\nCheck one.\n' >"$ports/skills/doubt/checks.md"
+printf '# Gone\n\nGoes.\n' >"$ports/skills/doubt/gone.md"
+printf '# Unused\n' >"$ports/skills/unused/SKILL.md"
+echo 'MIT 2025' >"$ports/LICENSE"
+repo=$ports commit first
+pfirst=$(git -C "$ports" rev-parse --short=12 HEAD)
+
+factory="$base/ports-factory"
+mkdir -p "$factory"
+cat >"$factory/UPSTREAM.md" <<EOF2
+| Skill | Source | Path | Repository path | Commit | Date | Overridden in |
+| ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
+
+| Port | Source | Path | Sections | Commit | Date |
+| ---- | ------ | ---- | -------- | ------ | ---- |
+| \`skills/lar-build/agents/reviewer.md\` | owner/ports | \`skills/review\`; \`skills/doubt\` | skills/review/SKILL.md#Axes; skills/review/SKILL.md#Moved; skills/review/SKILL.md#Untouched; \`skills/doubt/checks.md\`; skills/doubt/gone.md | \`$pfirst\` | 2026-10-01 |
+| \`skills/lar-shape/agents/quiet.md\` | owner/ports | \`skills/unused\` | skills/unused/SKILL.md | \`$pfirst\` | 2026-10-01 |
+EOF2
+
+out=$(run)
+check "reports an unchanged Port" "$out" "^== skills/lar-build/agents/reviewer.md: unchanged \\(owner/ports $pfirst, "
+check "says so when no Port section is touched" "$out" "^no Port sections touched$"
+check "reads a backticked Sections entry" "$out" "no such file" absent
+
+sed -i.bak -e 's/^Check five axes\.$/Check six axes./' -e 's/^Label each finding\.$/Label every finding./' \
+    -e 's/^## Moved$/## Renamed/' "$ports/skills/review/SKILL.md"
+printf '# Checks\n\nCheck two.\n' >"$ports/skills/doubt/checks.md"
+rm "$ports/skills/review/SKILL.md.bak" "$ports/skills/doubt/gone.md"
+echo 'MIT 2026' >"$ports/LICENSE"
+echo 'Other change' >"$ports/skills/unused/OTHER.md"
+repo=$ports commit "edit review and doubt"
+phead=$(git -C "$ports" rev-parse --short=12 HEAD)
+out=$(run)
+port=$(sed -n '/^== skills\/lar-build\/agents\/reviewer.md:/,/^== skills\/lar-shape/p' <<<"$out")
+check "reports a changed Port" "$out" "^== skills/lar-build/agents/reviewer.md: changed \\(owner/ports $pfirst..$phead, "
+check "logs the Port's upstream commits" "$port" "^   [0-9a-f]+ edit review and doubt$"
+check "shows changes in the Port's first folder" "$port" "^\\+Check six axes\\.$"
+check "shows changes in the Port's second folder" "$port" "^\\+Check two\\.$"
+check "leaves out the licence diff for a Port" "$port" "MIT 2026" absent
+check "leaves out folders outside the Port's Path" "$port" "Other change" absent
+check "flags a cited section that changed" "$port" "^skills/lar-build/agents/reviewer.md: skills/review/SKILL.md#Axes: upstream changed this section$"
+check "flags a cited heading upstream renamed" "$port" "^skills/lar-build/agents/reviewer.md: skills/review/SKILL.md#Moved: upstream renamed or deleted this heading$"
+check "flags a cited file upstream deleted" "$port" "^skills/lar-build/agents/reviewer.md: skills/doubt/gone.md: upstream renamed or deleted skills/doubt/gone.md$"
+check "leaves out a cited section the change doesn't touch" "$port" "#Untouched" absent
+check "marks a hunk inside a cited section" "$(grep -A1 '^>> skills/review/SKILL.md#Axes$' <<<"$port")" "^@@ "
+# The hunk's header sits three context lines above the removed line.
+above=$(grep -B4 '^-Label each finding\.$' <<<"$port" | head -2)
+check "finds the hunk outside every cited section" "$above" "^@@ "
+check "leaves a hunk outside every cited section unmarked" "$above" "^>> " absent
+check "marks every hunk of a whole-file citation" "$(grep -A1 '^>> skills/doubt/checks.md$' <<<"$port")" "^@@ "
+check "marks a hunk in a deleted cited file" "$(grep -A1 '^>> skills/doubt/gone.md$' <<<"$port")" "^@@ "
+check "says nothing about untouched Port sections when it flags some" "$out" "no Port sections touched" absent
+factory="$base/marks-factory"
+
 bad="$base/bad"
 mkdir -p "$bad"
 sed -e "s/$mfirst/--output=x/" "$factory/UPSTREAM.md" >"$bad/UPSTREAM.md"
@@ -151,6 +257,15 @@ if out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$b
 else
     check "exits non-zero on a Commit that isn't a sha" "$out" "^demo: Commit '--output=x' is not a hex sha$"
 fi
+
+for source in 'owner/..' '../marks' 'owner/marks/x'; do
+    sed -e "s#| owner/marks |#| $source |#" "$factory/UPSTREAM.md" >"$bad/UPSTREAM.md"
+    if out=$(SKILL_SYNC_GIT_BASE="file://$base" bash "$here/upstream-changes.sh" "$bad" 2>&1); then
+        echo "FAIL exits non-zero on Source $source"; fail=1
+    else
+        check "exits non-zero on Source $source" "$out" "^demo: Source '$source' is not <owner>/<repo>$"
+    fi
+done
 
 missing="$base/missing"
 mkdir -p "$missing"

@@ -6,7 +6,13 @@
 # and its commit date. Under each Copy's header it prints, as
 # <name>: <entry>: <reason>, each Override in the row's "Overridden in" column
 # that the upstream change touches (see citation_change). Prints
-# "no Overrides touched" at the end when it flags none. Exits non-zero on a
+# "no Overrides touched" at the end when it flags none.
+# For every row in the Ports table, prints the same header, log and diff for
+# each folder in the row's Path, without the licence. Under the header it
+# prints, as <port>: <section>: <reason>, each entry in the row's Sections
+# that the change touches, and in the diff it puts ">> <section>" above each
+# hunk that changes a line of that section (see mark_hunks). Prints
+# "no Port sections touched" at the end when it flags none. Exits non-zero on a
 # missing UPSTREAM.md, on a Commit that isn't a hex sha or that upstream doesn't
 # have, and on a failed clone or git command. Clones into a temp folder.
 # SKILL_SYNC_GIT_BASE overrides https://github.com.
@@ -104,14 +110,62 @@ citation_change() {
     fi
 }
 
-flagged=0
-# Reads rows in this shell, not a pipeline or $(...), so set -e stops the
-# script on a failed clone or git command and the flag count survives the loop.
-while IFS='|' read -r _ name source path _ commit _ overrides _; do
-    name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
-    path=$(echo "$path" | tr -d ' `'); commit=$(echo "$commit" | tr -d ' `')
+# mark_hunks <specs file>
+# Copies a git diff from stdin to stdout and puts ">> <citation>" above each
+# hunk that changes a line of a cited range. Each specs line is
+# <file>\t<start>\t<end>\t<citation>, with <file> relative to the source's
+# root. A removed line counts at its own line; an added line counts at the old
+# line it follows, as in citation_change.
+mark_hunks() {
+    awk -v specs="$1" '
+        BEGIN {
+            while ((getline line < specs) > 0) {
+                split(line, f, "\t")
+                n++; sf[n] = f[1]; ss[n] = f[2]; se[n] = f[3]; sc[n] = f[4]
+            }
+        }
+        function flush(   i, k) {
+            for (i = 1; i <= n; i++) if (hit[i]) print ">> " sc[i]
+            for (k = 1; k <= held; k++) print buf[k]
+            held = 0; split("", hit)
+        }
+        function touch(at,   i) {
+            for (i = 1; i <= n; i++)
+                if (sf[i] == file && at >= ss[i] && at <= se[i]) hit[i] = 1
+        }
+        /^diff --git / { flush(); header = 1; file = ""; print; next }
+        header && /^--- / { file = substr($0, 5); sub(/^a\//, "", file); print; next }
+        /^@@ / {
+            flush(); header = 0
+            # "-a,0" inserts after line a, so its added lines count at a.
+            split(substr($2, 2), old, ",")
+            cur = (2 in old) && old[2] == 0 ? old[1] + 1 : old[1]
+            buf[++held] = $0; next
+        }
+        held {
+            c = substr($0, 1, 1)
+            if (c == "-") touch(cur++)
+            else if (c == "+") touch(cur - 1)
+            else if (c == " ") cur++
+            buf[++held] = $0; next
+        }
+        { print }
+        END { flush() }
+    '
+}
+
+# fetch <name> <source> <commit>
+# Checks <source> is <owner>/<repo>, clones it once, checks <commit> is a sha
+# upstream has, and sets clone, head and date to the clone's folder and HEAD's
+# 12-character sha and date.
+fetch() {
+    local name=$1 source=$2 commit=$3
     if [[ ! $commit =~ ^[0-9a-f]{7,40}$ ]]; then
         echo "$name: Commit '$commit' is not a hex sha" >&2
+        exit 1
+    fi
+    if [[ ! $source =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ || /$source/ == */../* || /$source/ == */./* ]]; then
+        echo "$name: Source '$source' is not <owner>/<repo>" >&2
         exit 1
     fi
     clone="$work/${source//\//_}"
@@ -126,17 +180,35 @@ while IFS='|' read -r _ name source path _ commit _ overrides _; do
     fi
     head=$(git -C "$clone" rev-parse --short=12 HEAD)
     date=$(git -C "$clone" log -1 --format=%cs HEAD)
-    paths=("$path")
-    # The licence file at both ends, so one added or moved upstream shows too.
-    for rev in "$commit" HEAD; do
-        if licence=$(licence_file "$clone" "$rev" "$path"); then paths+=("$licence"); fi
-    done
-    changed=$(git -C "$clone" diff --quiet "$commit" HEAD -- "${paths[@]}" || echo 1)
+}
+
+# report_header <name> <source> <commit> <path>...
+# Prints the row's "== <name>: changed|unchanged" line and sets changed when
+# upstream changed any <path> since <commit>.
+report_header() {
+    local name=$1 source=$2 commit=$3
+    shift 3
+    changed=$(git -C "$clone" diff --quiet "$commit" HEAD -- "$@" || echo 1)
     if [[ $changed ]]; then
         echo "== $name: changed ($source $commit..$head, $date)"
     else
         echo "== $name: unchanged ($source $head, $date)"
     fi
+}
+
+flagged=0
+# Reads rows in this shell, not a pipeline or $(...), so set -e stops the
+# script on a failed clone or git command and the flag count survives the loop.
+while IFS='|' read -r _ name source path _ commit _ overrides _; do
+    name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
+    path=$(echo "$path" | tr -d ' `'); commit=$(echo "$commit" | tr -d ' `')
+    fetch "$name" "$source" "$commit"
+    paths=("$path")
+    # The licence file at both ends, so one added or moved upstream shows too.
+    for rev in "$commit" HEAD; do
+        if licence=$(licence_file "$clone" "$rev" "$path"); then paths+=("$licence"); fi
+    done
+    report_header "$name" "$source" "$commit" "${paths[@]}"
     while IFS= read -r entry; do
         entry=$(echo "$entry" | sed -e 's/^ *//' -e 's/ *$//')
         [[ -n $entry ]] || continue
@@ -153,3 +225,38 @@ while IFS='|' read -r _ name source path _ commit _ overrides _; do
 done < <(upstream_rows "$factory/UPSTREAM.md" Copies)
 
 if [[ $flagged == 0 ]]; then echo "no Overrides touched"; fi
+
+flagged=0
+while IFS='|' read -r _ name source path sections commit _; do
+    name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
+    commit=$(echo "$commit" | tr -d ' `')
+    fetch "$name" "$source" "$commit"
+    IFS=';' read -ra paths <<<"$(echo "$path" | tr -d ' `')"
+    report_header "$name" "$source" "$commit" "${paths[@]}"
+    : >"$work/specs"
+    while IFS= read -r entry; do
+        entry=$(echo "$entry" | sed -e 's/^ *//' -e 's/ *$//')
+        [[ -n $entry ]] || continue
+        reason=$(citation_change "$clone" "$commit" HEAD "$entry")
+        if [[ -n $reason ]]; then
+            echo "$name: $entry: $reason"
+            flagged=$((flagged + 1))
+        fi
+        file=${entry%%#*}
+        git -C "$clone" cat-file -e "$commit:$file" 2>/dev/null || continue
+        if [[ $entry == *"#"* ]]; then
+            range=$(git -C "$clone" show "$commit:$file" | section "${entry#*#}")
+        else
+            range="1 $(git -C "$clone" show "$commit:$file" | wc -l)"
+        fi
+        if [[ -n $range ]]; then
+            printf '%s\t%s\t%s\t%s\n' "$file" "${range% *}" "${range#* }" "$entry" >>"$work/specs"
+        fi
+    done < <(tr -d '`' <<<"$sections" | tr ';' '\n')
+    if [[ $changed ]]; then
+        git -C "$clone" log --format='   %h %s' "$commit..HEAD" -- "${paths[@]}"
+        git -C "$clone" diff "$commit" HEAD -- "${paths[@]}" | mark_hunks "$work/specs"
+    fi
+done < <(upstream_rows "$factory/UPSTREAM.md" Ports)
+
+if [[ $flagged == 0 ]]; then echo "no Port sections touched"; fi

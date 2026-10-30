@@ -211,13 +211,14 @@ const boardPageOnly = (boardOrigin: () => string, refusal: string) => (event: El
 const handleProfiles = (boardOrigin: () => string) => {
   const checkSender = boardPageOnly(boardOrigin, "Only the board's page can change the Claude profiles");
   const home = SkillInstall.installHome(NodeOS.homedir(), process.env);
+  const root = SkillInstall.installRoot(process.env);
   Electron.ipcMain.handle(IpcChannels.LIST_PROFILES, (event) => {
     checkSender(event);
     return ClaudeProfiles.list(home);
   });
   Electron.ipcMain.handle(IpcChannels.SET_PROFILE_TICK, (event, name: unknown, ticked: unknown) => {
     checkSender(event);
-    return ClaudeProfiles.setTick(home, name, ticked);
+    return ClaudeProfiles.setTick(home, name, ticked, root);
   });
 };
 

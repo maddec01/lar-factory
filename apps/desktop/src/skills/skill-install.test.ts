@@ -40,9 +40,9 @@ describe("plan", () => {
     });
   });
 
-  it("installs into the root the environment overrides", () => {
+  it("installs into the root the environment overrides, and keeps every write inside it", () => {
     const plan = SkillInstall.plan(launch({ env: { [SkillInstall.ROOT_ENV]: "/tmp/home" } }));
-    assert.strictEqual(plan?.home, "/tmp/home");
+    assert.deepStrictEqual([plan?.home, plan?.root], ["/tmp/home", "/tmp/home"]);
   });
 
   it("skips a dev run without the flag", () => {
@@ -55,7 +55,7 @@ describe("plan", () => {
       argv: ["/path/electron", ".", SkillInstall.INSTALL_FLAG],
       env: { [SkillInstall.ROOT_ENV]: "/tmp/home" },
     }));
-    assert.deepStrictEqual(plan, { home: "/tmp/home", bundle: "/App/bundle", version: "1.0.0" });
+    assert.deepStrictEqual(plan, { home: "/tmp/home", root: "/tmp/home", bundle: "/App/bundle", version: "1.0.0" });
   });
 });
 
@@ -103,6 +103,19 @@ describe("makeChecks", () => {
       assert.strictEqual(SkillInstall.buildRefusal(third!), null);
       assert.include(SkillInstall.notice(third!)?.detail, NodePath.join(home, ".agents/skills/lar-work"));
       assert.strictEqual(NodeFS.readFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "utf8"), "edited");
+    }));
+
+  it.effect("with an install root, leaves a Claude home linked outside it alone and refuses the build", () =>
+    Effect.gen(function* () {
+      const root = tempDir("skill-root-");
+      const outside = tempDir("skill-outside-");
+      NodeFS.symlinkSync(outside, NodePath.join(root, ".claude"));
+      const input = launch({ home: "/Users/someone", bundle: makeBundle(), env: { [SkillInstall.ROOT_ENV]: root } });
+
+      const outcome = yield* check(input, "beforeBuild");
+      assert.deepStrictEqual(NodeFS.readdirSync(outside), []);
+      assert.isTrue(NodeFS.existsSync(NodePath.join(root, ".agents/skills/lar-work/SKILL.md")));
+      assert.include(SkillInstall.buildRefusal(outcome!), "outside the install root");
     }));
 
   it.effect("shows a blocking folder's dialog on the first launch of a version, not the next", () =>

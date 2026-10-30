@@ -15,6 +15,8 @@ import { CopyStatus } from './copy/copy-button.tsx';
 import { Desk } from './desk/desk.tsx';
 import { ItemDialog } from './item-dialog/item-dialog.tsx';
 import { AbandonDialog } from './items/abandon-dialog.tsx';
+import { DriftChoiceDialog } from './items/drift-choice.tsx';
+import { startItem } from './items/start-item.ts';
 import { Line } from './line/line.tsx';
 import { LoadingScreen } from './loading/loading-screen.tsx';
 import { Warnings } from './notices/warnings.tsx';
@@ -69,6 +71,7 @@ export function App() {
         <ItemDialog />
         <SettingsDialog />
         <AbandonDialog />
+        <DriftChoiceDialog start={(itemId, choice, drift) => void startItem(itemId, choice, 'build', undefined, drift)} />
         <WizardDialog />
         <EditDialog />
         <ResetDialog />

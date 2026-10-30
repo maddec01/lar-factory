@@ -25,7 +25,7 @@ import type { InstanceDiscovery, ProviderInstance } from "@lar-factory/shared/in
 import { runInstall } from "./install-runner.ts";
 
 /** How long the launch waits before it asks a T3 that didn't answer again. */
-export const REDISCOVER_EVERY = "30 seconds";
+const REDISCOVER_EVERY = "30 seconds";
 
 /** Starts a dev run's install. A packaged app ignores it and installs on every launch. */
 export const INSTALL_FLAG = "--install-skills";
@@ -195,8 +195,11 @@ export const makeChecks = (input: LaunchInput, discover: Discover, run: typeof r
     const progressed = (event: TargetProgress) => {
       const earlier = state.progress ?? [];
       const previous = earlier.find(({ target }) => target.paths.some((path) => event.target.paths.includes(path)));
+      const retained = event.operation === "check" && previous?.operation !== undefined && previous.operation !== "check";
       const next = {
         ...event,
+        // A later discovery check must not erase actual work or make it look like another installation.
+        ...retained && { operation: previous.operation, running: false },
         // A read-only check keeps earlier results while it verifies them. Actual writes report installing again.
         skills: event.skills.map((skill) => event.operation === "check" && ["pending", "checking"].includes(skill.state)
           ? previous?.skills.find(({ name }) => name === skill.name) ?? skill : skill),

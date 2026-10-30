@@ -11,7 +11,8 @@ import { stoppedAt, useWizardStore } from '../onboarding/wizard-store.ts';
 import { ConfigUpdateNotice } from '../repositories/config-update-notice.tsx';
 import { useEditStore } from '../repositories/edit-store.ts';
 import { useResetStore } from '../repositories/reset-store.ts';
-import { ChannelChoice, TargetProgress, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
+import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
+import { TargetProgress } from './target-progress.tsx';
 import { Switch, type Control, ToolState } from './controls.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 

@@ -4,6 +4,8 @@ import { failedCheck } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { CLIENT_ERROR } from './dismiss-store.ts';
 import { Warning } from './warning.tsx';
+import { InstallOverview, hasInstallWork } from './install-overview.tsx';
+import { useInstallStore } from '../settings/install-store.ts';
 import { DriftWarning } from './drift-warning.tsx';
 import { ClashWarning, InstallFailedWarning } from './install-warnings.tsx';
 import { ItemSourceWarning } from './item-source-warning.tsx';
@@ -11,6 +13,7 @@ import { RepositoryConfigWarning } from './repository-config-warning.tsx';
 import { AzWarning, CommandWarning, GhWarning, T3NotRunningWarning } from './tool-notices.tsx';
 
 export function Warnings() {
+  const overview = useInstallStore((state) => hasInstallWork(state.snapshot));
   const data = useBoardStore((state) => state.data);
   const clientError = useBoardStore((state) => state.clientError);
   const t3 = failedCheck(data.tools, 't3');
@@ -36,8 +39,9 @@ export function Warnings() {
       })}
       {az && <AzWarning check={az} />}
       <DriftWarning />
-      <ClashWarning />
-      <InstallFailedWarning />
+      <InstallOverview />
+      {!overview && <ClashWarning />}
+      {!overview && <InstallFailedWarning />}
       {data.repositoryConfigProblems?.map((p) => <RepositoryConfigWarning key={p.repo.toLowerCase()} {...p} />)}
       {data.itemSourceProblems?.filter((p) => !(az && p.fix === az.fix))
         .map((p) => <ItemSourceWarning key={p.repo.toLowerCase()} {...p} repos={data.repos} />)}

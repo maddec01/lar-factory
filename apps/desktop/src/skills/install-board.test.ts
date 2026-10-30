@@ -281,3 +281,16 @@ describe("board-page mutations", () => {
     requireBoard("http://127.0.0.1:4320/?loading=drawn");
   });
 });
+
+describe("retained install work", () => {
+  it.effect("keeps a completed install visible after discovery checks it without reinstalling", () =>
+    Effect.gen(function* () {
+      const { checks, board } = yield* launch(makeHome(), () => ({ available: true, instances: [] }));
+      yield* checks.atLaunch;
+      yield* checks.afterDiscovery;
+      const snapshot = board.snapshot();
+      assert.strictEqual(target(snapshot, "~/.agents/skills")?.operation, "install");
+      assert.strictEqual(target(snapshot, "~/.agents/skills")?.running, false);
+      assert.strictEqual(target(snapshot, "~/.agents/skills")?.finished, true);
+    }));
+});

@@ -9,9 +9,9 @@
 // first time a work item needs it, as onboarding's Labels step does there.
 
 import { CONFIG_VERSION, missingCustomLabels, onAzure, onboardingConfigFile, sameRepo, type RepositoryConfigAnswers } from '@lar-factory/shared';
+import { boardDataDir } from '@lar-factory/shared/data-dir';
 import { listTags } from '../azure/azure-tags.ts';
 import { createLabel, listLabels, message } from '../github/github.ts';
-import { boardDataDir } from '../port/board-record.ts';
 import { prHost } from './pr-host.ts';
 import { findRepositoryConfig, isConfigAnswers, isRepo, readRepositoryList } from './repository-config.ts';
 

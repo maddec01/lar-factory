@@ -12,6 +12,7 @@
 import {
   isRecord, isSkillName, onAzure, onboardingConfigFile, sameRepo, type Clash, type OnboardingPicks, type OnboardingPrChange, type OnboardingRepository, type SkillPick,
 } from '@lar-factory/shared';
+import { boardDataDir } from '@lar-factory/shared/data-dir';
 import {
   type OnboardedRepository, dropRepository, findRepositoryConfig, isConfigAnswers, isProgress, isRepo, readRepositoryList, saveOnboarded, saveOnboarding,
   savePrClosed, saveResetting, stillOnboarding,
@@ -19,7 +20,6 @@ import {
 import { createBranch, createCommit, createTree, message, moveBranch } from '../github/github.ts';
 import { editPrOf, type Refused } from '../config/edit-config.ts';
 import { prHost as host } from '../config/pr-host.ts';
-import { boardDataDir } from '../port/board-record.ts';
 import { bundledSkillNames } from '../skills/bundled-skills.ts';
 import { planPrChanges, type PrPlan } from './pr-changes.ts';
 import { keepOnboarding } from './keep-onboarding.ts';

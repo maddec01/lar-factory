@@ -13,7 +13,7 @@ import { projectsDb } from './stats-db.ts';
 import type { FixtureProject } from './stats-db.ts';
 import type { BoardData } from '@lar-factory/shared';
 
-const MESSAGE = '#12 Issue 12\n$lar-work maddec01/lar-factory#12';
+const MESSAGE = '#12 Issue 12\n$lar-shape maddec01/lar-factory#12';
 
 /** A temporary home with git checkouts of the given origins under ~/Developer/lar. */
 function home(t: TestContext, origins: Record<string, string | null>): string {
@@ -51,7 +51,7 @@ async function factoryBoard(t: TestContext, items: object[], options: object = {
 
 const start = (board: Board, itemId: string, origin = board.url, model?: unknown) => board.postSession({ itemId, model }, '/api/start', origin);
 
-test("Start begins one lar-work thread in the card's repository project and leaves the Status alone", async (t) => {
+test("Start begins one lar-shape thread in the card's repository project and leaves the Status alone", async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued'), boardIssue(30, 'Queued', 'maddec01/lar-server')]);
   const response = await start(board, 'I_12');
   assert.equal(response.status, 200);
@@ -59,7 +59,7 @@ test("Start begins one lar-work thread in the card's repository project and leav
   assert.equal((await start(board, 'I_30')).status, 200);
   assert.deepEqual(await board.t3Calls(), [
     ['thread', 'start', 'project-factory', MESSAGE, '--json'],
-    ['thread', 'start', 'project-server', '#30 Issue 30\n$lar-work maddec01/lar-server#30', '--json'],
+    ['thread', 'start', 'project-server', '#30 Issue 30\n$lar-shape maddec01/lar-server#30', '--json'],
   ]);
   assert.equal((await board.calls()).filter((args) => args[1] === 'item-edit').length, 0);
 });

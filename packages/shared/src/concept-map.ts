@@ -1,4 +1,4 @@
-// A concept's map, read from the sections of its issue body that lar-work's concepts.md lays out.
+// A concept's map, read from the sections of its issue body that lar-shape's concepts.md lays out.
 
 import type { ConceptMap, EndToEndCheck } from './model.ts';
 

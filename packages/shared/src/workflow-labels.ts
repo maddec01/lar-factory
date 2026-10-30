@@ -1,4 +1,4 @@
-/** A label the lar workflow sets on issues, as `skills/lar-work/issue-tracker.md`'s label setup creates it. */
+/** A label the lar workflow sets on issues, as `skills/lar-shape/issue-tracker/label-setup.md`'s label setup creates it. */
 export interface WorkflowLabel {
   name: string;
   color: string;

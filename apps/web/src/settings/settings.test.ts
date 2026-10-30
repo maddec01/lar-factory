@@ -323,7 +323,7 @@ test('Diagnostics shows the version each command printed', async () => {
   await open('Diagnostics', { ...sample, tools: toolChecks({ gh: { result: 'ok', version: '2.102.0' }, t3: { result: 'ok', version: '0.1.3-nightly.1' },
     git: { result: 'ok', version: '2.56.0' }, jq: { result: 'ok', version: '1.7.1' } }) });
   expect(DIAGNOSED.map((id) => text(row(id).querySelector('.tool-state')))).toEqual(['● 2.102.0', '● 0.1.3-nightly.1', '● 2.56.0', '● 1.7.1', '● OK']);
-  expect(text(row('d-jq'))).toContain("lar-work's scripts read gh's answers with it.");
+  expect(text(row('d-jq'))).toContain("lar-shape's scripts read gh's answers with it.");
 });
 
 test('Diagnostics shows what the lookup found wrong with gh and t3', async () => {

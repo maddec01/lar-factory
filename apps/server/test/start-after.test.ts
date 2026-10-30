@@ -81,7 +81,7 @@ test("a Queued decision starts with today's Start once its blockers close", asyn
   await board.update({ items: [decision(['CLOSED', 'CLOSED'])] });
   await read(board);
   await until(board, (d) => !!d.started?.I_20);
-  assert.deepEqual(await board.t3Calls(), [['thread', 'start', 'project-factory', '#20 Issue 20\n$lar-work maddec01/lar-factory#20', '--json']]);
+  assert.deepEqual(await board.t3Calls(), [['thread', 'start', 'project-factory', '#20 Issue 20\n$lar-shape maddec01/lar-factory#20', '--json']]);
 });
 
 test('a failed start disarms the part and shows its error on it, until it is armed again', async (t) => {

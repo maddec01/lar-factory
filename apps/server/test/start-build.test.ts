@@ -22,7 +22,7 @@ const startBuild = (board: Board, itemId: string, model?: unknown, origin = boar
   board.postSession({ itemId, model }, '/api/start-build', origin);
 
 const message = (home: string, number: number) =>
-  `Build maddec01/lar-factory#${number}. Read ${home}/.agents/skills/lar-work/agents/builder.md and follow it.`;
+  `Build maddec01/lar-factory#${number}. Read ${home}/.agents/skills/lar-build/agents/builder.md and follow it.`;
 
 const statusEdit = (number: string, status: string) => ['issue', 'edit', number, '-R', 'maddec01/lar-factory', '--add-label', status, '--remove-label', 'status-ready'];
 
@@ -74,7 +74,7 @@ test('without a bundle Start build asks for no skill check', async (t) => {
   assert.equal(board.skillChecks(), 0);
 });
 
-test('the build message names lar-work under LAR_FACTORY_INSTALL_ROOT when it is set', async (t) => {
+test('the build message names lar-build under LAR_FACTORY_INSTALL_ROOT when it is set', async (t) => {
   const { board } = await buildBoard(t, [readyIssue(12, ['build'])], {}, { LAR_FACTORY_INSTALL_ROOT: '/tmp/lar-root' });
   assert.equal((await startBuild(board, 'I_12')).status, 200);
   assert.deepEqual((await board.t3Calls()).map((args) => args[3]), [message('/tmp/lar-root', 12)]);

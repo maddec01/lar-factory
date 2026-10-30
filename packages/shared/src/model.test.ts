@@ -109,15 +109,15 @@ test('Done counts for 7 days after closing', () => {
   assert.equal(isRecentlyDone(item('Review', [], { closedAt: '2026-10-21T09:00:00Z' }), now), false);
 });
 
-test('the work message titles the thread, then runs lar-work on the issue', () => {
-  assert.equal(workMessage(item('Queued')), '#7 t\n$lar-work maddec01/lar-server#7');
+test('the work message titles the thread, then runs lar-shape on the issue', () => {
+  assert.equal(workMessage(item('Queued')), '#7 t\n$lar-shape maddec01/lar-server#7');
   assert.equal(workTitle(item('Queued')), '#7 t');
 });
 
-test('a $word in the title is kept and $lar-work still opens line 2', () => {
+test('a $word in the title is kept and $lar-shape still opens line 2', () => {
   const message = workMessage(item('Queued', [], { title: 'Fix $foo parsing' }))!;
-  assert.equal(message, '#7 Fix $foo parsing\n$lar-work maddec01/lar-server#7');
-  assert.equal(message.split('\n')[1], '$lar-work maddec01/lar-server#7');
+  assert.equal(message, '#7 Fix $foo parsing\n$lar-shape maddec01/lar-server#7');
+  assert.equal(message.split('\n')[1], '$lar-shape maddec01/lar-server#7');
 });
 
 test('a build branch is <kind>/<n>-<slug>: fix for a bug, feat for a feature or improvement, else chore', () => {
@@ -140,9 +140,9 @@ test('a build branch slug takes up to five words of the title, lowercase, with w
   assert.equal(branch('日本語 🚀'), 'fix/7');
 });
 
-test('the build message names the build and the builder agent of the installed lar-work', () => {
-  assert.equal(buildMessage(item('Ready'), '/Users/me/.agents/skills/lar-work'),
-    'Build maddec01/lar-server#7. Read /Users/me/.agents/skills/lar-work/agents/builder.md and follow it.');
+test('the build message names the build and the builder agent of the installed lar-build', () => {
+  assert.equal(buildMessage(item('Ready'), '/Users/me/.agents/skills/lar-build'),
+    'Build maddec01/lar-server#7. Read /Users/me/.agents/skills/lar-build/agents/builder.md and follow it.');
 });
 
 test('an item total adds each sub-issue on the board once, at any depth, and is null when sub-issues add nothing', () => {

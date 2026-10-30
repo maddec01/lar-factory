@@ -92,3 +92,12 @@ test('the Azure guide distinguishes factory child Tasks from slices and plain te
   assert.match(guide, /Tasks with `build`, `decision-\*`, `concept` or a valid `status-\*` tag appear on the board/);
   assert.match(guide, /Slices carry only slice tags \(`active` or `blocked`\), with no factory Status/);
 });
+
+for (const provider of ['GitHub', 'Azure DevOps'] as const) {
+  test(`${provider} guidance uses the two installed skills`, () => {
+    const text = agentSetupWrites({}, provider).map(({ content }) => content).join('\n');
+    assert.match(text, /lar-shape/);
+    assert.match(text, /lar-build/);
+    assert.doesNotMatch(text, /lar-work|domain-modeling|to-tickets/);
+  });
+}

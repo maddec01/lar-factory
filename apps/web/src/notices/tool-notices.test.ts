@@ -68,7 +68,7 @@ test('a missing or logged-out gh shows its own notice, and other read failures s
 
 test('a gh older than 2.94.0 shows its warning with brew upgrade gh, and the board still shows', async () => {
   await mountPage(withTools({ gh: { result: 'outdated', version: '2.93.1', fix: 'brew upgrade gh' } }));
-  expect($$('[data-slot="toaster"] [data-toast-color="warning"]').map(warningText)).toEqual([['GitHub CLI is older than 2.94.0.', "lar-work's scripts need the --parent, "
+  expect($$('[data-slot="toaster"] [data-toast-color="warning"]').map(warningText)).toEqual([['GitHub CLI is older than 2.94.0.', "lar-shape's scripts need the --parent, "
     + '--add-sub-issue and --blocked-by flags that gh 2.94.0 added, and this gh is 2.93.1. Run brew upgrade gh Copy in a terminal, '
     + 'then press Recheck. Recheck']]);
   expect($('.desk')).not.toBeNull();
@@ -132,16 +132,16 @@ test('a Recheck note answers only the tool problems it found, and goes once they
 test('a missing git, jq or curl shows a warning with its install command and Recheck, and the board still shows', async () => {
   await mountPage(withTools({ jq: { result: 'missing', fix: 'brew install jq' } }));
   const warnings = () => $$('[data-slot="toaster"] [data-toast-color="warning"]');
-  expect(warnings().map(warningText)).toEqual([['jq not found.', "lar-work's scripts read gh's answers with jq. Install it with brew install jq Copy, "
+  expect(warnings().map(warningText)).toEqual([['jq not found.', "lar-shape's scripts read gh's answers with jq. Install it with brew install jq Copy, "
     + 'then press Recheck. Recheck']]);
   expect(warnings()[0]!.querySelector('button[data-slot="button"]:not([data-recheck])')!.getAttribute('aria-label')).toBe('Copy brew install jq');
   expect($('.desk')).not.toBeNull();
 
   await push(withTools({ git: { result: 'missing', override: 'GIT_PATH=/nowhere/git', fix: 'brew install git' }, curl: { result: 'missing', fix: 'brew install curl' } }));
   expect(warnings().map((b) => warningText(b)[0])).toEqual(['git not found.', 'curl not found.']);
-  expect(warningText(warnings()[0]!)[1]).toBe("lar-work's agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. "
+  expect(warningText(warnings()[0]!)[1]).toBe("lar-shape's agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. "
     + 'Point GIT_PATH at git, or unset it and install it with brew install git Copy, then press Recheck. Recheck');
-  expect(warningText(warnings()[1]!)[1]).toContain("lar-work's scripts tell the board to refresh with curl. Install it with brew install curl Copy");
+  expect(warningText(warnings()[1]!)[1]).toContain("lar-shape's scripts tell the board to refresh with curl. Install it with brew install curl Copy");
 });
 
 test('an az that fails its check shows a warning with its fix, and the board still shows', async () => {

@@ -44,7 +44,7 @@ test('Start on an untagged item tags it for the repository picked, then starts s
   const { board, commands, log } = commandsOn([queued(7, { untaggedFor: [WEB, API] })]);
   const reply = await commands.start('azure:contoso/7', undefined, 'Contoso/Fabrikam/API');
   assert.equal(reply.status, 200);
-  assert.deepEqual(log, ['tag 7 repo-api', `start ${API} $lar-work ${API}#7`]);
+  assert.deepEqual(log, ['tag 7 repo-api', `start ${API} $lar-shape ${API}#7`]);
   const shown = board.find('azure:contoso/7')!;
   assert.deepEqual([shown.repo, shown.untaggedFor], [API, undefined]);
 });
@@ -52,7 +52,7 @@ test('Start on an untagged item tags it for the repository picked, then starts s
 test('Start on an untagged item that only one repository reads tags it for that one without asking', async () => {
   const { commands, log } = commandsOn([queued(7, { untaggedFor: [WEB] })]);
   assert.equal((await commands.start('azure:contoso/7', undefined)).status, 200);
-  assert.deepEqual(log, ['tag 7 repo-web', `start ${WEB} $lar-work ${WEB}#7`]);
+  assert.deepEqual(log, ['tag 7 repo-web', `start ${WEB} $lar-shape ${WEB}#7`]);
 });
 
 test('Start on an untagged item two repositories read asks which, and refuses one that does not read it', async () => {
@@ -77,7 +77,7 @@ test('a failed tag write starts nothing, and Start may run again', async () => {
 test('Start on a tagged item writes no tag and ignores a repository sent with it', async () => {
   const { commands, log } = commandsOn([queued(7)]);
   assert.equal((await commands.start('azure:contoso/7', undefined, API)).status, 200);
-  assert.deepEqual(log, [`start ${WEB} $lar-work ${WEB}#7`]);
+  assert.deepEqual(log, [`start ${WEB} $lar-shape ${WEB}#7`]);
 });
 
 test("Abandon on an item whose abandonRefusal says why refuses with it, and writes nothing", async () => {

@@ -19,7 +19,7 @@ test('an item thread is running with a turn in flight, needs you with a runtime 
       { id: 'r1', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:10:00Z' },
       { id: 'r2', startedAt: '2026-10-20T11:00:00Z' },
     ] },
-    { id: 'asking', title: 'Prototype: sign-in screen', messages: [`$lar-work ${REPO}#1`], turns: [{ id: 'a1', startedAt: '2026-10-20T10:00:00Z' }] },
+    { id: 'asking', title: 'Prototype: sign-in screen', messages: [`$lar-shape ${REPO}#1`], turns: [{ id: 'a1', startedAt: '2026-10-20T10:00:00Z' }] },
     { id: 'answered', messages: [`$lar-work ${REPO}#1`], turns: [{ id: 'd1', startedAt: '2026-10-20T09:00:00Z', completedAt: '2026-10-20T09:30:00Z' }] },
     // A turn whose run failed stays open with its provider thread idle: nothing is in flight.
     { id: 'abandoned', messages: [`$lar-work ${REPO}#1`], turns: [{ id: 'x1', startedAt: '2026-10-20T08:30:00Z', abandoned: true }] },

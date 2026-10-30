@@ -8,7 +8,7 @@ import { Progress } from '@lar-factory/ui/progress';
 import { toast } from '@lar-factory/ui/toasts';
 import { useInstallStore } from '../settings/install-store.ts';
 import { TargetProgress } from '../settings/target-progress.tsx';
-import { closeKeepingFocus, DismissButton } from './toasts.tsx';
+import { closeKeepingFocus, DismissButton, useSuccessClose } from './toasts.tsx';
 
 /** Read-only checks have no overview. Their Drift and errors keep the existing warnings. */
 export const hasInstallWork = (snapshot: InstallSnapshot | null): boolean =>
@@ -43,6 +43,8 @@ function OverviewBody({ onClose }: { onClose: () => void }) {
   const targets = snapshot.targets.filter(({ active, homeMissing, operation, error }) => active || homeMissing || operation === 'install' || operation === 'replace' || error);
   const running = targets.some((target) => target.running && target.operation !== 'check');
   const failed = !!snapshot.error || !!snapshot.blocked.length || targets.some(({ error, skills }) => error || skills.some(({ state }) => state === 'failed' || state === 'blocked'));
+  const succeeded = !snapshot.running && !failed && targets.length > 0 && targets.every(({ finished, homeMissing, running }) => finished && !homeMissing && !running);
+  useSuccessClose(ref, succeeded, onClose);
   const completed = targets.filter(({ finished, homeMissing, error }) => finished && !homeMissing && !error).length;
   const title = running ? `Installing Release ${snapshot.version}'s skills` : failed ? 'Installation needs attention'
     : completed === targets.length ? `Release ${snapshot.version}'s skills are installed` : 'Installation incomplete';

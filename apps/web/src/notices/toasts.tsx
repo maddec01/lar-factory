@@ -2,7 +2,7 @@
 // has focus; a failure stays until it's closed. One toast per slot, so a new one replaces the last.
 
 import { useEffect, useRef } from 'react';
-import type { MouseEvent, ReactNode } from 'react';
+import type { MouseEvent, ReactNode, RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
 import { CloseIcon } from '@lar-factory/ui/design-system/NavigationIcons';
@@ -165,11 +165,12 @@ export function clearToast(slot: string): void {
   if (id) closeToast(slot, id);
 }
 
-/** One toast's content. `onClose` runs when its close button is clicked or, for a success, when its time is up. */
-function ToastBody({ slot, what, failed = false, body, onClose }: Toast & { onClose: () => void }) {
-  const ref = useRef<HTMLSpanElement>(null);
+/** Gives a successful notification five seconds after hover and keyboard focus leave it. */
+export function useSuccessClose(ref: RefObject<Element | null>, enabled: boolean, onClose: () => void): void {
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
-    if (failed) return;
+    if (!enabled) return;
     const entry = ref.current?.closest<HTMLElement>('[data-slot="toast"]');
     if (!entry) return;
     let hovered = entry.matches(':hover');
@@ -177,7 +178,7 @@ function ToastBody({ slot, what, failed = false, body, onClose }: Toast & { onCl
     let timer: ReturnType<typeof setTimeout> | undefined;
     const restart = () => {
       clearTimeout(timer);
-      if (!hovered && !focused) timer = setTimeout(onClose, TOAST_MS);
+      if (!hovered && !focused) timer = setTimeout(() => close.current(), TOAST_MS);
     };
     const enter = () => { hovered = true; restart(); };
     const leave = () => { hovered = false; restart(); };
@@ -198,7 +199,13 @@ function ToastBody({ slot, what, failed = false, body, onClose }: Toast & { onCl
       entry.removeEventListener('focusin', focus);
       entry.removeEventListener('focusout', blur);
     };
-  }, [failed, onClose]);
+  }, [enabled, ref]);
+}
+
+/** One toast's content. `onClose` runs when its close button is clicked or, for a success, when its time is up. */
+function ToastBody({ slot, what, failed = false, body, onClose }: Toast & { onClose: () => void }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useSuccessClose(ref, !failed, onClose);
   return (
     <span ref={ref} data-toast={slot}>
       <DismissButton what={`: ${what}`} onClick={onClose} />

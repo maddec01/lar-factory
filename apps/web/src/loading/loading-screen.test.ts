@@ -3,7 +3,7 @@
 
 import { expect, test, vi } from 'vite-plus/test';
 import type { BoardData, FirstRead } from '@lar-factory/shared';
-import { $, $$, NOW, mountPage, push, sample, settle, text } from '../../test/support.ts';
+import { $, $$, NOW, mountPage, push, sample, settle, stubApp, text } from '../../test/support.ts';
 
 const DRAW_MS = 1750;
 const EXIT_MS = 600;
@@ -212,4 +212,33 @@ test('the board behind is inert while the screen is up, through the fade, and se
 
   await push(unsettled(firstRead('items', ['lar-apple'])));
   expect(covered(), 'a restart covers the board again').toBe(true);
+});
+
+test('installation readiness waits until the loading screen has finished leaving and the stack is mounted', async () => {
+  const bridge = stubApp({
+    boardReady: vi.fn(async () => {
+      expect(screen()).toBeNull();
+      expect(covered()).toBe(false);
+      expect($('.notification-stack')).not.toBeNull();
+    }),
+    getInstallState: async () => ({ installs: true, installed: false, version: '1.0.0', running: null,
+      discovery: 'waiting', instances: [], targets: [], drift: [], replaced: [], conflicts: [], blocked: [] }),
+  });
+  await mountPage(settled(), '', '?loading=drawn');
+  expect(bridge.boardReady).not.toHaveBeenCalled();
+  await advance(EXIT_MS - 1);
+  expect(bridge.boardReady).not.toHaveBeenCalled();
+  await advance(1);
+  expect(bridge.boardReady).toHaveBeenCalledOnce();
+});
+
+test('a development app without installation enabled never sends installation readiness', async () => {
+  const bridge = stubApp({
+    boardReady: vi.fn(async () => {}),
+    getInstallState: async () => ({ installs: false, installed: false, version: '1.0.0', running: null,
+      discovery: 'waiting', instances: [], targets: [], drift: [], replaced: [], conflicts: [], blocked: [] }),
+  });
+  await mountPage(settled(), '', '?loading=drawn');
+  await advance(EXIT_MS);
+  expect(bridge.boardReady).not.toHaveBeenCalled();
 });

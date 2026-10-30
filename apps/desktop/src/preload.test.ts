@@ -71,3 +71,12 @@ describe("install progress through preload", () => {
     }
   });
 });
+
+it("forwards the board's readiness signal through the install mutation channel", async () => {
+  vi.resetModules();
+  await import("./preload.ts");
+  const bridge = ipc.expose.mock.calls.at(-1)![1] as BoardAppBridge;
+  ipc.invoke.mockResolvedValueOnce(undefined);
+  await bridge.boardReady();
+  expect(ipc.invoke).toHaveBeenLastCalledWith(IpcChannels.INSTALL_BOARD_READY);
+});

@@ -3,6 +3,7 @@ import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
 import { setTargetTick, type BlockingPath } from "@lar-factory/shared/install-skills";
 import type { InstallTarget, InstanceDiscovery, ProviderInstance } from "@lar-factory/shared/install-targets";
 
@@ -515,4 +516,34 @@ describe("buildRefusal", () => {
     assert.include(refusal, "couldn't install");
     assert.include(refusal, "EACCES: lar-work");
   });
+});
+
+describe("board readiness", () => {
+  it.effect("waits for the page, then runs fallback installation and discovery once across repeated ready signals", () =>
+    Effect.gen(function* () {
+      const home = tempDir("ready-install-");
+      let discoveries = 0;
+      const checks = (yield* SkillInstall.makeChecks(launch({ home, bundle: makeBundle() }), () => Effect.sync(() => {
+        discoveries++;
+        return { available: true, instances: [] };
+      })))!;
+      const ready = yield* SkillInstall.launchWhenReady(checks);
+      yield* Effect.yieldNow;
+      assert.strictEqual(checks.state().outcome, undefined);
+      assert.strictEqual(discoveries, 0);
+      const finished = yield* Deferred.make<void>();
+      const stop = checks.subscribe(() => {
+        if (checks.state().discovery === "available" && checks.state().running === null && checks.state().outcome) {
+          Effect.runSync(Deferred.succeed(finished, undefined));
+        }
+      });
+      ready();
+      ready();
+      yield* Deferred.await(finished);
+      ready();
+      yield* Effect.yieldNow;
+      stop();
+      assert.strictEqual(discoveries, 1);
+      assert.strictEqual(checks.state().progress?.[0]?.skills[0]?.state, "installed");
+    }).pipe(Effect.scoped));
 });

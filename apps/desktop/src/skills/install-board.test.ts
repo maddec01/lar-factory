@@ -267,3 +267,17 @@ it.effect("a Clash cannot mark a target successfully finished", () =>
     assert.isFalse(target(board.snapshot(), "~/.agents/skills")!.finished);
     assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")!.skills, [{ name: "lar-work", state: "blocked" }]);
   }));
+
+describe("board-page mutations", () => {
+  it("rejects readiness from the old origin after a restart, and while the server is unavailable", () => {
+    let origin = "http://127.0.0.1:4319";
+    const requireBoard = InstallBoard.boardPageOnly(() => origin, "Only the board's page can change the skill install");
+    requireBoard("http://127.0.0.1:4319/");
+    origin = "";
+    assert.throws(() => requireBoard("http://127.0.0.1:4319/"));
+    origin = "http://127.0.0.1:4320";
+    assert.throws(() => requireBoard("http://127.0.0.1:4319/"));
+    assert.throws(() => requireBoard("https://example.com/"));
+    requireBoard("http://127.0.0.1:4320/?loading=drawn");
+  });
+});

@@ -61,6 +61,8 @@ export interface BoardAppBridge {
   platform: string;
   /** The per-launch secret the app's server wants on each guarded write. */
   secret?: string | undefined;
+  /** The loading screen has left and the notification stack can show installation. Safe to repeat. */
+  boardReady: () => Promise<void>;
   /** The skills' install state now. */
   getInstallState: () => Promise<InstallSnapshot>;
   /** Calls `listener` with each new install state; the returned function stops it. */

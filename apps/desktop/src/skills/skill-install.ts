@@ -1,13 +1,15 @@
 // Installs the skills bundled in the app, with the engine in packages/shared/src/install-skills.ts. A packaged app
 // checks them at launch and before each Start build: it installs a new Release and reports Drift, which it leaves as
-// it is unless the User chooses Replace, or Replace and start before a build. A dev run does so only when started with INSTALL_FLAG. The launch installs into the fallback targets at
-// once, then into the Install targets of T3's provider instances once T3 answers; T3 can't unselect those. The
+// it is unless the User chooses Replace, or Replace and start before a build. A dev run does so only with INSTALL_FLAG.
+// The launch installs into fallback targets after the board page finishes loading, then into the targets of T3's
+// provider instances once T3 answers. T3 can't unselect those. The
 // board's page can retry, replace Drift and tick a target. The main process runs every check and operation one at a
 // time, and keeps what they found for the page.
 
 import * as NodePath from "node:path";
 
 import * as Data from "effect/Data";
+import * as Deferred from "effect/Deferred";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Semaphore from "effect/Semaphore";
@@ -297,3 +299,14 @@ export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: 
     drift: skills,
   };
 };
+
+/** One app-scoped launch lifecycle. Only the board page's readiness signal releases installation and discovery. */
+export const launchWhenReady = (checks: Checks) => Effect.gen(function* () {
+  const ready = yield* Deferred.make<void>();
+  yield* Deferred.await(ready).pipe(
+    Effect.andThen(checks.atLaunch.pipe(Effect.ignore)),
+    Effect.andThen(discoverUntilAnswered(checks, REDISCOVER_EVERY)),
+    Effect.forkScoped,
+  );
+  return () => { Effect.runSync(Deferred.succeed(ready, undefined)); };
+});

@@ -13,6 +13,7 @@ import { useEditStore } from '../repositories/edit-store.ts';
 import { useResetStore } from '../repositories/reset-store.ts';
 import { ChannelChoice, TargetSwitch, TargetsNote, UpdateAction, UpdateStatus, UpdatesNote } from './app-rows.tsx';
 import { TargetProgress } from './target-progress.tsx';
+import { TargetReaders } from './target-readers.tsx';
 import { Switch, type Control, ToolState } from './controls.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
@@ -171,8 +172,8 @@ function targetGroup({ app, targets }: PagesInput): Group {
   return {
     title: 'Install targets', description, note: <TargetsNote />,
     rows: (targets ?? []).map((target) => ({
-      id: `target-${target.path}`, title: target.path, description: targetNote(target), control: custom(() => <TargetSwitch path={target.path} />),
-      below: <TargetProgress target={target} />,
+      id: `target-${target.path}`, title: target.path, description: targetNote(target), control: custom(() => <TargetSwitch path={target.path} reason={targetNote(target)} />),
+      below: <><TargetReaders target={target} /><TargetProgress target={target} /></>,
     })),
   };
 }

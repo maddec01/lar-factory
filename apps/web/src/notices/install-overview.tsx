@@ -2,12 +2,12 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { installOverviewTargets, installOverviewSucceeded, type InstallSnapshot } from '@lar-factory/shared';
-import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
 import { Progress } from '@lar-factory/ui/progress';
 import { toast } from '@lar-factory/ui/toasts';
 import { useInstallStore } from '../settings/install-store.ts';
 import { TargetProgress } from '../settings/target-progress.tsx';
+import { TargetReaders } from '../settings/target-readers.tsx';
 import { closeKeepingFocus, DismissButton, useSuccessClose } from './toasts.tsx';
 
 /** Read-only checks have no overview. Their Drift and errors keep the existing warnings. */
@@ -65,14 +65,7 @@ function OverviewBody() {
         const installed = target.skills.filter(({ state }) => state === 'installed').length;
         return <li key={target.path} className="grid gap-1">
           <code className="text-xs">{target.path}</code>
-          <div className="flex flex-wrap gap-1">
-            {target.instances.length ? target.instances.map((id) => {
-              const instance = snapshot.instances.find((instance) => instance.id === id);
-              return <Badge key={id} className={instance?.enabled === false ? 'opacity-50' : ''}>
-                {instance?.displayName ?? id}{instance?.enabled === false ? ' (disabled)' : ''}
-              </Badge>;
-            }) : <span className="text-xs text-(--muted-foreground)">No provider instances reported</span>}
-          </div>
+          <TargetReaders target={target} />
           {target.homeMissing && <p className="m-0 text-xs text-(--muted-foreground)">Not installed until {target.path.replace(/\/skills$/, '')} exists.</p>}
           <Progress aria-label={`Skills installed in ${target.path}`} value={installed} max={target.skills.length || 1}
             caption={`${installed}/${target.skills.length}`} />

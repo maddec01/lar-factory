@@ -9,15 +9,16 @@ import { kind } from '../buttons/button-kinds.tsx';
 /** A working row renders its control. Unbuilt settings carry no value. */
 export type Control = { type: 'unavailable' } | { type: 'custom'; render: () => ReactNode };
 
-export function Switch({ on, onChange, disabled, busy, label }: {
+export function Switch({ on, onChange, disabled, busy, label, description }: {
   on: boolean;
   onChange?: (on: boolean) => void;
   disabled?: boolean;
   /** Busy rather than disabled, so focus stays on the switch just pressed. */
   busy?: boolean;
   label?: string;
+  description?: string;
 }) {
-  return <DesignSwitch checked={on} aria-label={label} disabled={disabled} aria-disabled={busy} className="aria-disabled:cursor-progress"
+  return <DesignSwitch checked={on} aria-label={label} aria-description={description} disabled={disabled} aria-disabled={busy} className="aria-disabled:cursor-progress"
     onCheckedChange={(next) => !busy && onChange?.(next)} />;
 }
 

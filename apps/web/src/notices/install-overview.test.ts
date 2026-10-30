@@ -72,7 +72,7 @@ test('expanded results name replaced Drift, failures and Clash paths without dup
     { ...target, running: false, release: '1.0.0', replaced: ['lar-build'],
       skills: [{ name: 'lar-build', state: 'installed' }, { name: 'lar-shape', state: 'blocked' }] },
     { ...target, path: '~/.claude/skills', paths: ['~/.claude/skills'], running: false, instances: [], error: 'EACCES: permission denied',
-      skills: [{ name: 'lar-build', state: 'failed' }] },
+      kind: 'claude', skills: [{ name: 'lar-build', state: 'failed' }, { name: 'lar-shape', state: 'blocked' }] },
   ], blocked: [{ skill: 'lar-shape', paths: [{ place: 'agents', path: '~/.agents/skills/lar-shape' }] }], conflicts: ['~/.agents/skills/lar-shape'] };
   stubInstall(broken);
   await mountPage(sample);
@@ -82,6 +82,8 @@ test('expanded results name replaced Drift, failures and Clash paths without dup
   await settle(() => toggle().click());
   expect(text(tray())).toContain('Replaced Drift: lar-build');
   expect(text(tray())).toContain('Clash at ~/.agents/skills/lar-shape');
+  expect(text(tray())).toContain('lar-shape: Blocked by source Clash');
+  expect(text(tray())).not.toContain('Clash at ~/.claude/skills/lar-shape');
   expect(text(tray())).toContain('~/.claude/skills: EACCES: permission denied');
   expect(text(tray())).not.toContain("skills are installed");
   expect(tray()!.closest('[data-slot="toast"]')!.getAttribute('aria-live')).toBe('off');

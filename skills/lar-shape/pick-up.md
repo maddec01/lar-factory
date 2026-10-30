@@ -13,7 +13,7 @@ Read the issue with comments, parent, sub-issues and blockers, then route:
   (**5. Start the build**).
 - Anything else: set Shaping. An **Explore subagent** reads the repo's
   `AGENTS.md`, `GLOSSARY.md`, relevant ADRs and the code this issue touches,
-  and returns ≤300 words in [domain-modeling](shared/skills/domain-modeling/SKILL.md) vocabulary: what exists, where,
+  and returns ≤300 words in [domain-modeling](shared/domain-docs.md) vocabulary: what exists, where,
   and what the issue would change. It also returns each onboarded repository's **role**:
   `bash <this skill>/shared/scripts/repo-config.sh --list` lists the repositories, and
   `bash <this skill>/shared/scripts/repo-config.sh <owner/repo>` (or an Azure

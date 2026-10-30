@@ -22,9 +22,9 @@ Assume the author is overconfident. Hunt for:
 - **Repository**: anything the brief changes outside the repo path; that work
   becomes a build in its own repository.
 - **Domain docs**: every term the brief uses matches `GLOSSARY.md`, or
-  **Domain docs** adds or changes it as a `GLOSSARY-FORMAT.md` entry. Nothing
+  **Domain docs** adds or changes it as a `glossary-format.md` entry. Nothing
   contradicts an ADR without superseding it. Every ADR draft meets
-  `domain-modeling`'s three conditions: hard to reverse, surprising without
+  `domain-docs.md`'s three conditions: hard to reverse, surprising without
   context, the result of a real trade-off.
 
 Report findings only; name each category a thorough pass found clean.

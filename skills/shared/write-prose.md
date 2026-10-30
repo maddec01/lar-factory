@@ -1,12 +1,8 @@
----
-name: unslop
-description: Cut AI tells from any writing.
-disable-model-invocation: true
----
+Ported from cursor/plugins (pstack/write-prose.md); see UPSTREAM.md.
 
 # Unslop
 
-Edit text to remove AI patterns. Scan for the patterns below, then rewrite. Preserve meaning and match the intended tone.
+Apply these rules while drafting all prose, including chat, questions, issues, briefs, PR bodies, commit messages, docs and skill files. Read this file once before writing, including after a handoff. Code is out of scope.
 
 ## Patterns to detect and fix
 

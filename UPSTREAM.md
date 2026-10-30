@@ -26,17 +26,14 @@ Maintainer ports an upstream change or skips it.
 | Skill | Source | Path | Repository path | Commit | Date | Overridden in |
 | ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
 | `grilling` | mattpocock/skills | `skills/productivity/grilling` | `skills/lar-shape/skills/grilling` | `5beb35b040e3` | 2026-10-19 |  |
-| `domain-modeling` | mattpocock/skills | `skills/engineering/domain-modeling` | `skills/shared/skills/domain-modeling` | `5beb35b040e3` | 2026-10-19 |  |
 | `prototype` | mattpocock/skills | `skills/engineering/prototype` | `skills/lar-shape/skills/prototype` | `5beb35b040e3` | 2026-10-19 | LOGIC.md#3. Build the shareable HTML file (skills/lar-shape/size-up.md); LOGIC.md#4. Hand it over (skills/lar-shape/size-up.md); LOGIC.md#Anti-patterns (skills/lar-shape/size-up.md); UI.md#5. Hand it over (skills/lar-shape/size-up.md); SKILL.md#Rules that apply to both (skills/lar-shape/size-up.md) |
 | `research` | mattpocock/skills | `skills/engineering/research` | `skills/lar-shape/skills/research` | `5beb35b040e3` | 2026-10-19 |  |
 | `diagnosing-bugs` | mattpocock/skills | `skills/engineering/diagnosing-bugs` | `skills/lar-shape/skills/diagnosing-bugs` | `5beb35b040e3` | 2026-10-19 |  |
 | `tdd` | mattpocock/skills | `skills/engineering/tdd` | `skills/lar-build/skills/tdd` | `5beb35b040e3` | 2026-10-19 |  |
 | `code-review` | mattpocock/skills | `skills/engineering/code-review` | `skills/lar-build/skills/code-review` | `5beb35b040e3` | 2026-10-19 |  |
 | `codebase-design` | mattpocock/skills | `skills/engineering/codebase-design` | `skills/lar-build/skills/codebase-design` | `5beb35b040e3` | 2026-10-19 |  |
-| `writing-for-agents` | mattpocock/skills | `skills/productivity/writing-for-agents` | `skills/shared/skills/writing-for-agents` | `5beb35b040e3` | 2026-10-19 |  |
 | `pr` | mattpocock/skills | `skills/engineering/pr` | `skills/lar-build/skills/pr` | `5beb35b040e3` | 2026-10-19 |  |
 | `retro` | mattpocock/skills | `skills/engineering/retro` | `skills/lar-build/skills/retro` | `5beb35b040e3` | 2026-10-19 |  |
-| `handoff` | mattpocock/skills | `skills/productivity/handoff` | `skills/shared/skills/handoff` | `5beb35b040e3` | 2026-10-19 |  |
 | `to-tickets` | mattpocock/skills | `skills/engineering/to-tickets` | `skills/lar-build/skills/to-tickets` | `5beb35b040e3` | 2026-10-19 | SKILL.md#4. Quiz the user (skills/lar-build/agents/planner.md); SKILL.md#5. Publish the tickets to the configured tracker (skills/lar-build/agents/planner.md); SKILL.md#Blocked by (skills/lar-build/agents/planner.md) |
 | `implement` | mattpocock/skills | `skills/engineering/implement` | `skills/lar-build/skills/implement` | `5beb35b040e3` | 2026-10-19 |  |
 | `security-and-hardening` | addyosmani/agent-skills | `skills/security-and-hardening` | `skills/lar-build/skills/security-and-hardening` | `aeac41d4d005` | 2026-10-13 |  |
@@ -44,10 +41,16 @@ Maintainer ports an upstream change or skips it.
 | `references/security-checklist.md` | addyosmani/agent-skills | `references/security-checklist.md` | `skills/lar-build/references/security-checklist.md` | `aeac41d4d005` | 2026-10-13 |  |
 | `references/performance-checklist.md` | addyosmani/agent-skills | `references/performance-checklist.md` | `skills/lar-build/references/performance-checklist.md` | `aeac41d4d005` | 2026-10-13 |  |
 | `references/accessibility-checklist.md` | addyosmani/agent-skills | `references/accessibility-checklist.md` | `skills/lar-build/references/accessibility-checklist.md` | `aeac41d4d005` | 2026-10-13 |  |
-| `unslop` | cursor/plugins | `pstack/skills/unslop` | `skills/shared/skills/unslop` | `8b3326d99fd4` | 2026-10-22 |  |
 
 | Port | Source | Path | Sections | Commit | Date |
 | ---- | ------ | ---- | -------- | ------ | ---- |
+| `skills/shared/write-prose.md` | cursor/plugins | `pstack/skills/unslop` | pstack/skills/unslop/SKILL.md | `8b3326d99fd4` | 2026-10-22 |
+| `skills/shared/handoff-content.md` | mattpocock/skills | `skills/productivity/handoff` | skills/productivity/handoff/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/shared/glossary-format.md` | mattpocock/skills | `skills/engineering/domain-modeling` | skills/engineering/domain-modeling/GLOSSARY-FORMAT.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/shared/domain-docs.md` | mattpocock/skills | `skills/engineering/domain-modeling` | skills/engineering/domain-modeling/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/shared/adr-format.md` | mattpocock/skills | `skills/engineering/domain-modeling` | skills/engineering/domain-modeling/ADR-FORMAT.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/shared/skill-mechanics.md` | mattpocock/skills | `skills/productivity/writing-for-agents` | skills/productivity/writing-for-agents/SKILL-MECHANICS.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/shared/write-agent-docs.md` | mattpocock/skills | `skills/productivity/writing-for-agents` | skills/productivity/writing-for-agents/SKILL.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/lar-build/agents/reviewer-code.md` | addyosmani/agent-skills | `skills/code-review-and-quality` | skills/code-review-and-quality/SKILL.md#Step 2: Review the Tests First; skills/code-review-and-quality/SKILL.md#1. Correctness; skills/code-review-and-quality/SKILL.md#2. Readability & Simplicity; skills/code-review-and-quality/SKILL.md#3. Architecture; skills/code-review-and-quality/SKILL.md#5. Performance; skills/code-review-and-quality/SKILL.md#Structural Remedies; skills/code-review-and-quality/SKILL.md#Step 4: Categorize Findings | `aeac41d4d005` | 2026-10-13 |
 | `skills/lar-build/agents/reviewer-security.md` | addyosmani/agent-skills | `skills/code-review-and-quality; skills/security-and-hardening` | skills/code-review-and-quality/SKILL.md#4. Security; skills/security-and-hardening/SKILL.md#Authentication and sessions; skills/security-and-hardening/SKILL.md#Rate limiting; skills/security-and-hardening/SKILL.md#Injection, XSS, and access control; skills/security-and-hardening/SKILL.md#Input validation and uploads; skills/security-and-hardening/SKILL.md#Destructive operations on derived paths; skills/security-and-hardening/SKILL.md#Secrets; skills/security-and-hardening/SKILL.md#Headers, CORS, and responses; skills/security-and-hardening/SKILL.md#Server-side fetches (SSRF); skills/security-and-hardening/SKILL.md#Dependencies and supply chain | `aeac41d4d005` | 2026-10-13 |
 | `skills/lar-build/agents/doubt.md` | addyosmani/agent-skills | `skills/doubt-driven-development` | skills/doubt-driven-development/SKILL.md#Step 3: DOUBT — Invoke the fresh-context reviewer | `aeac41d4d005` | 2026-10-13 |

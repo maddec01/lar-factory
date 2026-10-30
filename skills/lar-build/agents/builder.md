@@ -14,8 +14,8 @@ item's URL there. Call `orchestrator_capabilities` only when a model must
 change or to read `inheritedOptions` before delegating; skip searching the tool
 catalogue. Read each file or skill a step names only when that step runs.
 
-Before you write anything, read `unslop` once (`<lar-build>/shared/skills/unslop/SKILL.md`
-in Claude Code, `<lar-build>/shared/skills/unslop/SKILL.md` in Codex), also in a fresh
+Before you write anything, read `unslop` once (`<lar-build>/shared/write-prose.md`
+in Claude Code, `<lar-build>/shared/write-prose.md` in Codex), also in a fresh
 thread resuming after a handoff. Apply its rules while drafting all your prose
 (chat, issue comments, handoffs, retro text, docs), not as a separate
 scan-and-rewrite pass. Code is out of scope.
@@ -109,7 +109,7 @@ scan-and-rewrite pass. Code is out of scope.
    too. A wrong brief follows the stop rule below. Done when every slice is
    closed.
 5. A subagent writes the brief's **Domain docs** in its own commit,
-   following `<lar-build>/shared/skills/domain-modeling/SKILL.md`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
+   following `<lar-build>/shared/domain-docs.md`'s glossary and ADR formats and next ADR number, creating `GLOSSARY.md` or `docs/adr/` only for their first entry, and
    links them from `AGENTS.md` as the repo's `docs/agents/domain.md` says
    (without that file, it adds a **Domain docs** section to `AGENTS.md`
    pointing to both). Its prompt carries
@@ -139,7 +139,7 @@ implementers or planners, wait for any running planner to return (a native
 subagent outlives a handoff), and merge or `task_cancel` every running
 child task: task IDs work only in the thread that created them, so the
 handoff carries none. Then
-post a handoff written per `<lar-build>/shared/skills/handoff/SKILL.md` as an issue
+post a handoff written per `<lar-build>/shared/handoff-content.md` as an issue
 comment and relaunch with
 `t3_thread_launch`: message `Build <owner/repo#n>. Read <lar-build>/agents/builder.md and follow it.`,
 `workspaceStrategy` `{"type":"existing_worktree","worktreePath":"<build worktree>","branch":"<build branch>"}`.

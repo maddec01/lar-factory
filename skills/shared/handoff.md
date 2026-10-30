@@ -1,7 +1,7 @@
 # Handoff
 
 post a handoff written per
-  [handoff](skills/handoff/SKILL.md) as an issue comment, then continue in a
+  [handoff](handoff-content.md) as an issue comment, then continue in a
   fresh thread with `t3_thread_launch`.
   - Shaping thread: `/lar-shape <issue>` in the issue's repository project,
     `workspaceStrategy` `{"type":"root"}`.

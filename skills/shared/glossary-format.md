@@ -1,3 +1,5 @@
+Ported from mattpocock/skills (skills/engineering/domain-modeling/glossary-format.md); see UPSTREAM.md.
+
 # GLOSSARY.md Format
 
 ## Structure

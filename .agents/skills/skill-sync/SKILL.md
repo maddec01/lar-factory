@@ -18,7 +18,7 @@ freely; its first line names its source. ADR 0031
 (`docs/adr/0031-lars-skills-carry-upstream-content-as-ports-or-copies.md`)
 sets the rule between them.
 
-Before writing anything, read `skills/shared/skills/unslop/SKILL.md` in the checkout and follow its rules for all prose
+Before writing anything, read `skills/shared/write-prose.md` in the checkout and follow its rules for all prose
 you write: chat, commit messages, the PR body, Port text and `UPSTREAM.md`. Apply them while
 drafting, as you write each sentence, not as a later scan-and-rewrite pass. Code
 and copied files follow their own rules.

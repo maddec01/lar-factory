@@ -14,23 +14,77 @@ const TOAST_MS = 5_000;
 /** Where focus goes when a closed toast had it and names nowhere of its own. */
 const FALLBACK_FOCUS = ['.add-item', '.open-settings', '[data-slot="modal-close"]'];
 
-/** Keeps a new entry visible without taking focus or scrolling when an older entry changes. */
-function scrollToNewest(viewport: HTMLDivElement | null) {
+/** Each notice's fade, as wide as a Modal body's: notices scrolled past fade out at the stack's edges. */
+const FADE_PX = 24;
+
+/**
+ * Follows the newest notice while the User is at the bottom: a new entry, a narrower or shorter window and a notice
+ * growing all keep it in view. Once the User scrolls away the stack stays where they left it, until they scroll back.
+ * Notices scrolled past fade at the stack's edges. Each notice carries its own slice of the fade: a mask on the
+ * stack would make it the notices' backdrop root and cut their blur off from the board behind.
+ */
+function followNewest(viewport: HTMLDivElement | null) {
   if (!viewport) return;
-  viewport.scrollTop = viewport.scrollHeight;
-  const observer = new MutationObserver((changes) => {
-    const newest = viewport.lastElementChild;
-    if (newest && changes.some(({ addedNodes }) => Array.from(addedNodes).includes(newest))) {
-      viewport.scrollTop = viewport.scrollHeight;
+  let following = true;
+  const notices = () => Array.from(viewport.children).filter((el): el is HTMLElement => el instanceof HTMLElement);
+  const fade = () => {
+    const { scrollTop, scrollHeight, clientHeight } = viewport;
+    const stack = viewport.getBoundingClientRect();
+    const top = Math.min(FADE_PX, Math.max(0, scrollTop));
+    const bottom = Math.min(FADE_PX, Math.max(0, scrollHeight - clientHeight - scrollTop));
+    for (const entry of notices()) {
+      const y = entry.getBoundingClientRect().top - stack.top;
+      entry.style.setProperty('--fade-from', `${-y}px`);
+      entry.style.setProperty('--fade-top', `${top - y}px`);
+      entry.style.setProperty('--fade-bottom', `${stack.height - bottom - y}px`);
+      entry.style.setProperty('--fade-to', `${stack.height - y}px`);
     }
+  };
+  const toNewest = () => {
+    if (following) viewport.scrollTop = viewport.scrollHeight;
+    fade();
+  };
+  const scrolled = () => {
+    following = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 1;
+    fade();
+  };
+  const resizes = new ResizeObserver(toNewest);
+  const observe = () => {
+    resizes.disconnect();
+    resizes.observe(viewport);
+    notices().forEach((entry) => resizes.observe(entry));
+  };
+  const entries = new MutationObserver((changes) => {
+    observe();
+    const newest = viewport.lastElementChild;
+    const arrived = changes.some(({ addedNodes }) => Array.from(addedNodes).includes(newest as Node));
+    // Only a new entry moves the stack; one closing or changing above leaves the User where they are.
+    if (arrived) toNewest();
+    else fade();
   });
-  observer.observe(viewport, { childList: true });
-  return () => observer.disconnect();
+  entries.observe(viewport, { childList: true });
+  viewport.addEventListener('scroll', scrolled, { passive: true });
+  // Entering notices slide in; measure them where they land.
+  viewport.addEventListener('animationend', fade);
+  viewport.addEventListener('transitionend', fade);
+  observe();
+  toNewest();
+  return () => {
+    entries.disconnect();
+    resizes.disconnect();
+    viewport.removeEventListener('scroll', scrolled);
+    viewport.removeEventListener('animationend', fade);
+    viewport.removeEventListener('transitionend', fade);
+  };
 }
 
-/** One viewport on every screen. Ninna-ui portals it outside the board, which is inert during loading. */
+/**
+ * One viewport on every screen, above every dialog. Ninna-ui portals it outside the board, which is inert during
+ * loading. When its notices don't fit it scrolls, and those scrolled past fade at its edges, as a Modal's body does.
+ */
 export function NotificationStack() {
-  return <Toaster ref={scrollToNewest} position="bottom-right" max={Infinity} className="notification-stack" offset="calc(var(--spacing) * 1)" />;
+  return <Toaster ref={followNewest} position="bottom-right" max={Infinity} className="notification-stack"
+    offset="calc(var(--spacing) * 1)" />;
 }
 
 export interface Toast {

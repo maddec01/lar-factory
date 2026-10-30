@@ -220,7 +220,7 @@ test('more warnings and toasts than fit remain in one bounded scrolling viewport
   expect($$('[data-slot="toaster"] [data-slot="toast"]').map((el) => el.dataset.toastColor)).toEqual(['success', ...Array<string>(7).fill('warning'), 'danger']);
   expect(viewport.scrollTop).toBe(1_000);
   expect(getComputedStyle(viewport).overflowY).toBe('auto');
-  expect(getComputedStyle(viewport).maxHeight).toBe('min(60vh, calc(100dvh - var(--spacing) * 20))');
+  expect(getComputedStyle(viewport).maxHeight).toBe('calc(100dvh - var(--spacing) * 13 - var(--notice-edge) * 2)');
   expect($$('[data-toast-color="warning"]').every((entry) => getComputedStyle(entry).flexShrink === '0')).toBe(true);
 });
 

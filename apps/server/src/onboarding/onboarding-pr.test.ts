@@ -141,14 +141,14 @@ test('an edit whose lines moved on the default branch fails with its file and li
 
 test('a skill renamed in the PR moves its folder and names itself anew in its SKILL.md', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-web', onboarding: progress }]);
-  const { calls, run } = gh({}, {}, { '.claude/skills/code-review/SKILL.md': '---\nname: code-review\n---\n' });
+  const { calls, run } = gh({}, {}, { '.claude/skills/lar-build/SKILL.md': '---\nname: lar-build\n---\n' });
   await createPrOpener(dir, run)({ repo: 'maddec01/lar-web', progress, config,
-    picks: { clashes: [], skills: { '.claude/skills/code-review/': { kind: 'rename', name: 'web-review' } } } });
+    picks: { clashes: [], skills: { '.claude/skills/lar-build/': { kind: 'rename', name: 'web-review' } } } });
   const tree = writes(calls)[0]!;
   assert.ok(field(tree, 'tree[][path]').includes('.claude/skills/web-review/SKILL.md'));
   assert.ok(field(tree, 'tree[][content]').includes('---\nname: web-review\n---\n'));
   const create = writes(calls).at(-1)!;
-  assert.ok(create[create.indexOf('--body') + 1]!.includes('- Renames `.claude/skills/code-review/` to `.claude/skills/web-review/`.'));
+  assert.ok(create[create.indexOf('--body') + 1]!.includes('- Renames `.claude/skills/lar-build/` to `.claude/skills/web-review/`.'));
 });
 
 test('a taken lar-factory/onboarding with an open PR is moved to the new commit and its PR reused with the new body, opening nothing', async (t) => {
@@ -636,8 +636,8 @@ test('on Azure Repos, a .lar-factory.json that lands another way finishes onboar
 
 const AZURE_PR = `${REPO_URL}/pullrequest/100`;
 const azFiles = { '/AGENTS.md': RULES, '/CONTEXT.md': '# Terms\n', '/.scratch/todo.md': 'x',
-  '/.claude/skills/code-review/SKILL.md': '---\nname: code-review\n---\n', '/.claude/skills/code-review/notes.md': 'Notes\n' };
-const azPicks = { skills: { '.claude/skills/code-review/': { kind: 'rename', name: 'api-review' } }, clashes: [pushRule,
+  '/.claude/skills/lar-build/SKILL.md': '---\nname: lar-build\n---\n', '/.claude/skills/lar-build/notes.md': 'Notes\n' };
+const azPicks = { skills: { '.claude/skills/lar-build/': { kind: 'rename', name: 'api-review' } }, clashes: [pushRule,
   { id: 'context', file: 'CONTEXT.md', ticked: true, reason: 'Old name.', edit: { kind: 'rename', to: 'GLOSSARY.md' } },
   { id: 'scratch', file: '.scratch/', ticked: true, reason: 'Local tracker.', edit: { kind: 'delete' } }] };
 
@@ -652,8 +652,8 @@ test('on Azure Repos, one push makes the commit with every change on lar-factory
   assert.deepEqual([push!.ref, push!.oldObjectId, push!.parents, push!.comment],
     ['refs/heads/lar-factory/onboarding', '0'.repeat(40), ['abc123'], 'chore: onboard to lar Factory']);
   const change = (path: string) => push!.changes.find((c) => c.path === path);
-  assert.deepEqual(['/.scratch/todo.md', '/CONTEXT.md', '/.claude/skills/code-review/SKILL.md', '/.claude/skills/code-review/notes.md'].map(change),
-    ['/.scratch/todo.md', '/CONTEXT.md', '/.claude/skills/code-review/SKILL.md', '/.claude/skills/code-review/notes.md'].map((path) => ({ changeType: 'delete', path })));
+  assert.deepEqual(['/.scratch/todo.md', '/CONTEXT.md', '/.claude/skills/lar-build/SKILL.md', '/.claude/skills/lar-build/notes.md'].map(change),
+    ['/.scratch/todo.md', '/CONTEXT.md', '/.claude/skills/lar-build/SKILL.md', '/.claude/skills/lar-build/notes.md'].map((path) => ({ changeType: 'delete', path })));
   assert.deepEqual(change('/GLOSSARY.md'), { changeType: 'add', path: '/GLOSSARY.md', content: '# Terms\n' });
   assert.deepEqual(change('/.claude/skills/api-review/notes.md'), { changeType: 'add', path: '/.claude/skills/api-review/notes.md', content: 'Notes\n' });
   assert.equal(change('/.claude/skills/api-review/SKILL.md')?.content, '---\nname: api-review\n---\n');

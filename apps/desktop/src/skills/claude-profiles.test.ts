@@ -62,7 +62,7 @@ describe("setTick", () => {
     assert.deepStrictEqual(off.profiles, [{ name: ".claude", ticked: true }, { name: ".claude-work", ticked: false }]);
     assert.isFalse(NodeFS.existsSync(link(home, ".claude-work")));
 
-    assert.deepStrictEqual(off.removed, { links: ["lar-work"], checklists: true });
+    assert.deepStrictEqual(off.removed, { links: ["lar-work"], checklists: false });
 
     const on = ClaudeProfiles.setTick(home, ".claude-work", true);
     assert.deepStrictEqual(on.profiles[1], { name: ".claude-work", ticked: true });

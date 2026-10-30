@@ -158,7 +158,6 @@ function install(home: string, bundle: string, version: string, options: Require
   const owned = new Set(current?.skills ?? bundled);
   const conflicting = bundled.filter((name) => !owned.has(name) && exists(join(agents, 'skills', name)));
   const skills = bundled.filter((name) => !conflicting.includes(name));
-  const dropped = [...owned].filter((name) => !bundled.includes(name));
   const conflicts: string[] = [];
   // The paths that block each bundled skill.
   const blocking = new Map<string, BlockingPath[]>();
@@ -188,7 +187,7 @@ function install(home: string, bundle: string, version: string, options: Require
       ...(current?.antigravity?.[folder]?.includes(name) && { skill: name }),
       source: join(bundle, 'skills', name), target: join(home, folder, name),
     }))),
-    { label: 'references', source: join(bundle, 'references'), target: join(agents, 'references') },
+
   ].filter((copy) => !sameTree(copy.source, copy.target));
 
   const staged: { copy: Copy; temporary: string }[] = [];
@@ -205,9 +204,9 @@ function install(home: string, bundle: string, version: string, options: Require
   }
   // An Antigravity copy goes only while it is still a folder, so a link or file put in its place survives.
   const removals = [
-    ...dropped.map((name) => join(agents, 'skills', name)).filter(exists),
+
     ...Object.entries(current?.antigravity ?? {}).flatMap(([folder, names]) =>
-      names.filter((name) => !antigravity?.[folder]?.includes(name)).map((name) => join(home, folder, name))).filter(isRealFolder),
+      names.filter((name) => bundled.includes(name) && !antigravity?.[folder]?.includes(name)).map((name) => join(home, folder, name))).filter(isRealFolder),
   ];
   for (const path of removals) {
     rmSync(path, { recursive: true, force: true });
@@ -310,8 +309,7 @@ function linkProfile(
   putBack: Set<string>,
 ): ProfileState {
   const folder = join(home, name, 'skills');
-  const links = state.links.filter((skill) => skills.includes(skill));
-  for (const skill of state.links) if (!links.includes(skill) && removeLink(join(folder, skill))) progress.changed = true;
+  const links = [...state.links];
   if (!exists(folder)) {
     mkdirSync(folder, { recursive: true });
     progress.changed = true;
@@ -336,12 +334,7 @@ function linkProfile(
     progress.changed = true;
   }
 
-  const references = join(home, name, 'references');
-  const ours = state.references || adopt || !exists(references);
-  const source = join(home, '.agents/references');
-  if (!ours) conflict(references);
-  else if (!sameTree(source, references)) swap(stage({ label: `references for ${name}`, source, target: references }), references, progress);
-  return { ticked: true, links: links.sort(), references: ours };
+  return { ticked: true, links: links.sort(), references: state.references };
 }
 
 function unlinkProfile(home: string, name: string, state: ProfileState, removed: TickResult['removed']): ProfileState {

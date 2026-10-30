@@ -350,6 +350,8 @@ export type ItemSourceKind = (typeof ITEM_SOURCE_KINDS)[number];
 
 /** A skill or checklist the board app bundles: who wrote it, its licence and its source on GitHub. */
 export interface BundledSkill {
+  includedAuthors?: string[];
+  notices?: string;
   /** The folder name in `skills/`, or `references/<file>` for a checklist. */
   name: string;
   author: string;

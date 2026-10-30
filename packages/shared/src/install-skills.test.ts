@@ -27,16 +27,16 @@ const v1 = {
   'skills/lar-work/SKILL.md': 'lar-work v1',
   'skills/lar-work/scripts/status.sh': 'status v1',
   'skills/tdd/SKILL.md': 'tdd v1',
-  'references/pr-checklist.md': 'pr v1',
-  'references/review.md': 'review v1',
+  'skills/lar-work/references/pr-checklist.md': 'pr v1',
+  'skills/lar-work/references/review.md': 'review v1',
 };
 
 const v2 = {
   'skills/lar-work/SKILL.md': 'lar-work v2',
   'skills/lar-work/scripts/status.sh': 'status v2',
   'skills/tdd/SKILL.md': 'tdd v2',
-  'references/pr-checklist.md': 'pr v2',
-  'references/review.md': 'review v2',
+  'skills/lar-work/references/pr-checklist.md': 'pr v2',
+  'skills/lar-work/references/review.md': 'review v2',
 };
 
 function read(home: string, path: string): string {
@@ -70,18 +70,18 @@ test('a new version replaces the copies and leaves no temporary folders', () => 
   const home = temporary();
   installSkills(home, bundle(v1), '1.0.0');
   writeFileSync(join(home, '.agents/skills/tdd/stale.md'), 'stale');
-  writeFileSync(join(home, '.agents/references/stale.md'), 'stale');
+  writeFileSync(join(home, '.agents/skills/lar-work/references/stale.md'), 'stale');
 
   const result = installSkills(home, bundle(v2), '1.1.0');
 
   assert.equal(result.installed, true);
   assert.equal(read(home, 'skills/lar-work/scripts/status.sh'), 'status v2');
-  assert.equal(read(home, 'references/pr-checklist.md'), 'pr v2');
+  assert.equal(read(home, 'skills/lar-work/references/pr-checklist.md'), 'pr v2');
   assert.ok(!existsSync(join(home, '.agents/skills/tdd/stale.md')));
-  assert.ok(!existsSync(join(home, '.agents/references/stale.md')));
+  assert.ok(!existsSync(join(home, '.agents/skills/lar-work/references/stale.md')));
   assert.deepEqual(manifest(home), { version: '1.1.0', skills: ['lar-work', 'tdd'], status: matching('lar-work', 'tdd'), profiles: {} });
   assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'tdd']);
-  assert.deepEqual(readdirSync(join(home, '.agents')).sort(), [INSTALL_MANIFEST, 'references', 'skills']);
+  assert.deepEqual(readdirSync(join(home, '.agents')).sort(), [INSTALL_MANIFEST, 'skills']);
 });
 
 const restoredAt = new Date('2026-10-26T09:00:00.000Z');
@@ -118,11 +118,11 @@ test('a restore ignores the version the manifest names', () => {
   const home = temporary();
   installSkills(home, bundle(v1), '1.0.0');
   writeFileSync(join(home, '.agents', INSTALL_MANIFEST), JSON.stringify({ version: '9.0.0', skills: ['lar-work', 'tdd'] }));
-  writeFileSync(join(home, '.agents/references/review.md'), 'edited');
+  writeFileSync(join(home, '.agents/skills/lar-work/references/review.md'), 'edited');
 
   installSkills(home, bundle(v1), '9.0.0', { now });
 
-  assert.equal(read(home, 'references/review.md'), 'review v1');
+  assert.equal(read(home, 'skills/lar-work/references/review.md'), 'review v1');
 });
 
 test('a restored skill keeps its restore time while it matches, and an upgrade makes it matching', () => {
@@ -183,7 +183,7 @@ const installError = (changed: boolean) => (error: unknown) =>
 
 test.skipIf(runsAsRoot)('a failed copy says nothing changed yet', () => {
   const broken = bundle(v1);
-  chmodSync(join(broken, 'references/review.md'), 0o000);
+  chmodSync(join(broken, 'skills/lar-work/references/review.md'), 0o000);
 
   assert.throws(() => installSkills(temporary(), broken, '1.0.0'), installError(false));
 });
@@ -246,7 +246,7 @@ test.skipIf(runsAsRoot)('a copy that fails partway keeps the previous version, a
   for (const [path, content] of Object.entries(v1)) assert.equal(read(home, path), content);
   assert.deepEqual(manifest(home), { version: '1.0.0', skills: ['lar-work', 'tdd'], status: matching('lar-work', 'tdd'), profiles: {} });
   assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'tdd']);
-  assert.deepEqual(readdirSync(join(home, '.agents')).sort(), [INSTALL_MANIFEST, 'references', 'skills']);
+  assert.deepEqual(readdirSync(join(home, '.agents')).sort(), [INSTALL_MANIFEST, 'skills']);
 
   chmodSync(unreadable, 0o644);
   assert.equal(installSkills(home, broken, '2.0.0').installed, true);
@@ -257,10 +257,10 @@ test.skipIf(runsAsRoot)('a copy that fails partway keeps the previous version, a
 test.skipIf(runsAsRoot)('a failed checklist copy names the references folder', () => {
   const home = temporary();
   const broken = bundle(v1);
-  const unreadable = join(broken, 'references/review.md');
+  const unreadable = join(broken, 'skills/lar-work/references/review.md');
   chmodSync(unreadable, 0o000);
 
-  assert.throws(() => installSkills(home, broken, '1.0.0'), /references/);
+  assert.throws(() => installSkills(home, broken, '1.0.0'), /skill lar-work/);
   assert.ok(!existsSync(join(home, '.agents', INSTALL_MANIFEST)));
 });
 
@@ -288,7 +288,7 @@ test('a first install adopts earlier copies of bundled skills and leaves other s
   assert.equal(read(home, '.skill-lock.json'), lock);
 });
 
-test('an upgrade whose bundle drops a skill removes its copy and manifest entry', () => {
+test('an upgrade whose bundle drops a skill preserves its copy and removes its manifest entry', () => {
   const home = temporary();
   writeSkill(home, 'other', 'other');
   writeFileSync(join(home, '.agents/.skill-lock.json'), lock);
@@ -298,7 +298,7 @@ test('an upgrade whose bundle drops a skill removes its copy and manifest entry'
   const result = installSkills(home, bundle(withoutTdd), '2.0.0');
 
   assert.deepEqual(result, { installed: true, version: '2.0.0', skills: ['lar-work'], conflicts: [], blocked: [], warn: false });
-  assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'other']);
+  assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'other', 'tdd']);
   assert.deepEqual(manifest(home), { version: '2.0.0', skills: ['lar-work'], status: matching('lar-work'), profiles: {} });
   assert.equal(read(home, 'skills/other/SKILL.md'), 'other');
   assert.equal(read(home, '.skill-lock.json'), lock);
@@ -341,7 +341,7 @@ for (const [skill, changed] of [['lar-work', false], ['tdd', true]] as const) {
 
     assert.equal(read(home, `skills/${skill}/SKILL.md`), `${skill} v1`);
     assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'tdd']);
-    assert.deepEqual(readdirSync(join(home, '.agents')).sort(), [INSTALL_MANIFEST, 'references', 'skills']);
+    assert.deepEqual(readdirSync(join(home, '.agents')).sort(), [INSTALL_MANIFEST, 'skills']);
   });
 }
 
@@ -372,11 +372,11 @@ test('a skill the engine did not install survives installs and upgrades', () => 
   installSkills(home, bundle(v1), '1.0.0');
   writeSkill(home, 'later', 'later');
   installSkills(home, bundle(v2), '2.0.0');
-  installSkills(home, bundle({ 'skills/lar-work/SKILL.md': 'v3', 'references/review.md': 'v3' }), '3.0.0');
+  installSkills(home, bundle({ 'skills/lar-work/SKILL.md': 'v3', 'skills/lar-work/references/review.md': 'v3' }), '3.0.0');
 
   assert.equal(read(home, 'skills/other/SKILL.md'), 'other');
   assert.equal(read(home, 'skills/later/SKILL.md'), 'later');
-  assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'later', 'other']);
+  assert.deepEqual(readdirSync(join(home, '.agents/skills')).sort(), ['lar-work', 'later', 'other', 'tdd']);
 });
 
 test('after the first install, a same-named folder the engine did not install is a conflict and stays', () => {
@@ -413,7 +413,7 @@ test('a bundled skill new to an upgrade installs when nothing holds its name', (
 });
 
 /** v1 with a checklist link in one skill, as the real skills have. */
-const linked = { ...v1, 'skills/lar-work/SKILL.md': 'See `../../references/review.md` and [the PR list](../../references/pr-checklist.md#top).' };
+const linked = { ...v1, 'skills/lar-work/SKILL.md': 'See `references/review.md` and [the PR list](references/pr-checklist.md#top).' };
 
 function profile(home: string, name: string): string {
   mkdirSync(join(home, name), { recursive: true });
@@ -437,7 +437,7 @@ function assertChecklistsResolve(home: string, name: string): void {
     for (const file of readdirSync(join(skills, skill), { recursive: true, encoding: 'utf8' })) {
       if (!file.endsWith('.md')) continue;
       const text = readFileSync(join(skills, skill, file), 'utf8');
-      for (const [, path] of text.matchAll(/(?:`|\]\()(\.\.\/[^`) ]*)/g)) {
+      for (const [, path] of text.matchAll(/(?:`|\]\()((?:\.\.\/|references\/)[^`) ]*)/g)) {
         count++;
         const target = join(skills, skill, file, '..', path!.split('#')[0]!);
         assert.ok(lstatSync(target).isFile(), `${name}: ${path} resolves to ${target}`);
@@ -462,10 +462,10 @@ test('a fresh install links every skill and copies the checklists into each Clau
   assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude', ticked: true }, { name: '.claude-work', ticked: true }]);
   for (const name of ['.claude', '.claude-work']) {
     assert.deepEqual(entries(home, name), ownLinks);
-    assert.equal(readFileSync(join(home, name, 'references/review.md'), 'utf8'), 'review v1');
-    assert.ok(!lstatSync(join(home, name, 'references')).isSymbolicLink());
+    assert.equal(readFileSync(join(home, name, 'skills/lar-work/references/review.md'), 'utf8'), 'review v1');
+    assert.ok(!existsSync(join(home, name, 'references')));
     assertChecklistsResolve(home, name);
-    assert.deepEqual(readdirSync(join(home, name)).sort(), ['references', 'skills']);
+    assert.deepEqual(readdirSync(join(home, name)).sort(), ['skills']);
   }
   assert.ok(!existsSync(join(home, '.claudex/skills')));
   assert.deepEqual(manifest(home), {
@@ -473,8 +473,8 @@ test('a fresh install links every skill and copies the checklists into each Clau
     skills: ['lar-work', 'tdd'],
     status: matching('lar-work', 'tdd'),
     profiles: {
-      '.claude': { ticked: true, links: ['lar-work', 'tdd'], references: true },
-      '.claude-work': { ticked: true, links: ['lar-work', 'tdd'], references: true },
+      '.claude': { ticked: true, links: ['lar-work', 'tdd'], references: false },
+      '.claude-work': { ticked: true, links: ['lar-work', 'tdd'], references: false },
     },
   });
 });
@@ -486,7 +486,7 @@ test('unticking a profile removes only the engine links and checklists, and tick
   mkdirSync(join(home, '.claude-work/skills/mine'));
   writeFileSync(join(home, '.claude-work/settings.json'), '{}');
 
-  assert.deepEqual(setProfileTick(home, '.claude-work', false), { conflicts: [], removed: { links: ['lar-work', 'tdd'], checklists: true } });
+  assert.deepEqual(setProfileTick(home, '.claude-work', false), { conflicts: [], removed: { links: ['lar-work', 'tdd'], checklists: false } });
 
   assert.deepEqual(entries(home, '.claude-work'), { mine: 'folder' });
   assert.ok(!existsSync(join(home, '.claude-work/references')));
@@ -512,7 +512,7 @@ test('a profile that appears after the first install starts unticked with no lin
   assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude', ticked: true }, { name: '.claude-later', ticked: false }]);
   assert.deepEqual(readdirSync(join(home, '.claude-later')), []);
   assert.deepEqual((manifest(home) as { profiles: unknown }).profiles, {
-    '.claude': { ticked: true, links: ['lar-work', 'tdd'], references: true },
+    '.claude': { ticked: true, links: ['lar-work', 'tdd'], references: false },
     '.claude-later': { ticked: false, links: [], references: false },
   });
 
@@ -534,13 +534,13 @@ test('a first install adopts links to the right skill folder and replaces the pr
 
   assert.deepEqual(result.conflicts, []);
   assert.deepEqual(entries(home, '.claude'), { ...ownLinks, tdd: join(home, '.agents/skills/tdd') });
-  assert.ok(!existsSync(join(home, '.claude/references/old.md')));
+  assert.ok(existsSync(join(home, '.claude/references/old.md')));
   assertChecklistsResolve(home, '.claude');
 
   setProfileTick(home, '.claude', false);
 
   assert.deepEqual(readdirSync(join(home, '.claude/skills')), []);
-  assert.ok(!existsSync(join(home, '.claude/references')));
+  assert.ok(existsSync(join(home, '.claude/references')));
 });
 
 test('an entry the engine did not make is left in place and reported as a conflict', () => {
@@ -569,7 +569,7 @@ test('an entry the engine did not make is left in place and reported as a confli
   writeFileSync(join(home, '.claude-later/references/mine.md'), 'mine');
 
   assert.deepEqual(setProfileTick(home, '.claude-later', true), {
-    conflicts: [join(home, '.claude-later/references')], removed: { links: [], checklists: false },
+    conflicts: [], removed: { links: [], checklists: false },
   });
   assert.equal(readFileSync(join(home, '.claude-later/references/mine.md'), 'utf8'), 'mine');
   assert.deepEqual(entries(home, '.claude-later'), ownLinks);
@@ -640,7 +640,7 @@ test('manifest profile entries that are not an object are dropped and wrong fiel
   assert.deepEqual(listClaudeProfiles(home), [{ name: '.claude', ticked: false }, { name: '.claude-work', ticked: false }]);
 });
 
-test('an upgrade links new skills and removes the links of a dropped skill from every profile', () => {
+test('an upgrade links new skills and preserves the links of a dropped skill from every profile', () => {
   const home = temporary();
   profile(home, '.claude');
   profile(home, '.claude-work');
@@ -650,10 +650,10 @@ test('an upgrade links new skills and removes the links of a dropped skill from 
 
   installSkills(home, bundle({ ...withoutTdd, 'skills/grill/SKILL.md': 'grill v2' }), '2.0.0');
 
-  assert.deepEqual(entries(home, '.claude'), { grill: '../../.agents/skills/grill', 'lar-work': ownLinks['lar-work'] });
+  assert.deepEqual(entries(home, '.claude'), { ...ownLinks, grill: '../../.agents/skills/grill' });
   assert.deepEqual(readdirSync(join(home, '.claude-work/skills')), []);
   assertChecklistsResolve(home, '.claude');
-  assert.equal(readFileSync(join(home, '.claude/references/review.md'), 'utf8'), 'review v1');
+  assert.equal(readFileSync(join(home, '.claude/skills/lar-work/references/review.md'), 'utf8'), 'review v1');
 });
 
 test('ticking a folder that is not a Claude profile throws', () => {
@@ -675,8 +675,8 @@ test('an install restores a ticked profile missing or wrong link and its changed
   rmSync(join(home, '.claude/skills/lar-work'));
   rmSync(join(home, '.claude/skills/tdd'));
   symlinkSync('../../elsewhere/tdd', join(home, '.claude/skills/tdd'));
-  writeFileSync(join(home, '.claude/references/review.md'), 'edited');
-  writeFileSync(join(home, '.claude/references/extra.md'), 'extra');
+  writeFileSync(join(home, '.agents/skills/lar-work/references/review.md'), 'edited');
+  writeFileSync(join(home, '.agents/skills/lar-work/references/extra.md'), 'extra');
   symlinkSync('../../elsewhere/tdd', join(home, '.claude-off/skills/tdd'));
   mkdirSync(join(home, '.claude-off/references'));
   writeFileSync(join(home, '.claude-off/references/review.md'), 'mine');
@@ -689,8 +689,8 @@ test('an install restores a ticked profile missing or wrong link and its changed
     'lar-work': { state: 'restored', restoredAt: restoredAt.toISOString() }, tdd: { state: 'restored', restoredAt: restoredAt.toISOString() },
   });
   assert.deepEqual(entries(home, '.claude'), ownLinks);
-  assert.deepEqual(readdirSync(join(home, '.claude/references')).sort(), ['pr-checklist.md', 'review.md']);
-  assert.equal(readFileSync(join(home, '.claude/references/review.md'), 'utf8'), 'review v1');
+  assert.deepEqual(readdirSync(join(home, '.claude/skills/lar-work/references')).sort(), ['pr-checklist.md', 'review.md']);
+  assert.equal(readFileSync(join(home, '.claude/skills/lar-work/references/review.md'), 'utf8'), 'review v1');
   assert.deepEqual(entries(home, '.claude-off'), { tdd: '../../elsewhere/tdd' });
   assert.equal(readFileSync(join(home, '.claude-off/references/review.md'), 'utf8'), 'mine');
 });
@@ -879,7 +879,7 @@ test('a first install adopts a copy in an Antigravity skills folder that already
   assert.equal(readFileSync(join(app, 'tdd/SKILL.md'), 'utf8'), 'tdd v2');
 });
 
-test('an upgrade whose bundle drops a skill removes its Antigravity copies, and an existing install gains them', () => {
+test('an upgrade whose bundle drops a skill preserves its Antigravity copies, and an existing install gains them', () => {
   const home = temporary();
   installSkills(home, bundle(v1), '1.0.0');
   mkdirSync(join(home, '.gemini'));
@@ -890,7 +890,7 @@ test('an upgrade whose bundle drops a skill removes its Antigravity copies, and 
   const { 'skills/tdd/SKILL.md': _, ...withoutTdd } = v2;
   installSkills(home, bundle(withoutTdd), '2.0.0');
 
-  for (const folder of antigravity) assert.deepEqual(readdirSync(join(home, folder)), ['lar-work']);
+  for (const folder of antigravity) assert.deepEqual(readdirSync(join(home, folder)).sort(), ['lar-work', 'tdd']);
   assert.deepEqual((manifest(home) as { antigravity: unknown }).antigravity, {
     '.gemini/config/skills': ['lar-work'], '.gemini/antigravity-cli/skills': ['lar-work'],
   });

@@ -198,7 +198,7 @@ function bundledGroup({ data, version }: PagesInput): Group {
   const updated = (skill: BundledSkill) => skill.date ? <> · <span className="whitespace-nowrap">updated {day(skill.date, 'UTC')}</span></>
     : skill.author === 'Lar' && version ? <> · <span className="whitespace-nowrap">updated in Lar Factory {version}</span></> : null;
   const rows: Row[] = skills.length ? skills.map((skill) => ({
-    id: `bundled-${skill.name}`, title: skill.name, description: <>{skill.author} · {skill.licence}{updated(skill)}<BlockedReason status={skill.status} /></>,
+    id: `bundled-${skill.name}`, title: skill.name, description: <>{skill.author} · {skill.licence}{updated(skill)}{skill.includedAuthors?.length ? <span className="block">Includes work by {skill.includedAuthors.join(', ')}. <a href={skill.notices} target="_blank" rel="noopener" className="underline">THIRD_PARTY_NOTICES.md</a></span> : null}<BlockedReason status={skill.status} /></>,
     control: custom(() => <span className="flex items-center gap-2">
       <InstallState status={skill.status} />
       <a className="inline-flex items-center gap-1 text-xs font-medium text-(--foreground) underline-offset-2 hover:underline [&_svg]:size-3.5" aria-label={`${skill.name} source`} href={skill.source} target="_blank" rel="noopener"><ExternalLink /> Source</a>

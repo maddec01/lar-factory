@@ -90,7 +90,7 @@ describe("makeChecks", () => {
       const first = yield* check(input);
       assert.strictEqual(first?.installed, true);
       assert.isTrue(NodeFS.existsSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md")));
-      assert.isTrue(NodeFS.existsSync(NodePath.join(home, ".agents/references/checklist.md")));
+      assert.isFalse(NodeFS.existsSync(NodePath.join(home, ".agents/references/checklist.md")));
       assert.isTrue(NodeFS.lstatSync(NodePath.join(home, ".claude/skills/lar-work")).isSymbolicLink());
 
       const second = yield* check(input);
@@ -147,13 +147,14 @@ describe("makeChecks", () => {
     Effect.gen(function* () {
       const home = tempDir("skill-home-");
       const bundle = makeBundle();
-      NodeFS.rmSync(NodePath.join(bundle, "references"), { recursive: true });
+      NodeFS.rmSync(NodePath.join(bundle, "skills"), { recursive: true });
 
       const error = yield* Effect.flip(check(launch({ home, bundle })));
-      assert.include(error.message, "references");
+      assert.include(error.message, "skills");
       assert.isFalse(error.changed);
 
-      NodeFS.mkdirSync(NodePath.join(bundle, "references"));
+      NodeFS.mkdirSync(NodePath.join(bundle, "skills/lar-work"), { recursive: true });
+      NodeFS.writeFileSync(NodePath.join(bundle, "skills/lar-work/SKILL.md"), "# lar-work\n");
       const retry = yield* check(launch({ home, bundle }));
       assert.strictEqual(retry?.installed, true);
     }));

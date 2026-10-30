@@ -272,3 +272,15 @@ test('with the Scope on a repository that reads an untagged item, Start starts i
   expect(posted()).toEqual([['/api/start', { session: 's1', itemId: 'I_sample05', repo: API }]]);
   await settle(() => useScopeStore.getState().setScope(null));
 });
+
+test('local Started clears after its observed server record disappears', async () => {
+  await mountItem(withChoices, 'I_sample05');
+  await press(start());
+  const thread = { threadId: 'thread-1', title: 'Refine' };
+  await answer({ thread, error: null });
+  const { useBoardStore } = await import('../board/board-store.ts');
+  await settle(() => useBoardStore.getState().receive({ ...withChoices, started: { I_sample05: thread } }));
+  await settle(() => useBoardStore.getState().receive({ ...withChoices, started: {} }));
+  expect(card().querySelector('.started-tag')).toBeNull();
+  expect(start()).toBeTruthy();
+});

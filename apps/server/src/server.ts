@@ -325,6 +325,7 @@ function refreshLocal(): void {
   const running = (item: Item) => Array.isArray(item.threads) && item.threads.some((t) => t.state === 'running');
   // A run can finish between stats reads. Read its final turn before writing the settled PR block.
   if (after.some((item, index) => running(before[index]!) && !running(item))) after = withT3Reads(after);
+  void commands.reconcileStarts(after);
   const t3Of = (items: Item[]) => JSON.stringify(items.map((i) => [i.stats, i.threads]));
   if (t3Of(after) === t3Of(before)) return;
   board.update({ items: after });

@@ -1,6 +1,7 @@
 // The board data the page shows, the clock it reads ages against, and why the page can't
 // reach the server, if it can't. It starts from the data the server put in the page.
 
+import { useStartStore } from '../items/start-store.ts';
 import { create } from 'zustand';
 import type { BoardData } from '@lar-factory/shared';
 
@@ -23,7 +24,14 @@ export const useBoardStore = create<BoardState>()((set) => ({
   now: Date.now(),
   clientError: null,
   writes: 0,
-  receive: (data) => set({ data, now: Date.now(), clientError: null }),
+  receive: (data) => set((state) => {
+    for (const [record, kind] of [['started', 'refine'], ['startedBuilds', 'build']] as const) {
+      for (const id of Object.keys(state.data[record] ?? {})) {
+        if (!data[record]?.[id]) useStartStore.getState().set(id, undefined, kind);
+      }
+    }
+    return { data, now: Date.now(), clientError: null };
+  }),
   fail: (message) => set({ now: Date.now(), clientError: message }),
   tick: () => set({ now: Date.now() }),
   beginWrite: () => set((state) => ({ writes: state.writes + 1 })),

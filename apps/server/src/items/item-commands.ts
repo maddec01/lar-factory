@@ -13,7 +13,7 @@ import { installHome } from '../skills/bundled-skills.ts';
 import { repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
-import { startThread } from '../t3/t3.ts';
+import { lookupThread, startThread } from '../t3/t3.ts';
 import type { ItemSource } from './item-source.ts';
 
 /** A command's answer: the HTTP status and the JSON body. */
@@ -23,6 +23,8 @@ export interface Reply {
 }
 
 export interface ItemCommands {
+  /** Checks settled Starts missing from an available thread read. */
+  reconcileStarts(items: Item[]): Promise<void>;
   /** Creates the issue a submission describes, once per request ID. */
   capture(input: Record<string, unknown>): Promise<Reply>;
   queue(itemId: string): Promise<Reply>;
@@ -59,6 +61,7 @@ export interface ItemCommandsDeps {
   projectOf?: (repo: string) => Promise<RepositoryProject>;
   /** Starts a T3 thread; tests stand in for t3. */
   startThread?: typeof startThread;
+  showThread?: typeof lookupThread;
 }
 
 type Action = 'queue' | 'back to List' | 'pick' | 'start' | 'abandon';
@@ -109,7 +112,9 @@ async function currentRepositoryProject(repo: string): Promise<RepositoryProject
 }
 
 export function createItemCommands({ board, items, repos, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
-  startThread: startIn = startThread }: ItemCommandsDeps): ItemCommands {
+  showThread = lookupThread, startThread: startIn = startThread }: ItemCommandsDeps): ItemCommands {
+  const retryBuilds = new Set<string>();
+  const checks = new WeakMap<Promise<Start>, { pending: boolean; retryAt: number }>();
   const submissions = new Map<string, {
     draft: ItemDraft; progress: CreationProgress; pending?: Promise<CreationResult>; published?: boolean;
   }>();
@@ -258,6 +263,49 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
   }
 
   return {
+    async reconcileStarts(currentItems) {
+      const warnings = { ...board.snapshot().startCheckFailures };
+      for (const id of Object.keys(warnings)) if (!currentItems.some((item) => item.id === id)) delete warnings[id];
+      if (JSON.stringify(warnings) !== JSON.stringify(board.snapshot().startCheckFailures ?? {})) {
+        board.update({ startCheckFailures: warnings });
+        board.push();
+      }
+      await Promise.all(([['started', starts], ['startedBuilds', buildStarts]] as const).flatMap(([record, runs]) =>
+        [...runs].map(async ([id, run]) => {
+          const threadId = finishedStarts.get(run);
+          const item = currentItems.find((item) => item.id === id);
+          if (!threadId || !item || !Array.isArray(item.threads)) return;
+          if (item.threads.some((thread) => thread.id === threadId)) {
+            const failures = { ...board.snapshot().startCheckFailures };
+            if (id in failures) {
+              delete failures[id];
+              board.update({ startCheckFailures: failures });
+              board.push();
+            }
+            return;
+          }
+          const previous = checks.get(run);
+          if (previous?.pending || (previous && Date.now() < previous.retryAt)) return;
+          checks.set(run, { pending: true, retryAt: Infinity });
+          let answer: Awaited<ReturnType<typeof lookupThread>>;
+          try { answer = await showThread(threadId); } catch { answer = 'unknown'; }
+          if (runs.get(id) !== run || !board.find(id)) return;
+          const failures = { ...board.snapshot().startCheckFailures };
+          if (answer === 'unknown') failures[id] = item.title;
+          else delete failures[id];
+          checks.set(run, { pending: false, retryAt: answer === 'unknown' ? Date.now() + 30_000 : Infinity });
+          if (answer === 'deleted') {
+            runs.delete(id);
+            finishedStarts.delete(run);
+            if (record === 'startedBuilds') retryBuilds.add(id);
+            const records = { ...board.snapshot()[record] };
+            delete records[id];
+            board.update({ [record]: records });
+          }
+          board.update({ startCheckFailures: failures });
+          board.push();
+        })));
+    },
     async capture(input) {
       if (typeof input.requestId !== 'string' || !REQUEST_ID.test(input.requestId)) {
         return reply(400, { error: 'The submission needs a valid request ID.' });
@@ -319,7 +367,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       if (blocked) return blocked;
       const message = buildMessage(item, larBuild());
       const previous = board.snapshot().startedBuilds?.[itemId];
-      const retry = previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped');
+      const retry = retryBuilds.has(itemId) || previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped');
       const branch = `${buildBranch(item)}${retry ? `-retry-${randomUUID().slice(0, 8)}` : ''}`;
       const { repo } = item;
       return async () => {

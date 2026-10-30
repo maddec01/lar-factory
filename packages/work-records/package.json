@@ -1,0 +1,25 @@
+{
+  "name": "@lar-factory/work-records",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The factory's work-record database, the one module that writes it, and the lar-work command that opens it directly.",
+  "type": "module",
+  "exports": {
+    ".": "./src/work-records.ts"
+  },
+  "bin": {
+    "lar-work": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "vp test run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@lar-factory/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2",
+    "vite-plus": "1.3.0"
+  }
+}

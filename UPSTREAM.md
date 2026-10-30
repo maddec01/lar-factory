@@ -26,7 +26,7 @@ it and flags each Override an upstream change touches.
 | `pr` | mattpocock/skills | `skills/engineering/pr` | `skills/lar-build/skills/pr` | `5beb35b040e3` | 2026-10-19 |  |
 | `retro` | mattpocock/skills | `skills/engineering/retro` | `skills/lar-build/skills/retro` | `5beb35b040e3` | 2026-10-19 |  |
 | `handoff` | mattpocock/skills | `skills/productivity/handoff` | `skills/shared/skills/handoff` | `5beb35b040e3` | 2026-10-19 |  |
-| `to-tickets` | mattpocock/skills | `skills/engineering/to-tickets` | `skills/lar-build/skills/to-tickets` | `5beb35b040e3` | 2026-10-19 | SKILL.md#4. Quiz the user (skills/lar-work/agents/planner.md); SKILL.md#5. Publish the tickets to the configured tracker (skills/lar-work/agents/planner.md); SKILL.md#Blocked by (skills/lar-work/agents/planner.md) |
+| `to-tickets` | mattpocock/skills | `skills/engineering/to-tickets` | `skills/lar-build/skills/to-tickets` | `5beb35b040e3` | 2026-10-19 | SKILL.md#4. Quiz the user (skills/lar-build/agents/planner.md); SKILL.md#5. Publish the tickets to the configured tracker (skills/lar-build/agents/planner.md); SKILL.md#Blocked by (skills/lar-build/agents/planner.md) |
 | `implement` | mattpocock/skills | `skills/engineering/implement` | `skills/lar-build/skills/implement` | `5beb35b040e3` | 2026-10-19 |  |
 | `security-and-hardening` | addyosmani/agent-skills | `skills/security-and-hardening` | `skills/lar-build/skills/security-and-hardening` | `aeac41d4d005` | 2026-10-13 |  |
 | `frontend-ui-engineering` | addyosmani/agent-skills | `skills/frontend-ui-engineering` | `skills/lar-build/skills/frontend-ui-engineering` | `aeac41d4d005` | 2026-10-13 |  |

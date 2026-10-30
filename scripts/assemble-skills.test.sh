@@ -10,3 +10,7 @@ test -f .assembled-skills/lar-build/skills/security-and-hardening/SKILL.md
 printf stale > .assembled-skills/lar-shape/stale
 node scripts/assemble-skills.mjs
 test ! -e .assembled-skills/lar-shape/stale
+
+test -f .assembled-skills/lar-build/SKILL.md
+test -f .assembled-skills/lar-build/agents/builder.md
+test ! -d skills/lar-work

@@ -12,7 +12,7 @@ export const makeBundle = () => {
   const bundle = tempDir("skill-bundle-");
   NodeFS.mkdirSync(NodePath.join(bundle, "skills/lar-work"), { recursive: true });
   NodeFS.writeFileSync(NodePath.join(bundle, "skills/lar-work/SKILL.md"), "# lar-work\n");
-  NodeFS.mkdirSync(NodePath.join(bundle, "references"));
-  NodeFS.writeFileSync(NodePath.join(bundle, "references/checklist.md"), "- [ ] check\n");
+  NodeFS.mkdirSync(NodePath.join(bundle, "skills/lar-work/references"));
+  NodeFS.writeFileSync(NodePath.join(bundle, "skills/lar-work/references/checklist.md"), "- [ ] check\n");
   return bundle;
 };

@@ -151,11 +151,11 @@ test('an onboarding setup check answers with its result', async (t) => {
 });
 
 test("onboarding's fixed checks answer with the default branch's Clashes, or gh's problem", async (t) => {
-  const board = await startBoard(t, { files: ['CONTEXT.md', '.claude/skills/tdd/SKILL.md', '.claude/skills/web-deploy/SKILL.md'] });
+  const board = await startBoard(t, { files: ['CONTEXT.md', '.claude/skills/lar-shape/SKILL.md', '.claude/skills/web-deploy/SKILL.md'] });
   const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/clashes');
   const found = await response.json() as { clashes: { id: string }[]; skillClashes: unknown; projectSkills: string[] };
   assert.deepEqual([response.status, found.clashes.map((c) => c.id), found.skillClashes, found.projectSkills],
-    [200, ['context'], [{ name: 'tdd', path: '.claude/skills/tdd/' }], ['tdd', 'web-deploy']]);
+    [200, ['context'], [{ name: 'lar-shape', path: '.claude/skills/lar-shape/' }], ['lar-shape', 'web-deploy']]);
   await board.update({ fail: 'tree' });
   const failed = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/clashes');
   assert.equal(failed.status, 502);

@@ -23,9 +23,9 @@ export default defineConfig({
       // The skills and checklists of the commit being built, which the app installs on launch, and
       // UPSTREAM.md, which credits them in Settings > Skills.
       copy: [
-        { from: "../../skills", to: "dist-electron/bundle" },
-        { from: "../../references", to: "dist-electron/bundle" },
+        { from: "../../.assembled-skills/skills", to: "dist-electron/bundle/skills" },
         { from: "../../UPSTREAM.md", to: "dist-electron/bundle" },
+        { from: "../../THIRD_PARTY_NOTICES.md", to: "dist-electron/bundle" },
       ],
       deps: {
         alwaysBundle: (id) => !id.startsWith("node:") && !electronOnly(id),

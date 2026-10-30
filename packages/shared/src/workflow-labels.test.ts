@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { WORKFLOW_LABELS, isKindLabel } from './workflow-labels.ts';
 
 test("the workflow labels are the issue tracker's label setup list, in its order", () => {
-  const doc = readFileSync(new URL('../../../skills/lar-work/issue-tracker.md', import.meta.url), 'utf8');
+  const doc = readFileSync(new URL('../../../skills/shared/issue-tracker/label-setup.md', import.meta.url), 'utf8');
   const block = doc.split("<<'LABELS'\n")[1]!.split('\nLABELS')[0]!;
   assert.deepEqual(WORKFLOW_LABELS.map((l) => `${l.name}|${l.color}|${l.description}`), block.split('\n'));
 });

@@ -24,7 +24,7 @@ the part of the product an item touches.
 
 ## Matt Pocock's triage roles
 
-Skills such as `triage` and `to-tickets` name triage roles. Each maps to this:
+Bundled guidance in `lar-shape` and `lar-build` name triage roles. Each maps to this:
 
 | Role | In Lar Factory |
 | --- | --- |

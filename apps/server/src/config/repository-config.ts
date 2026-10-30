@@ -8,6 +8,7 @@ import {
   PROVIDERS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider,
   type RepositoryConfigAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
+import { AGENT_DOC_PATHS, withoutAgentSkills } from '../onboarding/agent-setup.ts';
 import { problemOf } from '../azure/azure-items.ts';
 import { readBranchFile as readAzureFile } from '../azure/azure-repos.ts';
 import { ReadProblem } from '../items/item-source.ts';
@@ -337,9 +338,34 @@ export async function readOnboardedConfigs(list: readonly OnboardedRepository[],
     if (onAzure(repo)) return { repo, problem: azProblem(err) };
     throw err;
   })));
+  const guidance: RepositoryConfigProblem[] = [];
+  await Promise.all(read.filter((r): r is RepositoryConfig => 'role' in r).map(async (config) => {
+    const readFile = onAzure(config.repo) ? readAzureFile : readBranchFile;
+    const stale: string[] = [];
+    const paths = ['AGENTS.md', 'CLAUDE.md', ...AGENT_DOC_PATHS];
+    let contents: (string | null)[];
+    try {
+      contents = await Promise.all(paths.map((path) => readFile(config.repo, path, undefined, run)));
+    } catch (err) {
+      const problem = problemOf(err);
+      const detail = problem instanceof ReadProblem && problem.fix ? `${problem.message} Run ${problem.fix}.`
+        : problem instanceof Error ? problem.message : String(problem);
+      guidance.push({ repo: config.repo, kind: 'agent-guidance', problem: `Could not check agent guidance. ${detail} Refresh to retry.` });
+      return;
+    }
+    for (const [index, path] of paths.entries()) {
+      const content = contents[index];
+      if (!content) continue;
+      const outside = path.startsWith('docs/agents/') ? null : withoutAgentSkills(content);
+      const guidance = outside === null ? (path.startsWith('docs/agents/') ? content : '') : content.match(/^## Agent skills\s*$[\s\S]*?(?=^#{1,2} |$(?![\s\S]))/m)?.[0] ?? '';
+      if (/(?:`|\$|(?<![\w-])\/)(?:lar-work|domain-modeling|to-tickets|triage|grilling|prototype|research|diagnosing-bugs|tdd|code-review|codebase-design|writing-for-agents|pr|retro|handoff|implement|developer-profile|unslop|skill-sync|code-review-and-quality|security-and-hardening|doubt-driven-development|frontend-ui-engineering|browser-testing-with-devtools)(?:`|\s|\/SKILL\.md)/.test(guidance)) stale.push(path);
+    }
+    if (stale.length) guidance.push({ repo: config.repo, kind: 'agent-guidance',
+      problem: `${stale.join(', ')} names retired factory skills. Update the Agent skills block to use lar-shape for shaping and lar-build for builds, and replace docs/agents guidance with the current setup from lar-factory's apps/server/src/onboarding/agent-setup.ts. Merge the change into the default branch, then refresh.` });
+  }));
   return {
     configs: read.filter((r): r is RepositoryConfig => 'role' in r),
-    problems: read.filter((r): r is RepositoryConfigProblem => !('role' in r)),
+    problems: [...read.filter((r): r is RepositoryConfigProblem => !('role' in r)), ...guidance],
     resetting: list.flatMap((e) => e.resetting ? [e.repo] : []),
   };
 }

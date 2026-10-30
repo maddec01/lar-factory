@@ -119,7 +119,7 @@ export function AzWarning({ check }: { check: FailedCheck<AzCheck> }) {
 
 /** What lar-shape does with each command whose check is a warning of its own. */
 const COMMAND_USES = {
-  git: "lar-shape's agents branch, commit and push with",
+  git: "lar-build's agents branch, commit and push with",
   jq: "lar-shape's scripts read gh's answers with",
   curl: "lar-shape's scripts tell the board to refresh with",
 } as const;

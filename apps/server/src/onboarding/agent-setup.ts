@@ -51,7 +51,7 @@ mention creates neither.
 Each item has one Status: List, Queued, Shaping, Needs you, Ready, In progress,
 Review, Verify, Ready to merge or Done. It lives as one
 \`status-<name>\` label on the issue, such as \`status-needs-you\`. Move an item
-with the \`lar-shape\` skill's \`scripts/status.sh <issue-url> "<Status>"\`. Closing
+with the \`lar-shape\` skill's \`shared/scripts/status.sh <issue-url> "<Status>"\`. Closing
 an issue makes it Done. State lives in Status alone, so assignees and other
 labels stay free of it.
 
@@ -76,7 +76,7 @@ const AZURE_ISSUE_TRACKER = `# Issue tracker: Azure DevOps
 Track work in Azure Boards work items.
 Lar Factory's board moves them through their Status.
 Use the local \`az\` login with the azure-devops extension.
-Read \`lar-shape/issue-tracker/azure-devops.md\`'s Azure DevOps section before changing work items.
+Read \`lar-shape/shared/issue-tracker/azure-devops.md\`'s Azure DevOps section before changing work items.
 
 ## Repository and project
 
@@ -124,10 +124,10 @@ az boards query --organization "$org" --project "$project" \\
   --wiql "SELECT [System.Id] FROM WorkItems WHERE [System.Tags] CONTAINS 'active'"
 \`\`\`
 
-Create a child Task with lar-shape's \`scripts/slice.sh\`:
+Create a child Task with lar-shape's \`shared/scripts/slice.sh\`:
 
 \`\`\`sh
-child_url=$(bash <lar-shape>/scripts/slice.sh "$azure_repo" "$parent_url" "<title>" /path/to/brief.md)
+child_url=$(bash <lar-shape>/shared/scripts/slice.sh "$azure_repo" "$parent_url" "<title>" /path/to/brief.md)
 \`\`\`
 
 Attach an existing child or mark its blocker:
@@ -141,7 +141,7 @@ Verify links with a read before retrying a write.
 
 ## Status and concepts
 
-Move an item with lar-shape's \`scripts/status.sh <work-item-url> "<Status>"\`.
+Move an item with lar-shape's \`shared/scripts/status.sh <work-item-url> "<Status>"\`.
 It keeps one \`status-<name>\` tag, such as \`status-needs-you\`.
 It moves Azure State when the Status category changes.
 A Completed-category State makes an item Done.
@@ -206,7 +206,7 @@ Bundled guidance in \`lar-shape\` and \`lar-build\` names triage roles. Each map
 | \`enhancement\` | \`feature\` or \`improvement\`: \`feature\` for new behaviour, \`improvement\` for better existing behaviour |
 
 Where a skill says to apply a state role, set the Status it maps to.
-${azure ? '\nRead all of `System.Tags` before changing tags. Each write replaces the whole string.\nUse the `retag` function in lar-shape/issue-tracker/azure-devops.md to preserve other tags.\nLet `scripts/status.sh` own the `status-*` tags.\n' : ''}`;
+${azure ? '\nRead all of `System.Tags` before changing tags. Each write replaces the whole string.\nUse the `retag` function in lar-shape/shared/issue-tracker/azure-devops.md to preserve other tags.\nLet `shared/scripts/status.sh` own the `status-*` tags.\n' : ''}`;
 }
 
 const DOMAIN = `# Domain docs

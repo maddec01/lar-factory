@@ -10,10 +10,13 @@ import { kind } from '../buttons/button-kinds.tsx';
 import { AddingARepository } from './adding-a-repository.tsx';
 import { Warning } from './warning.tsx';
 
-export function RepositoryConfigWarning({ repo, problem }: RepositoryConfigProblem) {
+export function RepositoryConfigWarning({ repo, problem, kind: problemKind }: RepositoryConfigProblem) {
   const offer = useBoardStore((state) => state.data.onboardingOffers?.find((choice) => sameRepo(choice.repo, repo)));
   const start = useWizardStore((state) => state.start);
   const dismissKey = `repository-config:${repo.toLowerCase()}`;
+  if (problemKind === 'agent-guidance') return <Warning dismissKey={dismissKey} title={`${shownRepo(repo)} needs attention to agent guidance.`}>
+    {problem}
+  </Warning>;
   if (offer?.configProblem) return <Warning dismissKey={dismissKey} title={`${shownRepo(repo)} needs setup`} action={<Button {...kind('other')} onClick={() => start(offer)}>Run onboarding</Button>}>
     {REPLACE_SETTINGS_HELP}
   </Warning>;

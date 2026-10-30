@@ -370,6 +370,7 @@ export type ShowSetting = (typeof SHOW_SETTINGS)[number];
 
 /** Why a repository's .lar-factory.json couldn't be read, in repo-config.sh's words after `owner/name: `. */
 export interface RepositoryConfigProblem {
+  kind?: 'agent-guidance';
   repo: string;
   problem: string;
 }

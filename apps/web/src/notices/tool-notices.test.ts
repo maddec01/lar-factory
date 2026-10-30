@@ -139,7 +139,7 @@ test('a missing git, jq or curl shows a warning with its install command and Rec
 
   await push(withTools({ git: { result: 'missing', override: 'GIT_PATH=/nowhere/git', fix: 'brew install git' }, curl: { result: 'missing', fix: 'brew install curl' } }));
   expect(warnings().map((b) => warningText(b)[0])).toEqual(['git not found.', 'curl not found.']);
-  expect(warningText(warnings()[0]!)[1]).toBe("lar-shape's agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. "
+  expect(warningText(warnings()[0]!)[1]).toBe("lar-build's agents branch, commit and push with git. No runnable git is at GIT_PATH=/nowhere/git. "
     + 'Point GIT_PATH at git, or unset it and install it with brew install git Copy, then press Recheck. Recheck');
   expect(warningText(warnings()[1]!)[1]).toContain("lar-shape's scripts tell the board to refresh with curl. Install it with brew install curl Copy");
 });

@@ -139,21 +139,21 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - name: lar-work slice tests
+      - name: Shared slice tests
         if: ${{ !cancelled() }}
-        run: bash skills/lar-work/scripts/slice.test.sh
+        run: bash skills/shared/scripts/slice.test.sh
 
-      - name: lar-work status tests
+      - name: Shared status tests
         if: ${{ !cancelled() }}
-        run: bash skills/lar-work/scripts/status.test.sh
+        run: bash skills/shared/scripts/status.test.sh
 
-      - name: lar-work repo config tests
+      - name: Shared repo config tests
         if: ${{ !cancelled() }}
-        run: bash skills/lar-work/scripts/repo-config.test.sh
+        run: bash skills/shared/scripts/repo-config.test.sh
 
       - name: skill-sync tests
         if: ${{ !cancelled() }}
-        run: for test in skills/skill-sync/scripts/*.test.sh; do bash "$test" || exit 1; done
+        run: for test in .agents/skills/skill-sync/scripts/*.test.sh; do bash "$test" || exit 1; done
 
       - name: Release plan tests
         if: ${{ !cancelled() }}

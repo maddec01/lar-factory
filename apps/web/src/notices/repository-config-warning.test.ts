@@ -37,3 +37,15 @@ test('an unusable settings file offers fresh onboarding directly from its warnin
   const { useWizardStore } = await import('../onboarding/wizard-store.ts');
   expect(useWizardStore.getState().run!.projectId).toBe('broken');
 });
+
+
+test('stale agent guidance shows its fix and clears after migration', async () => {
+  await mountPage({ ...sample, repositoryConfigProblems: [{ repo: 'owner/api', kind: 'agent-guidance',
+    problem: 'Update AGENTS.md to use lar-shape and lar-build, merge into the default branch, then refresh.' }] });
+  const warning = $$('[data-slot="toaster"] [data-toast-color="warning"]').find((entry) => text(entry).includes('owner/api'))!;
+  expect(text(warning)).toContain('owner/api needs attention to agent guidance.');
+  expect(text(warning)).toContain('Update AGENTS.md to use lar-shape and lar-build');
+  expect(text(warning)).not.toContain('off the board');
+  await push({ ...sample, repositoryConfigProblems: [] });
+  expect(text(document.body)).not.toContain('owner/api needs attention to agent guidance.');
+});

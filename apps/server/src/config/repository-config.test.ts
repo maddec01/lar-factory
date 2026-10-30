@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { agentSetupWrites } from '../onboarding/agent-setup.ts';
 import { fakeAzRepos } from '../azure/fake-az.ts';
 import {
   dropRepository, findRepositoryConfig, isItemSource, isRepo, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded,
@@ -252,14 +253,15 @@ test('a repository still onboarding or resetting reads no config and has no prob
   const read: string[] = [];
   const gh = async (args: string[]) => {
     read.push(args[1]!);
-    return JSON.stringify({ role: 'The factory' });
+    if (args[1]?.endsWith('/.lar-factory.json')) return JSON.stringify({ role: 'The factory' });
+    throw new Error('Not Found (HTTP 404)');
   };
   const list = [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: progress() }, { repo: 'maddec01/lar-web', resetting: { prUrl: RESET_PR } }];
   const { configs, problems, resetting } = await readOnboardedConfigs(list, gh);
   assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
   assert.deepEqual(problems, []);
   assert.deepEqual(resetting, ['maddec01/lar-web']);
-  assert.deepEqual(read, ['repos/maddec01/lar-factory/contents/.lar-factory.json']);
+  assert.equal(read[0], 'repos/maddec01/lar-factory/contents/.lar-factory.json');
 });
 
 test("an Azure repository az can't read is left out with az's problem and fix, and the others still read", async (t) => {
@@ -324,4 +326,56 @@ test('removed-source onboarding entries do not break healthy repositories or lat
   assert.equal(saved.note, 'keep');
   assert.deepEqual(saved.repositories.map((entry: { repo: string }) => entry.repo), ['maddec01/healthy', 'maddec01/current', 'maddec01/new']);
   assert.equal(saved.repositories[0].note, 'keep');
+});
+
+
+test('stale factory guidance warns without removing a usable repository; current and personal guidance stay quiet', async () => {
+  for (const [path, content, stale] of [
+    ['AGENTS.md', '## Agent skills\nUse `lar-work`.', true],
+    ['docs/agents/domain.md', 'Use the `domain-modeling` skill.', true],
+    ['AGENTS.md', '## Personal tools\nUse `tdd`.\n## Agent skills\nUse `lar-shape` and `lar-build`.', false],
+    ['docs/agents/domain.md', 'Read lar-build skills/domain-modeling/SKILL.md.', false],
+  ] as const) {
+    const run = async (args: string[]) => {
+      if (args[1]?.endsWith('/.lar-factory.json')) return JSON.stringify({ role: 'API' });
+      if (args[1]?.endsWith('/' + path)) return content;
+      throw new Error('Not Found (HTTP 404)');
+    };
+    const result = await readOnboardedConfigs([{ repo: 'owner/api' }], run);
+    assert.equal(result.configs.length, 1);
+    assert.equal(result.problems.length, stale ? 1 : 0);
+    if (stale) assert.match(result.problems[0]!.problem, /lar-shape.*lar-build/);
+  }
+});
+
+
+test('fresh onboarding guidance produces no migration warning', async () => {
+  const files = new Map(agentSetupWrites({}, 'GitHub').map(({ path, content }) => [path, content]));
+  const run = async (args: string[]) => {
+    const path = args[1]!.split('/contents/')[1]!;
+    if (path === '.lar-factory.json') return JSON.stringify({ role: 'API' });
+    if (files.has(path)) return files.get(path)!;
+    throw new Error('Not Found (HTTP 404)');
+  };
+  const result = await readOnboardedConfigs([{ repo: 'owner/api' }], run);
+  assert.equal(result.configs.length, 1);
+  assert.deepEqual(result.problems, []);
+});
+
+test('optional guidance failures preserve valid configs and report a retryable warning', async () => {
+  for (const repo of ['owner/api', 'contoso/Fabrikam/lar-api']) {
+    const run = async (args: string[]) => {
+      if (args.some((arg) => arg.includes('.lar-factory.json'))) return JSON.stringify({
+        role: 'API', ...(repo.includes('Fabrikam') ? { itemSource: { kind: 'azure-board', team: 'Team' } } : {}),
+      });
+      throw new Error('Temporary guidance read failure');
+    };
+    const azure = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify({ role: 'API', itemSource: { kind: 'azure-board', team: 'Team' } }) },
+      fail: (args) => args.some((arg) => arg.includes('.lar-factory.json')) ? undefined : new Error('Temporary guidance read failure') });
+    const result = await readOnboardedConfigs([{ repo }], repo.includes('Fabrikam') ? azure.run : run);
+    assert.deepEqual(result.configs.map((config) => config.repo), [repo]);
+    assert.equal(result.problems.length, 1);
+    assert.equal(result.problems[0]?.kind, 'agent-guidance');
+    assert.match(result.problems[0]!.problem, /Could not check agent guidance.*Temporary guidance read failure.*Refresh/);
+  }
 });

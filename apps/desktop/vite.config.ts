@@ -21,9 +21,10 @@ export default defineConfig({
       clean: true,
       plugins: [compiledCss()],
       // The skills and checklists of the commit being built, which the app installs on launch, and
-      // UPSTREAM.md, which credits them in Settings > Skills.
+      // UPSTREAM.md, which credits them in Settings > Skills. tsdown copies a folder into `to` under its own name,
+      // so the skills land in dist-electron/bundle/skills; `clean` empties dist-electron first.
       copy: [
-        { from: "../../.assembled-skills/skills", to: "dist-electron/bundle/skills" },
+        { from: "../../.assembled-skills/skills", to: "dist-electron/bundle" },
         { from: "../../UPSTREAM.md", to: "dist-electron/bundle" },
         { from: "../../THIRD_PARTY_NOTICES.md", to: "dist-electron/bundle" },
       ],

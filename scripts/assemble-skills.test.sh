@@ -32,3 +32,7 @@ for skill in ('lar-shape', 'lar-build'):
   if p.is_file():
    assert p.read_bytes()==(Path('.assembled-skills')/skill/p.relative_to(source)).read_bytes(), p
 PY
+# Packaged installs ship only lar's own skills, even after an earlier run assembled another.
+mkdir -p .assembled-skills/skills/lar-work
+node scripts/assemble-skills.mjs
+test "$(ls -A .assembled-skills/skills | tr '\n' ' ')" = "lar-build lar-shape "

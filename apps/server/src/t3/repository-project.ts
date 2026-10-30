@@ -92,7 +92,7 @@ export function githubRepo(url: string | null): string | null {
 /**
  * `organization/project/repository` from an Azure DevOps origin: `https://dev.azure.com/<org>/<project>/_git/<repo>`,
  * `git@ssh.dev.azure.com:v3/<org>/<project>/<repo>` or `https://<org>.visualstudio.com/<project>/_git/<repo>`, each
- * name as the URL has it, percent-encoded or not, as lar-work's azure.sh names it; null for any other URL. The organization keeps two organizations' projects apart. A URL without the
+ * name as the URL has it, percent-encoded or not, as lar-shape's azure.sh names it; null for any other URL. The organization keeps two organizations' projects apart. A URL without the
  * project names a repository named after its project.
  */
 export function azureRepo(url: string): string | null {

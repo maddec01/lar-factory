@@ -487,7 +487,7 @@ type Passed = { result: 'ok'; version?: string };
 /** A missing command, naming the override that pointed nowhere if one did. */
 type Missing = { result: 'missing'; override?: string };
 
-/** gh runs, is missing or logged out, or needs an upgrade for lar-work’s commands. */
+/** gh runs, is missing or logged out, or needs an upgrade for lar-shape’s commands. */
 export type GhCheck =
   | Passed
   | Missing & { fix: string }
@@ -508,7 +508,7 @@ export type AzCheck =
   | { result: 'logged-out'; version?: string; fix: string }
   | { result: 'no-extension'; version?: string; fix: string };
 
-/** The oldest gh lar-work's scripts run with: 2.94.0 added `--parent`, `--add-sub-issue` and `--blocked-by`. */
+/** The oldest gh lar-shape's scripts run with: 2.94.0 added `--parent`, `--add-sub-issue` and `--blocked-by`. */
 export const GH_FLOOR = '2.94.0';
 
 /**
@@ -718,10 +718,10 @@ export function workTitle(item: Item): string {
   return `#${item.number} ${item.title}`;
 }
 
-/** The work message: `#<n> <title>`, then `$lar-work <owner/repo>#<n>`. */
+/** The work message: `#<n> <title>`, then `$lar-shape <owner/repo>#<n>`. */
 export function workMessage(item: Item): string {
   const title = workTitle(item);
-  return `${title}\n$lar-work ${item.repo}#${item.number}`;
+  return `${title}\n$lar-shape ${item.repo}#${item.number}`;
 }
 
 /**
@@ -737,9 +737,9 @@ export function buildBranch(item: Item): string {
   return `${prefix}/${[item.number, ...words].join('-')}`;
 }
 
-/** Start build's message, naming the builder agent of the lar-work installed at `larWork`. */
-export function buildMessage(item: Item, larWork: string): string {
-  return `Build ${item.repo}#${item.number}. Read ${larWork}/agents/builder.md and follow it.`;
+/** Start build's message, naming the builder agent of the lar-build installed at `larBuild`. */
+export function buildMessage(item: Item, larBuild: string): string {
+  return `Build ${item.repo}#${item.number}. Read ${larBuild}/agents/builder.md and follow it.`;
 }
 
 /** Whether the data is stale: the latest read failed, or none succeeded for 3 intervals. A first read still running isn't. */

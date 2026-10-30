@@ -36,7 +36,7 @@ export interface ItemCommands {
   start(itemId: string, model: unknown, repo?: unknown): Promise<Reply>;
   /**
    * Starts a Ready build's thread in a new worktree, or retries a confirmed stopped run, once nothing open blocks it, as
-   * lar-work's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
+   * lar-shape's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
    */
   startBuild(itemId: string, model: unknown): Promise<Reply>;
   abandon(itemId: string): Promise<Reply>;
@@ -97,8 +97,8 @@ function track<T>(inFlight: Map<string, Promise<T>>, key: string, work: Promise<
   return tracked;
 }
 
-/** Where lar-work is installed, for the build message: under the board app's install root, else the home. */
-const larWork = () => join(installHome(), '.agents/skills/lar-work');
+/** Where lar-build is installed, for the build message: under the board app's install root, else the home. */
+const larBuild = () => join(installHome(), '.agents/skills/lar-build');
 
 /** The repository project for an onboarded repository as the list is now, so a repository onboarded after a refusal starts on the next Start. */
 async function currentRepositoryProject(repo: string): Promise<RepositoryProject> {
@@ -317,7 +317,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       if (busy) return withBoard(409, { error: busy });
       const blocked = blockedReply(item);
       if (blocked) return blocked;
-      const message = buildMessage(item, larWork());
+      const message = buildMessage(item, larBuild());
       const previous = board.snapshot().startedBuilds?.[itemId];
       const retry = previous && Array.isArray(item.threads) && item.threads.some((t) => t.id === previous.threadId && t.state === 'stopped');
       const branch = `${buildBranch(item)}${retry ? `-retry-${randomUUID().slice(0, 8)}` : ''}`;

@@ -1,5 +1,5 @@
 // The factory's agent setup, which every onboarding PR writes: the `## Agent skills` block and the three docs/agents/
-// files it points at. The bundled to-tickets and code-review Copies read them to find the tracker and labels, so they
+// files it points at. The lar-shape and lar-build skills read them to find the tracker and labels, so they
 // replace Matt Pocock's setup wherever it is. They live here as text, so the bundled server ships them.
 
 import type { Provider } from '@lar-factory/shared';
@@ -11,6 +11,8 @@ export interface FileWrite {
 }
 
 export const AGENT_SKILLS_BLOCK = `## Agent skills
+
+Use \`lar-shape\` for shaping and decisions, and \`lar-build\` for builds.
 
 ### Issue tracker
 GitHub issues in this repository, moved through Lar Factory's board. See \`docs/agents/issue-tracker.md\`.
@@ -49,7 +51,7 @@ mention creates neither.
 Each item has one Status: List, Queued, Shaping, Needs you, Ready, In progress,
 Review, Verify, Ready to merge or Done. It lives as one
 \`status-<name>\` label on the issue, such as \`status-needs-you\`. Move an item
-with the \`lar-work\` skill's \`scripts/status.sh <issue-url> "<Status>"\`. Closing
+with the \`lar-shape\` skill's \`scripts/status.sh <issue-url> "<Status>"\`. Closing
 an issue makes it Done. State lives in Status alone, so assignees and other
 labels stay free of it.
 
@@ -58,8 +60,7 @@ labels stay free of it.
 Work too broad or unclear for one issue is a \`concept\` issue: a map whose
 native sub-issues are decisions (\`decision-grill\`, \`decision-prototype\`,
 \`decision-research\`, \`decision-task\`) and builds (\`build\`). A build becomes
-one PR, and its slices are its sub-issues. The \`lar-work\` skill runs this
-workflow; read it before shaping, slicing or building.
+one PR, and its slices are its sub-issues. Read \`lar-shape\` before shaping and \`lar-build\` before slicing or building.
 
 ## When a skill says "publish to the issue tracker"
 
@@ -75,14 +76,14 @@ const AZURE_ISSUE_TRACKER = `# Issue tracker: Azure DevOps
 Track work in Azure Boards work items.
 Lar Factory's board moves them through their Status.
 Use the local \`az\` login with the azure-devops extension.
-Read \`lar-work/issue-tracker.md\`'s Azure DevOps section before changing work items.
+Read \`lar-shape/issue-tracker/azure-devops.md\`'s Azure DevOps section before changing work items.
 
 ## Repository and project
 
 Take the organization, project and repository from the git origin.
 Decode the project name, including spaces.
 A work item URL ends in \`/_workitems/edit/<id>\`.
-The lar-work scripts accept the repository's origin URL or \`<org>/<project>/<repo>\`.
+The lar-shape scripts accept the repository's origin URL or \`<org>/<project>/<repo>\`.
 
 \`\`\`sh
 org=https://dev.azure.com/<org>
@@ -109,7 +110,7 @@ id=$(az boards work-item create --type "<requirement type>" --title "<title>" \\
 \`\`\`
 
 Tag it \`repo-<repo>\` and its kind.
-Use lar-work's Azure instructions to write Markdown descriptions and comments.
+Use lar-shape's Azure instructions to write Markdown descriptions and comments.
 
 ## Tags and relationships
 
@@ -123,10 +124,10 @@ az boards query --organization "$org" --project "$project" \\
   --wiql "SELECT [System.Id] FROM WorkItems WHERE [System.Tags] CONTAINS 'active'"
 \`\`\`
 
-Create a child Task with lar-work's \`scripts/slice.sh\`:
+Create a child Task with lar-shape's \`scripts/slice.sh\`:
 
 \`\`\`sh
-child_url=$(bash <lar-work>/scripts/slice.sh "$azure_repo" "$parent_url" "<title>" /path/to/brief.md)
+child_url=$(bash <lar-shape>/scripts/slice.sh "$azure_repo" "$parent_url" "<title>" /path/to/brief.md)
 \`\`\`
 
 Attach an existing child or mark its blocker:
@@ -140,12 +141,12 @@ Verify links with a read before retrying a write.
 
 ## Status and concepts
 
-Move an item with lar-work's \`scripts/status.sh <work-item-url> "<Status>"\`.
+Move an item with lar-shape's \`scripts/status.sh <work-item-url> "<Status>"\`.
 It keeps one \`status-<name>\` tag, such as \`status-needs-you\`.
 It moves Azure State when the Status category changes.
 A Completed-category State makes an item Done.
 Close work that will not proceed in its type's Removed-category State.
-Read lar-work's Azure instructions to find the process's State names.
+Read lar-shape's Azure instructions to find the process's State names.
 
 Tag broad work \`concept\`.
 Its decisions and builds are child Tasks with \`decision-*\` or \`build\` tags.
@@ -192,7 +193,7 @@ the part of the product an item touches.
 
 ## Matt Pocock's triage roles
 
-Skills such as \`triage\` and \`to-tickets\` name triage roles. Each maps to this:
+Bundled guidance in \`lar-shape\` and \`lar-build\` names triage roles. Each maps to this:
 
 | Role | In Lar Factory |
 | --- | --- |
@@ -200,12 +201,12 @@ Skills such as \`triage\` and \`to-tickets\` name triage roles. Each maps to thi
 | \`needs-info\` | Status Needs you, with a comment that says what is missing |
 | \`ready-for-agent\` | Unused: threads start from the board, so the item keeps its Status and gets no ${azure ? 'tag' : 'label'} |
 | \`ready-for-human\` | Status Needs you |
-| \`wontfix\` | ${azure ? "Close the work item in its type's Removed-category State. See lar-work's Azure instructions." : 'Close the issue as not planned: `gh issue close <number> --reason "not planned"`'} |
+| \`wontfix\` | ${azure ? "Close the work item in its type's Removed-category State. See lar-shape's Azure instructions." : 'Close the issue as not planned: `gh issue close <number> --reason "not planned"`'} |
 | \`bug\` | \`bug\` |
 | \`enhancement\` | \`feature\` or \`improvement\`: \`feature\` for new behaviour, \`improvement\` for better existing behaviour |
 
 Where a skill says to apply a state role, set the Status it maps to.
-${azure ? '\nRead all of `System.Tags` before changing tags. Each write replaces the whole string.\nUse the `retag` function in lar-work/issue-tracker.md to preserve other tags.\nLet `scripts/status.sh` own the `status-*` tags.\n' : ''}`;
+${azure ? '\nRead all of `System.Tags` before changing tags. Each write replaces the whole string.\nUse the `retag` function in lar-shape/issue-tracker/azure-devops.md to preserve other tags.\nLet `scripts/status.sh` own the `status-*` tags.\n' : ''}`;
 }
 
 const DOMAIN = `# Domain docs
@@ -222,8 +223,7 @@ Look at the repository root:
   glossary, and the root \`docs/adr/\` holds decisions that span contexts.
 
 A root \`CONTEXT.md\` or \`CONTEXT-MAP.md\` is the glossary or map under its old
-name. When none of these exist, proceed silently; the \`domain-modeling\` skill
-creates them when a term or decision settles.
+name. When none of these exist, proceed silently; \`lar-shape\` drafts them when a term or decision settles, and \`lar-build\` writes them in the build PR.
 
 ## Before shaping or building
 
@@ -234,7 +234,7 @@ the work touches, and the ADRs for the area you change.
 
 Write the glossary's terms in issue titles, briefs, test names and code, and
 reach past each term's _Avoid_ list to the term itself. A concept the glossary
-lacks is a sign the work coins a term: note it for \`domain-modeling\`.
+lacks is a sign the work coins a term: record it in the brief for \`lar-build\`.
 
 ## Flag ADR conflicts
 

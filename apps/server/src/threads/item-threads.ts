@@ -9,7 +9,7 @@ import type { ThreadRows, TurnRow } from '../t3/t3-db.ts';
 export type ItemThreadsReader = (repo: string, number: number) => ItemThread[];
 
 // `$lar-work <ref>` or `/lar-work <ref>` on any line, or a message starting `Build <ref>`.
-const WORK_REF = /(?:^|\s)[$/]lar-work ([\w.-]+\/[\w.-]+)#(\d+)/;
+const WORK_REF = /(?:^|\s)[$/]lar-(?:shape|work) ([\w.-]+\/[\w.-]+)#(\d+)/;
 const BUILD_REF = /^Build ([\w.-]+\/[\w.-]+)#(\d+)/;
 
 /** The issue a thread's first user message names first, as lowercase `owner/repo#n`. */

@@ -69,10 +69,10 @@ export function toolState(check: ToolCheck | undefined, login = false): Componen
 /** The commands Diagnostics › Tools lists, with what each does; az follows, as it goes unchecked while no listed repository needs it. */
 const DIAGNOSED: [Exclude<CheckedTool, 'az'>, string][] = [
   ['gh', 'Reads GitHub repository issues and linked pull requests.'],
-  ['t3', 'Starts the lar-work threads in T3 Code.'],
-  ['git', "lar-work's agents branch, commit and push with it."],
-  ['jq', "lar-work's scripts read gh's answers with it."],
-  ['curl', "lar-work's scripts tell the board to refresh with it."],
+  ['t3', 'Starts the lar-shape threads in T3 Code.'],
+  ['git', "lar-shape's agents branch, commit and push with it."],
+  ['jq', "lar-shape's scripts read gh's answers with it."],
+  ['curl', "lar-shape's scripts tell the board to refresh with it."],
 ];
 
 const custom = (render: () => ReactNode): Control => ({ type: 'custom', render });
@@ -274,7 +274,7 @@ export function pages(input: PagesInput): Page[] {
         { id: 't3-app', title: 'T3 Code', control: { type: 'unavailable' } },
         { id: 't3-stats', title: 'Read thread stats', control: { type: 'unavailable' } },
       ] },
-      { title: 'Start', description: 'What Start does when it opens a lar-work thread.', rows: [
+      { title: 'Start', description: 'What Start does when it opens a lar-shape thread.', rows: [
         { id: 'model', title: 'Default model', control: { type: 'unavailable' } },
         { id: 'workspace', title: 'Workspace', control: { type: 'unavailable' } },
         { id: 'base', title: 'Base branch', control: { type: 'unavailable' } },

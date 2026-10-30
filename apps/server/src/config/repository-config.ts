@@ -1,6 +1,6 @@
 // The board's configuration: the onboarded repositories and the board-wide settings, in files in boardDataDir(),
 // and each repository's Repository config, its .lar-factory.json read from its default branch.
-// skills/lar-work/scripts/repo-config.sh reads the same files, with the same shapes, defaults and wording.
+// skills/lar-shape/scripts/repo-config.sh reads the same files, with the same shapes, defaults and wording.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

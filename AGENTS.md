@@ -11,8 +11,9 @@ the flow and `docs/plan.md` for how it was set up.
   in the Copy's "Overridden in" column of `UPSTREAM.md`.
 - The board is a root pnpm workspace laid out like T3 Code's monorepo:
   `apps/server`, `apps/web`, `apps/desktop` (the Electron board app),
-  `packages/shared` and `packages/ui` (the design system). Apps import only
-  packages, never each other. Code sits in feature folders (`src/github/`,
+  `packages/shared`, `packages/ui` (the design system) and `packages/work-records`
+  (the work-record database and its `lar-work` command, which browser code never
+  imports). Apps import only packages, never each other. Code sits in feature folders (`src/github/`,
   `src/items/`) with no wrapper folders such as `services/`. File names are
   kebab-case, except Copies and code Ports, which keep their source's names. Skill-text Ports use kebab-case names for their lar step. Unit
   tests sit next to the file they test.
@@ -26,7 +27,7 @@ the flow and `docs/plan.md` for how it was set up.
   `git rebase -i --autosquash`. Agents push branches and open PRs, never `main`;
   The user merges every PR.
 - Board changes: run `pnpm test` in each of `apps/server`, `apps/web`,
-  `apps/desktop`, `packages/shared` and `packages/ui` that changed (`pnpm test` at
+  `apps/desktop`, `packages/shared`, `packages/ui` and `packages/work-records` that changed (`pnpm test` at
   the root runs them all), then `pnpm run typecheck` and `pnpm run knip` at the root.
   `pnpm run dev` at the root opens the board app's window.
 - Sample board: `BOARD_PORT=<port> pnpm run sample` in `apps/server`, on a port where

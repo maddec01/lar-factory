@@ -49,10 +49,11 @@ List → Queued → Shaping ⇄ Needs you → Ready → In progress → Review �
    to find holes in it.
 5. **In progress.** A new thread builds it in its own git worktree, test-first,
    from the brief alone.
-6. **Review.** Four reviewers run in parallel, each with fresh context: code,
-   security, UX and UI (browser preview or simulator). A fixed finding's
-   reviewer checks the fix in a next round, on the fix diff only, unless the
-   builder skips it with a reason; at most three rounds.
+6. **Review.** Reviewers run in parallel, each with fresh context. Code
+   always runs; the builder picks Security, UI (browser preview or simulator)
+   and Performance from what the diff touches. Review runs at most 2 rounds:
+   round 2 reruns only the reviewers with a fixed finding, on the fix diff,
+   and findings still open after it go in the PR body.
 7. **Verify or Ready to merge.** An approver opens the PR. Anything visible, risky
    (auth, migrations, deployment) or not fully checked goes to Verify with test
    steps; the rest goes to Ready to merge. The item stays in Review until the

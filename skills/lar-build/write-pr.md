@@ -1,13 +1,4 @@
----
-name: pr
-description: "Use when writing a PR body."
-metadata:
-  credits:
-    skill: show-me
-    author: Dex Horthy
-    organisation: Humanlayer
-    url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
----
+Ported from mattpocock/skills, `skills/engineering/pr/SKILL.md`. See [UPSTREAM.md](../../UPSTREAM.md) for the Ports record. Credit for the Summary visuals and placement guidance goes to Dex Horthy, Humanlayer, from `show-me`.
 
 Use this template for writing the PR body:
 

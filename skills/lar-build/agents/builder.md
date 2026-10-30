@@ -245,7 +245,7 @@ and restart **Checks**. If they say stop, set **Needs you** and go to
 
 Run once, last, after the final status is set and the PR is unwatched. Show the
 UI reviewer's and UI-check's screenshots with captions and absolute file
-paths, beside the PR link. Follow `<lar-build>/skills/retro/SKILL.md` for this
+paths, beside the PR link. Follow `<lar-build>/review-session.md` for this
 thread. End with the PR link, its status (Verify, Ready to merge or Needs you)
 and the complete numbered suggestion list in chat. Collect picks and any
 clarifications in chat per [Retro picks](../shared/questions.md#retro-picks).

@@ -25,13 +25,7 @@ Maintainer ports an upstream change or skips it.
 
 | Skill | Source | Path | Repository path | Commit | Date | Overridden in |
 | ----- | ------ | ---- | --------------- | ------ | ---- | ------------- |
-| `tdd` | mattpocock/skills | `skills/engineering/tdd` | `skills/lar-build/skills/tdd` | `5beb35b040e3` | 2026-10-19 |  |
 | `code-review` | mattpocock/skills | `skills/engineering/code-review` | `skills/lar-build/skills/code-review` | `5beb35b040e3` | 2026-10-19 |  |
-| `codebase-design` | mattpocock/skills | `skills/engineering/codebase-design` | `skills/lar-build/skills/codebase-design` | `5beb35b040e3` | 2026-10-19 |  |
-| `pr` | mattpocock/skills | `skills/engineering/pr` | `skills/lar-build/skills/pr` | `5beb35b040e3` | 2026-10-19 |  |
-| `retro` | mattpocock/skills | `skills/engineering/retro` | `skills/lar-build/skills/retro` | `5beb35b040e3` | 2026-10-19 |  |
-| `to-tickets` | mattpocock/skills | `skills/engineering/to-tickets` | `skills/lar-build/skills/to-tickets` | `5beb35b040e3` | 2026-10-19 | SKILL.md#4. Quiz the user (skills/lar-build/agents/planner.md); SKILL.md#5. Publish the tickets to the configured tracker (skills/lar-build/agents/planner.md); SKILL.md#Blocked by (skills/lar-build/agents/planner.md) |
-| `implement` | mattpocock/skills | `skills/engineering/implement` | `skills/lar-build/skills/implement` | `5beb35b040e3` | 2026-10-19 |  |
 | `security-and-hardening` | addyosmani/agent-skills | `skills/security-and-hardening` | `skills/lar-build/skills/security-and-hardening` | `aeac41d4d005` | 2026-10-13 |  |
 | `frontend-ui-engineering` | addyosmani/agent-skills | `skills/frontend-ui-engineering` | `skills/lar-build/skills/frontend-ui-engineering` | `aeac41d4d005` | 2026-10-13 |  |
 | `references/security-checklist.md` | addyosmani/agent-skills | `references/security-checklist.md` | `skills/lar-build/references/security-checklist.md` | `aeac41d4d005` | 2026-10-13 |  |
@@ -51,7 +45,6 @@ Maintainer ports an upstream change or skips it.
 | `skills/lar-build/agents/reviewer-security.md` | addyosmani/agent-skills | `skills/code-review-and-quality; skills/security-and-hardening` | skills/code-review-and-quality/SKILL.md#4. Security; skills/security-and-hardening/SKILL.md#Authentication and sessions; skills/security-and-hardening/SKILL.md#Rate limiting; skills/security-and-hardening/SKILL.md#Injection, XSS, and access control; skills/security-and-hardening/SKILL.md#Input validation and uploads; skills/security-and-hardening/SKILL.md#Destructive operations on derived paths; skills/security-and-hardening/SKILL.md#Secrets; skills/security-and-hardening/SKILL.md#Headers, CORS, and responses; skills/security-and-hardening/SKILL.md#Server-side fetches (SSRF); skills/security-and-hardening/SKILL.md#Dependencies and supply chain | `aeac41d4d005` | 2026-10-13 |
 | `skills/lar-build/agents/doubt.md` | addyosmani/agent-skills | `skills/doubt-driven-development` | skills/doubt-driven-development/SKILL.md#Step 3: DOUBT — Invoke the fresh-context reviewer | `aeac41d4d005` | 2026-10-13 |
 | `skills/lar-shape/agents/doubt.md` | addyosmani/agent-skills | `skills/doubt-driven-development` | skills/doubt-driven-development/SKILL.md#Step 3: DOUBT — Invoke the fresh-context reviewer | `aeac41d4d005` | 2026-10-13 |
-
 | `skills/lar-shape/grill.md` | mattpocock/skills | `skills/productivity/grilling` | skills/productivity/grilling/SKILL.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/lar-shape/prototype-logic.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/LOGIC.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/lar-shape/prototype-ui.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/UI.md | `5beb35b040e3` | 2026-10-19 |
@@ -64,6 +57,16 @@ Maintainer ports an upstream change or skips it.
 | `skills/lar-build/prototype-question.md` | mattpocock/skills | `skills/engineering/prototype` | skills/engineering/prototype/SKILL.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/lar-build/research-question.md` | mattpocock/skills | `skills/engineering/research` | skills/engineering/research/SKILL.md | `5beb35b040e3` | 2026-10-19 |
 | `skills/lar-build/diagnose-bug.md` | mattpocock/skills | `skills/engineering/diagnosing-bugs` | skills/engineering/diagnosing-bugs/SKILL.md#Redact; skills/engineering/diagnosing-bugs/SKILL.md#Phase 1: Build a feedback loop; skills/engineering/diagnosing-bugs/SKILL.md#Phase 2: Reproduce + minimise; skills/engineering/diagnosing-bugs/SKILL.md#Phase 3: Hypothesise; skills/engineering/diagnosing-bugs/SKILL.md#Phase 4: Instrument | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/plan-slices.md` | mattpocock/skills | `skills/engineering/to-tickets` | skills/engineering/to-tickets/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/implement-slice.md` | mattpocock/skills | `skills/engineering/implement` | skills/engineering/implement/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/test-first-mocking.md` | mattpocock/skills | `skills/engineering/tdd` | skills/engineering/tdd/mocking.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/test-first-tests.md` | mattpocock/skills | `skills/engineering/tdd` | skills/engineering/tdd/tests.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/test-first.md` | mattpocock/skills | `skills/engineering/tdd` | skills/engineering/tdd/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/compare-module-designs.md` | mattpocock/skills | `skills/engineering/codebase-design` | skills/engineering/codebase-design/DESIGN-IT-TWICE.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/design-modules.md` | mattpocock/skills | `skills/engineering/codebase-design` | skills/engineering/codebase-design/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/deepen-module.md` | mattpocock/skills | `skills/engineering/codebase-design` | skills/engineering/codebase-design/DEEPENING.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/write-pr.md` | mattpocock/skills | `skills/engineering/pr` | skills/engineering/pr/SKILL.md | `5beb35b040e3` | 2026-10-19 |
+| `skills/lar-build/review-session.md` | mattpocock/skills | `skills/engineering/retro` | skills/engineering/retro/SKILL.md | `5beb35b040e3` | 2026-10-19 |
 
 Full commits: mattpocock/skills `5beb35b040e3de97e54fa9e386d7e42d15c295c2`, addyosmani/agent-skills `aeac41d4d005999432bb7312f7ff06383a91d59d`, cursor/plugins `8b3326d99fd4b993cb33a24dad8af03175c642c5`.
 

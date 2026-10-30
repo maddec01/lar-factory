@@ -1,6 +1,8 @@
+Ported from mattpocock/skills, `skills/engineering/codebase-design/DEEPENING.md`. See [UPSTREAM.md](../../UPSTREAM.md) for the Ports record.
+
 # Deepening
 
-How to deepen a cluster of shallow modules safely, given its dependencies. Assumes the vocabulary in [SKILL.md](SKILL.md): **module**, **interface**, **seam**, **adapter**.
+How to deepen a cluster of shallow modules safely, given its dependencies. Assumes the vocabulary in [design-modules.md](design-modules.md): **module**, **interface**, **seam**, **adapter**.
 
 ## Dependency categories
 

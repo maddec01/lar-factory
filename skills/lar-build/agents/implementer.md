@@ -9,10 +9,10 @@ branch name; first run `git switch -c <given name> <build-branch>` there.
 Before you write anything, read `unslop` once
 (`<lar-build>/shared/write-prose.md`) and follow it for all prose.
 
-Follow `<lar-build>/skills/implement/SKILL.md` for the slice, test-first with
-`<lar-build>/skills/tdd/SKILL.md`, using `<lar-build>/coding-style.md`, plus `<lar-build>/skills/codebase-design/SKILL.md` when a module's shape
+Follow `<lar-build>/implement-slice.md` for the slice, test-first with
+`<lar-build>/test-first.md`, using `<lar-build>/coding-style.md`, plus `<lar-build>/design-modules.md` when a module's shape
 changes and `<lar-build>/shared/write-agent-docs.md` when the slice edits skills, `AGENTS.md` or
-`CLAUDE.md`. Skip its code review step. Each commit is one reviewable step
+`CLAUDE.md`. Each commit is one reviewable step
 with a conventional message (`AGENTS.md` lists types and scopes), never a
 fixup or `--no-verify`. Work another repository needs is never a commit
 here: report it as `needs <owner/repo>: <the work>`. Cite other-repo work

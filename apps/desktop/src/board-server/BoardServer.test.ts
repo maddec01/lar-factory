@@ -122,9 +122,23 @@ describe("start", () => {
   it.live("answers the server's skill check over its IPC channel", () =>
     Effect.gen(function* () {
       const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: "1" }), {
-        checkSkills: () => Promise.resolve("tdd is blocked"),
+        checkSkills: () => Promise.resolve({ refusal: "tdd is blocked" }),
       });
       assert.deepStrictEqual(yield* skillAnswer(board.url), { type: "skills-checked", id: 7, refusal: "tdd is blocked" });
+    }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
+  );
+
+  it.live("passes the server's Drift choice to the skill check and answers with the Drift it found", () =>
+    Effect.gen(function* () {
+      const choices: Array<string | undefined> = [];
+      const board = yield* BoardServer.start(fakeConfig({ FAKE_BOARD_CHECK: "1", FAKE_BOARD_DRIFT: "keep" }), {
+        checkSkills: (drift) => {
+          choices.push(drift);
+          return Promise.resolve({ refusal: "Replace or start anyway", drift: ["lar-build"] });
+        },
+      });
+      assert.deepStrictEqual(yield* skillAnswer(board.url), { type: "skills-checked", id: 7, refusal: "Replace or start anyway", drift: ["lar-build"] });
+      assert.deepStrictEqual(choices, ["keep"]);
     }).pipe(Effect.scoped, Effect.provide(NodeHttpClient.layerUndici)),
   );
 

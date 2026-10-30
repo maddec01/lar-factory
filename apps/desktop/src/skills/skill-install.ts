@@ -1,6 +1,6 @@
 // Installs the skills bundled in the app, with the engine in packages/shared/src/install-skills.ts. A packaged app
 // checks them at launch and before each Start build: it installs a new Release and reports Drift, which it leaves as
-// it is. A dev run does so only when started with INSTALL_FLAG. The launch installs into the fallback targets at
+// it is unless the User chooses Replace, or Replace and start before a build. A dev run does so only when started with INSTALL_FLAG. The launch installs into the fallback targets at
 // once, then into the Install targets of T3's provider instances once T3 answers; T3 can't unselect those. The
 // board's page can retry, replace Drift and tick a target. The main process runs every check and operation one at a
 // time, and keeps what they found for the page.
@@ -12,7 +12,9 @@ import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Semaphore from "effect/Semaphore";
 
-import { blockedBy, type InstallOperation, type InstallSnapshot } from "@lar-factory/shared";
+import {
+  blockedBy, type DriftChoice, type InstallOperation, type InstallSnapshot, type SkillCheckOutcome,
+} from "@lar-factory/shared";
 import {
   InstallError, installSkills, profileTargets, setTargetTick, type InstallResult, type OfferedTarget, type TickResult,
 } from "@lar-factory/shared/install-skills";
@@ -130,8 +132,11 @@ export interface Checks {
   readonly atLaunch: Check;
   /** Asks T3, then checks the targets it reports as `atLaunch` does; undefined when T3 doesn't answer. */
   readonly afterDiscovery: Effect.Effect<InstallResult | undefined, SkillInstallError>;
-  /** The check before each Start build, after asking T3 again, which leaves the conflicts dialog to the launch. */
-  readonly beforeBuild: Check;
+  /**
+   * The check before each Start build, after asking T3 again, which leaves the conflicts dialog to the launch. With
+   * `replace` it overwrites the Drift of every active target first, as Replace does.
+   */
+  readonly beforeBuild: (drift?: DriftChoice) => Check;
   /** The User's retry: asks T3 again, then checks, which tries each failed target again. */
   readonly retry: Check;
   /** The User's Replace: asks T3 again, then overwrites the Drift of every active target with this Release. */
@@ -188,7 +193,7 @@ export const makeChecks = (input: LaunchInput, discover: Discover): Effect.Effec
     return {
       atLaunch: check("launch", { recordWarning: true }),
       afterDiscovery: learn.pipe(Effect.flatMap((available) => available ? check("discovery", { recordWarning: true }) : Effect.succeed(undefined))),
-      beforeBuild: learn.pipe(Effect.andThen(check("build", { recordWarning: false }))),
+      beforeBuild: (drift) => learn.pipe(Effect.andThen(check("build", { recordWarning: false, replace: drift === "replace" }))),
       retry: learn.pipe(Effect.andThen(check("retry", { recordWarning: true }))),
       replace: learn.pipe(Effect.andThen(check("replace", { recordWarning: true, replace: true }))),
       tick: (path, ticked) => serial(Effect.suspend(() => {
@@ -228,24 +233,28 @@ const failures = (outcome: InstallResult) =>
   outcome.targets.flatMap(({ path, error }) => error ? [`${path}: ${error.message}`] : []);
 
 /**
- * Why Start build can't run after a check: a failed install, in any target, or a Clash, a path the app didn't install
- * that blocks a skill. Drift doesn't stop it: the build runs with the skills as they are.
+ * Why Start build can't run after a check: a failed install or replacement, in any target, or a Clash, a path the app
+ * didn't install that blocks a skill. Drift alone doesn't stop it here; buildAnswer asks the User about it.
  */
-export const buildRefusal = (outcome: InstallResult | SkillInstallError): string | null => {
-  if (outcome instanceof SkillInstallError) {
-    return `Lar Factory couldn't install its skills, so the build can't start: ${outcome.message}`;
-  }
+export const buildRefusal = (outcome: InstallResult | SkillInstallError, drift?: DriftChoice): string | null => {
+  const couldnt = drift === "replace" ? "couldn't replace its changed skills" : "couldn't install its skills";
+  if (outcome instanceof SkillInstallError) return `Lar Factory ${couldnt}, so the build can't start: ${outcome.message}`;
   const failed = failures(outcome);
-  if (failed.length > 0) return `Lar Factory couldn't install its skills, so the build can't start. ${failed.join(" ")}`;
+  if (failed.length > 0) return `Lar Factory ${couldnt}, so the build can't start. ${failed.join(" ")}`;
   if (outcome.blocked.length === 0) return null;
   const skills = outcome.blocked.map(({ skill, paths }) => `${skill} is ${blockedBy(paths).join("")}.`);
   const one = outcome.blocked.length === 1 && outcome.blocked[0]!.paths.length === 1;
   return `The build can't start while a skill is blocked. ${skills.join(" ")} Move ${one ? "that path" : "each path"} away, then start the build again.`;
 };
 
+/** The skill names in `list`, as one phrase: `a`, `a and b`, `a, b and c`. */
+const named = (list: ReadonlyArray<string>) =>
+  list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list.at(-1)}` : list.join("");
+
 /**
- * `outcome` without what `shown`, an earlier check's outcome the user already saw, reported: its Drift paths and the
- * failures of its targets.
+ * What the check before a Start build tells the board server, given the User's Drift choice. A failure or a Clash
+ * refuses the build. Drift asks for a choice until the User makes one: Start anyway (`keep`) starts with the skills
+ * as they are, and Drift left after Replace and start refuses it.
  */
 export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: DriftChoice): SkillCheckOutcome => {
   const refusal = buildRefusal(outcome, drift);
@@ -257,5 +266,52 @@ export const buildAnswer = (outcome: InstallResult | SkillInstallError, drift?: 
   return {
     refusal: `${named(skills)} changed since Lar Factory installed ${skills.length > 1 ? "them" : "it"}. Replace and start, or start anyway.`,
     drift: skills,
+  };
+};
+
+/** `outcome` without the failures of its targets that `shown`, an earlier check's outcome the user already saw, reported. */
+export const unshown = (outcome: InstallResult, shown: InstallResult | SkillInstallError): InstallResult => {
+  if (shown instanceof SkillInstallError) return outcome;
+  const failed = new Set(failures(shown));
+  return {
+    ...outcome,
+    targets: outcome.targets.map(({ error, ...target }) =>
+      error && !failed.has(`${target.path}: ${error.message}`) ? { ...target, error } : target),
+  };
+};
+
+/** A message box for the user. */
+export interface Notice {
+  readonly type: "warning" | "error";
+  readonly message: string;
+  readonly detail: string;
+}
+
+/**
+ * What to tell the user after an install: nothing, its error or the targets it failed in, or a warning that names its
+ * Clashes, on the first launch of a version. The board's page reports Drift, with its Replace.
+ */
+export const notice = (outcome: InstallResult | SkillInstallError): Notice | undefined => {
+  if (!(outcome instanceof SkillInstallError) && failures(outcome).length > 0) {
+    return {
+      type: "error",
+      message: "Lar Factory couldn't install its skills everywhere",
+      detail: `${failures(outcome).join("\n")}\n\nThe other folders are installed. The next Start build or launch tries these again.`,
+    };
+  }
+  if (outcome instanceof SkillInstallError) {
+    return {
+      type: "error",
+      message: "Lar Factory couldn't install its skills",
+      detail: outcome.changed
+        ? `${outcome.message}\n\nThe install stopped partway, so some skills may be the new version and some the old. The next Start build or launch tries again.`
+        : `${outcome.message}\n\nThe previous skills are still in place. The next Start build or launch tries again.`,
+    };
+  }
+  if (!outcome.warn) return undefined;
+  return {
+    type: "warning",
+    message: "Lar Factory left some skills alone",
+    detail: `These folders have a bundled skill's name but Lar Factory didn't install them, so it didn't overwrite them:\n\n${outcome.conflicts.join("\n")}`,
   };
 };

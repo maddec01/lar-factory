@@ -115,7 +115,7 @@ describe("snapshot", () => {
       const { checks, board } = yield* launch(home);
       yield* checks.atLaunch;
       NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
-      yield* checks.beforeBuild;
+      yield* checks.beforeBuild();
 
       const snapshot = board.snapshot();
       assert.deepStrictEqual(target(snapshot, "~/.agents/skills")?.skills, [{ name: "lar-work", state: "drift" }]);

@@ -29,7 +29,7 @@ interface DriftState {
 }
 
 /** The store's part of a snapshot. */
-const fromSnapshot = (snapshot: InstallSnapshot) => ({
+const fromSnapshot = (snapshot: InstallSnapshot): Pick<DriftState, 'skills' | 'blocked' | 'failures'> => ({
   skills: [...new Set(snapshot.drift.map(({ skill }) => skill))],
   blocked: snapshot.blocked,
   failures: [
@@ -43,12 +43,14 @@ const failure = (error: unknown) => (error instanceof Error ? error.message : St
 export const useDriftStore = create<DriftState>()((set, get) => {
   /** Runs one of the app's operations while `busy` is set, keeping the snapshot it answers with and its error in `error`. */
   const operate = async (busy: 'replacing' | 'retrying', error: 'error' | 'retryError', call: () => Promise<InstallOperationResult>) => {
-    if (get()[busy]) return;
+    const snapshot = useInstallStore.getState().snapshot;
+    if (!snapshot?.installs || snapshot.running || get().replacing || get().retrying) return;
     set({ [busy]: true, [error]: null });
     try {
       const result = await call();
       useInstallStore.getState().accept(result.snapshot);
-      set({ [error]: result.error ?? null });
+      const failures = fromSnapshot(result.snapshot).failures.map(({ path, reason }) => `${path ? `${path}: ` : ''}${reason}`);
+      set({ [error]: result.error ?? (failures.length ? failures.join('; ') : null) });
     } catch (cause) {
       set({ [error]: failure(cause) });
     } finally {

@@ -90,3 +90,17 @@ test('a page outside the board app shows no Drift warning', async () => {
   await settle();
   expect(warning()).toBeNull();
 });
+
+test('a failed target replacement keeps Drift actionable and names the failure without a command error', async () => {
+  const failed: InstallSnapshot = { ...drifted(['lar-build']), targets: [{
+    kind: 'agents', path: '~/.agents/skills', paths: ['~/.agents/skills'], locked: true, active: true, finished: false,
+    instances: [], skills: [{ name: 'lar-build', state: 'failed' }], error: 'EACCES: copy denied',
+  }] };
+  stubInstall(drifted(['lar-build']), async () => ({ snapshot: failed }));
+  await mountPage(sample);
+  await settle();
+  await settle(() => replaceButton().click());
+  expect(text(warning()!.querySelector('[role="alert"]'))).toContain('EACCES: copy denied');
+  expect(replaceButton().disabled).toBe(false);
+  expect($$('[data-warning="drift"]')).toHaveLength(1);
+});

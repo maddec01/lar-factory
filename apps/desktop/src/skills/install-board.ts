@@ -71,7 +71,7 @@ interface Described {
 const describe = (input: BoardInput, state: CheckState, installs: boolean): Described => {
   const { home } = input;
   const tilde = (path: string) => inHome(path, home);
-  const outcome: InstallResult | undefined = state.outcome instanceof SkillInstallError ? undefined : state.outcome;
+  const outcome: InstallResult | undefined = state.outcome instanceof SkillInstallError ? state.lastResult : state.outcome;
   const shownPaths = (list: ReadonlyArray<SkillPaths>) =>
     list.map(({ skill, paths }) => ({ skill, paths: paths.map((at) => ({ ...at, path: tilde(at.path) })) }));
   const at = (list: ReadonlyArray<SkillPaths>, skill: string, folders: ReadonlyArray<string>) =>

@@ -362,7 +362,7 @@ A lar rule, written in the lar file that loads a Copy, that sets aside part of t
 _Avoid_: patch, tweak, local change
 
 **Port**:
-A file adapted from upstream code or skill text that names its source and commit at the top; we edit it freely.
+A file adapted from upstream code or skill text that names its source at the top and follows upstream up to the commit it was last reviewed against; we edit it freely.
 _Avoid_: copy, vendored file
 
 ### Skills

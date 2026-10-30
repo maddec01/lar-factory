@@ -127,6 +127,32 @@ test('a new entry scrolls into view without taking keyboard focus', async () => 
   expect(document.activeElement).toBe($('.add-item'));
 });
 
+test('the newest entry stays in view when the stack resizes, until the User scrolls away', async () => {
+  const resized = new Set<() => void>();
+  vi.stubGlobal('ResizeObserver', class {
+    fn: () => void;
+    constructor(fn: () => void) { this.fn = fn; }
+    observe() { resized.add(this.fn); }
+    disconnect() { resized.delete(this.fn); }
+  });
+  await mountPage();
+  const { showToast } = await import('./toasts.tsx');
+  await settle(() => showToast({ slot: 'first', what: 'First', body: 'First' }));
+  const viewport = $('[data-slot="toaster"]')!;
+  // jsdom has no layout; stand in for a window that shrank under a full stack.
+  Object.defineProperty(viewport, 'scrollHeight', { value: 1_000 });
+  Object.defineProperty(viewport, 'clientHeight', { value: 400 });
+  viewport.scrollTop = 0;
+  await settle(() => resized.forEach((fn) => fn()));
+  expect(viewport.scrollTop).toBe(1_000);
+  viewport.scrollTop = 50;
+  viewport.dispatchEvent(new Event('scroll'));
+  await settle(() => resized.forEach((fn) => fn()));
+  expect(viewport.scrollTop, 'the User scrolled away').toBe(50);
+  await settle(() => showToast({ slot: 'second', what: 'Second', body: 'Second' }));
+  expect(viewport.scrollTop, 'a new entry leaves the User where they are').toBe(50);
+});
+
 test.each(['expires', 'is dismissed'])('reading an older warning keeps its scroll position when the newest toast %s', async (removal) => {
   await mountPage({ ...sample, tools: toolChecks({ gh: { result: 'missing', fix: 'brew install gh' } }) });
   const { showToast } = await import('./toasts.tsx');
@@ -277,7 +303,7 @@ test('a build start announces the outcome and links the thread without printing 
   expect(toast()!.querySelector('a')!.getAttribute('href')).toBe('t3code://threads/sample-environment/raw-thread-id');
 });
 
-test('notifications sit in a bounded, scrollable stack with a gap from the bottom-right corner', async () => {
+test('notifications sit above every dialog, in a stack as far from the bottom edge as the right, no taller than the window under the title bar', async () => {
   await mountPage();
   addStylesheet();
   await notify({ verb: 'Moved', item: sample.items[0]!, to: 'Queued' });
@@ -286,11 +312,17 @@ test('notifications sit in a bounded, scrollable stack with a gap from the botto
   expect(viewport.classList.contains('right-0')).toBe(true);
   expect(viewport.classList.contains('top-0')).toBe(false);
   const style = getComputedStyle(viewport);
-  expect(style.bottom).toBe('calc(var(--spacing) * 16)');
-  expect(style.right).toBe('calc(var(--spacing) * 4)');
+  expect(style.bottom).toBe('var(--notice-edge)');
+  expect(style.right).toBe('var(--notice-edge)');
+  expect(style.zIndex).toBe('100');
   expect(style.width).toBe('min(calc(var(--spacing) * 104), calc(100vw - var(--spacing) * 8))');
-  expect(style.maxHeight).toBe('min(60vh, calc(100dvh - var(--spacing) * 20))');
+  expect(style.maxHeight).toBe('calc(100dvh - var(--spacing) * 13 - var(--notice-edge) * 2)');
   expect(style.overflowY).toBe('auto');
   expect(style.flexDirection).toBe('column');
   expect(style.pointerEvents).toBe('auto');
+  // Notices scrolled past fade at the stack's edges, as a Modal's body does, and none is cropped. The fade sits on
+  // each notice, not the stack, so the stack doesn't cut the notices' backdrop blur off from the board.
+  expect(style.getPropertyValue('mask-image')).toBe('none');
+  expect(getComputedStyle(toast()!).getPropertyValue('mask-image')).toContain('var(--fade-top');
+  expect(getComputedStyle(toast()!).flexShrink).toBe('0');
 });

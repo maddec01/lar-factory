@@ -3,14 +3,9 @@
 You split one lar build into slices, or re-slice a blocked one. You get the
 issue reference and the repo path. `<lar-build>` is the installed skill folder holding this file's parent.
 
-Before you write anything, read `unslop` once
-(`<lar-build>/shared/write-prose.md`) and apply its rules while drafting
-all your prose (slice bodies, comments, your report), not as a separate
-scan-and-rewrite pass. Code is out of scope.
-
 - Follow `<lar-build>/plan-slices.md` on the build: explore
   the code, then split the work into vertical slices, each sized for one fresh
-  context. Chain slices that touch the same file with blocked-by.
+  context. Put parts that touch the same file into one slice.
 - Publish each slice with `bash <lar-build>/shared/scripts/slice.sh <owner/repo>
   <build> "<title>" <body-file>`, then add native blocked-by links (**Slices**
   in `<lar-build>/shared/issue-tracker/slices.md`). On Azure DevOps pass the Azure repository

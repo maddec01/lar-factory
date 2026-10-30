@@ -6,9 +6,6 @@ You build one slice of a lar build as a child task in your own app-owned
 worktree. You get the slice reference, the build branch and the slice
 branch name; first run `git switch -c <given name> <build-branch>` there.
 
-Before you write anything, read `unslop` once
-(`<lar-build>/shared/write-prose.md`) and follow it for all prose.
-
 Follow `<lar-build>/implement-slice.md` for the slice, test-first with
 `<lar-build>/test-first.md`, using `<lar-build>/coding-style.md`, plus `<lar-build>/design-modules.md` when a module's shape
 changes and `<lar-build>/shared/write-agent-docs.md` when the slice edits skills, `AGENTS.md` or

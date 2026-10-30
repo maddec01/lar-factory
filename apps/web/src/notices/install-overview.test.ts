@@ -17,13 +17,23 @@ const installing: InstallSnapshot = {
 const tray = () => $('[data-install-overview]');
 const toggle = () => tray()!.querySelector<HTMLButtonElement>('[aria-expanded]')!;
 function stubInstall(snapshot: InstallSnapshot) {
+  snapshot = { ...snapshot, revision: snapshot.revision ?? 1, overview: snapshot.overview ?? 'open' };
   let push: (next: InstallSnapshot) => void = () => {};
   const app = stubApp({
     boardReady: vi.fn(async () => {}),
     getInstallState: vi.fn(async () => snapshot),
+    closeInstallOverview: vi.fn(async (overview, revision) => {
+      expect(revision).toBe(snapshot.revision);
+      snapshot = { ...snapshot, overview, revision: snapshot.revision! + 1 };
+      push(snapshot);
+      return snapshot;
+    }),
     onInstallState: vi.fn((listener) => { push = listener; return () => {}; }),
   });
-  return { app, push: (next: InstallSnapshot) => settle(() => push(next)) };
+  return { app, push: (next: InstallSnapshot) => settle(() => {
+    snapshot = { ...next, revision: next.revision ?? snapshot.revision! + 1, overview: next.overview ?? snapshot.overview };
+    push(snapshot);
+  }) };
 }
 
 test('the overview starts collapsed, labels one progress bar per shared target, and follows work in both states', async () => {
@@ -246,4 +256,69 @@ test('late work cancels the success timer and progress updates preserve one expa
   await bridge.push({ ...late, running: null, targets: [...succeeded.targets, { ...succeeded.targets[0]!, path: '~/late/skills', paths: ['~/late/skills'] }] });
   await settle(() => vi.advanceTimersByTime(100));
   expect(tray()).toBeNull();
+});
+
+test.each(['automatic', 'dismissed'] as const)('a reopened page recovers %s closure and follows the desktop decision for late work', async (overview) => {
+  const bridge = stubInstall({ ...succeeded, overview });
+  await mountPage(sample);
+  expect(tray()).toBeNull();
+  await bridge.push({ ...installing, overview: overview === 'automatic' ? 'open' : 'dismissed', running: 'discovery',
+    targets: [...succeeded.targets, { ...target, path: '~/late/skills', paths: ['~/late/skills'] }] });
+  expect(!!tray()).toBe(overview === 'automatic');
+  expect(bridge.app.getInstallState).toHaveBeenCalledOnce();
+  expect(bridge.app.boardReady).not.toHaveBeenCalled();
+});
+
+test.each(['automatic', 'dismissed'] as const)('%s closure stays closed across reload, with Settings results and the correct late-discovery behavior', async (reason) => {
+  const bridge = stubInstall(reason === 'automatic' ? succeeded : installing);
+  await mountPage(sample);
+  if (reason === 'automatic') await settle(() => vi.advanceTimersByTime(5_000));
+  else await settle(() => tray()!.querySelector<HTMLButtonElement>('.dismiss')!.click());
+  expect(tray()).toBeNull();
+  expect(bridge.app.closeInstallOverview).toHaveBeenCalledWith(reason, 1);
+  const { useInstallStore } = await import('../settings/install-store.ts');
+  expect(useInstallStore.getState().snapshot?.targets).toEqual(reason === 'automatic' ? succeeded.targets : installing.targets);
+
+  vi.resetModules();
+  await mountPage(sample);
+  expect(tray()).toBeNull();
+  expect(bridge.app.getInstallState).toHaveBeenCalledTimes(2);
+  await settle(() => $<HTMLButtonElement>('.open-settings')!.click());
+  await settle(() => $$<HTMLButtonElement>('.settings-nav button').find((button) => text(button) === 'Skills')!.click());
+  expect(text($('.settings-body'))).toContain('~/.agents/skills');
+  await bridge.push({ ...installing, overview: reason === 'automatic' ? 'open' : 'dismissed', running: 'discovery',
+    targets: [...succeeded.targets, { ...target, path: '~/late/skills', paths: ['~/late/skills'] }] });
+  expect(!!tray()).toBe(reason === 'automatic');
+  expect(bridge.app.closeInstallOverview).toHaveBeenCalledOnce();
+  expect(bridge.app.boardReady).not.toHaveBeenCalled();
+});
+
+test('a pending desktop dismissal stays hidden through progress pushes until acknowledgement', async () => {
+  const bridge = stubInstall(installing);
+  let acknowledge!: (snapshot: InstallSnapshot) => void;
+  bridge.app.closeInstallOverview.mockImplementationOnce(() => new Promise((resolve) => { acknowledge = resolve; }));
+  await mountPage(sample);
+  await settle(() => tray()!.querySelector<HTMLButtonElement>('.dismiss')!.click());
+  expect(tray()).toBeNull();
+  await bridge.push({ ...installing, overview: 'open' });
+  expect(tray()).toBeNull();
+  await settle(() => acknowledge({ ...installing, revision: 3, overview: 'dismissed' }));
+  expect(tray()).toBeNull();
+  const { useInstallStore } = await import('../settings/install-store.ts');
+  expect(useInstallStore.getState().snapshot?.overview).toBe('dismissed');
+});
+
+test('late work pushed before an automatic-close acknowledgement wins over its older reply', async () => {
+  const bridge = stubInstall(succeeded);
+  let acknowledge!: (snapshot: InstallSnapshot) => void;
+  bridge.app.closeInstallOverview.mockImplementationOnce(() => new Promise((resolve) => { acknowledge = resolve; }));
+  await mountPage(sample);
+  await settle(() => vi.advanceTimersByTime(5_000));
+  await bridge.push({ ...installing, overview: 'open', revision: 3, running: 'discovery',
+    targets: [...succeeded.targets, { ...target, path: '~/late/skills', paths: ['~/late/skills'] }] });
+  await settle(() => acknowledge({ ...succeeded, overview: 'automatic', revision: 2 }));
+  expect(tray()).not.toBeNull();
+  expect(tray()!.querySelectorAll('[role="progressbar"]')).toHaveLength(2);
+  await settle(() => vi.advanceTimersByTime(60_000));
+  expect(tray()).not.toBeNull();
 });

@@ -1,7 +1,7 @@
 // Variant B's corner tray, in the page's existing notification stack. Only actual install work opens it.
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import type { InstallSnapshot } from '@lar-factory/shared';
+import { installOverviewTargets, installOverviewSucceeded, type InstallSnapshot } from '@lar-factory/shared';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
 import { IconButton } from '@lar-factory/ui/design-system/IconButton';
 import { Progress } from '@lar-factory/ui/progress';
@@ -17,20 +17,21 @@ export const hasInstallWork = (snapshot: InstallSnapshot | null): boolean =>
 export function InstallOverview() {
   const snapshot = useInstallStore((state) => state.snapshot);
   const follow = useInstallStore((state) => state.follow);
-  const [dismissed, setDismissed] = useState(false);
-  const visible = hasInstallWork(snapshot) && !dismissed;
+  const closing = useInstallStore((state) => state.closingOverview);
+  const visible = !closing && hasInstallWork(snapshot) && (!snapshot?.overview || snapshot.overview === 'open');
   useEffect(follow, [follow]);
   useEffect(() => {
     if (!visible) return;
     const id = toast.create({ color: 'neutral', duration: 0, closable: false,
-      description: <OverviewBody onClose={() => setDismissed(true)} /> });
+      description: <OverviewBody /> });
     return () => toast.dismiss(id);
   }, [visible]);
   return null;
 }
 
-function OverviewBody({ onClose }: { onClose: () => void }) {
+function OverviewBody() {
   const snapshot = useInstallStore((state) => state.snapshot)!;
+  const closeOverview = useInstallStore((state) => state.closeOverview);
   const [expanded, setExpanded] = useState(false);
   const details = useId();
   const ref = useRef<HTMLDivElement>(null);
@@ -40,17 +41,16 @@ function OverviewBody({ onClose }: { onClose: () => void }) {
     entry?.setAttribute('aria-live', 'off');
     entry?.setAttribute('aria-atomic', 'false');
   }, []);
-  const targets = snapshot.targets.filter(({ active, homeMissing, operation, error }) => active || homeMissing || operation === 'install' || operation === 'replace' || error);
+  const targets = installOverviewTargets(snapshot);
   const running = targets.some((target) => target.running && target.operation !== 'check');
-  const failed = !!snapshot.error || !!snapshot.blocked.length || targets.some(({ error, skills }) => error || skills.some(({ state }) => state === 'failed' || state === 'blocked'));
-  const succeeded = !snapshot.running && !failed && targets.length > 0 && targets.every(({ finished, homeMissing, running }) => finished && !homeMissing && !running);
-  useSuccessClose(ref, succeeded, onClose);
+  const failed = !!snapshot.error || !!snapshot.blocked.length || !!snapshot.conflicts.length || targets.some(({ error, skills }) => error || skills.some(({ state }) => state === 'failed' || state === 'blocked'));
+  useSuccessClose(ref, installOverviewSucceeded(snapshot), () => closeKeepingFocus(ref.current?.closest('[data-slot="toast"]') ?? null, () => closeOverview('automatic')));
   const completed = targets.filter(({ finished, homeMissing, error }) => finished && !homeMissing && !error).length;
   const title = running ? `Installing Release ${snapshot.version}'s skills` : failed ? 'Installation needs attention'
     : completed === targets.length ? `Release ${snapshot.version}'s skills are installed` : 'Installation incomplete';
   return <div ref={ref} data-install-overview className="grid gap-3" aria-live="off">
     <div>
-      <DismissButton what=": install overview" onClick={(event) => closeKeepingFocus(event.currentTarget.closest('[data-slot="toast"]'), onClose)} />
+      <DismissButton what=": install overview" onClick={(event) => closeKeepingFocus(event.currentTarget.closest('[data-slot="toast"]'), () => closeOverview('dismissed'))} />
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1" role="status" aria-live="polite" aria-atomic="true">
           <div className="font-semibold">{title}</div>

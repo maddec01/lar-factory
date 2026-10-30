@@ -50,7 +50,12 @@ export interface TargetSnapshot {
   error?: string;
 }
 
+/** How the install overview closed in this app launch. */
+export type InstallOverviewClosure = 'automatic' | 'dismissed';
+
 export interface InstallSnapshot {
+  /** Presentation only, retained by the desktop process until the app quits. */
+  overview?: 'open' | InstallOverviewClosure;
   /** Monotonic within one app launch, so a delayed read or command cannot overwrite a newer push. */
   revision?: number;
   /** False when this run installs nothing, a dev run without `--install-skills`; every operation is then refused. */
@@ -82,3 +87,15 @@ export interface InstallOperationResult {
   conflicts?: string[];
   removed?: TickResult['removed'];
 }
+
+/** Targets shown in the overview, including retained work and unavailable selected homes. */
+export const installOverviewTargets = (snapshot: InstallSnapshot): TargetSnapshot[] =>
+  snapshot.targets.filter(({ active, homeMissing, operation, error }) => active || homeMissing || operation === 'install' || operation === 'replace' || error);
+
+/** Every current target succeeded, with no running operation, global error or Clash. */
+export const installOverviewSucceeded = (snapshot: InstallSnapshot): boolean => {
+  const targets = installOverviewTargets(snapshot);
+  return !snapshot.running && !snapshot.error && !snapshot.blocked.length && !snapshot.conflicts.length && targets.length > 0
+    && targets.every(({ finished, homeMissing, running, error, skills }) => finished && !homeMissing && !running && !error
+      && skills.every(({ state }) => state === 'installed'));
+};

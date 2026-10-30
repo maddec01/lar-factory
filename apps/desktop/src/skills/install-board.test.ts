@@ -294,3 +294,87 @@ describe("retained install work", () => {
       assert.strictEqual(target(snapshot, "~/.agents/skills")?.finished, true);
     }));
 });
+
+it.effect("recovers automatic closure on reconnect and reopens only for new target work", () =>
+  Effect.gen(function* () {
+    const home = makeHome();
+    let answer: InstanceDiscovery = notRunning;
+    const { checks, board } = yield* launch(home, () => answer);
+    yield* checks.atLaunch;
+    const completed = board.snapshot();
+    const sent: InstallSnapshot[] = [];
+    const stop = board.subscribe((snapshot) => sent.push(snapshot));
+    const closed = board.closeOverview("automatic", completed.revision);
+    assert.strictEqual(closed.overview, "automatic");
+    assert.isAbove(closed.revision!, completed.revision!);
+    stop();
+    assert.deepStrictEqual(sent.at(-1), closed);
+    assert.deepStrictEqual(board.snapshot(), closed);
+
+    answer = { available: true, instances: [true, false].map((enabled, index) => ({
+      id: `reader-${index}`, driver: "codex", displayName: `Reader ${index}`, enabled,
+      targets: [{ kind: "agents", path: NodePath.join(home, ".agents/skills") }],
+    })) };
+    yield* checks.afterDiscovery;
+    assert.strictEqual(board.snapshot().overview, "automatic");
+    assert.strictEqual(board.snapshot().targets.filter(({ path }) => path === "~/.agents/skills").length, 1);
+
+    const path = NodePath.join(home, "late/skills");
+    answer = { available: true, instances: [{ id: "late", driver: "antigravity", displayName: "Late", enabled: true,
+      targets: [{ kind: "antigravity", path }] }] };
+    const late: InstallSnapshot[] = [];
+    const reconnect = board.subscribe((snapshot) => late.push(snapshot));
+    yield* checks.afterDiscovery;
+    reconnect();
+    assert.isTrue(late.some((snapshot) => snapshot.overview === "open" && target(snapshot, "~/late/skills")?.running));
+    assert.strictEqual(board.snapshot().overview, "open");
+    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.skills, target(completed, "~/.agents/skills")?.skills);
+    assert.strictEqual(board.closeOverview("automatic", closed.revision).overview, "open");
+    assert.strictEqual(board.closeOverview("automatic", board.snapshot().revision).overview, "automatic");
+  }));
+
+it.effect("dismissal survives disconnection, late failure and Retry for the rest of the launch", () =>
+  Effect.gen(function* () {
+    const home = makeHome();
+    let answer: InstanceDiscovery = notRunning;
+    const { checks, board } = yield* launch(home, () => answer);
+    const during: InstallSnapshot[] = [];
+    const stop = board.subscribe((snapshot) => {
+      during.push(snapshot);
+      if (snapshot.overview === "open" && snapshot.targets.some(({ running }) => running)) board.closeOverview("dismissed", snapshot.revision);
+    });
+    yield* checks.atLaunch;
+    stop();
+    assert.isTrue(during.some((snapshot) => snapshot.overview === "dismissed" && snapshot.running === "launch"));
+    assert.strictEqual(board.snapshot().overview, "dismissed");
+    assert.isTrue(target(board.snapshot(), "~/.agents/skills")?.finished);
+    NodeFS.writeFileSync(NodePath.join(home, "late"), "blocks the target");
+    answer = { available: true, instances: [{ id: "late", driver: "antigravity", displayName: "Late", enabled: true,
+      targets: [{ kind: "antigravity", path: NodePath.join(home, "late/skills") }] }] };
+    yield* checks.afterDiscovery;
+    assert.strictEqual(board.snapshot().overview, "dismissed");
+    assert.isString(target(board.snapshot(), "~/late/skills")?.error);
+    const reconnected: InstallSnapshot[] = [];
+    const reconnect = board.subscribe((snapshot) => reconnected.push(snapshot));
+    NodeFS.rmSync(NodePath.join(home, "late"));
+    yield* checks.retry;
+    reconnect();
+    assert.isTrue(reconnected.every(({ overview }) => overview === "dismissed"));
+    assert.isTrue(target(board.snapshot(), "~/late/skills")?.finished);
+    assert.strictEqual(board.closeOverview("automatic", board.snapshot().revision).overview, "dismissed");
+    const nextLaunch = yield* launch(home, () => answer);
+    assert.strictEqual(nextLaunch.board.snapshot().overview, "open");
+  }));
+
+it.effect("rejects invalid and premature automatic closure without changing installation", () =>
+  Effect.gen(function* () {
+    const home = makeHome();
+    NodeFS.mkdirSync(NodePath.join(home, ".agents/skills/lar-work"), { recursive: true });
+    const { checks, board } = yield* launch(home);
+    assert.throws(() => board.closeOverview("open", 0));
+    assert.strictEqual(board.closeOverview("automatic", board.snapshot().revision).overview, "open");
+    yield* checks.atLaunch;
+    const blocked = board.snapshot();
+    assert.isNotEmpty(blocked.blocked);
+    assert.deepStrictEqual(board.closeOverview("automatic", blocked.revision), blocked);
+  }));

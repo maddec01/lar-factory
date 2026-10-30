@@ -173,6 +173,7 @@ export function stubApp<T extends Partial<BoardAppBridge>>(parts: T): BoardAppBr
     boardReady: unused,
     getInstallState: unused,
     onInstallState: () => () => {},
+    closeInstallOverview: unused,
     retryInstall: unused,
     replaceDrift: unused,
     setTargetTick: unused,

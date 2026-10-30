@@ -8,7 +8,7 @@ import * as NodePath from "node:path";
 
 import * as Effect from "effect/Effect";
 
-import type { InstallOperationResult, InstallSnapshot, TargetSkillState, TargetSnapshot } from "@lar-factory/shared";
+import { installOverviewSucceeded, type InstallOperationResult, type InstallSnapshot, type TargetSkillState, type TargetSnapshot } from "@lar-factory/shared";
 import { describeTargets, profileTargets, type InstallResult, type SkillPaths } from "@lar-factory/shared/install-skills";
 
 import { offlineTargets, SkillInstallError, type Checks, type CheckState } from "./skill-install.ts";
@@ -133,6 +133,8 @@ export interface InstallBoard {
   readonly snapshot: () => InstallSnapshot;
   /** Calls `listener` with each new snapshot; the returned function stops it. */
   readonly subscribe: (listener: (snapshot: InstallSnapshot) => void) => () => void;
+  /** Records presentation only. An automatic close must name the current successful snapshot's revision. */
+  readonly closeOverview: (reason: unknown, revision: unknown) => InstallSnapshot;
   readonly retry: () => Promise<InstallOperationResult>;
   readonly replace: () => Promise<InstallOperationResult>;
   /** Ticks or unticks the target the snapshot shows at `path`; anything else is refused. */
@@ -147,7 +149,26 @@ const NOT_INSTALLING = `This run of Lar Factory doesn't install skills. Start it
  */
 export const makeInstallBoard = (input: BoardInput, checks: Checks | undefined): InstallBoard => {
   const look = () => describe(input, checks?.state() ?? readOnlyState(input.home), checks !== undefined);
-  const read = () => look().snapshot;
+  const listeners = new Set<(snapshot: InstallSnapshot) => void>();
+  let overview: NonNullable<InstallSnapshot["overview"]> = "open";
+  let presentationRevision = 0;
+  // These paths identify the work visible at automatic closure. They carry no install ownership or results.
+  let closedTargets: string[][] = [];
+  const read = (): InstallSnapshot => {
+    const snapshot = look().snapshot;
+    const addedWork = snapshot.targets.some(({ operation, paths }) => (operation === "install" || operation === "replace")
+      && !closedTargets.some((previous) => paths.some((path) => previous.includes(path))));
+    if (overview === "automatic" && addedWork) {
+      overview = "open";
+      presentationRevision++;
+    }
+    return { ...snapshot, revision: (snapshot.revision ?? 0) + presentationRevision, overview };
+  };
+  const publish = () => {
+    const snapshot = read();
+    for (const listener of listeners) listener(snapshot);
+  };
+  checks?.subscribe(publish);
   const answer = <A>(operation: Effect.Effect<A, SkillInstallError>, extra: (result: A) => Partial<InstallOperationResult> = () => ({})) =>
     Effect.runPromise(operation.pipe(Effect.match({
       onFailure: (failed): InstallOperationResult => ({ snapshot: read(), error: inHome(failed.message, input.home) }),
@@ -156,7 +177,20 @@ export const makeInstallBoard = (input: BoardInput, checks: Checks | undefined):
   const refuse = (error: string) => Promise.resolve<InstallOperationResult>({ snapshot: read(), error });
   return {
     snapshot: read,
-    subscribe: (listener) => checks?.subscribe(() => listener(read())) ?? (() => {}),
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    closeOverview: (reason, revision) => {
+      if (reason !== "automatic" && reason !== "dismissed") throw new Error("The overview can close automatically or be dismissed");
+      const snapshot = read();
+      if (overview === "dismissed" || (reason === "automatic" && (revision !== snapshot.revision || !installOverviewSucceeded(snapshot)))) return snapshot;
+      overview = reason;
+      closedTargets = snapshot.targets.filter(({ operation }) => operation === "install" || operation === "replace").map(({ paths }) => paths);
+      presentationRevision++;
+      publish();
+      return read();
+    },
     retry: () => (checks ? answer(checks.retry) : refuse(NOT_INSTALLING)),
     replace: () => (checks ? answer(checks.replace) : refuse(NOT_INSTALLING)),
     setTick: (path, ticked) => {

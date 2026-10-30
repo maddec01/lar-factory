@@ -5,6 +5,7 @@
 export const INSTALL_BOARD_READY = "board-app:install-board-ready";
 export const INSTALL_GET_STATE = "board-app:install-get-state";
 export const INSTALL_STATE = "board-app:install-state";
+export const INSTALL_CLOSE_OVERVIEW = "board-app:install-close-overview";
 export const INSTALL_RETRY = "board-app:install-retry";
 export const INSTALL_REPLACE = "board-app:install-replace";
 export const INSTALL_SET_TICK = "board-app:install-set-tick";

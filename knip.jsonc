@@ -7,9 +7,9 @@
     },
     "apps/desktop": {
       // vp pack builds main.ts and preload.ts, which knip's Vite plugin doesn't read;
-      // electron-builder runs sign-macos.ts as its sign hook, and the tests spawn fake-board.mjs.
+      // electron-builder runs sign-macos.ts as its sign hook, and the tests spawn fake-board.mjs and preload pause-copy.mjs.
       // Knip's Vitest plugin finds vite.config.ts and the tests.
-      "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/fake-board.mjs"]
+      "entry": ["src/main.ts", "src/preload.ts", "scripts/sign-macos.ts", "test/*.mjs"]
     }
   },
   // ensure-electron-runtime.mjs, copied unchanged from T3 Code, runs macOS's `file`;

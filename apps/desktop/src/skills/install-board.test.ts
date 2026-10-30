@@ -59,7 +59,9 @@ describe("snapshot", () => {
       const reopened = InstallBoard.makeInstallBoard({ home, version: "1.0.0", bundle: "" }, checks).snapshot();
       assert.deepStrictEqual(board.snapshot(), sent.at(-1));
       assert.deepStrictEqual(reopened.targets.map(({ path, active }) => [path, active]), board.snapshot().targets.map(({ path, active }) => [path, active]));
-      assert.deepStrictEqual(sent.map(({ running }) => running), ["launch", null]);
+      assert.strictEqual(sent[0]?.running, "launch");
+      assert.strictEqual(sent.at(-1)?.running, null);
+      assert.isTrue(sent.some((snapshot) => target(snapshot, "~/.agents/skills")?.skills.some(({ state }) => state === "installing")));
       const snapshot = board.snapshot();
       assert.deepStrictEqual([snapshot.installs, snapshot.installed, snapshot.discovery], [true, true, "waiting"]);
       assert.deepStrictEqual(snapshot.targets.map(({ path, active, locked, release }) => [path, active, locked, release]), [
@@ -124,6 +126,11 @@ describe("snapshot", () => {
       const replaced = yield* Effect.promise(board.replace);
       assert.strictEqual(replaced.error, undefined);
       assert.deepStrictEqual(replaced.snapshot.replaced, ["lar-work"]);
+      assert.deepStrictEqual(target(replaced.snapshot, "~/.agents/skills")?.replaced, ["lar-work"]);
+      assert.deepStrictEqual(target(replaced.snapshot, "~/.claude/skills")?.replaced, []);
+      yield* checks.beforeBuild();
+      yield* checks.afterDiscovery;
+      assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.replaced, ["lar-work"]);
       assert.strictEqual(NodeFS.readFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "utf8"), "# lar-work\n");
     }));
 
@@ -215,3 +222,48 @@ describe("setTick", () => {
       assert.deepStrictEqual(NodeFS.readdirSync(outside), []);
     }));
 });
+
+
+it.effect("keeps completed results through late shared targets and clears a resolved failure on Retry", () =>
+  Effect.gen(function* () {
+    const home = makeHome();
+    let answer: InstanceDiscovery = notRunning;
+    const { checks, board } = yield* launch(home, () => answer);
+    yield* checks.atLaunch;
+    NodeFS.writeFileSync(NodePath.join(home, ".agents/skills/lar-work/SKILL.md"), "edited");
+    yield* checks.replace;
+    const earlier = target(board.snapshot(), "~/.agents/skills");
+    NodeFS.writeFileSync(NodePath.join(home, "late"), "blocks the folder");
+    const path = NodePath.join(home, "late/skills");
+    answer = { available: true, instances: [true, false].map((enabled, index) => ({
+      id: `late-${index}`, driver: "antigravity", displayName: `Late ${index}`, enabled, targets: [{ kind: "antigravity", path }],
+    })) };
+    const duringDiscovery: InstallSnapshot[] = [];
+    const stop = board.subscribe((snapshot) => duringDiscovery.push(snapshot));
+    yield* checks.afterDiscovery;
+    stop();
+    assert.isTrue(duringDiscovery.every((snapshot) => target(snapshot, "~/.agents/skills")?.skills.every(({ state }) => state === "installed")));
+    const late = target(board.snapshot(), "~/late/skills");
+    assert.isString(late?.error);
+    assert.deepStrictEqual(late?.skills, [{ name: "lar-work", state: "failed" }]);
+    assert.deepStrictEqual(late?.instances, ["late-0", "late-1"]);
+    assert.strictEqual(board.snapshot().targets.filter(({ path }) => path === "~/late/skills").length, 1);
+    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.replaced, earlier?.replaced);
+    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.skills, earlier?.skills);
+    NodeFS.rmSync(NodePath.join(home, "late"));
+    yield* checks.retry;
+    assert.strictEqual(target(board.snapshot(), "~/late/skills")?.error, undefined);
+    assert.deepStrictEqual(target(board.snapshot(), "~/late/skills")?.skills, [{ name: "lar-work", state: "installed" }]);
+    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")?.replaced, ["lar-work"]);
+  }));
+
+
+it.effect("a Clash cannot mark a target successfully finished", () =>
+  Effect.gen(function* () {
+    const home = makeHome();
+    NodeFS.mkdirSync(NodePath.join(home, ".agents/skills/lar-work"), { recursive: true });
+    const { checks, board } = yield* launch(home);
+    yield* checks.atLaunch;
+    assert.isFalse(target(board.snapshot(), "~/.agents/skills")!.finished);
+    assert.deepStrictEqual(target(board.snapshot(), "~/.agents/skills")!.skills, [{ name: "lar-work", state: "blocked" }]);
+  }));

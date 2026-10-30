@@ -431,6 +431,7 @@ export interface BoardData {
   /** The model choices Start offers besides "T3 default"; empty when T3's settings or model list can't be read. */
   modelChoices: ModelGroup[];
   /** Build threads this board run started, by hand or through Start after, by item id; kept apart from `started`'s refining threads. */
+  startCheckFailures?: Record<string, string>;
   startedBuilds?: Record<string, StartedThread>;
   /** Threads this board run started, by item id, so every page shows them. */
   started?: Record<string, StartedThread>;

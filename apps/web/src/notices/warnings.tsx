@@ -16,6 +16,11 @@ export function Warnings() {
   const az = failedCheck(data.tools, 'az');
   return (
     <>
+      {Object.entries(data.startCheckFailures ?? {}).map(([id, title]) => (
+        <Warning key={id} dismissKey={`start-check-${id}`} what="thread check failed" title={`Could not check whether the thread for ${title} still exists.`}>
+          The item stays Started. The board will retry in 30 seconds.
+        </Warning>
+      ))}
       {clientError && (
         <Warning dismissKey={CLIENT_ERROR} what="can't reach the board server" title="Can't reach the board server.">
           {clientError} Showing the last data this page received.

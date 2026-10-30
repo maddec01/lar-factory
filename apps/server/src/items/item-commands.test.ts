@@ -1,4 +1,4 @@
-import { test } from 'vite-plus/test';
+import { test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { BoardData, Item } from '@lar-factory/shared';
 import { createBoardState } from '../board/board-state.ts';
@@ -15,7 +15,7 @@ const queued = (id: number, extra: Partial<Item> = {}): Item => ({
 });
 
 /** Commands on a board holding `items`, whose source records each tag it writes and fails one when `failTag` is set. */
-function commandsOn(items: Item[], failTag?: string) {
+function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<'live' | 'deleted' | 'unknown'>) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
   const log: string[] = [];
   const branches: (string | undefined)[] = [];
@@ -31,7 +31,7 @@ function commandsOn(items: Item[], failTag?: string) {
     },
   } as unknown as ItemSource;
   const commands = createItemCommands({ board, items: source, repos: () => [], offerModelChoices: () => [],
-    projectOf: async (repo) => ({ projectId: repo }),
+    showThread, projectOf: async (repo) => ({ projectId: repo }),
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
       log.push(`start ${project} ${message.split('\n')[1]}`);
@@ -101,3 +101,61 @@ test('Start build reuses a live start, but a confirmed stopped build can start a
   assert.equal(branches[0], 'chore/7-item-7');
   assert.notEqual(branches[1], branches[0], 'a replacement worktree must not reuse the stopped build branch');
 });
+
+for (const build of [false, true]) test(`deleted ${build ? 'build' : 'refining'} Start releases and concurrent retries create one thread`, async () => {
+  const item = queued(7, { threads: [], ...(build ? { status: 'Ready', statuses: ['Ready'], labels: ['build'] } as Partial<Item> : {}) });
+  const { commands, board, branches } = commandsOn([item], undefined, async () => 'deleted');
+  const start = () => build ? commands.startBuild(item.id, undefined) : commands.start(item.id, undefined);
+  await start();
+  await commands.reconcileStarts([item]);
+  assert.equal(board.snapshot()[build ? 'startedBuilds' : 'started']?.[item.id], undefined);
+  await Promise.all([start(), start(), start()]);
+  assert.equal(branches.length, 2);
+  if (build) assert.match(branches[1]!, /-retry-[a-f0-9]+$/);
+});
+
+test('unknown lookup retains protection and warns without concurrent duplicate checks', async () => {
+  const item = queued(7, { threads: [] });
+  let calls = 0;
+  const { commands, board, branches } = commandsOn([item], undefined, async () => { calls++; return 'unknown'; });
+  await commands.start(item.id, undefined);
+  await Promise.all([commands.reconcileStarts([item]), commands.reconcileStarts([item])]);
+  await commands.start(item.id, undefined);
+  assert.equal(calls, 1);
+  assert.equal(branches.length, 1);
+  assert.equal((await commands.backToList(item.id)).status, 409);
+  assert.equal(board.snapshot().startCheckFailures?.[item.id], item.title);
+});
+
+for (const build of [false, true]) for (const outcome of ['live', 'deleted', 'removed'] as const) {
+  test(`${build ? 'build' : 'refining'} lookup retries at 30 seconds and clears warning when ${outcome}`, async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const item = queued(7, { threads: [], ...(build ? { status: 'Ready', statuses: ['Ready'], labels: ['build'] } as Partial<Item> : {}) });
+      let calls = 0;
+      const { commands, board } = commandsOn([item], undefined, async () => {
+        calls++;
+        return calls === 1 ? 'unknown' : outcome === 'deleted' ? 'deleted' : 'live';
+      });
+      await (build ? commands.startBuild(item.id, undefined) : commands.start(item.id, undefined));
+      await commands.reconcileStarts([{ ...item, threads: 'unavailable' }]);
+      assert.equal(calls, 0, 'unavailable reads never trigger a lookup');
+      await commands.reconcileStarts([item]);
+      assert.equal(board.snapshot().startCheckFailures?.[item.id], item.title);
+      vi.setSystemTime(29_999);
+      await commands.reconcileStarts([item]);
+      assert.equal(calls, 1);
+      vi.setSystemTime(30_000);
+      await commands.reconcileStarts(outcome === 'removed' ? [] : [item]);
+      assert.equal(calls, outcome === 'removed' ? 1 : 2);
+      assert.equal(board.snapshot().startCheckFailures?.[item.id], undefined);
+      if (outcome !== 'removed') {
+        assert.equal(Boolean(board.snapshot()[build ? 'startedBuilds' : 'started']?.[item.id]), outcome === 'live');
+        vi.setSystemTime(90_000);
+        await commands.reconcileStarts([item]);
+        assert.equal(calls, 2, 'a conclusive answer is not checked again');
+      }
+    } finally { vi.useRealTimers(); }
+  });
+}

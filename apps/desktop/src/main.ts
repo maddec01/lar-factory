@@ -23,6 +23,7 @@ import * as BoardSupervisor from "./board-server/BoardSupervisor.ts";
 import * as ClaudeProfiles from "./skills/claude-profiles.ts";
 import * as LaunchAgentCleanup from "./launch-agent/launch-agent-cleanup.ts";
 import * as SkillInstall from "./skills/skill-install.ts";
+import * as T3Instances from "./skills/t3-instances.ts";
 import * as ExternalLink from "./window/external-link.ts";
 import * as MainWindowBounds from "./window/MainWindowBounds.ts";
 import * as IpcChannels from "./ipc-channels.ts";
@@ -183,23 +184,29 @@ const openBoardWindow = (secret: string) => {
   return { window, events, progress, origin: () => origin, forgetOrigin, showStarting };
 };
 
-/** The launch's skill checks, or undefined when this run checks nothing: a dev run without the install flag. */
-const makeSkillChecks = SkillInstall.makeChecks({
-  isPackaged: Electron.app.isPackaged,
-  version: Electron.app.getVersion(),
-  home: NodeOS.homedir(),
-  bundle: SkillInstall.locateBundle(Electron.app.getAppPath(), Electron.app.isPackaged),
-  argv: process.argv,
-  env: process.env,
-});
+/**
+ * The launch's skill checks, or undefined when this run checks nothing: a dev run without the install flag. `env` is
+ * the login shell's environment, which finds the `t3` CLI.
+ */
+const makeSkillChecks = (env: Record<string, string | undefined>) =>
+  SkillInstall.makeChecks({
+    isPackaged: Electron.app.isPackaged,
+    version: Electron.app.getVersion(),
+    home: NodeOS.homedir(),
+    bundle: SkillInstall.locateBundle(Electron.app.getAppPath(), Electron.app.isPackaged),
+    argv: process.argv,
+    env: process.env,
+  }, T3Instances.discover(env, NodeOS.homedir()));
 
-/** Checks the skills at launch and shows the user an error or conflicts. */
-const checkSkillsAtLaunch = (check: SkillInstall.Check) =>
-  check.pipe(
-    Effect.match({ onFailure: SkillInstall.notice, onSuccess: SkillInstall.notice }),
-    Effect.flatMap((notice) =>
-      notice ? Effect.promise(() => Electron.dialog.showMessageBox({ ...notice, buttons: ["OK"] })) : Effect.void,
-    ),
+/**
+ * Checks the skills in the fallback targets at launch, then asks T3 until it answers and checks its targets. The board's
+ * page reports what each check found, Drift, Clashes and failures, in its notices; a native dialog would hold the main
+ * process on macOS and keep the window on the starting page.
+ */
+const checkSkillsAtLaunch = (checks: SkillInstall.Checks) =>
+  checks.atLaunch.pipe(
+    Effect.ignore,
+    Effect.andThen(SkillInstall.discoverUntilAnswered(checks, SkillInstall.REDISCOVER_EVERY)),
   );
 
 /** Throws for a call from any page but the current board server's, and while no server is ready. */
@@ -287,7 +294,7 @@ const program = Effect.gen(function* () {
   // Read once: a restarted server keeps the PATH the first one got.
   const env = yield* ShellEnvironment.childEnvironment(process.env);
   // One pair of checks for the whole run, so the launch's check and each Start build's take turns.
-  const skillChecks = yield* makeSkillChecks;
+  const skillChecks = yield* makeSkillChecks(env);
   const config = BoardServer.makeStartConfig({
     ...BoardServer.locate(Electron.app.getAppPath(), Electron.app.isPackaged),
     executablePath: process.execPath,
@@ -321,7 +328,7 @@ const program = Effect.gen(function* () {
   yield* supervisor.start;
   // Starts after the board server. The copy is synchronous, so it blocks the main
   // process briefly after start.
-  if (skillChecks) yield* Effect.forkScoped(checkSkillsAtLaunch(skillChecks.atLaunch));
+  if (skillChecks) yield* Effect.forkScoped(checkSkillsAtLaunch(skillChecks));
   // The app replaces the launch agent that ran the board before it.
   yield* Effect.forkScoped(
     LaunchAgentCleanup.onLaunch({

@@ -132,6 +132,11 @@ interface TargetState {
   /** Each owned copy's tree digest as the engine wrote it, which tells an upgrade whether it had Drift. */
   digests?: Record<string, string>;
   selection?: TargetSelection;
+  /**
+   * True when the last install offered this target because T3 required it, so a launch that can't reach T3 offers it
+   * again as required (see `t3Targets`). Only the path is kept, never the instance's settings or environment.
+   */
+  required?: true;
   /** True when a Claude home's `references/` folder is the engine's copy, from before skills carried their own. */
   references?: boolean;
 }
@@ -300,6 +305,7 @@ function install(
         return digest === undefined ? [] : [[name, digest]];
       })) },
       ...previous.selection && { selection: previous.selection },
+      ...target.required && { required: true },
       ...previous.references && { references: true },
     };
     states[target.key] = state;
@@ -369,13 +375,14 @@ function resolveTargets(offered: OfferedTarget[], states: Record<string, TargetS
 }
 
 /**
- * The state of a recorded target this install leaves inactive: when the target is `inside` the root, without the
- * owned skills the bundle no longer has. Removing those needs no tick, so a
+ * The state of a recorded target this install leaves inactive: T3's mark as this install offers it, and, when the
+ * target is `inside` the root, without the owned skills the bundle no longer has. Removing those needs no tick, so a
  * new Release cleans an unticked target or one no instance offers; it installs nothing there. A removal that fails
  * keeps that skill owned, so the next install tries again, and doesn't count as a failed install: the target isn't
  * one the build uses.
  */
 function leave(target: Target, previous: TargetState, bundled: string[], inside: boolean): TargetState {
+  const { required: _, ...rest } = previous;
   const work: Work = { owned: new Set(previous.skills), digests: { ...previous.digests }, changed: false };
   if (inside) {
     try { removeObsolete(target, bundled, work); }
@@ -383,8 +390,9 @@ function leave(target: Target, previous: TargetState, bundled: string[], inside:
   }
   const skills = [...work.owned].sort();
   return {
-    ...previous, skills,
+    ...rest, skills,
     ...previous.digests && { digests: Object.fromEntries(Object.entries(work.digests).filter(([name]) => work.owned.has(name))) },
+    ...target.required && { required: true },
   };
 }
 
@@ -469,6 +477,14 @@ export function listClaudeProfiles(home: string): ClaudeProfile[] {
   });
 }
 
+/**
+ * The targets the manifest records T3 required, offered as required, for a launch that can't reach T3: they keep
+ * their install and lock through the outage.
+ */
+export function t3Targets(home: string): OfferedTarget[] {
+  return Object.entries(readManifest(home)?.targets ?? {}).flatMap(([path, { kind, required }]) => required ? [{ kind, path, required: true }] : []);
+}
+
 /** Each bundled skill's state from the last install, or null before the first install that records it. */
 export function readSkillStatus(home: string): Record<string, SkillStatus> | null {
   return readManifest(home)?.status ?? null;
@@ -504,16 +520,23 @@ export function setProfileTick(home: string, name: string, ticked: boolean, { ro
   const state = manifest.targets[key] ?? { kind: 'claude' as const, finished: false, skills: [] };
   const conflicts: string[] = [];
   const removed = { links: [] as string[], checklists: false };
-  const work: Work = { owned: new Set(state.skills), digests: {}, changed: false };
-  if (ticked) linkTarget(path, join(home, '.agents/skills'), work, agents.skills, { place: 'profile', profile: name }, (conflicting) => conflicts.push(conflicting), () => true);
-  else unlinkTarget(path, state, work, removed);
-  const next: TargetState = {
-    kind: 'claude',
-    ...ticked ? { ...agents.release !== undefined && { release: agents.release }, finished: agents.finished } : { ...state.release !== undefined && { release: state.release }, finished: state.finished },
-    skills: [...work.owned].sort(), selection: ticked ? 'ticked' : 'unticked',
-    ...!ticked && state.references && exists(join(dirname(path), 'references')) && { references: true },
-  };
-  writeManifest(join(home, '.agents', INSTALL_MANIFEST), { ...manifest, targets: { ...manifest.targets, [key]: next } });
+  const selection: TargetSelection = ticked ? 'ticked' : 'unticked';
+  let next: TargetState = { ...state, selection };
+  if (target.kind === 'claude') {
+    const installed = manifest.targets[agentsKey];
+    if (!installed) throw new Error(`No skills are installed in ${join(home, '.agents')} yet`);
+    const work: Work = { owned: new Set(state.skills), digests: {}, changed: false };
+    if (ticked) linkTarget(target.path, agents, work, installed.skills, placeOf(target), (conflicting) => conflicts.push(conflicting), () => true);
+    else unlinkTarget(target.path, state, work, removed);
+    next = {
+      kind: 'claude',
+      ...ticked ? { ...installed.release !== undefined && { release: installed.release }, finished: installed.finished } : { ...state.release !== undefined && { release: state.release }, finished: state.finished },
+      skills: [...work.owned].sort(), selection,
+      ...state.required && { required: true },
+      ...!ticked && state.references && exists(join(dirname(target.path), 'references')) && { references: true },
+    };
+  }
+  writeManifest(join(home, '.agents', INSTALL_MANIFEST), { ...manifest, targets: { ...manifest.targets, [target.key]: next } });
   return { conflicts, removed };
 }
 
@@ -648,6 +671,7 @@ function readTargets(entries: Record<string, unknown>): Record<string, TargetSta
       skills: names(state.skills),
       ...isRecord(state.digests) && { digests: readDigests(state.digests) },
       ...(state.selection === 'ticked' || state.selection === 'unticked') && { selection: state.selection },
+      ...state.required === true && { required: true },
       ...state.references === true && { references: true },
     };
   }
@@ -714,9 +738,18 @@ function isFolder(path: string): boolean {
   catch { return false; }
 }
 
+/**
+ * A target's fields in the order the manifest writes them, so an unchanged state reads back as the same text. Typed
+ * over every field of TargetState, so a new one fails typecheck until it is listed here.
+ */
+const FIELDS = Object.keys({
+  kind: true, release: true, finished: true, skills: true, digests: true, selection: true, required: true, references: true,
+} satisfies Record<keyof TargetState, true>) as Array<keyof TargetState>;
+
 /** Writes `manifest`, its targets in path order, unless the file already holds exactly that. True when it wrote. */
 function writeManifest(path: string, manifest: Manifest): boolean {
-  const targets = Object.fromEntries(Object.entries(manifest.targets).sort(([a], [b]) => a.localeCompare(b)));
+  const targets = Object.fromEntries(Object.entries(manifest.targets).sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, state]) => [key, Object.fromEntries(FIELDS.flatMap((field) => state[field] === undefined ? [] : [[field, state[field]]]))]));
   const text = `${JSON.stringify({ ...manifest, targets }, null, 2)}\n`;
   try { if (readFileSync(path, 'utf8') === text) return false; }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }

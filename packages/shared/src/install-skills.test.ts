@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
-import { INSTALL_MANIFEST, defaultTargets, installSkills, listClaudeProfiles, readSkillStatus, setProfileTick, type InstallResult, type TargetResult } from './install-skills.ts';
+import { basename, dirname, join, relative } from 'node:path';
+import { INSTALL_MANIFEST, defaultTargets, describeTargets, installSkills, profileTargets, readSkillStatus, setTargetTick, t3Targets, type InstallResult, type RootOption, type TargetResult } from './install-skills.ts';
 
 function temporary(): string {
   const path = realpathSync(mkdtempSync(join(tmpdir(), 'install-skills-')));
@@ -43,7 +43,7 @@ function read(home: string, path: string): string {
   return readFileSync(join(home, '.agents', path), 'utf8');
 }
 
-interface Target { kind: string; release?: string; finished: boolean; skills: string[]; digests?: Record<string, string>; selection?: string; references?: true }
+interface Target { kind: string; release?: string; finished: boolean; skills: string[]; digests?: Record<string, string>; selection?: string; required?: true; references?: true }
 
 /** The manifest with its targets keyed by their path in `home` and without their digests, which `digests` checks. */
 function manifest(home: string): { targets: Record<string, Target>; [field: string]: unknown } {
@@ -1247,6 +1247,69 @@ test('a legacy manifest becomes targets with its owned skills, Release, ticks, l
   assert.ok(!existsSync(join(home, '.claude-off/skills')));
   setProfileTick(home, '.claude-work', false);
   assert.ok(!existsSync(join(home, '.claude-work/references')));
+});
+
+test('a new Release removes obsolete owned skills from every recorded target, active or not, and installs nothing new in an inactive one', () => {
+  const home = geminiHome();
+  profile(home, '.claude-work');
+  const work = join(home, '.claude-work/skills');
+  installSkills(home, bundle(v1), '1.0.0', { targets: [...defaultTargets(home), { kind: 'claude', path: work, required: true }] });
+  setTargetTick(home, join(home, antigravity[0]!), false);
+  writeFileSync(join(home, antigravity[1]!, 'tdd/SKILL.md'), 'edited');
+  mkdirSync(join(home, antigravity[1]!, 'mine'));
+
+  // Only the fallback targets: the CLI's Antigravity folder and the T3 Claude home aren't offered, the app's is unticked.
+  const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = v2;
+  const result = installSkills(home, bundle(withoutTdd), '2.0.0', { targets: [{ kind: 'agents', path: join(home, '.agents/skills') }, { kind: 'claude', path: join(home, '.claude/skills') }] });
+
+  for (const folder of antigravity) assert.deepEqual(readdirSync(join(home, folder)).sort(), folder === antigravity[1] ? ['lar-work', 'mine'] : ['lar-work']);
+  for (const folder of antigravity) assert.equal(readFileSync(join(home, folder, 'lar-work/SKILL.md'), 'utf8'), 'lar-work v1');
+  assert.deepEqual(entries(home, '.claude-work'), { 'lar-work': ownLinks['lar-work'] });
+  assert.deepEqual(antigravityOwned(home), [['lar-work'], ['lar-work']]);
+  assert.deepEqual(manifest(home).targets['.claude-work/skills']?.skills, ['lar-work']);
+  for (const path of [...antigravity.map((folder) => join(home, folder)), work]) {
+    const target = result.targets.find(({ paths }) => paths.includes(path));
+    assert.deepEqual([target?.active, target?.release, target?.error], [false, '1.0.0', undefined], path);
+  }
+});
+
+test('with a root, an inactive recorded target outside it keeps its obsolete skills', () => {
+  const root = temporary();
+  const outside = outsideHome();
+  mkdirSync(join(outside.home, 'skills/tdd'));
+  writeFileSync(join(outside.home, 'skills/tdd/SKILL.md'), 'tdd v1');
+  mkdirSync(join(root, '.agents'));
+  writeFileSync(join(root, '.agents', INSTALL_MANIFEST), JSON.stringify({
+    version: '1.0.0', targets: { [join(outside.home, 'skills')]: { kind: 'antigravity', release: '1.0.0', finished: true, skills: ['tdd'] } },
+  }));
+  const before = outside.files();
+
+  const { 'skills/tdd/SKILL.md': _dropped, ...withoutTdd } = v2;
+  installSkills(root, bundle(withoutTdd), '2.0.0', { root });
+
+  assert.deepEqual(outside.files(), before);
+  assert.deepEqual(manifest(root).targets[relative(root, join(outside.home, 'skills'))]?.skills, ['tdd']);
+});
+
+test('the manifest records which targets T3 required, which t3Targets offers again, until an install offers one without T3', () => {
+  const home = temporary();
+  profile(home, 'work-claude');
+  const work = join(home, 'work-claude/skills');
+  installSkills(home, bundle(v1), '1.0.0', { targets: [...defaultTargets(home), { kind: 'claude', path: work, required: true }] });
+
+  assert.equal(manifest(home).targets['work-claude/skills']?.required, true);
+  assert.equal(manifest(home).targets['.agents/skills']?.required, undefined);
+  assert.deepEqual(t3Targets(home), [{ kind: 'claude', path: work, required: true }]);
+
+  // T3 is down: the caller offers the recorded target again, which takes the new Release.
+  installSkills(home, bundle(v2), '2.0.0', { targets: [...defaultTargets(home), ...t3Targets(home)] });
+  assert.equal(readFileSync(join(work, 'tdd/SKILL.md'), 'utf8'), 'tdd v2');
+  assert.deepEqual(t3Targets(home), [{ kind: 'claude', path: work, required: true }]);
+
+  // T3 answers without it.
+  installSkills(home, bundle(v2), '2.0.0');
+  assert.deepEqual(t3Targets(home), []);
+  assert.equal(manifest(home).targets['work-claude/skills']?.required, undefined);
 });
 
 /** Every path in `folder` with its content or link target, without following links. */

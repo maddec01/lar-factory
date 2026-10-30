@@ -47,7 +47,7 @@ export function T3Missing({ check }: { check: FailedCheck<T3Check> }) {
   return (
     <div className="tool-missing">
       <div className="tool-missing-box" role="alert">
-        <BrandMark label="lar" />
+        <BrandMark label="Lar" />
         <h1>T3 Code not found</h1>
         <p>
           <Fix check={check} tool="t3" what="the T3 Code CLI">

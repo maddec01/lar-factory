@@ -84,11 +84,11 @@ test("the reset PR's one commit on the default branch's head deletes .lar-factor
   const create = calls.find((args) => args[0] === 'pr' && args[1] === 'create')!;
   assert.deepEqual([create[create.indexOf('--base') + 1], create[create.indexOf('--head') + 1]], ['main', 'lar-factory/reset']);
   assert.equal(create[create.indexOf('--body') + 1], 'This PR:\n\n'
-    + '- Deletes `.lar-factory.json`, the Repository config lar Factory reads for this repository.\n'
-    + "- Removes lar Factory's `## Agent skills` section from `CLAUDE.md`.\n"
-    + "- Removes lar Factory's `## Agent skills` section from `AGENTS.md`.\n"
+    + '- Deletes `.lar-factory.json`, the Repository config Lar Factory reads for this repository.\n'
+    + "- Removes Lar Factory's `## Agent skills` section from `CLAUDE.md`.\n"
+    + "- Removes Lar Factory's `## Agent skills` section from `AGENTS.md`.\n"
     + DOCS.map((path) => `- Deletes \`${path}\`.\n`).join('')
-    + '\nReset on the lar Factory board opened it. Once it merges, everyone who onboarded this repository loses its Repository config.');
+    + '\nReset on the Lar Factory board opened it. Once it merges, everyone who onboarded this repository loses its Repository config.');
 });
 
 test('a file without the section, or a missing file, is left alone, and a CLAUDE.md linked to AGENTS.md changes AGENTS.md once', async () => {
@@ -112,7 +112,7 @@ test('a lar-factory/reset left from before moves to the new commit, and its open
 
 test('a default branch with nothing of the setup opens no PR', async () => {
   const { calls, run } = gh({ 'README.md': '# lar-web\n' });
-  await assert.rejects(openResetPr('maddec01/lar-web', run), { message: "the default branch has none of lar Factory's setup to remove." });
+  await assert.rejects(openResetPr('maddec01/lar-web', run), { message: "the default branch has none of Lar Factory's setup to remove." });
   assert.ok(!calls.some((args) => args.includes('POST')));
 });
 

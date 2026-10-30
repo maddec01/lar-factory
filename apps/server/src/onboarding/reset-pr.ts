@@ -10,7 +10,7 @@ import { AGENT_DOC_PATHS, withoutAgentSkills } from './agent-setup.ts';
 import { linkTarget } from './pr-changes.ts';
 
 const RESET_BRANCH = 'lar-factory/reset';
-const TITLE = "chore: remove lar Factory's setup";
+const TITLE = "chore: remove Lar Factory's setup";
 
 type Run = (args: string[]) => Promise<string>;
 
@@ -21,12 +21,12 @@ interface ResetChange {
 }
 
 function describe({ kind, path }: ResetChange): string {
-  if (kind === 'agent-skills') return `Removes lar Factory's \`## Agent skills\` section from \`${path}\`.`;
-  return path === '.lar-factory.json' ? 'Deletes `.lar-factory.json`, the Repository config lar Factory reads for this repository.' : `Deletes \`${path}\`.`;
+  if (kind === 'agent-skills') return `Removes Lar Factory's \`## Agent skills\` section from \`${path}\`.`;
+  return path === '.lar-factory.json' ? 'Deletes `.lar-factory.json`, the Repository config Lar Factory reads for this repository.' : `Deletes \`${path}\`.`;
 }
 
 const prBody = (changes: ResetChange[]) => `This PR:\n\n${changes.map((change) => `- ${describe(change)}`).join('\n')}\n\n`
-  + 'Reset on the lar Factory board opened it. Once it merges, everyone who onboarded this repository loses its Repository config.';
+  + 'Reset on the Lar Factory board opened it. Once it merges, everyone who onboarded this repository loses its Repository config.';
 
 /** The reset PR's tree entries and changes against the default branch's `tree`, whose blobs `read` gives. */
 async function planReset(tree: CommitTree, read: (sha: string) => Promise<string>): Promise<{ entries: TreeEntry[]; changes: ResetChange[] }> {
@@ -62,7 +62,7 @@ export async function openResetPr(repo: string, run?: Run): Promise<string> {
   const { commitTree, createPr, defaultBranchHead, editPrBody, openPrFrom, pushCommit, readBlob } = prHost(repo);
   const head = await defaultBranchHead(repo, run);
   const { entries, changes } = await planReset(await commitTree(repo, head.sha, run), (sha) => readBlob(repo, sha, run));
-  if (!changes.length) throw new Error("the default branch has none of lar Factory's setup to remove.");
+  if (!changes.length) throw new Error("the default branch has none of Lar Factory's setup to remove.");
   await pushCommit(repo, RESET_BRANCH, { message: TITLE, parent: head.sha, entries }, run);
   const body = prBody(changes);
   const open = await openPrFrom(repo, RESET_BRANCH, run);

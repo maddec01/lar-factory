@@ -31,12 +31,12 @@ import { UpdateButton } from '../updates/UpdateButton.tsx';
 import { Counters } from './counters.tsx';
 import { TrafficLights, useWindowControlsInset } from './window-controls.tsx';
 
-/** "lar Factory": the copied BrandMark, the mark and "lar", then a muted "Factory" on the same baseline, in
+/** "Lar Factory": the copied BrandMark, the mark as the L and "ar", then a muted "Factory" on the same baseline, in
  *  BrandMark's size and type. Screen readers skip it: the page's hidden h1 names the page. */
 function Brand() {
   return (
     <span className="brand lar-brand-mark inline-flex shrink-0 items-baseline text-xl leading-none" aria-hidden="true">
-      <BrandMark label="lar" />
+      <BrandMark label="Lar" />
       <span className="ml-[0.24em] font-medium tracking-[-0.02em] text-base-700">Factory</span>
     </span>
   );

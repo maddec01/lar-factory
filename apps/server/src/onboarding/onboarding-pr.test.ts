@@ -104,8 +104,8 @@ test('opening the PR makes one commit on the default branch\'s head with every c
   assert.deepEqual([field(branch!, 'ref'), field(branch!, 'sha')], [['refs/heads/lar-factory/onboarding'], ['commit1']]);
   assert.deepEqual([create![create!.indexOf('--base') + 1], create![create!.indexOf('--head') + 1]], ['main', 'lar-factory/onboarding']);
   const body = create![create!.indexOf('--body') + 1]!;
-  for (const line of ["- Writes lar Factory's `## Agent skills` block in `AGENTS.md`.", '- Adds `docs/agents/domain.md`.',
-    '- Adds `.lar-factory.json`, the Repository config lar Factory reads for this repository.',
+  for (const line of ["- Writes Lar Factory's `## Agent skills` block in `AGENTS.md`.", '- Adds `docs/agents/domain.md`.',
+    '- Adds `.lar-factory.json`, the Repository config Lar Factory reads for this repository.',
     '- Edits `AGENTS.md` at line 3: It pushes to main, and the factory opens PRs.', '- Renames `CONTEXT.md` to `GLOSSARY.md`.', '- Deletes `.scratch/`.']) {
     assert.ok(body.includes(line), line);
   }
@@ -340,7 +340,7 @@ test('a .lar-factory.json that reaches the default branch another way finishes o
   assert.deepEqual(await follow(dir, gh), [{ repo: 'maddec01/lar-web' }]);
   assert.equal(gh.changed.length, 1);
   assert.deepEqual(gh.changed[0]!.slice(0, 4), ['pr', 'close', PR, '--comment']);
-  assert.match(gh.changed[0]![4]!, /reached the default branch without this PR, so lar Factory finished onboarding with that file and closed this PR/);
+  assert.match(gh.changed[0]![4]!, /reached the default branch without this PR, so Lar Factory finished onboarding with that file and closed this PR/);
 });
 
 test("a file that can't be used, or a PR that can't be closed, leaves the onboarding as it is", async (t) => {
@@ -445,7 +445,7 @@ test('Reopen pull request that gh refuses answers with gh\'s message and keeps t
   assert.deepEqual(await reopenOnboardingPr({ repo: 'lar-cli' }, dir, refusing), { status: 400, error: 'Send the repository whose onboarding PR to reopen.' });
 });
 
-const RESET = 'Reset on the lar Factory board dropped this onboarding, so it closed this PR.';
+const RESET = 'Reset on the Lar Factory board dropped this onboarding, so it closed this PR.';
 
 test('Reset closes an onboarding\'s open PR with a comment, then drops its entry and keeps the others', async (t) => {
   const dir = await dataDir(t, [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-web', onboarding: { ...progress, step: 'pr', prUrl: PR } },
@@ -509,7 +509,7 @@ test('Reset of an onboarded repository closes its open Edit PR with a comment be
   assert.deepEqual(await resetRepository({ repo: 'maddec01/lar-web' }, dir, run), { onboarding: [], prUrl: PR });
   const close = calls.findIndex((args) => args[0] === 'pr' && args[1] === 'close');
   assert.deepEqual(calls[close], ['pr', 'close', edit, '--comment',
-    'Reset on the lar Factory board opened a PR that removes `.lar-factory.json`, so it closed this Edit PR.']);
+    'Reset on the Lar Factory board opened a PR that removes `.lar-factory.json`, so it closed this Edit PR.']);
   assert.ok(close < calls.findIndex((args) => args[0] === 'pr' && args[1] === 'create'));
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web', resetting: { prUrl: PR } }]);
 });
@@ -650,7 +650,7 @@ test('on Azure Repos, one push makes the commit with every change on lar-factory
   assert.equal(az.pushes.length, 1);
   const [push] = az.pushes;
   assert.deepEqual([push!.ref, push!.oldObjectId, push!.parents, push!.comment],
-    ['refs/heads/lar-factory/onboarding', '0'.repeat(40), ['abc123'], 'chore: onboard to lar Factory']);
+    ['refs/heads/lar-factory/onboarding', '0'.repeat(40), ['abc123'], 'chore: onboard to Lar Factory']);
   const change = (path: string) => push!.changes.find((c) => c.path === path);
   assert.deepEqual(['/.scratch/todo.md', '/CONTEXT.md', '/.claude/skills/lar-build/SKILL.md', '/.claude/skills/lar-build/notes.md'].map(change),
     ['/.scratch/todo.md', '/CONTEXT.md', '/.claude/skills/lar-build/SKILL.md', '/.claude/skills/lar-build/notes.md'].map((path) => ({ changeType: 'delete', path })));
@@ -664,7 +664,7 @@ test('on Azure Repos, one push makes the commit with every change on lar-factory
   const create = az.calls.find((args) => args.slice(0, 3).join(' ') === 'repos pr create')!;
   assert.deepEqual([create[create.indexOf('--source-branch') + 1], create[create.indexOf('--target-branch') + 1]], ['lar-factory/onboarding', 'main']);
   // The title and description go joined to their flags, so one starting with - is no option.
-  assert.ok(create.includes('--title=chore: onboard to lar Factory') && !create.includes('--title'), create.join(' '));
+  assert.ok(create.includes('--title=chore: onboard to Lar Factory') && !create.includes('--title'), create.join(' '));
   assert.ok(create.find((arg) => arg.startsWith('--description='))!.includes('- Renames `CONTEXT.md` to `GLOSSARY.md`.'));
   assert.ok(az.calls.every((args) => args[0] === 'devops' || args[0] === 'repos'), 'every call is az devops or az repos');
   assert.ok(az.calls.filter((args) => args[1] === 'invoke').every((args) => args.includes('--api-version')));
@@ -677,7 +677,7 @@ test('on Azure Repos, a taken lar-factory/onboarding with an active PR is pushed
   const opened = await createPrOpener(dir, az.run)({ repo: AZURE, progress, config, picks });
   assert.equal((opened as { prUrl: string }).prUrl, `${REPO_URL}/pullrequest/7`);
   assert.deepEqual(az.pushes.map((p) => [p.ref, p.oldObjectId, p.parents]), [['refs/heads/lar-factory/onboarding', 'old789', ['abc123']]]);
-  assert.match(az.prs[0]!.description!, /^This PR:\n\n- Writes lar Factory's/);
+  assert.match(az.prs[0]!.description!, /^This PR:\n\n- Writes Lar Factory's/);
   assert.equal(az.prs.length, 1, 'it opens no PR');
 });
 

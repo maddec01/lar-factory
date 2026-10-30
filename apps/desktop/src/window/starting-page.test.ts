@@ -7,12 +7,12 @@ import * as StartingPage from "./starting-page.ts";
 const html = (url: string) => decodeURIComponent(url.slice(url.indexOf(",") + 1));
 
 describe("StartingPage", () => {
-  it("opens on the loading screen: the lar Factory lockup over the first step, titled Lar Factory", () => {
+  it("opens on the loading screen: the Lar Factory lockup over the first step, titled Lar Factory", () => {
     const page = StartingPage.url();
     assert.match(page, /^data:text\/html;charset=utf-8,/);
     assert.include(html(page), "<title>Lar Factory</title>");
     assert.include(html(page), `>${StartingPage.STEPS.shell}<`);
-    assert.match(html(page), /class="loading-lar">lar</);
+    assert.match(html(page), /class="loading-lar"><span class="loading-lar-slide">ar</);
     assert.match(html(page), /class="loading-factory">Factory</);
     assert.notInclude(html(page), "didn't start");
   });
@@ -36,8 +36,8 @@ describe("StartingPage", () => {
 
   it("plays the draw and the roll unless the user prefers reduced motion", () => {
     const page = html(StartingPage.url());
-    // The minifier writes 900ms as .9s.
-    assert.match(page, /@media \(prefers-reduced-motion:no-preference\)\{[^@]*\.9s[^@]*loading-trace[^@]*\.5s[^@]*loading-settle/);
+    // The minifier writes 480ms as .48s.
+    assert.match(page, /@media \(prefers-reduced-motion:no-preference\)\{[^@]*\.48s[^@]*loading-settle[^@]*\.7s[^@]*loading-trace[^@]*\.52s[^@]*loading-slide/);
     assert.match(page, /\.loading-roll-in\{[^}]*\.38s[^}]*loading-roll-in/);
     assert.include(page, 'matchMedia("(prefers-reduced-motion: reduce)")');
   });
@@ -162,24 +162,24 @@ describe("StartingPage script", () => {
 });
 
 describe("StartingPage.drawWait", () => {
-  it("is what is left of the 1.3 s draw since the page showed", () => {
-    assert.equal(StartingPage.DRAW_MS, 1300);
-    assert.equal(StartingPage.drawWait(10_000, 10_000), 1300);
-    assert.equal(StartingPage.drawWait(10_000, 10_400), 900);
-    assert.equal(StartingPage.drawWait(10_000, 11_299), 1);
+  it("is what is left of the 1.75 s draw since the page showed", () => {
+    assert.equal(StartingPage.DRAW_MS, 1750);
+    assert.equal(StartingPage.drawWait(10_000, 10_000), 1750);
+    assert.equal(StartingPage.drawWait(10_000, 10_400), 1350);
+    assert.equal(StartingPage.drawWait(10_000, 11_749), 1);
   });
 
   it("is nothing once the draw is done, or if the clock went back", () => {
-    assert.equal(StartingPage.drawWait(10_000, 11_300), 0);
+    assert.equal(StartingPage.drawWait(10_000, 11_750), 0);
     assert.equal(StartingPage.drawWait(10_000, 60_000), 0);
   });
 
   it("is the whole draw while the page has not finished loading", () => {
-    assert.equal(StartingPage.drawWait(undefined, 60_000), 1300);
+    assert.equal(StartingPage.drawWait(undefined, 60_000), 1750);
   });
 
   it("never exceeds the draw if the clock went back", () => {
-    assert.equal(StartingPage.drawWait(10_000, 9_000), 1300);
+    assert.equal(StartingPage.drawWait(10_000, 9_000), 1750);
   });
 });
 

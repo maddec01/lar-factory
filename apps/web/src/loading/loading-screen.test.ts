@@ -5,7 +5,7 @@ import { expect, test, vi } from 'vite-plus/test';
 import type { BoardData, FirstRead } from '@lar-factory/shared';
 import { $, $$, NOW, mountPage, push, sample, settle, text } from '../../test/support.ts';
 
-const DRAW_MS = 1300;
+const DRAW_MS = 1750;
 const EXIT_MS = 600;
 const ROLL_MS = 380;
 
@@ -25,7 +25,7 @@ test('the board page opens on the loading screen, over the board, with the mark 
   expect(screen()).not.toBeNull();
   expect(screen()!.hasAttribute('role'), 'the lockup is not announced').toBe(false);
   expect($('.loading-line')!.getAttribute('role'), 'only the step line is live').toBe('status');
-  expect(text($('.loading-wordmark'))).toBe('larFactory');
+  expect(text($('.loading-wordmark'))).toBe('arFactory');
   expect(screen()!.classList.contains('is-drawn')).toBe(false);
   expect(line()).toBe('Checking repositories');
   expect($('.title-bar'), 'the board is under the screen').not.toBeNull();

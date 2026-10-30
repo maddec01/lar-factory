@@ -27,10 +27,10 @@ import { openResetPr } from './reset-pr.ts';
 import { workflowLabelsProblem } from './repository-labels.ts';
 
 const ONBOARDING_BRANCH = 'lar-factory/onboarding';
-const TITLE = 'chore: onboard to lar Factory';
-const RESET = 'Reset on the lar Factory board dropped this onboarding, so it closed this PR.';
-const RESET_EDIT = 'Reset on the lar Factory board opened a PR that removes `.lar-factory.json`, so it closed this Edit PR.';
-const LANDED = '`.lar-factory.json` reached the default branch without this PR, so lar Factory finished onboarding with that file '
+const TITLE = 'chore: onboard to Lar Factory';
+const RESET = 'Reset on the Lar Factory board dropped this onboarding, so it closed this PR.';
+const RESET_EDIT = 'Reset on the Lar Factory board opened a PR that removes `.lar-factory.json`, so it closed this Edit PR.';
+const LANDED = '`.lar-factory.json` reached the default branch without this PR, so Lar Factory finished onboarding with that file '
   + 'and closed this PR.';
 
 type Run = (args: string[]) => Promise<string>;
@@ -38,9 +38,9 @@ type Run = (args: string[]) => Promise<string>;
 /** A line of the PR body that says what one change does. */
 function describe(change: OnboardingPrChange): string {
   switch (change.kind) {
-    case 'agent-skills': return `Writes lar Factory's \`## Agent skills\` block in \`${change.path}\`.`;
+    case 'agent-skills': return `Writes Lar Factory's \`## Agent skills\` block in \`${change.path}\`.`;
     case 'write': return change.path === '.lar-factory.json'
-      ? `${change.created ? 'Adds' : 'Replaces'} \`.lar-factory.json\`, the Repository config lar Factory reads for this repository.`
+      ? `${change.created ? 'Adds' : 'Replaces'} \`.lar-factory.json\`, the Repository config Lar Factory reads for this repository.`
       : `${change.created ? 'Adds' : 'Replaces'} \`${change.path}\`.`;
     case 'edit': return `Edits \`${change.path}\` at line ${change.line}: ${change.reason}`;
     case 'delete': return `Deletes \`${change.path}\`.`;

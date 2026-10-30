@@ -55,9 +55,9 @@ export const url = (): string => {
 <body><main class="loading-lockup" role="status">
 <div class="loading-wordmark"><svg class="loading-mark" viewBox="${BRAND_MARK_VIEWBOX}" aria-hidden="true">
 <path class="loading-mark-block" d="${BRAND_MARK_BLOCK}" fill="${BRAND_BLOCK_COLOR}"/>
-<path class="loading-mark-trace" d="${BRAND_MARK_CENTRE_LINE}" pathLength="1" fill="none" stroke="currentColor" stroke-width="${BRAND_MARK_BAR}" stroke-linecap="round" stroke-linejoin="round"/>
+<path class="loading-mark-trace" d="${BRAND_MARK_CENTRE_LINE}" pathLength="1" fill="none" stroke="currentColor" stroke-width="${BRAND_MARK_BAR}" stroke-linecap="butt" stroke-linejoin="miter"/>
 <path class="loading-mark-fill" d="${BRAND_MARK_L}" fill="currentColor"/>
-</svg><span class="loading-lar">lar</span><span class="loading-factory">Factory</span></div>
+</svg><span class="loading-lar"><span class="loading-lar-slide">ar</span></span><span class="loading-factory">Factory</span></div>
 <p class="loading-line" id="step"><span class="loading-line-slot" id="slot"><span>${STEPS.shell}</span></span></p>
 <p class="loading-line loading-error" id="error" hidden></p>
 </main><script>${script}</script></body></html>`;
@@ -73,7 +73,7 @@ export const errorScript = (reason: string): string =>
   `window.larLoading?.error(${JSON.stringify(`The board server didn't start: ${reason}. Trying again.`)})`;
 
 /** How long the mark takes to draw, as the board page's (apps/web/src/loading/loading-screen.tsx). */
-export const DRAW_MS = 1300;
+export const DRAW_MS = 1750;
 
 /**
  * How long to wait before the board page may open on the finished mark: what is left of the draw since the starting

@@ -8,7 +8,7 @@ Before you write anything, read `unslop` once
 all your prose (slice bodies, comments, your report), not as a separate
 scan-and-rewrite pass. Code is out of scope.
 
-- Follow `<lar-build>/skills/to-tickets/SKILL.md` (`<lar-build>/skills/to-tickets/SKILL.md`) on the build: explore
+- Follow `<lar-build>/skills/to-tickets/SKILL.md` on the build: explore
   the code, then split the work into vertical slices, each sized for one fresh
   context. Chain slices that touch the same file with blocked-by.
 - Publish each slice with `bash <lar-build>/shared/scripts/slice.sh <owner/repo>

@@ -9,7 +9,7 @@ slices.
 `bash <lar-build>/shared/scripts/status.sh <owner/repo#n> "<Status>"`. Call tools by
 name: the ones named here, plus `gh issue view <ref> --comments` and
 `gh issue comment`, or on Azure DevOps the read and comment commands in
-**Azure DevOps** in `<lar-build>/shared/issue-tracker/slices.md`. `status.sh` takes a work
+**Azure DevOps** in `<lar-build>/shared/issue-tracker/azure-devops.md`. `status.sh` takes a work
 item's URL there. Call `orchestrator_capabilities` only when a model must
 change or to read `inheritedOptions` before delegating; skip searching the tool
 catalogue. Read each file or skill a step names only when that step runs.
@@ -156,7 +156,7 @@ on. Write its short brief per **Brief** in `<lar-build>/brief.md`, with that
 repository's Domain docs only, as a sub-issue of this build that blocks it
 (reuse an open issue that covers the work), or on Azure DevOps a child Task
 tagged `repo-<that repository>` that this build waits for (**Children and
-blockers** in `<lar-build>/shared/issue-tracker/slices.md`); run its **Gate** in `<lar-build>/gate.md`, set it
+blockers** in `<lar-build>/shared/issue-tracker/azure-devops.md`); run its **Gate** in `<lar-build>/gate.md`, set it
 **Ready** and tell the user in chat that it waits for the board's Start build
 (the board starts a separate build thread). Ask the user only a product question they haven't
 confirmed. A slice holding that work

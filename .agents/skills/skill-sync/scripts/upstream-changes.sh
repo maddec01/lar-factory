@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage: upstream-changes.sh <lar-factory checkout>
-# For every row in UPSTREAM.md, prints the upstream log and diff of that skill's
-# folder and of its source's licence file (see licence-file.sh, looked up at both
+# For every row in UPSTREAM.md's Copies table, prints the upstream log and diff
+# of that skill's folder and of its source's licence file (see licence-file.sh, looked up at both
 # ends) from the recorded commit to upstream HEAD, with HEAD's 12-character sha
 # and its commit date. Exits non-zero on a Commit that isn't a hex sha.
 # Clones into a temp folder.
@@ -11,11 +11,13 @@ set -euo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source-path=SCRIPTDIR source=licence-file.sh
 source "$here/licence-file.sh"
+# shellcheck source-path=SCRIPTDIR source=upstream-rows.sh
+source "$here/upstream-rows.sh"
 factory=$(cd "${1:-.}" && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-grep -E '^\| `' "$factory/UPSTREAM.md" | while IFS='|' read -r _ name source path repository_path commit _; do
+upstream_rows "$factory/UPSTREAM.md" Copies | while IFS='|' read -r _ name source path _ commit _; do
     name=$(echo "$name" | tr -d ' `'); source=$(echo "$source" | tr -d ' ')
     path=$(echo "$path" | tr -d ' `'); commit=$(echo "$commit" | tr -d ' `')
     if [[ ! $commit =~ ^[0-9a-f]{7,40}$ ]]; then

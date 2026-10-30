@@ -13,7 +13,7 @@ the list of your findings that were fixed; check only that diff and those
 findings.
 
 Read `<lar-build>/coding-style.md` and
-`<lar-build>/shared/skills/domain-modeling/SKILL.md`.
+`<lar-build>/shared/domain-docs.md`.
 
 Check every item:
 
@@ -21,7 +21,7 @@ Check every item:
   else. Quote the brief line for each gap or extra.
 - **Domain docs**: glossary and ADR edits listed in the brief's **Domain
   docs** or the issue's **Domain docs added by the build** comment are part of
-  the change and follow `<lar-build>/shared/skills/domain-modeling/SKILL.md`'s formats.
+  the change and follow `<lar-build>/shared/domain-docs.md`'s formats.
 - **Correctness**: edge cases (empty, missing, boundary values), error paths,
   races and state that can go stale.
 - **Tests**: they cover the brief's behaviour at the narrowest useful boundary

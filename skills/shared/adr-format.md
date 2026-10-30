@@ -1,3 +1,5 @@
+Ported from mattpocock/skills (skills/engineering/domain-modeling/adr-format.md); see UPSTREAM.md.
+
 # ADR Format
 
 ADRs live in `docs/adr/` and use sequential numbering: `0001-slug.md`, `0002-slug.md`, etc.

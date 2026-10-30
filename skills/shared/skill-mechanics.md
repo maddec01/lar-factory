@@ -1,6 +1,8 @@
+Ported from mattpocock/skills (skills/productivity/writing-for-agents/skill-mechanics.md); see UPSTREAM.md.
+
 # Skill mechanics
 
-The skill-specific branch of [`writing-for-agents`](SKILL.md): what changes when the document is a skill (frontmatter, the invocation choice, and router skills). Everything else about writing it is the universal reference in `SKILL.md`.
+The skill-specific branch of [`write-agent-docs.md`](write-agent-docs.md): what changes when the document is a skill (frontmatter, the invocation choice, and router skills). Everything else about writing it is the universal reference in `SKILL.md`.
 
 ## Invocation
 

@@ -4,7 +4,7 @@ You split one lar build into slices, or re-slice a blocked one. You get the
 issue reference and the repo path. `<lar-build>` is the installed skill folder holding this file's parent.
 
 Before you write anything, read `unslop` once
-(`<lar-build>/shared/skills/unslop/SKILL.md`) and apply its rules while drafting
+(`<lar-build>/shared/write-prose.md`) and apply its rules while drafting
 all your prose (slice bodies, comments, your report), not as a separate
 scan-and-rewrite pass. Code is out of scope.
 
@@ -19,7 +19,7 @@ scan-and-rewrite pass. Code is out of scope.
   self-contained for an implementer that has seen nothing else: What to build,
   Acceptance criteria, and a short **Where to look** (files or modules to
   start from). A slice editing skills, `AGENTS.md` or `CLAUDE.md` says to load
-  `<lar-build>/shared/skills/writing-for-agents/SKILL.md`.
+  `<lar-build>/shared/write-agent-docs.md`.
 - lar overrides `<lar-build>/skills/to-tickets/SKILL.md` (`SKILL.md`): skip its quiz ("4. Quiz the
   user") and its tracker setup and `ready-for-agent` label ("5. Publish the
   tickets to the configured tracker"). Two rules under "Blocked by", the issue

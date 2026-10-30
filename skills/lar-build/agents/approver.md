@@ -10,7 +10,7 @@ rejected findings and its list of unreviewed fixes. Glossary and ADR edits
 from the brief's **Domain docs** are part of the change.
 
 Before you write anything, read `unslop` once
-(`<lar-build>/shared/skills/unslop/SKILL.md`) and apply its rules while drafting
+(`<lar-build>/shared/write-prose.md`) and apply its rules while drafting
 all your prose (PR title and body, comments, your report), not as a separate
 scan-and-rewrite pass. Code is out of scope.
 

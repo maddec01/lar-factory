@@ -55,6 +55,8 @@ Maintainer ports an upstream change or skips it.
 
 Full commits: mattpocock/skills `5beb35b040e3de97e54fa9e386d7e42d15c295c2`, addyosmani/agent-skills `aeac41d4d005999432bb7312f7ff06383a91d59d`, cursor/plugins `8b3326d99fd4b993cb33a24dad8af03175c642c5`.
 
+Checked up to: mattpocock/skills `5beb35b040e3`, addyosmani/agent-skills `aeac41d4d005`, cursor/plugins `8b3326d99fd4`.
+
 Authors: mattpocock/skills by Matt Pocock (MIT), addyosmani/agent-skills by Addy Osmani (MIT), cursor/plugins by Lauren Tan (MIT).
 
 The Authors line names each source's author and licence, which the board app's

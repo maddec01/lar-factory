@@ -5,7 +5,7 @@
 
 import { describe, expect, test, vi } from 'vite-plus/test';
 import { $, $$, addStylesheet, answerRestart, mountPage, push, sample, settle, stubApp, text, toolChecks, updatesOff } from '../../test/support.ts';
-import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type InstallOperationResult, type InstallSnapshot, type OnboardingProgress, type TargetSnapshot, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
+import { clock, day, type BoardData, type BundledSkill, type CheckedTool, type InstallOperationResult, type InstallSnapshot, type TargetSnapshot, type UpdateChannel, type UpdateState } from '@lar-factory/shared';
 import type { BlockingPath } from '@lar-factory/shared/install-skills';
 import { dialog, project, serve } from '../onboarding/onboarding-support.ts';
 
@@ -239,41 +239,19 @@ test('each onboarded repository has Edit and Reset, and Add repository opens the
   expect(document.activeElement, 'focus goes back to Add repository').toBe(add);
 });
 
-test("an Azure DevOps repository still onboarding names its team's sprint or backlog", async () => {
-  const setup = { team: 'Fabrikam Team', show: 'all' as const, showPicked: true, role: 'API' };
-  const progress = (itemSource: 'azure-board' | 'azure-board'): OnboardingProgress =>
-    ({ step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-api', provider: 'Azure DevOps', setup: { ...setup, itemSource } } });
+test('a repository still onboarding is listed with its provider and its step, and Resume reopens the dialog there', async () => {
   const data: BoardData = { ...sample, onboarding: [
-    { repo: 'contoso/Fabrikam%20Fiber/lar-api', progress: progress('azure-board') },
-    { repo: 'contoso/Fabrikam%20Fiber/lar-web', progress: progress('azure-board') },
-  ] };
-  serve(data, []);
-  await open('Repositories', data);
-  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api'))).toBe(
-    'contoso/Fabrikam Fiber/lar-apiAzure DevOps · Fabrikam Team\'s backlog and current sprint · All items · Onboarding, stopped at ChecksResumeReset');
-  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-web'))).toContain('Azure DevOps · Fabrikam Team\'s backlog and current sprint · All items');
-});
-
-test('a repository still onboarding is listed with its provider, the answers it has passed and its step, and Resume reopens the dialog there', async () => {
-  const setup = { itemSource: 'issues' as const, show: 'opted-in' as const, showPicked: false, role: 'Notes app' };
-  const data: BoardData = { ...sample, onboarding: [
-    { repo: 'maddec01/lar-web', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-web', provider: 'GitHub', setup: { ...setup, role: '' } } } },
-    { repo: 'maddec01/lar-notes', progress: { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-notes', provider: 'GitHub', setup } } },
+    { repo: 'maddec01/lar-web', progress: { step: 'role', done: ['project', 'detect', 'import'], answers: { projectId: 'lar-web', provider: 'GitHub' } } },
+    { repo: 'contoso/Fabrikam%20Fiber/lar-api', progress: { step: 'checks', done: ['project'], answers: { projectId: 'lar-api', provider: 'Azure DevOps' } } },
   ] };
   serve(data, [project('lar-web', { onBoard: true })]);
   await open('Repositories', data);
-  expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-maddec01/lar-notes']]);
-  expect(text(row('repo-maddec01/lar-web')), 'answers the step has not passed yet').toBe('maddec01/lar-webGitHub · Onboarding, stopped at Board settingsResumeReset');
-  expect(text(row('repo-maddec01/lar-notes'))).toBe('maddec01/lar-notesGitHub · Issues · Items with a status · Onboarding, stopped at ChecksResumeReset');
-  const pr = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-notes', provider: 'GitHub' as const, setup }, prUrl: 'https://github.com/maddec01/lar-notes/pull/2' };
-  const allItems = { ...pr, answers: { ...pr.answers, setup: { ...setup, itemSource: 'issues' as const, show: 'all' as const } } };
-  await push({ ...data, onboarding: [{ repo: 'maddec01/lar-web', progress: allItems }, { repo: 'maddec01/lar-notes', progress: { ...pr, prClosed: true } }] });
-  expect(text(row('repo-maddec01/lar-web'))).toContain('GitHub · Issues · All items · Onboarding, waiting for you to merge its pull request');
-  expect(text(row('repo-maddec01/lar-notes'))).toContain('Onboarding, its pull request closed without merging');
-  await push(data);
+  expect(groups()[1]).toEqual(['Repositories', [...sample.repos.map((r) => `repo-${r.repo}`), 'repo-maddec01/lar-web', 'repo-contoso/Fabrikam%20Fiber/lar-api']]);
+  expect(text(row('repo-maddec01/lar-web'))).toBe('maddec01/lar-webGitHub · Onboarding, stopped at Repository roleResumeReset');
+  expect(text(row('repo-contoso/Fabrikam%20Fiber/lar-api')), "an older board's step").toBe('contoso/Fabrikam Fiber/lar-apiAzure DevOps · Onboarding, stopped at RepositoryResumeReset');
   await settle(() => [...row('repo-maddec01/lar-web').querySelectorAll('button')].find((b) => text(b) === 'Resume')!.click());
   await settle(() => vi.advanceTimersByTime(50));
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Board settings');
+  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repository role');
 });
 
 const DIAGNOSED = ['d-gh', 'd-t3', 'd-git', 'd-jq', 'd-curl'];

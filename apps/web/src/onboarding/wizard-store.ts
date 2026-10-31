@@ -1,53 +1,28 @@
-// The onboarding run the dialog shows: its step, the steps it has passed, the T3 project it picked and the answers it
-// has given, with T3's projects as the server lists them and the folder Create a new T3 project adds. Closing before a
+// The onboarding run the dialog shows: its step, the T3 project it picked and the choices it changed from the detected
+// defaults, with T3's projects as the server lists them and the folder Create a new T3 project adds. Closing before a
 // project is picked, or an offered run before Next or any change, drops the run; closing after keeps its repository on
-// this Mac's list as onboarding, with where it stopped, and Resume reopens it there. The Labels step reads the
-// repository's labels, creates the missing workflow labels and renames old ones, and holds Next while one is missing;
-// it also picks the custom labels the PR's .lar-factory.json lists, creating any typed one. On Azure DevOps it reads
-// the project's tags and renames old ones, but creates none, as the board writes a tag the first time a work item needs
-// it: Next doesn't wait for one, and a typed custom tag is only picked. The Checks step runs the command checks, then the setup checks, and holds Next
-// until each passes. The Cleanup step runs the fixed checks for known Clashes and reads the Clash agent's runs, which the
-// board keeps going while the dialog is closed, asking again every few seconds while one runs. It keeps the user's ticks
-// and skill picks with the run, and holds Next until the latest agent run is done and each project skill named like a
-// bundled skill is deleted or renamed. The Pull request step lists what the PR changes, as the board previews it with
-// the Cleanup step's picks, opens the PR with those picks, then waits for the board to finish the onboarding once the PR
-// merges, whether the PR writes a .lar-factory.json or reuses the repository's own. A PR the board finds closed without
-// merging offers Reopen PR, or Start over, which opens a new one.
+// this Mac's list as onboarding, with where it stopped, and Resume reopens it there. What we found detects the
+// repository's setup, reading only, and holds Next until it can use the T3 project's folder. Work to import lists the
+// open tickets with a status label or tag, and Next imports the ticked ones, staying on the step while one needs the
+// user to settle its Status or placement. Repository edits previews the PR that drops the factory files the user
+// unticked, and Finish waits for the user's approval of it. Finish saves the answers as local settings, which puts the
+// repository on the board, then opens the approved PR.
 
 import { create } from 'zustand';
 import {
-  SETUP_CHECKS, customLabelProblem, customTagProblem, isOnboarding, labelPlan, labelsToCreate, missingCustomLabels, sameRepo, shownRepo, skillRenameProblem, workflowLabelsMissing, type BoardData, type CheckedTool, type Clash, type ClashRun, type CleanupPicks, type FixedClashes, type LabelPlan, type ModelChoice, type ModelGroup, type OnboardingOffer, type OnboardingPicks, type OnboardingPrChange, type OnboardingProgress, type ProjectChoice, type Provider, type RepositoryConfigAnswers, type RepositoryItemSource,
-  type SetupAnswers, type SetupCheckId, type SetupCheckResult, type SkillClash, type SkillPick, type ToolChecks,
+  isOnboarding, sameRepo, type BoardData, type ImportableTicket, type OnboardingChoices, type OnboardingOffer, type OnboardingPrChange,
+  type OnboardingProgress, type ProjectChoice, type Provider, type SetupDetection, type Status, type TicketImport, type TicketsImported,
 } from '@lar-factory/shared';
 import { useBoardStore } from '../board/board-store.ts';
 import { postAction, receive } from '../items/card-actions.ts';
 import { showToast } from '../notices/toasts.tsx';
-import { answerSetup, byTeam, setupItemSource, setupProblems, suggestedShow, type SetupChange } from './setup-answers.ts';
+import { STEP_TITLES, answerProblem, answersOf, isStep, stepsOf, type StepId } from './wizard-choices.ts';
 
-/** The steps in order. */
-export const STEPS = [
-  { id: 'project', label: 'Repository' },
-  { id: 'setup', label: 'Board settings' },
-  { id: 'labels', label: 'Labels' },
-  { id: 'checks', label: 'Checks' },
-  { id: 'cleanup', label: 'Cleanup' },
-  { id: 'pr', label: 'Pull request' },
-] as const;
-export type StepId = (typeof STEPS)[number]['id'];
-
-/** A step's title: the Labels step is Tags on Azure DevOps, whose projects have tags rather than labels. */
-export const stepTitle = (id: StepId, provider: Provider | null | undefined): string =>
-  id === 'labels' && provider === 'Azure DevOps' ? 'Tags' : (STEPS.find((s) => s.id === id) ?? STEPS[0]).label;
-
-/** Where a kept onboarding stopped, as a phrase: waiting for you to merge its pull request, its pull request closed without merging, or stopped at its step. */
-export function stoppedAt({ step, prUrl, prClosed, answers }: OnboardingProgress): string {
-  if (prUrl) return prClosed ? 'its pull request closed without merging' : 'waiting for you to merge its pull request';
-  return `stopped at ${stepTitle(isStep(step) ? step : 'project', answers.provider)}`;
-}
+/** Where a kept onboarding stopped, as a phrase; a step this dialog doesn't have, as an older board's, reads as the first. */
+export const stoppedAt = ({ step }: OnboardingProgress): string => `stopped at ${STEP_TITLES[isStep(step) ? step : 'project']}`;
 
 export interface Run {
   step: StepId;
-  done: StepId[];
   /** The picked T3 project's id. */
   projectId: string | null;
   /** The picked T3 project's repository. */
@@ -56,14 +31,7 @@ export interface Run {
   provider: Provider | null;
   /** The repository the run was kept under when it was last closed; null for a run never kept. */
   savedAs: string | null;
-  /** The Board settings step's answers; null until that step first shows. */
-  setup: SetupAnswers | null;
-  /** The custom labels the Labels step picked, which the PR's .lar-factory.json lists. */
-  customLabels: string[];
-  /** The Cleanup step's picks; null until that step first shows. */
-  cleanup: CleanupPicks | null;
-  /** The onboarding PR, once it is open. */
-  prUrl: string | null;
+  choices: OnboardingChoices;
 }
 
 export type Projects = { state: 'loading' } | { state: 'loaded'; projects: ProjectChoice[] } | { state: 'failed'; error: string };
@@ -74,6 +42,29 @@ export interface Creating {
   adding: boolean;
   error: string | null;
 }
+
+/** A read the board answers: running, answered, or the board's problem. */
+export type Read<T> = { state: 'reading' } | { state: 'read'; value: T } | { state: 'failed'; error: string };
+
+/** The user's pick for a ticket to import: whether it's ticked, and the Status or placement it needs. */
+export interface TicketPick {
+  on: boolean;
+  status?: Status;
+  placeHere?: boolean;
+}
+
+/** Work to import: the tickets offered, the user's picks, and the last import's refusals by ticket, or its problem. */
+export interface Tickets {
+  read: Read<ImportableTicket[]>;
+  picks: Record<number, TicketPick>;
+  importing: boolean;
+  refused: Record<number, string>;
+  error: string | null;
+}
+
+/** Finish: saving the answers, then opening the approved PR, if any, or the problem with either. */
+type Finish = { state: 'idle' } | { state: 'saving' } | { state: 'failed'; error: string }
+  | { state: 'done'; pr: null | { state: 'opening' } | { state: 'opened'; url: string } | { state: 'failed'; error: string } };
 
 /**
  * Why a T3 project can't be picked, or null when it can. The repository a resumed run was kept under stays pickable;
@@ -92,194 +83,46 @@ export function pickedProject(run: Run, projects: Projects): ProjectChoice | nul
   return projects.state === 'loaded' ? projects.projects.find((p) => p.id === run.projectId) ?? null : null;
 }
 
-/** Whether the setup step asks its questions: a repository on a provider, with no .lar-factory.json to reuse. */
-export const asksSetup = (project: ProjectChoice): boolean => !!project.provider && (project.hasConfig === false || !!project.configProblem);
+/** The run's detection, once read. */
+export const detectedOf = (detection: Read<SetupDetection> | null): SetupDetection | null => (detection?.state === 'read' ? detection.value : null);
 
-/** Whether the setup step's answers are whole, as setupProblems says. */
-const setupAnswered = (setup: SetupAnswers | null): boolean => !!setup && Object.keys(setupProblems(setup)).length === 0;
+/** The steps the run shows, as its detection shapes them. */
+export const runSteps = (run: Run, detection: Read<SetupDetection> | null): StepId[] => stepsOf(run.provider, detectedOf(detection), run.choices);
 
-/** The item source the run reads: its reused .lar-factory.json's, else its answers'; null until they are whole. */
-export function itemSourceOf(run: Run, project: ProjectChoice): RepositoryItemSource | null {
-  if (project.config) return project.config.itemSource;
-  if (!setupAnswered(run.setup)) return null;
-  return setupItemSource(run.setup!);
+/** Whether a ticket is offered for import: open, with a status, and held by no work record yet. */
+const importable = (ticket: ImportableTicket) => ticket.workId === null;
+
+/** What a ticked ticket needs before it can import, or null: its Status among several, or confirming an untagged work item is this repository's. */
+export function ticketProblem(ticket: ImportableTicket, pick: TicketPick | undefined): string | null {
+  if (!pick?.on) return null;
+  if (ticket.statuses.length > 1 && !pick.status) return 'Choose its Status, or untick it.';
+  if (ticket.untagged && !pick.placeHere) return "Confirm it is this repository's work, or untick it.";
+  return null;
 }
 
-/** The .lar-factory.json values the onboarding PR writes, from the setup step's answers; null until they are whole. */
-export function configOf(run: Run, project: ProjectChoice): RepositoryConfigAnswers | null {
-  const itemSource = itemSourceOf(run, project);
-  return itemSource && run.setup && { itemSource, show: run.setup.show, role: run.setup.role.trim(), labels: run.customLabels };
-}
-
-/** Whether the run's onboarding finished: its PR is open and the board no longer has its repository onboarding, as the PR merged. */
-export const onboarded = (run: Run, data: Pick<BoardData, 'onboarding'>): boolean => !!run.prUrl && !isOnboarding(data, run.repo);
-
-/** Whether the board found the run's PR closed without merging. */
-export function prClosed(run: Run, data: Pick<BoardData, 'onboarding'>): boolean {
-  const kept = run.repo ? data.onboarding?.find((o) => sameRepo(o.repo, run.repo!)) : undefined;
-  return !!run.prUrl && kept?.progress.prUrl === run.prUrl && !!kept.progress.prClosed;
-}
-
-/** Whether the item source is an Azure DevOps team's, read through az rather than gh. */
-const readsAzureTeam = (source: RepositoryItemSource | null): boolean => !!source && byTeam(source.kind);
-
-/** The commands the Checks step checks for the item source: az for an Azure DevOps team's, gh for a GitHub one. */
-export const commandChecks = (source: RepositoryItemSource | null): CheckedTool[] => [readsAzureTeam(source) ? 'az' : 'gh', 't3', 'git', 'jq', 'curl'];
-
-/** Whether a command's check passes for the item source. */
-export function commandPasses(name: CheckedTool, tools: ToolChecks | undefined, source: RepositoryItemSource | null): boolean {
-  const check = tools?.[name];
-  return check?.result === 'ok';
-}
-
-/** A setup check on the Checks step: waiting for the checks before it, running, or done with its result. */
-type SetupCheckState = { state: 'waiting' } | { state: 'running' } | { state: 'done'; result: SetupCheckResult };
-
-/** The Checks step's checks. */
-export interface Checks {
-  /** The command checks, which the board runs again; once done, their results are the board's tools. */
-  commands: { state: 'running' } | { state: 'done' } | { state: 'failed'; error: string };
-  setup: Record<SetupCheckId, SetupCheckState>;
-}
-
-/** Whether every check on the Checks step passed. */
-export function checksPassed(checks: Checks | null, tools: ToolChecks | undefined, source: RepositoryItemSource | null): boolean {
-  return checks?.commands.state === 'done' && commandChecks(source).every((name) => commandPasses(name, tools, source))
-    && SETUP_CHECKS.every((id) => { const c = checks.setup[id]; return c.state === 'done' && c.result.passed; });
-}
-
-/**
- * The Cleanup step's fixed checks: running, or read with the bundled skill names the board had then, or the board's
- * problem.
- */
-export type Clashes = { state: 'reading' } | { state: 'read'; found: FixedClashes; bundled: string[] } | { state: 'failed'; error: string };
-
-/** Whether a Clash's edit goes in the PR: never when it won't apply, else the user's tick, else as the check offers it. */
-export const ticked = (clash: Clash, picks: CleanupPicks | null): boolean => !clash.wontApply && (picks?.ticks[clash.id] ?? clash.ticked);
-
-/** The folder that holds a skill's folder, such as `.claude/skills/`. */
-export const skillsDir = (path: string) => path.replace(/[^/]+\/$/, '');
-
-/**
- * What Next waits for from a skill Clash, or null once it's picked: Delete, or Rename to a valid name that no bundled
- * skill, no other project skill, and no other rename into the same folder has.
- */
-export function skillProblem(skill: SkillClash, picks: CleanupPicks | null, clashes: Extract<Clashes, { state: 'read' }>): string | null {
-  const pick = picks?.skills[skill.path];
-  if (!pick) return 'Choose whether to remove or rename this skill.';
-  if (pick.kind === 'delete') return null;
-  const renamedBeside = clashes.found.skillClashes.flatMap((other) => {
-    const picked = picks.skills[other.path];
-    return other.path !== skill.path && skillsDir(other.path) === skillsDir(skill.path) && picked?.kind === 'rename' ? [picked.name] : [];
+/** The ticked tickets to import, with the Status or placement each needs. */
+function toImport(tickets: Tickets): TicketImport[] {
+  if (tickets.read.state !== 'read') return [];
+  return tickets.read.value.filter((t) => importable(t) && tickets.picks[t.number]?.on).map((t) => {
+    const { status, placeHere } = tickets.picks[t.number]!;
+    return { number: t.number, ...t.statuses.length > 1 && status && { status }, ...t.untagged && placeHere && { placeHere } };
   });
-  return skillRenameProblem(pick.name, clashes.bundled, clashes.found.projectSkills, renamedBeside);
 }
 
-/**
- * The Cleanup step's Clash agent: its runs as the board last answered, oldest first, null until it first answers; the
- * model picked for the next run, null while none is; whether Look for Clashes or Retry is posting; and the board's
- * problem with the last post or read, with which call failed, so Retry makes it again.
- */
-export interface Agent {
-  runs: ClashRun[] | null;
-  model: ModelChoice | null;
-  starting: boolean;
-  error: { call: 'start' | 'read'; message: string } | null;
-}
-
-const NO_AGENT: Agent = { runs: null, model: null, starting: false, error: null };
-
-/** The agent's latest run, which the step shows and Next waits for; null before the first. */
-export const latestRun = (agent: Agent | null): ClashRun | null => agent?.runs?.at(-1) ?? null;
-
-/** The model the next run starts on: the one picked, else the latest run's, else the first T3 offers. */
-export const nextModel = (agent: Agent | null, groups: readonly ModelGroup[]): ModelChoice | null => {
-  if (agent?.model) return agent.model;
-  const latest = latestRun(agent);
-  if (latest) return latest.model;
-  const first = groups.find((g) => g.models.length);
-  return first ? { instanceId: first.instanceId, model: first.models[0]!.slug } : null;
-};
-
-/** Whether the fixed checks ran, the latest agent run is done and each skill Clash is picked. */
-const cleanupDone = (run: Run, clashes: Clashes | null, agent: Agent | null): boolean =>
-  clashes?.state === 'read' && latestRun(agent)?.state === 'done' && clashes.found.skillClashes.every((skill) => !skillProblem(skill, run.cleanup, clashes));
-
-/**
- * The fixes the PR holds, from the Cleanup step: the fixed checks' and the latest agent run's ticked Clashes, and each
- * skill Clash's pick. Null until the fixed checks are read and the latest agent run is done.
- */
-export function picksOf(run: Run, clashes: Clashes | null, agent: Agent | null): OnboardingPicks | null {
-  const latest = latestRun(agent);
-  if (clashes?.state !== 'read' || latest?.state !== 'done') return null;
-  const skills = Object.fromEntries(clashes.found.skillClashes.flatMap((skill) => {
-    const pick = run.cleanup?.skills[skill.path];
-    return pick ? [[skill.path, pick]] : [];
-  }));
-  return { clashes: [...clashes.found.clashes, ...latest.clashes].filter((clash) => ticked(clash, run.cleanup)), skills };
-}
-
-/** The .lar-factory.json values the PR writes, null when it reuses the repository's own; undefined until the setup step's answers are whole. */
-function prConfig(run: Run, project: ProjectChoice): RepositoryConfigAnswers | null | undefined {
-  return project.config ? null : configOf(run, project) ?? undefined;
-}
-
-/** The Pull request step's list of the PR's changes, as the board previews them, or the board's problem. */
-type PrChanges = { state: 'reading' } | { state: 'read'; changes: OnboardingPrChange[] } | { state: 'failed'; error: string };
-
-/** A change the Labels step makes: Create, Rename, or adding a typed custom label. */
-type LabelAction = 'create' | 'rename' | 'custom';
-
-/**
- * The Labels step's read of the repository's labels, the old names Rename leaves, the custom label being typed, and a
- * change while it runs or once it failed.
- */
-export interface Labels {
-  read: { state: 'loading' } | { state: 'loaded'; names: string[] } | { state: 'failed'; error: string };
-  /** The old names unticked for Rename, whose new labels Create makes instead. */
-  kept: string[];
-  /** The new custom label's field. */
-  typed: string;
-  /** The custom labels the step created on the repository, which it doesn't list as left alone. */
-  created: string[];
-  busy: LabelAction | null;
-  progress?: { created: number; total: number };
-  /** A change that failed, with the custom label it was adding for a typed one. */
-  error: { action: LabelAction; message: string; name?: string } | null;
-}
-
-/** The Labels step's plan for the run's repository once its labels are read; null before. */
-export function labelsPlan(run: Run, project: ProjectChoice, labels: Labels | null): LabelPlan | null {
-  return labels?.read.state === 'loaded' ? labelPlan(labels.read.names) : null;
-}
-
-/** The custom labels a reused .lar-factory.json lists that the repository lacks, which Create makes too; none for a run that picks its own. */
-export const customLabelsToCreate = (project: ProjectChoice, labels: Labels): string[] =>
-  project.config && labels.read.state === 'loaded' ? missingCustomLabels(labels.read.names, project.config.labels) : [];
-
-/** Why the typed custom label can't be one, or null; on Azure DevOps a tag, which can't hold a comma or semicolon either. */
-export const typedLabelProblem = (project: ProjectChoice, typed: string): string | null =>
-  (project.provider === 'Azure DevOps' ? customTagProblem : customLabelProblem)(typed);
-
-/** The old names Rename moves: each the plan offers, less those unticked. */
-export const renaming = (plan: LabelPlan, labels: Labels): string[] =>
-  plan.workflow.flatMap((r) => r.state === 'rename' && !labels.kept.includes(r.oldName) ? [r.oldName] : []);
-
-/** Whether the run's step lets Next move past it. */
-export function stepReady(run: Run, projects: Projects, checks: Checks | null = null, tools?: ToolChecks, clashes: Clashes | null = null,
-  agent: Agent | null = null, labels: Labels | null = null): boolean {
-  const project = pickedProject(run, projects);
-  if (!project) return false;
+/** Whether the run's step lets Next or Finish move past it. */
+export function stepReady(run: Run, projects: Projects, detection: Read<SetupDetection> | null, tickets: Tickets | null = null,
+  changes: Read<OnboardingPrChange[]> | null = null, approved = false): boolean {
+  if (!pickedProject(run, projects)) return false;
   if (run.step === 'project') return true;
-  if (run.step === 'setup') return !!project.config || asksSetup(project) && setupAnswered(run.setup);
-  if (run.step === 'labels') {
-    if (labels?.busy) return false;
-    const plan = labelsPlan(run, project, labels);
-    return !!plan && (project.provider === 'Azure DevOps' || !workflowLabelsMissing(plan));
+  const detected = detectedOf(detection);
+  if (!detected || !('found' in detected.checkout)) return false;
+  if (answerProblem(run.step, answersOf(detected, run.choices))) return false;
+  if (run.step === 'import') {
+    if (!tickets || tickets.importing || tickets.read.state === 'reading') return false;
+    return tickets.read.state === 'failed' || tickets.read.value.every((t) => !importable(t) || !ticketProblem(t, tickets.picks[t.number]));
   }
-  if (run.step === 'checks') return checksPassed(checks, tools, itemSourceOf(run, project));
-  if (run.step === 'cleanup') return cleanupDone(run, clashes, agent);
-  return false;
+  if (run.step === 'edits') return changes?.state === 'read' && approved;
+  return true;
 }
 
 interface WizardState {
@@ -288,331 +131,160 @@ interface WizardState {
   projects: Projects;
   /** Create a new T3 project's form; null while a listed project is the choice. */
   creating: Creating | null;
-  /** The Labels step's labels; null until the run reaches it. */
-  labels: Labels | null;
-  /** The Checks step's checks; null until the run first reaches it. */
-  checks: Checks | null;
-  /** The Cleanup step's fixed checks; null until the run first reaches it. */
-  clashes: Clashes | null;
-  /** The Cleanup step's Clash agent. */
-  agent: Agent;
-  /** The Pull request step's list of the PR's changes; null until the run first reaches it. */
-  changes: PrChanges | null;
+  /** What we found; null until the run first reaches it. */
+  detection: Read<SetupDetection> | null;
+  /** Work to import; null until the run first reaches it. */
+  tickets: Tickets | null;
+  /** Repository edits' PR changes, as the board previews them; null until the run reaches the step. */
+  changes: Read<OnboardingPrChange[]> | null;
+  /** Whether the user approved the previewed edits. */
+  approved: boolean;
+  finish: Finish;
   /** The button that opened the dialog, which gets focus back when it closes. */
   opener: HTMLElement | null;
   /** Opens a new run, with the offered T3 project picked when it comes from an offer. */
   start: (offer?: OnboardingOffer) => void;
-  /** Reopens the onboarding the board keeps for `repo`, on its step with its answers. */
+  /** Reopens the onboarding the board keeps for `repo`, on its step with its choices. */
   resume: (repo: string) => void;
   close: () => void;
   /** Reads T3's projects again. */
   loadProjects: () => Promise<void>;
+  /** Picks a T3 project; another one than before drops what the run detected and chose. */
   pick: (projectId: string) => void;
   /** Chooses Create a new T3 project, which unpicks the picked project. */
   chooseNew: () => void;
   setFolder: (folder: string) => void;
   /** Adds the form's folder as a T3 project and picks it. */
   createProject: () => Promise<void>;
-  /** Changes the setup step's answers. A new item source brings its suggested show setting until one is picked. */
-  answer: (change: SetupChange) => void;
-  next: () => void;
+  /** Detects the picked repository's setup again. */
+  detect: () => Promise<void>;
+  /** Changes the run's choices; a new item source reads the tickets again, and new drops preview the edits again. */
+  choose: (change: OnboardingChoices) => void;
+  /** Reads the tickets to import with the run's item source. */
+  readTickets: () => Promise<void>;
+  /** Ticks or unticks a ticket to import, or settles its Status or placement. */
+  pickTicket: (number: number, change: Partial<TicketPick>) => void;
+  /** Next: on Work to import, imports the ticked tickets first and stays while one is refused. */
+  next: () => Promise<void>;
   back: () => void;
-  /** Reads the repository's labels for the Labels step, or its project's tags on Azure DevOps. */
-  loadLabels: () => Promise<void>;
-  /** Ticks or unticks an old name for Rename. */
-  toggleRename: (oldName: string) => void;
-  /** Creates the missing labels, less the old names Rename moves; nothing on Azure DevOps. */
-  createLabels: () => Promise<void>;
-  /** Renames each ticked old name to its new one. */
-  renameLabels: () => Promise<void>;
-  /** Picks or unpicks a custom label. */
-  toggleCustomLabel: (name: string) => void;
-  /** Changes the new custom label's field. */
-  typeCustomLabel: (typed: string) => void;
-  /** Creates the typed custom label on the repository, unless it has it already, and picks it; on Azure DevOps it only picks it. */
-  addCustomLabel: () => Promise<void>;
-  /** Runs the command checks, then each setup check in turn. */
-  runChecks: () => Promise<void>;
-  /** Runs one setup check again. */
-  retryCheck: (id: SetupCheckId) => Promise<void>;
-  /** Runs the fixed checks for known Clashes on the run's repository. */
-  findClashes: () => Promise<void>;
-  /** Reads the agent's runs for the run's repository, and again every few seconds while the latest runs. */
-  readClashRuns: () => Promise<void>;
-  /** Picks the model the next agent run starts on. */
-  pickModel: (model: ModelChoice) => void;
-  /**
-   * Look for Clashes, Look again or Retry: starts an agent run in a new T3 thread on `model`, leaving the earlier runs listed. A
-   * new run's Clashes reuse the ids of the earlier ones', so their ticks are dropped once the board takes the run; a failed
-   * start keeps them.
-   */
-  lookForClashes: (model: ModelChoice) => Promise<void>;
-  /** Ticks or unticks a Clash's edit, by its id. */
-  tick: (id: string, on: boolean) => void;
-  /** Picks Delete or Rename for a skill Clash, by its path. */
-  pickSkill: (path: string, pick: SkillPick) => void;
-  /** Asks the board what the PR changes with the run's answers and the Cleanup step's picks. */
-  previewPr: () => Promise<void>;
-  /**
-   * On the Pull request step with no changes read, as after Resume, or with their read failed, as on Retry: runs the
-   * fixed checks and reads the agent's runs again for the picks, then asks the board what the PR changes.
-   */
-  readPrChanges: () => Promise<void>;
-  /**
-   * Opening or reopening the onboarding PR, and why the board couldn't; Check now while it waits for the board's read,
-   * and when that read last answered with the PR still open.
-   */
-  pr: { opening: boolean; reopening: boolean; checking: boolean; checkedAt: number | null; error: string | null };
-  /** Opens the onboarding PR, which the board keeps with the run's progress. */
+  /** Asks the board what the PR that drops the unticked factory files changes. */
+  previewEdits: () => Promise<void>;
+  approve: (approved: boolean) => void;
+  /** Saves the answers, which puts the repository on the board, then opens the approved PR. */
+  save: () => Promise<void>;
+  /** Opens the approved PR, again after a failure. */
   openPr: () => Promise<void>;
-  /** Reopens the run's PR, which closed without merging. */
-  reopenPr: () => Promise<void>;
-  /** Drops the run's closed PR and opens a new one. */
-  startOver: () => Promise<void>;
-  /** Has the board read GitHub now, so it finds a merge before its next refresh, and waits for that read. */
-  checkMerge: () => Promise<void>;
 }
 
 /** Counts project reads, so one answered after a newer read or a close is dropped. */
 let reads = 0;
-/** Counts check runs, so a check answered after a newer run or a close is dropped. */
-let checkRuns = 0;
-/** Counts fixed check runs, so one answered after a newer run or a close is dropped. */
-let clashReads = 0;
-/** Counts previews of the PR's changes, so one answered after a newer preview or a close is dropped. */
+/** Counts the run's other reads, so one answered after a newer one, another project or a close is dropped. */
+let detections = 0;
+let ticketReads = 0;
 let previews = 0;
-/** Counts reads of the agent's runs, so one answered after a newer read, a start or a close is dropped, and its next read with it. */
-let agentReads = 0;
-/** The next read of the agent's runs while one runs. */
-let agentTimer: ReturnType<typeof setTimeout> | undefined;
-/** Counts label reads and changes, so one answered after a newer one or a close is dropped. */
-let labelRuns = 0;
 /** The run an offer opened, until Next or a change replaces it; closing it then keeps nothing. */
 let untouchedOffer: Run | null = null;
-
-/** The Cleanup step's picks before any is changed. */
-const NO_PICKS: CleanupPicks = { ticks: {}, skills: {} };
-
-const IDLE: WizardState['pr'] = { opening: false, reopening: false, checking: false, checkedAt: null, error: null };
-
-/** How often the step asks for the agent's runs while one runs. */
-export const AGENT_POLL_MS = 3_000;
-
-/** Stops reading the agent's runs: the dialog closed, or a newer read or start replaces the one waiting. */
-function stopAgentReads(): void {
-  agentReads++;
-  clearTimeout(agentTimer);
-}
-
-/** Drops the ticks of the agent's Clashes, whose ids a new run reuses. */
-const withoutAgentTicks = (picks: CleanupPicks): CleanupPicks =>
-  ({ ...picks, ticks: Object.fromEntries(Object.entries(picks.ticks).filter(([id]) => !id.startsWith('agent-'))) });
-
-/** How long Check now waits for the board's read before it gives up. */
-const READ_WAIT_MS = 60_000;
-
-/**
- * The board data the page gets once the board read GitHub after `before`: a new read time, or a read problem other than
- * the one `before` has. Null when none arrives within READ_WAIT_MS, as when gh can't read at all; `cancel` stops waiting.
- */
-function nextRead(before: BoardData): { read: Promise<BoardData | null>; cancel: () => void } {
-  let cancel = () => {};
-  const read = new Promise<BoardData | null>((resolve) => {
-    const done = (data: BoardData | null) => {
-      clearTimeout(timer);
-      stop();
-      resolve(data);
-    };
-    const stop = useBoardStore.subscribe(({ data }) => {
-      if (data.fetchedAt !== before.fetchedAt || data.error && data.error !== before.error) done(data);
-    });
-    const timer = setTimeout(() => done(null), READ_WAIT_MS);
-    cancel = () => done(null);
-  });
-  return { read, cancel };
-}
-
-const WAITING: Record<SetupCheckId, SetupCheckState> = { checkout: { state: 'waiting' }, source: { state: 'waiting' }, push: { state: 'waiting' } };
-
-const isStep = (id: string): id is StepId => STEPS.some((s) => s.id === id);
 
 /** The focused element, as the button that opens the dialog; null when nothing is. */
 const focused = (): HTMLElement | null => document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
 
-/** The run a kept onboarding resumes; a step this dialog doesn't have, as a newer board's, resumes on the T3 project step. */
-function resumed(repo: string, progress: OnboardingProgress): Run {
-  return { step: isStep(progress.step) ? progress.step : 'project', done: progress.done.filter(isStep), projectId: progress.answers.projectId, repo,
-    provider: progress.answers.provider ?? null, savedAs: repo, setup: progress.answers.setup ?? null, customLabels: progress.answers.customLabels ?? [],
-    cleanup: progress.answers.cleanup ?? null,
-    prUrl: progress.prUrl ?? null };
-}
+/** The run a kept onboarding resumes; a step this dialog doesn't have, as an older board's, resumes on the T3 project step. */
+const resumed = (repo: string, progress: OnboardingProgress): Run => ({ step: isStep(progress.step) ? progress.step : 'project',
+  projectId: progress.answers.projectId, repo, provider: progress.answers.provider ?? null, savedAs: repo, choices: progress.answers.choices ?? {} });
 
-/**
- * The setup step's defaults: repository issues on GitHub, or the combined Azure board. The Azure team
- * is chosen from the project's teams.
- */
-function firstSetup(provider: Provider | null): SetupAnswers {
-  const itemSource = provider === 'Azure DevOps' ? 'azure-board' : 'issues';
-  return { itemSource, team: '', show: suggestedShow(),
-    showPicked: false, role: '' };
+/** Where the run stopped, as the board keeps it, with the steps before it as done. */
+function progressOf(run: Run & { projectId: string }, detection: Read<SetupDetection> | null): OnboardingProgress {
+  const steps = runSteps(run, detection);
+  return { step: run.step, done: steps.slice(0, Math.max(0, steps.indexOf(run.step))),
+    answers: { projectId: run.projectId, ...run.provider && { provider: run.provider }, ...Object.keys(run.choices).length && { choices: run.choices } } };
 }
-
-/** Where the run stopped, as the board keeps it. */
-const progressOf = (run: Run & { projectId: string }): OnboardingProgress => ({ step: run.step, done: run.done,
-  answers: { projectId: run.projectId, ...run.provider && { provider: run.provider }, ...run.setup && { setup: run.setup },
-    ...run.customLabels.length && { customLabels: run.customLabels }, ...run.cleanup && { cleanup: run.cleanup } },
-  ...run.prUrl && { prUrl: run.prUrl } });
 
 /** The onboarding a run kept under another repository replaces, to send with its repository. */
 const replacing = (run: Run & { repo: string }) => run.savedAs && !sameRepo(run.savedAs, run.repo) ? { replaces: run.savedAs } : {};
 
 /** Asks the server to keep the run's repository as onboarding; a refusal shows in a toast. */
-async function keep(run: Run & { projectId: string; repo: string }): Promise<void> {
-  const progress = progressOf(run);
-  const replaces = replacing(run);
-  const result = await postAction('/api/onboarding/repositories', { repo: run.repo, progress, ...replaces });
+async function keep(run: Run & { projectId: string; repo: string }, detection: Read<SetupDetection> | null): Promise<void> {
+  const result = await postAction('/api/onboarding/repositories', { repo: run.repo, progress: progressOf(run, detection), ...replacing(run) });
   receive(result);
   if (result.error) showToast({ slot: 'onboarding', failed: true, what: ` error for onboarding ${run.repo}`,
     body: `Couldn't keep onboarding ${run.repo} on the board. ${result.error}` });
 }
 
+const FRESH = { detection: null, tickets: null, changes: null, approved: false, finish: { state: 'idle' } } as const;
+
 export const useWizardStore = create<WizardState>()((set, get) => {
+  /** Drops every read the run is waiting for. */
+  const forget = () => { detections++; ticketReads++; previews++; };
+
+  /** Reads what a step shows when the run reaches it, unless it has it already. */
+  const enter = (step: StepId) => {
+    const { detection, tickets } = get();
+    if (step !== 'project' && !detection) void get().detect();
+    if (step === 'import' && !tickets) void get().readTickets();
+    if (step === 'edits') void get().previewEdits();
+  };
+
   const move = (by: 1 | -1) => {
-    const { run, projects, checks, clashes, agent, labels } = get();
-    // Once its PR is open, the run stays on the Pull request step.
-    if (!run || run.prUrl || (by === 1 && !stepReady(run, projects, checks, useBoardStore.getState().data.tools, clashes, agent, labels))) return;
-    const to = STEPS[STEPS.findIndex((s) => s.id === run.step) + by]?.id;
-    if (to) set({ run: { ...run, step: to, done: by === 1 ? [...new Set([...run.done, run.step])] : run.done,
-      setup: run.setup ?? (to === 'setup' ? firstSetup(run.provider) : null), cleanup: run.cleanup ?? (to === 'cleanup' ? NO_PICKS : null) } });
-    if (to === 'labels') void get().loadLabels();
-    if (to === 'checks') void get().runChecks();
-    if (to === 'cleanup') {
-      void get().findClashes();
-      void get().readClashRuns();
-    } else stopAgentReads();
-    if (to === 'pr') void get().previewPr();
+    const { run, detection } = get();
+    if (!run) return;
+    const steps = runSteps(run, detection);
+    const to = steps[steps.indexOf(run.step) + by];
+    if (!to) return;
+    set({ run: { ...run, step: to } });
+    enter(to);
   };
 
-  /** Shows the agent's runs as the board answered them, and asks again in a while if the latest still runs. */
-  const showRuns = (runs: ClashRun[], read: number) => {
-    set({ agent: { ...get().agent, runs, error: null } });
-    if (runs.at(-1)?.state === 'running') agentTimer = setTimeout(() => { if (read === agentReads) void get().readClashRuns(); }, AGENT_POLL_MS);
-  };
-
-  /** The labels while `runId` is the latest label run and the run is open. */
-  const currentLabels = (runId: number) => runId === labelRuns && get().run ? get().labels : null;
-
-  /**
-   * Posts a label read or change for the run's repository, and keeps its answer while it's the latest; the labels it
-   * answers with, if any. A failed change keeps `name`, the custom label it was adding.
-   */
-  const labelsPost = async (path: string, body: object, action: LabelAction | null, name?: string): Promise<string[] | undefined> => {
-    const { run } = get();
-    if (!run?.repo) return;
-    const runId = ++labelRuns;
-    const answer = await postAction<{ labels: string[] }>(path, { repo: run.repo, ...body }, action === 'create' ? (update) => {
-      const now = currentLabels(runId);
-      if (!now || !update.labels) return;
-      const before = now.read.state === 'loaded' ? now.read.names : [];
-      const added = update.labels.filter((name) => !before.includes(name)).length;
-      set({ labels: { ...now, read: { state: 'loaded', names: update.labels }, progress: now.progress && { ...now.progress, created: now.progress.created + added } } });
-    } : undefined);
-    const now = currentLabels(runId);
-    if (!now) return;
-    if (answer.labels) {
-      set({ labels: { ...now, read: { state: 'loaded', names: answer.labels }, busy: null, error: null } });
-      return answer.labels;
+  /** Imports the ticked tickets; whether every one imported. */
+  const importTickets = async (): Promise<boolean> => {
+    const { run, tickets, detection } = get();
+    const detected = detectedOf(detection);
+    const chosen = tickets ? toImport(tickets) : [];
+    if (!run?.repo || !tickets || !detected || !chosen.length) return true;
+    const read = ++ticketReads;
+    set({ tickets: { ...tickets, importing: true, error: null } });
+    const answer = await postAction<TicketsImported>('/api/onboarding/import', { repo: run.repo, itemSource: answersOf(detected, run.choices).itemSource, tickets: chosen });
+    receive(answer);
+    const now = get().tickets;
+    if (read !== ticketReads || !now) return false;
+    if (answer.error || !answer.refused) {
+      set({ tickets: { ...now, importing: false, error: answer.error ?? 'The board sent no import.' } });
+      return false;
     }
-    const message = answer.error ?? 'The board sent no labels.';
-    if (!action) return void set({ labels: { ...now, read: { state: 'failed', error: message } } });
-    set({ labels: { ...now, busy: null, error: { action, message, ...name !== undefined && { name } } } });
-    // Some labels may have changed before gh failed, so read them again.
-    const reread = await postAction<{ labels: string[] }>('/api/onboarding/labels', { repo: run.repo });
-    const after = currentLabels(runId);
-    if (after && reread.labels) set({ labels: { ...after, read: { state: 'loaded', names: reread.labels } } });
-  };
-
-  /** The run's project and its label plan, while the Labels step has its labels and no change running. */
-  const labelStep = () => {
-    const { run, projects, labels } = get();
-    const project = run && pickedProject(run, projects);
-    const plan = run && project && labelsPlan(run, project, labels);
-    return run && project && plan && labels && !labels.busy ? { run, project, plan, labels } : null;
-  };
-
-  /** The run's checks while `runId` is the latest check run and the run is open. */
-  const current = (runId: number) => runId === checkRuns && get().run ? get().checks : null;
-
-  const runSetupCheck = async (id: SetupCheckId, runId: number) => {
-    const { run, projects } = get();
-    const project = run && pickedProject(run, projects);
-    const checks = current(runId);
-    if (!run?.repo || !project || !checks) return;
-    set({ checks: { ...checks, setup: { ...checks.setup, [id]: { state: 'running' } } } });
-    const answer = await postAction<{ result: SetupCheckResult }>('/api/onboarding/checks',
-      { check: id, repo: run.repo, projectId: project.id, itemSource: itemSourceOf(run, project) });
-    const now = current(runId);
-    if (!now) return;
-    const result: SetupCheckResult = answer.result ?? { passed: false, problem: answer.error ?? 'The board sent no result.', fix: 'Retry once the board answers.' };
-    set({ checks: { ...now, setup: { ...now.setup, [id]: { state: 'done', result } } } });
+    set({ tickets: { ...now, importing: false, refused: Object.fromEntries(answer.refused.map((r) => [r.number, r.reason])) } });
+    // The tickets imported now have records, so the list shows them as recorded.
+    await get().readTickets();
+    return answer.refused.length === 0;
   };
 
   return {
     run: null,
     projects: { state: 'loading' },
     creating: null,
-    checks: null,
-    clashes: null,
-    agent: NO_AGENT,
-    changes: null,
-    labels: null,
-    pr: IDLE,
+    ...FRESH,
     opener: null,
     start: (offer) => {
-      checkRuns++;
-      clashReads++;
-      const run: Run = { step: 'project', done: [], projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer?.provider ?? null,
-        savedAs: null, setup: null, customLabels: [], cleanup: null, prUrl: null };
+      forget();
+      const run: Run = { step: 'project', projectId: offer?.projectId ?? null, repo: offer?.repo ?? null, provider: offer?.provider ?? null, savedAs: null, choices: {} };
       untouchedOffer = offer ? run : null;
-      stopAgentReads();
-      previews++;
-      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, labels: null, pr: IDLE, opener: focused() });
+      set({ run, creating: null, ...FRESH, opener: focused() });
       void get().loadProjects();
     },
     resume: (repo) => {
       const kept = useBoardStore.getState().data.onboarding?.find((o) => sameRepo(o.repo, repo));
       if (!kept) return;
-      checkRuns++;
-      clashReads++;
-      stopAgentReads();
-      previews++;
+      forget();
       const run = resumed(kept.repo, kept.progress);
-      // The labels and the checks read the picked project, so they wait for T3's projects; the fixed checks and agent runs
-      // read only the repository. The Pull request step reads them with readPrChanges once it lists the PR's changes.
-      set({ run, creating: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, labels: null, pr: IDLE, opener: focused() });
-      if (run.step === 'cleanup') {
-        void get().findClashes();
-        void get().readClashRuns();
-      }
-      void get().loadProjects().then(() => {
-        if (get().run?.step === 'labels') void get().loadLabels();
-        if (get().run?.step === 'checks') void get().runChecks();
-      });
+      set({ run, creating: null, ...FRESH, opener: focused() });
+      void get().loadProjects();
+      if (run.step !== 'project') void get().detect().then(() => { const now = get().run; if (now) enter(now.step); });
     },
     close: () => {
-      const { run } = get();
+      const { run, detection, finish } = get();
       reads++;
-      checkRuns++;
-      clashReads++;
-      previews++;
-      labelRuns++;
-      // The board keeps the agent's run going; Resume reads it again.
-      stopAgentReads();
-      set({ run: null, checks: null, clashes: null, agent: NO_AGENT, changes: null, labels: null });
-      // A run whose PR merged is onboarded, so there's no onboarding left to keep.
-      if (run?.projectId && run.repo && run !== untouchedOffer && !onboarded(run, useBoardStore.getState().data)) {
-        void keep({ ...run, projectId: run.projectId, repo: run.repo });
-      }
+      forget();
+      set({ run: null, ...FRESH });
+      // A run Finish saved is on the board, so there's no onboarding left to keep.
+      if (run?.projectId && run.repo && run !== untouchedOffer && finish.state !== 'done') keep({ ...run, projectId: run.projectId, repo: run.repo }, detection);
     },
     loadProjects: async () => {
       const read = ++reads;
@@ -630,11 +302,16 @@ export const useWizardStore = create<WizardState>()((set, get) => {
     pick: (projectId) => {
       const { run, projects } = get();
       const project = projects.state === 'loaded' ? projects.projects.find((p) => p.id === projectId) : undefined;
-      if (run && project && !unpickable(project, run)) set({ run: { ...run, projectId, repo: project.repo, provider: project.provider }, creating: null });
+      if (!run || !project || unpickable(project, run)) return;
+      const same = run.projectId === projectId;
+      if (!same) forget();
+      set({ run: { ...run, projectId, repo: project.repo, provider: project.provider, choices: same ? run.choices : {} }, creating: null, ...!same && FRESH });
     },
     chooseNew: () => {
       const { run, creating } = get();
-      if (run) set({ run: { ...run, projectId: null, repo: null, provider: null }, creating: creating ?? { folder: '', adding: false, error: null } });
+      if (!run) return;
+      forget();
+      set({ run: { ...run, projectId: null, repo: null, provider: null, choices: {} }, creating: creating ?? { folder: '', adding: false, error: null }, ...FRESH });
     },
     setFolder: (folder) => {
       const { creating } = get();
@@ -656,201 +333,87 @@ export const useWizardStore = create<WizardState>()((set, get) => {
       if (reason) return set({ creating: { ...now, adding: false, error: `T3 Code added the project, but it can't be picked: ${reason}` } });
       get().pick(result.projectId);
     },
-    answer: (change) => {
+    detect: async () => {
       const { run } = get();
-      if (!run?.setup) return;
-      const teamChanged = change.team !== undefined && change.team !== run.setup.team;
-      if (teamChanged) checkRuns++;
-      set({ run: { ...run, setup: answerSetup(run.setup, change) }, ...teamChanged && { checks: null } });
+      if (!run?.repo || !run.projectId) return;
+      const read = ++detections;
+      set({ detection: { state: 'reading' } });
+      const answer = await postAction<{ detection: SetupDetection }>('/api/onboarding/detect', { repo: run.repo, projectId: run.projectId });
+      if (read !== detections || !get().run) return;
+      set({ detection: answer.detection ? { state: 'read', value: answer.detection } : { state: 'failed', error: answer.error ?? 'The board sent no detection.' } });
     },
-    next: () => move(1),
+    choose: (change) => {
+      const { run, tickets } = get();
+      if (!run) return;
+      const sourceChanged = change.itemSource && JSON.stringify(change.itemSource) !== JSON.stringify(run.choices.itemSource);
+      if (sourceChanged) ticketReads++;
+      if (change.drop) previews++;
+      set({ run: { ...run, choices: { ...run.choices, ...change } }, tickets: sourceChanged ? null : tickets,
+        ...change.drop && { changes: null, approved: false } });
+    },
+    readTickets: async () => {
+      const { run, detection, tickets } = get();
+      const detected = detectedOf(detection);
+      const itemSource = detected && answersOf(detected, run?.choices ?? {}).itemSource;
+      if (!run?.repo || !detected) return;
+      const read = ++ticketReads;
+      if (!itemSource) return set({ tickets: { picks: {}, refused: {}, error: null, importing: false, read: { state: 'failed', error: 'Go back and choose a team first.' } } });
+      set({ tickets: { picks: {}, refused: {}, error: null, ...tickets, importing: false, read: { state: 'reading' } } });
+      const answer = await postAction<{ tickets: ImportableTicket[] }>('/api/onboarding/import/tickets', { repo: run.repo, itemSource });
+      const now = get().tickets;
+      if (read !== ticketReads || !now || !get().run) return;
+      if (!answer.tickets) return set({ tickets: { ...now, read: { state: 'failed', error: answer.error ?? 'The board sent no tickets.' } } });
+      // Each ticket offered for the first time starts ticked; one the user unticked stays so.
+      const picks = Object.fromEntries(answer.tickets.filter(importable).map((t) => [t.number, now.picks[t.number] ?? { on: true }]));
+      set({ tickets: { ...now, read: { state: 'read', value: answer.tickets }, picks } });
+    },
+    pickTicket: (number, change) => {
+      const { tickets } = get();
+      if (!tickets) return;
+      const { [number]: _, ...refused } = tickets.refused;
+      set({ tickets: { ...tickets, picks: { ...tickets.picks, [number]: { on: false, ...tickets.picks[number], ...change } }, refused } });
+    },
+    next: async () => {
+      const { run, projects, detection, tickets, changes, approved } = get();
+      if (!run || !stepReady(run, projects, detection, tickets, changes, approved)) return;
+      if (run.step === 'import' && !await importTickets()) return;
+      if (get().run?.step === run.step) move(1);
+    },
     back: () => move(-1),
-    loadLabels: async () => {
-      const { run, projects } = get();
-      const project = run && pickedProject(run, projects);
-      if (!project) return;
-      set({ labels: { read: { state: 'loading' }, kept: get().labels?.kept ?? [], typed: get().labels?.typed ?? '', created: get().labels?.created ?? [], busy: null, error: null } });
-      await labelsPost('/api/onboarding/labels', {}, null);
+    previewEdits: async () => {
+      const { run, detection } = get();
+      const detected = detectedOf(detection);
+      if (!run?.repo || !detected) return;
+      const read = ++previews;
+      set({ changes: { state: 'reading' }, approved: false });
+      const answer = await postAction<{ changes: OnboardingPrChange[] }>('/api/onboarding/pr/changes', { repo: run.repo, edits: { drop: answersOf(detected, run.choices).drop } });
+      if (read !== previews || !get().run) return;
+      set({ changes: answer.changes ? { state: 'read', value: answer.changes } : { state: 'failed', error: answer.error ?? 'The board sent no changes.' } });
     },
-    toggleRename: (oldName) => {
-      const { labels } = get();
-      if (labels) set({ labels: { ...labels, kept: labels.kept.includes(oldName) ? labels.kept.filter((n) => n !== oldName) : [...labels.kept, oldName] } });
-    },
-    createLabels: async () => {
-      const step = labelStep();
-      const custom = step ? customLabelsToCreate(step.project, step.labels) : [];
-      if (!step || step.project.provider === 'Azure DevOps' || !labelsToCreate(step.plan, renaming(step.plan, step.labels)).length && !custom.length) return;
-      set({ labels: { ...step.labels, busy: 'create', progress: { created: 0, total: labelsToCreate(step.plan, renaming(step.plan, step.labels)).length + custom.length }, error: null } });
-      await labelsPost('/api/onboarding/labels/create', { itemSource: itemSourceOf(step.run, step.project), renaming: renaming(step.plan, step.labels), custom }, 'create');
-    },
-    renameLabels: async () => {
-      const step = labelStep();
-      const names = step ? renaming(step.plan, step.labels) : [];
-      if (!step || !names.length) return;
-      set({ labels: { ...step.labels, busy: 'rename', error: null } });
-      await labelsPost('/api/onboarding/labels/rename', { names }, 'rename');
-    },
-    toggleCustomLabel: (name) => {
-      const { run } = get();
-      if (run) set({ run: { ...run, customLabels: run.customLabels.includes(name) ? run.customLabels.filter((n) => n !== name) : [...run.customLabels, name] } });
-    },
-    typeCustomLabel: (typed) => {
-      const { labels } = get();
-      // Typing clears a failed add, whose title names the label it was adding.
-      if (labels) set({ labels: { ...labels, typed, ...labels.error?.action === 'custom' && { error: null } } });
-    },
-    addCustomLabel: async () => {
-      const step = labelStep();
-      if (!step || typedLabelProblem(step.project, step.labels.typed)) return;
-      const name = step.labels.typed.trim();
-      if (step.project.provider === 'Azure DevOps') {
-        const kept = step.run.customLabels.find((n) => n.toLowerCase() === name.toLowerCase());
-        return set({ run: { ...step.run, customLabels: kept ? step.run.customLabels : [...step.run.customLabels, name] }, labels: { ...step.labels, typed: '' } });
-      }
-      set({ labels: { ...step.labels, busy: 'custom', error: null } });
-      const names = await labelsPost('/api/onboarding/labels/custom', { name }, 'custom', name);
-      const { run, labels } = get();
-      // The repository's own spelling, as GitHub matches label names without case.
-      const added = names?.find((n) => n.toLowerCase() === name.toLowerCase());
-      if (!run || !labels || !added) return;
-      set({ run: { ...run, customLabels: run.customLabels.includes(added) ? run.customLabels : [...run.customLabels, added] }, labels: { ...labels, typed: '', created: [...labels.created, added] } });
-    },
-    runChecks: async () => {
-      const runId = ++checkRuns;
-      const { run, projects } = get();
-      const project = run && pickedProject(run, projects);
-      set({ checks: { commands: { state: 'running' }, setup: WAITING } });
-      // The board checks gh and az only while a listed repository needs them, so a run asks for its provider's.
-      const rechecked = await postAction('/api/recheck', project?.provider === 'Azure DevOps' ? { az: true } : { gh: true });
-      receive(rechecked);
-      const checks = current(runId);
-      if (!checks) return;
-      set({ checks: { ...checks, commands: rechecked.error ? { state: 'failed', error: rechecked.error } : { state: 'done' } } });
-      for (const id of SETUP_CHECKS) await runSetupCheck(id, runId);
-    },
-    retryCheck: (id) => runSetupCheck(id, checkRuns),
-    findClashes: async () => {
-      const { run } = get();
-      if (!run?.repo) return;
-      const read = ++clashReads;
-      set({ clashes: { state: 'reading' } });
-      const answer = await postAction<FixedClashes>('/api/onboarding/clashes', { repo: run.repo });
-      if (read !== clashReads || !get().run) return;
-      const { clashes, skillClashes, projectSkills } = answer;
-      if (answer.error || !clashes || !skillClashes || !projectSkills) return set({ clashes: { state: 'failed', error: answer.error ?? 'The board sent no Clashes.' } });
-      // A checklist, `references/<file>`, is no skill.
-      const bundled = (useBoardStore.getState().data.bundledSkills ?? []).map((skill) => skill.name).filter((name) => !name.includes('/'));
-      set({ clashes: { state: 'read', found: { clashes, skillClashes, projectSkills }, bundled } });
-    },
-    readClashRuns: async () => {
-      const { run } = get();
-      if (!run?.repo) return;
-      stopAgentReads();
-      const read = agentReads;
-      let answer: { runs?: ClashRun[]; error?: string | null };
-      try {
-        const response = await fetch(`/api/onboarding/clash-runs?repo=${encodeURIComponent(run.repo)}`, { cache: 'no-store' });
-        answer = await response.json() as typeof answer;
-        if (!answer.runs && !answer.error) answer.error = `The board answered ${response.status}.`;
-      } catch {
-        answer = { error: "Can't reach the board." };
-      }
-      if (read !== agentReads || !get().run) return;
-      if (answer.runs) return showRuns(answer.runs, read);
-      set({ agent: { ...get().agent, error: { call: 'read', message: answer.error! } } });
-    },
-    pickModel: (model) => set({ agent: { ...get().agent, model } }),
-    lookForClashes: async (model) => {
-      const { run, agent } = get();
-      if (!run?.repo || !run.projectId || agent.starting || latestRun(agent)?.state === 'running') return;
-      stopAgentReads();
-      const read = agentReads;
-      set({ agent: { ...agent, starting: true, error: null } });
-      const answer = await postAction<{ runs: ClashRun[] }>('/api/onboarding/clash-runs', { repo: run.repo, projectId: run.projectId, model });
-      const now = get().run;
-      if (read !== agentReads || !now) return;
-      set({ agent: { ...get().agent, starting: false } });
-      if (answer.error || !answer.runs) return set({ agent: { ...get().agent, error: { call: 'start', message: answer.error ?? 'The board sent no run.' } } });
-      if (now.cleanup) set({ run: { ...now, cleanup: withoutAgentTicks(now.cleanup) } });
-      showRuns(answer.runs, read);
-    },
-    tick: (id, on) => {
-      const { run } = get();
-      if (run?.cleanup) set({ run: { ...run, cleanup: { ...run.cleanup, ticks: { ...run.cleanup.ticks, [id]: on } } } });
-    },
-    pickSkill: (path, pick) => {
-      const { run } = get();
-      if (run?.cleanup) set({ run: { ...run, cleanup: { ...run.cleanup, skills: { ...run.cleanup.skills, [path]: pick } } } });
-    },
-    previewPr: async () => {
-      const { run, projects, clashes, agent } = get();
-      const project = run && pickedProject(run, projects);
-      if (!run?.repo || !project) return set({ changes: { state: 'failed', error: 'This project is no longer in T3 Code. Go back and choose another.' } });
-      const preview = ++previews;
-      const config = prConfig(run, project);
-      const picks = picksOf(run, clashes, agent);
-      if (config === undefined || !picks) {
-        return set({ changes: { state: 'failed', error: 'Go Back to Cleanup and wait for its checks, then come back to see the PR\'s changes.' } });
-      }
-      set({ changes: { state: 'reading' } });
-      const answer = await postAction<{ changes: OnboardingPrChange[] }>('/api/onboarding/pr/changes', { repo: run.repo, config, picks });
-      if (preview !== previews || !get().run) return;
-      set({ changes: answer.error || !answer.changes ? { state: 'failed', error: answer.error ?? 'The board sent no changes.' } : { state: 'read', changes: answer.changes } });
-    },
-    readPrChanges: async () => {
-      const { run, changes } = get();
-      if (!run || run.step !== 'pr' || changes && changes.state !== 'failed') return;
-      set({ changes: { state: 'reading' } });
-      await Promise.all([get().findClashes(), get().readClashRuns()]);
-      if (get().run?.repo === run.repo && get().run?.step === 'pr') await get().previewPr();
+    approve: (approved) => set({ approved }),
+    save: async () => {
+      const { run, projects, detection, tickets, changes, approved, finish } = get();
+      const detected = detectedOf(detection);
+      const steps = run && runSteps(run, detection);
+      if (!run?.repo || !run.projectId || !detected || finish.state === 'saving' || finish.state === 'done' || run.step !== steps?.at(-1)
+        || !stepReady(run, projects, detection, tickets, changes, approved)) return;
+      const { drop, ...answers } = answersOf(detected, run.choices);
+      set({ finish: { state: 'saving' } });
+      const result = await postAction('/api/onboarding/setup', { repo: run.repo, projectId: run.projectId, ...answers, ...replacing({ ...run, repo: run.repo }) });
+      receive(result);
+      if (get().run !== run) return;
+      if (result.error) return set({ finish: { state: 'failed', error: result.error } });
+      set({ finish: { state: 'done', pr: null } });
+      if (drop.length && approved) await get().openPr();
     },
     openPr: async () => {
-      const { run, projects, clashes, agent, pr } = get();
-      const project = run && pickedProject(run, projects);
-      const config = run && project ? prConfig(run, project) : undefined;
-      const picks = run && picksOf(run, clashes, agent);
-      // The PR opens only once its changes are listed, so it never holds what the step couldn't show.
-      if (!run?.repo || !run.projectId || run.step !== 'pr' || run.prUrl || pr.opening || pr.reopening || config === undefined || !picks
-        || get().changes?.state !== 'read') return;
-      set({ pr: { ...IDLE, opening: true } });
-      const body = { repo: run.repo, progress: progressOf({ ...run, projectId: run.projectId }), config, picks, ...replacing({ ...run, repo: run.repo }) };
-      const result = await postAction<{ prUrl: string }>('/api/onboarding/pr', body);
-      receive(result);
-      const now = get().run;
-      // The run closed while gh ran; the board kept the PR with its onboarding, which Resume reopens.
-      if (!now || now.repo !== run.repo) return;
-      if (result.error || !result.prUrl) return set({ pr: { ...IDLE, error: result.error ?? 'The board sent no PR.' } });
-      set({ run: { ...now, prUrl: result.prUrl, savedAs: run.repo }, pr: IDLE });
-    },
-    reopenPr: async () => {
-      const { run, pr } = get();
-      if (!run?.repo || !prClosed(run, useBoardStore.getState().data) || pr.reopening) return;
-      set({ pr: { ...IDLE, reopening: true } });
-      const result = await postAction('/api/onboarding/pr/reopen', { repo: run.repo });
-      receive(result);
-      if (get().run?.repo !== run.repo) return;
-      set({ pr: { ...IDLE, error: result.error } });
-    },
-    startOver: async () => {
-      const { run } = get();
-      if (!run || !prClosed(run, useBoardStore.getState().data) || get().pr.reopening || get().changes?.state !== 'read') return;
-      set({ run: { ...run, prUrl: null }, pr: IDLE });
-      await get().openPr();
-    },
-    checkMerge: async () => {
-      const { run, pr } = get();
-      if (!run?.prUrl || pr.checking) return;
-      set({ pr: { ...pr, checking: true, error: null } });
-      // Listen before asking, so a read that answers before the post does still counts.
-      const { read, cancel } = nextRead(useBoardStore.getState().data);
-      const asked = await postAction('/api/read', {});
-      if (asked.error) cancel();
-      const data = asked.error ? null : await read;
-      // The run closed, or moved to another PR, while the board read.
-      if (get().run?.prUrl !== run.prUrl) return;
-      const followed = data?.onboarding?.find((o) => o.progress.prUrl === run.prUrl)?.followProblem;
-      const error = asked.error ?? (data ? data.error ?? followed : 'The board hasn\'t read GitHub yet. It checks again on its next refresh.');
-      set({ pr: { ...get().pr, checking: false, checkedAt: error ? get().pr.checkedAt : Date.now(), error: error ?? null } });
+      const { run, detection, finish } = get();
+      const detected = detectedOf(detection);
+      if (!run?.repo || !detected || finish.state !== 'done' || finish.pr?.state === 'opening' || finish.pr?.state === 'opened') return;
+      set({ finish: { state: 'done', pr: { state: 'opening' } } });
+      const result = await postAction<{ prUrl: string }>('/api/onboarding/pr', { repo: run.repo, edits: { drop: answersOf(detected, run.choices).drop } });
+      if (get().run !== run) return;
+      set({ finish: { state: 'done', pr: result.prUrl ? { state: 'opened', url: result.prUrl } : { state: 'failed', error: result.error ?? 'The board sent no PR.' } } });
     },
   };
 });

@@ -578,12 +578,6 @@ export async function commitTree(repo: string, commit: string, run: (args: strin
   return { sha, files: new Map(tree.filter((entry) => entry.type === 'blob').map((entry) => [entry.path, { mode: entry.mode, sha: entry.sha }])) };
 }
 
-/** Every file's path on the repository's default branch at its head; throws when GitHub lists only part of them. */
-export async function defaultBranchFiles(repo: string, run: (args: string[]) => Promise<string> = gh): Promise<string[]> {
-  const { sha } = await defaultBranchHead(repo, run);
-  return [...(await commitTree(repo, sha, run)).files.keys()];
-}
-
 /** A blob's text, by its SHA. */
 export async function readBlob(repo: string, sha: string, run: (args: string[]) => Promise<string> = gh): Promise<string> {
   return run(['api', `repos/${repo}/git/blobs/${sha}`, '-H', 'Accept: application/vnd.github.raw']);

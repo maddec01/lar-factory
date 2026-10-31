@@ -92,12 +92,6 @@ async function commitTree(repo: string, commit: string, run: Az = az): Promise<C
     .map((entry) => [entry.relativePath, { mode: entry.mode, sha: entry.objectId }])) };
 }
 
-/** The path of each file on the repository's default branch. */
-async function defaultBranchFiles(repo: string, run: Az = az): Promise<string[]> {
-  const { sha } = await defaultBranchHead(repo, run);
-  return [...(await commitTree(repo, sha, run)).files.keys()];
-}
-
 /** A blob's bytes; az devops invoke writes an answer that isn't JSON only to a new --out-file. */
 async function blob(repo: string, sha: string, run: Az): Promise<Buffer> {
   const dir = await mkdtemp(join(tmpdir(), 'lar-azure-'));
@@ -205,5 +199,5 @@ async function reopenPr(url: string, run: Az = az): Promise<void> {
 
 /** The calls that open and follow the board's PRs on Azure Repos, each named and shaped as github.ts's gh call is. */
 export const AZURE_REPOS = {
-  branchExists, branchHead, closePr, commitTree, createPr, defaultBranchFiles, defaultBranchHead, editPrBody, openPrFrom, prState, pushCommit, readBlob, reopenPr,
+  branchExists, branchHead, closePr, commitTree, createPr, defaultBranchHead, editPrBody, openPrFrom, prState, pushCommit, readBlob, reopenPr,
 };

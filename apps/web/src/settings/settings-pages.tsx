@@ -57,7 +57,7 @@ const ONLY_APP_UPDATES = 'Only the board app updates itself.';
  * Not checked before the first check, in sample mode, and for an az no listed repository needs.
  * A `login` row says Signed in or Signed out instead, and Signed in beside a gh too old.
  */
-export function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
+function toolState(check: ToolCheck | undefined, login = false): ComponentProps<typeof ToolState> {
   if (!check) return { text: 'Not checked', tone: 'muted' };
   const older = (version: string) => `${version}, older than ${GH_FLOOR}`;
   switch (check.result) {
@@ -109,15 +109,9 @@ const sourceName = (kind: keyof typeof ITEM_SOURCES, team?: string) =>
 
 const SHOWN = { all: 'All items', 'opted-in': 'Items with a status' } as const;
 
-/**
- * A repository still onboarding: its provider, its item source and show setting once it has passed the step that asks
- * them, and the step it stopped at or its PR's wait for the merge.
- */
+/** A repository still onboarding: its provider and the step it stopped at. */
 function onboardingDescription(progress: OnboardingProgress): string {
-  const { done, answers: { provider, setup } } = progress;
-  const answered = setup && done.includes('setup')
-    ? [sourceName(setup.itemSource, setup.team), SHOWN[setup.show]] : [];
-  return [provider, ...answered, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
+  return [progress.answers.provider, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
 }
 
 /**
@@ -362,7 +356,7 @@ export function pages(input: PagesInput): Page[] {
 }
 
 /** What the command does, or why its check failed and how to fix it. */
-export function toolDescription(does: string, check: ToolCheck | undefined): ReactNode {
+function toolDescription(does: string, check: ToolCheck | undefined): ReactNode {
   if (!check || check.result === 'ok') return does;
   if (check.result === 'not-running') return 'Open T3 Code.';
   const where = check.result === 'missing' && check.override ? `Nothing runnable at ${check.override}. ` : '';

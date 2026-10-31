@@ -181,56 +181,20 @@ test('detection and saving refuse a body they cannot use', async (t) => {
     [400, { error: 'Send the repository, its T3 project, role, item source, domain-doc location, skills and write consent.' }]);
 });
 
-test("onboarding's fixed checks answer with the default branch's Clashes, or gh's problem", async (t) => {
-  const board = await startBoard(t, { files: ['CONTEXT.md', '.claude/skills/lar-shape/SKILL.md', '.claude/skills/web-deploy/SKILL.md'] });
-  const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/clashes');
-  const found = await response.json() as { clashes: { id: string }[]; skillClashes: unknown; projectSkills: string[] };
-  assert.deepEqual([response.status, found.clashes.map((c) => c.id), found.skillClashes, found.projectSkills],
-    [200, ['context'], [{ name: 'lar-shape', path: '.claude/skills/lar-shape/' }], ['lar-shape', 'web-deploy']]);
-  await board.update({ fail: 'tree' });
-  const failed = await board.post({ repo: 'maddec01/lar-web' }, board.url, '/api/onboarding/clashes');
-  assert.equal(failed.status, 502);
-  assert.match((await failed.json() as { error: string }).error, /^Can't read maddec01\/lar-web's default branch: .*HTTP 502/);
-});
-
-test("onboarding's Clash agent runs on a fresh fetch of origin's default branch, and its runs read back by repository", async (t) => {
-  const home = mkdtempSync(join(tmpdir(), 'lar-onboarding-home-'));
-  t.onTestFinished(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }));
-  const origin = join(home, 'origin');
-  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...args],
-    { env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
-  git('init', '-q', '-b', 'main', origin);
-  git('-C', origin, 'commit', '-q', '--allow-empty', '-m', 'init');
-  checkouts(home, { 'lar-web': origin });
-  const db = projectsDb(t, [{ id: 'lar-web', root: `${home}/Developer/lar/lar-web` }]);
-  const reply = JSON.stringify({ clashes: [{ file: 'AGENTS.md', line: 3, reason: 'Builders would push to main.', remove: ['Push to main.'], add: [] }] });
-  const board = await startBoard(t, { t3: { waited: { reply } } }, false, false, { HOME: home, T3_STATE_DB: db, ...SAMPLE_MODELS });
-  const model = { instanceId: 'claudeAgent_personal', model: 'claude-opus-5-5' };
-  const started = await board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web', model }, board.url, '/api/onboarding/clash-runs');
-  assert.equal(started.status, 200);
-  let runs: { state: string; threadId: string | null; clashes?: { file: string; line: number }[] }[] = [];
-  for (let i = 0; i < 100 && runs[0]?.state !== 'done'; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    runs = (await (await fetch(`${board.url}/api/onboarding/clash-runs?repo=maddec01/lar-web`)).json() as { runs: typeof runs }).runs;
-  }
-  assert.deepEqual(runs.map(({ state, threadId, clashes }) => [state, threadId, clashes?.map((c) => `${c.file}:${c.line}`)]),
-    [['done', 'thread-1', ['AGENTS.md:3']]]);
-  assert.equal(git('-C', `${home}/Developer/lar/lar-web`, 'rev-parse', 'origin/main').toString(), git('-C', origin, 'rev-parse', 'main').toString());
-  const [start] = (await board.t3Calls()).filter((args) => args[0] === 'thread');
-  assert.deepEqual(start?.slice(4), ['--title', start?.[5], '--provider', 'claudeAgent_personal', '--model', 'claude-opus-5-5', '--wait', '--json']);
-  assert.match(start![3]!, /git show origin\/main:<path>/);
-  const bad = await board.post({ repo: 'maddec01/lar-web', projectId: 'lar-web' }, board.url, '/api/onboarding/clash-runs');
-  assert.equal(bad.status, 400);
-});
-
-test('the sample board detects nothing, saves no setup, imports no ticket, finds no Clash and runs no Clash agent', async (t) => {
+test('the sample board detects nothing, saves no setup and imports no ticket', async (t) => {
   const board = await startBoard(t, {}, true);
-  for (const path of ['/api/onboarding/teams', '/api/onboarding/detect', '/api/onboarding/setup', '/api/onboarding/import/tickets', '/api/onboarding/import', '/api/onboarding/clashes', '/api/onboarding/clash-runs']) {
+  for (const path of ['/api/onboarding/teams', '/api/onboarding/detect', '/api/onboarding/setup', '/api/onboarding/import/tickets', '/api/onboarding/import']) {
     const response = await board.post({ repo: 'maddec01/lar-web' }, board.url, path);
     assert.deepEqual([response.status, await response.json()], [403, { error: 'Sample mode onboards no repository.' }], path);
   }
-  const runs = await fetch(`${board.url}/api/onboarding/clash-runs?repo=maddec01/lar-web`);
-  assert.deepEqual([runs.status, await runs.json()], [403, { error: 'Sample mode onboards no repository.' }]);
+});
+
+test("Clash resolution waits for a later build, so onboarding's Clash routes are gone", async (t) => {
+  const board = await startBoard(t, {}, true);
+  for (const path of ['/api/onboarding/clashes', '/api/onboarding/clash-runs']) {
+    assert.equal((await board.post({ repo: 'maddec01/lar-web' }, board.url, path)).status, 405, path);
+  }
+  assert.equal((await fetch(`${board.url}/api/onboarding/clash-runs?repo=maddec01/lar-web`)).status, 404);
 });
 
 const PR = 'https://github.com/maddec01/lar-web/pull/77';

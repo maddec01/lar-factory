@@ -101,18 +101,6 @@ export function protocolItemThreads(threadIds: readonly string[]): ItemThread[] 
   return seen.map((thread) => ({ ...thread, observedAt }));
 }
 
-/** Unavailable observations throw so callers retain an uncertain run. */
-export function protocolThreadByTitle(projectId: string, title: string): { threadId: string; latest: string | null } | null {
-  protocolItemThreads([]);
-  if (!current?.available) throw Error('T3 execution unavailable');
-  const shell = current.shells?.filter(shell => shell.projectId === projectId && shell.title === title && !shell.deletedAt)
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
-  if (!shell || typeof shell.id !== 'string') return null;
-  const messages = protocolThreadById(shell.id).observation?.projection.messages
-    .filter(message => message.role === 'assistant').sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  return { threadId: shell.id, latest: typeof messages?.[0]?.text === 'string' ? messages[0].text : null };
-}
-
 /**
  * The one root thread in `projectId` whose first user message is `message`, leaving out the `known` thread IDs, as the
  * protocol shows it now; null when none or more than one does. Unavailable observations throw.

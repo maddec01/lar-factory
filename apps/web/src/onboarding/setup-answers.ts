@@ -1,5 +1,5 @@
 // The setup fields' answers: the show setting suggested for an item source, giving an answer, and what each answer
-// that Next or Save waits for needs. Onboarding's Provider and item source step and Edit both use them.
+// that Save waits for needs, as Edit uses them.
 
 import type { RepositoryItemSource, SetupAnswers, ShowSetting } from '@lar-factory/shared';
 
@@ -13,7 +13,7 @@ export type SetupChange = Partial<Omit<SetupAnswers, 'showPicked'>>;
 export const suggestedShow = (): ShowSetting => 'all';
 
 /** Whether an item source is an Azure DevOps team's, so it is named by its team. */
-export const byTeam = (itemSource: SetupAnswers['itemSource']): itemSource is 'azure-board' =>
+const byTeam = (itemSource: SetupAnswers['itemSource']): itemSource is 'azure-board' =>
   itemSource === 'azure-board';
 
 /** The answers with `change` given: a picked show setting stays, and until one is picked a new item source takes its suggested one. */

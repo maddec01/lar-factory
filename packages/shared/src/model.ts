@@ -845,6 +845,12 @@ export const REPOSITORY_OPERATIONS = ['push-branch', 'open-pr', 'publish-ticket'
 
 export type RepositoryOperation = (typeof REPOSITORY_OPERATIONS)[number];
 
+/** The writes only publishing uses. Publishing arrives in a later build, so until then nothing offers them. */
+export const PUBLISHING_OPERATIONS: readonly RepositoryOperation[] = ['publish-ticket', 'tag-ticket'];
+
+/** The writes a current feature uses, which onboarding and Settings offer. */
+export const OFFERED_OPERATIONS = REPOSITORY_OPERATIONS.filter((op) => !PUBLISHING_OPERATIONS.includes(op));
+
 /** What the user's credentials allow for an operation, as last found; one not needed since the last check stays unverified. */
 export type OperationAccess = 'unverified' | 'allowed' | 'refused';
 
@@ -916,6 +922,19 @@ export interface OnboardingAnswers {
   cleanup?: CleanupPicks;
   /** The custom labels the Labels step picked, once it has shown. */
   customLabels?: string[];
+  /** The wizard's answers the user changed from their detected defaults. */
+  choices?: OnboardingChoices;
+}
+
+/** The onboarding wizard's answers, each one absent while its detected default stands. */
+export interface OnboardingChoices {
+  itemSource?: RepositoryItemSource;
+  role?: string;
+  consent?: RepositoryOperation[];
+  domainDocs?: DomainDocLocation;
+  skills?: string[];
+  /** The factory files of an earlier setup to drop through a PR. */
+  drop?: FactoryFileKind[];
 }
 
 /** What the user picked for a skill Clash: delete the skill's folder in the PR, or rename the skill. */
@@ -1121,13 +1140,6 @@ export interface SkillClash {
   path: string;
 }
 
-/** What onboarding's fixed checks find on the default branch, with every project skill's name so a rename avoids them. */
-export interface FixedClashes {
-  clashes: Clash[];
-  skillClashes: SkillClash[];
-  projectSkills: string[];
-}
-
 /** The fixes onboarding's PR holds, as the Cleanup step leaves them: the ticked Clashes and each skill Clash's pick, by its folder's path. */
 export interface OnboardingPicks {
   clashes: Clash[];
@@ -1148,18 +1160,3 @@ export type OnboardingPrChange = (
     preview?: { before: string | null; after: string };
   };
 
-/** Where a run of onboarding's Clash agent stands: running with the agent's latest message, done with its Clashes, or ended without them and why. */
-export type ClashRunState =
-  | { state: 'running'; progress: string | null }
-  | { state: 'done'; clashes: Clash[] }
-  | { state: 'failed' | 'timed-out' | 'waiting'; why: string };
-
-/** One run of onboarding's Clash agent in a T3 thread; Retry starts another and keeps this one listed. */
-export type ClashRun = ClashRunState & {
-  /** The thread's title, unique to the run. */
-  title: string;
-  /** The run's T3 thread, once T3 has it. */
-  threadId: string | null;
-  model: ModelChoice;
-  startedAt: string;
-};

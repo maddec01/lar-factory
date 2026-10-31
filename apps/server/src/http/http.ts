@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { pageWithData, sameRepo, type ClashRun, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type FixedClashes, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
+import { pageWithData, sameRepo, type Item, type ImportableTicket, type ItemCommentsPage, type ItemDetails, type RepositoryConfigAnswers, type OnboardingPrChange, type OnboardingRepository, type ProjectChoice, type RepoConfig, type SetupDetection, type TicketsImported } from '@lar-factory/shared';
 import type { BoardState } from '../board/board-state.ts';
 import type { Refused } from '../config/edit-config.ts';
 import { isRepo } from '../config/repository-config.ts';
@@ -58,12 +58,6 @@ export interface HttpDeps {
   importableTickets(input: Record<string, unknown>): Promise<{ tickets: ImportableTicket[] } | Refused>;
   /** Imports the body's chosen tickets as work records, reporting each one, or why it can't import. */
   importTickets(input: Record<string, unknown>): Promise<TicketsImported | Refused>;
-  /** Runs onboarding's fixed checks for known Clashes on the body's repository's default branch, or says why it can't. */
-  findFixedClashes(input: Record<string, unknown>): Promise<FixedClashes | Refused>;
-  /** Starts onboarding's Clash agent on the body's repository, T3 project and model, or returns its running run; answers the repository's runs. */
-  startClashRun(input: Record<string, unknown>): Promise<{ runs: ClashRun[] } | Refused>;
-  /** The repository's Clash agent runs, oldest first. */
-  clashRuns(repo: string): ClashRun[];
   /** Opens the PR with the repository edits onboarding's user approved, returning its URL, or gh's or az's problem. */
   openOnboardingPr(input: Record<string, unknown>): Promise<{ prUrl: string } | Refused>;
   /** What an onboarding's PR would change against its default branch with the body's edits and picks, or why it can't say. */
@@ -154,7 +148,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, readProjectTeams, keepOnboarding, createProject,
-  detectSetup, saveSetup, importableTickets, importTickets, findFixedClashes, startClashRun, clashRuns, openOnboardingPr, previewOnboardingPr, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, readEditConfig, openEditPr, openConfigUpdatePr, dismissConfigUpdate }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -347,20 +341,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
         return { status: 200, body: withBoard({ error: null }) };
       },
     },
-    '/api/onboarding/clashes': {
-      what: 'the repository to check', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const found = await findFixedClashes(input);
-        return 'error' in found ? { status: found.status, body: { error: found.error } } : { status: 200, body: { ...found, error: null } };
-      },
-    },
-    '/api/onboarding/clash-runs': {
-      what: 'the Clash run to start', disabled: 'Sample mode onboards no repository.',
-      async run(input) {
-        const started = await startClashRun(input);
-        return 'error' in started ? { status: started.status, body: { error: started.error } } : { status: 200, body: { ...started, error: null } };
-      },
-    },
     '/api/onboarding/pr': {
       what: 'the repository edits to open a PR with', disabled: 'Sample mode onboards no repository.',
       async run(input) {
@@ -488,14 +468,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     catch (err) { json(res, 502, { error: err instanceof Error ? err.message : String(err) }); }
   }
 
-  /** Answers a repository's Clash agent runs, which the Cleanup step reads while one runs. */
-  function clashRunsRequest(url: URL, res: ServerResponse): void {
-    if (sample) return json(res, 403, { error: 'Sample mode onboards no repository.' });
-    const repo = url.searchParams.get('repo');
-    if (!isRepo(repo)) return json(res, 400, { error: 'Name the repository whose Clash runs to read.' });
-    json(res, 200, { runs: clashRuns(repo) });
-  }
-
   /** Answers one item's details, which the item dialog reads when it opens. */
   async function itemDetailsRequest(url: URL, res: ServerResponse): Promise<void> {
     const itemId = url.searchParams.get('itemId');
@@ -582,7 +554,6 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     }
     if (path === '/api/events') return openStream(req, res);
     if (path === '/api/onboarding/projects') return projectsRequest(res);
-    if (path === '/api/onboarding/clash-runs') return clashRunsRequest(url, res);
     if (path === '/api/item-details') return itemDetailsRequest(url, res);
     if (path === '/api/item-comments') return itemCommentsRequest(url, res);
     if (path === '/api/tickets') return ticketsRequest(url, res);

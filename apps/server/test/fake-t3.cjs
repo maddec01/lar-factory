@@ -24,12 +24,6 @@ const main = async () => {
     db.close();
     return;
   }
-  // A waited start: T3 prints the run's end, with `waited` over a completed run, and exits `waitExit`.
-  if (args.includes('--wait')) {
-    process.stdout.write(JSON.stringify({ threadId: 'thread-1', runId: 'run-1', status: 'completed', reply: '{"clashes":[]}', error: null, ...options.waited }));
-    process.exitCode = options.waitExit ?? 0;
-    return;
-  }
   if (args[1] === 'list' && options.recover) {
     process.stdout.write(JSON.stringify([{ threadId: 'thread-1', title: '#12 Issue 12' }]));
     return;

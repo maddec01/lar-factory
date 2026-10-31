@@ -1,24 +1,20 @@
-// The T3 project step: T3's projects, each with its provider and whether its repository has .lar-factory.json, and
-// the ones that can't be picked. The Provider and item source step: the provider, then the item source, show setting
-// and role, or the values of a .lar-factory.json it reuses. The Labels step: each label's state, Create and Rename, gh's
-// message with Retry, the custom labels to pick or type, a reused file's custom labels, and an Azure DevOps project's tags. The
-// Checks step: each check with its state and a failure's fix with Retry. The Cleanup step: each fixed Clash with its
-// tick, Delete or Rename for a project skill named like a bundled skill, the Clash agent's run with its thread, Clashes or
-// why it ended with Retry, and what the PR always writes. The Pull request step: the PR's changes for a new or a reused
-// .lar-factory.json, Open pull request, gh's message with Retry, the wait for the merge, and Reopen PR and Start over for a PR
-// closed without merging.
+// The T3 project step: T3's projects, each with its provider and whether its repository shares a .lar-factory.json,
+// and the ones that can't be picked. What we found: each detected fact, or Refused with why. Each question step: where
+// its default came from, each option's cost line, Refused where access blocks it, and the choices it leaves for later.
+// Work to import: each ticket with what it needs settled. Factory files and Repository edits: keep or drop each file,
+// and the PR's changes to approve. Finish: the repository on the board, with the PR it opened.
 
-import { expect, test, vi } from 'vite-plus/test';
-import { STATUS_LABELS, WORKFLOW_LABELS, type BundledSkill, type ClashRun, type OnboardingPrChange, type ClashRunState, type FixedClashes, type ModelGroup, type ProjectChoice, type SetupCheckId, type SetupCheckResult } from '@lar-factory/shared';
-import { $, checkedOf, fetchMock, mountPage, sample, settle, text, toolChecks } from '../../test/support.ts';
-import { dialog, openOnboarding, project, serve } from './onboarding-support.ts';
+import { expect, test } from 'vite-plus/test';
+import type { ImportableTicket, SetupDetection } from '@lar-factory/shared';
+import { $, fetchMock, mountPage, sample, settle, text } from '../../test/support.ts';
+import { detection, dialog, openOnboarding, posted, project, serve, type Route } from './onboarding-support.ts';
 
 const rows = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-choice]')];
 const row = (name: string) => rows().find((r) => r.dataset.choice === name)!;
 const radio = (name: string) => row(name).querySelector<HTMLElement>('[role="radio"]')!;
 const badges = (name: string) => [...row(name).querySelectorAll('[data-slot="badge"]')].map(text);
 
-test('each project shows its folder, repository, provider and whether it has .lar-factory.json', async () => {
+test('each project shows its folder, repository, provider and whether it shares a .lar-factory.json', async () => {
   await openOnboarding([
     project('lar-web', { hasConfig: true }),
     project('lar-cli', { hasConfig: false }),
@@ -27,10 +23,11 @@ test('each project shows its folder, repository, provider and whether it has .la
   ]);
   expect(rows().map((r) => r.dataset.choice)).toEqual(['lar-web', 'lar-cli', 'lar-ios', 'lar-api', 'new']);
   expect(text(row('lar-web'))).toContain('/Users/me/Developer/lar-web · maddec01/lar-web');
-  expect(badges('lar-web')).toEqual(['GitHub', 'Saved settings']);
-  expect(badges('lar-cli')).toEqual(['GitHub', 'New setup']);
-  expect(badges('lar-ios')).toEqual(['GitHub', 'Could not check settings']);
-  expect(badges('lar-api')).toEqual(['Azure DevOps', 'Could not check settings']);
+  expect(badges('lar-web')).toEqual(['GitHub', 'Shared config']);
+  expect(badges('lar-cli')).toEqual(['GitHub']);
+  expect(badges('lar-ios')).toEqual(['GitHub']);
+  expect(badges('lar-api')).toEqual(['Azure DevOps']);
+  expect(text(body()), 'the step says what it asks once, above its body').not.toContain('Choose the repository folder where agents will work.');
 });
 
 test("an Azure DevOps repository whose project's name has a space shows it decoded", async () => {
@@ -44,7 +41,7 @@ test("a repository already on the board, or a folder with no provider's origin, 
     project('lar-server', { onBoard: true }),
     project('notes', { repo: null, provider: null, hasConfig: null }),
   ]);
-  expect(badges('lar-server')).toEqual(['GitHub', 'New setup', 'on the board']);
+  expect(badges('lar-server')).toEqual(['GitHub', 'on the board']);
   expect(text(row('notes'))).toContain('Choose a repository folder connected to GitHub or Azure DevOps.');
   for (const name of ['lar-server', 'notes']) {
     expect(radio(name).getAttribute('aria-disabled') ?? radio(name).hasAttribute('data-disabled').toString(), name).toBe('true');
@@ -54,12 +51,12 @@ test("a repository already on the board, or a folder with no provider's origin, 
 });
 
 test('a repository still onboarding shows as onboarding, with its Resume to use instead', async () => {
-  const data = { ...sample, repos: [], onboarding: [{ repo: 'maddec01/lar-cli', progress: { step: 'setup', done: ['project'], answers: { projectId: 'lar-cli' } } }] };
+  const data = { ...sample, repos: [], onboarding: [{ repo: 'maddec01/lar-cli', progress: { step: 'role', done: ['project'], answers: { projectId: 'lar-cli' } } }] };
   serve(data, [project('lar-cli', { onBoard: true })]);
   await mountPage(data);
   const { useWizardStore } = await import('./wizard-store.ts');
   await settle(() => useWizardStore.getState().start());
-  expect(badges('lar-cli')).toEqual(['GitHub', 'New setup', 'onboarding']);
+  expect(badges('lar-cli')).toEqual(['GitHub', 'onboarding']);
   expect(text(row('lar-cli'))).toContain('maddec01/lar-cli · Setup is already in progress. Close this window and choose Resume.');
 });
 
@@ -127,1086 +124,210 @@ test("a failing t3 project add shows t3's message and keeps the step", async () 
   expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Repository');
 });
 
-const field = (name: string) => dialog()!.querySelector<HTMLElement>(`[data-field="${name}"]`);
-const input = (name: string) => field(name)?.querySelector<HTMLInputElement>('input') ?? null;
-const choice = (name: string) => dialog()!.querySelector<HTMLElement>(`[data-choice="${name}"]`)!;
-const nextButton = () => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).trim().startsWith('Next'))!;
+const body = () => dialog()!.querySelector<HTMLElement>('[data-slot="modal-body"]')!;
+const heading = () => text(dialog()!.querySelector('[data-slot="modal-header"] h2'));
+const footer = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).trim() === label);
+const later = () => [...body().querySelectorAll('[data-later] li')].map(text);
+const origin = () => text(body().querySelector('[data-origin] [data-slot="badge"]'));
+const option = (id: string) => body().querySelector<HTMLElement>(`[data-option="${id}"]`)!;
+const optionBadges = (id: string) => [...option(id).querySelectorAll('[data-slot="badge"]')].map(text);
+const box = (id: string) => option(id).querySelector<HTMLElement>('[role="checkbox"], input[type="checkbox"]')!;
 
 async function type(into: HTMLInputElement, value: string): Promise<void> {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(into, value);
   await settle(() => into.dispatchEvent(new Event('input', { bubbles: true })));
 }
 
-/** Opens the dialog with `chosen` as the only T3 project, picks it and moves to the Provider and item source step. */
-async function openSetup(chosen: ProjectChoice): Promise<void> {
-  await openOnboarding([chosen]);
+const ticket = (number: number, parts: Partial<ImportableTicket> = {}): ImportableTicket => ({
+  number, title: `Ticket ${number}`, url: `https://github.com/maddec01/lar-web/issues/${number}`, statuses: ['Ready'], untagged: false, workId: null, ...parts,
+});
+
+/** The calls the wizard makes for a repository detected as `found`, with `tickets` to import. */
+const routes = (found: SetupDetection = detection(), tickets: ImportableTicket[] = [], more: Record<string, Route> = {}): Record<string, Route> => ({
+  '/api/onboarding/detect': { detection: found, error: null }, '/api/onboarding/import/tickets': { tickets, error: null },
+  '/api/onboarding/setup': { error: null }, ...more,
+});
+
+/** Opens the dialog with lar-web, picks it and presses Next until the step titled `title`. */
+async function openAt(title: string, calls: Record<string, Route> = routes(), chosen = project('lar-web')): Promise<void> {
+  await openOnboarding([chosen], calls);
   await settle(() => radio(chosen.name).click());
-  await settle(() => nextButton().click());
-}
-
-const suggested = () => [...dialog()!.querySelectorAll('[data-choice]')].filter((c) => text(c).includes('Suggested')).map((c) => (c as HTMLElement).dataset.choice);
-
-test('the GitHub setup reads issues without a source choice and asks what to show and what the repository does', async () => {
-  await openSetup(project('lar-web'));
-  expect(text(field('provider'))).toContain('GitHub');
-  expect(input('project-owner')).toBeNull();
-  expect(input('project-number')).toBeNull();
-  expect(text(dialog()!.querySelector('[data-item-source]'))).toContain("This repository's GitHub issues.");
-  expect(suggested()).toEqual(['all']);
-  expect(nextButton().disabled).toBe(true);
-  await type(input('role')!, 'Web client');
-  expect(nextButton().disabled).toBe(false);
-});
-
-test('Next explains the missing repository description under its field', async () => {
-  await openSetup(project('lar-web'));
-  expect(text(field('role')!.querySelector('[data-problem]'))).toBe('Describe what this repository does to continue with Next.');
-  await type(input('role')!, 'Web client');
-  expect(dialog()!.querySelector('[data-problem]')).toBeNull();
-  expect(nextButton().disabled).toBe(false);
-});
-
-test('the required description is muted until touched, then marks the field invalid', async () => {
-  await openSetup(project('lar-web'));
-  const role = input('role')!;
-  expect(role.getAttribute('aria-invalid')).not.toBe('true');
-  expect(field('role')!.querySelector<HTMLElement>('[data-problem]')!.className).toContain('text-base-700');
-  await settle(() => role.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
-  expect(role.getAttribute('aria-invalid')).toBe('true');
-  await type(role, 'Web client');
-  expect(role.getAttribute('aria-invalid')).not.toBe('true');
-});
-
-test("each field's help and problem describe its input, outside its label", async () => {
-  await openSetup(project('lar-web'));
-  const role = input('role')!;
-  const label = role.labels![0]!;
-  expect(label.querySelector('[data-problem]'), 'the problem is not part of the name').toBeNull();
-  expect(text(label)).toBe('What this repository does');
-  const described = role.getAttribute('aria-describedby')!.split(' ').map((id) => text(document.getElementById(id)));
-  expect(described).toEqual(['Describe its purpose so agents know where to work.', 'Describe what this repository does to continue with Next.']);
-});
-
-test('the Show setting can include all available work without changing its source', async () => {
-  await openSetup(project('lar-web'));
-  await settle(() => choice('all').querySelector<HTMLElement>('[role="radio"]')!.click());
-  await type(input('role')!, 'Web client');
-  expect(choice('all').querySelector('[role="radio"]')!.getAttribute('aria-checked')).toBe('true');
-  expect(suggested()).toEqual(['all']);
-  expect(nextButton().disabled).toBe(false);
-});
-
-test('a reused .lar-factory.json shows its values and asks nothing', async () => {
-  await openSetup(project('lar-web', { hasConfig: true,
-    config: { itemSource: { kind: 'issues' }, show: 'opted-in', role: 'Web client', labels: [] } }));
-  const values = text(dialog()!.querySelector('[data-reused-config]'));
-  for (const value of ['GitHub', "maddec01/lar-web's issues", 'Items with a status', 'Web client']) expect(values).toContain(value);
-  expect(text(dialog()!.querySelector('[data-slot="modal-body"]'))).toContain('You can edit them in Settings after setup.');
-  expect([...dialog()!.querySelectorAll('button')].some((b) => text(b) === 'Edit'), 'the onboarding dialog has no Edit').toBe(false);
-  expect(dialog()!.querySelector('[data-slot="modal-body"] input, [data-slot="modal-body"] [role="radio"]')).toBeNull();
-  expect(nextButton().disabled).toBe(false);
-});
-
-test('a settings file that cannot be reused can be replaced through fresh setup', async () => {
-  await openSetup(project('lar-web', { hasConfig: true, configProblem: '.lar-factory.json field role is missing or not a string.' }));
-  expect(text(dialog()!.querySelector('[data-slot="modal-body"]'))).toContain("Its settings file can't be used. Run onboarding to replace it.");
-  expect(nextButton().disabled).toBe(true);
-  await type(input('role')!, 'Web client');
-  expect(nextButton().disabled).toBe(false);
-});
-
-const AZURE = project('lar-api', { repo: 'contoso/Fabrikam%20Fiber/lar-api', provider: 'Azure DevOps' });
-const choices = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-choice]')].map((c) => c.dataset.choice);
-
-test('Azure setup offers team choices and requires one before Next', async () => {
-  await openSetup(AZURE);
-  expect(text(field('provider'))).toContain('Azure DevOps');
-  expect(choices()).toEqual(['all', 'opted-in']);
-  expect(text(dialog()!.querySelector('[data-item-source]'))).toContain('backlog and current sprint');
-  expect(suggested()).toEqual(['all']);
-  expect(field('team')!.querySelector<HTMLSelectElement>('select')!.value).toBe('');
-  await type(input('role')!, 'API server');
-  expect(nextButton().disabled).toBe(true);
-  await chooseTeam('Fabrikam Team');
-  expect(nextButton().disabled).toBe(false);
-});
-
-async function chooseTeam(name: string): Promise<void> {
-  const select = field('team')!.querySelector<HTMLSelectElement>('select')!;
-  await settle(() => { select.value = name; select.dispatchEvent(new Event('change', { bubbles: true })); });
-}
-
-test('a GitHub origin offers no Azure DevOps item source or Team field', async () => {
-  await openSetup(project('lar-web'));
-  expect(choices()).toEqual(['all', 'opted-in']);
-  expect(field('team')).toBeNull();
-});
-
-test('Resume shows the answers the step had when it closed', async () => {
-  await openSetup(project('lar-web'));
-  await type(input('role')!, 'Web client');
-  await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
-  const { useWizardStore } = await import('./wizard-store.ts');
-  const { useBoardStore } = await import('../board/board-store.ts');
-  const kept = JSON.parse(String((fetchMock.mock.calls as unknown as [string, RequestInit][])
-    .find(([url]) => url === '/api/onboarding/repositories')![1].body)) as { repo: string; progress: never };
-  await settle(() => useBoardStore.getState().receive({ ...sample, onboarding: [kept] }));
-  await settle(() => useWizardStore.getState().resume('maddec01/lar-web'));
-  expect($('[data-onboarding-dialog]')).not.toBeNull();
-  expect(input('role')!.value).toBe('Web client');
-  expect(dialog()!.querySelector('[data-item-source]')).not.toBeNull();
-});
-
-/** Every label the Labels step needs, so it lets Next through. */
-const EVERY_LABEL = [...WORKFLOW_LABELS, ...STATUS_LABELS].map((l) => l.name);
-
-/** Answers the command recheck with `tools`, the labels with every label, and each setup check from `results`, passing when it isn't named. */
-function answerChecks(results: Partial<Record<SetupCheckId, SetupCheckResult>> = {}, tools = toolChecks()): void {
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-    if (url === '/api/recheck') return new Response(JSON.stringify({ board: { ...sample, tools }, error: null }));
-    if (url === '/api/onboarding/labels') return new Response(JSON.stringify({ labels: EVERY_LABEL, error: null }));
-    if (url === '/api/onboarding/checks') {
-      const { check } = JSON.parse(String(init!.body)) as { check: SetupCheckId };
-      return new Response(JSON.stringify({ result: results[check] ?? { passed: true, detail: `${check} is fine` }, error: null }));
-    }
-    return served(url);
-  });
-}
-
-const checkRow = (id: string) => dialog()!.querySelector<HTMLElement>(`[data-check="${id}"]`)!;
-const footerButton = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('[data-slot="modal-footer"] button')].find((b) => text(b).trim().startsWith(label));
-
-/** Moves from the Provider and item source step, answered or reused, past Labels to Checks, and waits for the checks. */
-async function openChecks(): Promise<void> {
-  await settle(() => nextButton().click());
-  await vi.waitFor(() => expect(nextButton().disabled).toBe(false));
-  await settle(() => nextButton().click());
-  await vi.waitFor(() => expect(checkRow('push').dataset.status).not.toMatch(/waiting|running/));
-  await settle();
-}
-
-test('the Checks step lists the command checks, then the setup checks, each with its state', async () => {
-  await openSetup(project('lar-web'));
-  await type(input('role')!, 'Web client');
-  answerChecks({}, toolChecks({ gh: { result: 'ok', version: '2.96.1' } }));
-  await openChecks();
-  const ids = [...dialog()!.querySelectorAll<HTMLElement>('[data-check]')].map((r) => r.dataset.check);
-  expect(ids).toEqual(['gh', 't3', 'git', 'jq', 'curl', 'checkout', 'source', 'push']);
-  expect(ids.map((id) => checkRow(id!).dataset.status)).toEqual(Array(8).fill('passed'));
-  expect(text(checkRow('gh'))).toContain('Signed in');
-  expect(text(checkRow('source'))).toContain('source is fine');
-  expect(dialog()!.querySelector('[data-slot="modal-body"] [role="progressbar"]')!.getAttribute('aria-label')).toBe('8 of 8 passed');
-  expect(nextButton().disabled).toBe(false);
-});
-
-test("an Azure DevOps repository's Checks step lists az's check in place of gh's, and the az push check", async () => {
-  await openSetup(AZURE);
-  await chooseTeam('Fabrikam Team');
-  await type(input('role')!, 'API server');
-  answerChecks({ push: { passed: false, problem: "az's login can't push to contoso/Fabrikam%20Fiber/lar-api.", fix: 'Get Contribute, or log az in as an account that has it:', command: 'az login' } },
-    toolChecks({ az: { result: 'no-extension', fix: 'az extension add --name azure-devops' } }));
-  await openChecks();
-  const ids = [...dialog()!.querySelectorAll<HTMLElement>('[data-check]')].map((r) => r.dataset.check);
-  expect(ids).toEqual(['az', 't3', 'git', 'jq', 'curl', 'checkout', 'source', 'push']);
-  expect(checkRow('az').dataset.status).toBe('failed');
-  expect(text(checkRow('az'))).toContain('az extension add --name azure-devops');
-  expect(text(checkRow('push'))).toContain('Permission to push changes');
-  expect(text(checkRow('push'))).toContain('az login');
-  expect(nextButton().disabled).toBe(true);
-});
-
-test('a failed check shows its problem, fix and Retry, and Next stays disabled until Retry passes', async () => {
-  await openSetup(project('lar-web'));
-  await type(input('role')!, 'Web client');
-  answerChecks({ push: { passed: false, problem: "gh's login can't push to maddec01/lar-web.", fix: 'Get write access, or log gh in as an account that has it:', command: 'gh auth login' } },
-    toolChecks({ jq: { result: 'missing', fix: 'brew install jq' } }));
-  await openChecks();
-  expect(checkRow('jq').dataset.status).toBe('failed');
-  expect(text(checkRow('jq'))).toContain('brew install jq');
-  const push = checkRow('push');
-  expect(push.dataset.status).toBe('failed');
-  for (const part of ["gh's login can't push to maddec01/lar-web.", 'Get write access', 'gh auth login']) expect(text(push)).toContain(part);
-  expect(nextButton().disabled).toBe(true);
-
-  answerChecks();
-  await settle(() => [...push.querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
-  await vi.waitFor(() => expect(checkRow('push').dataset.status).toBe('passed'));
-  expect(nextButton().disabled, 'jq still fails').toBe(true);
-  await settle(() => [...checkRow('jq').querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
-  await vi.waitFor(() => expect(checkRow('jq').dataset.status).toBe('passed'));
-  await vi.waitFor(() => expect(checkRow('push').dataset.status).toBe('passed'));
-  await settle();
-  expect(nextButton().disabled).toBe(false);
-});
-
-const NONE: FixedClashes = { clashes: [], skillClashes: [], projectSkills: [] };
-const FOUND: FixedClashes = {
-  clashes: [
-    { id: 'context', file: 'CONTEXT.md', ticked: true, edit: { kind: 'rename', to: 'GLOSSARY.md' }, reason: 'Rename CONTEXT.md to GLOSSARY.md so agents can find the project terms.' },
-    { id: 'scratch', file: '.scratch/', ticked: false, edit: { kind: 'delete' }, reason: '.scratch/ holds 2 files from Matt Pocock\'s local tracker.' },
-  ],
-  skillClashes: [{ name: 'code-review', path: '.claude/skills/code-review/' }],
-  projectSkills: ['code-review', 'web-deploy'],
-};
-const BUNDLED: BundledSkill[] = ['code-review', 'tdd'].map((name) => ({ name, author: 'Lar', licence: 'MIT', source: `https://github.com/maddec01/lar-factory/tree/main/skills/${name}` }));
-
-const OPUS = { instanceId: 'claudeAgent', model: 'claude-opus-4-7' };
-const MODELS: ModelGroup[] = [
-  { instanceId: 'claudeAgent', name: 'Claude', models: [{ slug: 'claude-opus-4-7', label: 'Opus 4.7' }, { slug: 'claude-sonnet-4-6', label: 'Sonnet 4.6' }] },
-  { instanceId: 'codex', name: 'Codex', models: [{ slug: 'gpt-5.5', label: 'GPT-5.5' }] },
-];
-const run = (n: number, state: ClashRunState): ClashRun =>
-  ({ ...state, title: `Check instructions in maddec01/lar-web (run ${n})`, threadId: `thread-${n}`, model: OPUS, startedAt: '2026-10-21T09:50:00Z' });
-/** A Clash agent run that found none, so Next goes on. */
-const DONE = [run(1, { state: 'done', clashes: [] })];
-
-/** Answers the fixed checks with `answer`, what they found or the board's problem, and the agent's runs with `runs`. */
-function answerClashes(answer: FixedClashes | { error: string }, runs: ClashRun[] = DONE): void {
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/clashes'
-    ? new Response(JSON.stringify('error' in answer ? answer : { ...answer, error: null }), { status: 'error' in answer ? 502 : 200 })
-    : url.startsWith('/api/onboarding/clash-runs') ? new Response(JSON.stringify({ runs, error: null })) : served(url, init));
-}
-
-/**
- * Answers the setup step for `chosen` when it asks, passes Checks, and moves to Cleanup with the fixed checks answered by
- * `answer` and the agent's runs by `runs`.
- */
-async function openCleanup(chosen: ProjectChoice, answer: FixedClashes | { error: string } = NONE, runs: ClashRun[] = DONE): Promise<void> {
-  await openSetup(chosen);
-  if (!chosen.config) {
-      await type(input('role')!, 'Web client');
+  for (let i = 0; i < 10 && heading() !== title; i++) {
+    if (heading() === 'Repository role' && !body().querySelector<HTMLInputElement>('input')!.value) await type(body().querySelector('input')!, 'Web client');
+    await settle(() => footer('Next')!.click());
   }
-  answerChecks({}, toolChecks({ az: { result: 'ok' } }));
-  await openChecks();
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED, modelChoices: MODELS }));
-  answerClashes(answer, runs);
-  await settle(() => nextButton().click());
-  await settle();
+  expect(heading()).toBe(title);
 }
 
-const cleanup = () => dialog()!.querySelector<HTMLElement>('[data-cleanup-step]')!;
-const clashRow = (id: string) => cleanup().querySelector<HTMLElement>(`[data-clash="${id}"]`)!;
-const checkbox = (id: string) => clashRow(id).querySelector<HTMLElement>('input[type="checkbox"]')!;
-const skillClash = () => cleanup().querySelector<HTMLElement>('[data-skill-clash]');
-const skillPick = (pick: string) => skillClash()!.querySelector<HTMLElement>(`[data-skill-pick="${pick}"] [role="radio"]`)!;
+const fact = (label: string) => text(body().querySelector(`[data-fact="${label}"] dd`));
 
-test("the Cleanup step lists each fixed Clash with its file, reason and edit, CONTEXT.md's rename ticked and .scratch/'s delete not", async () => {
-  await openCleanup(project('lar-web'), { ...FOUND, skillClashes: [] });
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Cleanup');
-  expect(text(clashRow('context'))).toContain('CONTEXT.md');
-  expect(text(clashRow('context'))).toContain('Rename CONTEXT.md to GLOSSARY.md');
-  expect(text(clashRow('scratch'))).toContain("from Matt Pocock's local tracker");
-  expect(text(clashRow('scratch'))).toContain('Delete .scratch/');
-  expect([checkbox('context'), checkbox('scratch')].map(checkedOf)).toEqual(['true', 'false']);
-  await settle(() => checkbox('scratch').click());
-  expect(checkedOf(checkbox('scratch'))).toBe('true');
-  const { useWizardStore } = await import('./wizard-store.ts');
-  expect(useWizardStore.getState().run!.cleanup).toEqual({ ticks: { scratch: true }, skills: {} });
-  expect(nextButton().disabled).toBe(false);
-});
-
-test('the Files to update list names the Agent skills block, the three docs/agents/ files and .lar-factory.json', async () => {
-  await openCleanup(project('lar-web'));
-  const written = [...cleanup().querySelectorAll<HTMLElement>('[data-written]')];
-  expect(written.map((w) => w.dataset.written)).toEqual(['## Agent skills', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md', '.lar-factory.json']);
-  expect(text(written[0])).toContain('Adds or replaces the agent instructions in CLAUDE.md or AGENTS.md');
-  expect(text(written[1])).toContain('Tells agents where to track issues');
-  expect(text(written[2])).toContain('Explains how agents use labels');
-  expect(text(written[4])).toContain('Saves this repository');
-  expect(text(cleanup())).toContain('No known problems found.');
-});
-
-test('on Azure DevOps the Files to update list says work items and tags, and the step names the project decoded', async () => {
-  await openCleanup(project('lar-api', { repo: 'contoso/Fabrikam%20Fiber/lar-api', provider: 'Azure DevOps', hasConfig: true,
-    config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: [] } }));
-  const written = (file: string) => text(cleanup().querySelector(`[data-written="${file}"]`));
-  expect(written('docs/agents/issue-tracker.md')).toContain('Tells agents where to track work items');
-  expect(written('docs/agents/triage-labels.md')).toContain('Explains how agents use tags');
-  expect(text(cleanup())).toContain('Review changes to contoso/Fabrikam Fiber/lar-api\'s instructions');
-});
-
-test('a project skill named like a bundled skill keeps Next disabled until Delete it, or a rename to a name no other skill has', async () => {
-  await openCleanup(project('lar-web'), FOUND);
-  expect(text(skillClash())).toContain('.claude/skills/code-review/');
-  expect(text(skillClash())).toContain('Choose whether to remove or rename this skill.');
-  expect(nextButton().disabled).toBe(true);
-  await settle(() => skillPick('rename').click());
-  const name = () => skillClash()!.querySelector<HTMLInputElement>('[data-field="skill-name"] input')!;
-  await type(name(), 'Web Review');
-  expect(text(skillClash()), 'no path from an invalid name').toContain('.claude/skills/new-name/');
-  for (const [typed, why] of [['tdd', 'tdd is already a bundled skill.'], ['web-deploy', 'A local skill already uses web-deploy.']]) {
-    await type(name(), typed!);
-    expect(text(skillClash()!.querySelector('[data-problem]')), typed).toBe(why);
-    expect(name().getAttribute('aria-invalid'), typed).toBe('true');
-    expect(nextButton().disabled, typed).toBe(true);
-  }
-  await type(name(), 'web-code-review');
-  expect(skillClash()!.querySelector('[data-problem]')).toBeNull();
-  expect(text(skillClash())).toContain('.claude/skills/web-code-review/');
-  expect(nextButton().disabled).toBe(false);
-  await settle(() => skillPick('delete').click());
-  expect(nextButton().disabled).toBe(false);
-});
-
-test('a refused rename restored on Resume shows its problem as an error straight away', async () => {
-  await openCleanup(project('lar-web'), FOUND);
-  await settle(() => skillPick('rename').click());
-  await type(skillClash()!.querySelector<HTMLInputElement>('[data-field="skill-name"] input')!, 'tdd');
-  await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
-  const { useWizardStore } = await import('./wizard-store.ts');
-  const { useBoardStore } = await import('../board/board-store.ts');
-  const kept = JSON.parse(String((fetchMock.mock.calls as unknown as [string, RequestInit][])
-    .findLast(([url]) => url === '/api/onboarding/repositories')![1].body)) as { repo: string; progress: never };
-  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, onboarding: [kept] }));
-  await settle(() => useWizardStore.getState().resume('maddec01/lar-web'));
-  await settle();
-  const name = skillClash()!.querySelector<HTMLInputElement>('[data-field="skill-name"] input')!;
-  expect(name.value).toBe('tdd');
-  expect(name.getAttribute('aria-invalid')).toBe('true');
-  expect(skillClash()!.querySelector('[data-problem]')!.className).toContain('text-(--lar-danger-text)');
-});
-
-test('fixed checks the board can\'t run show why with Retry, and Next waits until Retry runs them', async () => {
-  await openCleanup(project('lar-web'), { error: "Can't read maddec01/lar-web's default branch: HTTP 502" });
-  const alert = cleanup().querySelector('[role="alert"]')!;
-  expect(text(alert)).toContain("Can't read maddec01/lar-web's default branch: HTTP 502");
-  expect(nextButton().disabled).toBe(true);
-  answerClashes(NONE);
-  await settle(() => [...alert.querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
-  await settle();
-  expect(cleanup().querySelector('[role="alert"]')).toBeNull();
-  expect(nextButton().disabled).toBe(false);
-});
-
-const agentPart = () => cleanup().querySelector<HTMLElement>('[data-clash-agent]')!;
-const agentRun = () => agentPart().querySelector<HTMLElement>('[data-agent-run]');
-const threadLinks = () => [...agentPart().querySelectorAll<HTMLAnchorElement>('a[data-thread-link]')].map((a) => a.getAttribute('href'));
-const select = (name: string) => agentPart().querySelector<HTMLSelectElement>(`[data-field="${name}"] select`)!;
-const AGENT_CLASH = { id: 'agent-1', file: 'AGENTS.md', line: 12, reason: 'It says to push to main.', edit: { kind: 'lines' as const, remove: ['Push to main.'], add: ['Open a PR.'] }, ticked: true };
-
-/** Serves the agent's runs from `runs`, and a post as a new running run on its model, recording each post's body. */
-function agentBoard(runs: ClashRun[]): object[] {
-  const posts: object[] = [];
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-    if (!url.startsWith('/api/onboarding/clash-runs')) return served(url, init);
-    if (init?.method === 'POST') {
-      const body = JSON.parse(String(init.body)) as { model: ClashRun['model'] };
-      posts.push(body);
-      runs.push({ ...run(runs.length + 1, { state: 'running', progress: null }), threadId: null, model: body.model });
-    }
-    return new Response(JSON.stringify({ runs, error: null }));
-  });
-  return posts;
-}
-
-test('the Instruction check asks for a provider and model, and Check instructions shows the run\'s latest message and thread until its Clashes come', async () => {
-  const runs: ClashRun[] = [];
-  await openCleanup(project('lar-web'), FOUND, runs);
-  await settle(() => skillPick('delete').click());
-  expect([select('agent-provider').value, select('agent-model').value], 'the first model T3 offers').toEqual(['claudeAgent', 'claude-opus-4-7']);
-  expect(nextButton().disabled, 'Next waits for a run').toBe(true);
-  const posts = agentBoard(runs);
-  select('agent-provider').value = 'codex';
-  await settle(() => select('agent-provider').dispatchEvent(new Event('change', { bubbles: true })));
-  expect(select('agent-model').value).toBe('gpt-5.5');
-  await settle(() => agentPart().querySelector<HTMLButtonElement>('[data-look-for-clashes]')!.click());
-  expect(posts).toEqual([{ repo: 'maddec01/lar-web', projectId: 'lar-web', model: { instanceId: 'codex', model: 'gpt-5.5' } }]);
-  expect(agentRun()!.dataset.agentRun).toBe('running');
-  expect(text(agentRun())).toContain('Agent running on Codex GPT-5.5');
-  expect(text(agentRun())).toContain('Waiting for the agent to respond.');
-  expect(agentRun()!.querySelector<HTMLButtonElement>('[data-thread-link]')!.disabled, 'no thread yet').toBe(true);
-  expect(select('agent-model').disabled).toBe(true);
-  expect(nextButton().disabled).toBe(true);
-
-  runs[0] = { ...runs[0]!, state: 'running', progress: 'Reading AGENTS.md on origin/main', threadId: 'thread-1' } as ClashRun;
-  const { AGENT_POLL_MS } = await import('./wizard-store.ts');
-  await settle(() => vi.advanceTimersByTime(AGENT_POLL_MS));
-  expect(text(agentRun())).toContain('Reading AGENTS.md on origin/main');
-  expect(threadLinks()).toEqual(['t3code://threads/sample-environment/thread-1']);
-
-  runs[0] = { ...runs[0]!, state: 'done', clashes: [AGENT_CLASH] } as ClashRun;
-  await settle(() => vi.advanceTimersByTime(AGENT_POLL_MS));
-  expect(text(agentRun())).toContain('Codex GPT-5.5 found 1 issue');
-  const row = agentRun()!.querySelector<HTMLElement>('[data-clash="agent-1"]')!;
-  for (const part of ['AGENTS.md:12', 'It says to push to main.', '- Push to main.', '+ Open a PR.']) expect(text(row)).toContain(part);
-  expect(clashRow('context'), 'beside the fixed Clashes').not.toBeNull();
-  await settle(() => row.querySelector<HTMLElement>('input[type="checkbox"]')!.click());
-  const { useWizardStore } = await import('./wizard-store.ts');
-  expect(useWizardStore.getState().run!.cleanup!.ticks).toEqual({ 'agent-1': false });
-  expect(nextButton().disabled).toBe(false);
-});
-
-test.each([
-  ['failed', 'The agent could not finish', "The agent's reply isn't the JSON the board asked for."],
-  ['waiting', 'The agent needs an answer', 'Answer it in the thread.'],
-  ['timed-out', 'The agent took too long', 'The run took longer than 15 minutes.'],
-] as const)('a %s run shows why with its thread and Retry, which starts a new thread and links both', async (state, title, why) => {
-  const runs = [run(1, { state, why })];
-  await openCleanup(project('lar-web'), NONE, runs);
-  expect(text(agentRun()!.querySelector('[data-slot="title"]'))).toBe(title);
-  expect(text(agentRun())).toContain(why);
-  expect(threadLinks()).toEqual(['t3code://threads/sample-environment/thread-1']);
-  expect(nextButton().disabled).toBe(true);
-  const posts = agentBoard(runs);
-  await settle(() => [...agentRun()!.querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
-  expect(posts).toEqual([{ repo: 'maddec01/lar-web', projectId: 'lar-web', model: OPUS }]);
-  expect(agentRun()!.dataset.agentRun).toBe('running');
-  runs[1] = { ...runs[1]!, state: 'done', clashes: [], threadId: 'thread-2' } as ClashRun;
-  const { AGENT_POLL_MS } = await import('./wizard-store.ts');
-  await settle(() => vi.advanceTimersByTime(AGENT_POLL_MS));
-  expect(text(agentRun())).toContain('The agent found no problems.');
-  expect(text(agentPart().querySelector('[data-earlier-runs]'))).toContain(`Earlier run on Claude Opus 4.7: ${state === 'timed-out' ? 'timed out' : state === 'waiting' ? 'waiting for an answer' : 'failed'}`);
-  expect(threadLinks()).toEqual(['t3code://threads/sample-environment/thread-2', 't3code://threads/sample-environment/thread-1']);
-  expect(nextButton().disabled).toBe(false);
-});
-
-test("an agent Clash whose edit won't apply shows why, unticked, and can't be ticked", async () => {
-  const wontApply = { ...AGENT_CLASH, id: 'agent-2', line: 30, ticked: false, wontApply: 'The text at line 30 in AGENTS.md has changed.' };
-  await openCleanup(project('lar-web'), NONE, [run(1, { state: 'done', clashes: [AGENT_CLASH, wontApply] })]);
-  expect(text(clashRow('agent-2').querySelector('[data-wont-apply]'))).toBe(`Cannot apply this change. ${wontApply.wontApply}`);
-  expect(clashRow('agent-2').querySelector('[data-edit-preview]')!.classList.contains('opacity-60'), 'its edit dimmed').toBe(true);
-  expect(clashRow('agent-1').querySelector('[data-edit-preview]')!.classList.contains('opacity-60')).toBe(false);
-  expect(checkedOf(checkbox('agent-2'))).toBe('false');
-  await settle(() => checkbox('agent-2').click());
-  expect(checkedOf(checkbox('agent-2'))).toBe('false');
-  const { picksOf, useWizardStore } = await import('./wizard-store.ts');
-  const { run: wizardRun, clashes, agent } = useWizardStore.getState();
-  expect(picksOf(wizardRun!, clashes, agent)!.clashes.map((clash) => clash.id)).toEqual(['agent-1']);
-});
-
-test('a done run offers Look again, on the model picked then, which starts a new run and drops the old ticks', async () => {
-  const runs = [run(1, { state: 'done', clashes: [AGENT_CLASH] })];
-  await openCleanup(project('lar-web'), NONE, runs);
-  await settle(() => checkbox('agent-1').click());
-  expect(select('agent-provider').disabled).toBe(false);
-  const posts = agentBoard(runs);
-  select('agent-provider').value = 'codex';
-  await settle(() => select('agent-provider').dispatchEvent(new Event('change', { bubbles: true })));
-  const again = agentPart().querySelector<HTMLButtonElement>('[data-look-for-clashes]')!;
-  expect(text(again).trim()).toBe('Look again');
-  await settle(() => again.click());
-  expect(posts).toEqual([{ repo: 'maddec01/lar-web', projectId: 'lar-web', model: { instanceId: 'codex', model: 'gpt-5.5' } }]);
-  expect(agentRun()!.dataset.agentRun).toBe('running');
-  const { useWizardStore } = await import('./wizard-store.ts');
-  expect(useWizardStore.getState().run!.cleanup!.ticks).toEqual({});
-});
-
-test("a Look again the board refuses keeps the old run's ticks, and offers only the alert's Retry to start it", async () => {
-  const runs = [run(1, { state: 'done', clashes: [AGENT_CLASH] })];
-  await openCleanup(project('lar-web'), NONE, runs);
-  await settle(() => checkbox('agent-1').click());
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url.startsWith('/api/onboarding/clash-runs') && init?.method === 'POST'
-    ? new Response(JSON.stringify({ error: 'The board is restarting.' }), { status: 503 }) : served(url, init));
-  await settle(() => agentPart().querySelector<HTMLButtonElement>('[data-look-for-clashes]')!.click());
-  const { useWizardStore } = await import('./wizard-store.ts');
-  expect(useWizardStore.getState().run!.cleanup!.ticks).toEqual({ 'agent-1': false });
-  expect(checkedOf(checkbox('agent-1'))).toBe('false');
-  expect(text(agentPart().querySelector('[role="alert"]'))).toContain('The board is restarting.');
-  expect(agentPart().querySelector('[data-look-for-clashes]'), 'Retry starts it instead').toBeNull();
-  expect(button(agentPart(), 'Retry')!.disabled).toBe(false);
-});
-
-test.each(['start', 'read'] as const)('the Instruction check\'s Retry after a failed %s makes that call again', async (call) => {
-  await openCleanup(project('lar-web'), NONE, []);
-  const calls: string[] = [];
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  let failing = true;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-    if (!url.startsWith('/api/onboarding/clash-runs')) return served(url, init);
-    calls.push(init?.method === 'POST' ? 'start' : 'read');
-    if (failing) return new Response(JSON.stringify({ error: 'The board is restarting.' }), { status: 503 });
-    return new Response(JSON.stringify({ runs: [run(1, { state: 'running', progress: null })], error: null }));
-  });
-  const { useWizardStore } = await import('./wizard-store.ts');
-  await settle(() => call === 'start' ? agentPart().querySelector<HTMLButtonElement>('[data-look-for-clashes]')!.click() : void useWizardStore.getState().readClashRuns());
-  expect(text(agentPart().querySelector('[role="alert"]'))).toContain('The board is restarting.');
-  failing = false;
-  calls.length = 0;
-  await settle(() => button(agentPart(), 'Retry')!.click());
-  expect(calls).toEqual([call]);
-  expect(agentRun()!.dataset.agentRun).toBe('running');
-});
-
-test('before the board\'s first read the Instruction check says it\'s reading T3 Code\'s models, not that T3 offers none', async () => {
-  await openCleanup(project('lar-web'), NONE, []);
-  const { useBoardStore } = await import('../board/board-store.ts');
-  const data = useBoardStore.getState().data;
-  await settle(() => useBoardStore.getState().receive({ ...data, modelChoices: [], fetchedAt: null, error: null }));
-  expect(text(agentPart().querySelector('[data-reading-models]'))).toContain('Loading available models...');
-  expect(text(agentPart())).not.toContain('offers no provider');
-  await settle(() => useBoardStore.getState().receive({ ...data, modelChoices: [], fetchedAt: '2026-10-21T09:41:00.000Z', error: null }));
-  expect(text(agentPart())).toContain('Enable an AI provider and model in T3 Code settings to continue.');
-});
-
-/** Answers the label read with `names`, and Create and Rename with `changed`, or with gh's problem when `failure` is set. */
-function answerLabels(names: string[], changed: string[] = EVERY_LABEL, failure: string | null = null): void {
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-    if (url === '/api/onboarding/labels') return new Response(JSON.stringify({ labels: names, error: null }));
-    if (url.startsWith('/api/onboarding/labels/')) {
-      return failure ? new Response(JSON.stringify({ error: failure }), { status: 502 }) : new Response(JSON.stringify({ labels: changed, error: null }));
-    }
-    return served(url, init);
-  });
-}
-
-const labelRow = (name: string) => dialog()!.querySelector<HTMLElement>(`[data-label="${name}"]`);
-const panelButton = (selector: string) => dialog()!.querySelector<HTMLButtonElement>(selector)!;
-
-/** Opens the Labels step of lar-web, reading its issues, with the repository's labels as `names`. */
-async function openLabels(names: string[], changed?: string[], failure?: string): Promise<void> {
-  await openSetup(project('lar-web'));
-  await type(input('role')!, 'Web client');
-  answerLabels(names, changed, failure);
-  await settle(() => nextButton().click());
-  await settle();
-}
-
-test('the Labels step shows each workflow label with what it does and whether the repository has it, or Rename for its old name', async () => {
-  await openLabels(['bug', 'decision: grill', 'decision-task', 'decision: task', 'needs-triage', 'status-list']);
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Labels');
-  expect(labelRow('bug')!.dataset.state).toBe('present');
-  expect(text(labelRow('bug'))).toContain('Something broken');
-  expect(labelRow('feature')!.dataset.state).toBe('missing');
-  expect(text(labelRow('feature'))).toContain('missing');
-  const grill = labelRow('decision-grill')!;
-  expect(grill.dataset.state).toBe('rename');
-  expect(text(grill)).toContain('Rename decision: grill');
-  expect(checkedOf(grill.querySelector('input[type="checkbox"]')!)).toBe('true');
-  expect(labelRow('decision-task')!.dataset.state).toBe('present');
-  expect(labelRow('status-list')!.dataset.state, 'issues list the status labels').toBe('present');
-  expect(labelRow('status-queued')!.dataset.state).toBe('missing');
-  expect(text(dialog()!.querySelector('[data-label="status-list"]')!.closest('ul')!.previousElementSibling)).toContain('Create adds any missing labels.');
-  const left = dialog()!.querySelector<HTMLElement>('[data-left-alone]')!;
-  expect([...left.querySelectorAll<HTMLElement>('[data-left]')].map((l) => l.dataset.left)).toEqual(['decision: task', 'needs-triage']);
-  expect(text(left.querySelector('[data-left="decision: task"]'))).toContain('Move items to it before removing decision: task.');
-  expect(text(panelButton('[data-rename-labels]'))).toBe('Rename 1');
-  expect(nextButton().disabled).toBe(true);
-});
-
-test('Rename moves the ticked old names, and once every workflow label is there Next goes on', async () => {
-  await openLabels(['decision: grill'], EVERY_LABEL);
-  expect(nextButton().disabled).toBe(true);
-  await settle(() => panelButton('[data-rename-labels]').click());
-  await settle();
-  const renamed = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/onboarding/labels/rename')!;
-  expect(JSON.parse(String(renamed[1].body))).toEqual({ repo: 'maddec01/lar-web', names: ['decision: grill'] });
-  expect(labelRow('decision-grill')!.dataset.state).toBe('present');
-  expect(dialog()!.querySelector('[data-create-labels]'), 'nothing left to create').toBeNull();
-  expect(dialog()!.querySelector('[data-rename-labels]'), 'nothing left to rename').toBeNull();
-  expect(nextButton().disabled).toBe(false);
-});
-
-test("a Create gh refuses shows gh's message with Retry", async () => {
-  await openLabels(['bug'], EVERY_LABEL, "Couldn't create feature in maddec01/lar-web: gh label create failed: HTTP 403");
-  await settle(() => panelButton('[data-create-labels]').click());
-  await settle();
-  const alert = [...dialog()!.querySelectorAll('[role="alert"]')].find((a) => text(a).includes('Can\'t create the labels'))!;
-  expect(text(alert)).toContain('HTTP 403');
-  answerLabels(['bug'], EVERY_LABEL);
-  await settle(() => [...alert.querySelectorAll('button')].find((b) => text(b).trim() === 'Retry')!.click());
-  await settle();
-  expect(nextButton().disabled).toBe(false);
-});
-
-const customSection = () => dialog()!.querySelector<HTMLElement>('[data-custom-labels]')!;
-const customRow = (name: string) => customSection().querySelector<HTMLElement>(`[data-custom="${name}"]`);
-const customNames = () => [...customSection().querySelectorAll<HTMLElement>('[data-custom]')].map((r) => r.dataset.custom);
-const picked = (name: string) => checkedOf(customRow(name)!.querySelector('input[type="checkbox"]')!);
-
-test('the Labels step offers the labels it leaves alone as custom labels to pick, less the status labels and old names', async () => {
-  await openLabels([...EVERY_LABEL, 'decision: task', 'app: music', 'web']);
-  expect(text(customSection())).toContain('Use labels to group work');
-  expect(customNames()).toEqual(['app: music', 'web']);
-  expect(picked('web')).toBe('false');
-  await settle(() => customRow('web')!.querySelector<HTMLElement>('input[type="checkbox"]')!.click());
-  expect(picked('web')).toBe('true');
-});
-
-test('a typed custom label with a colon is created on the repository and shows picked; one gh refuses shows its message', async () => {
-  await openLabels(EVERY_LABEL, [...EVERY_LABEL, 'app: music']);
-  const field = customSection().querySelector<HTMLInputElement>('[data-new-custom] input, input[data-new-custom]')!;
-  await type(field, 'build');
-  expect(text(customSection())).toContain('build is reserved for tracking work.');
-  expect(panelButton('[data-add-custom]').disabled).toBe(true);
-  await type(field, 'app: music');
-  await settle(() => panelButton('[data-add-custom]').click());
-  await settle();
-  const sent = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/onboarding/labels/custom')!;
-  expect(JSON.parse(String(sent[1].body))).toEqual({ repo: 'maddec01/lar-web', name: 'app: music' });
-  expect(picked('app: music')).toBe('true');
-  expect(dialog()!.querySelector('[data-left="app: music"]'), 'a label the step created is not left alone').toBeNull();
-
-  answerLabels(EVERY_LABEL, EVERY_LABEL, "Couldn't create web in maddec01/lar-web: gh label create failed: HTTP 403");
-  await type(field, 'web');
-  await settle(() => panelButton('[data-add-custom]').click());
-  await settle();
-  const alert = [...customSection().querySelectorAll('[role="alert"]')].find((a) => text(a).includes('Could not add web'))!;
-  expect(text(alert)).toContain('HTTP 403');
-  await type(field, 'web2');
-  expect([...customSection().querySelectorAll('[role="alert"]')].some((a) => text(a).includes('Can\'t create')), 'typing clears the failed add').toBe(false);
-});
-
-test('a ticked custom label is not listed as left alone too, and a long one breaks inside the dialog', async () => {
-  const long = 'area:' + 'x'.repeat(45);
-  await openLabels([...EVERY_LABEL, 'web', long]);
-  const left = () => [...dialog()!.querySelectorAll<HTMLElement>('[data-left]')].map((l) => l.dataset.left);
-  expect(left()).toEqual(['web', long]);
-  await settle(() => customRow('web')!.querySelector<HTMLElement>('input[type="checkbox"]')!.click());
-  expect(left()).toEqual([long]);
-  expect(customRow(long)!.querySelector('code')!.className).toContain('break-all');
-});
-
-test("a reused .lar-factory.json's Labels step lists its custom labels and asks nothing about them", async () => {
-  await openSetup(project('lar-web', { hasConfig: true,
-    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['app: music', 'web'] } }));
-  answerLabels([...EVERY_LABEL, 'app: music', 'web', 'other']);
-  await settle(() => nextButton().click());
-  await settle();
-  expect(text(customSection())).toContain('saved settings');
-  expect(customNames()).toEqual(['app: music', 'web']);
-  expect(customSection().querySelector('input')).toBeNull();
-  expect(dialog()!.querySelector('[data-left="web"]'), "the file's custom labels are not left alone too").toBeNull();
-});
-
-test("a reused .lar-factory.json's custom labels show whether the repository has each, and Create makes the missing ones", async () => {
-  await openSetup(project('lar-web', { hasConfig: true,
-    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['app: music', 'web'] } }));
-  answerLabels([...EVERY_LABEL, 'App: Music'], [...EVERY_LABEL, 'App: Music', 'web']);
-  await settle(() => nextButton().click());
-  await settle();
-  expect([customRow('app: music')!.dataset.state, customRow('web')!.dataset.state]).toEqual(['present', 'missing']);
-  expect(text(panelButton('[data-create-labels]'))).toBe('Create 1 missing');
-  await settle(() => panelButton('[data-create-labels]').click());
-  await settle();
-  const sent = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/onboarding/labels/create')!;
-  expect(JSON.parse(String(sent[1].body))).toMatchObject({ renaming: [], custom: ['web'] });
-  expect(customRow('web')!.dataset.state).toBe('present');
-});
-
-test("a reused .lar-factory.json's custom label that can't be one shows why on its row, and Create still makes the workflow labels", async () => {
-  await openSetup(project('lar-web', { hasConfig: true,
-    config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['build', 'x'.repeat(51), 'web'] } }));
-  answerLabels(EVERY_LABEL.filter((n) => n !== 'blocked'), EVERY_LABEL);
-  await settle(() => nextButton().click());
-  await settle();
-  expect(customRow('build')!.dataset.state).toBe('problem');
-  expect(text(customRow('build')!.querySelector('[data-problem]'))).toBe('build is reserved for tracking work.');
-  expect(text(customRow('build')!.querySelector('[data-slot="badge"]'))).toBe('can\'t create');
-  expect(text(customRow('x'.repeat(51))!.querySelector('[data-problem]'))).toContain('at most 50 characters');
-  expect(text(panelButton('[data-create-labels]'))).toBe('Create 2 missing');
-  await settle(() => panelButton('[data-create-labels]').click());
-  await settle();
-  const sent = (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url === '/api/onboarding/labels/create')!;
-  expect(JSON.parse(String(sent[1].body))).toMatchObject({ custom: ['web'] });
-  expect(nextButton().disabled).toBe(false);
-});
-
-test("on Azure DevOps the Labels step lists the project's tags with the status tags, offers Rename but no Create, and Next goes on", async () => {
-  await openSetup(project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true,
-    config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API', labels: ['web'] } }));
-  answerLabels(['decision: grill', 'status-list'], ['decision-grill', 'status-list']);
-  await settle(() => nextButton().click());
-  await settle();
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Tags');
-  expect(text(dialog())).toContain('Tags group work in Azure DevOps');
-  expect(text(dialog())).not.toContain('build #386');
-  expect(text(dialog())).not.toMatch(/\blabels?\b/);
-  expect(labelRow('feature')!.dataset.state).toBe('missing');
-  expect(text(labelRow('feature'))).toContain('not used yet');
-  expect(labelRow('status-list')!.dataset.state).toBe('present');
-  expect(text(customRow('web'))).toContain('not used yet');
-  expect(dialog()!.querySelector('[data-create-labels]')).toBeNull();
-  expect(nextButton().disabled).toBe(false);
-  await settle(() => panelButton('[data-rename-labels]').click());
-  await settle();
-  expect(labelRow('decision-grill')!.dataset.state).toBe('present');
-});
-
-const PR = 'https://github.com/maddec01/lar-web/pull/14';
-const prStep = () => dialog()!.querySelector<HTMLElement>('[data-pr-step]')!;
-const button = (within: HTMLElement, label: string) => [...within.querySelectorAll<HTMLButtonElement>('button')].find((b) => text(b).trim().startsWith(label));
-
-/** Answers Open pull request with `answer`, a PR's URL or the board's problem. */
-function answerPr(answer: { prUrl: string } | { error: string }): void {
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-    if (url !== '/api/onboarding/pr') return served(url, init);
-    const onboarding = 'prUrl' in answer ? [{ repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' }, prUrl: PR } }] : [];
-    return new Response(JSON.stringify('prUrl' in answer ? { ...answer, board: { ...sample, tools: toolChecks(), onboarding }, error: null } : answer));
-  });
-}
-
-/** Answers the board's preview of the PR's changes with `changes`, and records each preview's body in `previews`. */
-function answerChanges(changes: OnboardingPrChange[]): object[] {
-  const previews: object[] = [];
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-    if (url !== '/api/onboarding/pr/changes') return served(url, init);
-    previews.push(JSON.parse(String(init!.body)) as object);
-    return new Response(JSON.stringify({ changes, error: null }));
-  });
-  return previews;
-}
-
-const WRITTEN: OnboardingPrChange[] = [{ kind: 'agent-skills', path: 'CLAUDE.md' }, { kind: 'write', path: 'docs/agents/issue-tracker.md', created: true },
-  { kind: 'write', path: 'docs/agents/triage-labels.md', created: false }, { kind: 'write', path: 'docs/agents/domain.md', created: true }];
-
-/**
- * Answers the setup step with the repository's issues and a role, picks `custom` as its custom labels, passes Checks and
- * Cleanup, and opens the Pull request step with the PR's changes previewed as `changes`.
- */
-async function openPrStep(changes: OnboardingPrChange[] = WRITTEN, custom: string[] = []): Promise<object[]> {
-  await openCleanup(project('lar-web'));
-  const { useWizardStore } = await import('./wizard-store.ts');
-  for (const name of custom) useWizardStore.getState().toggleCustomLabel(name);
-  const previews = answerChanges(changes);
-  await settle(() => nextButton().click());
-  await settle();
-  return previews;
-}
-
-const changeRows = () => [...prStep().querySelectorAll<HTMLElement>('[data-pr-changes] li')].map((li) => text(li));
-
-test("the Pull request step lists the PR's changes with a new .lar-factory.json: the agent setup, the file, each ticked edit and the skill's rename", async () => {
-  await openPrStep([...WRITTEN, { kind: 'write', path: '.lar-factory.json', created: true },
-    { kind: 'edit', path: 'AGENTS.md', line: 12, reason: 'It says to push to main.' }, { kind: 'delete', path: '.scratch/' },
-    { kind: 'rename', path: '.claude/skills/code-review/', to: '.claude/skills/web-code-review/' }]);
-  expect(changeRows()).toEqual([
-    'CLAUDE.mdWrites the ## Agent skills block.', 'docs/agents/issue-tracker.mdAdds the file.', 'docs/agents/triage-labels.mdReplaces the file.',
-    'docs/agents/domain.mdAdds the file.', '.lar-factory.jsonAdds the file.', 'AGENTS.mdEdits line 12: It says to push to main.',
-    '.scratch/Deletes it.', '.claude/skills/code-review/Renames it to .claude/skills/web-code-review/',
+test('What we found lists each detected fact, with what the login allows, refuses and leaves unverified', async () => {
+  await openAt('What we found', routes(detection({
+    access: { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'unverified', 'tag-ticket': 'refused' },
+    domainDocs: { found: { kind: 'repository', glossary: 'CONTEXT.md', adrs: 'docs/adr' } }, projectSkills: { found: ['tdd', 'web-style'] },
+  })));
+  expect(fact('Provider')).toBe('GitHub');
+  expect(fact('Repository folder')).toBe('/Users/me/Developer/lar-web');
+  expect(fact('Item source')).toBe("maddec01/lar-web's issues");
+  expect(fact('Credential access')).toBe('Allowed: open issues. Refused: push branches, add labels. Unverified until needed: open pull requests, edit issues.');
+  expect(fact('Domain docs')).toBe('CONTEXT.md and docs/adr/');
+  expect(fact('Factory files')).toBe('None found');
+  expect(fact('Repository config')).toBe('None. Every setting is yours.');
+  expect(fact('Project skills')).toBe('tdd, web-style');
+  expect(later()).toEqual([
+    "You'll be offered a shared Repository config when a setting is worth sharing with your team.",
+    'Labels and agent guidance for the repository are offered when a feature would use them.',
   ]);
-  expect(text(prStep())).not.toContain('It adds .lar-factory.json');
-  expect(prStep().querySelector('[data-pr-changes] .text-success'), 'a change is no success').toBeNull();
+  expect(footer('Next')!.disabled).toBe(false);
 });
 
-test('the PR preview shows current and proposed contents before opening the PR and escapes repository text', async () => {
-  const before = '# Our Azure guide\nKeep our team query.\n<img src=x onerror=alert(1)>';
-  const after = '# Issue tracker: Azure DevOps\naz boards work-item show --id "$id" --expand all --organization "$org"';
-  await openPrStep([
-    { kind: 'write', path: 'docs/agents/issue-tracker.md', created: false, preview: { before, after } },
-    { kind: 'agent-skills', path: 'AGENTS.md', preview: { before: null, after: '## Agent skills\nAzure Boards work items.' } },
-  ]);
-  const rows = prStep().querySelectorAll('[data-pr-changes] li');
-  const details = rows[0]!.querySelector('details');
-  expect(details).not.toBeNull();
-  expect(text(details!.querySelector('summary'))).toBe('View contents');
-  expect([...details!.querySelectorAll('pre')].map((pre) => pre.textContent)).toEqual([before, after]);
-  expect(text(details)).toContain('Current contents');
-  expect(text(details)).toContain('Proposed contents');
-  expect(details!.querySelector('img')).toBeNull();
-  expect(text(rows[1])).toContain('New file');
-  expect(button(prStep(), 'Open pull request')!.disabled).toBe(false);
-  const { useWizardStore } = await import('./wizard-store.ts');
-  expect(useWizardStore.getState().run?.prUrl).toBeNull();
+test("a fact the login can't read shows Refused with why, and a folder agents can't use holds Next with Retry", async () => {
+  await openAt('What we found', routes(detection({
+    checkout: { refused: 'More than one T3 project points to maddec01/lar-web.' }, sharedConfig: { refused: "Can't read maddec01/lar-web with gh: HTTP 403" },
+    factoryFiles: { refused: "Can't read maddec01/lar-web with gh: HTTP 403" },
+  })));
+  expect(fact('Repository config')).toBe("RefusedCan't read maddec01/lar-web with gh: HTTP 403");
+  expect(text(body().querySelector('[data-fact="Factory files"] [data-slot="badge"]'))).toBe('Refused');
+  expect(text(body().querySelector('[role="alert"]'))).toContain('More than one T3 project points to maddec01/lar-web.');
+  expect(footer('Next')!.disabled).toBe(true);
+  expect(later(), 'no config offer where it could not be read').toHaveLength(1);
 });
 
-test('Open pull request waits while the PR\'s changes are read', async () => {
-  await openCleanup(project('lar-web'));
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  let answer!: (response: Response) => void;
-  fetchMock.mockImplementation((url: string, init?: RequestInit) => url === '/api/onboarding/pr/changes'
-    ? new Promise<Response>((resolve) => { answer = resolve; }) : served(url, init));
-  await settle(() => nextButton().click());
-  expect(prStep().querySelector('[data-reading-changes]')).not.toBeNull();
-  expect(button(prStep(), 'Open pull request')!.disabled).toBe(true);
-  await settle(() => answer(new Response(JSON.stringify({ changes: WRITTEN, error: null }))));
-  expect(button(prStep(), 'Open pull request')!.disabled).toBe(false);
+test("a shared .lar-factory.json's defaults are named on What we found and preselected as From Repository config", async () => {
+  await openAt('Repository role', routes(detection({ sharedConfig: { found: { defaults: { role: 'Web client', itemSource: { kind: 'issues' }, domainDocs: { kind: 'private' }, skills: [] } } } })));
+  expect(origin()).toBe('From Repository config');
+  expect(body().querySelector<HTMLInputElement>('input')!.value).toBe('Web client');
+  await type(body().querySelector('input')!, 'Admin web client');
+  expect(origin()).toBe('Changed');
+  await settle(() => footer('Back')!.click());
+  await settle(() => footer('Back')!.click());
+  expect(fact('Repository config')).toBe('.lar-factory.json supplies the role, item source, domain-doc location and skills. You can change each one here.');
+  expect(later(), 'no offer of a config it has').toEqual(['Labels and agent guidance for the repository are offered when a feature would use them.']);
 });
 
-test("with a reused .lar-factory.json, Cleanup goes on to the Pull request step, which lists the changes without the file and opens the PR", async () => {
-  const reused = project('lar-web', { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] } });
-  await openCleanup(reused);
-  expect(text(cleanup().querySelector('[data-written=".lar-factory.json"]'))).toContain('Keeps your saved settings.');
-  const previews = answerChanges(WRITTEN);
-  await settle(() => nextButton().click());
-  await settle();
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Pull request');
-  expect(previews).toMatchObject([{ repo: 'maddec01/lar-web', config: null }]);
-  expect(changeRows().map((row) => row.split(/(?=Writes|Adds|Replaces)/)[0])).toEqual(['CLAUDE.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md', 'docs/agents/domain.md']);
-  expect(prStep().querySelector('pre'), 'no .lar-factory.json to show').toBeNull();
-  answerPr({ prUrl: PR });
-  await settle(() => button(prStep(), 'Open pull request')!.click());
-  await settle();
-  expect(text(prStep())).toContain('ready for you to review and merge');
+test('the role step holds Next until it has a role, saying why', async () => {
+  await openAt('Repository role');
+  await type(body().querySelector('input')!, '');
+  expect(footer('Next')!.disabled).toBe(true);
+  expect(text(body().querySelector('[data-problem]'))).toBe('Describe what this repository does to continue.');
 });
 
-test("a preview the board refuses shows its problem with Retry", async () => {
-  await openCleanup(project('lar-web'));
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr/changes'
-    ? new Response(JSON.stringify({ error: 'The text at line 12 in AGENTS.md has changed. Uncheck this change in Cleanup or check instructions again.' }), { status: 409 }) : served(url, init));
-  await settle(() => nextButton().click());
-  await settle();
-  expect(text(prStep().querySelector('[role="alert"]'))).toContain('The text at line 12 in AGENTS.md has changed. Uncheck this change in Cleanup or check instructions again.');
-  expect(button(prStep(), 'Open pull request')!.disabled, 'no PR while its changes are unlisted').toBe(true);
-  answerChanges(WRITTEN);
-  await settle(() => button(prStep(), 'Retry')!.click());
-  await settle();
-  expect(changeRows()).toHaveLength(4);
+test('Write consent preselects every allowed write, shows a cost line on each, Refused ones locked off, and names publishing writes for later', async () => {
+  await openAt('Write consent', routes(detection({ access: { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed' } })));
+  expect(origin()).toBe('Detected');
+  expect(text(body().querySelector('[data-origin]'))).toContain('The default is preselected.');
+  expect(['publish-ticket', 'tag-ticket'].map((id) => body().querySelector(`[data-option="${id}"]`)), 'no control for a later feature').toEqual([null, null]);
+  expect(optionBadges('push-branch')).toEqual(['Refused']);
+  expect(optionBadges('open-pr')).toEqual(['Unverified']);
+  expect(text(option('push-branch'))).toContain("Refused: your GitHub access doesn't allow it.");
+  expect(text(option('open-pr'))).toContain('How builds deliver. Off: builds stop at a pushed branch.');
+  const checked = (id: string) => box(id).getAttribute('aria-checked') ?? String((box(id) as HTMLInputElement).checked);
+  expect(['push-branch', 'open-pr', 'edit-ticket'].map(checked)).toEqual(['false', 'false', 'true']);
+  expect(box('push-branch').hasAttribute('disabled') || box('push-branch').getAttribute('aria-disabled') === 'true' || box('push-branch').hasAttribute('data-disabled')).toBe(true);
+  await settle(() => box('open-pr').click());
+  expect(checked('open-pr')).toBe('true');
+  expect(origin()).toBe('Changed');
+  expect(text(body().querySelector('[data-origin]')), 'a changed answer is no longer the default').not.toContain('preselected');
+  expect(later()).toEqual(["You'll choose whether the factory may open and label issues, map its kinds to your labels and choose how to publish the first time you publish refined work."]);
 });
 
-test("Retry after the fixed checks' read failed reads them again, then lists the PR's changes", async () => {
-  await openCleanup(project('lar-web'));
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr/changes'
-    ? new Response(JSON.stringify({ error: 'GitHub answered 502.' }), { status: 502 }) : served(url, init));
-  await settle(() => nextButton().click());
-  await settle();
-  const failing = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/clashes'
-    ? new Response(JSON.stringify({ error: "Can't read maddec01/lar-web." }), { status: 502 }) : failing(url, init));
-  await settle(() => button(prStep(), 'Retry')!.click());
-  await settle();
-  expect(text(prStep().querySelector('[role="alert"]'))).toContain('Go Back to Cleanup and wait for its checks');
-  fetchMock.mockImplementation(served);
-  answerChanges(WRITTEN);
-  await settle(() => button(prStep(), 'Retry')!.click());
-  await settle();
-  expect(changeRows()).toHaveLength(WRITTEN.length);
+test("Domain docs offers the repository's docs or private drafts, Refused when the build PR is, and names publishing drafts for later", async () => {
+  await openAt('Domain docs', routes(detection({ domainDocs: { found: { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' } },
+    access: { ...detection().access, 'open-pr': 'refused' } })));
+  expect(text(choice('repository'))).toContain('Use GLOSSARY.md and docs/adr/');
+  expect(text(choice('repository'))).toContain('Refused');
+  expect(text(choice('private'))).toContain('Only you see them, on this Mac, until a build PR publishes them.');
+  expect(radio('private').getAttribute('aria-checked'), 'the default skips the refused option').toBe('true');
+  expect(later()).toEqual(["You'll choose whether to publish private drafts when a build first writes them."]);
 });
 
-test("an Azure DevOps repository's PR adds the team's item source, made on Azure DevOps, and names the PR as Azure Repos does", async () => {
-  await openSetup(AZURE);
-  await chooseTeam('Fabrikam Team');
-  await type(input('role')!, 'API server');
-  answerChecks({}, toolChecks({ az: { result: 'ok' } }));
-  await openChecks();
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, bundledSkills: BUNDLED, modelChoices: MODELS }));
-  answerClashes(NONE, DONE);
-  await settle(() => nextButton().click());
-  await settle();
-  answerChanges(WRITTEN);
-  await settle(() => nextButton().click());
-  await settle();
-  expect(text(prStep())).toContain('Your local files stay as they are.');
-  expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'API server',
-    itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', labels: [] });
-  const prUrl = 'https://dev.azure.com/contoso/Fabrikam%20Fiber/_git/lar-api/pullrequest/100';
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr' ? new Response(JSON.stringify({ prUrl, error: null,
-    board: { ...sample, tools: toolChecks(), onboarding: [{ repo: AZURE.repo, progress: { step: 'pr', done: [], answers: { projectId: 'lar-api' }, prUrl } }] } }))
-    : served(url, init));
-  await settle(() => button(prStep(), 'Open pull request')!.click());
-  await settle();
-  expect(text(prStep().querySelector(`a[href="${prUrl}"]`))).toBe('contoso/Fabrikam Fiber/lar-api!100');
+test('Project skills lists each skill found unticked, and names Clash resolution for later', async () => {
+  await openAt('Project skills', routes(detection({ projectSkills: { found: ['tdd', 'grill-me'] } })));
+  expect(text(body().querySelector('[data-origin]')), 'nothing is ticked, so nothing is preselected').toBe('Detected Found in the repository. Tick the ones builds should follow.');
+  expect([...body().querySelectorAll('[data-option]')].map((o) => (o as HTMLElement).dataset.option)).toEqual(['tdd', 'grill-me']);
+  expect(text(option('tdd'))).toContain('Builds follow it when they write and test code.');
+  expect(later()).toEqual(["If a project rule blocks factory work, you'll choose how to resolve it then."]);
+  expect(footer('Finish'), 'the last step for a repository with no factory files').toBeDefined();
 });
 
-test('the Pull request step shows the branch and the .lar-factory.json it writes, then Open pull request waits for the merge', async () => {
-  await openPrStep(WRITTEN, ['app: music']);
-  expect(text(dialog()!.querySelector('[data-slot="modal-header"] h2'))).toBe('Pull request');
-  expect(text(prStep())).toContain('Review these changes, then open a pull request to save them.');
-  expect(JSON.parse(text(prStep().querySelector('pre')))).toEqual({ version: 1, role: 'Web client', itemSource: { kind: 'issues' }, show: 'all', labels: ['app: music'] });
-  answerPr({ prUrl: PR });
-  await settle(() => button(prStep(), 'Open pull request')!.click());
-  await settle();
-  expect(prStep().querySelector<HTMLAnchorElement>(`a[href="${PR}"]`)).not.toBeNull();
-  expect(text(prStep())).toContain('ready for you to review and merge');
-  expect([prStep().querySelector('[data-pr-changes]'), prStep().querySelector('pre')], "the PR's body lists its changes now").toEqual([null, null]);
-  expect(footerButton('Back'), 'an open PR keeps the step').toBeUndefined();
-  fetchMock.mockClear();
-  await settle(() => button(prStep(), 'Check now')!.click());
-  expect((fetchMock.mock.calls as unknown as [string, RequestInit][]).map(([url, init]) => [url, init.method]), 'a read now, not on the next refresh').toEqual([['/api/read', 'POST']]);
-  await settle(() => footerButton('Close and wait')!.click());
+const choice = (id: string) => body().querySelector<HTMLElement>(`[data-choice="${id}"]`)!;
+const ticketRow = (n: number) => body().querySelector<HTMLElement>(`[data-ticket="${n}"]`)!;
+
+test("Work to import lists each ticket with a status, those recorded already, and what a ticked one needs settled", async () => {
+  await openAt('Work to import', routes(detection(), [ticket(3), ticket(4, { statuses: ['Ready', 'In progress'] }), ticket(6, { workId: 'W-2' })]));
+  expect(text(ticketRow(3))).toContain('#3Ticket 3Ready');
+  expect(text(ticketRow(6))).toContain('Recorded as W-2');
+  expect(text(ticketRow(4))).toContain('Choose its Status, or untick it.');
+  expect(footer('Next')!.disabled).toBe(true);
+  const select = ticketRow(4).querySelector<HTMLSelectElement>('select')!;
+  select.value = 'In progress';
+  await settle(() => select.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(footer('Next')!.disabled).toBe(false);
+});
+
+test('Next imports the ticked tickets and shows the reason for each one the board refuses', async () => {
+  await openAt('Work to import', routes(detection(), [ticket(3), ticket(8)], {
+    '/api/onboarding/import': { imported: [{ number: 3, workId: 'W-3', created: true, threads: 0 }], refused: [{ number: 8, reason: 'maddec01/lar-web#8 is no longer open.' }], error: null },
+  }));
+  await settle(() => footer('Next')!.click());
+  expect(heading()).toBe('Work to import');
+  expect(text(ticketRow(8))).toContain('maddec01/lar-web#8 is no longer open.');
+});
+
+const withFiles = (parts: Partial<SetupDetection> = {}) => detection({
+  factoryFiles: { found: [{ kind: 'config', paths: ['.lar-factory.json'] }, { kind: 'agent-skills', paths: ['AGENTS.md'] }] }, ...parts });
+
+test("an existing repository's factory files are kept by default, and dropping is Refused when the PR is", async () => {
+  await openAt('Factory files', routes(withFiles({ access: { ...detection().access, 'push-branch': 'refused' } })));
+  expect(text(option('agent-skills'))).toContain('## Agent skills in AGENTS.md');
+  expect(optionBadges('config')).toEqual(['Refused']);
+  expect(text(option('config'))).toContain("Refused: your access can't open the PR that drops it.");
+  expect(footer('Finish')).toBeDefined();
+});
+
+const CHANGES = [{ kind: 'agent-skills' as const, path: 'AGENTS.md', removed: true as const, preview: { before: '# Agents\n## Agent skills\n<b>x</b>', after: '# Agents\n' } }];
+const PR = 'https://github.com/maddec01/lar-web/pull/9';
+
+test('a repository with existing factory files completes: drop one, review and approve the PR, then Finish saves and opens it', async () => {
+  await openAt('Factory files', routes(withFiles(), [], { '/api/onboarding/pr/changes': { changes: CHANGES, error: null }, '/api/onboarding/pr': { prUrl: PR, error: null } }));
+  await settle(() => box('agent-skills').click());
+  await settle(() => footer('Next')!.click());
+  expect(heading()).toBe('Repository edits');
+  expect(text(body().querySelector('[data-change="AGENTS.md"]'))).toContain('Removes the ## Agent skills block.');
+  expect(body().querySelector('pre')!.innerHTML, 'repository text is escaped').toContain('&lt;b&gt;x&lt;/b&gt;');
+  expect(footer('Finish')!.disabled, 'Finish waits for approval').toBe(true);
+  await settle(() => body().querySelector<HTMLElement>('[data-approve] [role="checkbox"], [data-approve] input')!.click());
+  await settle(() => footer('Finish')!.click());
+  expect(heading()).toBe('Onboarded');
+  expect(text(body())).toContain('maddec01/lar-web is on the board');
+  expect(text(body().querySelector('[data-pr-opened]'))).toContain('maddec01/lar-web#9 holds the edits you approved');
+  expect(posted('/api/onboarding/pr')).toEqual([{ repo: 'maddec01/lar-web', edits: { drop: ['agent-skills'] } }]);
+  await settle(() => footer('Go to the board')!.click());
   expect(dialog()).toBeNull();
 });
 
-/** Opens the PR, so the step waits for its merge. */
-async function openWaiting(): Promise<void> {
-  await openPrStep();
-  answerPr({ prUrl: PR });
-  await settle(() => button(prStep(), 'Open pull request')!.click());
-  await settle();
-}
-
-test('Check now is busy until the board reads GitHub, then says when it checked and that the PR is still open', async () => {
-  await openWaiting();
-  await settle(() => button(prStep(), 'Check now')!.click());
-  await settle();
-  const checking = button(prStep(), 'Checking')!;
-  expect(checking.disabled, 'busy until the next board update').toBe(true);
-  expect(checking.getAttribute('aria-busy'), 'with a spinner').toBe('true');
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [ON_PR], fetchedAt: new Date(Date.now()).toISOString(), error: null }));
-  expect(button(prStep(), 'Check now')!.disabled).toBe(false);
-  const at = new Date(Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  expect(text(prStep())).toContain(`Last checked at ${at}. The pull request is still open`);
+test('a repository with no factory files completes with Finish on Project skills, writing nothing to it', async () => {
+  await openAt('Project skills');
+  await settle(() => footer('Finish')!.click());
+  expect(heading()).toBe('Onboarded');
+  expect(text(body())).toContain('Nothing was written to the repository.');
+  expect(posted('/api/onboarding/setup')).toHaveLength(1);
+  expect(posted('/api/onboarding/pr')).toEqual([]);
 });
 
-test("a Check now the board can't run shows why with Retry", async () => {
-  await openWaiting();
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/read'
-    ? new Response(JSON.stringify({ error: 'The board is shutting down.' }), { status: 503 }) : served(url, init));
-  await settle(() => button(prStep(), 'Check now')!.click());
-  await settle();
-  const alert = prStep().querySelector('[role="alert"]')!;
-  expect(text(alert)).toContain('The board is shutting down.');
-  expect(button(alert as HTMLElement, 'Retry')).toBeDefined();
-  expect(button(prStep(), 'Check now')!.disabled).toBe(false);
+test("a save the board refuses shows why on the last step", async () => {
+  await openAt('Project skills', routes(detection(), [], { '/api/onboarding/setup': { error: 'maddec01/lar-web is onboarded already.' } }));
+  await settle(() => footer('Finish')!.click());
+  expect(heading()).toBe('Project skills');
+  expect(text(body().querySelector('[role="alert"]'))).toContain('maddec01/lar-web is onboarded already.');
 });
 
-test("a Check now whose read couldn't follow the PR shows gh's message with Retry, not that it's still open", async () => {
-  await openWaiting();
-  await settle(() => button(prStep(), 'Check now')!.click());
-  await settle();
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [{ ...ON_PR, followProblem: 'gh pr view failed: HTTP 502' }],
-    fetchedAt: new Date(Date.now()).toISOString(), error: null }));
-  const alert = prStep().querySelector('[role="alert"]')!;
-  expect(text(alert)).toContain('gh pr view failed: HTTP 502');
-  expect(button(alert as HTMLElement, 'Retry')).toBeDefined();
-  expect(text(prStep())).not.toContain('still open');
-});
-
-test('a read error the board had before Check now waits for a new read, not an update that keeps it', async () => {
-  await openWaiting();
-  const { useBoardStore } = await import('../board/board-store.ts');
-  const before = { ...useBoardStore.getState().data, error: "gh can't reach GitHub." };
-  await settle(() => useBoardStore.getState().receive(before));
-  await settle(() => button(prStep(), 'Check now')!.click());
-  await settle();
-  await settle(() => useBoardStore.getState().receive({ ...before, tools: toolChecks() }));
-  expect(button(prStep(), 'Checking'), 'the same error and read time is no new read').toBeDefined();
-  await settle(() => useBoardStore.getState().receive({ ...before, fetchedAt: new Date(Date.now() + 1000).toISOString() }));
-  expect(text(prStep().querySelector('[role="alert"]'))).toContain("gh can't reach GitHub.");
-});
-
-test("a Check now the board can't run stops waiting for the board's read", async () => {
-  await openWaiting();
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/read'
-    ? new Response(JSON.stringify({ error: 'The board is shutting down.' }), { status: 503 }) : served(url, init));
-  const setTimer = vi.spyOn(globalThis, 'setTimeout');
-  const clearTimer = vi.spyOn(globalThis, 'clearTimeout');
-  await settle(() => button(prStep(), 'Check now')!.click());
-  await settle();
-  const wait = setTimer.mock.results[setTimer.mock.calls.findIndex(([, ms]) => ms === 60_000)]!.value;
-  expect(clearTimer).toHaveBeenCalledWith(wait);
-  setTimer.mockRestore();
-  clearTimer.mockRestore();
-});
-
-test("a PR the board can't open shows gh's message with Retry, and the step stays put", async () => {
-  await openPrStep();
-  answerPr({ error: "Can't open maddec01/lar-web's onboarding PR: gh pr create failed: HTTP 403" });
-  await settle(() => button(prStep(), 'Open pull request')!.click());
-  await settle();
-  expect(text(prStep())).toContain('gh pr create failed: HTTP 403');
-  answerPr({ prUrl: PR });
-  await settle(() => button(prStep(), 'Retry')!.click());
-  await settle();
-  expect(prStep().querySelector(`a[href="${PR}"]`)).not.toBeNull();
-});
-
-test('once the PR merges the step says the repository is ready, and Go to the board closes with nothing to keep', async () => {
-  await openPrStep();
-  answerPr({ prUrl: PR });
-  await settle(() => button(prStep(), 'Open pull request')!.click());
-  await settle();
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [] }));
-  expect(text(prStep())).toContain('maddec01/lar-web is ready');
-  const bar = dialog()!.querySelector('#onboarding-place + [data-slot="progress"]')!;
-  expect([bar.querySelector('[role="progressbar"]')!.getAttribute('aria-valuenow'), text(bar.querySelector('[data-slot="progress-caption"]'))], 'the Pull request step is done too').toEqual(['6', 'Ready']);
-  fetchMock.mockClear();
-  await settle(() => footerButton('Go to the board')!.click());
-  expect(dialog()).toBeNull();
-  expect(fetchMock.mock.calls.some(([url]) => url === '/api/onboarding/repositories')).toBe(false);
-});
-
-const ON_PR = { repo: 'maddec01/lar-web', progress: { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'lar-web' }, prUrl: PR } };
-
-/** Opens the PR, then has the board find it closed without merging; `reopened` answers Reopen PR. */
-async function closePr(reopened: object): Promise<void> {
-  await openPrStep();
-  answerPr({ prUrl: PR });
-  await settle(() => button(prStep(), 'Open pull request')!.click());
-  await settle();
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr/reopen'
-    ? new Response(JSON.stringify(reopened)) : served(url, init));
-  const { useBoardStore } = await import('../board/board-store.ts');
-  await settle(() => useBoardStore.getState().receive({ ...sample, tools: toolChecks(), onboarding: [{ ...ON_PR, progress: { ...ON_PR.progress, prClosed: true } }] }));
-}
-
-test('a PR closed before merging says so with Reopen pull request, which waits for the merge again once the board reopens it', async () => {
-  await closePr({ board: { ...sample, tools: toolChecks(), onboarding: [ON_PR] }, error: null });
-  expect(text(prStep().querySelector('[data-pr-closed]'))).toContain('maddec01/lar-web#14 closed before merging');
-  expect(text(prStep())).not.toContain('ready for you to review and merge');
-  expect(text(footerButton('Close')).trim(), 'nothing to wait for').toBe('Close');
-  await settle(() => button(prStep(), 'Reopen pull request')!.click());
-  await settle();
-  expect(prStep().querySelector('[data-pr-closed]')).toBeNull();
-  expect(text(prStep())).toContain('ready for you to review and merge');
-});
-
-test('a Reopen pull request the board refuses shows gh\'s message and keeps Reopen pull request and Start over', async () => {
-  await closePr({ error: "Can't reopen maddec01/lar-web's onboarding PR: gh pr reopen failed: HTTP 403" });
-  await settle(() => button(prStep(), 'Reopen pull request')!.click());
-  await settle();
-  expect(text(prStep().querySelector('[data-pr-closed]'))).toContain('gh pr reopen failed: HTTP 403');
-  expect(button(prStep(), 'Start over')).toBeDefined();
-});
-
-test('resumed while the PR is open, a PR that then closes lists its changes again, so Start over can open a new one', async () => {
-  const previews = await openPrStep();
-  answerPr({ prUrl: PR });
-  await settle(() => button(prStep(), 'Open pull request')!.click());
-  await settle();
-  await settle(() => dialog()!.querySelector<HTMLButtonElement>('[aria-label="Close"]')!.click());
-  const { useWizardStore } = await import('./wizard-store.ts');
-  const { useBoardStore } = await import('../board/board-store.ts');
-  const kept = JSON.parse(String((fetchMock.mock.calls as unknown as [string, RequestInit][])
-    .findLast(([url]) => url === '/api/onboarding/repositories')![1].body)) as { repo: string; progress: typeof ON_PR.progress };
-  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, onboarding: [kept] }));
-  previews.length = 0;
-  await settle(() => useWizardStore.getState().resume('maddec01/lar-web'));
-  await settle();
-  expect(text(prStep())).toContain('ready for you to review and merge');
-  expect([previews.length, useWizardStore.getState().changes], 'an open PR lists nothing').toEqual([0, null]);
-  await settle(() => useBoardStore.getState().receive({ ...useBoardStore.getState().data, onboarding: [{ ...kept, progress: { ...kept.progress, prClosed: true } }] }));
-  await settle();
-  expect(previews).toHaveLength(1);
-  expect(changeRows()).toHaveLength(WRITTEN.length);
-  expect(button(prStep(), 'Start over')!.disabled).toBe(false);
-});
-
-test('Start over opens a new PR and waits for its merge', async () => {
-  await closePr({ error: null });
-  const NEXT = 'https://github.com/maddec01/lar-web/pull/15';
-  const served = fetchMock.getMockImplementation()! as (url: string, init?: RequestInit) => Promise<Response>;
-  fetchMock.mockImplementation(async (url: string, init?: RequestInit) => url === '/api/onboarding/pr'
-    ? new Response(JSON.stringify({ prUrl: NEXT, board: { ...sample, tools: toolChecks(), onboarding: [{ ...ON_PR, progress: { ...ON_PR.progress, prUrl: NEXT } }] }, error: null }))
-    : served(url, init));
-  await settle(() => button(prStep(), 'Start over')!.click());
-  await settle();
-  expect(prStep().querySelector(`a[href="${NEXT}"]`)).not.toBeNull();
-  expect(text(prStep())).toContain('ready for you to review and merge');
-});
-
-test('Labels puts the missing count and Create before its collapsed full list', async () => {
-  await openLabels([]);
-  const body = dialog()!.querySelector('[data-slot="modal-body"]')!;
-  const create = panelButton('[data-create-labels]');
-  const details = body.querySelector('details')!;
-  expect(details).not.toBeNull();
-  expect(details.open).toBe(false);
-  expect(create.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(text(body.querySelector('[role="status"]'))).toContain('missing');
-});
-
-test('unusable saved settings offer fresh fields instead of a dead end', async () => {
-  await openSetup(project('lar-web', { hasConfig: true, configProblem: '.lar-factory.json has an unsupported item source. Run onboarding again.' }));
-  expect(text(dialog())).toContain("Its settings file can't be used. Run onboarding to replace it.");
-  expect(input('role')).not.toBeNull();
-  await type(input('role')!, 'New API');
-  expect(nextButton().disabled).toBe(false);
+test("an Azure DevOps repository asks for its team, with the shared config's team preselected", async () => {
+  const azure = detection({ repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps',
+    itemSources: { found: [{ kind: 'azure-board', team: 'Fabrikam Team' }, { kind: 'azure-board', team: 'Web' }] },
+    sharedConfig: { found: { defaults: { itemSource: { kind: 'azure-board', team: 'Web' } } } } });
+  await openAt('Item source', routes(azure), project('lar-api', { repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps' }));
+  expect(origin()).toBe('From Repository config');
+  expect(radio('team:Web').getAttribute('aria-checked')).toBe('true');
+  expect(text(choice('team:Fabrikam Team'))).toContain("The team's backlog and current sprint appear on the board.");
 });

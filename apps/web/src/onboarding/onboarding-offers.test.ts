@@ -13,8 +13,8 @@ test('the empty board offers to onboard a T3 project whose repository has .lar-f
   serve(offered(empty), []);
   await mountPage(offered(empty));
   expect($('[data-empty-state]')).not.toBeNull();
-  expect(text(offer())).toContain('lar-web has saved board settings');
-  expect(text(offer())).toContain('maddec01/lar-web keeps its settings in .lar-factory.json.');
+  expect(text(offer())).toContain('lar-web shares a Repository config');
+  expect(text(offer())).toContain('maddec01/lar-web shares defaults in .lar-factory.json. Onboarding starts from them, and you can change each one.');
   expect(text(offer()!.querySelector('button'))).toBe('Add lar-web');
 });
 
@@ -51,10 +51,10 @@ test('several offers share one compact notice until the user expands it', async 
   expect($$('[data-onboarding-offer]')).toHaveLength(0);
 });
 
-test('an offer with unusable settings explains that onboarding replaces them', async () => {
+test('an offer with an unusable Repository config says onboarding starts from detection', async () => {
   const data = { ...empty, onboardingOffers: [{ projectId: 'old', name: 'old', repo: 'maddec01/old', provider: 'GitHub' as const, configProblem: 'unsupported source' }] };
   serve(data, [project('old', { hasConfig: true, configProblem: 'unsupported source' })]);
   await mountPage(data);
-  expect(text($('[data-onboarding-offer="maddec01/old"]'))).toContain("Its settings file can't be used. Run onboarding to replace it.");
-  expect(text($('[data-onboarding-offer="maddec01/old"]'))).not.toContain('Setup will reuse');
+  expect(text($('[data-onboarding-offer="maddec01/old"]'))).toContain("Its .lar-factory.json can't be used, so every answer starts from detection.");
+  expect(text($('[data-onboarding-offer="maddec01/old"] button'))).toBe('Add old');
 });

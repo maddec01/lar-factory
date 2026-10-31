@@ -294,6 +294,23 @@ output=$(PATH="$(dirname "$(command -v jq)"):/usr/bin:/bin" bash "$status_sh" "$
 errors=$(cat "$bin/err")
 refuses "without lar-work on PATH, says how to install it" "lar-work isn't on PATH. Open the Lar Factory app once" "$id"
 
+# work.sh run as a command prints the record a picked ticket names, as a manual thread resolves its argument.
+id=$(make maddec01/lar-factory#9)
+status=0
+output=$(bash "$here/work.sh" maddec01/lar-factory#9 2>"$bin/err") || status=$?
+if ((status == 0)) && [[ $(jq -r .workId <<<"$output") == "$id" ]]; then
+    pass "work.sh prints the record a picked ticket names"
+else
+    fail "work.sh prints the record a picked ticket names: $status $output / $(cat "$bin/err")"
+fi
+status=0
+output=$(bash "$here/work.sh" maddec01/lar-factory#98 2>"$bin/err") || status=$?
+if ((status != 0)) && [[ -z $output ]] && grep -q "Pick the ticket on the board, then rerun" "$bin/err"; then
+    pass "work.sh says how to pick an unpicked ticket"
+else
+    fail "work.sh says how to pick an unpicked ticket: $status $output / $(cat "$bin/err")"
+fi
+
 : >"$log"
 output=$(LAR_BOARD_PORT=4999 FAKE_CURL_OFF=1 bash "$status_sh" "$id" Review 2>&1) || true
 if grep -q "^curl.*127.0.0.1:4999/api/read" "$log"; then

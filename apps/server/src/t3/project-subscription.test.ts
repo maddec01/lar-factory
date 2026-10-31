@@ -1,18 +1,18 @@
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 import { subscribeBoardProjects } from './board-projects.ts';
 import { subscribeProjects } from './project-subscription.ts';
-import { ProjectProtocol, supportedProjectVersion } from './project-protocol.ts';
+import { ProjectProtocol } from './project-protocol.ts';
 
 const session = { token: 'fixture', sessionId: 'fixture', expiresAt: '2099-01-01' };
 const protocol = () => new ProjectProtocol({ read: async () => session, write: async () => {} },
-  { issue: async () => session, revoke: async () => {} }, async () => new Response(), supportedProjectVersion);
+  { issue: async () => session, revoke: async () => {} }, async () => new Response(), 'fixture-release');
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 it('reports rejected authentication and cancels its retry on cleanup', async () => {
   vi.useFakeTimers();
   const request = vi.fn(async () => new Response('', { status: 401 }));
   vi.stubGlobal('fetch', request);
   const changed = vi.fn();
-  const close = subscribeProjects(new URL('http://127.0.0.1:3773'), supportedProjectVersion, protocol(), changed);
+  const close = subscribeProjects(new URL('http://127.0.0.1:3773'), 'fixture-release', protocol(), changed);
   await vi.advanceTimersByTimeAsync(0);
   expect(changed).toHaveBeenCalledWith({ availability: 'renewal-required' });
   close();
@@ -20,18 +20,21 @@ it('reports rejected authentication and cancels its retry on cleanup', async () 
   expect(request).toHaveBeenCalledTimes(1);
   expect(vi.getTimerCount()).toBe(0);
 });
-it('rejects unsupported versions before authentication', async () => {
-  const request = vi.fn();
+it.each(['0.1.6-nightly.20261031.3977', '1.0.0', 'unknown', ''])('attempts authenticated subscription on T3 %s', async version => {
+  vi.useFakeTimers();
+  const request = vi.fn(async () => new Response('', { status: 401 }));
   vi.stubGlobal('fetch', request);
   const changed = vi.fn();
-  const close = subscribeProjects(new URL('http://127.0.0.1:3773'), 'unknown', protocol(), changed);
-  expect(changed).toHaveBeenCalledWith({ availability: 'unsupported-version' });
-  expect(request).not.toHaveBeenCalled();
-  close();
+  const close = subscribeProjects(new URL('http://127.0.0.1:3773'), version, protocol(), changed);
+  try {
+    await vi.advanceTimersByTimeAsync(0);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(changed).toHaveBeenCalledWith({ availability: 'renewal-required' });
+  } finally { close(); }
 });
 
 it('validates local origins before obtaining credentials', () => {
-  expect(() => subscribeBoardProjects('https://example.com', supportedProjectVersion, () => {})).toThrow('Expected local T3 server');
+  expect(() => subscribeBoardProjects('https://example.com', 'fixture-release', () => {})).toThrow('Expected local T3 server');
 });
 it('retains observations across disconnect and requests a fresh snapshot', async () => {
   vi.useFakeTimers();
@@ -49,7 +52,7 @@ it('retains observations across disconnect and requests a fresh snapshot', async
   const request = vi.fn(async () => Response.json({ ticket: 'fixture' }));
   vi.stubGlobal('fetch', request);
   const changed = vi.fn();
-  const close = subscribeProjects(new URL('http://127.0.0.1:3773'), supportedProjectVersion, protocol(), changed);
+  const close = subscribeProjects(new URL('http://127.0.0.1:3773'), '0.1.6-nightly.20261031.3977', protocol(), changed);
   await vi.advanceTimersByTimeAsync(0);
   const first = Socket.instances[0]!;
   first.dispatchEvent(new Event('open'));
@@ -83,9 +86,9 @@ it('renews a healthy subscription before expiry and reports failed renewal', asy
   const expiresAt = new Date(Date.now() + 120_000).toISOString();
   const authority = { issue: vi.fn(async () => { throw Error('denied'); }), revoke: async () => {} };
   const authenticated = new ProjectProtocol({ read: async () => ({ ...session, expiresAt }), write: async () => {} }, authority,
-    async () => new Response(), supportedProjectVersion);
+    async () => new Response(), 'fixture-release');
   const changed = vi.fn();
-  const stop = subscribeProjects(new URL('http://127.0.0.1:3773'), supportedProjectVersion, authenticated, changed);
+  const stop = subscribeProjects(new URL('http://127.0.0.1:3773'), 'fixture-release', authenticated, changed);
   await vi.advanceTimersByTimeAsync(59_999);
   expect(authority.issue).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(1);

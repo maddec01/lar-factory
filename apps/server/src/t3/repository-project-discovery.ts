@@ -18,7 +18,7 @@ export function repositoryProjects(env: NodeJS.ProcessEnv = process.env): Promis
 async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
   const path = serverRuntimePath(env);
   const runtime = readJsonRecord(path);
-  if (!t3Running(path) || typeof runtime?.origin !== 'string' || typeof runtime.serverVersion !== 'string') {
+  if (!t3Running(path) || typeof runtime?.origin !== 'string') {
     current?.stop();
     if (current) { current.key = ''; current.read = { ...current.read, availability: 'unavailable' }; }
     return current?.read ?? { availability: 'unavailable' };
@@ -27,11 +27,12 @@ async function discover(env: NodeJS.ProcessEnv): Promise<ProjectRead> {
   if (current?.key === key) return current.read;
   current?.stop();
   try {
-    const protocol = boardProjects(runtime.origin, runtime.serverVersion);
+    const version = typeof runtime.serverVersion === 'string' ? runtime.serverVersion : '';
+    const protocol = boardProjects(runtime.origin, version);
     const read = await protocol.readProjects();
     const state = { key, protocol, read: { ...read, observation: read.observation ?? current?.read.observation }, stop: () => {} };
     current = state;
-    state.stop = subscribeProjects(new URL(runtime.origin), runtime.serverVersion, protocol, read => {
+    state.stop = subscribeProjects(new URL(runtime.origin), version, protocol, read => {
       state.read = { ...read, observation: read.observation ?? state.read.observation };
     });
     return state.read;
@@ -47,7 +48,7 @@ export function reauthorizeRepositoryProjects(): Promise<ProjectRead> {
   authorizing ??= (async () => {
     await repositoryProjects();
     const state = current;
-    if (!state || state.read.availability === 'unsupported-version') throw new Error('T3 unavailable');
+    if (!state) throw new Error('T3 unavailable');
     await state.protocol.reauthorize();
     state.stop();
     state.key = '';

@@ -1,6 +1,6 @@
 import { isRecord } from '@lar-factory/shared';
 import { ShellRecovery } from './shell-recovery.ts';
-import { supportedProjectVersion, type ProjectProtocol, type ProjectRead } from './project-protocol.ts';
+import { type ProjectProtocol, type ProjectRead } from './project-protocol.ts';
 
 /** T3 97e35bcf23e4dcf34c2dcffadd37c08db0e01e52:
  * apps/server/src/ws.ts:1158-1200,3277-3337; packages/client-runtime/src/rpc/protocol.ts.
@@ -9,7 +9,7 @@ import { supportedProjectVersion, type ProjectProtocol, type ProjectRead } from 
  * disconnect with retained observation, fresh-ticket reconnect to eight projects.
  * Renewal and rejection failures use fixtures. Consumer migration is #706.
  */
-export function subscribeProjects(origin: URL, version: string, protocol: ProjectProtocol,
+export function subscribeProjects(origin: URL, _serverVersion: string, protocol: ProjectProtocol,
   onChange: (read: ProjectRead) => void,
   execution?: { tag: string; payload: Record<string, unknown>; accept(value: unknown): void }): () => void {
   if (origin.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname) || origin.username || origin.password) throw new Error('Expected local T3 server');
@@ -24,7 +24,6 @@ export function subscribeProjects(origin: URL, version: string, protocol: Projec
   const publish = (availability: ProjectRead['availability']) => onChange({ availability, ...(observation ? { observation } : {}) });
   const connect = async () => {
     if (stopped) return;
-    if (version !== supportedProjectVersion) { publish('unsupported-version'); return; }
     let availability: ProjectRead['availability'] = 'unavailable';
     let current: WebSocket | undefined;
     const disconnected = () => {

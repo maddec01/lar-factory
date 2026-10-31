@@ -3,10 +3,10 @@ import { readExecution, readThreadFamily, subscribeExecution, subscribeExecution
 import { ProjectProtocol } from './project-protocol.ts';
 const protocol = new ProjectProtocol({ read: async () => undefined, write: async () => {} },
   { issue: async () => { throw Error(); }, revoke: async () => {} }, async () => new Response(), 'unknown');
-it('reports unsupported lookup and family without credentials or waiting for timeout', async () => {
+it('reports failed authentication without waiting for lookup or family timeout', async () => {
   const origin = new URL('http://127.0.0.1:3773');
-  expect(await readExecution(origin, 'unknown', protocol, 'thread')).toEqual({ availability: 'unsupported-version', observation: undefined });
-  expect(await readThreadFamily(origin, 'unknown', protocol, 'thread')).toEqual({ availability: 'unsupported-version' });
+  expect(await readExecution(origin, 'unknown', protocol, 'thread')).toEqual({ availability: 'renewal-required', observation: undefined });
+  expect(await readThreadFamily(origin, 'unknown', protocol, 'thread')).toEqual({ availability: 'renewal-required' });
 });
 it('refuses external origins before obtaining a session', () => {
   expect(() => subscribeExecution(new URL('http://example.com'), 'unknown', protocol, 'thread', () => {})).toThrow('Expected local T3 server');
@@ -39,7 +39,7 @@ it('retains execution on disconnect and rejects stale reconnect snapshots', asyn
   const authenticated = new ProjectProtocol({ read: async () => session, write: async () => {} },
     { issue: async () => session, revoke: async () => {} }, async () => new Response(), 'unused');
   const changed = vi.fn();
-  const stop = subscribeExecution(new URL('http://127.0.0.1:3773'), '0.1.6-nightly.20261030.3917', authenticated, 'thread', changed);
+  const stop = subscribeExecution(new URL('http://127.0.0.1:3773'), '0.1.6-nightly.20261031.3977', authenticated, 'thread', changed);
   try {
     await vi.advanceTimersByTimeAsync(0);
     Socket.instances[0]!.snapshot(4);

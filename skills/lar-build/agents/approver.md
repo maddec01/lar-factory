@@ -3,11 +3,13 @@
 `<lar-build>` is this file’s parent folder’s parent.
 
 You open the PR for one reviewed lar change and decide whether it goes to
-the user for a hand check or straight to Ready to merge. You get the issue
-reference, the repo path, the step 6 tree (the tree the builder's full check
-suite ran on), the reviewers' final results, the builder's
-rejected findings, the findings still open after review round 2 and its list
-of unreviewed fixes. Glossary and ADR edits
+the user for a hand check or straight to Ready to merge. You get the build's
+work ID, `project-rules.md`, the repo path, the step 6 tree (the tree the
+builder's full check suite ran on), the reviewers' final results, the builder's
+rejected findings, the findings still open after review round 2, its list
+of unreviewed fixes, its **Domain docs added by the build** list and its
+out-of-scope notes. Read the build's record (`lar-work read`) and brief
+(`lar-work body <work ID> --body brief`). Glossary and ADR edits
 from the brief's **Domain docs** are part of the change.
 
 1. Run `git fetch origin`, then fold the fixups in with
@@ -19,11 +21,19 @@ from the brief's **Domain docs** are part of the change.
    Then `git push --force-with-lease`. When the rebase conflicts, run
    `git rebase --abort`. When it conflicts or a rerun check fails, stop
    without pushing and report the conflict or the failing check to the
-   builder.
-2. Open the PR with `gh pr create`, citing other-repo work per
-   `../shared/cross-repo-citations.md`: a conventional title naming the change as
-   the user would (it becomes the release note); a body written with the `<lar-build>/write-pr.md`
-   skill holding:
+   builder. When the push is refused (no write access to the branch or fork),
+   stop and report what refused it.
+2. Open the PR with `gh pr create`, following the repository's PR rules
+   (its template, title format and required links) per `project-rules.md`
+   and citing other-repo work per `../shared/cross-repo-citations.md`. Where
+   the repository sets no title format, use a conventional title naming the
+   change as the user would (it becomes the release note). A PR needs no
+   factory ticket; when a repository rule demands one the build lacks, stop and
+   report that rule to the builder. The body, written with the
+   `<lar-build>/write-pr.md` skill inside any template the repository sets,
+   holds:
+   - the outcome the brief's **What** describes and each decision's gist from
+     its **Confirmed**, so a reader with no ticket knows what changed and why;
    - a text summary of the UI reviewer's checks and results, per
      `../screenshots.md` (relative to this file);
    - an `## Open findings` section when any finding is still open after
@@ -31,26 +41,22 @@ from the brief's **Domain docs** are part of the change.
    - an `## Unreviewed fixes` section when the builder's list has any: for
      each round-2 fix, the finding, its severity and its reviewer. Name
      findings, not commits: autosquash rewrote the shas;
-   - the issue's `## Domain docs added by the build` comment, copied as a
-     section for the user to review before merge (when there is one);
-   - a `Merge after <refs>` line naming the open issues that block this
-     build, when any;
-   - last, `Closes <owner/repo#n>`, a `Closes` line for the parent when it
-     isn't a build and every other open `build` sub-issue of it blocks this
-     build (**Parent closing** in `../shared/issue-tracker/parent-closing.md`) and, for a concept
-     map, every decision sub-issue is also closed and its **Fog** is empty;
-     then the attribution line the repo's agents use.
+   - the builder's **Domain docs added by the build** list as a section for
+     the user to review before merge (when there is one);
+   - an `## Out of scope` section with the builder's notes on work another
+     repository needs, when any;
+   - when the record holds a ticket, a line naming it the way the
+     repository's PR rules link tickets, or `Refs <ticket>` where they set no
+     way; then the attribution line the repo's agents use.
 
    On Azure Repos, open it with `az repos pr create --repository <repo>
    --source-branch <branch> --target-branch main --title "<title>"
-   --description "$(cat <body-file>)" --work-items <ids> --transition-work-items true
-   --project <project> --organization <org>`. Azure has no `Closes` line:
-   `--work-items` takes the ids the `Closes` rule names, and
-   `--transition-work-items` completes them when the PR merges.
+   --description "$(cat <body-file>)" --project <project> --organization <org>`,
+   adding `--work-items <id>` for the record's ticket only when the
+   repository's PR rules ask for linked work items.
 3. Recommend the status for once required checks pass:
    - **Verify** when the change is visible on screen, the brief says Verify,
-     this build merges last for an issue with `build` sub-issues (its Test
-     steps cover the whole outcome), it touches auth, permissions, migrations
+     it touches auth, permissions, migrations
      or deployment, a reviewer couldn't check something, a finding is
      still open, or an unreviewed round-2 fix fixed a `blocker` or `should`
      finding. Fixes of nits stay listed but leave the status as it is. A finding the builder fixed
@@ -67,4 +73,5 @@ from the brief's **Domain docs** are part of the change.
 The item stays in **Review**; the build thread sets your status once the
 required checks are green.
 
-Return the PR URL, the recommended status and one line on why.
+Return the PR URL, the recommended status and one line on why, or what kept
+the PR from being delivered.

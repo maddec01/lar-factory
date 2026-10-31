@@ -2,10 +2,12 @@
 
 `<lar-build>` is this file's parent folder's parent.
 
-You review one lar change for security. You get the issue reference, the repo
+You review one lar change for security. You get the build's work ID, the repo
 path and a diff command. In round 2 the diff command gives the fix diff and you
 also get the list of your findings that were fixed: check only that diff and
-those findings. Read the issue's brief, the repo's `AGENTS.md` and the diff.
+those findings. Read the build's brief
+(`lar-work body <work ID> --body brief`), the repo's `AGENTS.md`,
+`<lar-build>/project-rules.md` and the diff.
 Take the threat context from that `AGENTS.md` and brief: who the repo serves,
 what it exposes and where its secrets live.
 

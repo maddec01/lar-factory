@@ -49,3 +49,10 @@ test('stale agent guidance shows its fix and clears after migration', async () =
   await push({ ...sample, repositoryConfigProblems: [] });
   expect(text(document.body)).not.toContain('owner/api needs attention to agent guidance.');
 });
+
+test('a repository whose shared config is unusable says it keeps its last usable setup, and why', async () => {
+  await mountPage({ ...sample, repositoryConfigProblems: [{ repo: 'owner/api', kind: 'shared-config', problem: ".lar-factory.json isn't valid JSON." }] });
+  const warning = $$('[data-slot="toaster"] [data-toast-color="warning"]').find((entry) => text(entry).includes('owner/api'))!;
+  expect(warningText(warning)).toEqual(['owner/api keeps its last usable setup.',
+    ".lar-factory.json isn't valid JSON. The board reads it again on each refresh."]);
+});

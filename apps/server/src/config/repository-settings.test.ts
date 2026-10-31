@@ -3,19 +3,33 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { saveOnboarded, saveOnboarding } from './repository-config.ts';
+import { fakeAzRepos } from '../azure/fake-az.ts';
+import { agentSetupWrites } from '../onboarding/agent-setup.ts';
+import { readRepositoryList, saveOnboarded, saveOnboarding } from './repository-config.ts';
 import {
-  acceptSetup, applySharedDefaults, readRepositorySetups, recheckAccess, recordAccess, setConsent, setOverride, sharedDefaultsOf,
+  acceptSetup, applySharedDefaults, readOnboardedConfigs, readRepositorySetups, recheckAccess, recordAccess, setConsent, setOverride, sharedDefaultsOf,
 } from './repository-settings.ts';
 
 const REPO = 'maddec01/lar-apple';
 const AZURE = 'contoso/Fabrikam/lar-api';
 
-async function dataDir(t: TestContext, repos: string[] = [REPO]): Promise<string> {
+/** A data folder whose list names `entries`, each a repository or its whole entry. */
+async function dataDir(t: TestContext, entries: (string | object)[] = [REPO]): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar repository settings test '));
   t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
-  await writeFile(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: repos.map((repo) => ({ repo })) }));
+  const repositories = entries.map((entry) => typeof entry === 'string' ? { repo: entry } : entry);
+  await writeFile(join(dir, 'repository-settings.json'), JSON.stringify({ repositories }));
   return dir;
+}
+
+/** A gh that answers the contents call for each repository in `files`, and 404s for any other. */
+function ghWith(files: Record<string, unknown>): (args: string[]) => Promise<string> {
+  return async (args) => {
+    const repo = /^repos\/([^/]+\/[^/]+)\/contents\/\.lar-factory\.json$/.exec(args[1] ?? '')?.[1];
+    if (!repo || !(repo in files)) throw new Error(`gh api ${args[1]} failed: gh: Not Found (HTTP 404)`);
+    const file = files[repo];
+    return typeof file === 'string' ? file : JSON.stringify(file);
+  };
 }
 
 const setupOf = (dir: string, repo = REPO) => readRepositorySetups(dir).find((s) => s.repo === repo)!;
@@ -132,4 +146,120 @@ test("a list entry whose settings aren't usable is refused, naming its entry", a
 test('settings for a repository the list does not name are refused', async (t) => {
   const dir = await dataDir(t, []);
   assert.throws(() => setConsent(REPO, ['open-pr'], dir), { message: `${REPO} is not on this Mac's list.` });
+});
+
+test('a repository with no .lar-factory.json is on the board from its local settings', async (t) => {
+  const dir = await dataDir(t, ['maddec01/missing', 'maddec01/lar-factory']);
+  const gh = ghWith({ 'maddec01/lar-factory': { version: 1, role: 'The factory', show: 'opted-in', labels: ['area'] } });
+  const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), gh, dir);
+  assert.deepEqual(configs, [
+    { repo: 'maddec01/missing', version: 1, role: '', itemSource: { kind: 'issues' }, show: 'all', labels: [] },
+    { repo: 'maddec01/lar-factory', version: 1, role: 'The factory', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['area'] },
+  ]);
+  assert.deepEqual(problems, []);
+});
+
+test('a wrong .lar-factory.json keeps the last usable setup on the board and says why', async (t) => {
+  const dir = await dataDir(t, ['maddec01/lar-factory']);
+  await readOnboardedConfigs(readRepositoryList(dir), ghWith({ 'maddec01/lar-factory': { role: 'The factory' } }), dir);
+  for (const [file, problem] of [['{ broken', ".lar-factory.json isn't valid JSON."], [{ show: 'some' }, '.lar-factory.json field show must be "all" or "opted-in".']] as const) {
+    const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), ghWith({ 'maddec01/lar-factory': file }), dir);
+    assert.deepEqual(configs.map((c) => c.role), ['The factory']);
+    assert.deepEqual(problems, [{ repo: 'maddec01/lar-factory', kind: 'shared-config', problem }]);
+  }
+});
+
+test('a repository still onboarding or resetting reads no config and has no problem', async (t) => {
+  const read: string[] = [];
+  const gh = async (args: string[]) => {
+    read.push(args[1]!);
+    if (args[1]?.endsWith('/.lar-factory.json')) return JSON.stringify({ role: 'The factory' });
+    throw new Error('Not Found (HTTP 404)');
+  };
+  const dir = await dataDir(t, ['maddec01/lar-factory', { repo: 'maddec01/lar-apple', onboarding: { step: 'setup', done: ['project'], answers: { projectId: 'lar-apple' } } },
+    { repo: 'maddec01/lar-web', resetting: { prUrl: 'https://github.com/maddec01/lar-web/pull/9' } }]);
+  const { configs, problems, resetting } = await readOnboardedConfigs(readRepositoryList(dir), gh, dir);
+  assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(resetting, ['maddec01/lar-web']);
+  assert.equal(read[0], 'repos/maddec01/lar-factory/contents/.lar-factory.json');
+});
+
+test("an Azure repository az can't read keeps its last usable setup with az's problem, and one with no team stays off the board", async (t) => {
+  const dir = await dataDir(t, ['maddec01/lar-factory', 'contoso/Fabrikam/lar-api', 'contoso/Fabrikam/lar-web']);
+  const team = { role: 'API', itemSource: { kind: 'azure-board', team: 'API Team' } };
+  const reads = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify(team) }, fail: (args) => args.includes('repositoryId=lar-web') ? new Error('az devops invoke failed: TF400813: The user is not authorized to access this resource.') : undefined });
+  const gh = ghWith({ 'maddec01/lar-factory': { role: 'The factory' } });
+  const run = (azure: (args: string[]) => Promise<string>) => (args: string[]) => args[0] === 'devops' ? azure(args) : gh(args);
+  await readOnboardedConfigs(readRepositoryList(dir), run(reads.run), dir);
+  const loggedOut = fakeAzRepos({ fail: () => new Error('az devops invoke failed: Please run az login to setup account.') });
+  const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), run(loggedOut.run), dir);
+  assert.deepEqual(configs.map((c) => [c.repo, c.itemSource]), [['maddec01/lar-factory', { kind: 'issues' }], ['contoso/Fabrikam/lar-api', team.itemSource]]);
+  assert.deepEqual(problems, [
+    { repo: 'contoso/Fabrikam/lar-api', kind: 'shared-config', problem: 'az is logged out. Run az login.' },
+    { repo: 'contoso/Fabrikam/lar-web', problem: 'az is logged out. Run az login.' },
+  ]);
+});
+
+test('a gh failure other than a 404 still fails the whole read', async (t) => {
+  const dir = await dataDir(t, ['maddec01/lar-factory']);
+  const gh = async () => { throw new Error('gh api failed: To get started with GitHub CLI, please run:  gh auth login'); };
+  await assert.rejects(readOnboardedConfigs(readRepositoryList(dir), gh, dir), /gh auth login/);
+});
+
+test('stale factory guidance warns without removing a usable repository; current and personal guidance stay quiet', async (t) => {
+  for (const [path, content, stale] of [
+    ['AGENTS.md', '## Agent skills\nUse `lar-work`.', true],
+    ['docs/agents/domain.md', 'Use the `domain-modeling` skill.', true],
+    ['AGENTS.md', '## Personal tools\nUse `tdd`.\n## Agent skills\nUse `lar-shape` and `lar-build`.', false],
+    ['docs/agents/domain.md', 'Read lar-build skills/domain-modeling/SKILL.md.', false],
+  ] as const) {
+    const run = async (args: string[]) => {
+      if (args[1]?.endsWith('/.lar-factory.json')) return JSON.stringify({ role: 'API' });
+      if (args[1]?.endsWith('/' + path)) return content;
+      throw new Error('Not Found (HTTP 404)');
+    };
+    const result = await readOnboardedConfigs([{ repo: 'owner/api' }], run, await dataDir(t, ['owner/api']));
+    assert.equal(result.configs.length, 1);
+    assert.equal(result.problems.length, stale ? 1 : 0);
+    if (stale) assert.match(result.problems[0]!.problem, /lar-shape.*lar-build/);
+  }
+});
+
+test('fresh onboarding guidance produces no migration warning', async (t) => {
+  const files = new Map(agentSetupWrites({}, 'GitHub').map(({ path, content }) => [path, content]));
+  const run = async (args: string[]) => {
+    const path = args[1]!.split('/contents/')[1]!;
+    if (path === '.lar-factory.json') return JSON.stringify({ role: 'API' });
+    if (files.has(path)) return files.get(path)!;
+    throw new Error('Not Found (HTTP 404)');
+  };
+  const result = await readOnboardedConfigs([{ repo: 'owner/api' }], run, await dataDir(t, ['owner/api']));
+  assert.equal(result.configs.length, 1);
+  assert.deepEqual(result.problems, []);
+});
+
+test('optional guidance failures preserve valid configs and report a retryable warning', async (t) => {
+  for (const repo of ['owner/api', 'contoso/Fabrikam/lar-api']) {
+    const run = async (args: string[]) => {
+      if (args.some((arg) => arg.includes('.lar-factory.json'))) return JSON.stringify({ role: 'API' });
+      throw new Error('Temporary guidance read failure');
+    };
+    const azure = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify({ role: 'API', itemSource: { kind: 'azure-board', team: 'Team' } }) },
+      fail: (args) => args.some((arg) => arg.includes('.lar-factory.json')) ? undefined : new Error('Temporary guidance read failure') });
+    const result = await readOnboardedConfigs([{ repo }], repo.includes('Fabrikam') ? azure.run : run, await dataDir(t, [repo]));
+    assert.deepEqual(result.configs.map((config) => config.repo), [repo]);
+    assert.equal(result.problems.length, 1);
+    assert.equal(result.problems[0]?.kind, 'agent-guidance');
+    assert.match(result.problems[0]!.problem, /Could not check agent guidance.*Temporary guidance read failure.*Refresh/);
+  }
+});
+
+test('reading an unchanged Repository config again leaves the list file alone', async (t) => {
+  const dir = await dataDir(t);
+  applySharedDefaults(REPO, { defaults: { role: 'Apple app' } }, dir);
+  const file = join(dir, 'repository-settings.json');
+  await writeFile(file, `${await readFile(file, 'utf8')} `);
+  applySharedDefaults(REPO, { defaults: { role: 'Apple app' } }, dir);
+  assert.match(await readFile(file, 'utf8'), / $/);
 });

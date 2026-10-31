@@ -4,11 +4,19 @@
 
 import { join } from 'node:path';
 import {
-  REPOSITORY_OPERATIONS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
-  type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings, type ShowSetting,
+  CONFIG_VERSION, REPOSITORY_OPERATIONS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
+  type RepositoryConfigProblem, type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings,
+  type ShowSetting,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
-import { isItemSource, readListFile, writeListFile } from './repository-config.ts';
+import { problemOf } from '../azure/azure-items.ts';
+import { readBranchFile as readAzureFile } from '../azure/azure-repos.ts';
+import { readBranchFile } from '../github/github.ts';
+import { ReadProblem } from '../items/item-source.ts';
+import { AGENT_DOC_PATHS, withoutAgentSkills } from '../onboarding/agent-setup.ts';
+import {
+  isItemSource, onTheBoard, readListFile, writeListFile, type OnboardedRepository, type RepositoryConfig,
+} from './repository-config.ts';
 
 /** The settings that pause the work depending on them when they change. */
 type PausingSetting = RepositorySetup['paused'][number];
@@ -130,6 +138,8 @@ function updateSettings(repo: string, dir: string, change: (local: LocalSettings
   // Naming an Azure DevOps repository's first team changes no work, as none could read its items before.
   const next = changed.accepted?.itemSource === null
     ? { ...changed, accepted: { ...changed.accepted, itemSource: setupOf(list[at]!.repo, changed).itemSource } } : changed;
+  // Each refresh applies the shared defaults again, so an unchanged setup leaves the file alone.
+  if (JSON.stringify(next) === JSON.stringify(saved)) return;
   writeListFile(dir, { ...raw, repositories: raw.repositories.map((e, i) => i === at ? { ...e, settings: next } : e) });
 }
 
@@ -173,4 +183,93 @@ export function recordAccess(repo: string, op: RepositoryOperation, access: Excl
 /** Forgets what the credentials allowed, after they changed, so each operation is checked again when next needed. */
 export function recheckAccess(repo: string, dir = boardDataDir()): void {
   updateSettings(repo, dir, ({ access: _, ...local }) => local);
+}
+
+type SharedRead = Parameters<typeof applySharedDefaults>[1];
+
+/** Why az couldn't read an Azure repository's .lar-factory.json, with the fix when one command is it. */
+function azProblem(err: unknown): string {
+  const problem = problemOf(err);
+  if (problem instanceof ReadProblem) return problem.fix ? `${problem.message} Run ${problem.fix}.` : problem.message;
+  return `could not read .lar-factory.json. ${problem instanceof Error ? problem.message : String(problem)}`;
+}
+
+/**
+ * The repository's .lar-factory.json from its default branch, with its version, as applySharedDefaults takes it. Throws
+ * when gh can't read it, as a logged-out gh fails every repository.
+ */
+async function readSharedDefaults(repo: string, run?: (args: string[]) => Promise<string>): Promise<{ read: SharedRead; version: number }> {
+  let text: string | null;
+  try { text = await (onAzure(repo) ? readAzureFile : readBranchFile)(repo, '.lar-factory.json', undefined, run); }
+  catch (err) {
+    if (onAzure(repo)) return { read: { problem: azProblem(err) }, version: CONFIG_VERSION };
+    throw err;
+  }
+  if (text === null) return { read: null, version: CONFIG_VERSION };
+  let raw: unknown;
+  try { raw = JSON.parse(text); }
+  catch { return { read: { problem: ".lar-factory.json isn't valid JSON." }, version: CONFIG_VERSION }; }
+  if (!isRecord(raw)) return { read: { problem: ".lar-factory.json isn't a JSON object." }, version: CONFIG_VERSION };
+  const read = sharedDefaultsOf(raw, onAzure(repo));
+  return { read, version: 'defaults' in read && typeof raw.version === 'number' ? raw.version : CONFIG_VERSION };
+}
+
+/** The onboarded repositories' configs, why each repository needs attention, and the repositories resetting. */
+export interface OnboardedConfigs {
+  configs: RepositoryConfig[];
+  problems: RepositoryConfigProblem[];
+  resetting: string[];
+}
+
+/**
+ * Each config of the list's repositories on the board, in the list's order, made from its local settings over its
+ * optional .lar-factory.json, whose latest read the settings keep. A repository with no item source stays off the board
+ * with its problem, and one whose .lar-factory.json is wrong or unreadable keeps its last usable setup with the problem.
+ * Repositories resetting read nothing. Throws any other failure, such as a logged-out gh.
+ */
+export async function readOnboardedConfigs(list: readonly OnboardedRepository[], run?: (args: string[]) => Promise<string>,
+  dir = boardDataDir()): Promise<OnboardedConfigs> {
+  const onboarded = onTheBoard(list);
+  const reads = await Promise.all(onboarded.map(({ repo }) => readSharedDefaults(repo, run)));
+  for (const [index, { repo }] of onboarded.entries()) applySharedDefaults(repo, reads[index]!.read, dir);
+  const setups = readRepositorySetups(dir);
+  const configs: RepositoryConfig[] = [];
+  const problems: RepositoryConfigProblem[] = [];
+  for (const [index, { repo }] of onboarded.entries()) {
+    const setup = setups.find((s) => sameRepo(s.repo, repo))!;
+    const { role, itemSource, show, labels, sharedProblem } = setup;
+    if (!itemSource) {
+      problems.push({ repo, problem: sharedProblem ?? 'no setting names the Azure DevOps team whose backlog and current sprint the board reads.' });
+      continue;
+    }
+    if (sharedProblem) problems.push({ repo, kind: 'shared-config', problem: sharedProblem });
+    configs.push({ repo, version: reads[index]!.version, role, itemSource, show, labels });
+  }
+  const guidance: RepositoryConfigProblem[] = [];
+  // A repository already reporting its .lar-factory.json has one notice, so its guidance waits until that reads.
+  await Promise.all(configs.filter((c) => !problems.some((p) => p.repo === c.repo)).map(async (config) => {
+    const readFile = onAzure(config.repo) ? readAzureFile : readBranchFile;
+    const stale: string[] = [];
+    const paths = ['AGENTS.md', 'CLAUDE.md', ...AGENT_DOC_PATHS];
+    let contents: (string | null)[];
+    try {
+      contents = await Promise.all(paths.map((path) => readFile(config.repo, path, undefined, run)));
+    } catch (err) {
+      const problem = problemOf(err);
+      const detail = problem instanceof ReadProblem && problem.fix ? `${problem.message} Run ${problem.fix}.`
+        : problem instanceof Error ? problem.message : String(problem);
+      guidance.push({ repo: config.repo, kind: 'agent-guidance', problem: `Could not check agent guidance. ${detail} Refresh to retry.` });
+      return;
+    }
+    for (const [index, path] of paths.entries()) {
+      const content = contents[index];
+      if (!content) continue;
+      const outside = path.startsWith('docs/agents/') ? null : withoutAgentSkills(content);
+      const guidance = outside === null ? (path.startsWith('docs/agents/') ? content : '') : content.match(/^## Agent skills\s*$[\s\S]*?(?=^#{1,2} |$(?![\s\S]))/m)?.[0] ?? '';
+      if (/(?:`|\$|(?<![\w-])\/)(?:lar-work|domain-modeling|to-tickets|triage|grilling|prototype|research|diagnosing-bugs|tdd|code-review|codebase-design|writing-for-agents|pr|retro|handoff|implement|developer-profile|unslop|skill-sync|code-review-and-quality|security-and-hardening|doubt-driven-development|frontend-ui-engineering|browser-testing-with-devtools)(?:`|\s|\/SKILL\.md)/.test(guidance)) stale.push(path);
+    }
+    if (stale.length) guidance.push({ repo: config.repo, kind: 'agent-guidance',
+      problem: `${stale.join(', ')} names retired factory skills. Update the Agent skills block to use lar-shape for shaping and lar-build for builds, and replace docs/agents guidance with the current setup from lar-factory's apps/server/src/onboarding/agent-setup.ts. Merge the change into the default branch, then refresh.` });
+  }));
+  return { configs, problems: [...problems, ...guidance], resetting: list.flatMap((e) => e.resetting ? [e.repo] : []) };
 }

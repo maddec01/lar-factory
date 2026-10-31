@@ -53,7 +53,7 @@ new build or `src/` change.
   one other than line 1; every board page marks the card Started. While the
   board runs, a double press, a retry or another tab starts no second thread.
   Before starting, Start checks that the
-  repository is in `repositories.json`, then reads T3 Code's live projects from its
+  repository is in `repository-settings.json`, then reads T3 Code's live projects from its
   database (read-only) and keeps those whose folder exists, has a `.git`
   directory (so a worktree doesn't count) and has the repository as its git
   `origin`. The folder can have any name and live anywhere. With no such
@@ -112,36 +112,46 @@ that PR to finish. The board remembers your progress so you can resume from Sett
 
 The board reads two files in the board app's data folder, `~/Library/Application Support/Lar Factory/`:
 
-- `repositories.json` lists the onboarded repositories, each GitHub one as
+- `repository-settings.json` lists the onboarded repositories, each GitHub one as
   `owner/name` and each Azure DevOps one as `organization/project/repository`, as
-  its origin URL names them. Without it, the board shows no repository.
+  its origin URL names them, each with its local settings under `settings`.
+  Without it, the board shows no repository. It replaced `repositories.json`,
+  which the board leaves untouched: nothing migrates, so each repository onboards
+  again.
 - `settings.json` holds the board-wide settings. Today that is `refreshSeconds`,
   how often the board reads item sources with no active work and the Repository
   configs, 300 when the file or the field is missing.
 
-Each onboarded repository keeps its Repository config in `.lar-factory.json` at its
-root. The board reads it with `gh` from the repository's default branch every
+A repository may keep its Repository config in `.lar-factory.json` at its root.
+Its fields are shared defaults: a local setting overrides any of them, and removing
+the override inherits the default again. Credentials and write consent are never
+shared. The board reads it with `gh` from the repository's default branch every
 `refreshSeconds` and on a read request naming no item, never from a checkout, so a change shows once it merges to the default
 branch. Its fields:
 
 - `version`: the file's shape, `1`. A missing `version` counts as `1`.
-- `role`: what the repository is for, which lar-work reads. Required.
+- `role`: what the repository is for, which lar-work reads.
 - `itemSource`: `{ "kind": "issues" }` for GitHub repository issues (the default), or
   `{ "kind": "azure-board", "team": "<team>" }` on Azure DevOps. The Azure board
   combines the team's open backlog and current sprint, with each item once. It keeps
   completed sprint work and reads the backlog alone when no sprint is current.
-  Unsupported source kinds fail with a message to run onboarding again.
 - `show`: `"all"`, the default, or `"opted-in"`.
 - `labels`: an array of strings, empty by default.
+- `domainDocs`: `{ "kind": "private" }`, the default, for private drafts on this Mac,
+  or `{ "kind": "repository", "glossary": "<path>", "adrs": "<path>" }`.
+- `skills`: the project skills builds use as coding guidance, none by default.
 
-To add lar-factory, write `repositories.json`:
+A change to the item source or the domain-doc location pauses the work that depends
+on it until you accept the change.
+
+To add lar-factory, write `repository-settings.json`:
 
 ```json
 { "repositories": [{ "repo": "maddec01/lar-factory" }] }
 ```
 
-and merge this `.lar-factory.json` to lar-factory's default branch, which reads its
-repository issues:
+and, to share its defaults, merge this `.lar-factory.json` to lar-factory's default
+branch:
 
 ```json
 {
@@ -151,10 +161,11 @@ repository issues:
 }
 ```
 
-On its next refresh the board shows lar-factory. If `repositories.json` isn't valid
-or has the wrong shape, the board shows the read error with the file's path. If a
-repository's `.lar-factory.json` is missing or wrong, the board leaves that
-repository off and names it in a notice.
+On its next refresh the board shows lar-factory. If `repository-settings.json` isn't
+valid or has the wrong shape, the board shows the read error with the file's path. If
+a repository's `.lar-factory.json` is wrong or can't be read, the board keeps its last
+usable setup and names the problem in a notice. An Azure DevOps repository stays off
+the board until a setting names its team.
 `bash skills/lar-work/scripts/repo-config.sh maddec01/lar-factory` prints the
 config the board reads, with defaults filled in.
 

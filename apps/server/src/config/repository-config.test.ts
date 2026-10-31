@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { agentSetupWrites } from '../onboarding/agent-setup.ts';
 import { fakeAzRepos } from '../azure/fake-az.ts';
 import {
-  dropRepository, findRepositoryConfig, isItemSource, isRepo, readBoardSettings, readOnboardedConfigs, readRepositoryConfig, readRepositoryList, saveOnboarded,
+  dropRepository, findRepositoryConfig, isItemSource, isRepo, readBoardSettings, readRepositoryList, saveOnboarded,
   saveOnboarding, savePrClosed, saveResetting, stillOnboarding,
 } from './repository-config.ts';
 
@@ -224,9 +223,9 @@ test("a repository's config comes from its default branch, with each missing fie
   const project = { kind: 'issues' };
   const gh = ghWith({ 'maddec01/lar-factory': { version: 1, role: 'The factory', itemSource: project, show: 'opted-in', labels: ['area'] },
     'maddec01/lar-apple': { role: 'Apple client' } });
-  assert.deepEqual(await readRepositoryConfig('maddec01/lar-factory', gh),
+  assert.deepEqual(await findRepositoryConfig('maddec01/lar-factory', gh),
     { repo: 'maddec01/lar-factory', version: 1, role: 'The factory', itemSource: project, show: 'opted-in', labels: ['area'] });
-  assert.deepEqual(await readRepositoryConfig('maddec01/lar-apple', gh),
+  assert.deepEqual(await findRepositoryConfig('maddec01/lar-apple', gh),
     { repo: 'maddec01/lar-apple', version: 1, role: 'Apple client', itemSource: { kind: 'issues' }, show: 'all', labels: [] });
 });
 
@@ -244,62 +243,8 @@ test("an Azure DevOps repository's config is read from its default branch with o
 
 test('a gh failure other than a 404 passes through', async () => {
   const gh = async () => { throw new Error('gh api failed: To get started with GitHub CLI, please run:  gh auth login'); };
-  await assert.rejects(readRepositoryConfig('maddec01/lar-factory', gh), /gh auth login/);
+  await assert.rejects(findRepositoryConfig('maddec01/lar-factory', gh), /gh auth login/);
 });
-
-test("an onboarded repository whose config can't be read is left out with its problem, and the others still read", async (t) => {
-  const list = { repositories: [{ repo: 'maddec01/missing' }, { repo: 'maddec01/lar-factory' }, { repo: 'maddec01/broken' }, { repo: 'maddec01/some' }] };
-  const dir = await dataDir(t, { 'repository-settings.json': JSON.stringify(list) });
-  const gh = ghWith({ 'maddec01/lar-factory': { role: 'The factory' }, 'maddec01/broken': '{ broken', 'maddec01/some': { role: 'x', show: 'some' } });
-  const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), gh);
-  assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
-  assert.deepEqual(problems, [
-    { repo: 'maddec01/missing', problem: 'no .lar-factory.json on its default branch.' },
-    { repo: 'maddec01/broken', problem: ".lar-factory.json isn't valid JSON." },
-    { repo: 'maddec01/some', problem: '.lar-factory.json field show must be "all" or "opted-in".' },
-  ]);
-});
-
-test('a repository still onboarding or resetting reads no config and has no problem', async () => {
-  const read: string[] = [];
-  const gh = async (args: string[]) => {
-    read.push(args[1]!);
-    if (args[1]?.endsWith('/.lar-factory.json')) return JSON.stringify({ role: 'The factory' });
-    throw new Error('Not Found (HTTP 404)');
-  };
-  const list = [{ repo: 'maddec01/lar-factory' }, { repo: 'maddec01/lar-apple', onboarding: progress() }, { repo: 'maddec01/lar-web', resetting: { prUrl: RESET_PR } }];
-  const { configs, problems, resetting } = await readOnboardedConfigs(list, gh);
-  assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
-  assert.deepEqual(problems, []);
-  assert.deepEqual(resetting, ['maddec01/lar-web']);
-  assert.equal(read[0], 'repos/maddec01/lar-factory/contents/.lar-factory.json');
-});
-
-test("an Azure repository az can't read is left out with az's problem and fix, and the others still read", async (t) => {
-  const list = { repositories: [{ repo: 'maddec01/lar-factory' }, { repo: 'contoso/Fabrikam/lar-api' }, { repo: 'contoso/Fabrikam/lar-web' }] };
-  const dir = await dataDir(t, { 'repository-settings.json': JSON.stringify(list) });
-  const gh = ghWith({ 'maddec01/lar-factory': { role: 'The factory' } });
-  const failures: Record<string, string> = { 'repositoryId=lar-api': 'az devops invoke failed: Please run az login to setup account.',
-    'repositoryId=lar-web': 'az devops invoke failed: TF400813: The user is not authorized to access this resource.' };
-  const run = async (args: string[]) => {
-    const failure = Object.entries(failures).find(([route]) => args.includes(route))?.[1];
-    if (failure) throw new Error(failure);
-    return gh(args);
-  };
-  const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), run);
-  assert.deepEqual(configs.map((c) => c.repo), ['maddec01/lar-factory']);
-  assert.deepEqual(problems, [
-    { repo: 'contoso/Fabrikam/lar-api', problem: 'az is logged out. Run az login.' },
-    { repo: 'contoso/Fabrikam/lar-web', problem: 'could not read .lar-factory.json. az devops invoke failed: TF400813: The user is not authorized to access this resource.' },
-  ]);
-});
-
-test('a gh failure other than a 404 still fails the whole read', async (t) => {
-  const dir = await dataDir(t, { 'repository-settings.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory' }] }) });
-  const gh = async () => { throw new Error('gh api failed: To get started with GitHub CLI, please run:  gh auth login'); };
-  await assert.rejects(readOnboardedConfigs(readRepositoryList(dir), gh), /gh auth login/);
-});
-
 
 test('only issues and a combined Azure board are item sources', () => {
   assert.equal(isItemSource({ kind: 'issues' }), true);
@@ -319,9 +264,10 @@ test('removed and unknown sources ask for onboarding again, without migration', 
 
 test('malformed configs still name their problem', async () => {
   const gh = ghWith({ 'maddec01/broken': '{ broken', 'maddec01/no-role': {}, 'maddec01/some': { role: 'x', show: 'some' } });
-  for (const [repo, problem] of Object.entries({ missing: 'no .lar-factory.json on its default branch.', broken: ".lar-factory.json isn't valid JSON.",
+  assert.equal(await findRepositoryConfig('maddec01/missing', gh), null);
+  for (const [repo, problem] of Object.entries({ broken: ".lar-factory.json isn't valid JSON.",
     'no-role': '.lar-factory.json field role is missing or not a string.', some: '.lar-factory.json field show must be "all" or "opted-in".' })) {
-    await assert.rejects(readRepositoryConfig(`maddec01/${repo}`, gh), { message: `maddec01/${repo}: ${problem}` });
+    assert.deepEqual(await findRepositoryConfig(`maddec01/${repo}`, gh), { problem });
   }
 });
 
@@ -337,56 +283,4 @@ test('removed-source onboarding entries do not break healthy repositories or lat
   assert.equal(saved.note, 'keep');
   assert.deepEqual(saved.repositories.map((entry: { repo: string }) => entry.repo), ['maddec01/healthy', 'maddec01/current', 'maddec01/new']);
   assert.equal(saved.repositories[0].note, 'keep');
-});
-
-
-test('stale factory guidance warns without removing a usable repository; current and personal guidance stay quiet', async () => {
-  for (const [path, content, stale] of [
-    ['AGENTS.md', '## Agent skills\nUse `lar-work`.', true],
-    ['docs/agents/domain.md', 'Use the `domain-modeling` skill.', true],
-    ['AGENTS.md', '## Personal tools\nUse `tdd`.\n## Agent skills\nUse `lar-shape` and `lar-build`.', false],
-    ['docs/agents/domain.md', 'Read lar-build skills/domain-modeling/SKILL.md.', false],
-  ] as const) {
-    const run = async (args: string[]) => {
-      if (args[1]?.endsWith('/.lar-factory.json')) return JSON.stringify({ role: 'API' });
-      if (args[1]?.endsWith('/' + path)) return content;
-      throw new Error('Not Found (HTTP 404)');
-    };
-    const result = await readOnboardedConfigs([{ repo: 'owner/api' }], run);
-    assert.equal(result.configs.length, 1);
-    assert.equal(result.problems.length, stale ? 1 : 0);
-    if (stale) assert.match(result.problems[0]!.problem, /lar-shape.*lar-build/);
-  }
-});
-
-
-test('fresh onboarding guidance produces no migration warning', async () => {
-  const files = new Map(agentSetupWrites({}, 'GitHub').map(({ path, content }) => [path, content]));
-  const run = async (args: string[]) => {
-    const path = args[1]!.split('/contents/')[1]!;
-    if (path === '.lar-factory.json') return JSON.stringify({ role: 'API' });
-    if (files.has(path)) return files.get(path)!;
-    throw new Error('Not Found (HTTP 404)');
-  };
-  const result = await readOnboardedConfigs([{ repo: 'owner/api' }], run);
-  assert.equal(result.configs.length, 1);
-  assert.deepEqual(result.problems, []);
-});
-
-test('optional guidance failures preserve valid configs and report a retryable warning', async () => {
-  for (const repo of ['owner/api', 'contoso/Fabrikam/lar-api']) {
-    const run = async (args: string[]) => {
-      if (args.some((arg) => arg.includes('.lar-factory.json'))) return JSON.stringify({
-        role: 'API', ...(repo.includes('Fabrikam') ? { itemSource: { kind: 'azure-board', team: 'Team' } } : {}),
-      });
-      throw new Error('Temporary guidance read failure');
-    };
-    const azure = fakeAzRepos({ files: { '/.lar-factory.json': JSON.stringify({ role: 'API', itemSource: { kind: 'azure-board', team: 'Team' } }) },
-      fail: (args) => args.some((arg) => arg.includes('.lar-factory.json')) ? undefined : new Error('Temporary guidance read failure') });
-    const result = await readOnboardedConfigs([{ repo }], repo.includes('Fabrikam') ? azure.run : run);
-    assert.deepEqual(result.configs.map((config) => config.repo), [repo]);
-    assert.equal(result.problems.length, 1);
-    assert.equal(result.problems[0]?.kind, 'agent-guidance');
-    assert.match(result.problems[0]!.problem, /Could not check agent guidance.*Temporary guidance read failure.*Refresh/);
-  }
 });

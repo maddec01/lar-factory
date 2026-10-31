@@ -6,13 +6,10 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path';
 import {
   PROVIDERS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider,
-  type RepositoryConfigAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
+  type RepositoryConfigAnswers, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
-import { AGENT_DOC_PATHS, withoutAgentSkills } from '../onboarding/agent-setup.ts';
-import { problemOf } from '../azure/azure-items.ts';
 import { readBranchFile as readAzureFile } from '../azure/azure-repos.ts';
-import { ReadProblem } from '../items/item-source.ts';
 import { readBranchFile } from '../github/github.ts';
 
 /** One repository's Repository config, with each field its file leaves out filled in. */
@@ -278,17 +275,6 @@ function problem(raw: Record<string, unknown>, azure: boolean): string | null {
   return null;
 }
 
-/** A .lar-factory.json that is missing or wrong, which leaves its repository off the board; other read failures stay plain errors. */
-class RepositoryConfigError extends Error {
-  readonly repo: string;
-  readonly problem: string;
-  constructor(repo: string, problem: string) {
-    super(`${repo}: ${problem}`);
-    this.repo = repo;
-    this.problem = problem;
-  }
-}
-
 /**
  * The repository's .lar-factory.json from its default branch, or from `branch` when given, never a checkout, with
  * defaults filled in; null when it has none, or why the one it has is wrong. An Azure DevOps repository's file is read
@@ -308,69 +294,4 @@ export async function findRepositoryConfig(repo: string, run?: (args: string[]) 
   const source = file.itemSource;
   const itemSource: RepositoryItemSource = source?.kind === 'azure-board' ? { kind: 'azure-board', team: source.team } : { kind: 'issues' };
   return { repo, version: file.version ?? 1, role: file.role, itemSource, show: file.show ?? 'all', labels: file.labels ?? [] };
-}
-
-/** The repository's .lar-factory.json from its default branch, as findRepositoryConfig reads it; throws why it can't. */
-export async function readRepositoryConfig(repo: string, run?: (args: string[]) => Promise<string>): Promise<RepositoryConfig> {
-  const found = await findRepositoryConfig(repo, run);
-  if (!found) throw new RepositoryConfigError(repo, 'no .lar-factory.json on its default branch.');
-  if ('problem' in found) throw new RepositoryConfigError(repo, found.problem);
-  return found;
-}
-
-/** The onboarded repositories' configs, why each repository left off the board couldn't be read, and the repositories resetting. */
-export interface OnboardedConfigs {
-  configs: RepositoryConfig[];
-  problems: RepositoryConfigProblem[];
-  resetting: string[];
-}
-
-/** Why az couldn't read an Azure repository's .lar-factory.json, with the fix when one command is it. */
-function azProblem(err: unknown): string {
-  const problem = problemOf(err);
-  if (problem instanceof ReadProblem) return problem.fix ? `${problem.message} Run ${problem.fix}.` : problem.message;
-  return `could not read .lar-factory.json. ${problem instanceof Error ? problem.message : String(problem)}`;
-}
-
-/**
- * Each config of the list's repositories on the board, in the list's order, the problem of each whose
- * .lar-factory.json is missing or wrong, or that az can't read, which stays off the board, and the repositories
- * resetting, which read none; throws any other failure, such as a logged-out gh.
- */
-export async function readOnboardedConfigs(list: readonly OnboardedRepository[], run?: (args: string[]) => Promise<string>): Promise<OnboardedConfigs> {
-  const read = await Promise.all(onTheBoard(list).map(({ repo }) => readRepositoryConfig(repo, run).catch((err: unknown) => {
-    if (err instanceof RepositoryConfigError) return { repo: err.repo, problem: err.problem };
-    if (onAzure(repo)) return { repo, problem: azProblem(err) };
-    throw err;
-  })));
-  const guidance: RepositoryConfigProblem[] = [];
-  await Promise.all(read.filter((r): r is RepositoryConfig => 'role' in r).map(async (config) => {
-    const readFile = onAzure(config.repo) ? readAzureFile : readBranchFile;
-    const stale: string[] = [];
-    const paths = ['AGENTS.md', 'CLAUDE.md', ...AGENT_DOC_PATHS];
-    let contents: (string | null)[];
-    try {
-      contents = await Promise.all(paths.map((path) => readFile(config.repo, path, undefined, run)));
-    } catch (err) {
-      const problem = problemOf(err);
-      const detail = problem instanceof ReadProblem && problem.fix ? `${problem.message} Run ${problem.fix}.`
-        : problem instanceof Error ? problem.message : String(problem);
-      guidance.push({ repo: config.repo, kind: 'agent-guidance', problem: `Could not check agent guidance. ${detail} Refresh to retry.` });
-      return;
-    }
-    for (const [index, path] of paths.entries()) {
-      const content = contents[index];
-      if (!content) continue;
-      const outside = path.startsWith('docs/agents/') ? null : withoutAgentSkills(content);
-      const guidance = outside === null ? (path.startsWith('docs/agents/') ? content : '') : content.match(/^## Agent skills\s*$[\s\S]*?(?=^#{1,2} |$(?![\s\S]))/m)?.[0] ?? '';
-      if (/(?:`|\$|(?<![\w-])\/)(?:lar-work|domain-modeling|to-tickets|triage|grilling|prototype|research|diagnosing-bugs|tdd|code-review|codebase-design|writing-for-agents|pr|retro|handoff|implement|developer-profile|unslop|skill-sync|code-review-and-quality|security-and-hardening|doubt-driven-development|frontend-ui-engineering|browser-testing-with-devtools)(?:`|\s|\/SKILL\.md)/.test(guidance)) stale.push(path);
-    }
-    if (stale.length) guidance.push({ repo: config.repo, kind: 'agent-guidance',
-      problem: `${stale.join(', ')} names retired factory skills. Update the Agent skills block to use lar-shape for shaping and lar-build for builds, and replace docs/agents guidance with the current setup from lar-factory's apps/server/src/onboarding/agent-setup.ts. Merge the change into the default branch, then refresh.` });
-  }));
-  return {
-    configs: read.filter((r): r is RepositoryConfig => 'role' in r),
-    problems: [...read.filter((r): r is RepositoryConfigProblem => !('role' in r)), ...guidance],
-    resetting: list.flatMap((e) => e.resetting ? [e.repo] : []),
-  };
 }

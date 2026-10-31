@@ -68,6 +68,21 @@ describe('lar-work', { timeout: 30_000 }, () => {
     expect((await larWork(data, 'read', workId)).record).toMatchObject({ status: 'Shaping', revision: 2 });
   });
 
+  it('sets a parent and a blocker in a data folder with no board running', async () => {
+    const data = tempDir();
+    const create = async (kind: string) => (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', kind)).record.workId;
+    const [build, slice, other] = [await create('build'), await create('slice'), await create('slice')];
+
+    expect((await larWork(data, 'set-parent', slice, '--revision', '1', '--parent', build)).record).toMatchObject({ parentId: build, revision: 2 });
+    expect((await larWork(data, 'add-blocker', slice, '--revision', '2', '--blocker', other)).record).toMatchObject({ revision: 3 });
+    expect((await larWork(data, 'children', build)).record).toMatchObject([{ workId: slice }]);
+    expect((await larWork(data, 'blockers', slice)).record).toMatchObject([{ workId: other }]);
+    expect((await larWork(data, 'dependents', other)).record).toMatchObject([{ workId: slice }]);
+    expect(await larWork(data, 'add-blocker', other, '--revision', '2', '--blocker', slice)).toMatchObject({ code: 1, stderr: expect.stringContaining('cycle') });
+    expect((await larWork(data, 'remove-blocker', slice, '--revision', '3', '--blocker', other)).record).toMatchObject({ revision: 4 });
+    expect((await larWork(data, 'clear-parent', slice, '--revision', '4')).record).toMatchObject({ parentId: null });
+  });
+
   it('reports usage mistakes before opening the database', async () => {
     const data = join(tempDir(), 'unused');
     expect(await larWork(data, 'frobnicate')).toMatchObject({ code: 2, stderr: expect.stringContaining('Unknown command "frobnicate"') });
@@ -75,9 +90,9 @@ describe('lar-work', { timeout: 30_000 }, () => {
     expect(readdirSync(join(data, '..'))).toEqual([]);
   });
 
-  it('explains identifiers, reads, changes and errors in its help', async () => {
+  it('explains identifiers, reads, changes, structure and errors in its help', async () => {
     const help = await larWork(tempDir(), '--help');
     expect(help.code).toBe(0);
-    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
+    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
   });
 });

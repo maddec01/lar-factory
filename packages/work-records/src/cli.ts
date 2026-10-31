@@ -36,6 +36,20 @@ Changes
   set-aside <work-id> --revision N  Set the record aside. Its Status stays.
   restore <work-id> --revision N    Bring a set-aside record back.
 
+Structure
+  A concept owns decisions and builds, and a build owns slices. A record has at
+  most one parent. A blocker is a record the work waits on; a record can't block
+  itself or close a cycle. Each change bumps the revision of both records.
+  set-parent <work-id> --revision N --parent P
+                                    Put the record under P. Clear an old parent first.
+  clear-parent <work-id> --revision N
+  add-blocker <work-id> --revision N --blocker B
+                                    Record that the work waits on B.
+  remove-blocker <work-id> --revision N --blocker B
+  children <work-id>                Print the records it owns.
+  blockers <work-id>                Print the records it waits on.
+  dependents <work-id>              Print the records that wait on it.
+
 Options
   --data-dir D   Use the work-record database in folder D instead of the
                  factory's data folder (${workRecordsPath()}).
@@ -49,8 +63,9 @@ Errors
 
 class UsageError extends Error {}
 
-const COMMANDS = ['create', 'import', 'read', 'list', 'update', 'attach-ticket', 'set-aside', 'restore'];
-const TAKES_WORK_ID = ['read', 'update', 'attach-ticket', 'set-aside', 'restore'];
+const TAKES_WORK_ID = ['read', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker',
+  'children', 'blockers', 'dependents'];
+const COMMANDS = ['create', 'import', 'list', ...TAKES_WORK_ID];
 
 const OPTIONS = {
   repository: { type: 'string' },
@@ -58,13 +73,15 @@ const OPTIONS = {
   status: { type: 'string' },
   ticket: { type: 'string' },
   revision: { type: 'string' },
+  parent: { type: 'string' },
+  blocker: { type: 'string' },
   'data-dir': { type: 'string' },
   help: { type: 'boolean' },
 } as const;
 
 type Values = ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>['values'];
 
-function need(values: Values, name: 'repository' | 'kind' | 'ticket' | 'revision'): string {
+function need(values: Values, name: 'repository' | 'kind' | 'ticket' | 'revision' | 'parent' | 'blocker'): string {
   const value = values[name];
   if (value === undefined) throw new UsageError(`--${name} is required.`);
   return value;
@@ -92,6 +109,20 @@ function run(records: WorkRecords, command: string, workId: string | undefined, 
       return records.setAside(workId!, revision());
     case 'restore':
       return records.restore(workId!, revision());
+    case 'set-parent':
+      return records.setParent(workId!, revision(), need(values, 'parent'));
+    case 'clear-parent':
+      return records.clearParent(workId!, revision());
+    case 'add-blocker':
+      return records.addBlocker(workId!, revision(), need(values, 'blocker'));
+    case 'remove-blocker':
+      return records.removeBlocker(workId!, revision(), need(values, 'blocker'));
+    case 'children':
+      return records.children(workId!);
+    case 'blockers':
+      return records.blockers(workId!);
+    case 'dependents':
+      return records.dependents(workId!);
     default:
       throw new UsageError(`Unknown command "${command}".`);
   }

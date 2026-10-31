@@ -139,6 +139,8 @@ export type SliceProgress = 'done' | 'blocked' | 'active' | 'waiting';
 /** One of a build's slices. */
 export interface Slice extends IssueRef {
   progress: SliceProgress;
+  /** Its work record's ID; a private slice has no ticket number, so this tells slices apart. */
+  workId?: string;
 }
 
 /** Which of the slice labels the board reads an issue carries. */

@@ -3,6 +3,7 @@
 // sub-tickets in its sidebar. While the details load each shows a placeholder, and a failed read shows its error in the
 // description's place; the board's own fields never wait. Once they load, Edit opens the description editor in the
 // description's place, with Save and Cancel under it; the extra sections, such as Acceptance Criteria, stay read-only.
+// Beside a work record's own text, the description and comments are the ticket's context and say so.
 
 import type { ReactNode } from 'react';
 import { CircleCheck, CircleDot, Pencil } from 'lucide-react';
@@ -55,12 +56,12 @@ function Comment({ comment, now }: { comment: ItemComment; now: number }) {
 }
 
 /** The comments, newest first: the latest the details hold, then each page "Load 10 more" fetched. Remounts with each open of the dialog. */
-function Comments({ itemId, entry, now, className }: { itemId: string; entry: DetailsEntry; now: number; className: string }) {
+function Comments({ itemId, entry, now, ticketContext, className }: { itemId: string; entry: DetailsEntry; now: number; ticketContext: boolean; className: string }) {
   const older = useOlderComments(itemId, entry);
   const comments = [...entry.details.comments, ...older.comments];
   return (
     <div className={`grid min-w-0 gap-2 ${className}`} data-comments>
-      <Heading>Comments{comments.length > 0 && ` · ${comments.length}`}</Heading>
+      <Heading>{ticketContext ? 'Ticket comments' : 'Comments'}{comments.length > 0 && ` · ${comments.length}`}</Heading>
       {comments.length > 0
         ? <ol className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-3 p-0">{comments.map((c) => <Comment key={c.id} comment={c} now={now} />)}</ol>
         : <p className="m-0 text-sm text-(--muted-foreground)">No comments.</p>}
@@ -98,7 +99,7 @@ const RELOAD_FAILED = 'Saved; could not reload the details';
  * The description, or the loading state or the error that stands in for it. While `edit` is open the editor takes the
  * description's place, filling the height left when `fill`.
  */
-export function ItemDescription({ read, edit, fill, className }: { read: ItemDetailsRead; edit: DescriptionEdit; fill: boolean; className: string }) {
+export function ItemDescription({ read, edit, fill, ticketContext = false, className }: { read: ItemDetailsRead; edit: DescriptionEdit; fill: boolean; ticketContext?: boolean; className: string }) {
   if (read.state === 'loading') return <div className={className}><Loading /></div>;
   if (read.state === 'failed') return <p className={`m-0 text-sm text-(--error-foreground) ${className}`} role="alert">Could not load the details: {read.error}</p>;
   const { sections } = read.details;
@@ -107,7 +108,7 @@ export function ItemDescription({ read, edit, fill, className }: { read: ItemDet
   return (
     <div className={`grid min-w-0 gap-2 ${fill ? 'min-h-0 grid-rows-[auto_minmax(0,1fr)]' : ''} ${className}`} data-description>
       <div className="flex h-7 items-center justify-between gap-2">
-        <h2 className="m-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)">Description</h2>
+        <h2 className="m-0 text-[11px] font-medium uppercase tracking-wider text-(--muted-foreground)">{ticketContext ? 'Ticket description' : 'Description'}</h2>
         {!edit.editing && <span className="flex min-w-0 items-center gap-3">
           {edit.saved !== null && <span className="truncate text-xs text-(--muted-foreground)" role="status" title={RELOAD_FAILED}>{RELOAD_FAILED}</span>}
           <Button {...kind('other')} leftIcon={<Pencil />} onClick={edit.start}>Edit</Button>
@@ -122,8 +123,8 @@ export function ItemDescription({ read, edit, fill, className }: { read: ItemDet
 }
 
 /** The comments, newest first; none while the details load or when the read failed. */
-export function ItemComments({ itemId, read, now, className }: { itemId: string; read: ItemDetailsRead; now: number; className: string }) {
-  return read.state === 'loaded' ? <Comments itemId={itemId} entry={read.entry} now={now} className={className} /> : null;
+export function ItemComments({ itemId, read, now, ticketContext = false, className }: { itemId: string; read: ItemDetailsRead; now: number; ticketContext?: boolean; className: string }) {
+  return read.state === 'loaded' ? <Comments itemId={itemId} entry={read.entry} now={now} ticketContext={ticketContext} className={className} /> : null;
 }
 
 /** A labelled fact for the meta area; its value wraps rather than runs past the dialog. */

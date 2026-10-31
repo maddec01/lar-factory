@@ -46,7 +46,7 @@ export function recordItems(records: WorkRecords, tickets: readonly Item[], repo
       state: records.completion(b.workId).complete ? 'closed' : 'open', workId: b.workId, title: b.title }));
     // Start after still waits on the ticket's provider blockers, beside the record's, until it reads local completion alone.
     const blockers = [...recorded, ...(ticket?.blockers ?? []).filter((b) => !recorded.some((r) => r.number === b.number && sameRepo(r.repo, b.repo)))];
-    const slices = children.filter((c) => c.kind === 'slice').map((c): Slice => ({ ...ref(c), progress: sliceProgress(c) }));
+    const slices = children.filter((c) => c.kind === 'slice').map((c): Slice => ({ ...ref(c), progress: sliceProgress(c), workId: c.workId }));
     const work = children.filter((c) => c.kind !== 'slice');
     const mapBody = record.kind === 'concept' ? records.body(record.workId, 'map') : null;
     const map = mapBody !== null ? parseConceptMap(mapBody) : record.kind === 'concept' ? ticket?.map ?? parseConceptMap('') : ticket?.map;

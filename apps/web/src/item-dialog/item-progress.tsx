@@ -52,7 +52,7 @@ export function ItemProgress({ item }: { item: Item }) {
           <p className="m-0 text-xs text-(--muted-foreground)"><span className="font-medium text-(--foreground)">Slices</span> · {done}/{item.slices.length} done</p>
           {!split && <div aria-hidden><SliceBar item={item} thick /></div>}
           <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-            {item.slices.map((s) => <SliceChip key={s.number} slice={s} />)}
+            {item.slices.map((s) => <SliceChip key={s.workId ?? s.number} slice={s} />)}
           </ul>
         </div>
       )}

@@ -1,6 +1,6 @@
-// The board's configuration: the onboarded repositories and the board-wide settings, in files in boardDataDir(),
-// and each repository's Repository config, its .lar-factory.json read from its default branch.
-// skills/lar-shape/scripts/repo-config.sh reads the same files, with the same shapes, defaults and wording.
+// The board's configuration: the onboarded repositories, in REPOSITORY_LIST_FILE, and the board-wide settings, in
+// settings.json, both in boardDataDir(), and each repository's Repository config, its .lar-factory.json read from its
+// default branch. The board only reads settings.json, and leaves the old repositories.json untouched.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,7 +8,7 @@ import {
   PROVIDERS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type CleanupPicks, type OnboardingProgress, type OnboardingRepository, type Provider,
   type RepositoryConfigAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type SetupAnswers, type ShowSetting,
 } from '@lar-factory/shared';
-import { boardDataDir } from '@lar-factory/shared/data-dir';
+import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
 import { AGENT_DOC_PATHS, withoutAgentSkills } from '../onboarding/agent-setup.ts';
 import { problemOf } from '../azure/azure-items.ts';
 import { readBranchFile as readAzureFile } from '../azure/azure-repos.ts';
@@ -32,7 +32,7 @@ export interface BoardSettings {
 }
 
 /**
- * An onboarded repository, an entry of repositories.json's `repositories`, with where it stopped while it is still
+ * An onboarded repository, an entry of the repository list's `repositories`, with where it stopped while it is still
  * onboarding, or its reset PR while it is resetting.
  */
 export interface OnboardedRepository {
@@ -102,7 +102,7 @@ export function isProgress(value: unknown): value is OnboardingProgress {
     && (value.reusesConfig === undefined || value.reusesConfig === true);
 }
 
-/** repositories.json's entries as the file holds them, checked; none when there is no file. */
+/** The repository list's entries as the file holds them, checked; none when there is no file. */
 function readListFile(file: string): { raw: Record<string, unknown> & { repositories: Record<string, unknown>[] }; list: OnboardedRepository[] } {
   if (!existsSync(file)) return { raw: { repositories: [] }, list: [] };
   const raw = readJson(file) as { repositories?: unknown } | null;
@@ -135,11 +135,11 @@ function readListFile(file: string): { raw: Record<string, unknown> & { reposito
 }
 
 /**
- * repositories.json's entries, `{ "repositories": [{ "repo": "owner/name" }] }`, where an entry still onboarding
+ * The repository list's entries, `{ "repositories": [{ "repo": "owner/name" }] }`, where an entry still onboarding
  * carries its progress as `onboarding`, and one resetting its reset PR as `resetting`; none when there is no file.
  */
 export function readRepositoryList(dir = boardDataDir()): OnboardedRepository[] {
-  return readListFile(join(dir, 'repositories.json')).list;
+  return readListFile(join(dir, REPOSITORY_LIST_FILE)).list;
 }
 
 /**
@@ -183,7 +183,7 @@ export function saveOnboarded(repo: string, replaces: string | null, dir = board
 function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: string, replaceUnusableConfig = false): OnboardedRepository[] {
   const { repo } = entry;
   if (!REPO.test(repo)) throw new Error(`${repo} isn't a repository of the form owner/name.`);
-  const file = join(dir, 'repositories.json');
+  const file = join(dir, REPOSITORY_LIST_FILE);
   const { raw, list } = readListFile(file);
   const onboarded = list.find((e) => !e.onboarding && (sameRepo(e.repo, repo) || replaces !== null && sameRepo(e.repo, replaces))
     && !(replaceUnusableConfig && sameRepo(e.repo, repo) && !e.resetting));
@@ -198,7 +198,7 @@ function saveEntry(entry: OnboardedRepository, replaces: string | null, dir: str
 
 /** Drops the repository's entry, keeping every other entry as the file has it, and returns the list. Throws for a repository the list doesn't name. */
 export function dropRepository(repo: string, dir = boardDataDir()): OnboardedRepository[] {
-  const file = join(dir, 'repositories.json');
+  const file = join(dir, REPOSITORY_LIST_FILE);
   const { raw, list } = readListFile(file);
   if (!list.some((e) => sameRepo(e.repo, repo))) throw new Error(`${repo} is not on this Mac's list.`);
   return writeListFile(dir, { ...raw, repositories: raw.repositories.filter((_, i) => !sameRepo(list[i]!.repo, repo)) });
@@ -209,7 +209,7 @@ export function dropRepository(repo: string, dir = boardDataDir()): OnboardedRep
  * returns the list. Throws for a repository that is not onboarded, or is onboarding or resetting.
  */
 export function saveResetting(repo: string, prUrl: string, dir = boardDataDir()): OnboardedRepository[] {
-  const { raw, list } = readListFile(join(dir, 'repositories.json'));
+  const { raw, list } = readListFile(join(dir, REPOSITORY_LIST_FILE));
   const at = list.findIndex((e) => sameRepo(e.repo, repo));
   if (at < 0 || list[at]!.onboarding || list[at]!.resetting) throw new Error(`${repo} is not onboarded.`);
   return writeListFile(dir, { ...raw, repositories: raw.repositories.map((e, i) => i === at ? { ...e, resetting: { prUrl } } : e) });
@@ -222,9 +222,9 @@ export const onTheBoard = (list: readonly OnboardedRepository[]) => list.filter(
 export const stillResetting = (list: readonly OnboardedRepository[]) =>
   list.flatMap(({ repo, resetting }) => resetting ? [{ repo, prUrl: resetting.prUrl }] : []);
 
-/** Writes repositories.json with `content` and returns its list. */
+/** Writes the repository list with `content` and returns its list. */
 function writeListFile(dir: string, content: Record<string, unknown>): OnboardedRepository[] {
-  const file = join(dir, 'repositories.json');
+  const file = join(dir, REPOSITORY_LIST_FILE);
   mkdirSync(dir, { recursive: true });
   // Written beside it, then renamed over it, so repo-config.sh never reads half a file.
   const temp = `${file}.${process.pid}.tmp`;

@@ -66,7 +66,7 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
   const writes: string[] = [];
   let fail = false;
   const sources = onboardedSources(async () => {
-    if (fail) throw new Error('repositories.json isn\'t valid JSON.');
+    if (fail) throw new Error('repository-settings.json isn\'t valid JSON.');
     return { configs: [config('maddec01/lar-apple')], problems: [], resetting: [] };
   }, () => merged(fakeSource('apple', [], writes)));
   await sources.read();

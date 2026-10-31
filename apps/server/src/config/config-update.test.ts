@@ -9,7 +9,7 @@ import { configUpdateOf, dismissConfigUpdate, readDismissedUpdates } from './con
 /** The list of a data folder where both repositories are onboarded. */
 const LIST = JSON.stringify({ repositories: [{ repo: 'maddec01/lar-web' }, { repo: 'maddec01/lar-api' }] });
 
-async function dataDir(t: TestContext, files: Record<string, string> = { 'repositories.json': LIST }): Promise<string> {
+async function dataDir(t: TestContext, files: Record<string, string> = { 'repository-settings.json': LIST }): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'lar config update test '));
   t.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   for (const [name, text] of Object.entries(files)) await writeFile(join(dir, name), text);
@@ -34,7 +34,7 @@ test('a notice dismissed at the app version stays gone, and one dismissed at an 
 });
 
 test('a dismissal is kept in the data folder by repository and app version, keeping the others, so it survives a restart', async (t) => {
-  const dir = await dataDir(t, { 'repositories.json': LIST, 'config-update-notices.json': JSON.stringify({ dismissed: { 'maddec01/lar-api': 2 } }) });
+  const dir = await dataDir(t, { 'repository-settings.json': LIST, 'config-update-notices.json': JSON.stringify({ dismissed: { 'maddec01/lar-api': 2 } }) });
   assert.equal(dismissConfigUpdate('maddec01/lar-web', 3, dir), null);
   assert.deepEqual(JSON.parse(await readFile(join(dir, 'config-update-notices.json'), 'utf8')), { dismissed: { 'maddec01/lar-api': 2, 'maddec01/lar-web': 3 } });
   assert.deepEqual(readDismissedUpdates(dir), new Map([['maddec01/lar-api', 2], ['maddec01/lar-web', 3]]));
@@ -52,7 +52,7 @@ test('dismissing again under another case replaces the entry; a missing or unusa
 
 test('a repository that is not onboarded is refused as Edit refuses it, and nothing is recorded', async (t) => {
   const progress = { step: 'checks', done: ['project', 'setup'], answers: { projectId: 'lar-web' } };
-  const dir = await dataDir(t, { 'repositories.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-web', onboarding: progress }] }) });
+  const dir = await dataDir(t, { 'repository-settings.json': JSON.stringify({ repositories: [{ repo: 'maddec01/lar-web', onboarding: progress }] }) });
   assert.deepEqual(dismissConfigUpdate('maddec01/lar-web', 2, dir), { status: 409, error: 'maddec01/lar-web is still onboarding.' });
   assert.deepEqual(dismissConfigUpdate('maddec01/lar-cli', 2, dir), { status: 409, error: "maddec01/lar-cli is not on this Mac's list." });
   assert.deepEqual(readDismissedUpdates(dir), new Map());

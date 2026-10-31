@@ -44,7 +44,7 @@ const TEST_REPOSITORIES = ['maddec01/lar-server', 'maddec01/lar-apple', 'maddec0
 export function writeRepositoryList(home: string, repos: readonly string[]): void {
   const dir = join(home, 'Library/Application Support/Lar Factory');
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'repositories.json'), JSON.stringify({ repositories: repos.map((repo) => ({ repo })) }));
+  writeFileSync(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: repos.map((repo) => ({ repo })) }));
 }
 
 /**
@@ -56,7 +56,7 @@ export const NOT_LANDED = { repoConfigs: { 'maddec01/lar-factory': null } };
 export function writeOnboarding(home: string, repo: string): void {
   const progress = { step: 'pr', done: ['project', 'setup', 'checks'], answers: { projectId: 'project-factory' }, prUrl: `https://github.com/${repo}/pull/1` };
   writeRepositoryList(home, TEST_REPOSITORIES);
-  const file = join(home, 'Library/Application Support/Lar Factory/repositories.json');
+  const file = join(home, 'Library/Application Support/Lar Factory/repository-settings.json');
   writeFileSync(file, JSON.stringify({ repositories: TEST_REPOSITORIES.map((r) => (r === repo ? { repo: r, onboarding: progress } : { repo: r })) }));
 }
 
@@ -82,7 +82,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   // Each test gets a spare port; BOARD_PORT '' leaves the board to pick one from its range.
   const home = env.HOME ?? dir;
   const { repositories = TEST_REPOSITORIES } = options as { repositories?: readonly string[] | null };
-  if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'))) writeRepositoryList(home, repositories);
+  if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repository-settings.json'))) writeRepositoryList(home, repositories);
   const port = 'BOARD_PORT' in env ? env.BOARD_PORT : String(await freePort());
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', new URL('./project-discovery-fixture.ts', import.meta.url).href,
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {

@@ -115,6 +115,36 @@ describe('lar-work', { timeout: 30_000 }, () => {
     expect(await larWork(data, 'resolve-intent', workId, '--revision', '3', '--intent', intent.intentId)).toMatchObject({ code: 2, stderr: expect.stringContaining('--thread or --failure') });
   });
 
+  it("saves this machine's retention setting and hides and deletes set-aside records with it", async () => {
+    const data = tempDir();
+    expect((await larWork(data, 'retention')).record).toEqual({ hideAfterDays: 7, deleteAfterDays: null });
+    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'feature')).record;
+    const kept = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'bug')).record;
+    await larWork(data, 'set-aside', workId, '--revision', '1');
+    expect((await larWork(data, 'hidden')).record).toEqual([]);
+
+    expect((await larWork(data, 'retention', '--hide-after', '0')).record).toEqual({ hideAfterDays: 0, deleteAfterDays: null });
+    expect((await larWork(data, 'hidden')).record).toMatchObject([{ workId }]);
+    expect((await larWork(data, 'delete-expired')).record).toEqual({ deleted: [], kept: [] });
+    expect((await larWork(data, 'retention', '--delete-after', '0')).record).toEqual({ hideAfterDays: 0, deleteAfterDays: 0 });
+    expect((await larWork(data, 'delete-expired')).record).toEqual({ deleted: [workId], kept: [] });
+    expect((await larWork(data, 'list')).record).toEqual([kept]);
+    expect((await larWork(data, 'retention', '--delete-after', 'never')).record).toEqual({ hideAfterDays: 0, deleteAfterDays: null });
+    expect(await larWork(data, 'retention', '--delete-after', 'soon')).toMatchObject({ code: 2, stderr: expect.stringContaining('whole number of days or never') });
+  });
+
+  it('exports a brief as markdown to a folder and refuses a missing folder', async () => {
+    const data = tempDir();
+    const { workId } = (await larWork(data, 'create', '--repository', 'maddec01/lar', '--kind', 'build')).record;
+    const brief = join(tempDir(), 'brief.md');
+    writeFileSync(brief, '# Add it\n');
+    await larWork(data, 'set-body', workId, '--revision', '1', '--body', 'brief', '--file', brief);
+    const to = tempDir();
+    expect((await larWork(data, 'export', workId, '--to', to)).record).toEqual([join(to, 'brief-add-it.md')]);
+    expect(readdirSync(to)).toEqual(['brief-add-it.md']);
+    expect(await larWork(data, 'export', workId, '--to', join(to, 'missing'))).toMatchObject({ code: 1, stderr: expect.stringContaining("isn't a folder") });
+  });
+
   it('reports usage mistakes before opening the database', async () => {
     const data = join(tempDir(), 'unused');
     expect(await larWork(data, 'frobnicate')).toMatchObject({ code: 2, stderr: expect.stringContaining('Unknown command "frobnicate"') });
@@ -125,6 +155,6 @@ describe('lar-work', { timeout: 30_000 }, () => {
   it('explains identifiers, reads, changes, structure and errors in its help', async () => {
     const help = await larWork(tempDir(), '--help');
     expect(help.code).toBe(0);
-    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Content', 'Threads and launch intents', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
+    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Content', 'Threads and launch intents', 'Retention and export', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
   });
 });

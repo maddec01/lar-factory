@@ -546,3 +546,29 @@ test('closing the dialog clears the store, and Escape closes it', async () => {
   expect(useItemDialogStore.getState().itemId).toBeNull();
   expect(dialog()).toBeNull();
 });
+
+test('work that needs you shows why, posts each choice it offers and Clear, and sets the work aside through Abandon', async () => {
+  holdPosts();
+  const id = 'I_sample05';
+  const reason = 'Its PR closed without merging.';
+  await mountPage({ ...sample, capture: { enabled: true, session: 'session-1' },
+    items: sample.items.map((i) => (i.id === id ? { ...i, status: 'Review', needsYou: { reason, offers: ['reopen-pr', 'replace-pr', 'set-aside'] } } : i)) });
+  await openItem(id);
+  expect(text(inDialog('[data-needs-you-reason] p'))).toBe(`Needs you: ${reason}`);
+  expect($$('[data-needs-you-reason] button').map(text)).toEqual(['Reopen PR', 'Start a replacement build', 'Set aside', 'Clear']);
+  await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[0]!);
+  expect(posted()).toEqual([['/api/needs-you', { itemId: id, choice: 'reopen-pr' }]]);
+  await answer({ error: "Couldn't reopen the PR." }, 502);
+  expect(text(inDialog('.action-error [role="alert"]'))).toBe("Couldn't reopen the PR.");
+  await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[3]!);
+  expect(posted().at(-1)).toEqual(['/api/needs-you', { itemId: id, choice: 'clear' }]);
+  await answer({ error: null });
+  await press($$<HTMLButtonElement>('[data-needs-you-reason] button')[2]!);
+  expect(text($('#abandon-dialog h2'))).toMatch(/^Abandon #129 /);
+});
+
+test('work that needs nothing from you shows no reason', async () => {
+  await mountPage();
+  await openItem('I_sample05');
+  expect(inDialog('[data-needs-you-reason]')).toBeNull();
+});

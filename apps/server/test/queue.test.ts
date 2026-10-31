@@ -136,11 +136,11 @@ test('Back to List is refused while a Start is in flight, uncertain or done for 
   assert.deepEqual(edits, []);
 });
 
-test('Back to List works again once a failed Start is over', async (t) => {
+test('Back to List stays blocked after an unconfirmed Start', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'Queued')], t3: { fail: 'down' } }, false, false, startableEnv(t));
   await until(board, (d) => d.items.length === 1);
   assert.equal((await startItem(board, 'I_12')).status, 502);
-  assert.equal((await backToList(board, 'I_12')).status, 200);
+  assert.equal((await backToList(board, 'I_12')).status, 409);
 });
 
 test('Back to List is refused while Abandon is pending for the item', async (t) => {

@@ -199,14 +199,13 @@ test('a double press, a retry or another page starts no second thread for the it
   assert.equal((await board.t3Calls()).length, 2);
 });
 
-test('a T3 error is shown and the same request can try again', async (t) => {
+test('an uncertain T3 error prevents another launch', async (t) => {
   const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'down' } });
   const failed = await start(board, 'I_12');
   assert.equal(failed.status, 502);
-  assert.match((await failed.json()).error, /Is T3 Code running\?/);
+  assert.match((await failed.json()).error, /could not be confirmed/);
   await board.update({ items: [boardIssue(12, 'Queued')] });
-  assert.equal((await start(board, 'I_12')).status, 200);
-  assert.equal((await board.t3Calls()).length, 2);
+  assert.equal((await start(board, 'I_12')).status, 502);
 });
 
 for (const fail of ['killed', 'garbage']) {
@@ -217,7 +216,7 @@ for (const fail of ['killed', 'garbage']) {
     assert.equal((await first.json()).uncertain, true);
     await board.update({ items: [boardIssue(12, 'Queued')] });
     assert.equal((await (await start(board, 'I_12')).json()).uncertain, true);
-    assert.equal((await board.t3Calls()).length, 1);
+    assert.equal((await board.t3Calls()).filter(args => args[0] === 'thread' && args[1] === 'start').length, 1);
   });
 }
 
@@ -271,3 +270,17 @@ test('Start is refused while Back to List or Abandon is pending for the item', a
   assert.deepEqual((await Promise.all([moving, abandoning])).map((r) => r.status), [200, 200]);
   assert.deepEqual(await board.t3Calls(), []);
 });
+
+for (const recover of ['late', 'deleted']) {
+  test(`an uncertain launch with ${recover} CLI evidence preserves duplicate protection`, async (t) => {
+    const board = await factoryBoard(t, [boardIssue(12, 'Queued')], { t3: { fail: 'garbage', recover } });
+    const response = await start(board, 'I_12');
+    assert.equal(response.status, recover === 'late' ? 200 : 502);
+    const answer = await response.json();
+    if (recover === 'late') assert.equal(answer.thread.threadId, 'thread-1');
+    else assert.equal(answer.uncertain, true);
+    await start(board, 'I_12');
+    assert.equal((await board.t3Calls()).filter(args => args[1] === 'start').length, 1);
+    assert.ok((await board.t3Calls()).some(args => args[1] === 'show'));
+  });
+}

@@ -1,19 +1,16 @@
-// What the board reads from T3 Code's database on each refresh: every item's stats
-// and T3 threads, from one open of the database (docs/adr/0005).
+// Protocol observations supply association and timing. SQLite supplies residual usage pricing.
 
 import { existsSync } from 'node:fs';
 import type { Item, ItemStats, ItemThread } from '@lar-factory/shared';
 import { itemStats, transcriptsToRead } from '../stats/item-stats.ts';
 import { warmTranscripts } from '../stats/transcript-usage.ts';
 import type { ItemStatsReader, StatsSources } from '../stats/item-stats.ts';
-import { itemThreads } from '../threads/item-threads.ts';
-import type { ItemThreadsReader } from '../threads/item-threads.ts';
-import { protocolStatsInputs } from './item-execution.ts';
+import { protocolItemThreads, protocolStatsInputs } from './item-execution.ts';
 import { readT3Db } from './t3-db.ts';
 
 type Issue = Pick<Item, 'repo' | 'number'>;
 
-/** One read of T3's database, as the board shows it. */
+/** Execution observations and usage, as the board shows them. */
 export interface T3Reads {
   /** An item's stats; undefined when it has none, 'unavailable' when they can't be read. */
   stats: (item: Issue) => ItemStats | 'unavailable' | undefined;
@@ -29,35 +26,25 @@ export interface T3Reads {
 const statsLookup = (reader: ItemStatsReader): T3Reads['stats'] => ({ repo, number }) =>
   reader(repo, number) ?? undefined;
 
-/** An item's threads from `reader`; undefined for an item no thread names. */
-const threadsLookup = (reader: ItemThreadsReader): T3Reads['threads'] => ({ repo, number }) => {
-  const own = reader(repo, number);
-  return own.length ? own : undefined;
-};
-
 /** The same answer for every item. */
 const every = <T>(value: T) => (): T => value;
 
-/**
- * Opens T3's database once for the item stats and the item threads, which read the same thread rows. Stats read
- * more than the rows, so they can be unavailable while the threads are read, e.g. after T3 changes its schema.
- * Without `withStats` it reads the threads alone, which costs a fraction of the stats, and every item has no stats.
- */
+/** Thread association remains available independently of residual usage pricing reads. */
 export function loadT3Reads(sources: StatsSources, now: number, withStats = true): T3Reads {
-  if (!existsSync(sources.db)) return { stats: every(undefined), threads: every(undefined), statsUnavailable: false, priced: null };
+  const threads: T3Reads['threads'] = ({ repo, number }) => protocolItemThreads(repo, number);
+  if (!withStats) return { stats: every(undefined), threads, statsUnavailable: false, priced: null };
+  if (!existsSync(sources.db)) return { stats: every('unavailable'), threads, statsUnavailable: true, priced: null };
   const unavailable = { stats: every('unavailable' as const), statsUnavailable: true, priced: null };
   try {
     return readT3Db(sources.db, (db) => {
       const { rows, sessions } = protocolStatsInputs();
-      const threads = threadsLookup(itemThreads(rows));
-      if (!withStats) return { stats: every(undefined), threads, statsUnavailable: false, priced: null };
       let stats: ItemStatsReader;
       try { stats = itemStats(db, rows, sources, now, sessions); }
       catch { return { ...unavailable, threads }; }
       return { stats: statsLookup(stats), threads, statsUnavailable: false, priced: stats.priced };
     });
   } catch {
-    return { ...unavailable, threads: every('unavailable' as const) };
+    return { ...unavailable, threads };
   }
 }
 

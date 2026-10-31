@@ -8,7 +8,8 @@ import { assistant, claudeHome, statsDb, tempDir } from '../../test/stats-db.ts'
 import * as statsModule from '../stats/item-stats.ts';
 import * as execution from './item-execution.ts';
 vi.spyOn(execution, 'protocolStatsInputs').mockImplementation(() => fixtureInputs());
-import { protocolStatsInputs as fixtureInputs } from '../../test/execution-observations.ts';
+vi.spyOn(execution, 'protocolItemThreads').mockImplementation((repo, number) => fixtureThreads(repo, number));
+import { protocolItemThreads as fixtureThreads, protocolStatsInputs as fixtureInputs } from '../../test/execution-observations.ts';
 
 /** A home folder, settings and price table that don't exist, so tests never read real transcripts. */
 const NOWHERE = {
@@ -38,12 +39,14 @@ test('one read of the database gives each item its stats and threads, and undefi
   assert.deepEqual([reads.statsUnavailable, reads.priced], [false, false], 'no rate table, so nothing is priced');
 });
 
-test('a missing database gives no stats or threads, and an unexpected schema gives unavailable', (t) => {
+test('a missing usage database reports unavailable stats and protocol availability independently', (t) => {
+  vi.mocked(execution.protocolItemThreads).mockReturnValueOnce('unavailable');
   const missing = loadT3Reads({ db: join(tmpdir(), 'no-such-dir', 'statev2.sqlite'), ...NOWHERE }, NOW);
-  assert.deepEqual([missing.stats(item(1)), missing.threads(item(1)), missing.statsUnavailable, missing.priced], [undefined, undefined, false, null]);
+  assert.deepEqual([missing.stats(item(1)), missing.threads(item(1)), missing.statsUnavailable, missing.priced], ['unavailable', 'unavailable', true, null]);
   const changed = statsDb(t, [{ id: 'a', messages: [`$lar-work ${REPO}#1`] }]);
   vi.stubEnv('T3_STATE_DB', changed + '.unavailable');
   t.onTestFinished(() => { vi.unstubAllEnvs(); });
+  vi.mocked(execution.protocolItemThreads).mockReturnValueOnce('unavailable');
   const broken = loadT3Reads({ db: changed, ...NOWHERE }, NOW);
   assert.deepEqual([broken.stats(item(1)), broken.threads(item(1)), broken.statsUnavailable, broken.priced], ['unavailable', 'unavailable', true, null]);
 });

@@ -75,3 +75,23 @@ proof, not full-family or real transcript pricing parity. Descendant projections
 real token totals, renewal rejection and restart remain runtime limits; controlled
 fixtures cover calculation parity and unavailable observations. The probe used the
 board's existing Keychain credential in memory and printed only counts/timing.
+
+CLI recovery proof, 2026-10-31: repositoryProjects returned the registered
+lar-factory main-checkout project, mcp:0ee5d266-467e-4bda-a7e9-7690c8ebb34f.
+`thread list --project <id> --json` returned 127 threads with exit 0;
+`thread show <listed-id> --json --messages 0` returned the matching thread
+with exit 0. The installed CLI has no project-list subcommand. Discovery used
+the authenticated adapter, not the worktree folder as a project ID.
+Recovery reads complete CLI messages and requires a unique exact first-user
+message match. Empty, ambiguous and failed reads retain duplicate protection.
+Real timeout followed by a late launch, deletion and provider mutations were
+not induced by this probe.
+
+Association no longer opens SQLite or requires a usage database. `loadT3Reads`
+uses `protocolItemThreads` directly, including when stats are disabled or their
+residual pricing read fails. A missing usage database reports unavailable stats.
+The source audit finds no production project, title, association or timing SQL
+consumer outside the adapter. Legacy SQL helpers remain for parity fixtures;
+`item-stats.ts` retains its optional `threadSessions` default for those fixtures.
+Production supplies protocol sessions explicitly. The residual production query
+is `CODEX_TURN_SELECTIONS` described above, not project or thread discovery.

@@ -211,7 +211,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     '/api/start': {
       what: 'the item to start', disabled: 'Starting threads is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Start again.' }),
-      run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model, input.repo)),
+      run: forItem('Name the item to start.', (itemId, input) => commands.start(itemId, input.model)),
     },
     '/api/start-build': {
       what: 'the build to start', disabled: 'Starting builds is disabled in sample mode.',
@@ -221,7 +221,7 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
     '/api/arm': {
       what: 'the item to start after its blockers', disabled: 'Start after is disabled in sample mode.',
       restarted: () => withBoard({ error: 'The board restarted. Press Start after again.' }),
-      run: forItem('Name the item to start after its blockers.', async (itemId, input) => startAfter.arm(itemId, input.model, input.repo)),
+      run: forItem('Name the item to start after its blockers.', async (itemId, input) => startAfter.arm(itemId, input.model)),
     },
     '/api/disarm': {
       what: 'the item to disarm', disabled: 'Start after is disabled in sample mode.',

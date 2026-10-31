@@ -5,7 +5,7 @@
 
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, isDriftChoice, isOnboarding, pickRepoText, sameRepo, startRepo, workMessage } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, isDriftChoice, isOnboarding, sameRepo, workMessage } from '@lar-factory/shared';
 import type { BoardData, DriftChoice, Item, ModelChoice, ModelGroup, SkillCheckOutcome, StartedThread, StartResult, Status } from '@lar-factory/shared';
 import { WorkRecordError, type LaunchIntent, type WorkRecords } from '@lar-factory/work-records';
 import type { BoardState } from '../board/board-state.ts';
@@ -37,10 +37,9 @@ export interface ItemCommands {
   /**
    * Starts a T3 thread for a Queued item that nothing open blocks, once unless its recorded thread stopped or was
    * deleted. It writes a launch intent on the work record before it asks T3, and settles an unresolved one through T3
-   * before starting again. An untagged Azure work item starts in `repo`, one of the repositories reading it, or in
-   * the only one that does, and gets no tag.
+   * before starting again.
    */
-  start(itemId: string, model: unknown, repo?: unknown): Promise<Reply>;
+  start(itemId: string, model: unknown): Promise<Reply>;
   /**
    * Starts a Ready build's thread in a new worktree, or retries a confirmed stopped or deleted one, once nothing open
    * blocks it, as lar-shape's step 5 does after Go: it moves a parent record that isn't a build to In progress first,
@@ -229,17 +228,6 @@ export function createItemCommands({ board, items, records, reread, archive, off
     if (busy) return withBoard(409, { error: busy });
     const failed = setStatus(item, to);
     return withBoard(failed?.status ?? 200, { error: failed?.error ?? null });
-  }
-
-  /**
-   * The item a start runs on: as it is, or an untagged Azure work item for the repository `picked` names among those
-   * reading it, or for the only one; a refusal asking which when that names none of them.
-   */
-  function startingItem(item: Item, picked: unknown): Item | Reply {
-    const { untaggedFor, ...rest } = item;
-    if (!untaggedFor) return item;
-    const repo = startRepo(item, picked);
-    return repo ? { ...rest, repo } : withBoard(409, { error: pickRepoText(board.snapshot(), item) });
   }
 
   /**
@@ -480,12 +468,10 @@ export function createItemCommands({ board, items, records, reread, archive, off
     queue: (itemId) => move(itemId, QUEUE),
     backToList: (itemId) => move(itemId, BACK_TO_LIST),
 
-    start: (itemId, model, picked) => startOnce(starts, 'started', itemId, model, (listed, choice) => {
-      if (listed.status !== 'Queued') return reply(409, { error: `Only Queued items can be started; this one is in ${listed.status}.` });
+    start: (itemId, model) => startOnce(starts, 'started', itemId, model, (item, choice) => {
+      if (item.status !== 'Queued') return reply(409, { error: `Only Queued items can be started; this one is in ${item.status}.` });
       const busy = busyReason(itemId, 'start');
       if (busy) return withBoard(409, { error: busy });
-      const item = startingItem(listed, picked);
-      if ('body' in item) return item;
       const blocked = blockedReply(item);
       if (blocked) return blocked;
       const message = workMessage(item);

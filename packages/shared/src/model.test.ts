@@ -1,7 +1,7 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, startRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
+import { inRepo, itemRepoNames, itemRepos, onAzure, repoTag, shownRepo, blockedText, blockerRef, buildBranch, buildMessage, canAbandon, checkState, failedCheck, ghBlocksRead, itemSource, isBuild, itemPr, itemTotal, isRecentlyDone, isSlow, isStale, itemName, ref, kindLabel, labelKind, labelStatuses, openBlockers, repoKey, repoName, onboardingConfigFile, providerTool, repositoryProjectHint, sameRepo, skillRenameProblem, startHold, sliceProgress, statusLabel, threadLink, usesGh, workMessage, workTitle } from './model.ts';
 import type { BoardData, Checks, Item, Status } from './model.ts';
 import { boardSections } from './board-view.ts';
 import { validateDraft } from './add-item.ts';
@@ -370,15 +370,6 @@ test("an untagged item two repositories read shows both as its repositories, and
   assert.equal(itemRepoNames(both, repos), 'web or api');
   assert.equal(itemRepoNames({ repo: 'contoso/p/web', untaggedFor: ['contoso/p/web'] }, repos), 'web');
   assert.equal(itemRepoNames({ repo: 'contoso/p/api' }, repos), 'api');
-});
-
-test("a start runs in the item's repository, or in the one picked among an untagged item's, or in its only one", () => {
-  const both = { repo: 'contoso/p/web', untaggedFor: ['contoso/p/web', 'contoso/p/api'] };
-  assert.equal(startRepo(both, 'Contoso/P/API'), 'contoso/p/api');
-  assert.equal(startRepo(both), undefined);
-  assert.equal(startRepo(both, 'contoso/p/docs'), undefined);
-  assert.equal(startRepo({ repo: 'contoso/p/web', untaggedFor: ['contoso/p/web'] }), 'contoso/p/web');
-  assert.equal(startRepo({ repo: 'maddec01/lar' }, 'contoso/p/api'), 'maddec01/lar');
 });
 
 test("an Azure work item's repository tag is repo- and the repository's name as Azure shows it", () => {

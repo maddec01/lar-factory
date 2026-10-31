@@ -8,12 +8,9 @@ export function choiceOf(entry: { instanceId?: string; model?: string }): ModelC
   return entry.instanceId && entry.model ? { instanceId: entry.instanceId, model: entry.model } : undefined;
 }
 
-/**
- * /api/start's body. Without a choice it sends no `model`, so T3 uses the project's default; `repo` is the repository an
- * untagged Azure work item is for.
- */
-export function startRequest(session: string | undefined, itemId: string, choice?: ModelChoice, repo?: string): object {
-  return { session, itemId, ...choice && { model: choice }, ...repo !== undefined && { repo } };
+/** /api/start's body. Without a choice it sends no `model`, so T3 uses the project's default. */
+export function startRequest(session: string | undefined, itemId: string, choice?: ModelChoice): object {
+  return { session, itemId, ...choice && { model: choice } };
 }
 
 /** The entry a key moves focus to from `index` among `count`, wrapping; null for a key the menu doesn't take. */

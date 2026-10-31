@@ -64,15 +64,10 @@ test("the backlog's calls name the team and its requirement backlog, and every i
   assert.ok(az.calls.find((c) => c[c.indexOf('--resource') + 1] === 'teamfieldvalues')!.includes(`team=${TEAM}`));
 });
 
-test('a logged-out az names its fix, and a move on the backlog writes its work item', async () => {
+test('a logged-out az names its fix', async () => {
   const out = fakeAz({ items: BACKLOG, fail: () => new Error("az devops invoke failed: ERROR: Please run 'az login' to setup account.") });
   assert.deepEqual((await mergeSources(new Map([[REPO, azureBacklog([REPO], TEAM, out.run)]])).read()).problems,
     [{ repo: REPO, problem: 'az is logged out.', fix: 'az login' }]);
-  const az = fakeAz({ items: BACKLOG, backlog: [2] });
-  const backlog = azureBacklog([REPO], TEAM, az.run);
-  const [item] = (await backlog.read()).items;
-  assert.equal(await backlog.setStatus(item!, 'Queued'), null);
-  assert.deepEqual(az.patches.map((p) => p.id), [2]);
 });
 
 test('backlog priority order survives hydration that returns work items in ID order', async () => {

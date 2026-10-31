@@ -1,4 +1,4 @@
-// Every item source the onboarded repositories' configs name, as the one item source the board server reads and writes through.
+// Every item source the onboarded repositories' configs name, as the one item source the board server reads tickets through.
 // GitHub repository issues read through gh, and an Azure DevOps team's backlog and current sprint through az.
 
 import { decodePart, itemSource, refKey, shownRepo, type Item, type ItemSourceKind, type RepoConfig } from '@lar-factory/shared';
@@ -9,17 +9,13 @@ import { azureBoard } from '../azure/azure-board.ts';
 import { az, type Az } from '../azure/azure-items.ts';
 import { ReadProblem, type ItemSource, type ItemsRead, type ReadPace, type ReadProgress } from './item-source.ts';
 
-/** Who writes for a repository no source names, when its repository is not onboarded. */
+/** Who answers for a repository no source names, when its repository is not onboarded. */
 const NOT_ONBOARDED = "That item's repository isn't onboarded.";
 const unlisted: ItemSource = {
   read: async () => ({ title: '', items: [] }),
-  setStatus: async () => NOT_ONBOARDED,
-  statusRefusal: () => NOT_ONBOARDED,
-  addLabel: async () => NOT_ONBOARDED,
   searchTickets: async () => { throw new Error(NOT_ONBOARDED); },
   readTicket: async () => { throw new Error(NOT_ONBOARDED); },
   observeTicket: async () => { throw new Error(NOT_ONBOARDED); },
-  setParentStatus: async () => NOT_ONBOARDED,
   abandon: async () => NOT_ONBOARDED,
 };
 
@@ -314,13 +310,9 @@ export function mergeSources(byRepo: ReadonlyMap<string, ItemSource>, optedIn: r
       for (const source of own ? [own] : ref ? [] : sources) askedWhole.add(source);
     },
     readAfresh: (item) => afresh.has(sourceOf(item)) || afreshItems.has(item.id),
-    setStatus: (item, status) => sourceOf(item).setStatus(item, status),
-    statusRefusal: (item) => ('id' in item ? sourceOf(item) : forRepo(item.repo)).statusRefusal(item),
-    addLabel: (item, label) => sourceOf(item).addLabel(item, label),
     searchTickets: (repo, query) => forRepo(repo).searchTickets(repo, query),
     readTicket: (repo, number) => forRepo(repo).readTicket(repo, number),
     observeTicket: (repo, number) => forRepo(repo).observeTicket(repo, number),
-    setParentStatus: (parent, status) => forRepo(parent.repo).setParentStatus(parent, status),
     abandon: (item) => sourceOf(item).abandon(item),
   };
 }
@@ -375,13 +367,9 @@ export function onboardedSources(load: () => Promise<Omit<OnboardedConfigs, 'set
       current.invalidate();
     },
     repos: () => configs.map(repoView),
-    setStatus: (item, status) => current.setStatus(item, status),
-    statusRefusal: (item) => current.statusRefusal(item),
-    addLabel: (item, label) => current.addLabel(item, label),
     searchTickets: (repo, query) => current.searchTickets(repo, query),
     readTicket: (repo, number) => current.readTicket(repo, number),
     observeTicket: (repo, number) => current.observeTicket(repo, number),
-    setParentStatus: (parent, status) => current.setParentStatus(parent, status),
     abandon: (item) => current.abandon(item),
   };
 }

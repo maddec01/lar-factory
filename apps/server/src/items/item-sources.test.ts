@@ -20,13 +20,9 @@ function fakeSource(title: string, items: Item[], writes: string[]): ItemSource 
   const write = (what: string) => async () => { writes.push(`${title} ${what}`); return null; };
   return {
     read: async () => ({ title, items }),
-    setStatus: async (i, status) => write(`${i.id} ${status}`)(),
-    statusRefusal: (i) => `${title} refuses ${'id' in i ? i.id : `${i.repo}#${i.number}`}`,
-    addLabel: async (i, label) => write(`${i.id} ${label}`)(),
     searchTickets: async (repo, query) => { writes.push(`${title} search ${repo} ${query}`); return []; },
     readTicket: async (repo, number) => { writes.push(`${title} read ${repo}#${number}`); return null; },
     observeTicket: async (repo, number) => { writes.push(`${title} observe ${repo}#${number}`); return { state: 'open' }; },
-    setParentStatus: async (parent, status) => write(`${parent.repo}#${parent.number} ${status}`)(),
     abandon: async (i) => write(`abandon ${i.id}`)(),
   };
 }
@@ -49,10 +45,10 @@ test('a source with no opted-in repositories lists every item it read', async ()
   assert.deepEqual(read.items.map((i) => i.id), ['I_1', 'I_2']);
 });
 
-test('with no source a read lists nothing and a write is refused', async () => {
+test('with no source a read lists nothing and an abandon is refused', async () => {
   const sources = mergeSources(new Map());
   assert.deepEqual(await sources.read(), { title: '', items: [] });
-  assert.equal(await sources.setStatus(item('I_1', 'maddec01/lar-server'), 'Queued'), "That item's repository isn't onboarded.");
+  assert.equal(await sources.abandon(item('I_1', 'maddec01/lar-server')), "That item's repository isn't onboarded.");
 });
 
 const config = (repo: string, show: RepositoryConfig['show'] = 'all'): RepositoryConfig =>
@@ -75,7 +71,7 @@ test('each read loads the configs first and builds the sources again only when t
     { repo: 'maddec01/lar-server', role: 'role', items: 'issues', show: 'all', labels: [] }]);
 });
 
-test("a read whose configs can't be loaded fails, and writes keep going to the last sources", async () => {
+test("a read whose configs can't be loaded fails, and abandons keep going to the last sources", async () => {
   const writes: string[] = [];
   let fail = false;
   const sources = onboardedSources(async () => {
@@ -85,8 +81,8 @@ test("a read whose configs can't be loaded fails, and writes keep going to the l
   await sources.read();
   fail = true;
   await assert.rejects(sources.read(), /valid JSON/);
-  await sources.setStatus(item('I_1', 'maddec01/lar-apple'), 'Queued');
-  assert.deepEqual(writes, ['apple I_1 Queued']);
+  await sources.abandon(item('I_1', 'maddec01/lar-apple'));
+  assert.deepEqual(writes, ['apple abandon I_1']);
   assert.equal(sources.repos().length, 1);
 });
 

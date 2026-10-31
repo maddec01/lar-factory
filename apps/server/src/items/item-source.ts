@@ -1,7 +1,8 @@
-// The item source interface: where the board server reads its items and writes their changes.
+// The item source interface: where the board server reads tickets, for the work records' context, and closes one when
+// the user confirms Abandon's close.
 // Each adapter lives with its provider's code, such as GitHub issues in github/repo-issues.ts.
 
-import type { IssueRef, Item, ItemSourceKind, ItemSourceProblem, PickedTicket, Status, TicketMatch } from '@lar-factory/shared';
+import type { Item, ItemSourceKind, ItemSourceProblem, PickedTicket, TicketMatch } from '@lar-factory/shared';
 import type { NewObservation } from '@lar-factory/work-records';
 
 /** One read of an item source: its title, for the board's header, and its items. */
@@ -55,9 +56,6 @@ export interface ReadPace {
   slow?: boolean;
 }
 
-/** The error every item source gives a Done write: Done is never stored, and an item is Done once it closes. */
-export const DONE_REFUSED = 'Could not set Done. The board never stores Done. Close the item to make it Done.';
-
 /** How many tickets a search lists at most. */
 export const TICKET_MATCHES = 20;
 
@@ -67,7 +65,6 @@ export const ticketNumberOf = (query: string): number | null => (/^#?\d+$/.test(
 /** A ticket as its provider shows it now: open or closed with its assignees, or a confirmed not-found. */
 export type TicketObservation = Omit<Extract<NewObservation, { of: 'ticket' }>, 'of'>;
 
-/** Every write returns the error to show, or null when the provider accepted it. */
 export interface ItemSource {
   /** What a read reports for this source; absent for a source its repositories name, as the merged source then does. */
   name?: string;
@@ -89,11 +86,6 @@ export interface ItemSource {
   changes?(since: number): Promise<string[] | null>;
   /** Whether `changes` names every edit to an item: its state, labels, slices and PRs. */
   seesEdits?: boolean;
-  /** Sets the item's status, dropping every other status it carries. Callers check `statusRefusal` first. */
-  setStatus(item: Item, status: Status): Promise<string | null>;
-  /** Why a status write on an item, or on a parent that isn't on the board, would be refused before it runs; null when it may run. */
-  statusRefusal(item: Item | IssueRef): string | null;
-  addLabel(item: Item, label: string): Promise<string | null>;
   /**
    * The ticket picker's search: up to TICKET_MATCHES of `repo`'s open tickets whose words match `query`, or the one
    * a number names. Throws when the provider can't answer.
@@ -103,8 +95,7 @@ export interface ItemSource {
   readTicket(repo: string, number: number): Promise<PickedTicket | null>;
   /** One of `repo`'s tickets, open or not, as a work record observes it. Throws when the provider can't answer. */
   observeTicket(repo: string, number: number): Promise<TicketObservation>;
-  /** Sets the status of a child's parent that isn't on the board, adding it to the item source first. */
-  setParentStatus(parent: IssueRef, status: Status): Promise<string | null>;
+  /** Closes the item's ticket once the user confirms Abandon's close: the error to show, or null when the provider accepted it. */
   abandon(item: Item): Promise<string | null>;
   /** The Item.id now of an item a record saved under an id from before Item.id was the content's node id; undefined when none is. */
 }

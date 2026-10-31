@@ -5,6 +5,8 @@ import { boardProjects } from './board-projects.ts';
 import { readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead } from './execution-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 
+const firstMessageIssues = new WeakMap<object, string | null>();
+
 /** Association uses the first user message, never a shell's latest message. */
 export function executionItemThreads(shells: Record<string, unknown>[], reads: Map<string, ExecutionRead>) {
   const byIssue = new Map<string, ItemThread[]>();
@@ -14,9 +16,16 @@ export function executionItemThreads(shells: Record<string, unknown>[], reads: M
     if (isRecord(lineage) && lineage.relationshipToParent != null) continue;
     const read = reads.get(shell.id);
     if (read?.availability !== 'available' || !read.observation) throw Error('Execution unavailable');
-    const messages = read.observation.projection.messages.filter(message => message.role === 'user')
-      .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
-    const issue = typeof messages[0]?.text === 'string' ? namedIssue(messages[0].text) : null;
+    const projection = read.observation.projection;
+    let issue = firstMessageIssues.get(projection);
+    if (issue === undefined) {
+      let first: Record<string, unknown> | undefined;
+      for (const message of projection.messages) {
+        if (message.role === 'user' && (!first || String(message.createdAt).localeCompare(String(first.createdAt)) < 0)) first = message;
+      }
+      issue = typeof first?.text === 'string' ? namedIssue(first.text) : null;
+      firstMessageIssues.set(projection, issue);
+    }
     if (!issue) continue;
     if (typeof shell.updatedAt !== 'string' || !Number.isFinite(Date.parse(shell.updatedAt))) throw Error('Invalid execution timestamp');
     const state: ItemThread['state'] = shell.pendingRuntimeRequest ? 'needs you'
@@ -110,7 +119,7 @@ export function protocolThreadByTitle(projectId: string, title: string): { threa
 }
 
 /** Thread-ID lookup for the future switch/import; retained facts never imply availability. */
-export function protocolThreadById(threadId: string): ExecutionRead {
+function protocolThreadById(threadId: string): ExecutionRead {
   protocolItemThreads('', 0);
   const read = current?.reads?.get(threadId);
   return { availability: current?.available && read ? read.availability : 'unavailable',

@@ -3,10 +3,11 @@
 `<lar-build>` is this file's parent folder's parent.
 
 You check how one change looks and behaves on screen, and whether it does what
-its user expects. You get the issue reference, the repo path and a diff
+its user expects. You get the build's work ID, the repo path and a diff
 command. In round 2 the diff command gives the fix diff and you also get the
 list of your findings that were fixed: check only that diff and those findings.
-Read the issue's brief and the diff.
+Read the build's brief (`lar-work body <work ID> --body brief`) and
+the diff.
 
 Load `<lar-build>/skills/frontend-ui-engineering/SKILL.md` and
 `<lar-build>/references/accessibility-checklist.md`, and check every changed

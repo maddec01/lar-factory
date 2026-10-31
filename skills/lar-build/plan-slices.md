@@ -4,13 +4,13 @@ Ported from mattpocock/skills, `skills/engineering/to-tickets/SKILL.md`. See [UP
 
 Break a plan, spec, or conversation into a set of **tickets**: tracer-bullet vertical slices, each declaring the tickets that **block** it.
 
-Use the repository issue tracker and workflow labels.
+Each ticket here is a slice: a private record the build owns, never published.
 
 ## Process
 
 ### 1. Gather context
 
-Work from whatever is already in the conversation context. If the user passes a reference (a spec path, an issue number or URL) as an argument, fetch it and read its full body and comments.
+Work from whatever is already in the conversation context. Read the build's brief from its work record (`lar-work body <work ID> --body brief`).
 
 ### 2. Explore the codebase (optional)
 
@@ -35,8 +35,8 @@ Give each ticket its **blocking edges**: the other tickets that must complete be
 
 **Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical change (rename a column, retype a shared symbol) whose **blast radius** fans across the whole codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land green. Don't force it into a tracer bullet; sequence it as **expand–contract**. First expand: add the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping CI green batch to batch because the old form still exists. Finally contract: delete the old form once no caller remains, in a ticket blocked by every migrate batch. When even the batches can't stay green alone, keep the sequence but let them share an integration branch that all block a final integrate-and-verify ticket; green is promised only there.
 
-### 4. Publish slices
+### 4. Record slices
 
-Publish each slice with `bash <lar-build>/shared/scripts/slice.sh <owner/repo> <build> "<title>" <body-file>`. Follow **Slices** in `<lar-build>/shared/issue-tracker/slices.md`, including Azure slices for Azure DevOps. Set blockers only through native links. Chain slices touching the same file.
+Record each slice with `bash <lar-build>/shared/scripts/slice.sh <build work ID> "<title>" <body-file> [--blocked-by <slice work ID>]...`, per **Slices** in `<lar-build>/shared/issue-tracker/slices.md`. Chain slices touching the same file.
 
-Each body contains What to build, Acceptance criteria and Where to look. Include useful file paths there. For edits to skills, AGENTS.md or CLAUDE.md, require `<lar-build>/shared/write-agent-docs.md`. Do not quiz the user, configure a tracker or apply ready-for-agent. Do not close or modify the build.
+Each body contains What to build, Acceptance criteria and Where to look. Include useful file paths there. For edits to skills, AGENTS.md or CLAUDE.md, require `<lar-build>/shared/write-agent-docs.md`. The build's own record stays as it is; ask the user nothing.

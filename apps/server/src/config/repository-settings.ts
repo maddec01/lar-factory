@@ -4,9 +4,9 @@
 
 import { join } from 'node:path';
 import {
-  CONFIG_VERSION, REPOSITORY_OPERATIONS, SHARED_SETTINGS, SHOW_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
+  CONFIG_VERSION, REPOSITORY_OPERATIONS, SHARED_SETTINGS, isRecord, onAzure, sameRepo, type DomainDocLocation, type OperationAccess,
   type LocalSetupAnswers, type RepositoryConfigProblem, type RepositoryItemSource, type RepositoryOperation, type RepositorySetup, type SharedRepositorySettings,
-  type SharedSetting, type ShowSetting,
+  type SharedSetting,
 } from '@lar-factory/shared';
 import { REPOSITORY_LIST_FILE, boardDataDir } from '@lar-factory/shared/data-dir';
 import { problemOf } from '../azure/azure-items.ts';
@@ -54,18 +54,20 @@ function sharedProblemOf(raw: Record<string, unknown>, azure: boolean): string |
   if ('itemSource' in raw && (!isItemSource(source) || source.kind !== (azure ? 'azure-board' : 'issues'))) {
     return azure ? 'field itemSource must name the Azure DevOps team whose board the board reads' : 'field itemSource must be {"kind": "issues"}';
   }
-  if ('show' in raw && !SHOW_SETTINGS.includes(raw.show as ShowSetting)) return 'field show must be "all" or "opted-in"';
   if ('labels' in raw && !isStrings(raw.labels)) return 'field labels must be an array of strings';
   if ('domainDocs' in raw && !isDomainDocs(raw.domainDocs)) return 'field domainDocs must be {"kind": "private"} or name the repository\'s glossary and adrs paths';
   if ('skills' in raw && !isStrings(raw.skills)) return 'field skills must be an array of strings';
   return null;
 }
 
-/** The shared settings `raw` holds, every field optional, leaving out anything else, such as credentials or consent. */
+/**
+ * The shared settings `raw` holds, every field optional, leaving out anything else, such as credentials, consent or
+ * the old `show` setting.
+ */
 function sharedSettingsOf(raw: Record<string, unknown>): SharedRepositorySettings {
-  const { role, itemSource, show, labels, domainDocs, skills } = raw as SharedRepositorySettings;
+  const { role, itemSource, labels, domainDocs, skills } = raw as SharedRepositorySettings;
   return {
-    ...role !== undefined && { role }, ...itemSource !== undefined && { itemSource }, ...show !== undefined && { show },
+    ...role !== undefined && { role }, ...itemSource !== undefined && { itemSource },
     ...labels !== undefined && { labels }, ...domainDocs !== undefined && { domainDocs }, ...skills !== undefined && { skills },
   };
 }
@@ -112,7 +114,7 @@ function setupOf(repo: string, local: LocalSettings): RepositorySetup {
   const changed = (key: PausingSetting, now: unknown) => local.accepted !== undefined && JSON.stringify(local.accepted[key]) !== JSON.stringify(now);
   return {
     repo, ...local.projectId !== undefined && { projectId: local.projectId },
-    role: pick('role') ?? '', itemSource, show: pick('show') ?? 'all', labels: pick('labels') ?? [], domainDocs, skills: pick('skills') ?? [],
+    role: pick('role') ?? '', itemSource, labels: pick('labels') ?? [], domainDocs, skills: pick('skills') ?? [],
     access: Object.fromEntries(REPOSITORY_OPERATIONS.map((op) => [op, accessOf(op)])) as RepositorySetup['access'],
     consent: (local.consent ?? []).filter((op) => accessOf(op) !== 'refused'),
     paused: (['itemSource', 'domainDocs'] as const).filter((key) => changed(key, key === 'itemSource' ? itemSource : domainDocs)),
@@ -326,13 +328,13 @@ export async function readOnboardedConfigs(list: readonly OnboardedRepository[],
   const problems: RepositoryConfigProblem[] = [];
   for (const [index, { repo }] of onboarded.entries()) {
     const setup = setups.find((s) => sameRepo(s.repo, repo))!;
-    const { role, itemSource, show, labels, sharedProblem } = setup;
+    const { role, itemSource, labels, sharedProblem } = setup;
     if (!itemSource) {
       problems.push({ repo, problem: sharedProblem ?? 'no setting names the Azure DevOps team whose backlog and current sprint the board reads.' });
       continue;
     }
     if (sharedProblem) problems.push({ repo, kind: 'shared-config', problem: sharedProblem });
-    configs.push({ repo, version: reads[index]!.version, role, itemSource, show, labels });
+    configs.push({ repo, version: reads[index]!.version, role, itemSource, labels });
     onBoard.push(setup);
   }
   const guidance: RepositoryConfigProblem[] = [];

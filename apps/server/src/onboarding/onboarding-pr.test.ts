@@ -192,7 +192,7 @@ test('a body without the repository and its edits, or with edits or picks that d
   assert.deepEqual(await open({ repo: 'lar-web', edits: guidance }), refused);
   assert.deepEqual(await open({ repo: 'maddec01/lar-web', edits: { drop: ['labels'] } }), refused);
   assert.deepEqual(await open({ repo: 'maddec01/lar-web', edits: { drop: [], guidance: 'yes' } }), refused);
-  assert.deepEqual(await open({ repo: 'maddec01/lar-web', edits: { drop: [], config: { show: 'some' } } }), refused);
+  assert.deepEqual(await open({ repo: 'maddec01/lar-web', edits: { drop: [], config: { labels: 'area' } } }), refused);
   assert.deepEqual(await open({ repo: 'maddec01/lar-web', edits: guidance, picks: { clashes: [{ ...pushRule, line: undefined }], skills: {} } }), refused);
   assert.deepEqual(await open({ repo: 'maddec01/lar-web', edits: guidance, picks: { clashes: [], skills: { '.claude/skills/x/': { kind: 'rename', name: '../x' } } } }), refused);
   // Only the fixed checks delete or rename, and only CONTEXT.md and .scratch/.

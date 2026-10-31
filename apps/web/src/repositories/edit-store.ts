@@ -12,7 +12,6 @@ import { postAction, receive } from '../items/card-actions.ts';
 export interface Drafts {
   role: string;
   team: string;
-  show: string;
   labels: string;
   skills: string;
   /** `private` or `repository`. */
@@ -23,13 +22,13 @@ export interface Drafts {
 
 /** The fields that make each setting's value. */
 const FIELDS: Record<SharedSetting, (keyof Drafts)[]> = {
-  role: ['role'], itemSource: ['team'], show: ['show'], labels: ['labels'], skills: ['skills'], domainDocs: ['domainDocs', 'glossary', 'adrs'],
+  role: ['role'], itemSource: ['team'], labels: ['labels'], skills: ['skills'], domainDocs: ['domainDocs', 'glossary', 'adrs'],
 };
 
 /** The fields' text for the setup's values; a repository's own domain docs start at the usual paths. */
 function draftsOf(setup: RepositorySetup): Drafts {
   const docs = setup.domainDocs.kind === 'repository' ? setup.domainDocs : { kind: 'private', glossary: 'GLOSSARY.md', adrs: 'docs/adr' };
-  return { role: setup.role, team: setup.itemSource?.kind === 'azure-board' ? setup.itemSource.team : '', show: setup.show,
+  return { role: setup.role, team: setup.itemSource?.kind === 'azure-board' ? setup.itemSource.team : '',
     labels: setup.labels.join(', '), skills: setup.skills.join(', '), domainDocs: docs.kind, glossary: docs.glossary, adrs: docs.adrs };
 }
 
@@ -43,7 +42,6 @@ export function valueOf(key: SharedSetting, drafts: Drafts): SharedRepositorySet
   switch (key) {
     case 'role': return drafts.role.trim();
     case 'itemSource': return drafts.team.trim() ? { kind: 'azure-board', team: drafts.team.trim() } : null;
-    case 'show': return drafts.show as SharedRepositorySettings['show'];
     case 'labels': return list(drafts.labels);
     case 'skills': return list(drafts.skills);
     case 'domainDocs':

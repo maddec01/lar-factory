@@ -37,10 +37,10 @@ const setupOf = (dir: string, repo = REPO) => readRepositorySetups(dir).find((s)
 test('a repository with no Repository config and no local settings works from the defaults', async (t) => {
   const dir = await dataDir(t, [REPO, AZURE]);
   assert.deepEqual(setupOf(dir), {
-    repo: REPO, role: '', itemSource: { kind: 'issues' }, show: 'all', labels: [], domainDocs: { kind: 'private' }, skills: [],
+    repo: REPO, role: '', itemSource: { kind: 'issues' }, labels: [], domainDocs: { kind: 'private' }, skills: [],
     access: { 'push-branch': 'unverified', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified' },
     consent: [], paused: [], shared: {},
-    sources: { role: 'default', itemSource: 'default', show: 'default', labels: 'default', domainDocs: 'default', skills: 'default' },
+    sources: { role: 'default', itemSource: 'default', labels: 'default', domainDocs: 'default', skills: 'default' },
   });
   // An Azure DevOps repository has no item source until a team is named.
   assert.equal(setupOf(dir, AZURE).itemSource, null);
@@ -64,7 +64,7 @@ test("each setting names where it comes from, and the setup keeps Repository con
   applySharedDefaults(REPO, { defaults: { role: 'Apple app', labels: ['area'] } }, dir);
   setOverride(REPO, 'role', 'My Apple client', dir);
   const { sources, shared } = setupOf(dir);
-  assert.deepEqual(sources, { role: 'local', itemSource: 'default', show: 'default', labels: 'shared', domainDocs: 'default', skills: 'default' });
+  assert.deepEqual(sources, { role: 'local', itemSource: 'default', labels: 'shared', domainDocs: 'default', skills: 'default' });
   assert.deepEqual(shared, { role: 'Apple app', labels: ['area'] });
   setOverride(REPO, 'role', undefined, dir);
   assert.equal(setupOf(dir).sources.role, 'shared');
@@ -127,12 +127,12 @@ test('Repository config never supplies credentials or consent', () => {
 
 test('a Repository config with every field optional reads its shared defaults, and a wrong field is a problem', () => {
   assert.deepEqual(sharedDefaultsOf({}, false), { defaults: {} });
-  assert.deepEqual(sharedDefaultsOf({ version: 1, role: 'API', itemSource: { kind: 'azure-board', team: 'Team' }, show: 'opted-in', labels: ['area'],
+  assert.deepEqual(sharedDefaultsOf({ version: 1, role: 'API', itemSource: { kind: 'azure-board', team: 'Team' }, show: 'some', labels: ['area'],
     domainDocs: { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' }, skills: ['tdd'] }, true), { defaults: {
-    role: 'API', itemSource: { kind: 'azure-board', team: 'Team' }, show: 'opted-in', labels: ['area'],
+    role: 'API', itemSource: { kind: 'azure-board', team: 'Team' }, labels: ['area'],
     domainDocs: { kind: 'repository', glossary: 'GLOSSARY.md', adrs: 'docs/adr' }, skills: ['tdd'] } });
   for (const [raw, azure] of [[{ role: 3 }, false], [{ itemSource: { kind: 'issues' } }, true], [{ itemSource: { kind: 'azure-board' } }, true],
-    [{ show: 'some' }, false], [{ labels: 'area' }, false], [{ domainDocs: { kind: 'repository' } }, false], [{ skills: [1] }, false]] as const) {
+    [{ labels: 'area' }, false], [{ domainDocs: { kind: 'repository' } }, false], [{ skills: [1] }, false]] as const) {
     assert.ok('problem' in sharedDefaultsOf(raw, azure), JSON.stringify(raw));
   }
 });
@@ -165,8 +165,8 @@ test('a repository with no .lar-factory.json is on the board from its local sett
   const gh = ghWith({ 'maddec01/lar-factory': { version: 1, role: 'The factory', show: 'opted-in', labels: ['area'] } });
   const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), gh, dir);
   assert.deepEqual(configs, [
-    { repo: 'maddec01/missing', version: 1, role: '', itemSource: { kind: 'issues' }, show: 'all', labels: [] },
-    { repo: 'maddec01/lar-factory', version: 1, role: 'The factory', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['area'] },
+    { repo: 'maddec01/missing', version: 1, role: '', itemSource: { kind: 'issues' }, labels: [] },
+    { repo: 'maddec01/lar-factory', version: 1, role: 'The factory', itemSource: { kind: 'issues' }, labels: ['area'] },
   ]);
   assert.deepEqual(problems, []);
 });
@@ -174,7 +174,7 @@ test('a repository with no .lar-factory.json is on the board from its local sett
 test('a wrong .lar-factory.json keeps the last usable setup on the board and says why', async (t) => {
   const dir = await dataDir(t, ['maddec01/lar-factory']);
   await readOnboardedConfigs(readRepositoryList(dir), ghWith({ 'maddec01/lar-factory': { role: 'The factory' } }), dir);
-  for (const [file, problem] of [['{ broken', ".lar-factory.json isn't valid JSON."], [{ show: 'some' }, '.lar-factory.json field show must be "all" or "opted-in".']] as const) {
+  for (const [file, problem] of [['{ broken', ".lar-factory.json isn't valid JSON."], [{ labels: 'area' }, '.lar-factory.json field labels must be an array of strings.']] as const) {
     const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), ghWith({ 'maddec01/lar-factory': file }), dir);
     assert.deepEqual(configs.map((c) => c.role), ['The factory']);
     assert.deepEqual(problems, [{ repo: 'maddec01/lar-factory', kind: 'shared-config', problem }]);
@@ -311,9 +311,11 @@ test("Settings' changes refuse a setting Repository config can't share, a value 
   const dir = await dataDir(t, [REPO, { repo: 'maddec01/lar-web', onboarding: progress }]);
   assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'override', key: 'consent', value: ['open-pr'] }, dir),
     { status: 400, error: 'Send a setting Repository config can share.' });
-  assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'override', key: 'show', value: 'some' }, dir),
-    { status: 400, error: `${REPO}: field show must be "all" or "opted-in".` });
+  assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'override', key: 'show', value: 'all' }, dir),
+    { status: 400, error: 'Send a setting Repository config can share.' }, 'the old show setting is gone');
+  assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'override', key: 'labels', value: 'area' }, dir),
+    { status: 400, error: `${REPO}: field labels must be an array of strings.` });
   assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'fly' }, dir), { status: 400, error: 'Send the repository and the change to its settings.' });
   assert.deepEqual(changeRepositorySettings({ repo: 'maddec01/lar-web', change: 'recheck' }, dir), { status: 409, error: 'maddec01/lar-web is still onboarding.' });
-  assert.equal(setupOf(dir).sources.show, 'default');
+  assert.equal(setupOf(dir).sources.labels, 'default');
 });

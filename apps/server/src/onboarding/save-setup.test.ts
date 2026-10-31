@@ -29,11 +29,11 @@ test("saving onboarding's answers puts the repository on the board with them as 
   assert.deepEqual(await saveSetup({ repo: 'maddec01/lar-web', ...ANSWERS }, dir, reads()), { onboarding: [] });
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web' }]);
   assert.deepEqual(readRepositorySetups(dir), [{
-    repo: 'maddec01/lar-web', projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, show: 'all', labels: [],
+    repo: 'maddec01/lar-web', projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, labels: [],
     domainDocs: { kind: 'private' }, skills: ['web-review'],
     access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused' },
     consent: ['push-branch', 'open-pr'], paused: [], shared: {},
-    sources: { role: 'local', itemSource: 'local', show: 'default', labels: 'default', domainDocs: 'local', skills: 'local' },
+    sources: { role: 'local', itemSource: 'local', labels: 'default', domainDocs: 'local', skills: 'local' },
   }]);
 });
 

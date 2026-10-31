@@ -11,7 +11,7 @@
 // asks "Discard changes?" first.
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { HINTS, itemRepos, onAzure, openBlockers, itemName, sameRepo, shortAgo } from '@lar-factory/shared';
+import { HINTS, onAzure, openBlockers, itemName, repoKey, sameRepo, shortAgo } from '@lar-factory/shared';
 import type { BoardData, Item } from '@lar-factory/shared';
 import type { ItemDetailsRead } from './use-item-details.ts';
 import { Button } from '@lar-factory/ui/design-system/Button';
@@ -103,7 +103,7 @@ function ItemDialogContent({ item, data, now, read, edit, expanded, toggleExpand
       </>}>
       <div className="@container grid shrink-0 gap-1 border-b border-base-300 px-5 pb-3 text-xs text-base-700 sm:px-6" data-item-summary>
         <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-          {itemRepos(item).map((repo) => <RepoTag key={repo} repo={repo} repos={data.repos} />)}
+          <RepoTag repo={repoKey(item)} repos={data.repos} />
           <StatusGlyph status={item.status} /> <span className="font-medium text-base-content">{item.status}</span>
           <span className="min-w-0 truncate @max-[30rem]:hidden">· updated {shortAgo(item.updatedAt, now)}</span>
           {openBlockers(item).length > 0 && <span className="rounded bg-(--error-surface) px-1.5 text-(--error-foreground)">blocked by {openBlockers(item).length}</span>}

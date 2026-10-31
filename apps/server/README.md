@@ -137,7 +137,6 @@ branch. Its fields:
   `{ "kind": "azure-board", "team": "<team>" }` on Azure DevOps. The Azure board
   combines the team's open backlog and current sprint, with each item once. It keeps
   completed sprint work and reads the backlog alone when no sprint is current.
-- `show`: `"all"`, the default, or `"opted-in"`.
 - `labels`: an array of strings, empty by default.
 - `domainDocs`: `{ "kind": "private" }`, the default, for private drafts on this Mac,
   or `{ "kind": "repository", "glossary": "<path>", "adrs": "<path>" }`.

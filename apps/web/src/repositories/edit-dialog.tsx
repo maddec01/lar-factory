@@ -19,7 +19,6 @@ import { canSave, shownDrafts, useEditStore, type Drafts } from './edit-store.ts
 import { kind } from '../buttons/button-kinds.tsx';
 
 const SOURCES: Record<SettingSource, string> = { local: 'Set on this Mac', shared: 'Shared default', default: 'Factory default' };
-const SHOWN = { all: 'All items', 'opted-in': 'Items with a status' } as const;
 const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: 'Refused', unverified: 'Not checked yet' };
 
 const OPERATIONS = (azure: boolean): Partial<Record<RepositoryOperation, string>> => ({
@@ -27,10 +26,10 @@ const OPERATIONS = (azure: boolean): Partial<Record<RepositoryOperation, string>
 });
 
 /** A setting's value as the dialog names it. */
-function shown<K extends SharedSetting>(key: K, value: SharedRepositorySettings[K]): string {
+function shown<K extends SharedSetting>(value: SharedRepositorySettings[K]): string {
   const v = value as SharedRepositorySettings[SharedSetting];
   if (Array.isArray(v)) return v.length ? v.join(', ') : 'none';
-  if (typeof v === 'string') return key === 'show' ? SHOWN[v as keyof typeof SHOWN] : v || 'none';
+  if (typeof v === 'string') return v || 'none';
   if (v?.kind === 'azure-board') return `${v.team}'s backlog and current sprint`;
   if (v?.kind === 'repository') return `${v.glossary} and ${v.adrs}`;
   return v?.kind === 'private' ? 'Private drafts on this Mac' : "This repository's GitHub issues";
@@ -49,7 +48,7 @@ function Setting({ repo, setup, name, hint, settingKey, children }: {
       <span className="flex flex-wrap items-center gap-2 text-sm font-medium">{name}<Badge data-source tone={source === 'local' ? 'accent' : 'neutral'}>{SOURCES[source]}</Badge></span>
       {hint && <p className="m-0 text-xs text-base-700">{hint}</p>}
       {children}
-      {source === 'local' && shared !== undefined && <p data-shared className="m-0 text-xs text-base-700">Shared default: {shown(settingKey, shared)}</p>}
+      {source === 'local' && shared !== undefined && <p data-shared className="m-0 text-xs text-base-700">Shared default: {shown(shared)}</p>}
       {editable && <span className="flex flex-wrap gap-2">
         <Button {...kind('other')} disabled={running !== null || !canSave(settingKey, setup, typed)} loading={running === settingKey}
           onClick={() => void save(repo, settingKey, setup)}>Save</Button>
@@ -74,12 +73,6 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
       </Setting>
       <Setting repo={repo} setup={setup} settingKey="itemSource" name="Work to read">
         {azure ? text('team', 'Team') : <p className="m-0 text-xs text-base-700">This repository's GitHub issues.</p>}
-      </Setting>
-      <Setting repo={repo} setup={setup} settingKey="show" name="Show">
-        <NativeSelect aria-label="Show" value={drafts.show} disabled={running !== null} onChange={(e) => type('show', e.target.value)}>
-          <option value="all">{SHOWN.all}</option>
-          <option value="opted-in">{SHOWN['opted-in']}</option>
-        </NativeSelect>
       </Setting>
       <Setting repo={repo} setup={setup} settingKey="labels" name={azure ? 'Custom tags' : 'Custom labels'} hint="Separate them with commas.">
         {text('labels', azure ? 'Custom tags' : 'Custom labels', 'area: server, area: web')}

@@ -100,7 +100,7 @@ test("the config update PR rewrites only .lar-factory.json with the default bran
   assert.deepEqual(await openConfigUpdatePr({ repo: REPO }, run, 2), { prUrl: PR });
   const [tree, commit, branch, pr, ...rest] = writes(calls);
   assert.deepEqual(field(tree!, 'tree[][path]'), ['.lar-factory.json']);
-  assert.equal(field(tree!, 'tree[][content]')[0], `${JSON.stringify({ version: 2, role: 'Web client', itemSource: { kind: 'issues' }, show: 'all', labels: ['app: music'] }, null, 2)}\n`);
+  assert.equal(field(tree!, 'tree[][content]')[0], `${JSON.stringify({ version: 2, role: 'Web client', itemSource: { kind: 'issues' }, labels: ['app: music'] }, null, 2)}\n`);
   assert.deepEqual(field(commit!, 'parents[]'), ['abc123']);
   assert.deepEqual(field(branch!, 'ref'), ['refs/heads/lar-factory/edit-config']);
   assert.deepEqual(pr!.slice(0, 8), ['pr', 'create', '-R', REPO, '--base', 'main', '--head', 'lar-factory/edit-config']);
@@ -113,7 +113,7 @@ test("the config update PR joins an open Edit PR, rewriting its branch's values,
   assert.deepEqual(await openConfigUpdatePr({ repo: REPO }, run, 4), { prUrl: PR });
   const [tree, commit, moved, ...rest] = writes(calls);
   assert.deepEqual(JSON.parse(field(tree!, 'tree[][content]')[0]!),
-    { version: 4, role: 'Web client on the PR', itemSource: { kind: 'issues' }, show: 'opted-in', labels: ['app: video'] });
+    { version: 4, role: 'Web client on the PR', itemSource: { kind: 'issues' }, labels: ['app: video'] }, 'the old show setting is dropped');
   assert.deepEqual(field(commit!, 'parents[]'), ['old']);
   assert.equal(moved![1], `repos/${REPO}/git/refs/heads/lar-factory/edit-config`);
   assert.deepEqual(rest, []);
@@ -162,7 +162,8 @@ const created = (calls: string[][]) => calls.filter((args) => args.slice(0, 3).j
 test("on Azure, the config update PR rewrites .lar-factory.json at the app's version through one push and az's PR, which the row shows", async () => {
   const az = azRepos();
   assert.deepEqual(await openUpdate({ repo: AZURE }, az.run, 4, AZURE_LISTED), { prUrl: `${REPO_URL}/pullrequest/100` });
-  assert.deepEqual(pushedFile(az.pushes[0]!), { ...JSON.parse(AZURE_FILE), version: 4 });
+  const { show: _, ...kept } = JSON.parse(AZURE_FILE) as Record<string, unknown>;
+  assert.deepEqual(pushedFile(az.pushes[0]!), { ...kept, version: 4 }, 'the old show setting is dropped');
   assert.equal(created(az.calls)[0]!.includes('--transition-work-items'), true);
   assert.deepEqual(await readEditPrs([AZURE], azRepos({ open: true }).run), new Map([[AZURE, AZURE_PR]]));
 });

@@ -41,7 +41,7 @@ const reply = (held: Map<string, (response: Response) => void>, itemId: string, 
 const azureItem = (): [BoardData, string] => {
   const id = 'azure:contoso/310';
   const item: Item = { ...sample.items[0]!, id, number: 310, repo: 'contoso/Fabrikam/web', url: 'https://dev.azure.com/contoso/Fabrikam/_workitems/edit/310', labels: ['bug'] };
-  return [{ ...sample, repos: [...sample.repos, { repo: item.repo!, role: 'Web client', items: 'azure-board', team: 'Web', show: 'all', labels: [] }], items: [item, ...sample.items.slice(1)] }, id];
+  return [{ ...sample, repos: [...sample.repos, { repo: item.repo!, role: 'Web client', items: 'azure-board', team: 'Web', labels: [] }], items: [item, ...sample.items.slice(1)] }, id];
 };
 
 test('while the details load the dialog shows the board data and a loading state, then the issue as GitHub shows it', async () => {

@@ -54,8 +54,10 @@ test('existing domain docs, factory files, shared config and project skills are 
 
 test('a shared config that is wrong is detected with its problem', async () => {
   assert.deepEqual((await detect({ '.lar-factory.json': '{' })).sharedConfig, { found: { problem: ".lar-factory.json isn't valid JSON." } });
-  assert.deepEqual((await detect({ '.lar-factory.json': '{"show": "some"}' })).sharedConfig,
-    { found: { problem: '.lar-factory.json field show must be "all" or "opted-in".' } });
+  assert.deepEqual((await detect({ '.lar-factory.json': '{"labels": "area"}' })).sharedConfig,
+    { found: { problem: '.lar-factory.json field labels must be an array of strings.' } });
+  assert.deepEqual((await detect({ '.lar-factory.json': '{"role": "API", "show": "some"}' })).sharedConfig,
+    { found: { defaults: { role: 'API' } } }, 'the old show setting is ignored, whatever its value');
 });
 
 test('an Agent skills section in a file CLAUDE.md links to is found once, at the file it links to', async () => {

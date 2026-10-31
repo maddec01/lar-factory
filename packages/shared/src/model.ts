@@ -344,8 +344,6 @@ export interface RepoConfig {
   items?: ItemSourceKind;
   /** The Azure DevOps team whose backlog and current sprint its item source is; absent for the other item sources. */
   team?: string;
-  /** Its show setting: every open item its item source lists, the default, or only the items that carry a status. */
-  show?: ShowSetting;
   /** Its custom labels, the `labels` in its .lar-factory.json, which Add item offers and the queue shows. */
   labels: string[];
   /** The URL of its open Edit PR, the open PR from lar-factory/edit-config, as the latest read found it; absent when it has none. */
@@ -380,10 +378,6 @@ export interface BundledSkill {
   /** A skill's state in the install manifest; absent for a checklist, and before the first install that records it. */
   status?: SkillStatus;
 }
-
-export const SHOW_SETTINGS = ['all', 'opted-in'] as const;
-
-export type ShowSetting = (typeof SHOW_SETTINGS)[number];
 
 /**
  * Why a repository needs attention: with no kind, it is off the board; `shared-config` keeps its last usable setup
@@ -691,13 +685,8 @@ export const stillReading = (data: Pick<BoardData, 'firstRead'>, repo: string): 
 export const inRepo = (item: Pick<Item, 'repo' | 'untaggedFor'>, repo: string): boolean =>
   sameRepo(repoKey(item), repo) || Boolean(item.untaggedFor?.some((r) => sameRepo(r, repo)));
 
-/** The repositories an item shows as its own: every one an untagged Azure work item that several read is for, else its own. */
-export const itemRepos = (item: Pick<Item, 'repo' | 'untaggedFor'>): string[] =>
-  (item.untaggedFor && item.untaggedFor.length > 1 ? [...item.untaggedFor] : [repoKey(item)]);
-
-/** The names of the item's repositories as the board shows them, such as `web or api` for an untagged item both read. */
-export const itemRepoNames = (item: Pick<Item, 'repo' | 'untaggedFor'>, repos: readonly RepoConfig[]): string =>
-  itemRepos(item).map((r) => repoName(r, repos)).join(' or ');
+/** The name of the item's repository as the board shows it. */
+export const itemRepoNames = (item: Pick<Item, 'repo'>, repos: readonly RepoConfig[]): string => repoName(repoKey(item), repos);
 
 /** Whether a repository is on Azure DevOps: organization/project/repository, not GitHub's owner/name. */
 export const onAzure = (repo: string): boolean => repo.split('/').length === 3;
@@ -800,7 +789,6 @@ export interface SharedRepositorySettings {
   /** Repository role: what this repository is to the others. */
   role?: string;
   itemSource?: RepositoryItemSource;
-  show?: ShowSetting;
   labels?: string[];
   domainDocs?: DomainDocLocation;
   /** The project skills the user selected as coding guidance for builds. */
@@ -808,7 +796,7 @@ export interface SharedRepositorySettings {
 }
 
 /** The settings Repository config may share, in the order Settings lists them. */
-export const SHARED_SETTINGS = ['role', 'itemSource', 'show', 'labels', 'domainDocs', 'skills'] as const satisfies readonly (keyof SharedRepositorySettings)[];
+export const SHARED_SETTINGS = ['role', 'itemSource', 'labels', 'domainDocs', 'skills'] as const satisfies readonly (keyof SharedRepositorySettings)[];
 
 export type SharedSetting = (typeof SHARED_SETTINGS)[number];
 
@@ -840,7 +828,6 @@ export interface RepositorySetup {
   role: string;
   /** Null for an Azure DevOps repository whose team no setting names yet. */
   itemSource: RepositoryItemSource | null;
-  show: ShowSetting;
   labels: string[];
   domainDocs: DomainDocLocation;
   skills: string[];
@@ -860,7 +847,6 @@ export interface RepositorySetup {
 /** The Repository config's values onboarding asks for, which a reused .lar-factory.json answers instead. */
 export interface RepositoryConfigAnswers {
   itemSource: RepositoryItemSource;
-  show: ShowSetting;
   role: string;
   /** Its custom labels: the file's `labels`, or those the Labels step picked. */
   labels: string[];
@@ -873,8 +859,8 @@ export interface RepositoryConfigAnswers {
 export const CONFIG_VERSION = 1;
 
 /** The .lar-factory.json that onboarding's PR adds and Edit's PR writes, at CONFIG_VERSION unless a test names another. */
-export const onboardingConfigFile = ({ role, itemSource, show, labels }: RepositoryConfigAnswers, version = CONFIG_VERSION): string =>
-  `${JSON.stringify({ version, role, itemSource, show, labels }, null, 2)}\n`;
+export const onboardingConfigFile = ({ role, itemSource, labels }: RepositoryConfigAnswers, version = CONFIG_VERSION): string =>
+  `${JSON.stringify({ version, role, itemSource, labels }, null, 2)}\n`;
 
 /**
  * What the setup step has answered so far, as typed. Only Azure DevOps asks for a team.
@@ -883,9 +869,6 @@ export interface SetupAnswers {
   itemSource: RepositoryItemSource['kind'];
   /** The Azure DevOps team whose backlog and current sprint the board reads. */
   team?: string;
-  show: ShowSetting;
-  /** Whether the show setting was picked, so a new item source no longer changes it to the one suggested. */
-  showPicked: boolean;
   role: string;
 }
 
@@ -988,7 +971,7 @@ export const SETUP_CHECKS = ['checkout', 'source', 'push'] as const;
 export type SetupCheckId = (typeof SETUP_CHECKS)[number];
 
 /** A setup check's result: what it found, or the problem with its fix and the command that fixes it, when one does. */
-export type SetupCheckResult = { passed: true; detail: string; counts?: Record<ShowSetting, number> } | { passed: false; problem: string; fix: string; command?: string };
+export type SetupCheckResult = { passed: true; detail: string } | { passed: false; problem: string; fix: string; command?: string };
 
 /** A fact onboarding's detection found, or why the login's access kept it from finding it. */
 export type Detected<T> = { found: T } | { refused: string };

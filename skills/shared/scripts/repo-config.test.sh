@@ -174,11 +174,11 @@ rm "$list_file"
 
 file maddec01/lar-factory '{"role":"factory"}'
 run maddec01/lar-factory
-check "fills in the defaults" '{"version":1,"role":"factory","itemSource":{"kind":"issues"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
+check "fills in the defaults" '{"version":1,"role":"factory","itemSource":{"kind":"issues"},"labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
 
 file maddec01/lar-server '{"version":1,"role":"server","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"private"},"skills":[]}'
 run maddec01/lar-server
-check "keeps the fields the file sets" '{"version":1,"role":"server","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"private"},"skills":[]}'
+check "keeps the fields the file sets" '{"version":1,"role":"server","itemSource":{"kind":"issues"},"labels":["area-api"],"domainDocs":{"kind":"private"},"skills":[]}'
 
 run maddec01/lar-apple
 refuses "a repository with neither local settings nor .lar-factory.json says it isn't onboarded" "maddec01/lar-apple isn't onboarded on this Mac and has no .lar-factory.json on its default branch"
@@ -201,7 +201,7 @@ refuses "an unknown item source kind asks for onboarding" "maddec01/broken has a
 
 file maddec01/broken '{"role":"factory","show":"some"}'
 run maddec01/broken
-refuses "a show other than all or opted-in names show" "maddec01/broken: .lar-factory.json field show"
+check "ignores the old show setting, whatever its value" '{"version":1,"role":"factory","itemSource":{"kind":"issues"},"labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
 
 file maddec01/broken '{"role":"factory","labels":"area-api"}'
 run maddec01/broken
@@ -213,14 +213,14 @@ refuses "a version that isn't a number names version" "maddec01/broken: .lar-fac
 
 # A repository whose .lar-factory.json can't be used falls back to the last usable copy the board kept, and says why.
 echo '{"repositories":[{"repo":"maddec01/broken","settings":{"shared":{"role":"kept","show":"opted-in"},"overrides":{"labels":["web"]}}}]}' >"$list_file"
-kept='{"version":1,"role":"kept","itemSource":{"kind":"issues"},"show":"opted-in","labels":["web"],"domainDocs":{"kind":"private"},"skills":[]}'
+kept='{"version":1,"role":"kept","itemSource":{"kind":"issues"},"labels":["web"],"domainDocs":{"kind":"private"},"skills":[]}'
 file maddec01/broken '{"role": '
 run maddec01/broken
 falls_back "a file that doesn't parse falls back to the last usable copy, saying why" "$kept" \
     "maddec01/broken: .lar-factory.json isn't valid JSON. Using the last usable copy on this Mac."
-file maddec01/broken '{"role":"factory","show":"some"}'
+file maddec01/broken '{"role":"factory","labels":"area-api"}'
 run maddec01/broken
-falls_back "a file with a wrong field falls back to the last usable copy, naming the field" "$kept" "maddec01/broken: .lar-factory.json field show"
+falls_back "a file with a wrong field falls back to the last usable copy, naming the field" "$kept" "maddec01/broken: .lar-factory.json field labels"
 FAKE_LOGGED_OUT=1 run maddec01/broken
 refuses "with gh logged out, there is no fallback" "gh auth login"
 rm "$list_file"
@@ -243,7 +243,7 @@ refuses "no argument shows the usage" "usage: repo-config.sh"
 
 sprint='{"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all"}'
 file contoso/Fabrikam/web "$sprint"
-want='{"version":1,"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
+want='{"version":1,"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
 for origin in https://dev.azure.com/contoso/Fabrikam/_git/web https://contoso@dev.azure.com/contoso/Fabrikam/_git/web \
     git@ssh.dev.azure.com:v3/contoso/Fabrikam/web https://contoso.visualstudio.com/Fabrikam/_git/web contoso/Fabrikam/web; do
     : >"$FAKE_AZ_LOG"
@@ -258,11 +258,11 @@ check "passes a percent-encoded project name to az as its name" "$want"
 
 file contoso/Fabrikam/api '{"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"opted-in","labels":["area-api"]}'
 run contoso/Fabrikam/api
-check "keeps a combined Azure board source" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"private"},"skills":[]}'
+check "keeps a combined Azure board source" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"labels":["area-api"],"domainDocs":{"kind":"private"},"skills":[]}'
 
 file contoso/Fabrikam/board '{"role":"api","itemSource":{"kind":"azure-board","team":"API"}}'
 run contoso/Fabrikam/board
-check "reads the combined Azure board" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
+check "reads the combined Azure board" '{"version":1,"role":"api","itemSource":{"kind":"azure-board","team":"API"},"labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
 
 run contoso/Fabrikam/missing
 refuses "an Azure repository with neither local settings nor a file says it isn't onboarded" "contoso/Fabrikam/missing isn't onboarded on this Mac and has no .lar-factory.json on its default branch"
@@ -299,7 +299,7 @@ refuses "without the azure-devops extension, says to add it" "az extension add -
 echo '{"repositories":[{"repo":"contoso/Fabrikam/web","settings":{"shared":{"role":"kept","itemSource":{"kind":"azure-board","team":"Web Team"}}}}]}' >"$list_file"
 FAKE_LOGGED_OUT=1 run contoso/Fabrikam/web
 falls_back "with az logged out, an Azure repository falls back to the last usable copy, saying to run az login" \
-    '{"version":1,"role":"kept","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}' \
+    '{"version":1,"role":"kept","itemSource":{"kind":"azure-board","team":"Web Team"},"labels":[],"domainDocs":{"kind":"private"},"skills":[]}' \
     "az is logged out. Run az login"
 rm "$list_file"
 
@@ -320,17 +320,17 @@ done
 # Local overrides over optional shared defaults
 
 rm -rf "$FAKE_FILES"
-echo '{"repositories":[{"repo":"maddec01/no-files","settings":{"projectId":"p1","overrides":{"role":"app","show":"opted-in"}}}]}' >"$list_file"
+echo '{"repositories":[{"repo":"maddec01/no-files","settings":{"projectId":"p1","overrides":{"role":"app","show":"opted-in","skills":["web"]}}}]}' >"$list_file"
 run maddec01/no-files
-check "a repository with local overrides and no .lar-factory.json works from them" '{"version":1,"role":"app","itemSource":{"kind":"issues"},"show":"opted-in","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
+check "a repository with local overrides and no .lar-factory.json works from them" '{"version":1,"role":"app","itemSource":{"kind":"issues"},"labels":[],"domainDocs":{"kind":"private"},"skills":["web"]}'
 
 file maddec01/no-files '{"role":"shared role","show":"all","labels":["area-api"],"skills":["tdd"],"domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"}}'
 run maddec01/no-files
-check "each local override replaces its shared default, and the rest inherit" '{"version":1,"role":"app","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"},"skills":["tdd"]}'
+check "each local override replaces its shared default, and the rest inherit" '{"version":1,"role":"app","itemSource":{"kind":"issues"},"labels":["area-api"],"domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"},"skills":["web"]}'
 
-echo '{"repositories":[{"repo":"maddec01/no-files","settings":{"overrides":{"show":"opted-in"}}}]}' >"$list_file"
+echo '{"repositories":[{"repo":"maddec01/no-files","settings":{"overrides":{"skills":["web"]}}}]}' >"$list_file"
 run maddec01/no-files
-check "removing a local override inherits the shared default again" '{"version":1,"role":"shared role","itemSource":{"kind":"issues"},"show":"opted-in","labels":["area-api"],"domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"},"skills":["tdd"]}'
+check "removing a local override inherits the shared default again" '{"version":1,"role":"shared role","itemSource":{"kind":"issues"},"labels":["area-api"],"domainDocs":{"kind":"repository","glossary":"GLOSSARY.md","adrs":"docs/adr"},"skills":["web"]}'
 
 rm -rf "$FAKE_FILES"
 run maddec01/no-files
@@ -342,7 +342,7 @@ refuses "a bad local override names the settings file and the field" "maddec01/n
 
 echo '{"repositories":[{"repo":"contoso/Fabrikam/local","settings":{"overrides":{"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"}}}}]}' >"$list_file"
 run https://dev.azure.com/contoso/Fabrikam/_git/local
-check "an Azure repository with local overrides and no file works from them" '{"version":1,"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"show":"all","labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
+check "an Azure repository with local overrides and no file works from them" '{"version":1,"role":"web","itemSource":{"kind":"azure-board","team":"Web Team"},"labels":[],"domainDocs":{"kind":"private"},"skills":[]}'
 
 echo '{"repositories": [' >"$list_file"
 file maddec01/lar-factory '{"role":"factory"}'

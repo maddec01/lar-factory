@@ -17,7 +17,7 @@ function gh(files: Record<string, 'file' | 'none' | 'fails'>) {
 test("each repository's answer is read once and kept until the checks clear", async () => {
   const { run, asked } = gh({ 'maddec01/lar-web': 'file', 'maddec01/lar-server': 'none' });
   const checks = createConfigChecks(run, () => {});
-  const web = { hasConfig: true, config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: ['app: music'] } };
+  const web = { hasConfig: true, config: { itemSource: { kind: 'issues' }, role: 'Web client', labels: ['app: music'] } };
   assert.deepEqual(await Promise.all([checks.configOf('maddec01/lar-web'), checks.configOf('maddec01/lar-server'), checks.configOf('Maddec01/Lar-Web')]),
     [web, { hasConfig: false }, web]);
   assert.deepEqual(await Promise.all([checks.configOf('maddec01/lar-web'), checks.configOf('maddec01/lar-server')]), [web, { hasConfig: false }]);

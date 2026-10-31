@@ -48,10 +48,10 @@ test('each T3 project shows its provider, whether its repository has .lar-factor
   const folder = (name: string) => join(home, 'Developer/lar', name);
   assert.deepEqual(choices, [
     { id: 'lar-web', name: 'lar-web', folder: folder('lar-web'), repo: 'maddec01/lar-web', provider: 'GitHub', hasConfig: true, onBoard: false,
-      config: { itemSource: { kind: 'issues' }, show: 'all', role: 'Web client', labels: [] } },
+      config: { itemSource: { kind: 'issues' }, role: 'Web client', labels: [] } },
     { id: 'lar-server', name: 'lar-server', folder: folder('lar-server'), repo: 'maddec01/lar-server', provider: 'GitHub', hasConfig: false, onBoard: true },
     { id: 'lar-api', name: 'lar-api', folder: folder('lar-api'), repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps', hasConfig: true, onBoard: false,
-      config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, show: 'all', role: 'API server', labels: [] } },
+      config: { itemSource: { kind: 'azure-board', team: 'Fabrikam Team' }, role: 'API server', labels: [] } },
     { id: 'lar-cli', name: 'lar-cli', folder: folder('lar-cli'), repo: 'maddec01/lar-cli', provider: 'GitHub', hasConfig: null, onBoard: false },
   ]);
 });

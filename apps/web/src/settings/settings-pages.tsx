@@ -107,15 +107,13 @@ const ITEM_SOURCES = { issues: 'Issues', 'azure-board': 'Backlog and current spr
 const sourceName = (kind: keyof typeof ITEM_SOURCES, team?: string) =>
   kind === 'azure-board' && team ? `${team}'s backlog and current sprint` : ITEM_SOURCES[kind];
 
-const SHOWN = { all: 'All items', 'opted-in': 'Items with a status' } as const;
-
 /** A repository still onboarding: its provider and the step it stopped at. */
 function onboardingDescription(progress: OnboardingProgress): string {
   return [progress.answers.provider, `Onboarding, ${stoppedAt(progress)}`].filter(Boolean).join(' · ');
 }
 
 /**
- * Each repository on this Mac's list by its name: an onboarded one with its provider, item source and show setting,
+ * Each repository on this Mac's list by its name: an onboarded one with its provider and item source,
  * Edit, which opens Edit's dialog once the board has its setup, the notice of a changed setup that pauses work and the
  * config update notice while it has them; one still onboarding with what it has answered, the step it stopped at and
  * Resume. Add repository opens the onboarding dialog. The
@@ -123,7 +121,7 @@ function onboardingDescription(progress: OnboardingProgress): string {
  */
 function repositoryGroup(data: BoardData): Group {
   const onboarded: Row[] = data.repos.map((r) => ({
-    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)} · {SHOWN[r.show ?? 'all']}
+    id: `repo-${r.repo}`, title: shownRepo(r.repo), description: <>{itemSource(r) === 'azure-board' ? 'Azure DevOps' : 'GitHub'} · {sourceName(itemSource(r), r.team)}
       {r.editPr && <> · <a data-edit-pr className="underline" href={r.editPr} target="_blank" rel="noopener">Edit PR open</a></>}</>,
     below: <><SetupNotice repo={r} /><ConfigUpdateNotice repo={r} /></>,
     control: custom(() => r.setup ? <Button {...kind('other')} onClick={() => useEditStore.getState().open(r.repo)}>Edit</Button> : null),

@@ -1,46 +1,39 @@
 # Issue tracker: GitHub
 
-Issues and PRs for this repository live in its GitHub issues, and Lar Factory's
-board moves them through their Status. Use the `gh` CLI with the local login;
-it infers the repository from `git remote -v` when run inside a clone.
+This repository's tickets are its GitHub issues. Lar Factory reads them with
+the `gh` CLI and the local login, which infers the repository from
+`git remote -v` inside a clone. The factory's own progress lives in work
+records on the user's machine, so no step writes it to an issue.
 
-## Conventions
+## Reading issues
 
-- Create an issue: `gh issue create --title "..." --body-file <file> --label <kind>`,
-  where the kind is `bug`, `feature` or `improvement` (see `docs/agents/triage-labels.md`).
 - Read an issue: `gh issue view <number> --comments`.
-- List issues: `gh issue list --state open --json number,title,labels`.
-- Comment: `gh issue comment <number> --body-file <file>`.
-- Add or remove a label: `gh issue edit <number> --add-label <label>` or `--remove-label <label>`.
-- Close: `gh issue close <number> --reason completed`, or `--reason "not planned"`.
-- Make a sub-issue: `gh issue create --parent <number> ...`, or
-  `gh issue edit <parent> --add-sub-issue <child>` for an existing issue.
-- Mark a blocker: `gh issue edit <child> --add-blocked-by <blocker>`.
+- List open issues: `gh issue list --state open --json number,title,labels`.
 
-Sub-issues and blocked-by are GitHub's native relationships. A `Part of #n`
-mention creates neither.
+## Work records
 
-## Status
+Work reaches the board when the user captures it there or picks an issue there.
+Each piece of work has one record, named by its work ID, which holds its Status,
+structure, brief, map, decisions, slices and PR. A picked issue's text at pick
+time is the record's initial context. Refinement in the record is the
+authority, and later issue edits never change it.
 
-Each item has one Status: List, Queued, Shaping, Needs you, Ready, In progress,
-Review, Verify, Ready to merge or Done. It lives as one
-`status-<name>` label on the issue, such as `status-needs-you`. Move an item
-with the `lar-shape` skill's `shared/scripts/status.sh <issue-url> "<Status>"`. Closing
-an issue makes it Done. State lives in Status alone, so assignees and other
-labels stay free of it.
+Resolve a thread's argument, a work ID or an issue, with the lar skill's
+`shared/scripts/work.sh <ref>`. For an issue no record holds, it says to pick
+the issue on the board first. The lar skill's
+`shared/issue-tracker/work-records.md` covers picking, Status, structure and
+completion.
 
-## Concepts
-
-Work too broad or unclear for one issue is a `concept` issue: a map whose
-native sub-issues are decisions (`decision-grill`, `decision-prototype`,
-`decision-research`, `decision-task`) and builds (`build`). A build becomes
-one PR, and its slices are its sub-issues. The `lar-shape` and `lar-build` skills run this
-workflow; read it before shaping, slicing or building.
+A build delivers one standalone PR and needs no issue. Its recorded PR merging
+makes it Done.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue in this repository with `gh issue create`.
+Publishing work as issues arrives in a later Lar Factory release. Keep the work
+in its record and tell the user publishing isn't available yet.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh issue view <number> --comments`.
+Resolve the work with `shared/scripts/work.sh <ref>`, then read the record's
+initial context as `shared/issue-tracker/work-records.md` shows. For a picked
+issue, `gh issue view <number> --comments` shows its current text.

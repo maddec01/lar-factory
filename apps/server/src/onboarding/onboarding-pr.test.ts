@@ -578,10 +578,9 @@ test('Azure onboarding previews and commits provider-specific agent setup from t
   const content = (path: string) => az.pushes[0]!.changes.find((change) => change.path === path)!.content!;
   const tracker = content('/docs/agents/issue-tracker.md');
   assert.match(tracker, /Azure Boards work items/);
-  assert.ok(tracker.includes('az boards work-item show --id "$id" --expand all --organization "$org"'));
-  assert.ok(tracker.includes(String.raw`id=$(az boards work-item create --type "<requirement type>" --title "<title>" \
-  --project "$project" --organization "$org" --query id -o tsv)`));
-  assert.match(content('/docs/agents/triage-labels.md'), /System.Tags/);
+  assert.ok(tracker.includes('az boards work-item show --id <id> --expand all --organization <org>'));
+  assert.doesNotMatch(tracker, /work-item create/);
+  assert.match(content('/docs/agents/triage-labels.md'), /no factory tags/);
   assert.match(content('/AGENTS.md'), /Azure Boards work items/);
   for (const path of ['/AGENTS.md', '/docs/agents/issue-tracker.md', '/docs/agents/triage-labels.md', '/docs/agents/domain.md']) {
     assert.doesNotMatch(content(path), /GitHub|\bgh |[\u2013\u2014\u2018\u2019\u201c\u201d]/);

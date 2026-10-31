@@ -12,8 +12,15 @@ Look at the repository root:
   glossary, and the root `docs/adr/` holds decisions that span contexts.
 
 A root `CONTEXT.md` or `CONTEXT-MAP.md` is the glossary or map under its old
-name. When none of these exist, proceed silently; the domain documentation steps bundled in `lar-shape` and `lar-build`
-creates them when a term or decision settles.
+name. When none of these exist, proceed silently.
+
+## Where new terms and decisions go
+
+The lar skill's `shared/scripts/repo-config.sh <owner/repo>` prints the
+repository's `domainDocs`. With `"kind": "repository"`, `lar-shape` drafts new
+terms and decisions in the work record and `lar-build` writes them to the named
+glossary and ADR folder in the build PR. With `"kind": "private"`, the drafts
+stay in the work record and the build PR writes no domain docs.
 
 ## Before shaping or building
 
@@ -22,7 +29,7 @@ the work touches, and the ADRs for the area you change.
 
 ## Use the glossary's terms
 
-Write the glossary's terms in issue titles, briefs, test names and code, and
+Write the glossary's terms in work titles, briefs, test names and code, and
 reach past each term's _Avoid_ list to the term itself. A concept the glossary
 lacks is a sign the work coins a term: record it in the brief for `lar-build`.
 

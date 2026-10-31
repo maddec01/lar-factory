@@ -51,14 +51,10 @@ test('domain.md describes single-context and multi-context repositories', () => 
   for (const name of ['GLOSSARY.md', 'docs/adr/', 'GLOSSARY-MAP.md']) assert.ok(domain.includes(`\`${name}\``), name);
 });
 
-test("triage-labels.md lists every workflow label and maps Matt Pocock's triage roles", () => {
+test("triage-labels.md maps Matt Pocock's triage roles to work-record kinds and Statuses", () => {
   const labels = written({}).get('docs/agents/triage-labels.md')!;
-  for (const name of ['bug', 'feature', 'improvement', 'concept', 'decision-grill', 'decision-prototype', 'decision-research',
-    'decision-task', 'build', 'active', 'blocked']) {
-    assert.match(labels, new RegExp(`^\\| \`${name}\` \\|`, 'm'), name);
-  }
-  for (const [role, factory] of [['needs-triage', 'List'], ['needs-info', 'Needs you'], ['ready-for-human', 'Needs you'],
-    ['wontfix', 'not planned'], ['bug', '`bug`'], ['enhancement', '`feature` or `improvement`'], ['ready-for-agent', 'board']]) {
+  for (const [role, factory] of [['needs-triage', 'Status List'], ['needs-info', 'Status Needs you'], ['ready-for-human', 'Status Needs you'],
+    ['wontfix', 'Abandon'], ['bug', 'Kind `bug`'], ['enhancement', 'Kind `feature`.*`improvement`'], ['ready-for-agent', 'board']]) {
     assert.match(labels, new RegExp(`^\\| \`${role}\` \\| .*${factory}`, 'm'), role);
   }
 });
@@ -86,18 +82,17 @@ test('a file with no block has nothing to remove', () => {
   assert.equal(withoutAgentSkills('# lar-web\n\n### Agent skills\n'), null);
 });
 
-test('the Azure guide distinguishes factory child Tasks from slices and plain team Tasks', () => {
-  const guide = agentSetupWrites({}, 'Azure DevOps').find(({ path }) => path === 'docs/agents/issue-tracker.md')!.content;
-  assert.match(guide, /Its decisions and builds are child Tasks with `decision-\*` or `build` tags/);
-  assert.match(guide, /Tasks with `build`, `decision-\*`, `concept` or a valid `status-\*` tag appear on the board/);
-  assert.match(guide, /Slices carry only slice tags \(`active` or `blocked`\), with no factory Status/);
-});
-
 for (const provider of ['GitHub', 'Azure DevOps'] as const) {
   test(`${provider} guidance uses the two installed skills`, () => {
     const text = agentSetupWrites({}, provider).map(({ content }) => content).join('\n');
     assert.match(text, /lar-shape/);
     assert.match(text, /lar-build/);
     assert.doesNotMatch(text, /lar-work|domain-modeling|to-tickets/);
+  });
+
+  test(`${provider} guidance keeps factory progress off tickets`, () => {
+    const text = agentSetupWrites({}, provider).map(({ content }) => content).join('\n');
+    assert.match(text, /no step writes it to an? (issue|work item)/);
+    assert.doesNotMatch(text, /status-|retag|sub-issue|child Task|--add-label|slice\.sh|`(active|blocked|build|decision-\w+)`/);
   });
 }

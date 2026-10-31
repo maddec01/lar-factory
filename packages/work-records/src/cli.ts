@@ -11,6 +11,7 @@ import type { PublicationContent, PublicationOutcome, PublicationProposal, Statu
 import { exportMarkdown } from './export.ts';
 import { PublicationRefused } from './publication-providers.ts';
 import { PublicationConflict, publicationEngine, type PreparePublication, type ReconciliationSelection } from './publication-engine.ts';
+import { publicationPr } from './publication-pr.ts';
 import {
   openWorkRecords, readRetention, WorkRecordError, workRecordsPath, writeRetention, type Body, type BuildPhase, type FindingDisposition,
   type NewObservation, type NewReviewRound, type Observed, type ReviewAxis, type WorkKind, type WorkRecords,
@@ -121,6 +122,22 @@ Content
   review-rounds <work-id>           Print the build's review rounds.
 
 Publication
+  publication-pr-body <work-id> --file F
+                                    Return JSON with the complete Markdown PR body
+                                    in F plus this build's GitHub closing reference,
+                                    or unchanged text for Azure or ticketless work.
+  prepare-publication-pr <work-id>
+                                    After set-pr, preview GitHub body verification or
+                                    native Azure PR linking for this build's ticket.
+                                    Returns null for ticketless work. Replaces the
+                                    current plan; resolve uncertainty before retry.
+  inspect-publication-pr <work-id> --plan P
+  execute-publication-pr <work-id> --plan P --identity I
+  reconcile-publication-pr <work-id> --plan P --identity I
+                                    Use the same approval and outcome journal. Execute
+                                    resumes pending work only. Reconcile uncertain
+                                    links before any retry. Azure completion options
+                                    and State remain under native team control.
   prepare-publication <work-id> --file F
                                     Prepare an immutable publication preview. F is
                                     PreparePublication JSON: documents, optional
@@ -279,6 +296,7 @@ Errors
 class UsageError extends Error {}
 
 const TAKES_WORK_ID = ['read', 'context', 'update', 'attach-ticket', 'set-aside', 'restore', 'set-needs-you', 'clear-needs-you',
+  'publication-pr-body', 'prepare-publication-pr', 'inspect-publication-pr', 'execute-publication-pr', 'reconcile-publication-pr',
   'prepare-publication', 'inspect-publication', 'execute-publication', 'resume-publication', 'reconcile-publication', 'fallback-publication',
   'snapshot-skills', 'set-parent', 'clear-parent', 'add-blocker', 'remove-blocker', 'children', 'blockers', 'dependents', 'completion',
   'waiting-on', 'set-fog', 'finish', 'set-body', 'body', 'set-phase', 'set-pr', 'pr-history', 'record-review-round', 'set-disposition',
@@ -395,6 +413,16 @@ async function run(records: WorkRecords, command: string, workId: string | undef
     context: values.file === undefined ? undefined : readInput(values),
   });
   switch (command) {
+    case 'publication-pr-body':
+      return publicationPr(records).body(workId!, readInput(values));
+    case 'prepare-publication-pr':
+      return publicationPr(records, { dir: values['data-dir'] }).prepare(workId!);
+    case 'inspect-publication-pr':
+      return publicationPr(records, { dir: values['data-dir'] }).inspect(workId!, need(values, 'plan'));
+    case 'execute-publication-pr':
+      return publicationPr(records, { dir: values['data-dir'] }).execute(workId!, need(values, 'plan'), need(values, 'identity'));
+    case 'reconcile-publication-pr':
+      return publicationPr(records, { dir: values['data-dir'] }).reconcile(workId!, need(values, 'plan'), need(values, 'identity'));
     case 'prepare-publication':
       return publicationEngine(records, { dir: values['data-dir'] }).prepare(workId!, readJson(values) as PreparePublication);
     case 'inspect-publication':

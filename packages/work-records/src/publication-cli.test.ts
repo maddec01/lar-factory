@@ -25,6 +25,7 @@ else if (args.includes('POST') && path?.endsWith('/issues')) {
  process.stderr.write('Fixture lost the creation response.'); process.exitCode=1;
 } else if (path?.includes('/issues?')) emit([[JSON.parse(readFileSync(${JSON.stringify(state)},'utf8'))]]);
 else if (path?.endsWith('/issues/12')) emit(JSON.parse(readFileSync(${JSON.stringify(state)},'utf8')));
+else if (path?.endsWith('/pulls/5')) emit({body:'Find saved searches. Use prefixes because names are stable.\\n\\nCloses team/app#12\\n',base:{ref:'main',repo:{default_branch:'main'}}});
 else if (path==='repos/team/app') emit([{owner:{type:'Organization'}}]);
 else { process.stderr.write('Unexpected controlled call: '+args.join(' ')); process.exitCode=1; }
 `, { mode: 0o755 });
@@ -52,6 +53,15 @@ else { process.stderr.write('Unexpected controlled call: '+args.join(' ')); proc
     expect(await cli('resume-publication', ...args, '--identity', 'board')).toMatchObject({ successful: [`create:${work.workId}`], uncertain: [] });
     expect(readFileSync(writes, 'utf8').trim().split('\n')).toHaveLength(1);
     expect(records.read(work.workId)).toMatchObject({ status: 'List', buildPhase: null });
+    const current = await cli('read', work.workId);
+    await cli('set-pr', work.workId, '--revision', String(current.revision), '--pr', 'team/app#5');
+    writeFileSync(file, 'Find saved searches. Use prefixes because names are stable.');
+    expect(await cli('publication-pr-body', work.workId, '--file', file)).toMatchObject({ body: 'Find saved searches. Use prefixes because names are stable.\n\nCloses team/app#12\n' });
+    const delivery = await cli('prepare-publication-pr', work.workId);
+    expect(await cli('inspect-publication-pr', work.workId, '--plan', delivery.planId)).toMatchObject({ current: false });
+    await cli('approve-publication', work.workId, '--plan', delivery.planId, '--revision', String(delivery.revision), '--digest', delivery.digest, '--identity', 'person');
+    expect(await cli('execute-publication-pr', work.workId, '--plan', delivery.planId, '--identity', 'approver')).toMatchObject({ successful: [expect.any(String)], uncertain: [] });
+    expect(await cli('reconcile-publication-pr', work.workId, '--plan', delivery.planId, '--identity', 'person')).toMatchObject({ successful: [expect.any(String)], uncertain: [] });
   } finally { records.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 

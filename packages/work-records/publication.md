@@ -175,5 +175,42 @@ read cannot establish that a PR or publication is absent.
 Controlled-client tests cover both providers, including picked append, exact
 replacement, HTML and Repro Steps preservation, conflicts, notices, refusals,
 handovers, URL attachment and restart after lost body and comment responses.
-No live tracker writes were used. PR closing references remain for the delivery
-extension. Connections and external Dependencies remain outside this build.
+No live tracker writes were used. Connections and external Dependencies remain
+outside this build.
+
+## Delivery PR relationships
+
+`@lar-factory/work-records/publication-pr` exports `publicationPr(records,
+{ dir?, settings?, transport? })`. `body(workId, markdown)` returns the complete
+body plus `Closes <repository#number>` for GitHub. Ticketless and Azure bodies
+retain the complete outcome and reasons. Target lookup uses this build's
+picked ticket, publication attachment or primary published receipt, including
+receipts from a concept-owned plan. It never selects the concept's parent.
+
+After recording the PR, `prepare(workId)` previews its relationship in the
+existing journal as `pr-closing-reference`. GitHub verifies the closing line
+already delivered in the reviewed PR body and requires the default branch.
+Azure links the work item to the PR with
+[`az repos pr work-item add`](https://learn.microsoft.com/en-us/cli/azure/repos/pr/work-item?view=azure-cli-latest).
+It leaves native completion options unchanged. The team's
+[PR completion setting](https://learn.microsoft.com/en-us/azure/devops/repos/git/complete-pull-requests?view=azure-devops)
+decides whether the linked work item transitions when the user merges. No
+State write or completion-option update is part of this command. GitHub's
+[closing-reference contract](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)
+controls its ticket closure.
+
+`inspect`, `execute` and `reconcile` use the same immutable approvals, source
+checks, settings snapshots, claims and outcome commands as publication.
+Azure needs separate `relate-ticket` consent. Execute checks existing native
+links before adding one. A refusal records failure; a lost response or failed
+verification remains uncertain. Reconciliation confirms the relationship or
+keeps uncertainty for explicit user resolution. Retry needs a replacement and
+new approval. Repeated execution resumes pending work only.
+
+The installed command exposes `publication-pr-body`, `prepare-publication-pr`,
+`inspect-publication-pr`, `execute-publication-pr` and
+`reconcile-publication-pr`. Use ordinary `approve-publication` and outcome
+commands with their returned plans. No additional receipt store exists.
+Controlled tests cover both native completion settings, refusal, lost-response
+recovery, GitHub body generation and ticketless completeness. Local completion
+still comes from the recorded PR's merge observation.

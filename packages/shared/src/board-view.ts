@@ -1,7 +1,7 @@
 // What the board page shows, as data and plain text: its sections, each status's hint, a PR's link text, and what
 // Abandon asks.
 
-import { STATUSES, inRepo, isRecentlyDone, kindOf, onAzure, ref, repoKey, repoName, sameRepo } from './model.ts';
+import { STATUSES, inRepo, isRecentlyDone, onAzure, ref, repoKey, repoName, sameRepo } from './model.ts';
 import type { BoardData, Item, LinkedPr, Status } from './model.ts';
 import { slug } from './format.ts';
 
@@ -56,11 +56,11 @@ export function boardSections(data: BoardData, now: number): BoardSections {
   const listGroups = repos
     .map((repo) => ({ repo, name: repoName(repo, data.repos), id: listGroupId(repo), items: data.items.filter((i) => i.status === 'List' && inRepo(i, repo)) }))
     .sort((a, b) => b.items.length - a.items.length);
-  const notConcept = (i: Item) => kindOf(i) !== 'concept';
+  const notConcept = (i: Item) => i.kind !== 'concept';
   return {
     needsYou: inStatus('Ready', 'Needs you', 'Verify', 'Ready to merge').filter(notConcept),
     inFlight: inStatus('Shaping', 'Ready', 'In progress', 'Review').filter(notConcept),
-    concepts: items.filter((i) => kindOf(i) === 'concept' && i.status !== 'Done'),
+    concepts: items.filter((i) => i.kind === 'concept' && i.status !== 'Done'),
     queued: inStatus('Queued'),
     list,
     listGroups,
@@ -70,17 +70,10 @@ export function boardSections(data: BoardData, now: number): BoardSections {
   };
 }
 
-/** A concept's open sub-issues on the board, in flow order. */
+/** A concept's open child work on the board, in flow order. */
 export function conceptChildren(concept: Item, items: readonly Item[]): Item[] {
   return items
-    .filter(
-      (i) =>
-        i.parent &&
-        i.parent.repo === concept.repo &&
-        i.parent.number === concept.number &&
-        i.status !== 'Done' &&
-        i.state === 'open',
-    )
+    .filter((i) => i.parentId === concept.id && i.status !== 'Done' && i.state === 'open')
     .sort(byFlowOrder);
 }
 

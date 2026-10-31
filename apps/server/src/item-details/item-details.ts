@@ -49,14 +49,29 @@ function fromFile(file: string): ItemDetailsReader {
   };
 }
 
-/** The reader for the board: the file in sample mode, else the item's provider. */
-export function createItemDetails(sampleFile: string | null): ItemDetailsReader {
+const NO_TICKET: Refused = { status: 409, error: 'This work has no ticket the board has read.' };
+
+/**
+ * The reader for the board: the file in sample mode, else the provider of the ticket `ticketOf` finds for a board item,
+ * which reads and writes it by its node id. Work with no ticket has no details.
+ */
+export function createItemDetails(sampleFile: string | null, ticketOf: (item: Item) => Item | undefined): ItemDetailsReader {
   if (sampleFile) return fromFile(sampleFile);
   const azure = (item: Item) => Boolean(item.repo && onAzure(item.repo));
   return {
-    details: (item) => (azure(item) ? readAzureItemDetails(item) : readGithubItemDetails(item)),
-    olderComments: (item, before) => (azure(item) ? readAzureOlderComments(item, before) : readGithubOlderComments(item, before)),
-    async saveDescription(item, { body, bodyField, revision }) {
+    async details(work) {
+      const item = ticketOf(work);
+      if (!item) return NO_DETAILS;
+      return azure(item) ? readAzureItemDetails(item) : readGithubItemDetails(item);
+    },
+    async olderComments(work, before) {
+      const item = ticketOf(work);
+      if (!item) return NO_TICKET;
+      return azure(item) ? readAzureOlderComments(item, before) : readGithubOlderComments(item, before);
+    },
+    async saveDescription(work, { body, bodyField, revision }) {
+      const item = ticketOf(work);
+      if (!item) return NO_TICKET;
       if (!azure(item)) return saveGithubDescription(item, body);
       if (!bodyField || revision === undefined) return { status: 400, error: 'Send the field and revision the work item\'s details gave.' };
       return saveAzureDescription(item, { body, bodyField, revision });

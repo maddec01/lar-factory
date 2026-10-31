@@ -8,7 +8,7 @@ for (const [repo, detail, done] of [
   ['org/project/repo', 'This moves the work item to Removed in Azure DevOps. You can reactivate it in Azure DevOps.', 'Moved #7 Keep history to Removed.'],
 ]) {
   test(`Abandon explains how ${repo}'s item stays recoverable`, () => {
-    assert.deepEqual(abandonPrompt({ content: 'ticket', repo, number: 7, title: 'Keep history' } as Item), {
+    assert.deepEqual(abandonPrompt({ content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo, number: 7, title: 'Keep history' } as Item), {
       question: 'Abandon #7 Keep history?', detail, confirm: 'Abandon', done,
     });
   });

@@ -3,7 +3,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
+import { DONE_WINDOW_MS, STATUS_LABELS, buildSubIssueSearches, labelKind, normalizeItems, readBuilds, rawBuildPrs, rawDossiers, refKey, sliceLabelSearches, statusLabel } from '@lar-factory/shared';
 import type { CreationProgress, CreationResult, Item, ItemDraft, RawItem, RawLinkedPr, Searched, Status } from '@lar-factory/shared';
 import { createCooldown } from '../tools/cooldown.ts';
 import { runTool } from '../tools/run-tool.ts';
@@ -720,9 +720,9 @@ export async function createIssue(
     }
     const issue = progress.issue;
     progress.item = {
-      id: issue.node_id, status: 'List', statuses: ['List'], content: 'ticket', number: issue.number,
+      id: issue.node_id, revision: 0, status: 'List', statuses: ['List'], kind: labelKind(labels), content: 'ticket', number: issue.number,
       title: draft.title, url: issue.html_url, repo: draft.repo, labels, state: 'open', closedAs: null,
-      parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
+      parent: null, parentId: null, subIssues: { total: 0, completed: 0 }, blockers: [],
       updatedAt: issue.updated_at, closedAt: null, linkedPrs: [], slices: [],
     };
     return { item: progress.item, issueUrl: issue.html_url, error: null };

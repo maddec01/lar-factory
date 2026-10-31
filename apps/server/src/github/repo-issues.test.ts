@@ -6,7 +6,7 @@ import { repoIssues } from './repo-issues.ts';
 const REPO = 'maddec01/lar-apple';
 
 const item = (statuses: Status[]): Item => ({
-  id: 'I_7', status: statuses[0] ?? 'List', statuses, content: 'ticket', number: 7, title: 'Seek', url: `https://github.com/${REPO}/issues/7`,
+  id: 'I_7', status: statuses[0] ?? 'List', statuses, content: 'ticket', revision: 0, kind: 'issue', parentId: null, number: 7, title: 'Seek', url: `https://github.com/${REPO}/issues/7`,
   repo: REPO, labels: [], state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 }, blockers: [],
   updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [],
 });

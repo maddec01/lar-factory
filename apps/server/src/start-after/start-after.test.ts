@@ -11,7 +11,7 @@ const WEB = 'contoso/Fabrikam/web';
 const API = 'contoso/Fabrikam/api';
 
 const blocked = (blockerState: 'open' | 'closed'): Item => ({
-  id: 'azure:contoso/7', status: 'Queued', statuses: ['Queued'], content: 'ticket', number: 7, title: 'Item 7', url: null, repo: WEB,
+  id: 'azure:contoso/7', status: 'Queued', statuses: ['Queued'], content: 'ticket', revision: 0, kind: 'issue', parentId: null, number: 7, title: 'Item 7', url: null, repo: WEB,
   untaggedFor: [WEB, API], labels: [], state: 'open', closedAs: null, parent: null, subIssues: { total: 0, completed: 0 },
   blockers: [{ number: 6, repo: WEB, state: blockerState }], updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [],
 });

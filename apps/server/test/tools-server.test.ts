@@ -274,7 +274,7 @@ test('a slow az check holds up neither the page nor the GitHub read, and the Azu
   const azure = azureHome(t, true);
   const board = await startBoard(t, mixed, false, false, azure.env);
   const read = await until(board, (d) => d.fetchedAt !== null);
-  assert.deepEqual(read.items.map((i) => i.id), ['I_1'], 'the GitHub read finished');
+  assert.deepEqual(read.items.map((i) => i.id), [board.id(1)], 'the GitHub read finished');
   assert.equal(read.tools?.az, undefined, 'az still checks');
   assert.ok(read.toolProgress?.checking.includes('az'), 'az shows as checking');
   assert.deepEqual(read.toolProgress?.skipped, [], 'neither provider\'s tool is left out');
@@ -298,7 +298,7 @@ test('a slow gh check holds up no Azure DevOps read', async (t) => {
   writeFileSync(hold, '');
   const settled = await until(board, (d) => d.firstRead.settled);
   assert.equal(settled.tools?.gh?.result, 'ok');
-  assert.deepEqual(settled.items.map((i) => i.id), ['I_1']);
+  assert.deepEqual(settled.items.map((i) => i.id), [board.id(1)]);
 });
 
 test('a slow t3 or jq check holds up neither the page nor the read, and its notice shows once it lands', async (t) => {

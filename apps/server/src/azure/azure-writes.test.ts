@@ -133,7 +133,7 @@ test('a logged-out az shows its fix, and any other az error shows as it is', asy
   assert.equal(await changed.source.abandon(changed.item), 'Could not abandon work item 4. az devops invoke failed: TF26071: changed since you opened it');
 });
 
-const workItem = (number: number) => ({ id: `azure:contoso/${number}`, content: 'ticket', repo: REPO, number } as Item);
+const workItem = (number: number) => ({ id: `azure:contoso/${number}`, content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo: REPO, number } as Item);
 
 test('a saved description replaces the field the details read, as markdown, at 7.2-preview.3 and testing the rev read', async () => {
   const az = fakeAz({ items: ITEMS });

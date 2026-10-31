@@ -43,8 +43,8 @@ test('a read after the first never un-settles it', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(1, 'List')] });
   await settled(board);
   await fetch(`${board.url}/api/read`, { method: 'POST', headers: { Origin: board.url, 'Content-Type': 'application/json' }, body: '{}' });
-  await board.update({ items: [boardIssue(1, 'Ready')] });
-  await until(board, (d) => d.items[0]?.status === 'Ready');
+  await board.update({ items: [boardIssue(1, 'List', 'maddec01/lar-factory', ['bug'])] });
+  await until(board, (d) => d.items[0]?.labels.includes('bug') === true);
   assert.equal((await board.board() as BoardData).firstRead.settled, true);
 });
 
@@ -102,6 +102,6 @@ test("each repository's items show once its own read lands, while another reposi
   assert.equal(early.fetchedAt, null, 'the whole read has yet to land');
   assert.equal(early.error, null);
   const data = await settled(board);
-  assert.deepEqual(data.items.map((i) => [i.repo, i.number]), [[apple, 7], ['maddec01/lar-factory', 1]]);
+  assert.deepEqual(data.items.map((i) => [i.repo, i.number]).sort(), [[apple, 7], ['maddec01/lar-factory', 1]]);
   assert.deepEqual(data.firstRead, { step: 'finishing', running: [], settled: true });
 });

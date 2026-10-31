@@ -1,14 +1,14 @@
 // The commands the board's buttons send: add, queue, back to List, pick a status, start, start build and abandon.
-// The maps of commands in flight are private here, so every rule about which command
-// blocks which lives in this file.
+// Every Status move writes the item's work record, naming the revision the board read, and never its ticket. The maps of
+// commands in flight are private here, so every rule about which command blocks which lives in this file.
 
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isBuild, isDriftChoice, isOnboarding, pickRepoText, repoTag, startRepo, validateDraft, workMessage } from '@lar-factory/shared';
+import { WAITS_FOR_ONBOARDING, blockedText, buildBranch, buildMessage, canAbandon, carriesTwoStatuses, isDriftChoice, isOnboarding, pickRepoText, repoTag, startRepo, validateDraft, workMessage } from '@lar-factory/shared';
 import type { BoardData, CreationProgress, CreationResult, DriftChoice, Item, ItemDraft, ModelChoice, ModelGroup, RepoConfig, SkillCheckOutcome, StartResult, Status } from '@lar-factory/shared';
+import { WorkRecordError, type WorkRecords } from '@lar-factory/work-records';
 import type { BoardState } from '../board/board-state.ts';
 import { readRepositoryList } from '../config/repository-config.ts';
-import { issueLabels } from '../github/github.ts';
 import { installHome } from '../skills/bundled-skills.ts';
 import { repositoryProject } from '../t3/repository-project.ts';
 import type { RepositoryProject } from '../t3/repository-project.ts';
@@ -27,10 +27,10 @@ export interface ItemCommands {
   reconcileStarts(items: Item[]): Promise<void>;
   /** Creates the issue a submission describes, once per request ID. */
   capture(input: Record<string, unknown>): Promise<Reply>;
-  queue(itemId: string): Promise<Reply>;
-  backToList(itemId: string): Promise<Reply>;
-  /** Keeps one of the statuses an issue carrying more than one has, and drops the others: the one move such an issue allows. */
-  pickStatus(itemId: string, status: unknown): Promise<Reply>;
+  queue(itemId: string): Reply;
+  backToList(itemId: string): Reply;
+  /** Keeps one of the statuses an item carrying more than one has, and drops the others: the one move such an item allows. */
+  pickStatus(itemId: string, status: unknown): Reply;
   /**
    * Starts a T3 thread for a Queued item that nothing open blocks, once unless its recorded run stopped. An untagged Azure work
    * item is tagged first for `repo`, one of the repositories reading it, or for the only one that does.
@@ -38,7 +38,7 @@ export interface ItemCommands {
   start(itemId: string, model: unknown, repo?: unknown): Promise<Reply>;
   /**
    * Starts a Ready build's thread in a new worktree, or retries a confirmed stopped run, once nothing open blocks it, as
-   * lar-shape's step 5 does after Go: it adds the `build` label and moves a parent that isn't a build to In progress first.
+   * lar-shape's step 5 does after Go: it moves a parent record that isn't a build to In progress first.
    * Drift refuses it with the skills that changed until `drift` carries the User's DriftChoice.
    */
   startBuild(itemId: string, model: unknown, drift?: unknown): Promise<Reply>;
@@ -47,8 +47,12 @@ export interface ItemCommands {
 
 export interface ItemCommandsDeps {
   board: BoardState;
-  /** Where the commands write their changes. */
+  /** Where the commands write changes to tickets. */
   items: ItemSource;
+  /** Where the commands write Status moves; null in sample mode, which moves nothing. */
+  records: WorkRecords | null;
+  /** Shows the work records as they are now, after a write or a refused one, with `tickets` a source has yet to read. */
+  reread(tickets?: Item[]): void;
   /** The onboarded repositories as the last read found them, which Add item may create in. */
   repos(): RepoConfig[];
   /** Reads the model choices T3 offers now into the board data. */
@@ -113,7 +117,7 @@ async function currentRepositoryProject(repo: string): Promise<RepositoryProject
   return repositoryProject(repo, repos);
 }
 
-export function createItemCommands({ board, items, repos, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
+export function createItemCommands({ board, items, records, reread, repos, offerModelChoices, checkSkills, projectOf = currentRepositoryProject,
   showThread = lookupThread, startThread: startIn = startThread }: ItemCommandsDeps): ItemCommands {
   const retryBuilds = new Set<string>();
   const checks = new WeakMap<Promise<Start>, { pending: boolean; retryAt: number }>();
@@ -126,8 +130,6 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
   const buildStarts = new Map<string, Promise<Start>>();
   // Only settled starts can be retried; requests arriving during a retry share its pending result.
   const finishedStarts = new WeakMap<Promise<Start>, string>();
-  /** Status changes in flight by item id; Start and Abandon wait out a move, and a move waits out Abandon. */
-  const moving = new Set<string>();
   /** Deletes in flight by item id, so a second press waits for the first. */
   const abandoning = new Map<string, Promise<string | null>>();
 
@@ -139,29 +141,39 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
     const started = starts.has(itemId) || !!board.snapshot().started?.[itemId];
     if (started && action === 'back to List') return 'Start is running or has run for this item. Check its T3 thread before moving it back to List.';
     if (started && action === 'abandon') return 'Start is running or has run for this item. Check its T3 thread before abandoning it.';
-    if (moving.has(itemId) && action === 'start') return 'This item is moving back to List, so it can\'t start.';
-    if (moving.has(itemId) && action === 'abandon') return 'This item is being moved, so it can\'t be abandoned.';
     if (abandoning.has(itemId) && action !== 'abandon') return `This item is being abandoned, so it can't ${action === 'start' ? 'start' : 'move'}.`;
     return null;
   }
 
-  async function move(itemId: string, { action, from, to, refused }: Move): Promise<Reply> {
+  /**
+   * Moves the item's work record to `to` at the revision the board read: the error to show, null once it moved. A
+   * revision a thread moved past refuses and shows the record as it is now; any answer reads the records again.
+   */
+  function setStatus(item: Item, to: Status): { status: number; error: string } | null {
+    if (!records) return { status: 409, error: 'The board has no work records to move.' };
+    try {
+      records.update(item.id, item.revision, { status: to });
+      return null;
+    } catch (err) {
+      const refused = err instanceof WorkRecordError && (err.code === 'stale-revision' || err.code === 'not-found' || err.code === 'invalid');
+      return { status: refused ? 409 : 502, error: (err as Error).message };
+    } finally {
+      reread();
+    }
+  }
+
+  function move(itemId: string, { action, from, to, refused }: Move): Reply {
     const item = board.find(itemId);
     if (!item) return reply(404, { error: GONE });
     if (item.status === to) return withBoard(200, { error: null });
     if (item.status !== from) return reply(409, { error: refused(item.status) });
-    const refusal = items.statusRefusal(item);
-    if (refusal) return withBoard(409, { error: refusal });
     const busy = busyReason(itemId, action);
     if (busy) return withBoard(409, { error: busy });
-    moving.add(itemId);
-    const error = await items.setStatus(item, to).finally(() => moving.delete(itemId));
-    if (error) return withBoard(502, { error });
-    board.showChanged({ ...item, status: to, statuses: [to] });
-    return withBoard(200, { error: null });
+    const failed = setStatus(item, to);
+    return withBoard(failed?.status ?? 200, { error: failed?.error ?? null });
   }
 
-  async function pickStatus(itemId: string, status: unknown): Promise<Reply> {
+  function pickStatus(itemId: string, status: unknown): Reply {
     const item = board.find(itemId);
     if (!item) return reply(404, { error: GONE });
     if (!carriesTwoStatuses(item)) return withBoard(409, { error: 'Only an open item that carries more than one status has one to pick.' });
@@ -169,11 +181,8 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
     if (!picked) return withBoard(409, { error: `Pick one of the statuses this item carries: ${item.statuses.join(', ')}.` });
     const busy = busyReason(itemId, 'pick');
     if (busy) return withBoard(409, { error: busy });
-    moving.add(itemId);
-    const error = await items.setStatus(item, picked).finally(() => moving.delete(itemId));
-    if (error) return withBoard(502, { error });
-    board.showChanged({ ...item, status: picked, statuses: [picked] });
-    return withBoard(200, { error: null });
+    const failed = setStatus(item, picked);
+    return withBoard(failed?.status ?? 200, { error: failed?.error ?? null });
   }
 
   /**
@@ -236,32 +245,11 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
     return withBoard(refused ? 409 : result.error ? 502 : 200, result);
   }
 
-  /**
-   * Plans the move of the item's parent to In progress, unless it's a build or there already: null when there is
-   * nothing to move, the error or refusal to show, or the move, which returns its error or null. The parent moves
-   * through its own item source, so a source that refuses it does so here, before Start build writes anything.
-   */
-  async function parentInProgress({ parent }: Item): Promise<null | { error: string; refused?: true } | { move: () => Promise<string | null> }> {
-    if (!parent) return null;
-    const onBoard = board.snapshot().items.find((i) => i.number === parent.number &&
-      i.repo?.toLowerCase() === parent.repo.toLowerCase());
-    if (onBoard) {
-      if (isBuild(onBoard) || onBoard.status === 'In progress') return null;
-      const refusal = items.statusRefusal(onBoard);
-      if (refusal) return { error: refusal, refused: true };
-      return { move: async () => {
-        const error = await items.setStatus(onBoard, 'In progress');
-        if (!error) board.showChanged({ ...onBoard, status: 'In progress', statuses: ['In progress'] });
-        return error;
-      } };
-    }
-    // A parent off the board has no labels here, so GitHub says whether it's a build.
-    let labels: string[];
-    try { labels = await issueLabels(parent.repo, parent.number); }
-    catch (err) { return { error: `Could not read the labels of ${parent.repo}#${parent.number}. ${(err as Error).message}` }; }
-    if (isBuild({ labels })) return null;
-    const refusal = items.statusRefusal(parent);
-    return refusal ? { error: refusal, refused: true } : { move: () => items.setParentStatus(parent, 'In progress') };
+  /** Moves the item's parent record to In progress, unless it's a build or there already: the error to show, else null. */
+  function parentInProgress({ parentId }: Item): string | null {
+    const parent = parentId ? board.find(parentId) : undefined;
+    if (!parent || parent.kind === 'build' || parent.status === 'In progress') return null;
+    return setStatus(parent, 'In progress')?.error ?? null;
   }
 
   return {
@@ -328,8 +316,14 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
       const result = await entry.pending;
       entry.pending = undefined;
       if (result.item && !entry.published) {
-        board.showChanged(result.item);
         entry.published = true;
+        // Only recorded work is on the board, so the new ticket gets its work record, which a retry finds again.
+        if (records) {
+          const { item } = result;
+          const work = records.importTicket({ title: item.title, repository: item.repo, kind: item.kind, ticket: `${item.repo}#${item.number}` });
+          reread([item]);
+          result.item = board.find(work.record.workId) ?? null;
+        } else board.showChanged(result.item);
       }
       return withBoard(result.error ? 502 : 200, result);
     },
@@ -379,14 +373,7 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
         if (skills?.refusal) return { thread: null, error: skills.refusal, refused: true, ...skills.drift && { drift: skills.drift } };
         const repoProject = await projectOf(repo);
         if (repoProject.error !== undefined) return { thread: null, error: repoProject.error, refused: true };
-        const parent = await parentInProgress(item);
-        if (parent && 'error' in parent) return { thread: null, ...parent };
-        if (!item.labels.includes('build')) {
-          const error = await items.addLabel(item, 'build');
-          if (error) return { thread: null, error };
-          board.showChanged({ ...item, labels: [...item.labels, 'build'] });
-        }
-        const error = await parent?.move();
+        const error = parentInProgress(item);
         if (error) return { thread: null, error };
         return startIn(repoProject.projectId, message, choice, { base: 'main', branch });
       };
@@ -403,9 +390,14 @@ export function createItemCommands({ board, items, repos, offerModelChoices, che
         if (item.abandonRefusal) return reply(409, { error: item.abandonRefusal });
         const busy = busyReason(itemId, 'abandon');
         if (busy) return withBoard(409, { error: busy });
-        const work = items.abandon(item).then((error) => {
-          if (!error) board.remove(itemId);
-          return error;
+        // Work with no ticket has nothing to close; the record is set aside once its ticket closes.
+        const work = (!item.number ? Promise.resolve(null) : items.abandon(item)).then((error) => {
+          if (error) return error;
+          board.remove(itemId);
+          try { records?.setAside(item.id, item.revision); }
+          catch (err) { return (err as Error).message; }
+          finally { reread(); }
+          return null;
         });
         pending = track(abandoning, itemId, work);
       }

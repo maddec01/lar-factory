@@ -1,26 +1,58 @@
-import { test, vi } from 'vite-plus/test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, test, vi } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import type { BoardData, Item } from '@lar-factory/shared';
+import { openWorkRecords, type WorkRecords } from '@lar-factory/work-records';
 import { createBoardState } from '../board/board-state.ts';
 import { createItemCommands } from './item-commands.ts';
 import type { ItemSource } from './item-source.ts';
+import { recordItems } from './record-items.ts';
 
 const WEB = 'contoso/Fabrikam/web';
 const API = 'contoso/Fabrikam/api';
 
 const queued = (id: number, extra: Partial<Item> = {}): Item => ({
-  id: `azure:contoso/${id}`, status: 'Queued', statuses: ['Queued'], content: 'ticket', number: id, title: `Item ${id}`,
-  url: `https://dev.azure.com/contoso/Fabrikam/_workitems/edit/${id}`, repo: WEB, labels: [], state: 'open', closedAs: null, parent: null,
+  id: `azure:contoso/${id}`, revision: 1, status: 'Queued', statuses: ['Queued'], kind: 'issue', content: 'ticket', number: id, title: `Item ${id}`,
+  url: `https://dev.azure.com/contoso/Fabrikam/_workitems/edit/${id}`, repo: WEB, labels: [], state: 'open', closedAs: null, parent: null, parentId: null,
   subIssues: { total: 0, completed: 0 }, blockers: [], updatedAt: '2026-10-21T08:00:00Z', closedAt: null, linkedPrs: [], slices: [], ...extra,
 });
 
-/** Commands on a board holding `items`, whose source records each tag it writes and fails one when `failTag` is set. */
-function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<'live' | 'deleted' | 'unknown'>) {
+const opened: { records: WorkRecords; dir: string }[] = [];
+afterEach(() => {
+  for (const { records, dir } of opened.splice(0)) {
+    records.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+async function openRecords(): Promise<WorkRecords> {
+  const dir = mkdtempSync(join(tmpdir(), 'item-commands-'));
+  const records = await openWorkRecords(join(dir, 'work-records.db'));
+  opened.push({ records, dir });
+  return records;
+}
+
+/**
+ * Commands on a board holding `items`, whose source records each write it gets and fails a tag when `failTag` is set.
+ * Given `records`, the board shows their items and reads them again after each write.
+ */
+function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<'live' | 'deleted' | 'unknown'>, records?: WorkRecords) {
   const board = createBoardState({ items, repos: [], modelChoices: [] } as unknown as BoardData);
+  const reread = () => { if (records) board.update({ items: recordItems(records, [], [WEB]) }); };
+  reread();
   const log: string[] = [];
   const branches: (string | undefined)[] = [];
   const source = {
     statusRefusal: () => null,
+    setStatus: async (item: Item, status: string) => {
+      log.push(`status ${item.number} ${status}`);
+      return null;
+    },
+    setParentStatus: async (parent: Item, status: string) => {
+      log.push(`status ${parent.number} ${status}`);
+      return null;
+    },
     addLabel: async (item: Item, label: string) => {
       log.push(`tag ${item.number} ${label}`);
       return failTag ?? null;
@@ -30,7 +62,7 @@ function commandsOn(items: Item[], failTag?: string, showThread?: () => Promise<
       return null;
     },
   } as unknown as ItemSource;
-  const commands = createItemCommands({ board, items: source, repos: () => [], offerModelChoices: () => [],
+  const commands = createItemCommands({ board, items: source, records: records ?? null, reread, repos: () => [], offerModelChoices: () => [],
     showThread, projectOf: async (repo) => ({ projectId: repo }),
     startThread: async (project, message, _choice, worktree) => {
       branches.push(worktree?.branch);
@@ -159,3 +191,39 @@ for (const build of [false, true]) for (const outcome of ['live', 'deleted', 're
     } finally { vi.useRealTimers(); }
   });
 }
+
+test('Queue and Back to List move the work record and write nothing to its ticket', async () => {
+  const records = await openRecords();
+  const work = records.importTicket({ title: 'Work', repository: WEB, kind: 'bug', ticket: `${WEB}#7` }).record;
+  const { board, commands, log } = commandsOn([], undefined, undefined, records);
+  assert.equal((await commands.queue(work.workId)).status, 200);
+  assert.equal(records.read(work.workId).status, 'Queued');
+  assert.equal(board.find(work.workId)?.status, 'Queued', 'the board reads the record again at once');
+  assert.equal((await commands.backToList(work.workId)).status, 200);
+  assert.equal(records.read(work.workId).status, 'List');
+  assert.deepEqual(log, []);
+});
+
+test('a move on a record a thread changed since the board read it is refused, and the board reads it again', async () => {
+  const records = await openRecords();
+  const work = records.create({ title: 'Work', repository: WEB, kind: 'feature' });
+  const { board, commands } = commandsOn([], undefined, undefined, records);
+  records.update(work.workId, work.revision, { kind: 'bug' });
+  const refused = await commands.queue(work.workId);
+  assert.equal(refused.status, 409);
+  assert.match((refused.body as { error: string }).error, /read it again/);
+  assert.equal(records.read(work.workId).status, 'List');
+  assert.equal(board.find(work.workId)?.kind, 'bug');
+  assert.equal((await commands.queue(work.workId)).status, 200, 'the next move names the revision the board read again');
+});
+
+test("Start build moves the build's concept record to In progress and writes no ticket's status", async () => {
+  const records = await openRecords();
+  const concept = records.create({ title: 'Concept', repository: WEB, kind: 'concept', status: 'Shaping' });
+  const made = records.create({ title: 'Build', repository: WEB, kind: 'build', status: 'Ready' });
+  const build = records.setParent(made.workId, made.revision, concept.workId);
+  const { commands, log } = commandsOn([], undefined, undefined, records);
+  assert.equal((await commands.startBuild(build.workId, undefined)).status, 200);
+  assert.equal(records.read(concept.workId).status, 'In progress');
+  assert.ok(log.every((line) => !line.startsWith('status')), log.join('; '));
+});

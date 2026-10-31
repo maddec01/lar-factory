@@ -2,7 +2,7 @@
 // in the order they run. Each part's kind comes from its labels, what it waits on from its blocked-by issues, and its
 // thread is its newest item thread.
 
-import { blockerRef, decisionType, kindOf, openBlockers, refKey } from '@lar-factory/shared';
+import { blockerRef, decisionType, openBlockers, refKey } from '@lar-factory/shared';
 import type { Blocker, Item, ItemThread, Status, ThreadState } from '@lar-factory/shared';
 
 const PART_KINDS = ['research', 'grill', 'prototype', 'task', 'build'] as const;
@@ -31,7 +31,7 @@ const STARTED: Status[] = ['In progress', 'Review', 'Verify', 'Ready to merge', 
 
 const started = (item: Item) => STARTED.includes(item.status);
 export const isDone = (item: Item) => item.status === 'Done' || item.state === 'closed';
-const childOf = (child: Item, parent: Item) => child.parent?.number === parent.number && child.parent.repo === parent.repo;
+const childOf = (child: Item, parent: Item) => child.parentId === parent.id;
 export const threadsOf = (item: Item): ItemThread[] => (Array.isArray(item.threads) ? item.threads : []);
 
 /** `decision-grill`, `decision-prototype`, `decision-research` and `decision-task` are decisions; everything else builds. */
@@ -76,7 +76,7 @@ export const waitText = (item: Item, blockers: readonly Blocker[]) => blockers.m
 export function dossiersOf(items: readonly Item[], all: readonly Item[]): DossierItems[] {
   const shown = new Set(items.map((i) => i.id));
   return all.filter((p) => p.status !== 'List' && p.status !== 'Done'
-    && (kindOf(p) === 'concept' || all.some((c) => childOf(c, p))))
+    && (p.kind === 'concept' || all.some((c) => childOf(c, p))))
     .map((parent) => ({ parent, parts: partsOf(parent, all) }))
     .filter(({ parent, parts }) => shown.has(parent.id) || parts.some((p) => shown.has(p.item.id)));
 }

@@ -28,7 +28,7 @@ test('each onboarded repository reads its items from the item source its .lar-fa
   });
   const data = await until(board, (d) => d.fetchedAt !== null);
   assert.equal(data.error, null);
-  assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]), [[FACTORY, 1, 'Queued'], [FACTORY, 2, 'List'], [APPLE, 7, 'Queued']]);
+  assert.deepEqual(data.items.map((i) => [i.repo, i.number, i.status]), [[FACTORY, 1, 'Queued'], [APPLE, 7, 'Queued'], [FACTORY, 2, 'List']], 'Queued work comes first, in Queue order');
   assert.deepEqual(data.repos, [{ repo: FACTORY, role: 'The factory', items: 'issues', show: 'all', labels: [], version: 1 },
     { repo: APPLE, role: 'Apple client', items: 'issues', show: 'opted-in', labels: ['app: music'], version: 1 }]);
 });
@@ -78,13 +78,14 @@ test("a list that stops being valid JSON clears the repositories and notices of 
   assert.deepEqual([data.repos, data.repositoryConfigProblems], [[], []]);
 });
 
-test('a change to a .lar-factory.json shows on the next refresh', async (t) => {
+test('a change to a .lar-factory.json shows on the next refresh, and the board still shows only recorded work', async (t) => {
   const options = { repositories: [APPLE], repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: LAR, show: 'opted-in' } },
     items: [boardIssue(1, 'Queued', APPLE)], repoIssues: { [APPLE]: [appleIssue(7)] } };
   const board = await startBoard(t, options, false, true);
   await until(board, (d) => d.items.map((i) => i.number).join() === '1');
   await board.update({ ...options, repoConfigs: { [APPLE]: { role: 'Apple client', itemSource: { kind: 'issues' } } } });
-  const data: BoardData = await until(board, (d) => d.items.map((i) => i.number).join() === '7,1');
+  const data: BoardData = await until(board, (d) => d.repos[0]?.show === 'all');
+  assert.deepEqual(data.items.map((i) => i.number), [1], 'an issue with no work record stays off the board');
   assert.deepEqual(data.repos, [{ repo: APPLE, role: 'Apple client', items: 'issues', show: 'all', labels: [], version: 1 }]);
 });
 

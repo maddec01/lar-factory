@@ -32,6 +32,7 @@ const sample05 = sample.items.find((i) => i.id === 'I_sample05')!;
 const decision = (id: string, parent: number): Item => ({
   ...sample05, id, number: 300 + parent, title: `Decide under #${parent}`, labels: ['decision-grill'],
   parent: { number: parent, repo: sample05.repo!, title: 'Parent', url: 'https://github.com/x', state: 'open' },
+  parentId: sample.items.find((i) => i.number === parent)?.id ?? null,
 });
 
 beforeEach(() => localStorage.clear());

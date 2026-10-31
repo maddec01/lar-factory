@@ -112,17 +112,17 @@ test('saving a GitHub issue\'s description edits its body with gh, and its detai
   const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: issueNode } });
   await onboarded(board);
   await until(board, (d) => d.items.length === 1);
-  const response = await save(board, { itemId: 'I_12', body: '- a\n- b' });
+  const response = await save(board, { itemId: board.id(12), body: '- a\n- b' });
   assert.deepEqual([response.status, await response.json()], [200, { error: null }]);
   assert.ok((await board.calls()).some((args) => args[0] === 'issue' && args[1] === 'edit' && args.includes('--body-file')));
-  const read = await details(board, '?itemId=I_12');
+  const read = await details(board, `?itemId=${board.id(12)}`);
   assert.equal(((await read.json()) as { details: ItemDetails }).details.body, '- a\n- b');
 });
 
 test('a failed save answers gh\'s message', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: issueNode }, fail: 'body' });
   await until(board, (d) => d.items.length === 1);
-  const response = await save(board, { itemId: 'I_12', body: 'New.' });
+  const response = await save(board, { itemId: board.id(12), body: 'New.' });
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Could not save the description. gh issue edit failed: HTTP 403: Resource not accessible by integration' }]);
 });
 
@@ -131,7 +131,7 @@ test('a save for an item the board does not hold is 404, and one naming no item 
   await until(board, (d) => d.items.length === 1);
   const unknown = await save(board, { itemId: 'I_nope', body: 'x' });
   assert.deepEqual([unknown.status, await unknown.json()], [404, { error: 'That item is not on the board.' }]);
-  for (const body of [{ body: 'x' }, { itemId: 'I_12' }, { itemId: 'I_12', body: 5 }]) {
+  for (const body of [{ body: 'x' }, { itemId: board.id(12) }, { itemId: board.id(12), body: 5 }]) {
     const bad = await save(board, body);
     assert.deepEqual([bad.status, await bad.json()], [400, { error: 'Name the item and send its description.' }], JSON.stringify(body));
   }

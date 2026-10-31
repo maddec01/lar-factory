@@ -5,7 +5,7 @@ import { readAzureItemDetails, readAzureOlderComments } from './azure-details.ts
 import { fakeAz, type FakeComment, type WorkItem } from './fake-az.ts';
 
 const REPO = 'contoso/Fabrikam%20Fiber/lar-api';
-const item = (number: number): Item => ({ id: `azure:contoso/${number}`, content: 'ticket', repo: REPO, number } as Item);
+const item = (number: number): Item => ({ id: `azure:contoso/${number}`, content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo: REPO, number } as Item);
 const workItem = (extra: Partial<WorkItem> = {}): WorkItem => ({ id: 5, type: 'User Story', state: 'Active', createdBy: 'Ana Silva', assignedTo: 'Rui Costa',
   created: '2026-10-12T09:14:00Z', iteration: 'Fabrikam Fiber\\Sprint 12', ...extra });
 const comment = (id: number, extra: Partial<FakeComment> = {}): FakeComment => ({ id, by: 'Ana Silva', date: `2026-10-${10 + id}T08:00:00Z`, text: `Comment ${id}`, format: 'markdown', ...extra });
@@ -129,7 +129,7 @@ test('the oldest page answers no token', async () => {
 });
 
 test('older comments of a repository not on Azure DevOps, or of a failed az, answer the error', async () => {
-  assert.deepEqual(await readAzureOlderComments({ id: 'I_1', content: 'ticket', repo: 'maddec01/lar', number: 5 } as Item, '10', fakeAz({ items: [] }).run), { status: 404, error: 'That item is not an Azure DevOps work item.' });
+  assert.deepEqual(await readAzureOlderComments({ id: 'I_1', content: 'ticket', revision: 0, kind: 'issue', parentId: null, repo: 'maddec01/lar', number: 5 } as Item, '10', fakeAz({ items: [] }).run), { status: 404, error: 'That item is not an Azure DevOps work item.' });
   const failing = async () => { throw new Error('az exploded'); };
   assert.deepEqual(await readAzureOlderComments(item(5), '10', failing), { status: 502, error: 'az exploded' });
 });

@@ -3,7 +3,7 @@
 // Board view's in-flight cards and slice popover tests to the card.
 
 import { beforeEach, expect, test, vi } from 'vite-plus/test';
-import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, sample, settle, text, toast } from '../../test/support.ts';
+import { $, $$, answer, holdPosts, mountPage, posted, pressMenu, recorded, sample, settle, text, toast } from '../../test/support.ts';
 import { normalizeItems } from '@lar-factory/shared';
 import type { BoardData, Item, ItemThread, RawItem } from '@lar-factory/shared';
 import { rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
@@ -25,12 +25,12 @@ const entries = () => $$('[role="menu"] [role="menuitemradio"]');
 const dialog = () => $('[data-item-dialog]');
 const boardOf = (raws: RawItem[], keys: { active?: number[]; blocked?: number[] } = {}): BoardData => {
   const set = (numbers: number[] = []) => new Set(numbers.map((n) => `maddec01/lar-factory#${n}`));
-  return { ...sample, error: null, items: normalizeItems(raws, { active: set(keys.active), blocked: set(keys.blocked) }) };
+  return { ...sample, error: null, items: recorded(normalizeItems(raws, { active: set(keys.active), blocked: set(keys.blocked) })) };
 };
 const withItem = (id: string, change: Partial<Item>, data: BoardData = sample): BoardData =>
   ({ ...data, items: data.items.map((i) => (i.id === id ? { ...i, ...change } : i)) });
 /** The sample with #140 out of its concept's dossier, so it has a row in the table. */
-const loose = withItem('I_sample13', { parent: null });
+const loose = withItem('I_sample13', { parent: null, parentId: null });
 /** #140 with its blocker closed, so its Start build runs, on a board whose writes are on. */
 const unblocked = (data: BoardData = loose): BoardData => withItem('I_sample13', {
   blockers: [{ number: 202, repo: 'maddec01/lar-server', state: 'closed' }],

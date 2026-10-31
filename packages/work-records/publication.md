@@ -239,6 +239,9 @@ an `error` and HTTP 409. Text conflicts during preparation return the engine's
 are rejected while another request runs. The journal also guards claims shared
 with commands and other publications.
 
+A stored delivery PR plan uses the existing `publicationPr` engine for inspection,
+execution and reconciliation. It keeps the same board approval identity checks.
+
 The board mounts one `PublicationDialog`. Later append, update and recovery
 screens can open it through `usePublicationStore.open(workId)` and submit engine
 request fields through `request(action, extra)`. `request('prepare', ...)` returns

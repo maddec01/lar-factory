@@ -1,5 +1,0 @@
-# Confirm a deleted thread through the t3 CLI
-
-The board reads protocol observations for thread state, as described in [ADR 0035](0035-the-board-reads-t3-through-its-first-party-protocol.md), but confirms a thread is gone with the documented `t3 thread show` command before releasing a Start's protection against duplicate work. For a deleted or unknown thread, T3 exits 1 with `Thread <id> is no longer available.` and no stdout; a missing thread in an observation alone cannot distinguish deletion from a failed, late or unmatched read. [Issue #623](https://github.com/maddec01/lar-factory/issues/623) settled that only this answer releases the Start, while every other failure leaves its existence unknown and the Start held.
-
-[ADR 0035](0035-the-board-reads-t3-through-its-first-party-protocol.md) also uses documented CLI list/show evidence after uncertain launches. A unique exact first-user-message match recovers the existing thread; empty, ambiguous or failed reads retain duplicate protection.

@@ -3,7 +3,7 @@
 The copy record: every Copy in this package, where it came from, and the upstream
 commit it matches byte for byte. A Copy is never edited here; an update is a fresh
 copy from upstream and a diff, with its row's commit moved on. The build adapts to
-the Copies instead (`docs/adr/0027-copy-the-design-system-from-lar-server.md`).
+the Copies instead.
 
 | File | Source | Path | Commit |
 | ---- | ------ | ---- | ------ |

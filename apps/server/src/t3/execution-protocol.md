@@ -6,7 +6,7 @@ Server callers use `readExecution` for bounded thread-ID lookup and
 `readThreadFamily` reads active family shells. `subscribeExecutionShell` reads
 projects, active threads and archived threads. Consumers must check availability
 before treating a retained observation as current. Neither failure nor an empty
-family establishes deletion. ADR 0033 still governs deletion confirmation.
+family establishes deletion. Only `t3 thread show` confirms a deletion.
 
 The reference contract is pingdotgg/t3code 97e35bcf23e4dcf34c2dcffadd37c08db0e01e52,
 nightly 0.1.6-nightly.20261030.3917. This identifies the source used to implement
@@ -46,7 +46,7 @@ first user message no longer associates it. Onboarding title lookup uses the
 same completed observation. While T3 can't be read, each recorded thread shows
 its last observation with that observation's time, or unavailable once one was
 never seen. A recorded thread missing from a completed snapshot is left out
-until the T3 CLI confirms it deleted (docs/adr/0033). Stats use the same completed protocol observation.
+until the T3 CLI confirms it deleted. Stats use the same completed protocol observation.
 
 
 Stats coverage (#709): `execution-stats.ts` maps providerTurns to turn intervals,

@@ -324,7 +324,7 @@ const checksRunning = (item: Item, now: number) => item.linkedPrs.map((pr) => [p
     return now - (pr.checks.since ? Date.parse(pr.checks.since) : checksSeenAt.get(key)!) < SLOW_CHECKS_MS;
   });
 
-/** The idle pace: the list file's refreshSeconds, at least a minute, so a setting saved from before ADR 0028 spends no more. */
+/** The idle pace: the list file's refreshSeconds, at least a minute, so an older setting spends no more. */
 const idleMs = () => TEST_READ_MS || Math.max(60, settings.refreshSeconds) * 1000;
 
 /** The pace reads run at now: slow while gh's quota runs low. */

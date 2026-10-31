@@ -14,9 +14,7 @@ get skills only through a Release.
 
 A Copy is upstream text lar uses as is, kept unchanged inside the skill that
 loads it. A Port is a lar file rewritten from upstream text, which lar edits
-freely; its first line names its source. ADR 0031
-(`docs/adr/0031-lars-skills-carry-upstream-content-as-ports-or-copies.md`)
-sets the rule between them.
+freely; its first line names its source.
 
 Before writing anything, read `skills/shared/write-prose.md` in the checkout and follow its rules for all prose
 you write: chat, commit messages, the PR body, Port text and `UPSTREAM.md`. Apply them while
@@ -67,7 +65,7 @@ and copied files follow their own rules.
    - Ask whether they want to add a Copy or Port (source repo, path, commit;
      HEAD unless they name one) or drop one.
 4. Confirm each add and drop with the maintainer before step 5:
-   - **Add**: ask Copy or Port by ADR 0031's rule: text lar uses as is stays a
+   - **Add**: ask Copy or Port: text lar uses as is stays a
      Copy; text lar changes becomes a Port. Then run
      `bash <this skill>/scripts/preview-copy.sh <owner/repo> <path> [commit]`.
      It prints the source's HEAD, the commit to take, the files at the path,

@@ -82,8 +82,7 @@ alone does not establish that a capability is absent.
 Azure requires a mapped work item type, and tags cannot contain semicolons. New
 bodies use [Markdown's multilineFieldsFormat setting](https://devblogs.microsoft.com/devops/markdown-support-arrives-for-work-items/).
 Creation, reads and comments use `az devops invoke`. Only revision-checked work-item
-body and link PATCH use `az rest`, following
-[ADR 0029](../../docs/adr/0029-azure-calls-go-through-az-devops-invoke-and-only-a-work-item-patch-through-az-rest.md).
+body and link PATCH use `az rest`.
 That PATCH still depends on az login's default tenant; another-tenant organizations
 may refuse links despite successful reads and creation. Preview versions use bare
 `-preview` because invoke appends the server resource version. WIQL refusal or result

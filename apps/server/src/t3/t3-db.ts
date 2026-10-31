@@ -1,4 +1,4 @@
-// T3 Code's database, read-only (docs/adr/0005): every query the board runs on
+// T3 Code's database, read-only: every query the board runs on
 // T3's internal schema lives here, so a schema change touches one file. The Codex
 // turn selections follow pingdotgg/t3code main at f054d1b8018721bd997d99cbb918a7b17bf098a4:
 // apps/server/src/usage/CodexUsageHistory.ts.

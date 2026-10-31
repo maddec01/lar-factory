@@ -1,5 +1,0 @@
-# The board writes descriptions as Markdown
-
-The board's description editor reads and writes Markdown only, on GitHub and Azure DevOps. Editing an Azure work item whose description is HTML converts it to Markdown, and saving switches the field to Markdown for good, since Azure can't switch it back. One format keeps one editor and one save path. Formatting Markdown can't express, such as colours or merged table cells, is lost on that first save, and we accept the loss over keeping a second, HTML editor.
-
-Amended by [ADR 0042](0042-refinement-publishes-only-finished-work-in-the-teams-terms.md), built in [#695](https://github.com/maddec01/lar-factory/issues/695): appending published refinement preserves the author's existing description format and content, including Azure HTML. Publication cannot use the description editor's lossy Markdown conversion. If it cannot guarantee preservation, it explains the limit and offers an approved comment or markdown handover. This exception leaves the description editor's conversion rule in place for ordinary edits.

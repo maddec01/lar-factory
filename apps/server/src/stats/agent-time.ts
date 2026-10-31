@@ -1,5 +1,5 @@
 // An item's agent and wall time, counted from T3 Code's thread, turn, run and wait
-// rows (docs/adr/0005, 0008) of the threads its work record holds. Pure: t3/t3-db.ts reads the rows.
+// rows of the threads its work record holds. Pure: t3/t3-db.ts reads the rows.
 
 import type { ThreadRows, TurnRow } from '../t3/t3-db.ts';
 import { latestActivity } from '../threads/item-threads.ts';

@@ -5,7 +5,7 @@ import { boardProjects } from './board-projects.ts';
 import { readExecution, subscribeExecutionShell, type ShellRead, type ExecutionRead } from './execution-protocol.ts';
 import { serverRuntimePath, t3Running } from './t3-settings.ts';
 
-/** Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out (docs/adr/0005). */
+/** Each recorded thread's shell as T3 shows it, by thread ID. A thread T3 removed or deleted is left out. */
 export function executionItemThreads(shells: Record<string, unknown>[]) {
   const byId = new Map<string, ItemThread>();
   for (const shell of shells) {

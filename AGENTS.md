@@ -39,14 +39,6 @@ the flow and `docs/plan.md` for how it was set up.
   `bash skills/shared/scripts/status.test.sh` and
   `bash skills/shared/scripts/repo-config.test.sh`.
 - skill-sync script changes: run each `.agents/skills/skill-sync/scripts/*.test.sh` with `bash`.
-- Factory work and its Status live in work records on this machine, never on
-  issues or PRs. Move Status with `status.sh <work ID>`; a build's standalone PR
-  has no Status of its own.
-
-## Domain docs
-
-Single-context: one root `GLOSSARY.md` and `docs/adr/`. Read both before
-shaping or building; a build PR writes the brief's **Domain docs** to them.
 
 ## Worktree builds
 
@@ -65,16 +57,3 @@ reusing the download cache in `~/Library/Caches/electron`.
   also installs branches from before the workspace, with `board/` and `app/`. It
   leaves a `node_modules` made by npm alone; delete it to switch.
 - Setup changes: run `bash scripts/setup-worktree.test.sh`.
-
-## Agent skills
-
-Use `lar-shape` for shaping and decisions, and `lar-build` for builds.
-
-### Issue tracker
-GitHub issues in this repository, read by Lar Factory and picked into work records. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-No factory labels; an item's kind and Status live in its work record. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-A glossary and ADRs, single-context or multi-context. See `docs/agents/domain.md`.

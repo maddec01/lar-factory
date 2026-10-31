@@ -1,5 +1,5 @@
-// The model choices Start offers, from T3 Code's settings and model list, read-only
-// (docs/adr/0005). Only instance ids, display names, model slugs and model names
+// The model choices Start offers, from T3 Code's settings and model list, read-only.
+// Only instance ids, display names, model slugs and model names
 // leave this file: the settings may hold secrets. Which instances are enabled and
 // what they're called follow pingdotgg/t3code main at a68e6e97c501d265e1edccb47b96f8365c8e38f4:
 // resolveProviderInstanceEnabled in packages/contracts/src/settings.ts,

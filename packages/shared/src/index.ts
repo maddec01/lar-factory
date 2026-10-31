@@ -19,3 +19,7 @@ export * from './skill-check.ts';
 export * from './item-details.ts';
 export * from './publication.ts';
 export * from './vocabulary.ts';
+
+export * from './tracker-structure.ts';
+
+export * from './map-concurrent.ts';

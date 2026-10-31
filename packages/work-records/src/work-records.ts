@@ -9,6 +9,7 @@ import { openDatabase, WorkRecordError, workRecordsPath, type Database } from '.
 import { dependencyRecords, forgetDependencies, type DependencyRecords } from './dependencies.ts';
 import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import type { Retention } from './retention.ts';
+import { trackerCache, type TrackerCache } from './tracker-cache.ts';
 
 export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './database.ts';
 export { DEPENDENCY_OBSERVATION_KINDS, type Dependency, type DependencyChange, type DependencyObservationKind, type NewDependency } from './dependencies.ts';
@@ -218,7 +219,7 @@ export interface WorkRecordFilter {
   kind?: WorkKind;
 }
 
-export interface WorkRecords extends PublicationRecords, DependencyRecords {
+export interface WorkRecords extends TrackerCache, PublicationRecords, DependencyRecords {
   create(record: NewWorkRecord): WorkRecord;
   /** Throws `not-found` when no record has `workId`. */
   read(workId: string): WorkRecord;
@@ -643,6 +644,7 @@ function workRecords(database: Database): WorkRecords {
   });
 
   return {
+    ...trackerCache(database),
     ...publicationRecords(database, (workId) => fromRow(find(workId)), recordDependencyTicket),
     ...dependencyChanges,
     create: (record) => database.write(() => insert(record)),

@@ -1,190 +1,111 @@
 #!/usr/bin/env bash
-# Tests slice.sh against a fake gh, a fake az and a fake sleep. No network.
+# Tests slice.sh through the real lar-work command, on a work-record database in a
+# temporary HOME. A fake gh and az log any call, which slice.sh must never make, and
+# a fake curl logs the board read it asks for. No network.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
-slice="$here/slice.sh"
+slice_sh="$here/slice.sh"
+root=$(cd "$here/../../.." && pwd)
 
 failures=0
 pass() { printf 'ok   %s\n' "$1"; }
 fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 
-# A fake gh. A read of a repository's .lar-factory.json logs "config <owner/repo>"
-# repository's issues when it is "issues", and GitHub's 404 when it is "none".
-# `issue create` logs its args and prints the new issue's URL. Each
+# lar-work runs the workspace's command, as the app's launcher runs its bundle.
 bin=$(mktemp -d)
+trap 'rm -rf "$bin"' EXIT
 log="$bin/log"
-cat >"$bin/gh" <<'EOF'
-#!/bin/bash
-if [[ $1 == api && $* =~ \ repos/([^/]+/[^/]+)/contents/\.lar-factory\.json$ ]]; then
-    echo "config ${BASH_REMATCH[1]}" >>"$FAKE_GH_LOG"
-    case ${FAKE_ITEMS:-issues} in
-    issues) echo '{"role": "factory", "itemSource": {"kind": "issues"}}' ;;
-    *) echo 'gh: Not Found (HTTP 404)' >&2; exit 1 ;;
-    esac
-    exit 0
-fi
-case "$1 $2" in
-"issue create")
-    echo "create ${*:3}" >>"$FAKE_GH_LOG"
-    echo "https://github.com/maddec01/lar-factory/issues/999"
-    ;;
-*)
-    echo "fake gh: unexpected $*" >&2
-    exit 1
-    ;;
-esac
-EOF
-cat >"$bin/sleep" <<'EOF'
-#!/bin/bash
-echo "sleep $*" >>"$FAKE_GH_LOG"
-EOF
-# A fake az that answers the Task create: it logs "az <args>", then the JSON patch
-# on one line, and prints the new work item 77. With FAKE_AZ_ERROR set it fails with it.
-cat >"$bin/az" <<'EOF'
-#!/bin/bash
-echo "az $*" >>"$FAKE_GH_LOG"
-if [[ -n ${FAKE_AZ_ERROR:-} ]]; then echo "$FAKE_AZ_ERROR" >&2; exit 1; fi
-if [[ $1 == boards && $2 == work-item && $3 == show ]]; then
-    jq -nc --arg area "${FAKE_AZ_AREA-Fabrikam Fiber\\App}" --arg iteration "${FAKE_AZ_ITERATION-Fabrikam Fiber\\Sprint 12}" '{fields: {"System.AreaPath": $area, "System.IterationPath": $iteration}}'
-    exit 0
-fi
-args="$*" file=${args#*--in-file }
-jq -c . "${file%% *}" >>"$FAKE_GH_LOG"
-echo "WARNING: an az warning on stderr" >&2
-echo '{"id": 77, "rev": 1, "fields": {"System.WorkItemType": "Task"}}'
-EOF
-# A fake curl that logs "curl <args>", for the read request to the board.
-cat >"$bin/curl" <<'EOF'
-#!/bin/bash
-echo "curl $*" >>"$FAKE_GH_LOG"
-EOF
-chmod +x "$bin/gh" "$bin/sleep" "$bin/az" "$bin/curl"
-items="$bin/items"
-# slice.sh reads board records from this home, never the real one.
-export FAKE_GH_LOG="$log" FAKE_GH_ITEMS="$items" PATH="$bin:$PATH" HOME="$bin/home"
+cat >"$bin/lar-work" <<SH
+#!/bin/sh
+exec node --disable-warning=ExperimentalWarning "$root/packages/work-records/src/cli.ts" "\$@"
+SH
+for tool in gh az curl; do
+    cat >"$bin/$tool" <<FAKE
+#!/bin/sh
+echo "$tool \$*" >>"$log"
+FAKE
+done
+chmod +x "$bin/lar-work" "$bin/gh" "$bin/az" "$bin/curl"
+export PATH="$bin:$PATH" HOME="$bin/home" LAR_BOARD_PORT=4999
+printf '## What to build\n\nThe sign-in form.\n' >"$bin/body.md"
 
-body="$bin/body.md"
-echo "What to build" >"$body"
-
-# run <items, one line per poll>: runs slice.sh with fresh logs, sets $output
-# (stdout), $errors (stderr) and $status. The parent is PARENT, else 133.
+# make <kind> [ticket]: creates a record in maddec01/lar-factory and prints its work ID.
+make() {
+    local args=(create --title "Work" --repository maddec01/lar-factory --kind "$1")
+    [[ -z ${2:-} ]] || args+=(--ticket "$2")
+    lar-work "${args[@]}" | jq -r .workId
+}
+# run <args>: runs slice.sh with a fresh log, sets $output, $errors and $status.
 run() {
-    printf '%s\n' "$@" >"$items"
     : >"$log"
     status=0
-    output=$(bash "$slice" maddec01/lar-factory "${PARENT:-133}" "A slice" "$body" 2>"$bin/err") || status=$?
+    output=$(bash "$slice_sh" "$@" 2>"$bin/err") || status=$?
     errors=$(cat "$bin/err")
 }
-count() { grep -c "^$1" "$log" || true; }
+no_provider() { ! grep -q '^gh \|^az ' "$log"; }
+count() { lar-work list | jq length; }
+# refuses <name> <text>: passes when the run failed, printed nothing, named the text, called no provider and made
+# no record.
+refuses() {
+    if ((status != 0)) && [[ -z $output && $errors == *"$2"* ]] && no_provider && (($(count) == before)); then
+        pass "$1"
+    else
+        fail "$1: $status $output / $errors / $(cat "$log")"
+    fi
+}
 
-url=https://github.com/maddec01/lar-factory/issues/999
-
-FAKE_ITEMS=issues run "PVTI_a"
-if ((status == 0)) && [[ $output == "$url" && -z $errors ]] &&
-    (($(count query) == 0 && $(count sleep) == 0 && $(count delete) == 0 && $(count create) == 1)); then
-    pass "on a repository that reads its issues, creates the slice and prints its URL with no polling"
+build=$(make build maddec01/lar-factory#30)
+first=$(make slice)
+run "$build" "Sign in" "$bin/body.md"
+record=$(lar-work read "$output" 2>/dev/null || true)
+if ((status == 0)) && [[ -z $errors ]] && jq -e --arg build "$build" '.kind == "slice" and .title == "Sign in"
+    and .parentId == $build and .repository == "maddec01/lar-factory" and .ticket == null' <<<"$record" >/dev/null &&
+    [[ $(lar-work body "$output" --body brief) == "$(cat "$bin/body.md")" ]] && no_provider &&
+    grep -q "^curl .*127.0.0.1:4999/api/read" "$log" && grep -qF "\"workId\":\"$build\"" "$log"; then
+    pass "a build's work ID gets a private slice record with the brief, no ticket, and the board asked to read the build"
 else
-    fail "on a repository that reads its issues, creates the slice and prints its URL with no polling: $status $output / $errors / $(cat "$log")"
+    fail "a build's work ID gets a private slice record with the brief, no ticket, and the board asked to read the build: $status $output / $errors / $record / $(cat "$log")"
+fi
+slice=$output
+
+run maddec01/lar-factory#30 "Sign out" "$bin/body.md" --blocked-by "$slice" --blocked-by "$first"
+if ((status == 0)) && [[ $(lar-work read "$output" | jq -r .parentId) == "$build" ]] &&
+    [[ $(lar-work blockers "$output" | jq -c '[.[].workId] | sort') == "$(jq -cn --arg a "$slice" --arg b "$first" '[$a, $b] | sort')" ]] && no_provider; then
+    pass "a picked build ticket gets the slice, with each --blocked-by as a blocker edge"
+else
+    fail "a picked build ticket gets the slice, with each --blocked-by as a blocker edge: $status $output / $errors"
 fi
 
-FAKE_ITEMS=none run ""
-if ((status != 0)) && [[ -z $output && $errors == *"maddec01/lar-factory: no .lar-factory.json on its default branch."* ]] &&
-    (($(count create) == 0)) && [[ $errors != *"created"* ]]; then
-    pass "a failing lookup stops before creating the slice and passes its message through"
+concept=$(make concept)
+run "$concept" "Which store" "$bin/body.md" --kind decision
+if ((status == 0)) && [[ $(lar-work read "$output" | jq -r '.kind + " " + .parentId') == "decision $concept" ]] &&
+    [[ $(lar-work body "$output" --body decision) == "$(cat "$bin/body.md")" ]]; then
+    pass "under a concept, --kind decision makes a decision with the text as its decision"
 else
-    fail "a failing lookup stops before creating the slice and passes its message through: $status $output / $errors / $(cat "$log")"
+    fail "under a concept, --kind decision makes a decision with the text as its decision: $status $output / $errors"
 fi
 
-PARENT=https://github.com/maddec01/lar-server/issues/5 run ""
-if ((status == 0)) && [[ $(sed -n 1p "$log") == "config maddec01/lar-server" ]]; then
-    pass "a parent URL in another repository looks up the build's repository"
-else
-    fail "a parent URL in another repository looks up the build's repository: $status $output / $errors / $(cat "$log")"
-fi
+before=$(count)
+run maddec01/lar-factory#99 "Sign in" "$bin/body.md"
+refuses "an unpicked build ticket says to pick it on the board, making nothing" "maddec01/lar-factory#99 has no work record. Pick the ticket on the board"
 
-if output=$(bash "$slice" maddec01/lar-factory 133 2>&1); then
-    fail "missing arguments print usage: $output"
-else
-    if [[ $output == *usage* ]]; then pass "missing arguments print usage"; else fail "missing arguments print usage: $output"; fi
-fi
+run "$build" "Sign in" "$bin/body.md" --blocked-by maddec01/lar-factory#98
+refuses "an unpicked blocker makes nothing" "maddec01/lar-factory#98 has no work record"
 
-# On Azure DevOps
+run "$concept" "Store" "$bin/body.md"
+refuses "under a concept, a missing --kind is refused" "under a concept, --kind names decision or build"
 
-azure_build=https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/42
-printf '## What to build\n\nA "quoted" line.\n' >"$body"
-: >"$log"
-status=0
-output=$(bash "$slice" contoso/Fabrikam%20Fiber/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
-errors=$(cat "$bin/err")
-want_patch=$(jq -nc --rawfile body "$body" '[{op: "add", path: "/fields/System.AreaPath", value: "Fabrikam Fiber\\App"},
-    {op: "add", path: "/fields/System.IterationPath", value: "Fabrikam Fiber\\Sprint 12"},
-    {op: "add", path: "/fields/System.Title", value: "A slice"},
-    {op: "add", path: "/fields/System.Description", value: $body},
-    {op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown"},
-    {op: "add", path: "/relations/-", value: {rel: "System.LinkTypes.Hierarchy-Reverse", url: "https://dev.azure.com/contoso/_apis/wit/workItems/42"}}]')
-if ((status == 0)) && [[ $output == https://dev.azure.com/contoso/Fabrikam%20Fiber/_workitems/edit/77 && -z $errors ]] &&
-    [[ $(sed -n 1p "$log") == "az boards work-item show --id 42 --organization https://dev.azure.com/contoso --output json" ]] &&
-    [[ $(sed -n 2p "$log") == "az devops invoke --area wit --resource workitems --organization https://dev.azure.com/contoso --route-parameters project=Fabrikam Fiber type=Task --http-method POST --media-type application/json-patch+json --in-file "*" --api-version 7.2-preview --output json" ]] &&
-    [[ $(sed -n 3p "$log") == "$want_patch" ]] &&
-    jq -e 'all(.[]; .path != "/fields/System.Tags")' <<<"$(sed -n 3p "$log")" >/dev/null &&
-    (($(wc -l <"$log") == 3)); then
-    pass "on Azure DevOps, creates an untagged slice Task in the build's area and iteration and prints its URL"
-else
-    fail "on Azure DevOps, creates an untagged slice Task in the build's area and iteration and prints its URL: $status $output / $errors / $(cat "$log")"
-fi
+run "$build" "Store" "$bin/body.md" --kind decision
+refuses "a build takes no other kind" "a build owns only slices"
 
-: >"$log"
-status=0
-output=$(FAKE_AZ_ERROR="ERROR: Before you can run Azure DevOps commands, you need to run the login command (az login if using AAD/MSA identity else az devops login if using PAT token) to setup credentials." \
-    bash "$slice" contoso/Fabrikam/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
-errors=$(cat "$bin/err")
-if ((status != 0)) && [[ -z $output && $errors == "slice.sh: az is logged out. Run az login, then rerun." ]]; then
-    pass "on Azure DevOps with az logged out, says to run az login"
-else
-    fail "on Azure DevOps with az logged out, says to run az login: $status $output / $errors"
-fi
+run "$slice" "Deeper" "$bin/body.md"
+refuses "a slice owns no work" "only a build or a concept owns work"
 
-: >"$log"
-status=0
-output=$(bash "$slice" contoso/Fabrikam/web 42 "A slice" "$body" 2>"$bin/err") || status=$?
-errors=$(cat "$bin/err")
-if ((status != 0)) && [[ -z $output && $errors == *"the parent is the build's work item URL"* ]] && [[ ! -s $log ]]; then
-    pass "on an Azure repository, a parent that isn't a work item URL stops before any call"
-else
-    fail "on an Azure repository, a parent that isn't a work item URL stops before any call: $status $output / $errors / $(cat "$log")"
-fi
+run "$build" "Sign in" "$bin/missing.md"
+refuses "a body file it can't read makes nothing" "can't read $bin/missing.md"
 
-# Missing placement must never fall back to the project's template.
-: >"$log"
-status=0
-output=$(FAKE_AZ_AREA='' bash "$slice" contoso/Fabrikam/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
-errors=$(cat "$bin/err")
-if ((status != 0)) && [[ -z $output && $errors == *"the build has no area or iteration"* ]] && ! grep -q -- '--http-method POST' "$log"; then
-    pass "missing parent placement stops before creating anything"
-else
-    fail "missing parent placement stops before creating anything: $status $output / $errors / $(cat "$log")"
-fi
+run "$build" "Sign in" "$bin/body.md" --parent x
+refuses "an unknown option shows the usage" "usage: slice.sh"
 
-: >"$log"
-status=0
-output=$(FAKE_AZ_ITERATION='Fabrikam Fiber' bash "$slice" contoso/Fabrikam/web "$azure_build" "A slice" "$body" 2>"$bin/err") || status=$?
-if ((status == 0)) && jq -e '.[] | select(.path == "/fields/System.IterationPath" and .value == "Fabrikam Fiber")' <<<"$(sed -n 3p "$log")" >/dev/null; then
-    pass "a backlog parent keeps the new child in the backlog"
-else
-    fail "a backlog parent keeps the new child in the backlog: $status $output / $(cat "$log")"
-fi
-
-# A made slice asks the board on LAR_BOARD_PORT to read its build's source.
-export LAR_BOARD_PORT=4999
-FAKE_ITEMS=issues run ""
-if ((status == 0)) && grep -qF '"url":"https://github.com/maddec01/lar-factory/issues/133"' "$log" && grep -q '127.0.0.1:4999/api/read' "$log"; then
-    pass "a made slice asks the board to read its build's source"
-else
-    fail "a made slice asks the board to read its build's source: $status $output / $errors / $(cat "$log")"
-fi
-unset LAR_BOARD_PORT
-
-rm -rf "$bin"
-((failures == 0)) || { echo "$failures failed"; exit 1; }
-echo "all passed"
+((failures == 0))

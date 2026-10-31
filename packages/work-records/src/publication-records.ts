@@ -221,7 +221,8 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
     };
     for (const item of list(content.tickets)) {
       const ticket = object(item);
-      keys(ticket, ['workId', 'destination', 'vocabulary', 'typeResolution', 'title', 'body']);
+      keys(ticket, ['workId', 'settingsSnapshot', 'destination', 'vocabulary', 'typeResolution', 'title', 'body']);
+      if (ticket.settingsSnapshot !== undefined) filled(ticket.settingsSnapshot, 'settings snapshot');
       const workId = filled(ticket.workId, 'ticket work ID');
       const record = find(workId);
       if (!ready.sources.some((item) => item.workId === workId) || ['decision', 'slice'].includes(record.kind)) invalid('Only this publication\'s concept and builds can have tickets.');
@@ -235,7 +236,7 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
       if (destination.ticket !== undefined) {
         reference(destination.ticket); url(destination.url);
         if (record.ticket && record.ticket !== destination.ticket) invalid('The destination differs from the attached ticket.');
-      } else if (record.ticket) invalid('A picked ticket needs an existing destination.');
+      } else if (record.ticket && knownTicket(workId)?.ticket !== record.ticket) invalid('A picked ticket needs an existing destination.');
       const known = knownTicket(workId);
       if (known && destination.ticket !== undefined && (destination.ticket !== known.ticket || destination.url !== known.url)) invalid('The destination differs from the known publication ticket.');
       if (known && destination.ticket === undefined) {
@@ -435,7 +436,8 @@ export function publicationRecords(database: Database, readRecord: (workId: stri
           if (operation) {
             const oldTicket = previous.tickets.find((item) => item.workId === operation.ticketWorkId)!;
             const newTicket = content.tickets.find((item) => item.workId === operation.ticketWorkId)!;
-            if (operation.kind === 'create' && digest(oldTicket) !== digest(newTicket)) invalid('A completed creation cannot change. Use an existing ticket and a new update operation.');
+            // Settings evidence may refresh for outstanding writes. The completed provider payload stays exact.
+            if (operation.kind === 'create' && digest({ ...oldTicket, settingsSnapshot: undefined }) !== digest({ ...newTicket, settingsSnapshot: undefined })) invalid('A completed creation cannot change. Use an existing ticket and a new update operation.');
             carried.push({ operationId: operation.operationId, attempt: result.attempt! });
           }
           if (result.operation.kind === 'create' && content.operations.some((item) => item.kind === 'create' && item.ticketWorkId === result.operation.ticketWorkId && item.operationId !== result.operation.operationId)) invalid('A completed ticket creation cannot be retried.');

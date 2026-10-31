@@ -1,6 +1,5 @@
 // Node entry used by the installed command and the board. Discovery only reads provider metadata.
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { providerCommand as commandOutput } from './provider-command.ts';
 import { decodePart, isRecord, onAzure, sameRepo, type RepositorySetup } from './index.ts';
 import { applySharedDefaults, isRepo, readRepositorySetups, sharedConfigOf } from './repository-settings.ts';
 import { publicationSettingsSnapshot, type VocabularyCapability, type VocabularyDiscovery } from './vocabulary.ts';
@@ -13,14 +12,7 @@ export interface VocabularyReads {
   sharedConfig?(repo: string): Promise<string | null>;
 }
 
-const exec = promisify(execFile);
-async function commandOutput(command: string, args: string[]): Promise<string> {
-  const executable = process.env[command === 'gh' ? 'GH_PATH' : 'AZ_PATH'] || command;
-  const { stdout } = await exec(executable, args, { timeout: 60_000, maxBuffer: 16 * 1024 * 1024 });
-  return stdout;
-}
-
-async function jsonCommand(command: string, args: string[]): Promise<unknown> {
+async function jsonCommand(command: 'gh' | 'az', args: string[]): Promise<unknown> {
   return JSON.parse(await commandOutput(command, args));
 }
 

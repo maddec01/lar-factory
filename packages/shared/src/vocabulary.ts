@@ -50,8 +50,8 @@ export type VocabularyResolution = (Resolution & { ready: true }) | (Omit<Resolu
 });
 
 /** A conflict remains unresolved until the user selects a candidate or explicitly selects none. */
-export function resolveVocabulary(mapping: EffectiveVocabulary, scope: 'concept' | 'build', kind: 'bug' | 'feature' | 'improvement' | 'concept', selected?: string | null): VocabularyResolution {
-  const keys: VocabularyKey[] = [scope, kind === 'concept' ? 'concept-kind' : kind];
+export function resolveVocabulary(mapping: EffectiveVocabulary, scope: 'concept' | 'build', kind: 'bug' | 'feature' | 'improvement' | 'concept' | undefined, selected?: string | null): VocabularyResolution {
+  const keys: VocabularyKey[] = [scope, ...(kind === undefined ? [] : [kind === 'concept' ? 'concept-kind' as const : kind])];
   const vocabulary = Object.fromEntries(keys.map((key) => [key, mapping[key]]));
   const requests = keys.flatMap((key) => mapping[key].type === null ? [] : [{ key, type: mapping[key].type! }]);
   const candidates = [...new Set(requests.map((r) => r.type))];

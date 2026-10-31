@@ -143,6 +143,12 @@ test('sample mode saves no description', async (t) => {
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Saving descriptions is disabled in sample mode.' }]);
 });
 
+test('sample mode exports nothing', async (t) => {
+  const board = await startBoard(t, {}, true);
+  const response = await board.post({ itemId: 'I_sample13' }, board.url, '/api/item-export');
+  assert.deepEqual([response.status, await response.json()], [403, { error: 'Exporting is disabled in sample mode.' }]);
+});
+
 test('readiness refuses foreign origins and sample mode without running Azure', async (t) => {
   const board = await startBoard(t, {}, true);
   const input = { itemId: 'I_sample01', number: 1, organization: 'untrusted' };

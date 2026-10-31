@@ -661,7 +661,7 @@ const { server, endStreams } = createBoardServer({
     board.update({ t3Availability: { availability: read.availability, observedAt: read.observation?.observedAt } });
     if (read.availability !== 'available') throw new Error('T3 unavailable');
   },
-  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf), readSoon, ready: () => firstGhCheck, projectChoices: choices,
+  recheck: (options) => recheckTools(true, options), itemDetails: createItemDetails(fixture ? detailsFileFor(fixture) : null, ticketOf, { records }), readSoon, ready: () => firstGhCheck, projectChoices: choices,
   keepOnboarding: (input) => keepOnboarding(input),
   createProject: (input) => createProject(input, choices),
   runSetupCheck: (input) => runSetupCheck(input),

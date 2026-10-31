@@ -1,5 +1,6 @@
-// What the item dialog reads for one item when it opens: the text and people the board-wide read leaves out.
-// The item's labels, parent, linked PRs and update time stay on the board's `Item`.
+// What the item dialog reads for one item when it opens: its work record's own text and progress, and its ticket's text
+// and people, which the board-wide read leaves out. The item's labels, parent, linked PRs, slices, blockers and update
+// time stay on the board's `Item`.
 
 import type { IssueRef } from './model.ts';
 
@@ -26,8 +27,31 @@ export interface ItemComment {
   format: TextFormat;
 }
 
+/** A review round as the item dialog shows it: each reviewer's verdict and how many of its findings are still open. */
+export interface RecordReviewRound {
+  round: number;
+  recordedAt: string;
+  reviewers: { axis: string; verdict: string; findings: number; open: number }[];
+}
+
+/** The work record's own text and progress, which ticket edits never change. */
+export interface RecordDetails {
+  /** Which body the record holds: a concept's map, a decision's text, or any other record's brief. */
+  bodyKind: 'map' | 'decision' | 'brief';
+  /** That body's markdown; empty while none is written. */
+  body: string;
+  /** The markdown the work began with, such as the picked ticket's text then; empty when it began with none. */
+  context: string;
+  /** Where its build stands, as lar-build names the phase, or null before it starts. */
+  buildPhase: string | null;
+  /** The build's review rounds, oldest first. */
+  reviewRounds: RecordReviewRound[];
+}
+
 export interface ItemDetails {
-  /** The description; empty when there is none. */
+  /** The work record's text and progress; absent in sample mode and for an item with no record. */
+  record?: RecordDetails;
+  /** The ticket's description; empty when there is none. */
   body: string;
   format: TextFormat;
   /** On Azure DevOps, the field the description was read from, which a save writes back; absent on GitHub. */

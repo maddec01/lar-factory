@@ -130,22 +130,13 @@ export interface Slice extends IssueRef {
   workId?: string;
 }
 
-/** Which of the slice labels the board reads an issue carries. */
-export interface SliceLabels {
-  active?: boolean;
-  /** An implementer couldn't finish it; it waits for a re-slice. Not GitHub's blocked-by link. */
-  blocked?: boolean;
-}
-
 /**
- * Done once closed as completed, even if it still has a label; while open, blocked
- * with the `blocked` label, even if also `active`; active with the `active` label;
- * waiting otherwise. Null for a slice closed as not planned (or as a duplicate):
- * it's hidden and not counted.
+ * A slice ticket's progress: done once closed as completed, waiting while open. Null for a slice closed as not planned
+ * (or as a duplicate): it's hidden and not counted. A work record holds a slice's active and blocked progress.
  */
-export function sliceProgress(state: 'OPEN' | 'CLOSED', stateReason: string | null, labels: SliceLabels): SliceProgress | null {
+export function sliceProgress(state: 'OPEN' | 'CLOSED', stateReason: string | null): SliceProgress | null {
   if (state === 'CLOSED') return stateReason === 'NOT_PLANNED' || stateReason === 'DUPLICATE' ? null : 'done';
-  return labels.blocked ? 'blocked' : labels.active ? 'active' : 'waiting';
+  return 'waiting';
 }
 
 /** An item's agent time, wall time, tokens and API cost, over every thread that worked on it. */

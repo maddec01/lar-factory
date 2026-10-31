@@ -181,16 +181,15 @@ test("a linked PR carries its merge state", () => {
 test("a build's slices come from the board query, open and closed, in GitHub's order; other kinds keep none", () => {
   const subIssues = [sliceRef(48, 'OPEN'), { ...sliceRef(46, 'CLOSED'), stateReason: 'COMPLETED' }, { ...sliceRef(45, 'CLOSED'), stateReason: 'NOT_PLANNED' },
     { ...sliceRef(47, 'OPEN'), stateReason: 'REOPENED' }, sliceRef(49, 'OPEN')];
-  const issue = (labels: string[]) => normalizeItem(withSubIssues('I_5', 5, labels, subIssues),
-    { active: new Set(['maddec01/lar-factory#47', 'maddec01/lar-factory#49']), blocked: new Set(['maddec01/lar-factory#49']) });
+  const issue = (labels: string[]) => normalizeItem(withSubIssues('I_5', 5, labels, subIssues));
   const slice = (number: number, state: 'OPEN' | 'CLOSED', progress: string) =>
     ({ number, title: `Issue ${number}`, url: sliceRef(number, state).url, repo: 'maddec01/lar-factory', state: state.toLowerCase(), progress });
   assert.deepEqual(issue(['build'])?.slices, [
     slice(48, 'OPEN', 'waiting'),
     slice(46, 'CLOSED', 'done'),
-    slice(47, 'OPEN', 'active'),
-    slice(49, 'OPEN', 'blocked'),
-  ], 'a slice closed as not planned is hidden; blocked wins over active');
+    slice(47, 'OPEN', 'waiting'),
+    slice(49, 'OPEN', 'waiting'),
+  ], 'a slice closed as not planned is hidden');
   assert.deepEqual(issue(['concept'])?.slices, [], "a concept's sub-issues are board items, not slices");
 });
 

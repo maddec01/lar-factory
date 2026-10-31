@@ -28,8 +28,6 @@ interface RawBlocker {
 
 /** What the issue searches found, as `repo#number` keys: open issues labelled `active` or `blocked`, and issues labelled `build`. */
 export interface Searched {
-  active?: ReadonlySet<string>;
-  blocked?: ReadonlySet<string>;
   builds?: ReadonlySet<string>;
 }
 
@@ -192,17 +190,16 @@ function subIssueCounts(raw: RawItem, builds: ReadonlySet<string>): Item['subIss
   return { total: found.length, completed: found.filter((b) => b.state === 'CLOSED').length };
 }
 
-/** Keeps GitHub's sub-issue order and hides slices closed as not planned. `active` and `blocked` hold the `repo#number` keys of open issues with that label. */
-function normalizeSlices(raws: RawIssueRef[], active: ReadonlySet<string>, blocked: ReadonlySet<string>): Slice[] {
+/** Keeps GitHub's sub-issue order and hides slices closed as not planned. */
+function normalizeSlices(raws: RawIssueRef[]): Slice[] {
   return raws.flatMap((raw) => {
-    const key = refKey(raw.repository.nameWithOwner, raw.number);
-    const progress = sliceProgress(raw.state, raw.stateReason ?? null, { active: active.has(key), blocked: blocked.has(key) });
+    const progress = sliceProgress(raw.state, raw.stateReason ?? null);
     return progress ? [{ ...normalizeIssueRef(raw), progress }] : [];
   });
 }
 
 /** Turns one raw item into the board's Item, reading its statuses `from` its item source's store; null for items we can't see. */
-export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new Set(), builds = new Set() }: Searched = {}): Item | null {
+export function normalizeItem(raw: RawItem, { builds = new Set() }: Searched = {}): Item | null {
   const c = raw.content;
   if (!c) return null;
   const updated = [raw.updatedAt, c.updatedAt].filter(Boolean).sort().at(-1) ?? raw.updatedAt;
@@ -228,7 +225,7 @@ export function normalizeItem(raw: RawItem, { active = new Set(), blocked = new 
     updatedAt: updated,
     closedAt: c.closedAt ?? null,
     linkedPrs: c.closedByPullRequestsReferences?.nodes.map(normalizeLinkedPr) ?? [],
-    slices: normalizeSlices(rawSlices(raw, builds), active, blocked),
+    slices: normalizeSlices(rawSlices(raw, builds)),
   };
   if (c.assignees) item.assignee = c.assignees.nodes.map((a) => a.login).sort().join(', ') || null;
   if (isRawConcept(raw)) {

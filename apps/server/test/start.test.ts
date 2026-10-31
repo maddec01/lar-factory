@@ -137,7 +137,7 @@ const refusals: { name: string; repo?: string; origins?: Record<string, string |
     },
     error: () => 'Several T3 projects are checkouts of maddec01/lar-factory: ~/Developer/lar/lar-factory, ~/code/factory-clone; remove all but one in T3 Code' },
   { name: 'a missing T3 database', db: (dir) => join(dir, 'none.sqlite'),
-    error: (dir) => `Can't read T3 Code's projects at ${join(dir, 'none.sqlite')}` },
+    error: () => "Can't read T3 Code's projects; reconnect T3 Code before starting" },
 ];
 
 for (const refusal of refusals) {
@@ -165,7 +165,7 @@ test('Start refuses a T3 database whose schema changed', async (t) => {
   });
   const response = await start(board, 'I_12');
   assert.equal(response.status, 409);
-  assert.equal((await response.json()).error, `Can't read T3 Code's projects at ${db}`);
+  assert.equal((await response.json()).error, "Can't read T3 Code's projects; reconnect T3 Code before starting");
   assert.deepEqual(await board.t3Calls(), []);
 });
 

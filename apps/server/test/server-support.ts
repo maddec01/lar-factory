@@ -84,7 +84,7 @@ export async function startBoard(t: TestContext, options = {}, fixture = false, 
   const { repositories = TEST_REPOSITORIES } = options as { repositories?: readonly string[] | null };
   if (repositories && !existsSync(join(home, 'Library/Application Support/Lar Factory/repositories.json'))) writeRepositoryList(home, repositories);
   const port = 'BOARD_PORT' in env ? env.BOARD_PORT : String(await freePort());
-  const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning',
+  const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', '--import', new URL('./project-discovery-fixture.ts', import.meta.url).href,
     ...(fastRefresh ? ['--import', new URL('./fast-refresh.ts', import.meta.url).href] : []), 'src/server.ts'], {
     cwd: directory ?? new URL('../', import.meta.url),
     // A home of its own keeps a live board's record out of the real one.

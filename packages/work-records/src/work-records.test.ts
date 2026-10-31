@@ -344,4 +344,74 @@ describe('work-record content', () => {
     const concept = lar(reopened, 'concept');
     expect(() => reopened.setBuildPhase(concept.workId, 1, 'plan')).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('A concept is never built') }));
   });
+
+  const round1 = {
+    base: 'c8890a1a',
+    reviewers: [
+      { axis: 'code', verdict: 'changes', findings: [
+        { severity: 'should', summary: 'Spec: src/cli.ts:12: the help skips export.', disposition: 'open' },
+        { severity: 'nit', summary: 'Standards: src/cli.ts:40: name it run.', disposition: 'rejected', reason: 'The repo names it so.' },
+      ] },
+      { axis: 'security', verdict: 'approve', findings: [], notChecked: 'Signed releases.' },
+      { axis: 'ui', verdict: 'skipped', findings: [], notChecked: 'Nothing on screen changed.' },
+    ],
+  } as const;
+
+  it('keeps a review round with every axis, finding and disposition across close and reopen', async () => {
+    const path = join(tempDir(), 'work-records.db');
+    const first = await openWorkRecords(path);
+    const build = lar(first, 'build');
+    expect(first.recordReviewRound(build.workId, 1, round1)).toMatchObject({ revision: 2 });
+    first.setFindingDisposition(build.workId, 2, { round: 1, axis: 'code', finding: 1 }, 'fixed');
+    first.recordReviewRound(build.workId, 3, { base: 'aa11bb22', reviewers: [{ axis: 'code', verdict: 'approve', findings: [] }] });
+    first.close();
+
+    const rounds = (await open(path)).reviewRounds(build.workId);
+    expect(rounds.map((r) => [r.round, r.base])).toEqual([[1, 'c8890a1a'], [2, 'aa11bb22']]);
+    expect(rounds[0]!.reviewers).toEqual([
+      { axis: 'code', verdict: 'changes', notChecked: null, findings: [
+        { severity: 'should', summary: 'Spec: src/cli.ts:12: the help skips export.', disposition: 'fixed', reason: null },
+        { severity: 'nit', summary: 'Standards: src/cli.ts:40: name it run.', disposition: 'rejected', reason: 'The repo names it so.' },
+      ] },
+      { axis: 'security', verdict: 'approve', notChecked: 'Signed releases.', findings: [] },
+      { axis: 'ui', verdict: 'skipped', notChecked: 'Nothing on screen changed.', findings: [] },
+    ]);
+  });
+
+  it('leaves no round behind when one of its findings fails validation', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    const broken = { ...round1, reviewers: [round1.reviewers[0], { axis: 'performance', verdict: 'changes', findings: [{ severity: 'huge', summary: 'Slow.', disposition: 'open' }] }] };
+    expect(() => records.recordReviewRound(build.workId, 1, broken as never)).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('severity "huge"') }));
+    expect(records.reviewRounds(build.workId)).toEqual([]);
+    expect(records.read(build.workId)).toEqual(build);
+  });
+
+  it('refuses a malformed round, a repeated axis, a rejection without a reason and a missing finding', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    const code = round1.reviewers[0];
+    const refuse = (round: unknown, message: string) =>
+      expect(() => records.recordReviewRound(build.workId, 1, round as never)).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining(message) }));
+    refuse({ base: 'not a sha', reviewers: [code] }, 'base');
+    refuse({ base: 'c8890a1a', reviewers: [] }, 'no reviewers');
+    refuse({ base: 'c8890a1a', reviewers: [code, code] }, 'code reviewer twice');
+    refuse({ base: 'c8890a1a', reviewers: [{ ...code, axis: 'style' }] }, 'axis "style"');
+    refuse({ base: 'c8890a1a', reviewers: [{ ...code, findings: [{ ...code.findings[1], reason: undefined }] }] }, 'reason');
+    refuse({ base: 'c8890a1a', reviewers: [{ axis: 'ui', verdict: 'skipped', findings: [] }] }, 'skipped');
+    expect(() => records.recordReviewRound(lar(records, 'concept').workId, 1, round1)).toThrow(expect.objectContaining({ message: expect.stringContaining('never built') }));
+
+    records.recordReviewRound(build.workId, 1, round1);
+    expect(() => records.setFindingDisposition(build.workId, 2, { round: 1, axis: 'code', finding: 3 }, 'fixed')).toThrow(expect.objectContaining({ code: 'not-found' }));
+    expect(() => records.setFindingDisposition(build.workId, 2, { round: 1, axis: 'code', finding: 1 }, 'rejected')).toThrow(expect.objectContaining({ code: 'invalid' }));
+    expect(records.reviewRounds(build.workId)[0]!.reviewers[0]!.findings[0]!.disposition).toBe('open');
+  });
+
+  it('refuses to make a reviewed build a kind that is never built', async () => {
+    const records = await open();
+    const build = lar(records, 'build');
+    const reviewed = records.recordReviewRound(build.workId, 1, round1);
+    expect(() => records.update(build.workId, 2, { kind: 'slice' })).toThrow(expect.objectContaining({ code: 'invalid', message: expect.stringContaining('A slice is never built') }));
+    expect(records.read(build.workId)).toEqual(reviewed);
+  });
 });

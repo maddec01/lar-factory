@@ -13,7 +13,7 @@ export class ShellRecovery {
     const snapshot = value.kind === 'snapshot' && isRecord(value.snapshot) ? value.snapshot : undefined;
     const sequence = snapshot ? snapshot.snapshotSequence : value.sequence;
     if (typeof sequence !== 'number' || !Number.isSafeInteger(sequence) || sequence < 0) throw new Error('Invalid shell sequence');
-    if (sequence <= this.sequence) return false;
+    if (sequence < this.sequence || (!snapshot && sequence === this.sequence)) return false;
     const project = (input: unknown) => {
       if (!isRecord(input) || typeof input.id !== 'string' || typeof input.title !== 'string' || typeof input.workspaceRoot !== 'string') throw new Error('Invalid shell project');
       return { id: input.id, title: input.title, workspaceRoot: input.workspaceRoot };
@@ -22,8 +22,10 @@ export class ShellRecovery {
     if (snapshot) {
       if (!Array.isArray(snapshot.projects)) throw new Error('Invalid shell snapshot');
       const projects = snapshot.projects.map(project);
+      changed = JSON.stringify([...this.projects.values()]) !== JSON.stringify(projects);
+      // The first empty snapshot still establishes an authoritative observation.
+      if (this.sequence < 0) changed = true;
       this.projects = new Map(projects.map(item => [item.id, item]));
-      changed = true;
     } else if (value.kind === 'project.updated') {
       const next = project(value.project);
       this.projects.set(next.id, next);

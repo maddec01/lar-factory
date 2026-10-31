@@ -359,7 +359,7 @@ test('a blocked build shows only Start after, a Start, in place of Start build',
   expect(text(next()), 'the header offers no start while a part waits on you').toBe('Needs you#202 Sign-in screen');
 });
 
-test('once its blockers close, Start build sends the build, and the header offers it too', async () => {
+test('once its blockers complete, Start build sends the build, and the header offers it too', async () => {
   holdPosts(unblocked());
   await mountPage(withItem('I_sample12', { status: 'Shaping' }, unblocked()));
   expect(text(startIn(next()))).toBe('Start ▾');
@@ -404,7 +404,7 @@ test('a Queued decision shows only Start after while a blocker is open, naming t
   await mountPage(data);
   expect(startIn(step('I_d204'))).toBeNull();
   const after = step('I_d204').querySelector<HTMLButtonElement>('[data-start-after]')!;
-  expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Starts by itself once #201, #140 close']);
+  expect([text(after), after.title]).toEqual(['Start after #140 ▾', 'Starts by itself once #201, #140 complete']);
   await pressMenu(after);
   await press(entries()[0]!);
   expect(posted(), 'T3 default arms it with no model').toEqual([['/api/arm', { session: 's1', itemId: 'I_d204' }]]);

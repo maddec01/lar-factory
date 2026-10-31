@@ -96,10 +96,10 @@ export interface IssueRef {
   azure?: AzureWorkItem;
 }
 
-/** Work blocking an item: closed once that work is complete. A record's blocker names its work ID and title; its number is 0 without a ticket. */
+/** Work blocking an item: closed once its work record's local facts complete it. A record's blocker names its work ID and title; its number is 0 without a ticket. */
 export type Blocker = Pick<IssueRef, 'number' | 'repo' | 'state'> & { workId?: string; title?: string };
 
-/** The issues the item is blocked by that are still open: what holds its start, its badge and Start after. */
+/** The blockers whose work isn't complete yet: what holds its start, its badge and Start after. */
 export const openBlockers = (item: Pick<Item, 'blockers'>): Blocker[] => item.blockers.filter((b) => b.state === 'open');
 
 /** A blocker as `#n`, or as `owner/repo#n` when another repository's; `short` drops the owner, to fit on a button. */
@@ -110,10 +110,10 @@ export const blockerRef = (item: Pick<Item, 'repo'>, b: Pick<Blocker, 'number' |
 export const openBlockerRefs = (item: Pick<Item, 'blockers' | 'repo'>, short = false): string[] =>
   openBlockers(item).map((b) => blockerRef(item, b, short));
 
-/** Why the item can't start while an issue it's blocked by is open, naming the open ones; null once none is. */
+/** Why the item can't start while a blocker's work isn't complete, naming each such blocker; null once none is left. */
 export function blockedText(item: Pick<Item, 'blockers' | 'repo'>): string | null {
   const open = openBlockerRefs(item);
-  return open.length ? `Blocked by ${open.join(', ')} until ${open.length > 1 ? 'they close' : 'it closes'}` : null;
+  return open.length ? `Blocked by ${open.join(', ')} until ${open.length > 1 ? 'they complete' : 'it completes'}` : null;
 }
 
 /** The run that shows a concept works once every build lands: a title line, then numbered steps. */

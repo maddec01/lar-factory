@@ -27,7 +27,7 @@ const SHRINKS = 'min-w-0 max-w-full shrink';
 /** What the title says Start after waits for: every open blocker. */
 function waitsFor(item: Item): string {
   const open = openBlockerRefs(item);
-  return `${open.join(', ')} ${open.length > 1 ? 'close' : 'closes'}`;
+  return `${open.join(', ')} ${open.length > 1 ? 'complete' : 'completes'}`;
 }
 
 /** Arms the item's start on `choice`, or disarms it with `null`; a refusal shows as a toast. */

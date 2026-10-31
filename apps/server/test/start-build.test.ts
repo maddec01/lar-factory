@@ -2,7 +2,7 @@ import { test } from 'vite-plus/test';
 import type { TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { openWorkRecords, workRecordsPath } from '@lar-factory/work-records';
-import { NOT_LANDED, readsRepositoryConfig, SAMPLE_MODELS, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
+import { NOT_LANDED, readsRepositoryConfig, recordBlockers, SAMPLE_MODELS, settleDecisions, startableEnv, startBoard, until, writeOnboarding } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue, rawIssue, sliceRef } from '@lar-factory/shared/test/raw-items';
 import type { BoardData, DriftChoice, RawItem, SkillCheckOutcome } from '@lar-factory/shared';
@@ -135,18 +135,14 @@ test('a refused repository project writes nothing to GitHub and runs no t3', asy
 });
 
 
-test('Start build is refused while an issue the build is blocked by is open, and runs once it closes', async (t) => {
-  const blocked = (state: 'OPEN' | 'CLOSED') => rawIssue('I_12', 12, 'Ready', ['build'], {
-    blockedBy: { nodes: [{ number: 5, state, repository: { nameWithOwner: 'maddec01/lar-factory' } }] },
-  });
-  const { board } = await buildBoard(t, [blocked('OPEN')]);
+test('Start build is refused while a blocker is incomplete, naming it, and runs once it completes', async (t) => {
+  const { board } = await buildBoard(t, [readyIssue(12, ['build'])]);
+  const blockers = await recordBlockers(board, board.id(12), ['Decision 5']);
   const refused = await startBuild(board, board.id(12));
   assert.equal(refused.status, 409);
-  assert.equal((await refused.json()).error, 'Blocked by #5 until it closes; use Start after to start it then.');
+  assert.equal((await refused.json()).error, 'Blocked by Decision 5 until it completes; use Start after to start it then.');
   assert.deepEqual([...await writes(board), ...await board.t3Calls()], []);
-  await board.update({ items: [blocked('CLOSED')] });
-  await board.post({}, board.url, '/api/read');
-  await until(board, (d) => d.items[0]?.blockers[0]?.state === 'closed');
+  await settleDecisions(board, board.id(12), blockers);
   assert.equal((await startBuild(board, board.id(12))).status, 200);
 });
 

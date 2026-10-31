@@ -234,8 +234,8 @@ export function createItemCommands({ board, items, records, reread, offerModelCh
   }
 
   /**
-   * Refuses a start while the item's repository is still onboarding, until its PR merges, or while an issue the item
-   * is blocked by is open; Start after starts it once they close.
+   * Refuses a start while the item's repository is still onboarding, until its PR merges, or while a blocker's work
+   * isn't complete; Start after starts it once they complete.
    */
   function blockedReply(item: Item): Reply | null {
     if (isOnboarding(board.snapshot(), item.repo)) return withBoard(409, { error: WAITS_FOR_ONBOARDING });

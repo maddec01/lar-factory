@@ -1,6 +1,6 @@
 // The board's items: the work records of the onboarded repositories, each with its ticket's context when an item source
-// read the ticket. The record owns Status, kind, title, structure, its own blockers and slices; the ticket adds its URL,
-// labels, PRs, provider blockers and provider fields, so a ticket edit never moves, retitles or restructures work.
+// read the ticket. The record owns Status, kind, title, structure, blockers and slices; the ticket adds its URL, labels,
+// PRs and provider fields, so a ticket edit never moves, retitles, restructures or blocks work.
 
 import { parseConceptMap, refKey, sameRepo } from '@lar-factory/shared';
 import type { Blocker, IssueRef, Item, Slice, SliceProgress } from '@lar-factory/shared';
@@ -42,10 +42,9 @@ export function recordItems(records: WorkRecords, tickets: readonly Item[], repo
     const ticket = ticketOf(record);
     const parent = record.parentId ? records.read(record.parentId) : null;
     const children = records.children(record.workId).filter((c) => !c.setAside);
-    const recorded = records.blockers(record.workId).map((b): Blocker => ({ number: ticketNumber(b.ticket), repo: b.repository,
+    // A blocker holds the work until its local facts complete it; its Status, its ticket closing and its thread ending never do.
+    const blockers = records.blockers(record.workId).map((b): Blocker => ({ number: ticketNumber(b.ticket), repo: b.repository,
       state: records.completion(b.workId).complete ? 'closed' : 'open', workId: b.workId, title: b.title }));
-    // Start after still waits on the ticket's provider blockers, beside the record's, until it reads local completion alone.
-    const blockers = [...recorded, ...(ticket?.blockers ?? []).filter((b) => !recorded.some((r) => r.number === b.number && sameRepo(r.repo, b.repo)))];
     const slices = children.filter((c) => c.kind === 'slice').map((c): Slice => ({ ...ref(c), progress: sliceProgress(c), workId: c.workId }));
     const work = children.filter((c) => c.kind !== 'slice');
     const mapBody = record.kind === 'concept' ? records.body(record.workId, 'map') : null;

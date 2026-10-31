@@ -81,6 +81,14 @@ test("a record's structure, blockers and slices come from records", async () => 
   assert.deepEqual(shown('Concept').map, { destination: 'Where it goes.', decisions: [], fog: ['What is left'] });
 });
 
+test("only the record's blockers hold it: its ticket's provider blockers never do", async () => {
+  const records = await open();
+  records.importTicket({ title: 'Ticketed', repository: REPO, kind: 'feature', status: 'Queued', ticket: `${REPO}#12` });
+  const [ticket] = tickets([12, 'Queued']);
+  const [item] = recordItems(records, [{ ...ticket!, blockers: [{ number: 11, repo: REPO, state: 'open' }] }], [REPO]);
+  assert.deepEqual(item!.blockers, []);
+});
+
 test("in a repository whose source hasn't read yet, only a record with a ticket waits for it", async () => {
   const records = await open();
   records.importTicket({ title: 'Unread', repository: REPO, kind: 'bug', ticket: `${REPO}#40` });

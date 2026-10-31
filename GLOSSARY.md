@@ -362,7 +362,7 @@ The board action that starts a Ready build's thread in its own worktree.
 _Avoid_: launch
 
 **Start after**:
-Arming a blocked part's start, so the board starts it once every issue it's blocked by closes.
+Arming a blocked part's start, so the board starts it once the local facts in its work records complete every work it waits on. A ticket closing, a Status or a finished T3 turn completes none.
 _Avoid_: auto-start (for this)
 
 **Design system**:

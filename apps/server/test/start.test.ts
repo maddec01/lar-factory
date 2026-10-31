@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { NOT_LANDED, SAMPLE_MODELS, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
+import { NOT_LANDED, recordBlockers, SAMPLE_MODELS, startBoard, until, writeOnboarding, writeRepositoryList } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue, rawIssue } from '@lar-factory/shared/test/raw-items';
 import { checkouts } from './repo-support.ts';
@@ -245,14 +245,12 @@ test('Start only runs for Queued issues from this board page and session', async
   assert.deepEqual([...await board.t3Calls(), ...await sample.t3Calls()], []);
 });
 
-test('Start is refused while an issue the item is blocked by is open', async (t) => {
-  const blocked = rawIssue('I_12', 12, 'Queued', ['decision-grill'], {
-    blockedBy: { nodes: [5, 6].map((number) => ({ number, state: 'OPEN', repository: { nameWithOwner: number === 5 ? 'maddec01/lar-factory' : 'maddec01/lar-server' } })) },
-  });
-  const board = await factoryBoard(t, [blocked]);
+test('Start is refused while a blocker is incomplete, naming each one', async (t) => {
+  const board = await factoryBoard(t, [rawIssue('I_12', 12, 'Queued', ['decision-grill'])]);
+  await recordBlockers(board, board.id(12), ['Decision 5', 'Decision 6']);
   const refused = await start(board, board.id(12));
   assert.equal(refused.status, 409);
-  assert.equal((await refused.json()).error, 'Blocked by #5, maddec01/lar-server#6 until they close; use Start after to start it then.');
+  assert.equal((await refused.json()).error, 'Blocked by Decision 5, Decision 6 until they complete; use Start after to start it then.');
   assert.deepEqual(await board.t3Calls(), []);
 });
 

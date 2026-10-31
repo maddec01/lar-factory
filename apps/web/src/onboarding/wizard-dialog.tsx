@@ -1,5 +1,6 @@
-// The onboarding dialog: the copied Modal over the board, showing one step at a time with a progress bar, Back and Next.
-// The empty board, an offer and Resume open it; closing it drops the run until a T3 project is picked, or an offered run until Next or a change, then keeps it to resume.
+// The onboarding dialog: the copied Modal over the board, showing one step at a time with a progress bar, Back and Next,
+// and Finish on the last step. The empty board, an offer and Resume open it; closing it drops the run until a T3 project
+// is picked, or an offered run until Next or a change, then keeps it to resume. Once Finish saves, it says so, with Go to the board.
 
 import { useEffect, useRef } from 'react';
 import { ArrowRight, Check } from 'lucide-react';
@@ -8,21 +9,23 @@ import { Button } from '@lar-factory/ui/design-system/Button';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
 import { Progress } from '@lar-factory/ui/progress';
-import { useBoardStore } from '../board/board-store.ts';
 import { StepBody } from './steps.tsx';
-import { type Run, type StepId, STEPS, onboarded, pickedProject, prClosed, stepReady, stepTitle, useWizardStore } from './wizard-store.ts';
+import { STEP_TITLES, type StepId } from './wizard-choices.ts';
+import { type Run, pickedProject, runSteps, stepReady, useWizardStore } from './wizard-store.ts';
 import { kind } from '../buttons/button-kinds.tsx';
 
 const STEP_HELP: Record<StepId, string> = {
-  project: 'Connect a repository folder so agents know where to work.',
-  setup: 'Choose what to show and tell agents what this repository does.',
-  labels: 'Set up labels to group work and track its progress.',
-  checks: 'Check tools and access so agents can read work and push changes.',
-  cleanup: 'Check agent instructions to prevent rules from working against each other.',
-  pr: 'Review and merge a pull request to save the setup in your repository.',
+  project: 'Choose the repository folder where agents will work.',
+  detect: 'Read from the repository and your access, with no test write. Nothing here is a question.',
+  source: "Choose the team whose work the board shows.",
+  import: 'Ticked tickets with a status label or tag become private work with that Status. Their labels and tags stay as they are.',
+  role: 'Say what this repository is to the others, such as the API server a client app uses.',
+  consent: 'Choose what the factory may write for you, within what your access allows.',
+  docs: 'Choose where the glossary and ADRs that builds write go.',
+  skills: "Choose the repository's skills that guide how builds write code.",
+  files: 'This repository has files from an earlier Lar Factory setup. Keep or drop each one.',
+  edits: 'Review the pull request that drops the files you unticked.',
 };
-
-const indexOf = (run: Run) => STEPS.findIndex((s) => s.id === run.step);
 
 /**
  * Where focus goes when the dialog closes and the copied Modal found nowhere to return it: the button that opened it;
@@ -33,23 +36,19 @@ function closedFocus(opener: HTMLElement | null): HTMLElement | null {
   return document.querySelector<HTMLElement>('.title-bar h1');
 }
 
-/**
- * Back and Next. Once the PR is open the run stays on its step, with Close and wait, then Go to the board once it merged, or Close once it closed without
- * merging.
- */
+/** Back, then Next, or on the last step Finish; once Finish saved, Go to the board. */
 function Nav({ run }: { run: Run }) {
-  const { projects, checks, clashes, agent, labels, next, back, close } = useWizardStore();
-  const data = useBoardStore((s) => s.data);
-  const ready = stepReady(run, projects, checks, data.tools, clashes, agent, labels);
-  if (run.prUrl) {
-    return onboarded(run, data) ? <Button {...kind('main')} leftIcon={<Check />} onClick={close}>Go to the board</Button>
-      : <Button {...kind('other')} onClick={close}>{prClosed(run, data) ? 'Close' : 'Close and wait'}</Button>;
-  }
-  if (run.step === 'pr') return <Button {...kind('other')} onClick={back}>Back</Button>;
+  const { projects, detection, tickets, changes, approved, finish, next, back, save, close } = useWizardStore();
+  if (finish.state === 'done') return <Button {...kind('main')} leftIcon={<Check />} onClick={close}>Go to the board</Button>;
+  const steps = runSteps(run, detection);
+  const at = steps.indexOf(run.step);
+  const ready = stepReady(run, projects, detection, tickets, changes, approved);
   return (
     <>
-      {indexOf(run) > 0 && <Button {...kind('other')} onClick={back}>Back</Button>}
-      <Button {...kind('main')} disabled={!ready} rightIcon={<ArrowRight />} onClick={next}>Next</Button>
+      {at > 0 && <Button {...kind('other')} disabled={finish.state === 'saving'} onClick={back}>Back</Button>}
+      {at === steps.length - 1
+        ? <Button {...kind('main')} disabled={!ready} loading={finish.state === 'saving'} leftIcon={<Check />} onClick={() => void save()}>Finish</Button>
+        : <Button {...kind('main')} disabled={!ready} loading={!!tickets?.importing} rightIcon={<ArrowRight />} onClick={() => void next()}>Next</Button>}
     </>
   );
 }
@@ -66,12 +65,14 @@ function stepHeading(dialog: HTMLElement | null): HTMLElement | null {
 
 /** The dialog while a run is open: the step's title, its place and the progress bar, the step, then Back and Next. */
 function WizardModal({ run }: { run: Run }) {
-  const { projects, close } = useWizardStore();
+  const { projects, detection, finish, close } = useWizardStore();
   const dialog = useRef<HTMLDivElement>(null);
-  const shown = useRef<StepId | null>(null);
+  const shown = useRef<string | null>(null);
+  const finished = finish.state === 'done';
+  const place = finished ? 'done' : run.step;
   useEffect(() => {
-    const moved = run.step !== shown.current;
-    shown.current = run.step;
+    const moved = place !== shown.current;
+    shown.current = place;
     // Opening, a new step, or a button such as Retry that went away with this render, puts focus on the step's heading, not the page.
     if (moved) {
       const body = dialog.current?.querySelector<HTMLElement>('[data-slot="modal-body"]');
@@ -79,24 +80,22 @@ function WizardModal({ run }: { run: Run }) {
     }
     if (moved || document.activeElement === document.body) stepHeading(dialog.current)?.focus();
   });
-  const data = useBoardStore((s) => s.data);
-  const step = STEPS[indexOf(run)]!;
-  const steps = STEPS.length;
-  // Once its PR merged, the Pull request step is done too.
-  const finished = onboarded(run, data);
-  const doneCount = finished ? steps : run.done.length;
-  const done = finished ? 'Ready' : `${doneCount} of ${steps} done`;
+  const steps = runSteps(run, detection);
+  const at = steps.indexOf(run.step);
+  const doneCount = finished ? steps.length : at;
+  const done = finished ? 'Ready' : `${doneCount} of ${steps.length} done`;
   return (
     <Modal onClose={close}>
       {/* ninna-ui's Modal drops the description from aria-describedby, so the step's place names itself. */}
-      <Modal.Content ref={dialog} data-onboarding-dialog title={stepTitle(step.id, run.provider)} aria-describedby="onboarding-place" description={run.step === 'labels' && run.provider === 'Azure DevOps' ? 'Set up tags to group work and track its progress.' : STEP_HELP[run.step]} focusFirstField={false}>
+      <Modal.Content ref={dialog} data-onboarding-dialog title={finished ? 'Onboarded' : STEP_TITLES[run.step]} aria-describedby="onboarding-place"
+        description={finished ? undefined : STEP_HELP[run.step]} focusFirstField={false}>
         <div className="grid shrink-0 gap-2 px-5 pb-4 sm:px-6">
           <Text id="onboarding-place" tone="muted">
-            Set up {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'}. Step {indexOf(run) + 1} of {steps}.
+            Set up {pickedProject(run, projects)?.name ?? (run.repo && shownRepo(run.repo).split('/').at(-1)) ?? 'a repository'}.{!finished && ` Step ${at + 1} of ${steps.length}.`}
           </Text>
-          <Progress value={doneCount} max={steps} caption={done} aria-label={done} />
+          <Progress value={doneCount} max={steps.length} caption={done} aria-label={done} />
         </div>
-        <Modal.Body><StepBody run={run} step={run.step} /></Modal.Body>
+        <Modal.Body><StepBody run={run} /></Modal.Body>
         <Modal.Footer><Nav run={run} /></Modal.Footer>
       </Modal.Content>
     </Modal>

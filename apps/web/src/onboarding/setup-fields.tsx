@@ -1,6 +1,6 @@
-// The setup fields and the custom label picker, which onboarding's steps and Edit both show. They hold no store: each
-// takes its values and calls back with the user's changes. Choice, Field and Group lay out every question onboarding
-// asks, one to a row with its label and one line of help.
+// The setup fields and the custom label picker, which Edit shows. They hold no store: each takes its values and calls
+// back with the user's changes. Choice, Field and Group lay out every question onboarding and Edit ask, one to a row
+// with its label and one line of help.
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { customLabelProblem, customTagProblem, shownRepo, writeHeaders, type SetupAnswers, type ShowSetting } from '@lar-factory/shared';
@@ -60,7 +60,7 @@ export function Group({ legend, hint, children }: { legend: string; hint?: React
   );
 }
 
-export const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opted-in': 'Items with a status' };
+const SHOW_TITLES: Record<ShowSetting, string> = { all: 'All items', 'opted-in': 'Items with a status' };
 
 type TextAnswer = keyof ReturnType<typeof setupProblems>;
 
@@ -127,7 +127,7 @@ export function SetupFields({ repo, azure = false, setup, action = 'Next', disab
 }
 
 /** The same Show choices in setup and beside the completed source check's counts. */
-export function ShowChoices({ setup, azure, disabled, onAnswer, counts }: {
+function ShowChoices({ setup, azure, disabled, onAnswer, counts }: {
   setup: SetupAnswers; azure?: boolean; disabled?: boolean; onAnswer: (change: SetupChange) => void; counts?: Record<ShowSetting, number>;
 }) {
   const suggested = suggestedShow();
@@ -168,10 +168,10 @@ export interface CustomLabelHandlers {
 }
 
 /** What custom labels, or on Azure DevOps custom tags, are for. */
-export const customLabelsHelp = (noun: 'label' | 'tag') =>
+const customLabelsHelp = (noun: 'label' | 'tag') =>
   `Use ${noun}s to group work, such as app: music.`;
 
-export function CustomLabelsTitle({ noun = 'label' }: { noun?: 'label' | 'tag' }) {
+function CustomLabelsTitle({ noun = 'label' }: { noun?: 'label' | 'tag' }) {
   return <h4 className="m-0 text-xs font-medium text-base-700">Custom {noun}s</h4>;
 }
 

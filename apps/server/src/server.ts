@@ -28,14 +28,12 @@ import { archivedItems, recordItems, ticketsByReference } from './items/record-i
 import type { ItemsRead, ReadPace, ReadProgress, TicketObservation } from './items/item-source.ts';
 import { log } from './log.ts';
 import { createItemDetails, detailsFileFor } from './item-details/item-details.ts';
-import { createClashRuns } from './onboarding/clash-runs.ts';
 import { createConfigChecks } from './onboarding/config-checks.ts';
 import { createProject } from './onboarding/create-project.ts';
 import { keepOnboarding } from './onboarding/keep-onboarding.ts';
 import { createPrOpener, previewOnboardingPr } from './onboarding/onboarding-pr.ts';
 import { readProjectTeams } from './onboarding/project-teams.ts';
 import { onboardingOffers, projectChoices } from './onboarding/project-choices.ts';
-import { findFixedClashes } from './onboarding/fixed-clashes.ts';
 import { detectSetup } from './onboarding/detect-setup.ts';
 import { importTickets, importableTickets } from './onboarding/import-tickets.ts';
 import { saveSetup } from './onboarding/save-setup.ts';
@@ -681,8 +679,6 @@ function readNow(): void {
 // Resources/server/dist/, beside Resources/web/dist/.
 const page = loadBuild(new URL('../../web/dist/', import.meta.url));
 
-/** Onboarding's Clash agent runs, kept while the board runs so closing the dialog leaves a run going. */
-const clashRuns = createClashRuns(offerModelChoices);
 const reread = () => {
   showRecords();
   board.push();
@@ -709,8 +705,6 @@ const { server, endStreams } = createBoardServer({
     return imported;
   },
   readProjectTeams,
-  findFixedClashes: (input) => findFixedClashes(input),
-  startClashRun: (input) => clashRuns.start(input), clashRuns: (repo) => clashRuns.list(repo),
   openOnboardingPr: createPrOpener(), previewOnboardingPr: (input) => previewOnboardingPr(input),
   readEditConfig: (input) => readEditConfig(input), openEditPr: (input) => openEditPr(input),
   openConfigUpdatePr: (input) => openConfigUpdatePr(input), dismissConfigUpdate: (repo) => dismissConfigUpdate(repo),

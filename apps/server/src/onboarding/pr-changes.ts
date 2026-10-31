@@ -8,7 +8,7 @@ import { skillRenameProblem, type FactoryFileKind, type Provider, type Onboardin
 import type { CommitTree, TreeEntry } from '../github/github.ts';
 import { AGENT_DOC_PATHS, agentSetupWrites, withoutAgentSkills } from './agent-setup.ts';
 import { isInstructionFile, isLineEdit, opencodeInstructions, overlaps, removesWhatIsThere } from './clash-edits.ts';
-import { projectSkills } from './fixed-clashes.ts';
+import { projectSkills } from './project-skills.ts';
 
 export interface PrPlan {
   /** The default branch's tree the entries change. */

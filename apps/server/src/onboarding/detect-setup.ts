@@ -16,7 +16,7 @@ import { isRepo } from '../config/repository-config.ts';
 import { type CommitTree, message, repositoryAccess } from '../github/github.ts';
 import { type Checkout, azureRepo, checkouts, githubRepo, onAzureDevOps } from '../t3/repository-project.ts';
 import { AGENT_DOC_PATHS, withoutAgentSkills } from './agent-setup.ts';
-import { projectSkills } from './fixed-clashes.ts';
+import { projectSkills } from './project-skills.ts';
 import { linkTarget } from './pr-changes.ts';
 import { readProjectTeams } from './project-teams.ts';
 

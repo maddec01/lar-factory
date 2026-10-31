@@ -32,3 +32,11 @@ that ID; `readThreadFamily` returned available with one member. A separate shell
 probe reconnected successfully. Real credential rejection, renewal failure and
 server restart were not exercised. Probe scripts live in /tmp and contain no
 credentials; credentials were read directly from Keychain into process memory.
+
+Item-thread refresh uses `item-execution.ts`: active and archived shell arrays,
+with both omission flags disabled, followed by bounded thread-ID projection
+reads. Association still uses only a root's first user message. Descendants are
+read but do not acquire an independent item association. Onboarding title lookup
+uses the same completed observation. An incomplete or disconnected refresh
+returns unavailable and retains the previous lookup and its observation time;
+only a completed empty snapshot means no matching threads. Stats still use SQL.

@@ -2,14 +2,13 @@
 // fetch of the default branch and answers with the rules that work against the factory's. The board keeps each
 // repository's last five runs in memory, so closing the dialog leaves a run going, and Retry adds a run beside the old one.
 
-import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { isRecord, onAzure, type Clash, type ClashRun, type ClashRunState, type ModelChoice, type ModelGroup } from '@lar-factory/shared';
 import { AZURE_REPOS } from '../azure/azure-repos.ts';
 import { isRepo } from '../config/repository-config.ts';
 import { defaultBranchHead, message as errorMessage } from '../github/github.ts';
-import { liveProjects, threadByTitle } from '../t3/t3-db.ts';
-import { statsDbPath } from '../t3/t3-settings.ts';
+import { repositoryProjects } from '../t3/repository-project-discovery.ts';
+import { protocolThreadByTitle } from '../t3/item-execution.ts';
 import { startThreadAndWait, type WaitedRun } from '../t3/t3.ts';
 import { findModelChoice } from '../t3/model-choices.ts';
 import { isInstructionFile, isLineEdit, opencodeInstructions, overlaps, removesWhatIsThere } from './clash-edits.ts';
@@ -25,7 +24,7 @@ export async function defaultBranch(repo: string, run?: (args: string[]) => Prom
 export interface ClashRunDeps {
   defaultBranch(repo: string): Promise<string>;
   /** The T3 project's folder, or null when T3 no longer has it; throws when T3's projects can't be read. */
-  projectFolder(projectId: string): string | null;
+  projectFolder(projectId: string): string | null | Promise<string | null>;
   /** Runs `git fetch origin <branch>` in the folder, returning null once it fetched, else the problem. */
   fetch(folder: string, branch: string): Promise<string | null>;
   /** The file at `path` on `ref` in the folder, as `git show <ref>:<path>` prints it; null when it can't. */
@@ -41,7 +40,11 @@ export interface ClashRunDeps {
 
 const DEPS: ClashRunDeps = {
   defaultBranch: (repo) => defaultBranch(repo),
-  projectFolder: (projectId) => liveProjects(statsDbPath(), homedir()).find((p) => p.id === projectId)?.folder ?? null,
+  projectFolder: async (projectId) => {
+    const read = await repositoryProjects();
+    if (read.availability !== 'available') throw Error('T3 projects unavailable');
+    return read.observation?.projects.find(project => project.id === projectId)?.workspaceRoot ?? null;
+  },
   fetch: async (folder, branch) => {
     const git = toolCommand('git');
     if (!git) return missingTool('git');
@@ -61,7 +64,7 @@ const DEPS: ClashRunDeps = {
     return code === 0 && stdout.startsWith('120000 ');
   },
   start: (projectId, message, choice, title) => startThreadAndWait(projectId, message, choice, title),
-  thread: (projectId, title) => threadByTitle(statsDbPath(), projectId, title),
+  thread: (projectId, title) => protocolThreadByTitle(projectId, title),
   runId: () => randomUUID().slice(0, 8),
   now: () => new Date(),
 };
@@ -207,7 +210,7 @@ export function createClashRuns(modelGroups: () => readonly ModelGroup[], deps: 
     try { branch = await deps.defaultBranch(repo); }
     catch (err) { return failed(`Can't read ${repo}'s default branch: ${errorMessage(err)}`); }
     let folder;
-    try { folder = deps.projectFolder(entry.projectId); }
+    try { folder = await deps.projectFolder(entry.projectId); }
     catch (err) { return failed(`Can't read T3 Code's projects: ${errorMessage(err)}`); }
     if (!folder) return failed('T3 Code no longer has the T3 project. Go back and pick one.');
     const problem = await deps.fetch(folder, branch);

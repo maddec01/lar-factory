@@ -101,6 +101,33 @@ export interface LaunchIntent {
   resolvedAt: string | null;
 }
 
+/** What a provider read observes: the record's ticket or its current PR. */
+export const OBSERVED = ['ticket', 'pr'] as const;
+export type Observed = (typeof OBSERVED)[number];
+/** A ticket's state as its provider shows it, or a confirmed not-found. */
+export const TICKET_STATES = ['open', 'closed', 'not-found'] as const;
+export type TicketState = (typeof TICKET_STATES)[number];
+/** A PR's state; `closed` is closed unmerged. */
+export const PULL_REQUEST_STATES = ['open', 'merged', 'closed'] as const;
+export type PullRequestState = (typeof PULL_REQUEST_STATES)[number];
+
+export type NewObservation = { of: 'ticket'; state: TicketState; assignee?: string } | { of: 'pr'; state: PullRequestState };
+
+/** The last provider read of a record's ticket or current PR. */
+export interface Observation {
+  of: Observed;
+  /** The ticket or PR it read, `owner/name#12`. */
+  subject: string;
+  /** What the last successful read showed, or null while no read has succeeded. */
+  state: TicketState | PullRequestState | null;
+  /** The ticket's assignee at that read; always null for a PR. */
+  assignee: string | null;
+  observedAt: string | null;
+  /** When the latest read failed and why, kept until a read succeeds; null otherwise. */
+  failedAt: string | null;
+  failure: string | null;
+}
+
 export interface ReplacedPullRequest {
   pullRequest: string;
   replacedAt: string;
@@ -201,6 +228,13 @@ export interface WorkRecords {
   setPullRequest(workId: string, revision: number, pullRequest: string): WorkRecord;
   /** The PRs the record held before its current one, oldest first. */
   replacedPullRequests(workId: string): ReplacedPullRequest[];
+  /** Records a successful read of the record's ticket or current PR, replacing the last one of its kind. A merged PR
+   * finishes the work. */
+  observe(workId: string, revision: number, observation: NewObservation): WorkRecord;
+  /** Records that a read failed, keeping the last observation of its kind. */
+  recordReadFailure(workId: string, revision: number, of: Observed, failure: string): WorkRecord;
+  /** Its ticket's observation, then its current PR's, for each it has. */
+  observations(workId: string): Observation[];
   /** Records the build's next review round with every axis and finding, whole or not at all. */
   recordReviewRound(workId: string, revision: number, round: NewReviewRound): WorkRecord;
   /** Records what became of a finding. A rejection needs its reason. */
@@ -217,13 +251,13 @@ export interface WorkRecords {
   launchIntents(filter: LaunchIntentFilter): LaunchIntent[];
   /** Resolves an unresolved intent once: to T3's thread ID, which it records as the record's thread, or to a failure. */
   resolveLaunchIntent(workId: string, revision: number, intentId: string, outcome: { threadId: string } | { failure: string }): { record: WorkRecord; intent: LaunchIntent };
-  /** Records that the work is finished. Only the build's delivery PR observation calls it; a ticket closing or a thread
-   * ending never does. A finish is final. */
+  /** Records that the work is finished. A merged observation of the delivery PR finishes the work too; a ticket closing
+   * or a thread ending never does. A finish is final. */
   recordFinished(workId: string, revision: number): WorkRecord;
   /** The finished and set-aside records `retention` hides at `now`, in the order they were made. */
   hidden(retention: Retention, now?: Date): WorkRecord[];
   /** Deletes the finished and set-aside records `retention` deletes at `now`, with their bodies, review rounds, threads,
-   * launch intents, replaced PRs and blocker edges, in one transaction. A due record stays while it owns a kept record or a kept
+   * launch intents, replaced PRs, observations and blocker edges, in one transaction. A due record stays while it owns a kept record or a kept
    * record waits on it; the kept parent and blockers of a deleted record are bumped. */
   deleteExpired(retention: Retention, now?: Date): Expired;
   /** The records it owns, in the order they were made. */
@@ -418,6 +452,19 @@ function workRecords(database: Database): WorkRecords {
   const bodyNames = db.prepare('SELECT body FROM bodies WHERE work_id = ?');
   const bodyText = db.prepare('SELECT markdown FROM bodies WHERE work_id = ? AND body = ?');
   const writeBody = db.prepare('INSERT INTO bodies (work_id, body, markdown) VALUES (?, ?, ?) ON CONFLICT DO UPDATE SET markdown = excluded.markdown');
+  const writeObservation = db.prepare(`INSERT INTO observations (work_id, observed, subject, state, assignee, observed_at) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT DO UPDATE SET subject = excluded.subject, state = excluded.state, assignee = excluded.assignee, observed_at = excluded.observed_at,
+    failed_at = NULL, failure = NULL`);
+  const writeReadFailure = db.prepare(`INSERT INTO observations (work_id, observed, subject, failed_at, failure) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT DO UPDATE SET failed_at = excluded.failed_at, failure = excluded.failure`);
+  const deleteObservation = db.prepare('DELETE FROM observations WHERE work_id = ? AND observed = ?');
+  const observationRows = db.prepare(`SELECT * FROM observations WHERE work_id = ? ORDER BY observed = 'pr'`);
+  /** The ticket or PR a read of `of` observes on `row`; throws when the record has none. */
+  const subject = (row: Row, of: Observed): string => {
+    const reference = of === 'ticket' ? row.ticket : row.pull_request;
+    if (!reference) throw invalid(`The work record ${row.work_id} has no ${of === 'ticket' ? 'ticket' : 'PR'} to observe.`);
+    return reference;
+  };
   const replacePullRequest = db.prepare('INSERT INTO replaced_pull_requests (work_id, pull_request, replaced_at) VALUES (?, ?, ?)');
   const replacedRows = db.prepare('SELECT * FROM replaced_pull_requests WHERE work_id = ? ORDER BY rowid');
   const nextQueueOrder = db.prepare('SELECT coalesce(max(queue_order), 0) + 1 AS next FROM work_records WHERE repository = ?');
@@ -612,9 +659,39 @@ function workRecords(database: Database): WorkRecords {
         checkBuilt(row.kind);
         if (row.pull_request === reference) return null;
         if (row.pull_request) replacePullRequest.run(workId, row.pull_request, new Date().toISOString());
+        deleteObservation.run(workId, 'pr');
         return { pull_request: reference };
       });
     },
+    observe: (workId, revision, observation) => {
+      const of = checkOneOf(OBSERVED, observation?.of, 'observed thing');
+      const state = of === 'ticket' ? checkOneOf(TICKET_STATES, observation.state, 'ticket state') : checkOneOf(PULL_REQUEST_STATES, observation.state, 'PR state');
+      const { assignee } = observation as { assignee?: unknown };
+      if (of === 'pr' && assignee !== undefined) throw invalid('A PR observation has no assignee.');
+      const who = assignee === undefined ? null : checkFilled(assignee, 'assignee');
+      return change(workId, revision, (row) => {
+        const now = new Date().toISOString();
+        writeObservation.run(workId, of, subject(row, of), state, who, now);
+        return state === 'merged' && !row.finished_at ? { finished_at: now } : {};
+      });
+    },
+    recordReadFailure: (workId, revision, of, failure) => {
+      const observed = checkOneOf(OBSERVED, of, 'observed thing');
+      const reason = checkFilled(failure, 'read failure');
+      return change(workId, revision, (row) => (writeReadFailure.run(workId, observed, subject(row, observed), new Date().toISOString(), reason), {}));
+    },
+    observations: (workId) => database.read(() => {
+      find(workId);
+      return observationRows.all(workId).map((row): Observation => ({
+        of: row.observed as Observed,
+        subject: String(row.subject),
+        state: row.state as Observation['state'],
+        assignee: row.assignee as string | null,
+        observedAt: row.observed_at as string | null,
+        failedAt: row.failed_at as string | null,
+        failure: row.failure as string | null,
+      }));
+    }),
     replacedPullRequests: (workId) => database.read(() => {
       find(workId);
       return replacedRows.all(workId).map((row) => ({ pullRequest: String(row.pull_request), replacedAt: String(row.replaced_at) }));
@@ -743,7 +820,7 @@ function workRecords(database: Database): WorkRecords {
           for (const blocker of blockerRows.all(workId) as unknown as Row[]) if (!due.has(blocker.work_id)) touched.add(blocker.work_id);
         }
         // Children go before their parents, so clear the parents among the deleted records first.
-        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests']
+        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests', 'observations']
           .map((table) => db.prepare(`DELETE FROM ${table} WHERE work_id = ?`));
         const clearParent = db.prepare('UPDATE work_records SET parent_id = NULL WHERE work_id = ?');
         const deleteBlockers = db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?');

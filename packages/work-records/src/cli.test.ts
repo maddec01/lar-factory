@@ -127,6 +127,16 @@ describe('lar-work', { timeout: 30_000 }, () => {
     expect(await larWork(data, 'resolve-intent', workId, '--revision', '3', '--intent', intent.intentId)).toMatchObject({ code: 2, stderr: expect.stringContaining('--thread or --failure') });
   });
 
+  it("records a ticket's observations and a failed read with no board running", async () => {
+    const data = tempDir();
+    const { workId } = (await larWork(data, 'create', '--title', 'Work', '--repository', 'maddec01/lar', '--kind', 'bug', '--ticket', 'maddec01/lar#4')).record;
+    expect((await larWork(data, 'observe', workId, '--revision', '1', '--of', 'ticket', '--state', 'open', '--assignee', 'pedro')).record).toMatchObject({ revision: 2 });
+    expect((await larWork(data, 'observe-failure', workId, '--revision', '2', '--of', 'ticket', '--failure', 'GitHub answered 502.')).record).toMatchObject({ revision: 3 });
+    expect((await larWork(data, 'observations', workId)).record).toMatchObject([{ of: 'ticket', state: 'open', assignee: 'pedro', failure: 'GitHub answered 502.' }]);
+    expect(await larWork(data, 'observe', workId, '--revision', '2', '--of', 'ticket', '--state', 'closed')).toMatchObject({ code: 1, stderr: expect.stringContaining('revision 3, not 2') });
+    expect((await larWork(data, 'observations', workId)).record).toMatchObject([{ state: 'open' }]);
+  });
+
   it("saves this machine's retention setting and hides and deletes set-aside records with it", async () => {
     const data = tempDir();
     expect((await larWork(data, 'retention')).record).toEqual({ hideAfterDays: 7, deleteAfterDays: null });
@@ -167,6 +177,6 @@ describe('lar-work', { timeout: 30_000 }, () => {
   it('explains identifiers, reads, changes, structure and errors in its help', async () => {
     const help = await larWork(tempDir(), '--help');
     expect(help.code).toBe(0);
-    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Content', 'Threads and launch intents', 'Retention and export', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
+    for (const heading of ['Identifiers', 'Reads', 'Changes', 'Structure', 'Content', 'Provider observations', 'Threads and launch intents', 'Retention and export', 'Errors']) expect(help.stdout).toContain(`\n${heading}\n`);
   });
 });

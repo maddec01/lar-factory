@@ -67,6 +67,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paus
     repo: record.repository, state: state(record) });
   const toItem = (record: WorkRecord): Item => {
     const ticket = ticketOf(record);
+    const attachment = records.publicationAttachment(record.workId);
     const parent = record.parentId ? records.read(record.parentId) : null;
     const children = records.children(record.workId).filter((c) => !c.setAside);
     // A blocker holds the work until its local facts complete it; its Status, its ticket closing and its thread ending never do.
@@ -88,7 +89,7 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paus
       kind: record.kind === 'slice' ? 'issue' : record.kind,
       number: ticketNumber(record.ticket),
       title: record.title || ticket?.title || '',
-      url: ticket?.url ?? null,
+      url: ticket?.url ?? attachment?.url ?? null,
       repo: record.repository,
       state: state(record),
       closedAs: done ? 'done' : null,
@@ -100,6 +101,10 @@ function itemMapper(records: WorkRecords, tickets: readonly Item[], paused: Paus
       closedAt: done ? record.finishedAt ?? record.updatedAt : null,
       slices,
     };
+    if (!['decision', 'slice'].includes(record.kind)) {
+      const { eligible, reasons } = records.publicationReadiness(record.workId);
+      item.publication = { eligible, reasons };
+    }
     if (map) item.map = map;
     const pause = pausedOf(record, paused);
     if (pause) item.paused = pause;

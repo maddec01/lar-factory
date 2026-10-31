@@ -19,7 +19,10 @@ import type { StartAfter } from '../start-after/start-after.ts';
 import { log } from '../log.ts';
 import { readAzureReadiness } from '../azure/azure-readiness.ts';
 
+import type { createPublication } from '../publication/publication.ts';
+
 export interface HttpDeps {
+  publication: ReturnType<typeof createPublication>;
   board: BoardState;
   commands: ItemCommands;
   capture: Capture;
@@ -144,7 +147,7 @@ function forItem(unnamed: string, run: (itemId: string, input: Record<string, un
 }
 
 export function createBoardServer({ board, commands, capture, startAfter, retention, archive, page, appSecret, sample, recheck, reauthorizeT3, itemDetails, readSoon, ready, projectChoices, keepOnboarding, createProject,
-  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings, publicationVocabulary }: HttpDeps): BoardServer {
+  detectSetup, saveSetup, importableTickets, importTickets, openOnboardingPr, previewOnboardingPr, openConfigUpdatePr, dismissConfigUpdate, changeRepositorySettings, publicationVocabulary, publication }: HttpDeps): BoardServer {
   /** Open /api/events responses, one per page. */
   const streams = new Set<ServerResponse>();
   /** Set once the app asks to drain before installing an update: guarded writes are refused from then on. */
@@ -174,6 +177,11 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
 
   /** The guarded writes by path. /api/read stays open for status.sh, since it only starts a read. */
   const WRITES: Record<string, Write> = {
+    ...Object.fromEntries(['open', 'prepare', 'approve', 'inspect', 'resume', 'reconcile', 'fallback'].map((action) => [`/api/publication/${action}`, {
+      what: 'the publication request', disabled: 'Publishing is disabled in sample mode. Your private work remains available.',
+      restarted: () => ({ error: 'The board restarted. Reopen publication to inspect its stored plan.' }),
+      run: (input: Record<string, unknown>) => publication.request(action, input),
+    }])),
     '/api/pr-readiness': {
       what: 'the linked PR to read', disabled: 'Azure readiness is unavailable in sample mode.',
       async run({ itemId, number }) {

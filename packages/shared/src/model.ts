@@ -195,6 +195,8 @@ function sum(stats: readonly ItemStats[], figure: (s: ItemStats) => number): num
 }
 
 export interface Item {
+  /** Eligibility from the durable journal, independent of Status. Absent for decisions and slices. */
+  publication?: Pick<import('./publication.ts').PublicationReadiness, 'eligible' | 'reasons'>;
   /**
    * The board item's work ID, from its work record. An item source's read, before it joins a record, holds its ticket's
    * node id here, which the provider reads and writes it by.

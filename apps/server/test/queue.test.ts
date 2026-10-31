@@ -62,7 +62,8 @@ test('Queue only moves List items and is a no-op for an item already Queued', as
 
 test('a move on a record a thread changed since the board read it is refused, and the board shows the record as it is', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')] });
-  await until(board, (d) => d.items.length === 1);
+  // Let startup's provider observation publish its revision before deliberately making the board stale.
+  await until(board, (d) => d.firstRead.settled && d.items.length === 1 && d.items[0]!.revision > 1);
   const id = board.id(12);
   const records = await openWorkRecords(workRecordsPath(board.dataDir));
   try { records.update(id, records.read(id).revision, { kind: 'bug' }); } finally { records.close(); }

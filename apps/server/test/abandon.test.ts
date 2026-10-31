@@ -46,7 +46,8 @@ test('a failed ticket close reports the error, and the work stays set aside', as
 test('an abandoned item does not come back while GitHub still reports it', async (t) => {
   const board = await startBoard(t, { items: [boardIssue(12, 'List')] }, false, true);
   await until(board, (d) => d.items.length === 1);
-  assert.equal((await abandon(board, board.id(12))).status, 200);
+  const response = await abandon(board, board.id(12));
+  assert.equal(response.status, 200, await response.text());
   await reads(board, 5);
   const data = await board.board() as BoardData;
   assert.ok(!has(data, board.id(12)));

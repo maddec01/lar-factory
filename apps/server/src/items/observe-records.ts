@@ -66,9 +66,11 @@ async function observeOne(records: WorkRecords, workId: string, of: Observed, re
 /**
  * Observes every active record of `repos`, less the work IDs in `hidden`, which retention hides: its current PR until
  * the work finishes, then its ticket, PR first so a merge that closes the ticket finishes the work before the ticket's
- * close is seen, OBSERVED_AT_ONCE records at a time. A record a thread changes meanwhile is read again next time.
+ * close is seen, OBSERVED_AT_ONCE records at a time. `changed` publishes each observation's writes before another
+ * provider read can hold up the pass. A record a thread changes meanwhile is read again next time.
  */
-export async function observeRecords(records: WorkRecords, repos: readonly string[], reads: ObserveReads, hidden: ReadonlySet<string> = new Set()): Promise<void> {
+export async function observeRecords(records: WorkRecords, repos: readonly string[], reads: ObserveReads, hidden: ReadonlySet<string> = new Set(),
+  changed: () => void = () => {}): Promise<void> {
   const active = records.list({}).filter((r) => !r.setAside && !hidden.has(r.workId) && repos.some((repo) => sameRepo(repo, r.repository)));
   let next = 0;
   const observeNext = async (): Promise<void> => {
@@ -77,11 +79,11 @@ export async function observeRecords(records: WorkRecords, repos: readonly strin
   const observeActive = async ({ workId, repository, ticket, pullRequest, finishedAt }: WorkRecord): Promise<void> => {
     try {
       if (pullRequest && !finishedAt) {
-        await observeOne(records, workId, 'pr', async () => ({ of: 'pr', state: await reads.pr(repository, numberOf(pullRequest)) }));
+        await observeOne(records, workId, 'pr', async () => ({ of: 'pr', state: await reads.pr(repository, numberOf(pullRequest)) })).finally(changed);
       }
       if (ticket && !records.read(workId).setAside) {
         const number = numberOf(ticket);
-        await observeOne(records, workId, 'ticket', async () => ({ of: 'ticket', ...reads.known?.(repository, number) ?? await reads.ticket(repository, number) }));
+        await observeOne(records, workId, 'ticket', async () => ({ of: 'ticket', ...reads.known?.(repository, number) ?? await reads.ticket(repository, number) })).finally(changed);
       }
     } catch (err) {
       log(`can't record what ${workId}'s provider shows: ${(err as Error).message}`);

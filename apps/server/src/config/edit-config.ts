@@ -23,8 +23,8 @@ async function currentConfig(repo: string, run?: Run, branch?: string): Promise<
   const found = await findRepositoryConfig(repo, run, branch);
   if (!found) return { status: 409, error: `${repo} has no .lar-factory.json on ${branch ?? 'its default branch'}.` };
   if ('problem' in found) return { status: 409, error: found.problem };
-  const { version, itemSource, role, labels } = found;
-  return { version, itemSource, role, labels };
+  const { version, itemSource, role, labels, vocabulary, domainDocs, skills } = found;
+  return { version, itemSource, role, labels, vocabulary, domainDocs, skills };
 }
 
 /**

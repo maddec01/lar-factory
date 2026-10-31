@@ -4,8 +4,8 @@
 // can't be used, the dialog says why and shows the last usable setup. Shared defaults change only through a PR.
 
 import type { ReactNode } from 'react';
-import { OFFERED_OPERATIONS, onAzure, sameRepo, shownRepo, type OperationAccess, type RepositoryOperation, type RepositorySetup,
-  type SettingSource, type SharedRepositorySettings, type SharedSetting } from '@lar-factory/shared';
+import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, type OperationAccess, type RepositoryOperation, type RepositorySetup,
+  type SettingSource, type SharedRepositorySettings } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
@@ -15,19 +15,22 @@ import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
 import { NativeSelect } from '@lar-factory/ui/native-select';
 import { useBoardStore } from '../board/board-store.ts';
-import { canSave, shownDrafts, useEditStore, type Drafts } from './edit-store.ts';
+import { canSave, shownDrafts, useEditStore, type Drafts, type DraftSetting } from './edit-store.ts';
+import { VocabularySettings } from '../publication/vocabulary-settings.tsx';
 import { kind } from '../buttons/button-kinds.tsx';
 
 const SOURCES: Record<SettingSource, string> = { local: 'Set on this Mac', shared: 'Shared default', default: 'Factory default' };
 const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: 'Refused', unverified: 'Not checked yet' };
 
-const OPERATIONS = (azure: boolean): Partial<Record<RepositoryOperation, string>> => ({
+const OPERATIONS = (azure: boolean): Record<RepositoryOperation, string> => ({
   'push-branch': 'Push branches', 'open-pr': 'Open PRs', 'edit-ticket': azure ? 'Edit work items' : 'Edit issues',
+  'publish-ticket': azure ? 'Create work items' : 'Create issues', 'tag-ticket': azure ? 'Set tags' : 'Set labels',
+  'comment-ticket': 'Post comments', 'type-ticket': azure ? 'Set work item types' : 'Set issue types', 'relate-ticket': 'Set relationships',
 });
 
 /** A setting's value as the dialog names it. */
-function shown<K extends SharedSetting>(value: SharedRepositorySettings[K]): string {
-  const v = value as SharedRepositorySettings[SharedSetting];
+function shown<K extends DraftSetting>(value: SharedRepositorySettings[K]): string {
+  const v = value as SharedRepositorySettings[DraftSetting];
   if (Array.isArray(v)) return v.length ? v.join(', ') : 'none';
   if (typeof v === 'string') return v || 'none';
   if (v?.kind === 'azure-board') return `${v.team}'s backlog and current sprint`;
@@ -37,7 +40,7 @@ function shown<K extends SharedSetting>(value: SharedRepositorySettings[K]): str
 
 /** One setting: its name, source and editor, Save, and Use shared default while it is set on this Mac. */
 function Setting({ repo, setup, name, hint, settingKey, children }: {
-  repo: string; setup: RepositorySetup; name: string; hint?: string; settingKey: SharedSetting; children: ReactNode;
+  repo: string; setup: RepositorySetup; name: string; hint?: string; settingKey: DraftSetting; children: ReactNode;
 }) {
   const { typed, running, save, useShared } = useEditStore();
   const source = setup.sources[settingKey];
@@ -103,14 +106,14 @@ function Access({ repo, setup }: { repo: string; setup: RepositorySetup }) {
       <span className="text-sm font-medium">Access</span>
       <p className="m-0 text-xs text-base-700">What your credentials allowed when the factory last tried, and what you let it offer. After you change credentials, recheck so each one is tried again when needed.</p>
       <ul className="m-0 grid list-none gap-1 p-0 text-sm">
-        {OFFERED_OPERATIONS.map((op) => <li key={op} data-operation={op} className="flex flex-wrap justify-between gap-2">
+        {REPOSITORY_OPERATIONS.map((op) => <li key={op} data-operation={op} className="flex flex-wrap justify-between gap-2">
           <span>{names[op]}</span>
           <span className="flex items-center gap-3 text-xs text-base-700">{ACCESS[setup.access[op]]}
             <Checkbox label="Offer" checked={setup.consent.includes(op)} disabled={running !== null || setup.access[op] === 'refused'}
               onChange={() => void offer(repo, op, !setup.consent.includes(op), setup)} /></span>
         </li>)}
       </ul>
-      <p className="m-0 text-xs text-base-700">You'll choose whether the factory may {onAzure(repo) ? 'create and tag work items' : 'open and label issues'} the first time you publish refined work.</p>
+      <p className="m-0 text-xs text-base-700">Each operation needs its own permission. Publication also asks you to approve the exact content before any write.</p>
       <span><Button {...kind('other')} disabled={running !== null} loading={running === 'recheck'} onClick={() => void recheck(repo)}>Recheck access</Button></span>
     </div>
   );
@@ -133,6 +136,7 @@ export function EditDialog() {
               {setup.sharedProblem} The board keeps the last usable setup until the file reads again.
             </Alert>}
             <Settings repo={repo} setup={setup} />
+            <VocabularySettings key={repo} setup={setup} />
             <Access repo={repo} setup={setup} />
             {errors[repo] && <Alert tone="danger" title="Can't change this setting">{errors[repo]}</Alert>}
           </div>

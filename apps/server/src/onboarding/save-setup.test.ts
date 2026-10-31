@@ -1,3 +1,4 @@
+import { effectiveVocabulary } from '@lar-factory/shared';
 import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -30,10 +31,10 @@ test("saving onboarding's answers puts the repository on the board with them as 
   assert.deepEqual(readRepositoryList(dir), [{ repo: 'maddec01/lar-web' }]);
   assert.deepEqual(readRepositorySetups(dir), [{
     repo: 'maddec01/lar-web', projectId: 'lar-web', role: 'Web client', itemSource: { kind: 'issues' }, labels: [],
-    domainDocs: { kind: 'private' }, skills: ['web-review'],
-    access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused' },
+    domainDocs: { kind: 'private' }, skills: ['web-review'], ...effectiveVocabulary(),
+    access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
     consent: ['push-branch', 'open-pr'], paused: [], shared: {},
-    sources: { role: 'local', itemSource: 'local', labels: 'default', domainDocs: 'local', skills: 'local' },
+    sources: { role: 'local', itemSource: 'local', labels: 'default', domainDocs: 'local', skills: 'local', vocabulary: 'default' },
   }]);
 });
 

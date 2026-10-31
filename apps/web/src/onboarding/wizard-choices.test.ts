@@ -9,7 +9,7 @@ import { answerProblem, answersOf, consentOptions, defaultsOf, docsOptions, file
 const azure = (parts: Partial<SetupDetection> = {}) => detection({ repo: 'contoso/Fabrikam/lar-api', provider: 'Azure DevOps',
   itemSources: { found: [{ kind: 'azure-board', team: 'Fabrikam Team' }, { kind: 'azure-board', team: 'Web' }] }, ...parts });
 
-const contributor = { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'unverified', 'tag-ticket': 'refused' } as const;
+const contributor = { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' } as const;
 
 test('a GitHub repository with no factory files asks its questions in order after detection', () => {
   expect(stepsOf('GitHub', detection(), {})).toEqual(['project', 'detect', 'import', 'role', 'consent', 'docs', 'skills']);

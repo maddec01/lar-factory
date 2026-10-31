@@ -1,3 +1,4 @@
+import { effectiveVocabulary } from '@lar-factory/shared';
 import { test, type TestContext } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -37,10 +38,10 @@ const setupOf = (dir: string, repo = REPO) => readRepositorySetups(dir).find((s)
 test('a repository with no Repository config and no local settings works from the defaults', async (t) => {
   const dir = await dataDir(t, [REPO, AZURE]);
   assert.deepEqual(setupOf(dir), {
-    repo: REPO, role: '', itemSource: { kind: 'issues' }, labels: [], domainDocs: { kind: 'private' }, skills: [],
-    access: { 'push-branch': 'unverified', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified' },
+    repo: REPO, role: '', itemSource: { kind: 'issues' }, labels: [], domainDocs: { kind: 'private' }, skills: [], ...effectiveVocabulary(),
+    access: { 'push-branch': 'unverified', 'open-pr': 'unverified', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
     consent: [], paused: [], shared: {},
-    sources: { role: 'default', itemSource: 'default', labels: 'default', domainDocs: 'default', skills: 'default' },
+    sources: { role: 'default', itemSource: 'default', labels: 'default', domainDocs: 'default', skills: 'default', vocabulary: 'default' },
   });
   // An Azure DevOps repository has no item source until a team is named.
   assert.equal(setupOf(dir, AZURE).itemSource, null);
@@ -64,7 +65,7 @@ test("each setting names where it comes from, and the setup keeps Repository con
   applySharedDefaults(REPO, { defaults: { role: 'Apple app', labels: ['area'] } }, dir);
   setOverride(REPO, 'role', 'My Apple client', dir);
   const { sources, shared } = setupOf(dir);
-  assert.deepEqual(sources, { role: 'local', itemSource: 'default', labels: 'shared', domainDocs: 'default', skills: 'default' });
+  assert.deepEqual(sources, { role: 'local', itemSource: 'default', labels: 'shared', domainDocs: 'default', skills: 'default', vocabulary: 'default' });
   assert.deepEqual(shared, { role: 'Apple app', labels: ['area'] });
   setOverride(REPO, 'role', undefined, dir);
   assert.equal(setupOf(dir).sources.role, 'shared');
@@ -165,7 +166,7 @@ test('a repository with no .lar-factory.json is on the board from its local sett
   const gh = ghWith({ 'maddec01/lar-factory': { version: 1, role: 'The factory', show: 'opted-in', labels: ['area'] } });
   const { configs, problems } = await readOnboardedConfigs(readRepositoryList(dir), gh, dir);
   assert.deepEqual(configs, [
-    { repo: 'maddec01/missing', version: 1, role: '', itemSource: { kind: 'issues' }, labels: [] },
+    { repo: 'maddec01/missing', version: 2, role: '', itemSource: { kind: 'issues' }, labels: [] },
     { repo: 'maddec01/lar-factory', version: 1, role: 'The factory', itemSource: { kind: 'issues' }, labels: ['area'] },
   ]);
   assert.deepEqual(problems, []);
@@ -318,4 +319,57 @@ test("Settings' changes refuse a setting Repository config can't share, a value 
   assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'fly' }, dir), { status: 400, error: 'Send the repository and the change to its settings.' });
   assert.deepEqual(changeRepositorySettings({ repo: 'maddec01/lar-web', change: 'recheck' }, dir), { status: 409, error: 'maddec01/lar-web is still onboarding.' });
   assert.equal(setupOf(dir).sources.labels, 'default');
+});
+
+test('Vocabulary inherits per term, preserves explicit nothing and restores inheritance when removed', async (t) => {
+  const dir = await dataDir(t);
+  applySharedDefaults(REPO, { defaults: { vocabulary: { build: { type: 'Task', labels: ['delivery'] }, bug: { type: 'Bug', labels: [] } } } }, dir);
+  setOverride(REPO, 'vocabulary', { build: { type: null, labels: [] } }, dir);
+  assert.deepEqual(setupOf(dir).vocabulary.build, { type: null, labels: [] });
+  assert.deepEqual(setupOf(dir).vocabulary.bug, { type: 'Bug', labels: [] });
+  assert.equal(setupOf(dir).vocabularySources.build, 'local');
+  assert.equal(setupOf(dir).vocabularySources.bug, 'shared');
+  assert.equal(setupOf(dir).vocabularySources.feature, 'default');
+  setOverride(REPO, 'vocabulary', {}, dir);
+  assert.deepEqual(setupOf(dir).vocabulary.build, { type: 'Task', labels: ['delivery'] });
+  assert.equal(setupOf(dir).vocabularySources.build, 'shared');
+});
+
+test('malformed Vocabulary keeps the last usable shared config and consent remains local', async (t) => {
+  const dir = await dataDir(t);
+  applySharedDefaults(REPO, { defaults: { vocabulary: { concept: { type: 'Epic', labels: [] } } } }, dir);
+  for (const vocabulary of [{ build: null }, { slice: { type: 'Task', labels: [] } }, { bug: { type: ['Bug'], labels: [] } }, { build: { type: null, labels: [3] } }]) {
+    const read = sharedDefaultsOf({ vocabulary, consent: ['publish-ticket'] }, false);
+    assert.ok('problem' in read);
+    applySharedDefaults(REPO, read, dir);
+    assert.equal(setupOf(dir).vocabulary.concept.type, 'Epic');
+    assert.match(setupOf(dir).sharedProblem!, /vocabulary/);
+    assert.deepEqual(setupOf(dir).consent, []);
+  }
+});
+
+test('Settings edits and removes one Vocabulary override without changing the other terms or consent', async (t) => {
+  const dir = await dataDir(t);
+  applySharedDefaults(REPO, { defaults: { vocabulary: { bug: { type: 'Bug', labels: ['defect'] } } } }, dir);
+  setOverride(REPO, 'vocabulary', { build: { type: 'Task', labels: [] } }, dir);
+  const saved = changeRepositorySettings({ repo: REPO, change: 'vocabulary', key: 'bug', value: { type: null, labels: [] } }, dir);
+  assert.ok('setup' in saved);
+  assert.deepEqual(saved.setup.vocabulary.bug, { type: null, labels: [] });
+  assert.equal(saved.setup.vocabulary.build.type, 'Task');
+  assert.deepEqual(saved.setup.consent, []);
+  changeRepositorySettings({ repo: REPO, change: 'vocabulary', key: 'bug' }, dir);
+  assert.equal(setupOf(dir).vocabulary.bug.type, 'Bug');
+  assert.equal(setupOf(dir).vocabulary.build.type, 'Task');
+  assert.ok('error' in changeRepositorySettings({ repo: REPO, change: 'vocabulary', key: 'slice' }, dir));
+});
+
+test('permission to offer ticket creation grants neither edits, comments, terms nor relationships', async (t) => {
+  const dir = await dataDir(t);
+  const changed = changeRepositorySettings({ repo: REPO, change: 'consent', value: ['publish-ticket'] }, dir);
+  assert.ok('setup' in changed);
+  assert.deepEqual(changed.setup.consent, ['publish-ticket']);
+  for (const operation of ['comment-ticket', 'edit-ticket', 'tag-ticket', 'type-ticket', 'relate-ticket'] as const) {
+    assert.equal(changed.setup.access[operation], 'unverified');
+    assert.equal(changed.setup.consent.includes(operation), false);
+  }
 });

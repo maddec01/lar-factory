@@ -73,7 +73,7 @@ test('opening the PR makes one commit on the default branch\'s head with the cho
     'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'docs/agents/triage-labels.md']);
   assert.ok(field(tree!, 'tree[][content]').some((text) => text.startsWith('# lar-web\n\n- Open a PR when done.\n\n## Agent skills')));
   assert.deepEqual(JSON.parse(field(tree!, 'tree[][content]').find((text) => text.includes('"version"'))!),
-    { version: 1, role: 'Web client', itemSource: { kind: 'issues' }, skills: ['web-review'] });
+    { version: 2, role: 'Web client', itemSource: { kind: 'issues' }, skills: ['web-review'] });
   assert.deepEqual([field(commit!, 'tree'), field(commit!, 'parents[]')], [['tree1'], ['abc123']]);
   assert.deepEqual([field(branch!, 'ref'), field(branch!, 'sha')], [['refs/heads/lar-factory/onboarding'], ['commit1']]);
   assert.deepEqual([create![create!.indexOf('--base') + 1], create![create!.indexOf('--head') + 1]], ['main', 'lar-factory/onboarding']);

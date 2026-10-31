@@ -192,7 +192,7 @@ function accessLine(detection: SetupDetection): string {
 }
 
 /** Each shared setting as What we found names it. */
-const SETTING_NAMES: Record<SharedSetting, string> = { role: 'role', itemSource: 'item source', labels: 'labels', domainDocs: 'domain-doc location', skills: 'skills' };
+const SETTING_NAMES: Record<SharedSetting, string> = { role: 'role', itemSource: 'item source', labels: 'labels', domainDocs: 'domain-doc location', skills: 'skills', vocabulary: 'Vocabulary' };
 
 /** Names in a sentence: `a`, `a and b`, `a, b and c`. */
 const listed = (names: string[]) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]!);

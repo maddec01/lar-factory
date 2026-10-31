@@ -31,7 +31,7 @@ test('a repository with no factory files detects issues, private domain docs, no
   assert.deepEqual(await detect({ 'README.md': '# Web\n' }), {
     repo: 'maddec01/lar-web', provider: 'GitHub', checkout: { found: '/Users/me/Developer/lar-web' },
     itemSources: { found: [{ kind: 'issues' }] },
-    access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed' },
+    access: { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'allowed', 'edit-ticket': 'allowed', 'tag-ticket': 'allowed', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' },
     domainDocs: { found: { kind: 'private' } }, factoryFiles: { found: [] }, sharedConfig: { found: null }, projectSkills: { found: [] },
   });
 });
@@ -74,7 +74,7 @@ test('an Agent skills section in a file CLAUDE.md links to is found once, at the
 test("a login without push or triage access marks those operations Refused and leaves what it can't settle unverified", async () => {
   const detection = await detect({}, { github: async () => ({ push: false, triage: false, issues: true }) });
   assert.deepEqual(detection.access,
-    { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'unverified', 'tag-ticket': 'refused' });
+    { 'push-branch': 'refused', 'open-pr': 'unverified', 'publish-ticket': 'allowed', 'edit-ticket': 'unverified', 'tag-ticket': 'refused', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
 });
 
 test("a repository with issues turned off has its issues Refused, and one the login can't read Refuses every fact it reads", async () => {
@@ -87,7 +87,7 @@ test("a repository with issues turned off has its issues Refused, and one the lo
   const refused = { refused: "Can't read maddec01/lar-web with gh: HTTP 404: Not Found" };
   assert.deepEqual([blocked.itemSources, blocked.domainDocs, blocked.factoryFiles, blocked.sharedConfig, blocked.projectSkills],
     [refused, refused, refused, refused, refused]);
-  assert.deepEqual(Object.values(blocked.access), ['unverified', 'unverified', 'unverified', 'unverified', 'unverified']);
+  assert.deepEqual(Object.values(blocked.access), ['unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified', 'unverified']);
 });
 
 test("an Azure DevOps repository detects its teams' boards and push access, with ticket access unverified", async () => {
@@ -96,7 +96,7 @@ test("an Azure DevOps repository detects its teams' boards and push access, with
   assert.deepEqual([detection.provider, detection.checkout, detection.itemSources], ['Azure DevOps', { found: '/Users/me/shop' },
     { found: [{ kind: 'azure-board', team: 'Retail Team' }, { kind: 'azure-board', team: 'Platform' }] }]);
   assert.deepEqual(detection.access,
-    { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified' });
+    { 'push-branch': 'allowed', 'open-pr': 'allowed', 'publish-ticket': 'unverified', 'edit-ticket': 'unverified', 'tag-ticket': 'unverified', 'comment-ticket': 'unverified', 'type-ticket': 'unverified', 'relate-ticket': 'unverified' });
   const refused = await detect({}, { azurePush: async () => false, teams: async () => { throw new Error('TF400813: not authorized'); } }, { repo, projectId: 'shop' });
   assert.deepEqual([refused.access['push-branch'], refused.access['open-pr'], refused.itemSources],
     ['refused', 'refused', { refused: "Can't read contoso/Retail/shop's teams with az: TF400813: not authorized" }]);

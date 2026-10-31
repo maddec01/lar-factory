@@ -392,9 +392,9 @@ test('Add item refuses an unlisted repository, an unknown kind and a blank title
   }
 });
 
-test('.lar-factory.json as onboarding writes it has the answers, version 1 and the custom labels the Labels step picked', () => {
+test('.lar-factory.json as onboarding writes it has the answers, version 2 and the custom labels the Labels step picked', () => {
   assert.equal(onboardingConfigFile({ itemSource: { kind: 'issues' }, role: 'Web client', labels: ['app: music', 'web'] }),
-    '{\n  "version": 1,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "labels": [\n    "app: music",\n    "web"\n  ]\n}\n');
+    '{\n  "version": 2,\n  "role": "Web client",\n  "itemSource": {\n    "kind": "issues"\n  },\n  "labels": [\n    "app: music",\n    "web"\n  ]\n}\n');
 });
 
 test('.lar-factory.json as Edit writes it keeps the version the file had', () => {

@@ -1,14 +1,15 @@
 // Edit's dialog over Settings › Repositories: each of the repository's settings with where its value comes from, an
 // editor and Save, which sets it on this Mac over the shared default, and Use shared default once it is set here. Below
-// them, what the credentials were found to allow with the consent given, and Recheck access. While a Repository config
+// them, what the credentials were found to allow, Offer for each operation they don't refuse, and Recheck access. While a Repository config
 // can't be used, the dialog says why and shows the last usable setup. Shared defaults change only through a PR.
 
 import type { ReactNode } from 'react';
-import { REPOSITORY_OPERATIONS, onAzure, sameRepo, shownRepo, type OperationAccess, type RepositoryOperation, type RepositorySetup,
+import { OFFERED_OPERATIONS, onAzure, sameRepo, shownRepo, type OperationAccess, type RepositoryOperation, type RepositorySetup,
   type SettingSource, type SharedRepositorySettings, type SharedSetting } from '@lar-factory/shared';
 import { Button } from '@lar-factory/ui/design-system/Button';
 import { Alert } from '@lar-factory/ui/design-system/Alert';
 import { Badge } from '@lar-factory/ui/design-system/Badge';
+import { Checkbox } from '@lar-factory/ui/design-system/Checkbox';
 import { Input } from '@lar-factory/ui/design-system/Input';
 import { Modal } from '@lar-factory/ui/design-system/Modal';
 import { Text } from '@lar-factory/ui/design-system/Typography';
@@ -21,9 +22,8 @@ const SOURCES: Record<SettingSource, string> = { local: 'Set on this Mac', share
 const SHOWN = { all: 'All items', 'opted-in': 'Items with a status' } as const;
 const ACCESS: Record<OperationAccess, string> = { allowed: 'Allowed', refused: 'Refused', unverified: 'Not checked yet' };
 
-const OPERATIONS = (azure: boolean): Record<RepositoryOperation, string> => ({
-  'push-branch': 'Push branches', 'open-pr': 'Open PRs', 'publish-ticket': azure ? 'Publish work items' : 'Publish issues',
-  'edit-ticket': azure ? 'Edit work items' : 'Edit issues', 'tag-ticket': azure ? 'Tag work items' : 'Label issues',
+const OPERATIONS = (azure: boolean): Partial<Record<RepositoryOperation, string>> => ({
+  'push-branch': 'Push branches', 'open-pr': 'Open PRs', 'edit-ticket': azure ? 'Edit work items' : 'Edit issues',
 });
 
 /** A setting's value as the dialog names it. */
@@ -98,20 +98,26 @@ function Settings({ repo, setup }: { repo: string; setup: RepositorySetup }) {
   );
 }
 
-/** What the credentials were found to allow for each operation, whether the user lets the factory offer it, and Recheck access. */
+/**
+ * What the credentials were found to allow for each operation a current feature uses, Offer, which lets the factory offer it unless the
+ * credentials refuse it, and Recheck access.
+ */
 function Access({ repo, setup }: { repo: string; setup: RepositorySetup }) {
-  const { running, recheck } = useEditStore();
+  const { running, recheck, offer } = useEditStore();
   const names = OPERATIONS(onAzure(repo));
   return (
     <div data-access className="grid gap-2">
       <span className="text-sm font-medium">Access</span>
       <p className="m-0 text-xs text-base-700">What your credentials allowed when the factory last tried, and what you let it offer. After you change credentials, recheck so each one is tried again when needed.</p>
       <ul className="m-0 grid list-none gap-1 p-0 text-sm">
-        {REPOSITORY_OPERATIONS.map((op) => <li key={op} data-operation={op} className="flex flex-wrap justify-between gap-2">
+        {OFFERED_OPERATIONS.map((op) => <li key={op} data-operation={op} className="flex flex-wrap justify-between gap-2">
           <span>{names[op]}</span>
-          <span className="text-xs text-base-700">{ACCESS[setup.access[op]]} · {setup.consent.includes(op) ? 'Offered' : 'Not offered'}</span>
+          <span className="flex items-center gap-3 text-xs text-base-700">{ACCESS[setup.access[op]]}
+            <Checkbox label="Offer" checked={setup.consent.includes(op)} disabled={running !== null || setup.access[op] === 'refused'}
+              onChange={() => void offer(repo, op, !setup.consent.includes(op), setup)} /></span>
         </li>)}
       </ul>
+      <p className="m-0 text-xs text-base-700">You'll choose whether the factory may {onAzure(repo) ? 'create and tag work items' : 'open and label issues'} the first time you publish refined work.</p>
       <span><Button {...kind('other')} disabled={running !== null} loading={running === 'recheck'} onClick={() => void recheck(repo)}>Recheck access</Button></span>
     </div>
   );

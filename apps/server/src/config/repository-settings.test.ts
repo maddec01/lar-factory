@@ -291,6 +291,21 @@ test("Settings' changes set and remove an override, accept a changed setup and r
   assert.equal('setup' in rechecked && rechecked.setup.access['open-pr'], 'unverified');
 });
 
+test("Settings' consent change sets the operations offered within the access available, keeping consent a refusal hides", async (t) => {
+  const dir = await dataDir(t);
+  setConsent(REPO, ['open-pr', 'tag-ticket'], dir);
+  recordAccess(REPO, 'tag-ticket', 'refused', dir);
+  const changed = changeRepositorySettings({ repo: REPO, change: 'consent', value: ['push-branch'] }, dir);
+  assert.deepEqual('setup' in changed && changed.setup.consent, ['push-branch']);
+  assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'consent', value: ['tag-ticket'] }, dir),
+    { status: 400, error: `The credentials for ${REPO} refuse tag-ticket, so the board can't offer it.` });
+  assert.deepEqual(changeRepositorySettings({ repo: REPO, change: 'consent', value: ['fly'] }, dir),
+    { status: 400, error: 'Send the operations to offer.' });
+  // The consent given before access was refused comes back once a recheck finds the access again.
+  recheckAccess(REPO, dir);
+  assert.deepEqual(setupOf(dir).consent, ['push-branch', 'tag-ticket']);
+});
+
 test("Settings' changes refuse a setting Repository config can't share, a value that doesn't fit and a repository not onboarded", async (t) => {
   const progress = { step: 'setup', done: ['project'], answers: { projectId: 'lar-web' } };
   const dir = await dataDir(t, [REPO, { repo: 'maddec01/lar-web', onboarding: progress }]);

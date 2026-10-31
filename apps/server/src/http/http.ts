@@ -264,6 +264,10 @@ export function createBoardServer({ board, commands, capture, startAfter, retent
           || (revision !== undefined && !Number.isSafeInteger(revision))) return { status: 400, body: { error: 'Send the field and revision the work item\'s details gave.' } };
         const item = board.snapshot().items.find((i) => i.id === itemId);
         if (!item) return { status: 404, body: { error: 'That item is not on the board.' } };
+        // Saving writes the ticket, which waits on this Mac's consent to edit the repository's tickets.
+        if (!board.snapshot().repos.find((r) => sameRepo(r.repo, item.repo))?.setup?.consent.includes('edit-ticket')) {
+          return { status: 403, body: { error: `Editing tickets is off for ${item.repo}. Turn on its Offer under Access in Settings › Repositories › Edit.` } };
+        }
         const refused = await itemDetails.saveDescription(item, { body, ...bodyField !== undefined && { bodyField }, ...revision !== undefined && { revision: revision as number } });
         return refused ? { status: refused.status, body: { error: refused.error } } : { status: 200, body: { error: null } };
       },

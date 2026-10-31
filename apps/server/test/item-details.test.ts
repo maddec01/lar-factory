@@ -1,6 +1,9 @@
 import { test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { TestContext } from 'vite-plus/test';
 import { onboarded, startBoard, until } from './server-support.ts';
 import type { Board } from './server-support.ts';
 import { boardIssue } from '@lar-factory/shared/test/raw-items';
@@ -108,8 +111,18 @@ test('outside sample mode older comments are one graphql call for the page befor
 const save = (board: Board, body: object) => board.post(body, board.url, '/api/item-description');
 const issueNode = { __typename: 'Issue', body: 'Old.', author: null, assignees: { nodes: [] }, createdAt: null, subIssues: { nodes: [] }, comments: { pageInfo: { hasPreviousPage: false, startCursor: null }, nodes: [] } };
 
+/** A home whose repository list lets the factory edit maddec01/lar-factory's tickets, as its Edit dialog's Offer does. */
+function editingHome(t: TestContext): Record<string, string> {
+  const home = mkdtempSync(join(tmpdir(), 'lar-board-home-'));
+  t.onTestFinished(() => rmSync(home, { recursive: true, force: true }));
+  const dir = join(home, 'Library/Application Support/Lar Factory');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'repository-settings.json'), JSON.stringify({ repositories: [{ repo: 'maddec01/lar-factory', settings: { consent: ['edit-ticket'] } }] }));
+  return { HOME: home };
+}
+
 test('saving a GitHub issue\'s description edits its body with gh, and its details then read the new text', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: issueNode } });
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: issueNode } }, false, false, editingHome(t));
   await onboarded(board);
   await until(board, (d) => d.items.length === 1);
   const response = await save(board, { itemId: board.id(12), body: '- a\n- b' });
@@ -119,8 +132,17 @@ test('saving a GitHub issue\'s description edits its body with gh, and its detai
   assert.equal(((await read.json()) as { details: ItemDetails }).details.body, '- a\n- b');
 });
 
+test("a save waits on this Mac's consent to edit the repository's tickets, and writes nothing without it", async (t) => {
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: issueNode } });
+  await until(board, (d) => d.items.length === 1);
+  const response = await save(board, { itemId: board.id(12), body: 'New.' });
+  assert.deepEqual([response.status, await response.json()],
+    [403, { error: 'Editing tickets is off for maddec01/lar-factory. Turn on its Offer under Access in Settings › Repositories › Edit.' }]);
+  assert.ok(!(await board.calls()).some((args) => args[0] === 'issue' && args[1] === 'edit'));
+});
+
 test('a failed save answers gh\'s message', async (t) => {
-  const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: issueNode }, fail: 'body' });
+  const board = await startBoard(t, { items: [boardIssue(12, 'List')], details: { I_12: issueNode }, fail: 'body' }, false, false, editingHome(t));
   await until(board, (d) => d.items.length === 1);
   const response = await save(board, { itemId: board.id(12), body: 'New.' });
   assert.deepEqual([response.status, await response.json()], [403, { error: 'Could not save the description. gh issue edit failed: HTTP 403: Resource not accessible by integration' }]);

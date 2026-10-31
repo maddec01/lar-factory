@@ -194,19 +194,23 @@ export function readDismissedUpdates(dir = boardDataDir()): Map<string, number> 
 /**
  * Changes the body's onboarded `repo`'s local settings as Settings asks: `override` sets `key`'s override to `value`, or
  * removes it when the body has no value; `accept` accepts the setup as it is now; `recheck` forgets what the credentials
- * allowed. Answers the setup the change makes, or why it can't.
+ * allowed; `consent` sets the operations offered to `value`, as changeConsent does. Answers the setup the change makes, or why it can't.
  */
 export function changeRepositorySettings(input: Record<string, unknown>, dir = boardDataDir()): { setup: RepositorySetup } | Refused {
   const { repo, change, key, value } = input;
-  if (!isRepo(repo) || !['override', 'accept', 'recheck'].includes(change as string)) {
+  if (!isRepo(repo) || !['override', 'accept', 'recheck', 'consent'].includes(change as string)) {
     return { status: 400, error: 'Send the repository and the change to its settings.' };
   }
   if (change === 'override' && !SHARED_SETTINGS.includes(key as SharedSetting)) return { status: 400, error: 'Send a setting Repository config can share.' };
+  if (change === 'consent' && !(Array.isArray(value) && value.every((op) => REPOSITORY_OPERATIONS.includes(op as RepositoryOperation)))) {
+    return { status: 400, error: 'Send the operations to offer.' };
+  }
   const refused = notEditable(repo, dir);
   if (refused) return refused;
   try {
     if (change === 'accept') acceptSetup(repo, dir);
     else if (change === 'recheck') recheckAccess(repo, dir);
+    else if (change === 'consent') changeConsent(repo, value as RepositoryOperation[], dir);
     else setOverride(repo, key as SharedSetting, value as SharedRepositorySettings[SharedSetting], dir);
   } catch (err) {
     return { status: 400, error: (err as Error).message };
@@ -238,6 +242,20 @@ export function saveLocalSetup(repo: string, answers: LocalSetupAnswers, access:
 /** Sets the operations the user allows the factory to offer for the repository. */
 export function setConsent(repo: string, consent: readonly RepositoryOperation[], dir = boardDataDir()): void {
   updateSettings(repo, dir, (local) => ({ ...local, consent: [...consent] }));
+}
+
+/**
+ * Sets the operations Settings offers for the repository, each one the credentials don't refuse. The consent given for
+ * an operation the credentials refuse now stays, so it comes back once a recheck finds the access again.
+ */
+function changeConsent(repo: string, consent: readonly RepositoryOperation[], dir: string): void {
+  updateSettings(repo, dir, (local) => {
+    const refused = (op: RepositoryOperation) => local.access?.[op] === 'refused';
+    const blocked = consent.find(refused);
+    if (blocked) throw new Error(`The credentials for ${repo} refuse ${blocked}, so the board can't offer it.`);
+    const kept = (local.consent ?? []).filter(refused);
+    return { ...local, consent: REPOSITORY_OPERATIONS.filter((op) => consent.includes(op) || kept.includes(op)) };
+  });
 }
 
 /** Records what an attempted operation found the credentials allow. */

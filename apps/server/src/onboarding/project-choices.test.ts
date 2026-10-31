@@ -1,4 +1,5 @@
-import { test } from 'vite-plus/test';
+import { liveProjects } from '../t3/t3-db.ts';
+import { vi, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -81,7 +82,7 @@ test('a resetting repository is on the list, so the board offers no onboarding t
 });
 
 test("T3's projects that can't be read are an error that names the database", async () => {
-  await assert.rejects(projectChoices([], gh({}), { ...process.env, T3_STATE_DB: '/nowhere/state.sqlite' }), /Can't read T3 Code's projects at \/nowhere\/state\.sqlite/);
+  await assert.rejects(projectChoices([], gh({}), { ...process.env, T3_STATE_DB: '/nowhere/state.sqlite' }), /Can't read T3 Code's projects; reconnect T3 Code before onboarding/);
 });
 
 test('the board offers each T3 project whose GitHub or Azure DevOps repository has .lar-factory.json and is off the list', () => {
@@ -110,3 +111,8 @@ test('listed and unlisted repositories with unusable settings are offered fresh 
   assert.deepEqual(onboardingOffers(choices).map((offer) => offer.repo), ['maddec01/listed', 'maddec01/unlisted']);
   assert.equal(choices[2]!.onBoard, true);
 });
+
+vi.mock('../t3/repository-project-discovery.ts', () => ({ repositoryProjects: async (env: NodeJS.ProcessEnv) => {
+  try { return { availability: 'available', observation: { observedAt: '2026-10-31T00:00:00Z', projects: liveProjects(env.T3_STATE_DB!, env.HOME ?? '').map(p => ({ id: p.id, title: p.title, workspaceRoot: p.folder })) } }; }
+  catch { return { availability: 'unavailable' }; }
+} }));

@@ -1,4 +1,5 @@
-import { test } from 'vite-plus/test';
+import { liveProjects } from './t3-db.ts';
+import { vi, test } from 'vite-plus/test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -58,3 +59,8 @@ test('Start finds the checkout of a GitHub or an Azure DevOps repository', async
     'contoso/fabrikam/lar-web': 'No T3 project is a checkout of contoso/fabrikam/lar-web; add the checkout in T3 Code',
   });
 });
+
+vi.mock('./repository-project-discovery.ts', () => ({ repositoryProjects: async (env: NodeJS.ProcessEnv) => {
+  try { return { availability: 'available', observation: { observedAt: '2026-10-31T00:00:00Z', projects: liveProjects(env.T3_STATE_DB!, env.HOME ?? '').map(p => ({ id: p.id, title: p.title, workspaceRoot: p.folder })) } }; }
+  catch { return { availability: 'unavailable' }; }
+} }));

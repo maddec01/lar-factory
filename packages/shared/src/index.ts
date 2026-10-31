@@ -17,3 +17,4 @@ export * from './is-record.ts';
 export * from './custom-labels.ts';
 export * from './skill-check.ts';
 export * from './item-details.ts';
+export * from './publication.ts';

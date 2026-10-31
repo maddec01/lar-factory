@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { StatementSync } from 'node:sqlite';
 import { STATUSES, type Status } from '@lar-factory/shared';
 import { openDatabase, WorkRecordError, workRecordsPath, type Database } from './database.ts';
+import { publicationRecords, type PublicationRecords } from './publication-records.ts';
 import type { Retention } from './retention.ts';
 
 export { WorkRecordError, workRecordsPath, type WorkRecordErrorCode } from './database.ts';
@@ -215,7 +216,7 @@ export interface WorkRecordFilter {
   kind?: WorkKind;
 }
 
-export interface WorkRecords {
+export interface WorkRecords extends PublicationRecords {
   create(record: NewWorkRecord): WorkRecord;
   /** Throws `not-found` when no record has `workId`. */
   read(workId: string): WorkRecord;
@@ -628,6 +629,7 @@ function workRecords(database: Database): WorkRecords {
   });
 
   return {
+    ...publicationRecords(database, (workId) => fromRow(find(workId))),
     create: (record) => database.write(() => insert(record)),
     read: (workId) => database.read(() => fromRow(find(workId))),
     initialContext: (workId) => database.read(() => find(workId).initial_context),
@@ -916,15 +918,28 @@ function workRecords(database: Database): WorkRecords {
       return database.write(() => {
         const due = new Map(dueRows(retiredRows.all() as unknown as Row[], days, now).map((row) => [row.work_id, row]));
         const kept: Expired['kept'] = [];
+        const journals = db.prepare('SELECT plan_id, work_id, content, superseded_by FROM publication_plans').all();
+        const publicationSources = db.prepare('SELECT work_id FROM publication_sources WHERE plan_id = ?');
+        const unresolved = (planId: string, content: string): boolean => {
+          const operations = (JSON.parse(content) as { operations: { operationId: string }[] }).operations;
+          const attempts = new Map(db.prepare('SELECT operation_id, attempt FROM publication_outcomes WHERE plan_id = ?').all(planId)
+            .map((row) => [String(row.operation_id), (JSON.parse(String(row.attempt)) as { status: string }).status]));
+          return operations.some((operation) => attempts.get(operation.operationId) !== 'successful');
+        };
         // A due record that a kept record needs is kept too, which can keep its own parent or blockers in turn.
         for (let changed = true; changed;) {
           changed = false;
           for (const [workId] of due) {
             const child = (childRows.all(workId) as unknown as Row[]).find((row) => !due.has(row.work_id));
             const waiting = child ? undefined : (dependentRows.all(workId) as unknown as Row[]).find((row) => !due.has(row.work_id));
-            if (!child && !waiting) continue;
+            const journal = journals.find((plan) => {
+              const members = [String(plan.work_id), ...publicationSources.all(String(plan.plan_id)).map((source) => String(source.work_id))];
+              return members.includes(workId) && (members.some((id) => !due.has(id)) ||
+                (plan.superseded_by === null && unresolved(String(plan.plan_id), String(plan.content))));
+            });
+            if (!child && !waiting && !journal) continue;
             due.delete(workId);
-            kept.push({ workId, reason: child ? `It owns the ${child.kind} ${child.work_id}, which is kept.` : `The ${waiting!.kind} ${waiting!.work_id}, which is kept, waits on it.` });
+            kept.push({ workId, reason: journal ? `Its publication journal still needs recovery evidence or a kept source.` : child ? `It owns the ${child.kind} ${child.work_id}, which is kept.` : `The ${waiting!.kind} ${waiting!.work_id}, which is kept, waits on it.` });
             changed = true;
           }
         }
@@ -936,12 +951,14 @@ function workRecords(database: Database): WorkRecords {
           for (const blocker of blockerRows.all(workId) as unknown as Row[]) if (!due.has(blocker.work_id)) touched.add(blocker.work_id);
         }
         // Children go before their parents, so clear the parents among the deleted records first.
-        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests', 'observations']
+        const deleteOwned = ['review_findings', 'review_axes', 'review_rounds', 'bodies', 'threads', 'launch_intents', 'replaced_pull_requests', 'observations', 'brief_gates']
           .map((table) => db.prepare(`DELETE FROM ${table} WHERE work_id = ?`));
         const clearParent = db.prepare('UPDATE work_records SET parent_id = NULL WHERE work_id = ?');
         const deleteBlockers = db.prepare('DELETE FROM blockers WHERE work_id = ? OR blocker_id = ?');
         const deleteRecord = db.prepare('DELETE FROM work_records WHERE work_id = ?');
         for (const workId of deleted) clearParent.run(workId);
+        for (const workId of deleted) db.prepare('DELETE FROM publication_attachments WHERE work_id = ?').run(workId);
+        for (const workId of deleted) db.prepare('DELETE FROM publication_plans WHERE work_id = ?').run(workId);
         for (const workId of deleted) {
           for (const statement of deleteOwned) statement.run(workId);
           deleteBlockers.run(workId, workId);

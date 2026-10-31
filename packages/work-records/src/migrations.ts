@@ -129,4 +129,67 @@ export const MIGRATIONS: readonly Migration[] = [
       PRIMARY KEY (work_id, observed)
     ) STRICT;
   `),
+  (db) => db.exec(`
+    CREATE TABLE brief_gates (
+      gate_id TEXT PRIMARY KEY,
+      work_id TEXT NOT NULL REFERENCES work_records (work_id) ON DELETE CASCADE,
+      source_revision INTEGER NOT NULL,
+      brief_digest TEXT NOT NULL,
+      approved_by TEXT NOT NULL,
+      evidence TEXT NOT NULL,
+      recorded_at TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX brief_gates_by_work ON brief_gates (work_id);
+    CREATE TABLE publication_plans (
+      plan_id TEXT PRIMARY KEY,
+      work_id TEXT NOT NULL REFERENCES work_records (work_id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL,
+      digest TEXT NOT NULL,
+      content TEXT NOT NULL,
+      sources TEXT NOT NULL,
+      replaces TEXT UNIQUE REFERENCES publication_plans (plan_id),
+      superseded_by TEXT REFERENCES publication_plans (plan_id),
+      proposed_at TEXT NOT NULL,
+      approval TEXT
+    ) STRICT;
+    CREATE INDEX publication_plans_by_work ON publication_plans (work_id);
+    -- References protect source records and relationship endpoints until their journal can be safely removed.
+    CREATE TABLE publication_sources (
+      plan_id TEXT NOT NULL REFERENCES publication_plans (plan_id) ON DELETE CASCADE,
+      work_id TEXT NOT NULL REFERENCES work_records (work_id),
+      PRIMARY KEY (plan_id, work_id)
+    ) STRICT;
+    CREATE INDEX publication_sources_by_work ON publication_sources (work_id);
+    CREATE TABLE publication_outcomes (
+      plan_id TEXT NOT NULL REFERENCES publication_plans (plan_id) ON DELETE CASCADE,
+      operation_id TEXT NOT NULL,
+      attempt TEXT NOT NULL,
+      PRIMARY KEY (plan_id, operation_id)
+    ) STRICT;
+    -- Reconciliation and provider evidence are append-only, including uncertainty that was later resolved.
+    CREATE TABLE publication_evidence (
+      plan_id TEXT NOT NULL REFERENCES publication_plans (plan_id) ON DELETE CASCADE,
+      operation_id TEXT NOT NULL,
+      evidence TEXT NOT NULL,
+      recorded_at TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE published_text (
+      plan_id TEXT NOT NULL REFERENCES publication_plans (plan_id) ON DELETE CASCADE,
+      operation_id TEXT NOT NULL,
+      work_id TEXT NOT NULL REFERENCES work_records (work_id),
+      ticket TEXT NOT NULL,
+      url TEXT NOT NULL,
+      text TEXT NOT NULL,
+      location TEXT NOT NULL,
+      recorded_at TEXT NOT NULL,
+      PRIMARY KEY (plan_id, operation_id)
+    ) STRICT;
+    CREATE TABLE publication_attachments (
+      work_id TEXT PRIMARY KEY REFERENCES work_records (work_id) ON DELETE CASCADE,
+      ticket TEXT NOT NULL UNIQUE,
+      url TEXT NOT NULL,
+      plan_id TEXT NOT NULL REFERENCES publication_plans (plan_id),
+      recorded_at TEXT NOT NULL
+    ) STRICT;
+  `),
 ];
